@@ -18,6 +18,8 @@ function App() {
   const [stage, setStage] = useState<Stage>('welcome');
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
+  const [, setMoodBoardUrl] = useState<string | null>(null);
+  const [, setMoodBoardFile] = useState<File | null>(null);
 
   const goNext = useCallback(() => {
     const currentIndex = STAGE_ORDER.indexOf(stage);
@@ -51,7 +53,16 @@ function App() {
           />
         );
       case 'upload':
-        return <UploadStage onNext={goNext} onBack={goBack} />;
+        return (
+          <UploadStage
+            onNext={goNext}
+            onBack={goBack}
+            onImageUploaded={(url, file) => {
+              setMoodBoardUrl(url);
+              setMoodBoardFile(file);
+            }}
+          />
+        );
       case 'color':
         return <ColorStage onNext={goNext} onBack={goBack} />;
       case 'color-assignment':
