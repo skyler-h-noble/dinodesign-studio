@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { DynoDesignProvider } from '@dynodesign/components';
-import type { Stage } from './types';
+import type { Stage, ColorScheme } from './types';
 import { STAGE_ORDER } from './types';
 
 import TopNav from './components/TopNav';
@@ -18,8 +18,9 @@ function App() {
   const [stage, setStage] = useState<Stage>('welcome');
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
-  const [, setMoodBoardUrl] = useState<string | null>(null);
+  const [moodBoardUrl, setMoodBoardUrl] = useState<string | null>(null);
   const [, setMoodBoardFile] = useState<File | null>(null);
+  const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme | null>(null);
 
   const goNext = useCallback(() => {
     const currentIndex = STAGE_ORDER.indexOf(stage);
@@ -61,10 +62,22 @@ function App() {
               setMoodBoardUrl(url);
               setMoodBoardFile(file);
             }}
+            onGenerate={(_mode) => {
+              // TODO: auto mode will skip to review in a future sprint
+              goNext();
+            }}
           />
         );
       case 'color':
-        return <ColorStage onNext={goNext} onBack={goBack} />;
+        return (
+          <ColorStage
+            onNext={goNext}
+            onBack={goBack}
+            moodBoardUrl={moodBoardUrl}
+            selectedScheme={selectedColorScheme}
+            onSchemeSelected={setSelectedColorScheme}
+          />
+        );
       case 'color-assignment':
         return <ColorAssignmentStage onNext={goNext} onBack={goBack} />;
       case 'typography':

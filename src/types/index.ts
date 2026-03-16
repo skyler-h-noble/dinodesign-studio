@@ -42,8 +42,8 @@ export interface ColorScheme {
     secondary: number;
     tertiary: number;
   };
-  tonePalettes: Record<string, Array<{ tone: number; lightness: number; hex: string }>>;
-  darkModeTonePalettes: Record<string, Array<{ tone: number; lightness: number; hex: string }>>;
+  tonePalettes: Record<string, Array<{ tone: number; lightness: number; hex: string; colorNumber: number }>>;
+  darkModeTonePalettes: Record<string, Array<{ tone: number; lightness: number; hex: string; colorNumber: number }>>;
   userSelections?: UserSelections;
 }
 
