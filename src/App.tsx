@@ -3,6 +3,7 @@ import { DynoDesignProvider } from '@dynodesign/components';
 import type { Stage } from './types';
 import { STAGE_ORDER } from './types';
 
+import TopNav from './components/TopNav';
 import WelcomeStage from './components/stages/WelcomeStage';
 import DesignSystemNameStage from './components/stages/DesignSystemNameStage';
 import UploadStage from './components/stages/UploadStage';
@@ -14,11 +15,8 @@ import ReviewStage from './components/stages/ReviewStage';
 import ExportStage from './components/stages/ExportStage';
 
 function App() {
-  // Stage navigation
   const [stage, setStage] = useState<Stage>('welcome');
-
-  // Design system state (will be wired up in later sprints)
-  const [, setDesignSystemName] = useState('');
+  const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
 
   const goNext = useCallback(() => {
@@ -71,20 +69,20 @@ function App() {
     }
   };
 
+  const showNav = stage !== 'welcome';
+
   return (
     <DynoDesignProvider
       defaultTheme="Default"
       defaultStyle="Modern"
       defaultSurface="Surface"
     >
+      {showNav && <TopNav designSystemName={designSystemName} />}
       <main data-surface="Surface" style={{ minHeight: '100vh' }}>
         {renderStage()}
       </main>
     </DynoDesignProvider>
   );
 }
-
-// Suppress unused for now — will be consumed in later sprints
-void App;
 
 export default App;
