@@ -166,7 +166,7 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
           </Card>
 
           <Button
-            color="primary"
+            color="default"
             fullWidth
             onClick={() => onGenerate(mode)}
           >
@@ -176,7 +176,7 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
       )}
 
       <HStack spacing={2}>
-        <Button variant="outline" color="neutral" onClick={onBack}>Back</Button>
+        <Button variant="outline" color="default" onClick={onBack}>Back</Button>
       </HStack>
     </VStack>
   );

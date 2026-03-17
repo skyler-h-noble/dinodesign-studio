@@ -1,0 +1,131 @@
+.assign-colors-page {
+  padding: 40px 24px;
+  width: 100%;
+}
+
+.assign-colors-tabs {
+  display: none;
+  margin-bottom: 24px;
+}
+
+.assign-colors-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 32px;
+  width: 100%;
+  align-items: start;
+}
+
+.assign-colors-preview {
+  position: sticky;
+  top: 40px;
+}
+
+.assign-preview-container {
+  height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assign-preview-scaler {
+  transform: scale(0.7);
+  transform-origin: center;
+}
+
+.assign-colors-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.assign-card-text-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.assign-buttons-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assign-theme-order-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.assign-bg-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Tablet: stack to single column with tab toggle */
+@media (max-width: 960px) {
+  .assign-colors-tabs {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--Border);
+    border-radius: var(--Style-Border-Radius);
+    overflow: hidden;
+  }
+
+  .assign-colors-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .assign-colors-preview {
+    position: static;
+    display: flex;
+    justify-content: center;
+  }
+
+  .assign-preview-container {
+    height: auto;
+    padding: 24px 0;
+  }
+
+  .assign-preview-scaler {
+    transform: scale(0.55);
+    transform-origin: top center;
+  }
+
+  .assign-colors-preview.hidden,
+  .assign-colors-controls.hidden {
+    display: none;
+  }
+}
+
+/* Mobile: stack everything vertically */
+@media (max-width: 600px) {
+  .assign-colors-page {
+    padding: 24px 16px;
+  }
+
+  .assign-card-text-row {
+    flex-direction: column;
+  }
+
+  .assign-theme-order-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .assign-preview-scaler {
+    transform: scale(0.45);
+    transform-origin: top center;
+  }
+
+  .assign-bg-buttons {
+    flex-direction: column;
+  }
+
+  .assign-bg-buttons > * {
+    width: 100%;
+  }
+}

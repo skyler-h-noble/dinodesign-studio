@@ -9,22 +9,22 @@ import type { ColorScheme } from '../types';
 /**
  * Generate tone palettes for an array of 3 colors (primary, secondary, tertiary).
  */
-function generateTonePalettes(colors: string[]) {
+function generateTonePalettes(colors: string[], maxChroma: number = 64) {
   return {
-    primary: generateSemanticLightModeScale(colors[0]),
-    secondary: generateSemanticLightModeScale(colors[1]),
-    tertiary: generateSemanticLightModeScale(colors[2]),
+    primary: generateSemanticLightModeScale(colors[0], maxChroma),
+    secondary: generateSemanticLightModeScale(colors[1], maxChroma),
+    tertiary: generateSemanticLightModeScale(colors[2], maxChroma),
   };
 }
 
 /**
- * Generate dark mode tone palettes (chroma capped at 50).
+ * Generate dark mode tone palettes.
  */
-function generateDarkModeTonePalettes(colors: string[]) {
+function generateDarkModeTonePalettes(colors: string[], maxChroma: number = 50) {
   return {
-    primary: generateSemanticDarkModeScale(colors[0]),
-    secondary: generateSemanticDarkModeScale(colors[1]),
-    tertiary: generateSemanticDarkModeScale(colors[2]),
+    primary: generateSemanticDarkModeScale(colors[0], maxChroma),
+    secondary: generateSemanticDarkModeScale(colors[1], maxChroma),
+    tertiary: generateSemanticDarkModeScale(colors[2], maxChroma),
   };
 }
 
@@ -42,86 +42,112 @@ function calculateTones(colors: string[]) {
 /**
  * Build a full ColorScheme object from a name and 3 colors.
  */
-function buildScheme(name: string, colors: [string, string, string]): ColorScheme {
+function buildScheme(
+  name: string,
+  colors: [string, string, string],
+  lightMaxChroma: number = 62,
+  darkMaxChroma: number = 36,
+): ColorScheme {
   return {
     name,
     colors,
     originalColors: [...colors],
     extractedTones: calculateTones(colors),
-    tonePalettes: generateTonePalettes(colors),
-    darkModeTonePalettes: generateDarkModeTonePalettes(colors),
+    tonePalettes: generateTonePalettes(colors, lightMaxChroma),
+    darkModeTonePalettes: generateDarkModeTonePalettes(colors, darkMaxChroma),
   };
 }
 
 /**
- * Adjust lightness of a color by a relative amount.
+ * Find the color from the pool that is most complementary (furthest hue) from the given color.
  */
-function adjustLightness(hex: string, targetLightness: number): string {
-  const [, c, h] = chroma(hex).lch();
-  try {
-    return chroma.lch(targetLightness, c, h).hex();
-  } catch {
-    return chroma.lch(targetLightness, 0, h).hex();
+function findComplementary(base: string, pool: string[]): string {
+  const [, , baseH] = chroma(base).lch();
+  let best = pool[0];
+  let bestDist = 0;
+  for (const c of pool) {
+    const [, , h] = chroma(c).lch();
+    const dist = Math.min(Math.abs(h - baseH), 360 - Math.abs(h - baseH));
+    if (dist > bestDist) {
+      bestDist = dist;
+      best = c;
+    }
   }
+  return best;
 }
 
 /**
- * Rotate hue of a color by degrees.
+ * Find the color from the pool closest in hue to the given color.
  */
-function rotateHue(hex: string, degrees: number): string {
-  const [l, c, h] = chroma(hex).lch();
-  try {
-    return chroma.lch(l, c, (h + degrees) % 360).hex();
-  } catch {
-    return chroma.lch(l, 0, (h + degrees) % 360).hex();
+function findAnalogous(base: string, pool: string[]): string {
+  const [, , baseH] = chroma(base).lch();
+  let best = pool[0];
+  let bestDist = Infinity;
+  for (const c of pool) {
+    const [, , h] = chroma(c).lch();
+    const dist = Math.min(Math.abs(h - baseH), 360 - Math.abs(h - baseH));
+    if (dist > 0 && dist < bestDist) {
+      bestDist = dist;
+      best = c;
+    }
   }
+  return best;
 }
 
 /**
- * Generate 6 color scheme variations from extracted colors.
+ * Generate 6 color scheme variations from the 6 top selected colors.
+ * All schemes only use colors from the provided topColors array.
+ * The first color in topColors is treated as primary.
  */
-export function generateColorSchemes(extractedColors: string[]): ColorScheme[] {
-  const [c1, c2, c3] = extractedColors;
+export function generateColorSchemes(
+  topColors: string[],
+  lightMaxChroma: number = 62,
+  darkMaxChroma: number = 36,
+): ColorScheme[] {
+  const [c1, c2, c3] = topColors;
+  const others = topColors.slice(1);
 
-  const l1 = getLightness(c1);
+  // 1. Custom - primary + next two most prominent
+  const custom: [string, string, string] = [c1, c2 || c1, c3 || c1];
+
+  // 2. Monochromatic - primary + two others closest in hue
+  const mono2 = findAnalogous(c1, others);
+  const monoRest = others.filter(c => c !== mono2);
+  const mono3 = findAnalogous(c1, monoRest.length ? monoRest : others);
+  const monochromatic: [string, string, string] = [c1, mono2, mono3];
+
+  // 3. Analogous - primary + two nearest hue neighbors
+  const ana2 = findAnalogous(c1, others);
+  const anaRest = others.filter(c => c !== ana2);
+  const ana3 = findAnalogous(c1, anaRest.length ? anaRest : others);
+  const analogous: [string, string, string] = [c1, ana2, ana3];
+
+  // 4. Complementary - primary + most opposite hue + a bridge color
+  const comp2 = findComplementary(c1, others);
+  const compRest = others.filter(c => c !== comp2);
+  const comp3 = compRest[0] || c3 || c2;
+  const complementary: [string, string, string] = [c1, comp2, comp3];
+
+  // 5. Triadic - primary + two colors spread widest in hue
+  const tri2 = findComplementary(c1, others);
+  const triRest = others.filter(c => c !== tri2);
+  const tri3 = findComplementary(tri2, triRest.length ? triRest : others);
+  const triadic: [string, string, string] = [c1, tri2, tri3];
+
+  // 6. Split-Complementary - primary + two colors flanking the complement
+  const splitComp = findComplementary(c1, others);
+  const splitRest = others.filter(c => c !== splitComp);
+  const split2 = findAnalogous(splitComp, splitRest.length ? splitRest : others);
+  const splitRest2 = splitRest.filter(c => c !== split2);
+  const split3 = splitRest2[0] || splitComp;
+  const splitComplementary: [string, string, string] = [c1, split2, split3];
 
   return [
-    // 1. Custom - uses the top 3 extracted colors as-is
-    buildScheme('Custom', [c1, c2, c3]),
-
-    // 2. Monochromatic - same hue, different lightness
-    buildScheme('Monochromatic', [
-      c1,
-      adjustLightness(c1, Math.min(l1 + 20, 90)),
-      adjustLightness(c1, Math.max(l1 - 20, 20)),
-    ]),
-
-    // 3. Analogous - adjacent hues (±30°)
-    buildScheme('Analogous', [
-      c1,
-      rotateHue(c1, 30),
-      rotateHue(c1, -30),
-    ]),
-
-    // 4. Complementary - opposite hue (180°)
-    buildScheme('Complementary', [
-      c1,
-      rotateHue(c1, 180),
-      c2 || rotateHue(c1, 90),
-    ]),
-
-    // 5. Triadic - three equally spaced hues (120° apart)
-    buildScheme('Triadic', [
-      c1,
-      rotateHue(c1, 120),
-      rotateHue(c1, 240),
-    ]),
-
-    // 6. Split-Complementary - opposite hue split (±150°)
-    buildScheme('Split-Complementary', [
-      c1,
-      rotateHue(c1, 150),
-      rotateHue(c1, 210),
-    ]),
+    buildScheme('Analogous', analogous, lightMaxChroma, darkMaxChroma),
+    buildScheme('Monochromatic', monochromatic, lightMaxChroma, darkMaxChroma),
+    buildScheme('Complementary', complementary, lightMaxChroma, darkMaxChroma),
+    buildScheme('Triadic', triadic, lightMaxChroma, darkMaxChroma),
+    buildScheme('Split-Complementary', splitComplementary, lightMaxChroma, darkMaxChroma),
+    buildScheme('Custom', custom, lightMaxChroma, darkMaxChroma),
   ];
 }

@@ -7,8 +7,8 @@ export default function TypographyStage({ onNext, onBack }: StageProps) {
       <H2>Typography Selection</H2>
       <Body>Choose fonts for your design system.</Body>
       <HStack spacing={2}>
-        <Button variant="outline" color="neutral" onClick={onBack}>Back</Button>
-        <Button color="primary" onClick={onNext}>Next</Button>
+        <Button variant="outline" color="default" onClick={onBack}>Back</Button>
+        <Button color="default" onClick={onNext}>Next</Button>
       </HStack>
     </VStack>
   );

@@ -1,15 +1,13 @@
 import { H1, Body, BodySmall, VStack, Card, HStack } from '@dynodesign/components';
 import AddIcon from '@mui/icons-material/Add';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
-import AccessibilityNewIcon from '@mui/icons-material/AccessibilityNew';
 import type { StageProps } from '../../types';
 
 interface Props extends StageProps {
   onLoadSystem?: () => void;
-  onAccessibilityCheck?: () => void;
 }
 
-export default function WelcomeStage({ onNext, onLoadSystem, onAccessibilityCheck }: Props) {
+export default function WelcomeStage({ onNext, onLoadSystem }: Props) {
   return (
     <VStack spacing={6} alignItems="center" style={{ padding: '80px 24px' }}>
       <VStack spacing={2} alignItems="center">
@@ -50,21 +48,6 @@ export default function WelcomeStage({ onNext, onLoadSystem, onAccessibilityChec
           </HStack>
         </Card>
 
-        <Card
-          onClick={onAccessibilityCheck}
-          padding="medium"
-          elevation={1}
-        >
-          <HStack spacing={2} alignItems="center">
-            <AccessibilityNewIcon style={{ color: 'var(--Icons-Info)' }} />
-            <VStack spacing={0}>
-              <Body style={{ fontWeight: 600 }}>Accessibility Check</Body>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Verify contrast ratios and WCAG compliance
-              </BodySmall>
-            </VStack>
-          </HStack>
-        </Card>
       </VStack>
     </VStack>
   );

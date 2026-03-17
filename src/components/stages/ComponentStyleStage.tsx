@@ -7,8 +7,8 @@ export default function ComponentStyleStage({ onNext, onBack }: StageProps) {
       <H2>Component Style</H2>
       <Body>Select the shape language for your components.</Body>
       <HStack spacing={2}>
-        <Button variant="outline" color="neutral" onClick={onBack}>Back</Button>
-        <Button color="primary" onClick={onNext}>Next</Button>
+        <Button variant="outline" color="default" onClick={onBack}>Back</Button>
+        <Button color="default" onClick={onNext}>Next</Button>
       </HStack>
     </VStack>
   );

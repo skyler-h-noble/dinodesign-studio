@@ -2,6 +2,11 @@ import { useState, useCallback } from 'react';
 import { DynoDesignProvider } from '@dynodesign/components';
 import type { Stage, ColorScheme, UserSelections } from './types';
 import { STAGE_ORDER } from './types';
+import {
+  generateSemanticLightModeScale,
+  generateSemanticDarkModeScale,
+  getLightness,
+} from './utils/colorScale';
 
 import TopNav from './components/TopNav';
 import WelcomeStage from './components/stages/WelcomeStage';
@@ -98,6 +103,30 @@ function App() {
             colorScheme={selectedColorScheme}
             userSelections={userSelections}
             onSelectionsChanged={setUserSelections}
+            moodBoardUrl={moodBoardUrl}
+            designSystemName={designSystemName}
+            onColorsReordered={(newColors) => {
+              if (!selectedColorScheme) return;
+              setSelectedColorScheme({
+                ...selectedColorScheme,
+                colors: newColors,
+                extractedTones: {
+                  primary: getLightness(newColors[0]),
+                  secondary: getLightness(newColors[1]),
+                  tertiary: getLightness(newColors[2]),
+                },
+                tonePalettes: {
+                  primary: generateSemanticLightModeScale(newColors[0]),
+                  secondary: generateSemanticLightModeScale(newColors[1]),
+                  tertiary: generateSemanticLightModeScale(newColors[2]),
+                },
+                darkModeTonePalettes: {
+                  primary: generateSemanticDarkModeScale(newColors[0]),
+                  secondary: generateSemanticDarkModeScale(newColors[1]),
+                  tertiary: generateSemanticDarkModeScale(newColors[2]),
+                },
+              });
+            }}
           />
         );
       case 'typography':

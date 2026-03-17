@@ -1,9 +1,14 @@
 import chroma from 'chroma-js';
 
+export interface ExtractedColor {
+  hex: string;
+  isSwatch: boolean; // High uniformity region = likely an intentional swatch
+}
+
 export interface ExtractedColorData {
-  topColors: string[];        // Top 6 most prominent
-  additionalColors: string[]; // Remaining extracted colors
-  totalSwatches: number;      // How many distinct colors detected
+  topColors: ExtractedColor[];     // Top 6 most prominent
+  additionalColors: ExtractedColor[]; // Remaining extracted colors
+  totalSwatches: number;           // How many swatch-like regions detected
 }
 
 /**
@@ -59,13 +64,18 @@ export async function extractColorsFromImage(imageUrl: string): Promise<Extracte
         const sorted = [...colorMap.entries()]
           .sort((a, b) => b[1] - a[1]);
 
+        // Total pixels sampled for swatch detection threshold
+        const totalSampled = sorted.reduce((sum, [, count]) => sum + count, 0);
+        const swatchThreshold = totalSampled * 0.005; // 0.5% of pixels = likely a swatch
+
         // Extract all distinct colors with minimum distance
-        const allColors: string[] = [];
+        const allColors: ExtractedColor[] = [];
         const minDistanceTop = 20;
         const minDistanceAdditional = 12;
         const maxTotal = 60;
+        let swatchCount = 0;
 
-        for (const [key] of sorted) {
+        for (const [key, count] of sorted) {
           if (allColors.length >= maxTotal) break;
 
           const [r, g, b] = key.split(',').map(Number);
@@ -82,25 +92,28 @@ export async function extractColorsFromImage(imageUrl: string): Promise<Extracte
           if (allColors.length < 6 && c < 8) continue;
 
           const tooClose = allColors.some(
-            existing => chroma.distance(hex, existing, 'lab') < minDist
+            existing => chroma.distance(hex, existing.hex, 'lab') < minDist
           );
           if (tooClose) continue;
 
-          allColors.push(hex);
+          const isSwatch = count >= swatchThreshold;
+          if (isSwatch) swatchCount++;
+
+          allColors.push({ hex, isSwatch });
         }
 
         // Ensure we have at least 6
         while (allColors.length < 6) {
           if (allColors.length === 0) {
-            allColors.push('#3B82F6');
+            allColors.push({ hex: '#3B82F6', isSwatch: false });
           } else {
-            const base = allColors[0];
+            const base = allColors[0].hex;
             const [l, c, h] = chroma(base).lch();
             const offset = allColors.length * 60;
             try {
-              allColors.push(chroma.lch(l, c, (h + offset) % 360).hex());
+              allColors.push({ hex: chroma.lch(l, c, (h + offset) % 360).hex(), isSwatch: false });
             } catch {
-              allColors.push(chroma.lch(60, 40, (h + offset) % 360).hex());
+              allColors.push({ hex: chroma.lch(60, 40, (h + offset) % 360).hex(), isSwatch: false });
             }
           }
         }
@@ -108,7 +121,7 @@ export async function extractColorsFromImage(imageUrl: string): Promise<Extracte
         resolve({
           topColors: allColors.slice(0, 6),
           additionalColors: allColors.slice(6),
-          totalSwatches: allColors.length,
+          totalSwatches: swatchCount,
         });
       } catch (err) {
         reject(err);
