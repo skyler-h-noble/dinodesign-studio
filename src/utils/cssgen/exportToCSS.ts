@@ -2605,38 +2605,38 @@ function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJson
   if (modeName === 'Light-Mode') {
     lines.push('');
     lines.push('  /* Text Surfaces Black/White */');
-    lines.push('  --Text-Surfaces-BW-Color-1: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-2: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-3: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-4: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-5: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-6: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-7: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-8: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-9: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-10: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-11: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-12: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-13: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-14: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-Vibrant: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-1: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-2: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-3: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-4: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-5: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-6: var(--White);');
+    lines.push('  --Text-Surfaces-BW-Color-7: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-8: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-9: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-10: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-11: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-12: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-13: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-14: var(--Neutral-Color-1);');
+    lines.push('  --Text-Surfaces-BW-Color-Vibrant: var(--Neutral-Color-1);');
     lines.push('');
     lines.push('  /* Text Containers Black/White */');
-    lines.push('  --Text-Containers-BW-Color-1: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-2: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-3: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-4: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-5: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-1: var(--White);');
+    lines.push('  --Text-Containers-BW-Color-2: var(--White);');
+    lines.push('  --Text-Containers-BW-Color-3: var(--White);');
+    lines.push('  --Text-Containers-BW-Color-4: var(--White);');
+    lines.push('  --Text-Containers-BW-Color-5: var(--White);');
     lines.push('  --Text-Containers-BW-Color-6: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-7: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-8: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-9: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-10: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-11: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-12: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-13: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-14: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-Vibrant: var(--White);');
+    lines.push('  --Text-Containers-BW-Color-7: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-8: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-9: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-10: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-11: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-12: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-13: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-14: var(--Neutral-Color-1);');
+    lines.push('  --Text-Containers-BW-Color-Vibrant: var(--Neutral-Color-1);');
     lines.push('');
     lines.push('  /* Header Surfaces Black/White */');
     lines.push('  --Header-Surfaces-BW-Color-1: var(--White);');
@@ -4058,7 +4058,26 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('  --Buttons-Error-Light-Text: var(--Text-Surfaces-Error-Color-12);');
   lines.push(`  --Buttons-Error-Light-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
   lines.push('  --Buttons-Error-Light-Hover: var(--Hover-Error-Color-12);');
-  lines.push('  --Buttons-Error-Light-Active: var(--Active-Error-12);');
+  lines.push('  --Buttons-Error-Light-Active: var(--Active-Error-Color-12);');
+  // BlackWhite buttons
+  lines.push('  --Buttons-BlackWhite-Light-Button: var(--White);');
+  lines.push('  --Buttons-BlackWhite-Light-Text: var(--Text-Surfaces-BW-Button-Color-1);');
+  lines.push('  --Buttons-BlackWhite-Light-Hover: var(--Hover-Neutral-Color-13);');
+  lines.push('  --Buttons-BlackWhite-Light-Active: var(--Active-Neutral-Color-14);');
+  lines.push('  --Buttons-BlackWhite-Medium-Button: var(--Neutral-Color-1);');
+  lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-14);');
+  lines.push('  --Buttons-BlackWhite-Medium-Hover: var(--Hover-Neutral-Color-1);');
+  lines.push('  --Buttons-BlackWhite-Medium-Active: var(--Active-Neutral-Color-1);');
+  // Default button — points to the user's selected button mode via Default-Button indirection
+  lines.push('  --Buttons-Default-Button: var(--Default-Button-Default-Medium-Button);');
+  lines.push('  --Buttons-Default-Text: var(--Default-Button-Default-Medium-Text);');
+  lines.push('  --Buttons-Default-Border: var(--Default-Button-Border-Surfaces-Default-Color-' + primaryTone + ');');
+  lines.push('  --Buttons-Default-Hover: var(--Default-Button-Default-Medium-Hover);');
+  lines.push('  --Buttons-Default-Active: var(--Default-Button-Default-Medium-Active);');
+  lines.push('  --Buttons-Default-Light-Button: var(--Default-Button-Default-Light-Button);');
+  lines.push('  --Buttons-Default-Light-Text: var(--Default-Button-Default-Light-Text);');
+  lines.push('  --Buttons-Default-Light-Hover: var(--Default-Button-Default-Light-Hover);');
+  lines.push('  --Buttons-Default-Light-Active: var(--Default-Button-Default-Light-Active);');
   lines.push(`  --Icons-Default: var(--Icon-Surfaces-Neutral-Color-${primaryTone});`);
   lines.push(`  --Icons-Default-Variant: var(--Icon-Variant-Surfaces-Neutral-Color-${primaryTone});`);
   lines.push(`  --Icons-Primary: var(--Icon-Surfaces-Primary-Color-${primaryTone});`);
@@ -4080,8 +4099,8 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('}');
   lines.push('');
   
-  // Start with Default theme data attribute selector
-  lines.push('[data-theme][data-theme=\"Default\"] {');
+  // Start with :root selector for Default theme variables
+  lines.push(':root {');
   
   // System Metadata variables (at the very top of :root)
   if (jsonData && jsonData.Basics) {
@@ -4660,7 +4679,7 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
   
   // All theme variants to generate
   const themeVariants = [
-    { name: 'Default', selector: '[data-theme][data-theme="Default"]' },
+    { name: 'Default', selector: ':root' },
     { name: 'Primary', selector: '[data-theme="Primary"]' },
     { name: 'Primary-Light', selector: '[data-theme="Primary-Light"]' },
     { name: 'Primary-Medium', selector: '[data-theme="Primary-Medium"]' },

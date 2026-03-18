@@ -519,114 +519,148 @@ function generateTagSection(mode: 'Light-Mode' | 'Dark-Mode', OB: number): any {
 
 /**
  * Generate Default-Button-Borders section
- * Light Mode: Uses color-specific borders (Color-8, Color-7, etc.)
- * Dark Mode: Uses White for Color 1-6, Neutral Color-1 for Color 7-14 and Vibrant
+ * Uses the button mode mapping to determine which palette's border to use for each theme.
+ * If button mode is "laddered" and Secondary theme uses Tertiary buttons,
+ * then Secondary's border should use Tertiary palette borders.
+ * Black-White mode uses Neutral borders for all themes.
  */
-function generateDefaultButtonBorders(mode: 'Light-Mode' | 'Dark-Mode'): any {
+function generateDefaultButtonBorders(
+  mode: 'Light-Mode' | 'Dark-Mode',
+  buttonMode: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white' = 'primary'
+): any {
   const borders: any = {
     Surfaces: {},
     Containers: {}
   };
-  
-  // Define the theme types
-  // IMPORTANT: "Default" is NOT a valid palette - it should use Neutral instead
-  // Based on the Default Settings Logic, Default always maps to either Primary or Neutral
-  // For button borders, we use Neutral as the safe fallback for Default
+
+  // Get the button-to-palette mapping for each theme based on button mode
+  // This is the same mapping used by generateDefaultButton
+  const buttonMappings = getButtonModeBorderMappings(buttonMode, mode);
+
   const themeTypes = [
-    { name: 'Default', variable: 'Neutral' },  // FIXED: Use Neutral instead of {Default}
-    { name: 'Primary', variable: 'Primary' },  // FIXED: Remove curly braces
-    { name: 'Secondary', variable: 'Secondary' },  // FIXED: Remove curly braces
-    { name: 'Tertiary', variable: 'Tertiary' },  // FIXED: Remove curly braces
-    { name: 'Neutral', variable: 'Neutral' },  // FIXED: Remove curly braces
-    { name: 'Info', variable: 'Info' },
-    { name: 'Success', variable: 'Success' },  // FIXED: Add curly braces for consistency
-    { name: 'Warning', variable: 'Warning' },  // FIXED: Add curly braces for consistency
-    { name: 'Error', variable: 'Error' }  // FIXED: Add curly braces for consistency
+    'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
+    'Info', 'Success', 'Warning', 'Error'
   ];
   
-  // Generate for each theme type
-  themeTypes.forEach(({ name, variable }) => {
+  // Generate for each theme type, using the button palette mapping
+  themeTypes.forEach(themeName => {
+    // Get which palette this theme's default button uses
+    const buttonPalette = (buttonMappings as any)[themeName] || 'Neutral';
+
+    // For BlackWhite, borders use Neutral
+    const variable = buttonPalette === 'BlackWhite' ? 'Neutral' : buttonPalette;
+
     const surfaceBorders: any = {};
     const containerBorders: any = {};
-    
-    if (mode === 'Light-Mode') {
-      // Light Mode logic
-      surfaceBorders['Color-1'] = { value: `{Colors.${variable}.Color-8}`, type: 'color' };
-      surfaceBorders['Color-2'] = { value: `{Colors.${variable}.Color-8}`, type: 'color' };
-      surfaceBorders['Color-3'] = { value: `{Colors.${variable}.Color-9}`, type: 'color' };
-      surfaceBorders['Color-4'] = { value: `{Colors.${variable}.Color-11}`, type: 'color' };
-      surfaceBorders['Color-5'] = { value: `{Colors.${variable}.Color-12}`, type: 'color' };
-      surfaceBorders['Color-6'] = { value: `{Colors.${variable}.Color-13}`, type: 'color' };
-      surfaceBorders['Color-7'] = { value: `{Colors.${variable}.Color-3}`, type: 'color' };
-      surfaceBorders['Color-8'] = { value: `{Colors.${variable}.Color-4}`, type: 'color' };
-      surfaceBorders['Color-9'] = { value: `{Colors.${variable}.Color-5}`, type: 'color' };
-      surfaceBorders['Color-10'] = { value: `{Colors.${variable}.Color-5}`, type: 'color' };
-      surfaceBorders['Color-11'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      surfaceBorders['Color-12'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      surfaceBorders['Color-13'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      surfaceBorders['Color-14'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      surfaceBorders['Color-Vibrant'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      
-      // Containers use the same logic as Surfaces in Light Mode
-      containerBorders['Color-1'] = { value: `{Colors.${variable}.Color-8}`, type: 'color' };
-      containerBorders['Color-2'] = { value: `{Colors.${variable}.Color-8}`, type: 'color' };
-      containerBorders['Color-3'] = { value: `{Colors.${variable}.Color-9}`, type: 'color' };
-      containerBorders['Color-4'] = { value: `{Colors.${variable}.Color-11}`, type: 'color' };
-      containerBorders['Color-5'] = { value: `{Colors.${variable}.Color-12}`, type: 'color' };
-      containerBorders['Color-6'] = { value: `{Colors.${variable}.Color-13}`, type: 'color' };
-      containerBorders['Color-7'] = { value: `{Colors.${variable}.Color-3}`, type: 'color' };
-      containerBorders['Color-8'] = { value: `{Colors.${variable}.Color-4}`, type: 'color' };
-      containerBorders['Color-9'] = { value: `{Colors.${variable}.Color-5}`, type: 'color' };
-      containerBorders['Color-10'] = { value: `{Colors.${variable}.Color-5}`, type: 'color' };
-      containerBorders['Color-11'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      containerBorders['Color-12'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      containerBorders['Color-13'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      containerBorders['Color-14'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-      containerBorders['Color-Vibrant'] = { value: `{Colors.${variable}.Color-7}`, type: 'color' };
-    } else {
-      // Dark Mode logic
-      // For Default theme in Dark Mode, use Neutral references
-      const neutralRef = name === 'Default' ? '{Neutral}' : 'Neutral';
-      
-      surfaceBorders['Color-1'] = { value: '{Color-Scale.White}', type: 'color' };
-      surfaceBorders['Color-2'] = { value: '{Color-Scale.White}', type: 'color' };
-      surfaceBorders['Color-3'] = { value: '{Color-Scale.White}', type: 'color' };
-      surfaceBorders['Color-4'] = { value: '{Color-Scale.White}', type: 'color' };
-      surfaceBorders['Color-5'] = { value: '{Color-Scale.White}', type: 'color' };
-      surfaceBorders['Color-6'] = { value: '{Color-Scale.White}', type: 'color' };
-      surfaceBorders['Color-7'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-8'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-9'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-10'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-11'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-12'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-13'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-14'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      surfaceBorders['Color-Vibrant'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      
-      // Containers use the same logic as Surfaces in Dark Mode
-      containerBorders['Color-1'] = { value: '{Color-Scale.White}', type: 'color' };
-      containerBorders['Color-2'] = { value: '{Color-Scale.White}', type: 'color' };
-      containerBorders['Color-3'] = { value: '{Color-Scale.White}', type: 'color' };
-      containerBorders['Color-4'] = { value: '{Color-Scale.White}', type: 'color' };
-      containerBorders['Color-5'] = { value: '{Color-Scale.White}', type: 'color' };
-      containerBorders['Color-6'] = { value: '{Color-Scale.White}', type: 'color' };
-      containerBorders['Color-7'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-8'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-9'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-10'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-11'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-12'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-13'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-14'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-      containerBorders['Color-Vibrant'] = { value: `{Colors.${neutralRef}.Color-1}`, type: 'color' };
-    }
-    
-    borders.Surfaces[name] = surfaceBorders;
-    borders.Containers[name] = containerBorders;
+
+    // Border contrast lookup: 3.1:1 against the surface at each Color-N
+    // Same pattern for both Surfaces and Containers, same for Light and Dark
+    const lightBorderMap: Record<string, string> = {
+      'Color-1': `{Colors.${variable}.Color-8}`,
+      'Color-2': `{Colors.${variable}.Color-8}`,
+      'Color-3': `{Colors.${variable}.Color-9}`,
+      'Color-4': `{Colors.${variable}.Color-11}`,
+      'Color-5': `{Colors.${variable}.Color-12}`,
+      'Color-6': `{Colors.${variable}.Color-13}`,
+      'Color-7': `{Colors.${variable}.Color-3}`,
+      'Color-8': `{Colors.${variable}.Color-4}`,
+      'Color-9': `{Colors.${variable}.Color-5}`,
+      'Color-10': `{Colors.${variable}.Color-5}`,
+      'Color-11': `{Colors.${variable}.Color-7}`,
+      'Color-12': `{Colors.${variable}.Color-7}`,
+      'Color-13': `{Colors.${variable}.Color-7}`,
+      'Color-14': `{Colors.${variable}.Color-7}`,
+      'Color-Vibrant': `{Colors.${variable}.Color-7}`,
+    };
+
+    const darkBorderMap: Record<string, string> = {
+      'Color-1': '{Colors.White}',
+      'Color-2': '{Colors.White}',
+      'Color-3': '{Colors.White}',
+      'Color-4': '{Colors.White}',
+      'Color-5': '{Colors.White}',
+      'Color-6': '{Colors.White}',
+      'Color-7': `{Colors.Neutral.Color-1}`,
+      'Color-8': `{Colors.Neutral.Color-1}`,
+      'Color-9': `{Colors.Neutral.Color-1}`,
+      'Color-10': `{Colors.Neutral.Color-1}`,
+      'Color-11': `{Colors.Neutral.Color-1}`,
+      'Color-12': `{Colors.Neutral.Color-1}`,
+      'Color-13': `{Colors.Neutral.Color-1}`,
+      'Color-14': `{Colors.Neutral.Color-1}`,
+      'Color-Vibrant': `{Colors.Neutral.Color-1}`,
+    };
+
+    const borderMap = mode === 'Light-Mode' ? lightBorderMap : darkBorderMap;
+
+    Object.entries(borderMap).forEach(([colorN, value]) => {
+      surfaceBorders[colorN] = { value, type: 'color' };
+      containerBorders[colorN] = { value, type: 'color' };
+    });
+
+    borders.Surfaces[themeName] = surfaceBorders;
+    borders.Containers[themeName] = containerBorders;
   });
-  
+
   return borders;
+}
+
+/**
+ * Get the button palette mapping for borders based on button mode.
+ * Same logic as getButtonThemeMappings in generateButtonsSimplified.ts
+ * but returns which palette each theme's border should reference.
+ */
+function getButtonModeBorderMappings(
+  buttonMode: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white',
+  mode: 'Light-Mode' | 'Dark-Mode'
+): Record<string, string> {
+  // Black-White in dark mode switches to tonal/laddered
+  if (buttonMode === 'black-white' && mode === 'Dark-Mode') {
+    return {
+      Default: 'Primary', Primary: 'Primary', Secondary: 'Secondary',
+      Tertiary: 'Tertiary', Neutral: 'Primary',
+      Info: 'Info', Success: 'Success', Warning: 'Warning', Error: 'Error'
+    };
+  }
+
+  switch (buttonMode) {
+    case 'primary':
+      return {
+        Default: 'Primary', Primary: 'Primary', Secondary: 'Primary',
+        Tertiary: 'Primary', Neutral: 'Primary',
+        Info: 'Info', Success: 'Success', Warning: 'Warning', Error: 'Error'
+      };
+    case 'secondary':
+      return {
+        Default: 'Secondary', Primary: 'Secondary', Secondary: 'Secondary',
+        Tertiary: 'Secondary', Neutral: 'Secondary',
+        Info: 'Info', Success: 'Success', Warning: 'Warning', Error: 'Error'
+      };
+    case 'tonal':
+      return {
+        Default: 'Primary', Primary: 'Primary', Secondary: 'Secondary',
+        Tertiary: 'Tertiary', Neutral: 'Primary',
+        Info: 'Info', Success: 'Success', Warning: 'Warning', Error: 'Error'
+      };
+    case 'laddered':
+      return {
+        Default: 'Secondary', Primary: 'Secondary', Secondary: 'Tertiary',
+        Tertiary: 'Secondary', Neutral: 'Primary',
+        Info: 'Info', Success: 'Success', Warning: 'Warning', Error: 'Error'
+      };
+    case 'black-white':
+      return {
+        Default: 'BlackWhite', Primary: 'BlackWhite', Secondary: 'BlackWhite',
+        Tertiary: 'BlackWhite', Neutral: 'BlackWhite',
+        Info: 'BlackWhite', Success: 'BlackWhite', Warning: 'BlackWhite', Error: 'BlackWhite'
+      };
+    default:
+      return {
+        Default: 'Primary', Primary: 'Primary', Secondary: 'Secondary',
+        Tertiary: 'Tertiary', Neutral: 'Primary',
+        Info: 'Info', Success: 'Success', Warning: 'Warning', Error: 'Error'
+      };
+  }
 }
 
 /**
@@ -670,7 +704,7 @@ export function generateCompleteSimplifiedSystem(
   const tag = mode === 'Light-Mode' 
     ? generateLightModeTags(config.textColoring, OB) 
     : generateDarkModeTags(config.textColoring);
-  const defaultButtonBorder = generateDefaultButtonBorders(mode);
+  const defaultButtonBorder = generateDefaultButtonBorders(mode, config.buttonMode);
   
   console.log(`  ✓ Generated Themes section (${Object.keys(themes).length} complete themes with Surfaces & Containers)`);
   console.log(`  ✓ Generated Buttons section (9 button types)`);
