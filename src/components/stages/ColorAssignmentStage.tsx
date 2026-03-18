@@ -1,9 +1,10 @@
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card,
+  Button, H2, H3, BodySmall, VStack, HStack, Card, ButtonGroup,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';
+import { buildPreviewCSS } from '../../utils/buildPreviewCSS';
 import '../../styles/assign-colors.css';
 
 import type { StageProps, UserSelections, ColorScheme } from '../../types';
@@ -66,6 +67,7 @@ export default function ColorAssignmentStage({
   designSystemName,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'preview' | 'customize'>('customize');
+  const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
   const palettes = colorScheme?.tonePalettes;
   const PC = toneToColorNumber(colorScheme?.extractedTones?.primary || 60);
@@ -106,6 +108,33 @@ export default function ColorAssignmentStage({
     }
   };
 
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const sendThemeToIframe = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow || !colorScheme) return;
+
+    // Generate the real CSS from the cascade — same logic as export
+    const css = buildPreviewCSS({
+      colorScheme,
+      userSelections,
+      componentStyle: 'modern',
+      mode: previewMode,
+    });
+
+    iframe.contentWindow.postMessage({ type: 'update-css', css }, '*');
+    iframe.contentWindow.postMessage({ type: 'update-moodboard', src: moodBoardUrl || '' }, '*');
+    iframe.contentWindow.postMessage({ type: 'update-name', name: designSystemName || 'Lise' }, '*');
+  }, [userSelections, colorScheme, moodBoardUrl, designSystemName, previewMode]);
+
+  useEffect(() => {
+    sendThemeToIframe();
+  }, [sendThemeToIframe]);
+
+  const handleIframeLoad = () => {
+    sendThemeToIframe();
+  };
+
   return (
     <div className="assign-colors-page">
       <H2>Assign Colors</H2>
@@ -133,100 +162,36 @@ export default function ColorAssignmentStage({
       <div className="assign-colors-grid">
         {/* ─── Left: Preview ─── */}
         <div className={`assign-colors-preview ${activeTab !== 'preview' ? 'hidden' : ''}`}>
-          <BodySmall style={{ fontWeight: 600, marginBottom: 8 }}>Preview</BodySmall>
-          <div className="assign-preview-container">
-          <div className="assign-preview-scaler">
-          <div style={{
-            width: 390,
-            border: '8px solid #2e2e2e',
-            borderRadius: 32,
-            overflow: 'hidden',
-            background: getBgColor(),
-          }}>
-            {/* Status bar */}
-            <div style={{
-              height: 28,
-              background: getNavColor(userSelections.status),
-              display: 'flex',
-              alignItems: 'center',
-              padding: '0 16px',
-            }}>
-              <BodySmall style={{ fontSize: '0.55rem', color: chroma(getNavColor(userSelections.status)).luminance() > 0.5 ? '#000' : '#fff' }}>9:41</BodySmall>
-            </div>
+          <VStack spacing={2} alignItems="center">
+            <ButtonGroup size="small" variant="default-outline">
+              <Button
+                variant={previewMode === 'light' ? 'solid' : 'outline'}
+                color="default"
+                size="small"
+                onClick={() => setPreviewMode('light')}
+              >Light</Button>
+              <Button
+                variant={previewMode === 'dark' ? 'solid' : 'outline'}
+                color="default"
+                size="small"
+                onClick={() => setPreviewMode('dark')}
+              >Dark</Button>
+            </ButtonGroup>
 
-            {/* App bar */}
-            <div style={{
-              height: 44,
-              background: getNavColor(userSelections.appBar),
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0 16px',
-            }}>
-              <div style={{ width: 18, height: 2, background: chroma(getNavColor(userSelections.appBar)).luminance() > 0.5 ? '#333' : '#fff', boxShadow: `0 5px 0 ${chroma(getNavColor(userSelections.appBar)).luminance() > 0.5 ? '#333' : '#fff'}, 0 10px 0 ${chroma(getNavColor(userSelections.appBar)).luminance() > 0.5 ? '#333' : '#fff'}` }} />
-              <div style={{ width: 24, height: 24, borderRadius: '50%', border: `1px solid ${chroma(getNavColor(userSelections.appBar)).luminance() > 0.5 ? '#999' : '#aaa'}` }} />
-            </div>
-
-            {/* Content */}
-            <div style={{ padding: 12, minHeight: 340 }}>
-              <Body style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 8, color: userSelections.textColoring === 'black-white' ? '#1a1a1a' : colors[0] }}>Welcome</Body>
-
-              {/* Mood board thumbnail */}
-              {moodBoardUrl && (
-                <img src={moodBoardUrl} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} />
-              )}
-
-              {/* Card */}
-              <div style={{
-                background: userSelections.cardColoring === 'white' ? '#fff' : userSelections.cardColoring === 'black' ? '#1a1a1a' : palettes?.primary?.[12]?.hex || '#f5f5f5',
-                borderRadius: 10, padding: 12, marginBottom: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid var(--Border)',
-              }}>
-                <BodySmall style={{ fontWeight: 600, fontSize: '0.75rem', color: userSelections.textColoring === 'black-white' ? (userSelections.cardColoring === 'black' ? '#fff' : '#1a1a1a') : colors[0], marginBottom: 2 }}>
-                  {designSystemName || 'Lise'}
-                </BodySmall>
-                <BodySmall style={{ fontSize: '0.6rem', color: 'var(--Quiet)', marginBottom: 6 }}>
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                </BodySmall>
-                <div style={{
-                  display: 'inline-block', padding: '4px 12px', borderRadius: 6, fontSize: '0.6rem', fontWeight: 600,
-                  background: userSelections.button === 'black-white' ? '#1a1a1a' : userSelections.button === 'secondary' ? colors[1] : colors[0],
-                  color: '#fff', border: `1px solid ${userSelections.button === 'black-white' ? '#1a1a1a' : colors[0]}`,
-                }}>Button</div>
-              </div>
-
-              {/* Two small cards */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ flex: 1, background: userSelections.cardColoring === 'white' ? '#fff' : userSelections.cardColoring === 'black' ? '#1a1a1a' : palettes?.secondary?.[12]?.hex || '#f5f5f5', borderRadius: 8, padding: 8, border: '1px solid var(--Border)' }}>
-                  <BodySmall style={{ fontWeight: 600, fontSize: '0.6rem' }}>Next Steps</BodySmall>
-                </div>
-                <div style={{ flex: 1, background: userSelections.cardColoring === 'white' ? '#fff' : userSelections.cardColoring === 'black' ? '#1a1a1a' : palettes?.tertiary?.[12]?.hex || '#f5f5f5', borderRadius: 8, padding: 8, border: '1px solid var(--Border)' }}>
-                  <BodySmall style={{ fontWeight: 600, fontSize: '0.6rem' }}>Have fun!</BodySmall>
-                </div>
+            <div className="assign-preview-container">
+              <div className="assign-preview-scaler">
+                <iframe
+                  ref={iframeRef}
+                  src="/phone-frame.html"
+                  onLoad={handleIframeLoad}
+                  title="Design System Preview"
+                  style={{ width: 406, height: 860, border: 'none', overflow: 'hidden' }}
+                />
               </div>
             </div>
 
-            {/* Nav bar */}
-            <div style={{
-              height: 50,
-              background: getNavColor(userSelections.navBar),
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-around',
-              borderTop: '1px solid var(--Border)',
-              padding: '0 8px',
-            }}>
-              {['Home', 'Tickets', 'Travel', 'Hotels', 'Food'].map(label => (
-                <VStack key={label} spacing={0} alignItems="center">
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', background: chroma(getNavColor(userSelections.navBar)).luminance() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)' }} />
-                  <BodySmall style={{ fontSize: '0.4rem', color: chroma(getNavColor(userSelections.navBar)).luminance() > 0.5 ? '#666' : '#ddd' }}>{label}</BodySmall>
-                </VStack>
-              ))}
-            </div>
-          </div>
-          </div>
-          </div>
+            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>Preview</BodySmall>
+          </VStack>
         </div>
 
         {/* ─── Right: Controls ─── */}
@@ -261,6 +226,7 @@ export default function ColorAssignmentStage({
                   flex: 1,
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'flex-start',
                   gap: 8,
                   padding: '8px 12px',
                   borderRadius: 'var(--Style-Border-Radius)',

@@ -1,14 +1,19 @@
 import { useState, useCallback } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router';
 import { DynoDesignProvider } from '@dynodesign/components';
-import type { Stage, ColorScheme, UserSelections } from './types';
+import type { Stage, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from './types';
 import { STAGE_ORDER } from './types';
 import {
   generateSemanticLightModeScale,
   generateSemanticDarkModeScale,
   getLightness,
 } from './utils/colorScale';
+import { assessImageStyle } from './utils/imageAnalysis';
+import { autoAssignColors } from './utils/autoAssignColors';
+import { suggestComponentStyle } from './utils/autoSuggestStyle';
 
 import TopNav from './components/TopNav';
+import { CreationTopBar, CreationBottomBar } from './components/CreationNav';
 import WelcomeStage from './components/stages/WelcomeStage';
 import DesignSystemNameStage from './components/stages/DesignSystemNameStage';
 import UploadStage from './components/stages/UploadStage';
@@ -18,8 +23,11 @@ import TypographyStage from './components/stages/TypographyStage';
 import ComponentStyleStage from './components/stages/ComponentStyleStage';
 import ReviewStage from './components/stages/ReviewStage';
 import ExportStage from './components/stages/ExportStage';
+import Playground from './components/Playground';
+import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
+import ToneTuner from './components/ToneTuner';
 
-function App() {
+function MainApp() {
   const [stage, setStage] = useState<Stage>('welcome');
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
@@ -38,13 +46,39 @@ function App() {
     cardColoring: 'tonal',
     textColoring: 'tonal',
   });
+  const [typographyStyles, setTypographyStyles] = useState<TypographyStyle[]>([]);
+  const [componentStyle, setComponentStyle] = useState<ComponentStyle>('modern');
+  const [dinoId, setDinoId] = useState<string | null>(null);
+  const [surfaceStyle, setSurfaceStyle] = useState<SurfaceStyle>('light-tonal');
+  const [autoAssigned, setAutoAssigned] = useState(false);
+  const [savedSchemes, setSavedSchemes] = useState<ColorScheme[]>([]);
+  const [savedTopColors, setSavedTopColors] = useState<any[]>([]);
+  const [savedFontSamples, setSavedFontSamples] = useState<any[]>([]);
+  const [savedSelectedSample, setSavedSelectedSample] = useState<number | null>(null);
+  const [savedStyleCustomizations, setSavedStyleCustomizations] = useState<any>(null);
 
   const goNext = useCallback(() => {
     const currentIndex = STAGE_ORDER.indexOf(stage);
     if (currentIndex < STAGE_ORDER.length - 1) {
-      setStage(STAGE_ORDER[currentIndex + 1]);
+      const nextStage = STAGE_ORDER[currentIndex + 1];
+
+      // Auto-assign color selections when entering color-assignment for the first time
+      // Auto-assign color selections when entering color-assignment for the first time
+      if (nextStage === 'color-assignment' && !autoAssigned && selectedColorScheme) {
+        const defaults = autoAssignColors(surfaceStyle, selectedColorScheme);
+        setUserSelections(defaults);
+        setAutoAssigned(true);
+      }
+
+      // Auto-suggest component style based on mood when entering component-style
+      if (nextStage === 'component-style' && selectedColorScheme) {
+        const suggested = suggestComponentStyle(selectedColorScheme.colors[0]);
+        setComponentStyle(suggested);
+      }
+
+      setStage(nextStage);
     }
-  }, [stage]);
+  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle]);
 
   const goBack = useCallback(() => {
     const currentIndex = STAGE_ORDER.indexOf(stage);
@@ -78,9 +112,12 @@ function App() {
             onImageUploaded={(url, file) => {
               setMoodBoardUrl(url);
               setMoodBoardFile(file);
+              // Detect surface style from the mood board
+              assessImageStyle(url).then(style => {
+                setSurfaceStyle(style);
+              });
             }}
             onGenerate={(_mode) => {
-              // TODO: auto mode will skip to review in a future sprint
               goNext();
             }}
           />
@@ -93,6 +130,10 @@ function App() {
             moodBoardUrl={moodBoardUrl}
             selectedScheme={selectedColorScheme}
             onSchemeSelected={setSelectedColorScheme}
+            savedSchemes={savedSchemes}
+            onSchemesGenerated={setSavedSchemes}
+            savedTopColors={savedTopColors}
+            onTopColorsExtracted={setSavedTopColors}
           />
         );
       case 'color-assignment':
@@ -130,19 +171,76 @@ function App() {
           />
         );
       case 'typography':
-        return <TypographyStage onNext={goNext} onBack={goBack} />;
+        return (
+          <TypographyStage
+            onNext={goNext}
+            onBack={goBack}
+            colorScheme={selectedColorScheme}
+            moodBoardUrl={moodBoardUrl}
+            designSystemName={designSystemName}
+            onTypographyComplete={setTypographyStyles}
+            savedFontSamples={savedFontSamples}
+            savedSelectedSample={savedSelectedSample}
+            onFontSamplesGenerated={(samples, selected) => {
+              setSavedFontSamples(samples);
+              setSavedSelectedSample(selected);
+            }}
+          />
+        );
       case 'component-style':
-        return <ComponentStyleStage onNext={goNext} onBack={goBack} />;
+        return (
+          <ComponentStyleStage
+            onNext={goNext}
+            onBack={goBack}
+            colorScheme={selectedColorScheme}
+            onStyleSelected={(style, customs) => {
+              setComponentStyle(style);
+              setSavedStyleCustomizations((prev: any) => ({ ...(prev || {}), [style]: customs }));
+            }}
+            selectedStyle={componentStyle}
+            savedCustomizations={savedStyleCustomizations}
+          />
+        );
       case 'review':
-        return <ReviewStage onNext={goNext} onBack={goBack} />;
+        return (
+          <ReviewStage
+            onNext={goNext}
+            onBack={goBack}
+            designSystemName={designSystemName}
+            colorScheme={selectedColorScheme}
+            userSelections={userSelections}
+            typographyStyles={typographyStyles}
+            componentStyle={componentStyle}
+            moodBoardUrl={moodBoardUrl}
+          />
+        );
       case 'export':
-        return <ExportStage onNext={goNext} onBack={goBack} />;
+        return (
+          <ExportStage
+            onNext={goNext}
+            onBack={goBack}
+            designSystemName={designSystemName}
+            colorScheme={selectedColorScheme}
+            userSelections={userSelections}
+            typographyStyles={typographyStyles}
+            componentStyle={componentStyle}
+            dinoId={dinoId}
+            onDinoIdGenerated={setDinoId}
+            moodBoardUrl={moodBoardUrl}
+            surfaceStyle={surfaceStyle}
+          />
+        );
       default:
         return <WelcomeStage onNext={goNext} onBack={goBack} />;
     }
   };
 
-  const showNav = stage !== 'welcome';
+  const showTopBar = designSystemName && stage !== 'welcome' && stage !== 'name';
+  const showBottomBar = stage !== 'export'; // export has its own layout
+  const isFirstStage = stage === 'welcome';
+
+  // Bottom bar label
+  const nextLabel = stage === 'review' ? 'Get Your Design System' : 'Continue';
 
   return (
     <DynoDesignProvider
@@ -150,11 +248,30 @@ function App() {
       defaultStyle="Modern"
       defaultSurface="Surface"
     >
-      {showNav && <TopNav designSystemName={designSystemName} />}
-      <main data-surface="Surface" style={{ minHeight: '100vh' }}>
+      {showTopBar && (
+        <CreationTopBar designSystemName={designSystemName} onBack={goBack} />
+      )}
+      <main data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: showBottomBar ? 72 : 0 }}>
         {renderStage()}
       </main>
+      {showBottomBar && !isFirstStage && (
+        <CreationBottomBar onNext={goNext} nextLabel={nextLabel} />
+      )}
     </DynoDesignProvider>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/playground" element={<Playground />} />
+        <Route path="/api/tokens/:uuid" element={<ApiTokensJson />} />
+        <Route path="/api/tokens/:uuid/md" element={<ApiTokensMd />} />
+        <Route path="/tune" element={<ToneTuner />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

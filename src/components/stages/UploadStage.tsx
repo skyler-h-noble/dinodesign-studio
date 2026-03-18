@@ -117,53 +117,50 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
         <VStack spacing={3} style={{ maxWidth: 560, width: '100%' }}>
           <H3>Generation Process</H3>
 
-          <Card
-            onClick={() => setMode('guided')}
-            padding="medium"
-            style={{
-              outline: mode === 'guided'
-                ? '2px solid var(--Buttons-Primary-Button)'
-                : '1px solid var(--Border)',
-              cursor: 'pointer',
-            }}
-          >
-            <HStack spacing={2} alignItems="flex-start">
-              <TuneIcon style={{ color: 'var(--Icons-Primary)', marginTop: 2 }} />
-              <VStack spacing={0}>
-                <Body style={{ fontWeight: 600 }}>Guide Me</Body>
-                <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  More Control
-                </BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
-                  Step-by-step process where you can review and adjust recommendations at each stage
-                </BodySmall>
-              </VStack>
-            </HStack>
-          </Card>
-
-          <Card
-            onClick={() => setMode('auto')}
-            padding="medium"
-            style={{
-              outline: mode === 'auto'
-                ? '2px solid var(--Buttons-Primary-Button)'
-                : '1px solid var(--Border)',
-              cursor: 'pointer',
-            }}
-          >
-            <HStack spacing={2} alignItems="flex-start">
-              <BoltIcon style={{ color: 'var(--Icons-Secondary)', marginTop: 2 }} />
-              <VStack spacing={0}>
-                <Body style={{ fontWeight: 600 }}>Auto Generate</Body>
-                <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Faster
-                </BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
-                  AI makes all decisions and jumps directly to the final preview
-                </BodySmall>
-              </VStack>
-            </HStack>
-          </Card>
+          {([
+            { value: 'guided' as const, icon: <TuneIcon />, title: 'Guide Me', badge: 'More Control', desc: 'Step-by-step process where you can review and adjust recommendations at each stage' },
+            { value: 'auto' as const, icon: <BoltIcon />, title: 'Auto Generate', badge: 'Faster', desc: 'AI makes all decisions and jumps directly to the final preview' },
+          ]).map(opt => {
+            const isSelected = mode === opt.value;
+            return (
+              <div
+                key={opt.value}
+                onClick={() => setMode(opt.value)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 16px',
+                  borderRadius: 'var(--Style-Border-Radius)',
+                  border: '1px solid var(--Buttons-Default-Border)',
+                  background: isSelected ? 'var(--Buttons-Default-Button)' : 'transparent',
+                  color: isSelected ? 'var(--Buttons-Default-Text)' : 'var(--Quiet)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  width: '100%',
+                }}
+              >
+                <input
+                  type="radio"
+                  checked={isSelected}
+                  onChange={() => setMode(opt.value)}
+                  style={{ width: 18, height: 18, accentColor: 'var(--Buttons-Primary-Button)', flexShrink: 0 }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  {opt.icon}
+                </div>
+                <VStack spacing={0} style={{ flex: 1 }}>
+                  <Body style={{ fontWeight: 600, color: 'inherit' }}>{opt.title}</Body>
+                  <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'inherit' }}>
+                    {opt.badge}
+                  </BodySmall>
+                  <BodySmall style={{ color: 'inherit', opacity: 0.8 }}>
+                    {opt.desc}
+                  </BodySmall>
+                </VStack>
+              </div>
+            );
+          })}
 
           <Button
             color="default"

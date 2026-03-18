@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DynoDesign Preview Frame</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Allura&display=swap" rel="stylesheet" />
+  <style id="base-styles">
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: transparent; font-family: var(--Set-Font-Family-Body, 'Noto Sans', sans-serif); font-weight: var(--Set-Font-Family-Body-Weight, 400); overflow: hidden; }
+
+    .phone {
+      width: 390px; border-radius: 48px; border: 8px solid #2e2e2e;
+      overflow: hidden; display: flex; flex-direction: column;
+      position: relative; max-height: 844px;
+    }
+
+    .status-bar {
+      background: var(--Background); height: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px 0 35px; position: relative; flex-shrink: 0;
+      color: var(--Text);
+    }
+    .status-time { font-size: 14px; font-weight: 600; color: var(--Text); font-family: -apple-system, 'SF Pro Display', sans-serif; }
+    .status-icons { display: flex; align-items: center; gap: 6px; color: var(--Text); }
+    .dynamic-island { position: absolute; left: 50%; transform: translateX(-50%); top: 8px; width: 110px; height: 32px; background: #000; border-radius: 20px; z-index: 10; }
+    .signal-icon { width: 18px; height: 10px; }
+    .wifi-icon   { width: 16px; height: 12px; }
+    .battery-icon{ width: 24px; height: 12px; }
+
+    .app-bar {
+      background: var(--Background); height: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; flex-shrink: 0; color: var(--Text); margin-top: -1px;
+    }
+    .hamburger { display: flex; flex-direction: column; gap: 4px; }
+    .hamburger span { display: block; width: 28px; height: 2px; background: var(--Text); border-radius: 2px; }
+    .avatar-btn {
+      width: 40px; height: 40px; border-radius: 40px;
+      background: var(--Buttons-Default-Button, transparent); border: 1px solid var(--Buttons-Default-Border, rgba(0,0,0,0.12));
+      display: flex; align-items: center; justify-content: center;
+    }
+    .avatar-btn svg { width: 18px; height: 18px; color: var(--Buttons-Default-Text, #1a1a1a); }
+    .avatar-btn svg path,
+    .avatar-btn svg rect,
+    .avatar-btn svg line,
+    .avatar-btn svg circle { stroke: var(--Buttons-Default-Text, #1a1a1a); }
+
+    .main-content {
+      background: var(--Background); flex: 1; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 16px;
+      scrollbar-width: none; color: var(--Text);
+    }
+    .main-content::-webkit-scrollbar { display: none; }
+
+    .chip-btn {
+      display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+      background: var(--Buttons-Primary-Button); border: 1px solid var(--Buttons-Primary-Border);
+      border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--Buttons-Primary-Text);
+    }
+    .chip-btn .x-icon { font-style: normal; font-size: 13px; opacity: 0.7; }
+
+    .welcome-heading { font-family: var(--Set-Font-Family-Header, Arial, sans-serif); font-weight: var(--Set-Font-Family-Header-Weight, 700); font-size: 24px; color: var(--Header); line-height: 1.2; }
+
+    .image-banner { width: 100%; height: 202px; border-radius: 8px; overflow: hidden; background: var(--Border-Variant, rgba(0,0,0,0.05)); position: relative; flex-shrink: 0; }
+    .image-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .card {
+      background: var(--Background); border: 1px solid var(--Border-Variant, rgba(0,0,0,0.12));
+      border-radius: var(--Card-Radius, 16px); padding: 16px;
+      display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 2px 2px rgba(0,0,0,0.15); flex-shrink: 0;
+    }
+    .card-row { display: flex; align-items: flex-start; justify-content: space-between; width: 100%; }
+    .card-titles { display: flex; flex-direction: column; gap: 6px; }
+    .card-header { font-family: var(--Set-Font-Family-Header, Arial, sans-serif); font-weight: var(--Set-Font-Family-Header-Weight, 700); font-size: 18px; color: var(--Header); white-space: nowrap; }
+    .card-quiet { font-size: 14px; color: var(--Quiet); font-family: var(--Set-Font-Family-Decorative, 'Allura', cursive); }
+    .card-quiet.sans { font-family: var(--Set-Font-Family-Body, Arial, sans-serif); font-weight: 700; font-size: 12px; }
+    .icon-btn {
+      width: 40px; height: 40px; border-radius: 40px;
+      background: var(--Buttons-Primary-Button); border: 1px solid var(--Buttons-Primary-Border);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: var(--Buttons-Default-Text); stroke-width: 1.5; color: var(--Buttons-Default-Text); }
+    .icon-btn svg path,
+    .icon-btn svg rect,
+    .icon-btn svg line,
+    .icon-btn svg circle { stroke: var(--Buttons-Default-Text); }
+    .card-text { font-size: 15px; color: var(--Text); line-height: 1.5; }
+    .card-placeholder { width: 100%; height: 56px; min-height: 40px; border-radius: 8px; background: var(--Border-Variant, rgba(0,0,0,0.05)); flex-shrink: 0; }
+    .card-action-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      height: 40px; width: 78px; background: var(--Buttons-Default-Button, transparent); border: 1px solid var(--Buttons-Default-Border, rgba(0,0,0,0.12));
+      border-radius: var(--Style-Border-Radius, 8px); font-family: var(--Set-Font-Family-Body, Arial, sans-serif); font-weight: 700; font-size: 14px; color: var(--Buttons-Default-Text);
+    }
+    .tag { display: inline-flex; align-items: center; justify-content: center; padding: 4px 16px; background: var(--Tag-Tertiary-BG, #e8e8e8); border-radius: 2px; font-family: Arial, sans-serif; font-weight: 700; font-size: 12px; color: var(--Tag-Tertiary-Text, #333); }
+    .card-row-2col { display: flex; gap: 16px; flex-shrink: 0; }
+    .card-row-2col .card { flex: 1; min-width: 0; }
+
+    .nav-bar {
+      background: var(--Background); height: 83px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 32px; flex-shrink: 0;
+    }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 40px; }
+    .nav-icon-wrap { width: 40px; height: 40px; border-radius: 40px; display: flex; align-items: center; justify-content: center; }
+    .nav-icon-wrap svg { width: 22px; height: 22px; fill: none; stroke: var(--Quiet); stroke-width: 1.5; color: var(--Quiet); }
+    .nav-icon-wrap svg path,
+    .nav-icon-wrap svg rect,
+    .nav-icon-wrap svg line,
+    .nav-icon-wrap svg circle { stroke: var(--Quiet); }
+    .nav-icon-wrap.active { background: var(--Text); }
+    .nav-icon-wrap.active svg,
+    .nav-icon-wrap.active svg path,
+    .nav-icon-wrap.active svg rect,
+    .nav-icon-wrap.active svg line,
+    .nav-icon-wrap.active svg circle { stroke: var(--Background); }
+    .nav-label { font-family: var(--Set-Font-Family-Body, Arial, sans-serif); font-weight: 700; font-size: 11px; color: var(--Quiet); }
+    .nav-item.active .nav-label { color: var(--Text); }
+  </style>
+  <!-- Theme CSS injected here by postMessage -->
+  <style id="theme-css"></style>
+  <script>
+    window.addEventListener('message', function(e) {
+      var data = e.data;
+      if (data.type === 'update-css') {
+        document.getElementById('theme-css').textContent = data.css;
+      }
+      if (data.type === 'update-moodboard') {
+        var img = document.getElementById('mood-board-img');
+        if (img) img.src = data.src || '';
+      }
+      if (data.type === 'update-name') {
+        var el = document.getElementById('design-system-name');
+        if (el) el.textContent = data.name || 'Your DynoDesign Systems';
+      }
+    });
+  </script>
+</head>
+<body>
+
+<div class="phone">
+  <div class="status-bar" data-theme="Status" data-surface="Surface-Bright">
+    <div class="dynamic-island"></div>
+    <span class="status-time">9:41</span>
+    <div class="status-icons">
+      <svg class="signal-icon" viewBox="0 0 18 10" fill="none"><rect x="0" y="6" width="3" height="4" rx="0.5" fill="currentColor"/><rect x="4" y="4" width="3" height="6" rx="0.5" fill="currentColor"/><rect x="8" y="2" width="3" height="8" rx="0.5" fill="currentColor"/><rect x="12" y="0" width="3" height="10" rx="0.5" fill="currentColor"/><rect x="16" y="0" width="2" height="10" rx="0.5" fill="currentColor" opacity="0.3"/></svg>
+      <svg class="wifi-icon" viewBox="0 0 16 12" fill="none"><path d="M8 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="currentColor"/><path d="M5.2 7.4a4 4 0 0 1 5.6 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M2.8 5a7 7 0 0 1 10.4 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M0.4 2.6A10 10 0 0 1 15.6 2.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      <svg class="battery-icon" viewBox="0 0 24 12" fill="none"><rect x="0" y="1" width="20" height="10" rx="2" stroke="currentColor" stroke-width="1"/><rect x="1" y="2" width="17" height="8" rx="1.2" fill="currentColor"/><path d="M21 4v4a2 2 0 0 0 0-4z" fill="currentColor"/></svg>
+    </div>
+  </div>
+
+  <div class="app-bar" data-theme="App-Bar" data-surface="Surface-Bright">
+    <div class="hamburger"><span></span><span></span><span></span></div>
+    <div class="avatar-btn">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke-width="1.5"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="main-content" data-theme="Default" data-surface="Surface">
+    <div><button class="chip-btn"><i class="x-icon">&times;</i> Text <i class="x-icon">&times;</i></button></div>
+    <div class="welcome-heading">Welcome</div>
+    <div class="image-banner"><img id="mood-board-img" src="" alt="Mood board" /></div>
+
+    <div class="card" data-surface="Container">
+      <div class="card-row">
+        <div class="card-titles">
+          <div class="card-header" id="design-system-name">Your DynoDesign Systems</div>
+          <div class="card-quiet">Adaptive &amp; Accessible</div>
+        </div>
+        <div class="icon-btn">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" stroke-width="1.5" fill="none"/><line x1="3" y1="9" x2="21" y2="9" stroke-width="1.5"/><line x1="8" y1="2" x2="8" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="16" y1="2" x2="16" y2="6" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14c0-1.1.9-2 2-2s2 .9 2 2c0 1.5-2 3-2 3s-2-1.5-2-3z"/></svg>
+        </div>
+      </div>
+      <p class="card-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ali.</p>
+      <button class="card-action-btn">Button</button>
+    </div>
+
+    <div class="card-row-2col">
+      <div class="card" data-surface="Container">
+        <div class="card-row">
+          <div class="card-titles">
+            <div class="card-header" style="font-size:16px;">Next Steps</div>
+            <div class="card-quiet sans">Explore</div>
+          </div>
+          <div class="icon-btn">
+            <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="card-placeholder"></div>
+        <p class="card-text">Incididunt ut labore et dolore.</p>
+      </div>
+      <div class="card" data-theme="Tertiary" data-surface="Container">
+        <div class="card-row" style="align-items:flex-start;">
+          <div class="card-titles">
+            <div class="tag">NEW</div>
+            <div class="card-quiet sans">Have fun!</div>
+          </div>
+        </div>
+        <div class="card-placeholder"></div>
+        <p class="card-text">Incididunt ut labore et dolore.</p>
+      </div>
+    </div>
+  </div>
+
+  <nav class="nav-bar" data-theme="Nav-Bar" data-surface="Surface-Dim">
+    <div class="nav-item active">
+      <div class="nav-icon-wrap active"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z" stroke-width="1.5" fill="none"/><path d="M9 21V12h6v9" stroke-width="1.5" fill="none"/></svg></div>
+      <span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-icon-wrap"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" stroke-width="1.5" fill="none"/><path d="M2 11h20" stroke-width="1.5"/><path d="M7 3v4M17 3v4" stroke-width="1.5" stroke-linecap="round"/><path d="M7 15l2 2 4-4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <span class="nav-label">Tickets</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-icon-wrap"><svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-width="1.5" stroke-linecap="round"/><path d="M22 2L15 22l-4-9-9-4 20-7z" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg></div>
+      <span class="nav-label">Travel</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-icon-wrap"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2" stroke-width="1.5" fill="none"/><path d="M2 9h20" stroke-width="1.5"/><path d="M9 3v6M15 3v6" stroke-width="1.5"/><rect x="6" y="13" width="4" height="5" rx="1" stroke-width="1.2" fill="none"/><rect x="14" y="13" width="4" height="5" rx="1" stroke-width="1.2" fill="none"/></svg></div>
+      <span class="nav-label">Hotels</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-icon-wrap"><svg viewBox="0 0 24 24"><rect x="3" y="10" width="18" height="11" rx="2" stroke-width="1.5" fill="none"/><path d="M7 10V7a5 5 0 0 1 10 0v3" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="12" cy="15.5" r="1.5"/></svg></div>
+      <span class="nav-label">Food</span>
+    </div>
+  </nav>
+</div>
+
+</body>
+</html>

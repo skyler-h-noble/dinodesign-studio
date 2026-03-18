@@ -6,7 +6,7 @@ import StarIcon from '@mui/icons-material/Star';
 import { useState, useEffect, useCallback } from 'react';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
 import { generateColorSchemes } from '../../utils/colorSchemes';
-import { getLightness, getChroma, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../../utils/colorScale';
+import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma } from '../../utils/colorScale';
 import { getColorDescription } from '../../utils/colorNaming';
 import type { StageProps, ColorScheme } from '../../types';
 import type { ExtractedColorData, ExtractedColor } from '../../utils/imageAnalysis';
@@ -17,6 +17,10 @@ interface Props extends StageProps {
   moodBoardUrl: string | null;
   onSchemeSelected: (scheme: ColorScheme) => void;
   selectedScheme: ColorScheme | null;
+  savedSchemes?: ColorScheme[];
+  onSchemesGenerated?: (schemes: ColorScheme[]) => void;
+  savedTopColors?: ExtractedColor[];
+  onTopColorsExtracted?: (colors: ExtractedColor[]) => void;
 }
 
 export default function ColorStage({
@@ -25,13 +29,17 @@ export default function ColorStage({
   moodBoardUrl,
   onSchemeSelected,
   selectedScheme,
+  savedSchemes,
+  onSchemesGenerated,
+  savedTopColors,
+  onTopColorsExtracted,
 }: Props) {
-  const [step, setStep] = useState<ColorStep>('extraction');
+  const [step, setStep] = useState<ColorStep>(selectedScheme ? 'theme' : 'extraction');
   const [colorData, setColorData] = useState<ExtractedColorData | null>(null);
-  const [topColors, setTopColors] = useState<ExtractedColor[]>([]);
+  const [topColors, setTopColors] = useState<ExtractedColor[]>(savedTopColors || []);
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [primaryIndex, setPrimaryIndex] = useState(0);
-  const [schemes, setSchemes] = useState<ColorScheme[]>([]);
+  const [schemes, setSchemes] = useState<ColorScheme[]>(savedSchemes || []);
   const [showChromaSettings, setShowChromaSettings] = useState(false);
   const [chromaPerColor, setChromaPerColor] = useState<number[]>([62, 62, 62, 62, 62, 62]);
   const [darkChromaPerColor, setDarkChromaPerColor] = useState<number[]>([36, 36, 36, 36, 36, 36]);
@@ -57,10 +65,11 @@ export default function ColorStage({
         if (cancelled) return;
         setColorData(data);
         setTopColors([...data.topColors]);
-        // Initialize chroma per color from natural chroma values
-        const naturalChromas = data.topColors.map(c => Math.round(getChroma(c.hex)));
-        setChromaPerColor(naturalChromas.map(c => Math.min(c, 70)));
-        setDarkChromaPerColor(naturalChromas.map(c => Math.min(c, 42)));
+        onTopColorsExtracted?.([...data.topColors]);
+        // Initialize chroma per color from natural peak chroma across all tones
+        const peakChromas = data.topColors.map(c => getNaturalPeakChroma(c.hex));
+        setChromaPerColor(peakChromas.map(c => Math.min(c, 70)));
+        setDarkChromaPerColor(peakChromas.map(c => Math.min(c, 42)));
       } catch (err) {
         if (!cancelled) {
           setError('Failed to extract colors. Try a different image.');
@@ -98,6 +107,7 @@ export default function ColorStage({
     // Use the primary color's chroma for scheme generation
     const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx]);
     setSchemes(generated);
+    onSchemesGenerated?.(generated);
     if (selectedScheme) {
       const updated = generated.find(s => s.name === selectedScheme.name);
       onSchemeSelected(updated || generated[0]);
@@ -268,7 +278,7 @@ export default function ColorStage({
       </VStack>
 
       {/* Core Colors + Settings */}
-      <Card padding="medium" style={{ maxWidth: 500, width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
+      <Card padding="medium" style={{ width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
         <VStack spacing={3}>
           <VStack spacing={1}>
             <BodySmall style={{ fontWeight: 600 }}>Core Colors</BodySmall>
@@ -366,7 +376,7 @@ export default function ColorStage({
                   : generateSemanticDarkModeScale(color.hex, dc);
                 const currentTone = Math.round(getLightness(color.hex));
                 const currentColorN = toneToColorNumber(currentTone);
-                const naturalChroma = Math.round(getChroma(color.hex));
+                const naturalChroma = getNaturalPeakChroma(color.hex);
                 const colorName = colorIdx === primaryIndex
                   ? `Primary – ${getColorDescription(color.hex)}`
                   : getColorDescription(color.hex);
@@ -501,7 +511,7 @@ export default function ColorStage({
       </Card>
 
       {/* Scheme cards */}
-      <VStack spacing={2} style={{ maxWidth: 500, width: '100%' }}>
+      <VStack spacing={2} style={{ width: '100%' }}>
         {schemes.map((scheme) => {
           const isSelected = selectedName === scheme.name;
           const isCustom = scheme.name === 'Custom';
@@ -511,6 +521,7 @@ export default function ColorStage({
               key={scheme.name}
               padding="medium"
               style={{
+                width: '100%',
                 borderRadius: 'var(--Card-Radius, 14px)',
                 outline: isSelected
                   ? '2px solid var(--Buttons-Default-Button)'
