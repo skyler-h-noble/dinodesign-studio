@@ -15,7 +15,7 @@ export interface DimensionValue {
   type: 'dimension';
 }
 
-// Color scale (Color-1 through Color-13)
+// Color scale (Color-1 through Color-12)
 export interface ColorScale {
   'Color-1': ColorValue;
   'Color-2': ColorValue;
@@ -29,7 +29,6 @@ export interface ColorScale {
   'Color-10': ColorValue;
   'Color-11': ColorValue;
   'Color-12': ColorValue;
-  'Color-13': ColorValue;
 }
 
 // Button definition

@@ -33,21 +33,21 @@ export function detectSurfaceStyle(
 }
 
 /**
- * Helper to convert tone value to Color-N number (1-14)
+ * Helper to convert tone value to Color-N number (1-12)
  */
 export function toneToColorNumber(tone: number): number {
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
   // Find exact match
   const exactIndex = toneScale.findIndex(t => Math.abs(t - tone) < 0.5);
   if (exactIndex !== -1) {
     return exactIndex + 1;
   }
-  
+
   // Find closest match
   let closestIndex = 0;
   let minDiff = Math.abs(toneScale[0] - tone);
-  
+
   for (let i = 1; i < toneScale.length; i++) {
     const diff = Math.abs(toneScale[i] - tone);
     if (diff < minDiff) {
@@ -55,7 +55,7 @@ export function toneToColorNumber(tone: number): number {
       closestIndex = i;
     }
   }
-  
+
   return closestIndex + 1;
 }
 
@@ -65,7 +65,7 @@ export function toneToColorNumber(tone: number): number {
 export interface SimplifiedDefaultConfig {
   // Background/Surface themes
   defaultTheme: string; // Primary, Secondary, Tertiary, Neutral
-  defaultN: number; // 1-14
+  defaultN: number; // 1-12
   appBarTheme: string;
   appBarN: number;
   navBarTheme: string;
@@ -94,9 +94,9 @@ export function getSimplifiedDefaultSettings(
   schemeType: 'monochromatic' | 'analogous' | 'complementary' | 'triadic' | 'split-complementary' | 'tetradic',
   userSelections?: {
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base' | 'primary-dark' | 'neutral-light' | 'neutral-dark'; // CRITICAL FIX: Added neutral-light and neutral-dark
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    status?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
@@ -107,7 +107,7 @@ export function getSimplifiedDefaultSettings(
   // Initialize with defaults
   const config: SimplifiedDefaultConfig = {
     defaultTheme: 'Primary',
-    defaultN: 13,
+    defaultN: 11,
     appBarTheme: 'Primary',
     appBarN: PC,
     navBarTheme: 'Primary',
@@ -115,7 +115,7 @@ export function getSimplifiedDefaultSettings(
     statusTheme: 'Primary',
     statusN: PC,
     containerTheme: 'Neutral',
-    containerN: 14,
+    containerN: 12,
     containerShade: 'Light',
     buttonMode: 'laddered',
     textColoring: 'tonal'
@@ -125,7 +125,7 @@ export function getSimplifiedDefaultSettings(
   if (surfaceStyle === 'grey-professional') {
     // Grey Professional
     config.defaultTheme = 'Neutral';
-    config.defaultN = 14;
+    config.defaultN = 12;
     config.appBarTheme = 'Neutral';
     config.appBarN = 1;
     config.navBarTheme = 'Neutral';
@@ -133,7 +133,7 @@ export function getSimplifiedDefaultSettings(
     config.statusTheme = 'Neutral';
     config.statusN = 1;
     config.containerTheme = 'Neutral';
-    config.containerN = 14;
+    config.containerN = 12;
     config.buttonMode = 'primary';
     config.textColoring = 'black-white';
   } else if (surfaceStyle === 'dark-professional') {
@@ -147,13 +147,13 @@ export function getSimplifiedDefaultSettings(
     config.statusTheme = 'Neutral';
     config.statusN = 1;
     config.containerTheme = 'Neutral';
-    config.containerN = 1;
+    config.containerN = 3;
     config.buttonMode = 'primary';
     config.textColoring = 'black-white';
   } else if (schemeType === 'monochromatic') {
     // Monochromatic
     config.defaultTheme = 'Primary';
-    config.defaultN = 13;
+    config.defaultN = 11;
     config.appBarTheme = 'Primary';
     config.appBarN = PC;
     config.navBarTheme = 'Primary';
@@ -161,37 +161,37 @@ export function getSimplifiedDefaultSettings(
     config.statusTheme = 'Primary';
     config.statusN = PC;
     config.containerTheme = 'Primary';
-    config.containerN = 13;
+    config.containerN = 11;
     config.buttonMode = 'primary';
     config.textColoring = 'tonal';
   } else {
     // Light-tonal with PC-based logic
-    if (PC <= 6) {
+    if (PC <= 5) {
       // Dark Primary
       config.defaultTheme = 'Primary';
-      config.defaultN = 13;
+      config.defaultN = 11;
       config.containerTheme = 'Neutral';
-      config.containerN = 14;
+      config.containerN = 12;
       config.buttonMode = 'laddered';
       config.textColoring = 'tonal';
       config.statusTheme = 'Primary';
       config.statusN = PC;
-    } else if (PC > 6 && PC < 11) {
+    } else if (PC > 5 && PC < 9) {
       // Bright Primary
       config.defaultTheme = 'Neutral';
-      config.defaultN = 14;
+      config.defaultN = 12;
       config.containerTheme = 'Neutral';
-      config.containerN = 14;
+      config.containerN = 12;
       config.buttonMode = 'secondary';
       config.textColoring = 'black-white';
       config.statusTheme = 'Neutral';
       config.statusN = 1;
     } else {
-      // Light Primary (PC >= 11)
+      // Light Primary (PC >= 9)
       config.defaultTheme = 'Primary';
-      config.defaultN = 13;
+      config.defaultN = 11;
       config.containerTheme = 'Primary';
-      config.containerN = 13;
+      config.containerN = 11;
       config.buttonMode = 'laddered';
       config.textColoring = 'tonal';
       config.statusTheme = 'Primary';
@@ -206,7 +206,7 @@ export function getSimplifiedDefaultSettings(
       switch (userSelections.background) {
         case 'white':
           config.defaultTheme = 'Neutral';
-          config.defaultN = 14;
+          config.defaultN = 12;
           break;
         case 'primary':
           config.defaultTheme = 'Primary';
@@ -218,7 +218,7 @@ export function getSimplifiedDefaultSettings(
           break;
         case 'primary-light':
           config.defaultTheme = 'Primary';
-          config.defaultN = 13;
+          config.defaultN = 11;
           break;
         case 'primary-base':
           config.defaultTheme = 'Primary';
@@ -230,7 +230,7 @@ export function getSimplifiedDefaultSettings(
           break;
         case 'neutral-light':
           config.defaultTheme = 'Neutral';
-          config.defaultN = 14;
+          config.defaultN = 12;
           break;
         case 'neutral-dark':
           config.defaultTheme = 'Neutral';
@@ -244,91 +244,91 @@ export function getSimplifiedDefaultSettings(
       switch (userSelections.appBar) {
         case 'white':
           config.appBarTheme = 'Neutral';
-          config.appBarN = 14;
+          config.appBarN = 12;
           break;
         case 'black':
           config.appBarTheme = 'Neutral';
           config.appBarN = 1;
           break;
+        case 'primary-light':
+          config.appBarTheme = 'Primary';
+          config.appBarN = 11;
+          break;
+        case 'primary-light-bright':
+          config.appBarTheme = 'Primary';
+          config.appBarN = 12;
+          break;
         case 'primary':
           config.appBarTheme = 'Primary';
           config.appBarN = PC;
           break;
-        case 'primary-light':
+        case 'primary-bright':
           config.appBarTheme = 'Primary';
-          config.appBarN = 13;
-          break;
-        case 'primary-medium':
-          config.appBarTheme = 'Primary';
-          config.appBarN = 6;
-          break;
-        case 'primary-dark':
-          config.appBarTheme = 'Neutral'; // Changed to Dark in spec
-          config.appBarN = 3;
+          config.appBarN = Math.min(PC + 1, 12);
           break;
       }
     }
-    
+
     // Nav Bar selection
     if (userSelections.navBar) {
       switch (userSelections.navBar) {
         case 'white':
           config.navBarTheme = 'Neutral';
-          config.navBarN = 14;
+          config.navBarN = 12;
           break;
         case 'black':
           config.navBarTheme = 'Neutral';
           config.navBarN = 1;
           break;
+        case 'primary-light':
+          config.navBarTheme = 'Primary';
+          config.navBarN = 11;
+          break;
+        case 'primary-light-dim':
+          config.navBarTheme = 'Primary';
+          config.navBarN = 10;
+          break;
         case 'primary':
           config.navBarTheme = 'Primary';
           config.navBarN = PC;
           break;
-        case 'primary-light':
+        case 'primary-dim':
           config.navBarTheme = 'Primary';
-          config.navBarN = 13;
-          break;
-        case 'primary-medium':
-          config.navBarTheme = 'Primary';
-          config.navBarN = 6;
-          break;
-        case 'primary-dark':
-          config.navBarTheme = 'Primary';
-          config.navBarN = 3;
+          config.navBarN = Math.max(PC - 1, 1);
           break;
       }
     }
-    
+
     // Status selection
     if (userSelections.status) {
       switch (userSelections.status) {
         case 'white':
           config.statusTheme = 'Neutral';
-          config.statusN = 14;
+          config.statusN = 12;
           break;
         case 'black':
           config.statusTheme = 'Neutral';
           config.statusN = 1;
           break;
+        case 'primary-light':
+          config.statusTheme = 'Primary';
+          config.statusN = 11;
+          break;
+        case 'primary-light-bright':
+          config.statusTheme = 'Primary';
+          config.statusN = 12;
+          break;
         case 'primary':
           config.statusTheme = 'Primary';
           config.statusN = PC;
           break;
-        case 'primary-light':
+        case 'primary-bright':
           config.statusTheme = 'Primary';
-          config.statusN = 13;
-          break;
-        case 'primary-medium':
-          config.statusTheme = 'Primary';
-          config.statusN = 6;
-          break;
-        case 'primary-dark':
-          config.statusTheme = 'Primary';
-          config.statusN = 3;
+          config.statusN = Math.min(PC + 1, 12);
           break;
       }
     }
-    
+
     // Button mode
     if (userSelections.button) {
       // Extract button type from values like "primary-fixed", "secondary-adaptive", etc.
@@ -368,20 +368,20 @@ export function getSimplifiedDefaultSettings(
         // Use the current background theme and N values
         config.containerTheme = config.defaultTheme;
         config.containerN = config.defaultN;
-        config.containerShade = config.defaultN >= 11 ? 'Medium' : 'Light';
+        config.containerShade = config.defaultN >= 9 ? 'Medium' : 'Light';
         console.log('   ✅ TONAL: ContTheme =', config.containerTheme, 'ContN =', config.containerN, 'CShade =', config.containerShade);
       } else if (userSelections.cardColoring === 'white') {
-        // White Cards: ContTheme = Neutral, ContN = 14, CShade = Medium (14 >= 11)
+        // White Cards: ContTheme = Neutral, ContN = 12, CShade = Medium (12 >= 9)
         config.containerTheme = 'Neutral';
-        config.containerN = 14;
-        config.containerShade = 'Medium'; // 14 >= 11
+        config.containerN = 12;
+        config.containerShade = 'Medium'; // 12 >= 9
         console.log('   ✅ WHITE: ContTheme = Neutral, ContN = 14, CShade = Medium');
       } else if (userSelections.cardColoring === 'black') {
         // Black Cards: ContTheme = Neutral, ContN = 1, CShade = Light (1 < 11)
         config.containerTheme = 'Neutral';
-        config.containerN = 1;
-        config.containerShade = 'Light'; // 1 < 11
-        console.log('   ✅ BLACK: ContTheme = Neutral, ContN = 1, CShade = Light');
+        config.containerN = 3;
+        config.containerShade = 'Light'; // 3 < 9
+        console.log('   ✅ BLACK: ContTheme = Neutral, ContN = 3, CShade = Light');
       }
     }
   }
@@ -461,56 +461,56 @@ function generateTagSection(mode: 'Light-Mode' | 'Dark-Mode', OB: number): any {
         BG: { value: `{Color-Palettes.Primary.Color-${OB}}`, type: 'color' },
         Text: {
           Primary: { value: `{Text.Tag.Primary.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Secondary: {
         BG: { value: `{Color-Palettes.Secondary.Color-${OB}}`, type: 'color' },
         Text: {
           Secondary: { value: `{Text.Tag.Secondary.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: `{Color-Palettes.Tertiary.Color-${OB}}`, type: 'color' },
         Text: {
           Tertiary: { value: `{Text.Tag.Tertiary.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Neutral: {
         BG: { value: `{Color-Palettes.Neutral.Color-${OB}}`, type: 'color' },
         Text: {
           Neutral: { value: `{Text.Tag.Neutral.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Info: {
         BG: { value: `{Color-Palettes.Info.Color-${OB}}`, type: 'color' },
         Text: {
           Info: { value: `{Text.Tag.Info.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Success: {
         BG: { value: `{Color-Palettes.Success.Color-${OB}}`, type: 'color' },
         Text: {
           Success: { value: `{Text.Tag.Success.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Warning: {
         BG: { value: `{Color-Palettes.Warning.Color-${OB}}`, type: 'color' },
         Text: {
           Warning: { value: `{Text.Tag.Warning.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Error: {
         BG: { value: `{Color-Palettes.Error.Color-${OB}}`, type: 'color' },
         Text: {
           Error: { value: `{Text.Tag.Error.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 11 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       }
     }
@@ -556,21 +556,19 @@ function generateDefaultButtonBorders(
     // Border contrast lookup: 3.1:1 against the surface at each Color-N
     // Same pattern for both Surfaces and Containers, same for Light and Dark
     const lightBorderMap: Record<string, string> = {
-      'Color-1': `{Colors.${variable}.Color-8}`,
-      'Color-2': `{Colors.${variable}.Color-8}`,
-      'Color-3': `{Colors.${variable}.Color-9}`,
-      'Color-4': `{Colors.${variable}.Color-11}`,
-      'Color-5': `{Colors.${variable}.Color-12}`,
-      'Color-6': `{Colors.${variable}.Color-13}`,
-      'Color-7': `{Colors.${variable}.Color-3}`,
-      'Color-8': `{Colors.${variable}.Color-4}`,
+      'Color-1': `{Colors.${variable}.Color-6}`,
+      'Color-2': `{Colors.${variable}.Color-6}`,
+      'Color-3': `{Colors.${variable}.Color-7}`,
+      'Color-4': `{Colors.${variable}.Color-9}`,
+      'Color-5': `{Colors.${variable}.Color-10}`,
+      'Color-6': `{Colors.${variable}.Color-3}`,
+      'Color-7': `{Colors.${variable}.Color-4}`,
+      'Color-8': `{Colors.${variable}.Color-5}`,
       'Color-9': `{Colors.${variable}.Color-5}`,
       'Color-10': `{Colors.${variable}.Color-5}`,
-      'Color-11': `{Colors.${variable}.Color-7}`,
-      'Color-12': `{Colors.${variable}.Color-7}`,
-      'Color-13': `{Colors.${variable}.Color-7}`,
-      'Color-14': `{Colors.${variable}.Color-7}`,
-      'Color-Vibrant': `{Colors.${variable}.Color-7}`,
+      'Color-11': `{Colors.${variable}.Color-5}`,
+      'Color-12': `{Colors.${variable}.Color-5}`,
+      'Color-Vibrant': `{Colors.${variable}.Color-5}`,
     };
 
     const darkBorderMap: Record<string, string> = {
@@ -579,15 +577,13 @@ function generateDefaultButtonBorders(
       'Color-3': '{Colors.White}',
       'Color-4': '{Colors.White}',
       'Color-5': '{Colors.White}',
-      'Color-6': '{Colors.White}',
+      'Color-6': `{Colors.Neutral.Color-1}`,
       'Color-7': `{Colors.Neutral.Color-1}`,
       'Color-8': `{Colors.Neutral.Color-1}`,
       'Color-9': `{Colors.Neutral.Color-1}`,
       'Color-10': `{Colors.Neutral.Color-1}`,
       'Color-11': `{Colors.Neutral.Color-1}`,
       'Color-12': `{Colors.Neutral.Color-1}`,
-      'Color-13': `{Colors.Neutral.Color-1}`,
-      'Color-14': `{Colors.Neutral.Color-1}`,
       'Color-Vibrant': `{Colors.Neutral.Color-1}`,
     };
 
@@ -674,9 +670,9 @@ export function generateCompleteSimplifiedSystem(
   schemeType: 'monochromatic' | 'analogous' | 'complementary' | 'triadic' | 'split-complementary' | 'tetradic',
   userSelections?: {
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base' | 'primary-dark' | 'neutral-light' | 'neutral-dark'; // CRITICAL FIX: Added neutral-light and neutral-dark
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    status?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
@@ -693,9 +689,9 @@ export function generateCompleteSimplifiedSystem(
   // Get default settings
   const config = getSimplifiedDefaultSettings(extractedTones, surfaceStyle, schemeType, userSelections);
   
-  // Calculate OB - NEW SPEC: PC >= 11 then OB = 10, else OB = 8
+  // Calculate OB - PC >= 9 then OB = 8, else OB = 6
   const PC = toneToColorNumber(extractedTones.primary);
-  const OB = PC >= 11 ? 10 : 8;
+  const OB = PC >= 9 ? 8 : 6;
   
   // Generate all sections with COMPLETE THEMES (includes Surfaces and Containers)
   const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections);

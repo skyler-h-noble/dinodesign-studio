@@ -122,40 +122,20 @@ export function generateSurfaceDataAttributesFromJSON(jsonData: any): string {
   const surfacesContainers = jsonData['SurfacesContainers'];
   console.log('✅ Found SurfacesContainers, generating CSS from JSON references...');
   
-  // Surface types with their selectors and effects levels
-  const surfaceTypes = [
-    { key: 'Surface', selector: '', effects: 'Effect-Level-1' },
-    { key: 'Surface-Dim', selector: 'Surface-Dim', effects: 'Effect-Level-1' },
-    { key: 'Surface-Bright', selector: 'Surface-Bright', effects: 'Effect-Level-1' },
-    { key: 'Container', selector: 'Container', effects: 'Effect-Level-2' },
-    { key: 'Container-Low', selector: 'Container-Low', effects: 'Effect-Level-2' },
-    { key: 'Container-Lowest', selector: 'Container-Lowest', effects: 'Effect-Level-2' },
-    { key: 'Container-High', selector: 'Container-High', effects: 'Effect-Level-2' },
-    { key: 'Container-Highest', selector: 'Container-Highest', effects: 'Effect-Level-2' }
+  // Container types only — Surface variants are now per-theme
+  const containerTypes = [
+    { key: 'Container', effects: 'Effects-Level-2' },
+    { key: 'Container-Low', effects: 'Effects-Level-1' },
+    { key: 'Container-Lowest', effects: 'Effects-Level-negative-1' },
+    { key: 'Container-High', effects: 'Effects-Level-3' },
+    { key: 'Container-Highest', effects: 'Effects-Level-4' }
   ];
-  
-  // Generate CSS for each surface type
-  surfaceTypes.forEach(({ key, selector, effects }) => {
-    if (!surfacesContainers[key]) {
-      console.log(`⚠️ Surface type ${key} not found in SurfacesContainers`);
-      return;
-    }
-    
-    const surfaceData = surfacesContainers[key];
-    
-    // Build selector - use [data-surface] [data-surface="..."] descendant pattern
-    const fullSelector = selector ? `[data-surface] [data-surface=\"${selector}\"]` : '[data-surface] [data-surface=\"Surface\"]';
-    
+
+  containerTypes.forEach(({ key, effects }) => {
     lines.push('');
-    lines.push(`${fullSelector} {`);
-    
-    // Process all properties dynamically from the JSON
-    const cssVars = processObjectToCSSVars(surfaceData, '  ');
-    lines.push(...cssVars);
-    
-    // Add Effects level
+    lines.push(`[data-surface="${key}"] {`);
+    lines.push(`  --Background: var(--${key});`);
     lines.push(`  --Effects: var(--${effects});`);
-    
     lines.push('}');
   });
   

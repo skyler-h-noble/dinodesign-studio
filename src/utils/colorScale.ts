@@ -1,26 +1,29 @@
 import chroma from 'chroma-js';
 
-/** The 14-tone scale mapped to LCH lightness values */
-export const TONE_SCALE = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99] as const;
+/** The 12-tone light mode scale mapped to LCH lightness values */
+export const TONE_SCALE = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99] as const;
 
-/** Color-N position (1-14) labels */
-export const COLOR_POSITIONS = Array.from({ length: 14 }, (_, i) => i + 1);
+/** The 12-tone dark mode scale — shifted darker for dark mode surfaces */
+export const DARK_TONE_SCALE = [1, 5, 12, 18, 24, 58, 64, 70, 76, 82, 85, 89] as const;
+
+/** Color-N position (1-12) labels */
+export const COLOR_POSITIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export interface ToneStep {
   tone: number;
   lightness: number;
   hex: string;
-  colorNumber: number; // 1-14
+  colorNumber: number; // 1-12
 }
 
 /**
- * Generate a natural (uncapped) 14-tone scale to find the max achievable chroma.
+ * Generate a natural (uncapped) 12-tone scale to find the max achievable chroma.
  * Returns the scale and the peak chroma value.
  */
-function generateNaturalScale(hex: string): { steps: Array<{ tone: number; chroma: number; hue: number }>; peakChroma: number } {
+function generateNaturalScale(hex: string, toneScale: readonly number[] = TONE_SCALE): { steps: Array<{ tone: number; chroma: number; hue: number }>; peakChroma: number } {
   const [, , h] = chroma(hex).lch();
 
-  const steps = TONE_SCALE.map((targetTone) => {
+  const steps = toneScale.map((targetTone) => {
     // Find the max chroma achievable at this lightness and hue
     // Binary search for max displayable chroma
     let lo = 0;
@@ -52,44 +55,64 @@ function generateNaturalScale(hex: string): { steps: Array<{ tone: number; chrom
 }
 
 /**
- * Bell-curve chroma multipliers for each of the 14 tones.
- * Default peaks at Color-7 (index 6, lightness 53).
- * Yellow hues (60-100) shift peak to Color-9 (index 8, lightness 71)
- * because yellow naturally achieves max chroma at higher lightness.
+ * Bell-curve chroma multipliers for each of the 12 tones.
+ * Default peaks at Color-6 (index 5).
+ * Yellow hues (60-100) shift peak to Color-7 (index 6).
  *
- *  Color:  1     2     3     4     5     6     7     8     9    10    11    12    13    14
- *  L:      1    10    19    28    37   46.6   53    62    71    81    90    95    98    99
+ * LIGHT MODE:
+ *  Color:  1     2     3     4     5     6     7     8     9    10    11    12
+ *  L:      1    10    19    28    37    58    71    81    90    95    98    99
  */
 const CHROMA_BELL_DEFAULT = [
-  0.10, 0.20, 0.35, 0.55, 0.75, 0.92,
-  1.00,  // Color-7 — PEAK
-  0.90, 0.75, 0.55, 0.35, 0.22, 0.156, 0.094,
+  0.10, 0.20, 0.35, 0.55, 0.75,
+  0.90,  // Color-6 (L=58)
+  0.75, 0.55, 0.35, 0.22, 0.156, 0.094,
 ];
 
 const CHROMA_BELL_YELLOW = [
-  0.06, 0.12, 0.22, 0.35, 0.50, 0.65, 0.80, 0.92,
-  1.00,  // Color-9 — PEAK (shifted for yellow)
+  0.06, 0.12, 0.22, 0.35, 0.50,
+  0.92,  // Color-6 (L=58)
+  1.00,  // Color-7 (L=71) — PEAK (shifted for yellow)
   0.75, 0.45, 0.25, 0.156, 0.094,
 ];
 
-function getChromaBellCurve(hue: number): number[] {
-  // Yellow/gold hues (roughly 60-100 in LCH) peak at higher lightness
+/**
+ * DARK MODE bell curves — matched to dark mode L values.
+ * Dark mode tones are shifted darker, so the chroma distribution must follow.
+ *
+ *  Color:  1     2     3     4     5     6     7     8     9    10    11    12
+ *  L:      1     5    12    18    24    58    64    70    76    82    85    89
+ */
+const DARK_CHROMA_BELL_DEFAULT = [
+  0.10, 0.15, 0.25, 0.35, 0.45,
+  0.90,  // Color-6 (L=58) — same as light mode
+  0.82, 0.75, 0.65, 0.55, 0.45, 0.35,
+];
+
+const DARK_CHROMA_BELL_YELLOW = [
+  0.06, 0.10, 0.18, 0.28, 0.40,
+  0.92,  // Color-6 (L=58)
+  1.00,  // Color-7 (L=64) — PEAK
+  0.82, 0.65, 0.50, 0.40, 0.30,
+];
+
+function getChromaBellCurve(hue: number, isDarkMode: boolean = false): number[] {
   const normalizedHue = ((hue % 360) + 360) % 360;
-  if (normalizedHue >= 60 && normalizedHue <= 100) {
-    return CHROMA_BELL_YELLOW;
+  if (isDarkMode) {
+    return (normalizedHue >= 60 && normalizedHue <= 100) ? DARK_CHROMA_BELL_YELLOW : DARK_CHROMA_BELL_DEFAULT;
   }
-  return CHROMA_BELL_DEFAULT;
+  return (normalizedHue >= 60 && normalizedHue <= 100) ? CHROMA_BELL_YELLOW : CHROMA_BELL_DEFAULT;
 }
 
 /**
- * Generate a 14-tone scale using a bell-curve chroma distribution.
+ * Generate a 12-tone scale using a bell-curve chroma distribution.
  * maxChroma controls the peak. The peak position shifts based on hue.
  * Each tone is also clamped to the gamut limit at that lightness/hue.
  */
-function generateScaledTones(hex: string, maxChroma: number): ToneStep[] {
+function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly number[] = TONE_SCALE, isDarkMode: boolean = false): ToneStep[] {
   const [, , h] = chroma(hex).lch();
-  const { steps } = generateNaturalScale(hex);
-  const bellCurve = getChromaBellCurve(h);
+  const { steps } = generateNaturalScale(hex, toneScale);
+  const bellCurve = getChromaBellCurve(h, isDarkMode);
 
   return steps.map((step, index) => {
     // Desired chroma from bell curve, clamped to what the gamut can actually display
@@ -120,7 +143,7 @@ function generateScaledTones(hex: string, maxChroma: number): ToneStep[] {
 }
 
 /**
- * Generate a 14-tone light mode scale from a hex color.
+ * Generate a 12-tone light mode scale from a hex color.
  * maxChroma is the desired peak chroma across all tones.
  * Default: uses the natural peak chroma of the color.
  */
@@ -140,7 +163,7 @@ export function generateSemanticLightModeScale(hex: string, maxChroma?: number):
 }
 
 /**
- * Generate a 14-tone dark mode scale from a hex color.
+ * Generate a 12-tone dark mode scale from a hex color.
  * Peak derived from extracted color, capped at maxChroma (default 42).
  */
 export function generateSemanticDarkModeScale(hex: string, maxChroma?: number): ToneStep[] {
@@ -153,11 +176,11 @@ export function generateSemanticDarkModeScale(hex: string, maxChroma?: number): 
   const cap = maxChroma !== undefined ? maxChroma : 42;
   const peakChroma = Math.min(derivedPeak, cap);
 
-  return generateScaledTones(hex, peakChroma);
+  return generateScaledTones(hex, peakChroma, DARK_TONE_SCALE, true);
 }
 
 /**
- * Get the natural peak chroma achievable across all 14 tones for a color.
+ * Get the natural peak chroma achievable across all 12 tones for a color.
  */
 export function getNaturalPeakChroma(hex: string): number {
   const { peakChroma } = generateNaturalScale(hex);
@@ -165,7 +188,7 @@ export function getNaturalPeakChroma(hex: string): number {
 }
 
 /**
- * Convert an LCH lightness value (0-100) to a Color-N position (1-14).
+ * Convert an LCH lightness value (0-100) to a Color-N position (1-12).
  */
 export function toneToColorNumber(tone: number): number {
   const exactIndex = TONE_SCALE.findIndex(t => Math.abs(t - tone) < 0.1);
@@ -190,7 +213,7 @@ export function toneToColorNumber(tone: number): number {
  * Get the vibrant tone Color-N based on mode.
  */
 export function getVibrantColorNumber(mode: 'light' | 'dark'): number {
-  return mode === 'light' ? 11 : 5;
+  return mode === 'light' ? 9 : 5;
 }
 
 /**
@@ -198,7 +221,7 @@ export function getVibrantColorNumber(mode: 'light' | 'dark'): number {
  */
 export function calculateOB(primaryTone: number): number {
   const PC = toneToColorNumber(primaryTone);
-  return PC >= 11 ? 10 : 8;
+  return PC >= 9 ? 8 : 6;
 }
 
 /**

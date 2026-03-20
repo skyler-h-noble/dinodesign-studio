@@ -9,11 +9,11 @@ import { generateSemanticLightModeScale } from '../utils/colorScale';
  * Route: /tune
  */
 
-const TONE_SCALE = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
+const TONE_SCALE = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
 
-const INITIAL_TEXT: number[] =    [11, 11, 11, 12, 12, 13, 1, 3, 3, 4, 4, 5, 5, 5];
-const INITIAL_HEADER: number[] =  [9, 9, 10, 10, 11, 11, 3, 4, 5, 5, 6, 7, 7, 7];
-const INITIAL_QUIET: number[] =   [9, 9, 10, 10, 11, 12, 2, 3, 4, 4, 5, 6, 6, 6];
+const INITIAL_TEXT: number[] =    [9, 9, 9, 10, 10, 1, 3, 3, 4, 4, 5, 5];
+const INITIAL_HEADER: number[] =  [7, 7, 8, 8, 9, 3, 4, 5, 5, 6, 6, 6];
+const INITIAL_QUIET: number[] =   [7, 7, 8, 8, 9, 2, 3, 4, 4, 5, 5, 5];
 
 // Test with a few different palette hues
 const TEST_COLORS = [
@@ -41,7 +41,7 @@ export default function ToneTuner() {
   const p = (n: number) => palette[n - 1]?.hex || '#888';
 
   const update = (type: 'text' | 'header' | 'quiet', index: number, value: number) => {
-    const clamped = Math.max(1, Math.min(14, value));
+    const clamped = Math.max(1, Math.min(12, value));
     if (type === 'text') {
       const next = [...textLookup]; next[index] = clamped; setTextLookup(next);
     } else if (type === 'header') {
@@ -52,7 +52,7 @@ export default function ToneTuner() {
   };
 
   const copyArrays = () => {
-    const output = `const TEXT_LOOKUP_LIGHT_BG: number[] = [\n  ${textLookup.slice(0, 7).join(', ')},\n  ${textLookup.slice(7).join(', ')},\n];\n\nconst HEADER_LOOKUP_LIGHT_BG: number[] = [\n  ${headerLookup.slice(0, 7).join(', ')},\n  ${headerLookup.slice(7).join(', ')},\n];\n\nconst QUIET_LOOKUP_LIGHT_BG: number[] = [\n  ${quietLookup.slice(0, 7).join(', ')},\n  ${quietLookup.slice(7).join(', ')},\n];`;
+    const output = `const TEXT_LOOKUP_LIGHT_BG: number[] = [\n  ${textLookup.slice(0, 6).join(', ')},\n  ${textLookup.slice(6).join(', ')},\n];\n\nconst HEADER_LOOKUP_LIGHT_BG: number[] = [\n  ${headerLookup.slice(0, 6).join(', ')},\n  ${headerLookup.slice(6).join(', ')},\n];\n\nconst QUIET_LOOKUP_LIGHT_BG: number[] = [\n  ${quietLookup.slice(0, 6).join(', ')},\n  ${quietLookup.slice(6).join(', ')},\n];`;
     navigator.clipboard.writeText(output);
     alert('Copied to clipboard!');
   };
@@ -61,7 +61,7 @@ export default function ToneTuner() {
     <div style={{ padding: 32, fontFamily: 'system-ui', maxWidth: 1400, margin: '0 auto' }}>
       <h1 style={{ marginBottom: 8 }}>Tone Tuner</h1>
       <p style={{ color: '#888', marginBottom: 24 }}>
-        Adjust Text, Header, and Quiet Color-N values for each of the 14 surface tones.
+        Adjust Text, Header, and Quiet Color-N values for each of the 12 surface tones.
         Contrast ratios are shown — Text/Quiet need 4.5:1, Header needs 3.1:1.
       </p>
 
@@ -91,7 +91,7 @@ export default function ToneTuner() {
       </div>
 
       {/* Main tuning grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(14, 1fr)', gap: 8, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 8, marginBottom: 32 }}>
         {TONE_SCALE.map((tone, i) => {
           const bgHex = p(i + 1);
           const textHex = p(textLookup[i]);
@@ -116,7 +116,7 @@ export default function ToneTuner() {
               {/* Header preview */}
               <div style={{ color: headerHex, fontWeight: 700, fontSize: 14 }}>Header</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={1} max={14} value={headerLookup[i]}
+                <input type="number" min={1} max={12} value={headerLookup[i]}
                   onChange={e => update('header', i, parseInt(e.target.value) || 1)}
                   style={{ width: 36, padding: 2, fontSize: 11, textAlign: 'center', borderRadius: 4, border: '1px solid rgba(128,128,128,0.5)' }}
                 />
@@ -129,7 +129,7 @@ export default function ToneTuner() {
               {/* Text preview */}
               <div style={{ color: textHex, fontSize: 13 }}>Body text sample</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={1} max={14} value={textLookup[i]}
+                <input type="number" min={1} max={12} value={textLookup[i]}
                   onChange={e => update('text', i, parseInt(e.target.value) || 1)}
                   style={{ width: 36, padding: 2, fontSize: 11, textAlign: 'center', borderRadius: 4, border: '1px solid rgba(128,128,128,0.5)' }}
                 />
@@ -142,7 +142,7 @@ export default function ToneTuner() {
               {/* Quiet preview */}
               <div style={{ color: quietHex, fontSize: 11 }}>Quiet text</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={1} max={14} value={quietLookup[i]}
+                <input type="number" min={1} max={12} value={quietLookup[i]}
                   onChange={e => update('quiet', i, parseInt(e.target.value) || 1)}
                   style={{ width: 36, padding: 2, fontSize: 11, textAlign: 'center', borderRadius: 4, border: '1px solid rgba(128,128,128,0.5)' }}
                 />

@@ -1,6 +1,15 @@
 .assign-colors-page {
-  padding: 40px 24px;
+  padding: 24px 24px 80px;
   width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.assign-colors-page > h2 {
+  text-align: center;
+  margin-bottom: 8px;
 }
 
 .assign-colors-tabs {
@@ -10,34 +19,52 @@
 
 .assign-colors-grid {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 32px;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 24px;
   width: 100%;
   align-items: start;
+  box-sizing: border-box;
 }
 
 .assign-colors-preview {
   position: sticky;
-  top: 40px;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.assign-preview-toggle {
+  margin-bottom: 12px;
 }
 
 .assign-preview-container {
-  height: 600px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
 }
 
 .assign-preview-scaler {
-  transform: scale(0.7);
-  transform-origin: center;
+  transform: scale(0.55);
+  transform-origin: top center;
+  height: 480px;
+}
+
+.assign-preview-label {
+  text-align: center;
+  margin-top: -4px;
 }
 
 .assign-colors-controls {
   width: 100%;
+  max-width: 940px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .assign-card-text-row {
@@ -56,6 +83,7 @@
   display: flex;
   gap: 12px;
   width: 100%;
+  overflow-x: auto;
 }
 
 .assign-bg-buttons {
@@ -77,22 +105,16 @@
   .assign-colors-grid {
     grid-template-columns: 1fr;
     gap: 24px;
+    width: 100%;
   }
 
   .assign-colors-preview {
     position: static;
-    display: flex;
-    justify-content: center;
-  }
-
-  .assign-preview-container {
-    height: auto;
-    padding: 24px 0;
   }
 
   .assign-preview-scaler {
-    transform: scale(0.55);
-    transform-origin: top center;
+    transform: scale(0.5);
+    height: 430px;
   }
 
   .assign-colors-preview.hidden,
@@ -104,7 +126,11 @@
 /* Mobile: stack everything vertically */
 @media (max-width: 600px) {
   .assign-colors-page {
-    padding: 24px 16px;
+    padding: 24px 16px 80px;
+  }
+
+  .assign-colors-grid {
+    width: calc(100% - 32px);
   }
 
   .assign-card-text-row {
@@ -117,8 +143,8 @@
   }
 
   .assign-preview-scaler {
-    transform: scale(0.45);
-    transform-origin: top center;
+    transform: scale(0.4);
+    height: 350px;
   }
 
   .assign-bg-buttons {

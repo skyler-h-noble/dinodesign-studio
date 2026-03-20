@@ -16,10 +16,10 @@ interface BuildInput {
   typographyStyles?: import('../types').TypographyStyle[];
 }
 
-// Neutral gray scale (14 tones) for black/white card coloring
+// Neutral gray scale (12 tones) for black/white card coloring
 const NEUTRAL = [
-  '#050505', '#1a1a1a', '#2e2e2e', '#434343', '#585858', '#6e6e6e',
-  '#7a7a7a', '#8e8e8e', '#a3a3a3', '#b8b8b8', '#cccccc', '#e0e0e0',
+  '#050505', '#1a1a1a', '#2e2e2e', '#434343', '#585858',
+  '#8e8e8e', '#a3a3a3', '#b8b8b8', '#cccccc', '#e0e0e0',
   '#f0f0f0', '#fafafa',
 ];
 
@@ -34,18 +34,15 @@ const NEUTRAL = [
 // Starting points — less extreme than the absolute minimum contrast pass.
 // findAccessibleTone() will nudge further if these don't meet 4.5:1.
 const TEXT_LOOKUP_LIGHT_BG: number[] = [
-  11, 11, 11, 12, 12, 13, 1,
-  3, 3, 4, 4, 4, 4, 4,
+  9, 9, 9, 9, 11, 1, 1, 2, 2, 3, 4, 4,
 ];
 
 const HEADER_LOOKUP_LIGHT_BG: number[] = [
-  12, 12, 12, 12, 12, 12, 2,
-  3, 3, 4, 4, 4, 4, 4,
+  10, 10, 10, 10, 8, 2, 3, 4, 5, 5, 5, 5,
 ];
 
 const QUIET_LOOKUP_LIGHT_BG: number[] = [
-  9, 9, 9, 9, 11, 13, 1,
-  3, 4, 6, 5, 6, 6, 6,
+  6, 6, 7, 8, 9, 2, 3, 4, 5, 5, 5, 5,
 ];
 
 function contrastRatio(hex1: string, hex2: string): number {
@@ -82,7 +79,7 @@ function findAccessibleTone(
     }
   } else {
     // Try lighter tones (higher N)
-    for (let n = startN + 1; n <= 14; n++) {
+    for (let n = startN + 1; n <= 12; n++) {
       const hex = palette[n - 1]?.hex;
       if (hex && contrastRatio(bgHex, hex) >= minContrast) return n;
     }
@@ -114,7 +111,7 @@ function getAccessibleTones(
   palette: Array<{ hex: string }>,
 ): { text: number; header: number; quiet: number } {
   const idx = surfaceN - 1; // 0-based index into lookup tables
-  const safeIdx = Math.max(0, Math.min(idx, 13));
+  const safeIdx = Math.max(0, Math.min(idx, 11));
 
   const textStart = TEXT_LOOKUP_LIGHT_BG[safeIdx];
   const headerStart = HEADER_LOOKUP_LIGHT_BG[safeIdx];
@@ -176,22 +173,57 @@ export function buildPreviewCSS(input: BuildInput): string {
     switch (sel.background) {
       case 'black': surfaceBg = '#1a1a1a'; break;
       case 'primary-base': surfaceBg = p(primary, PC); break;
-      case 'primary-light': surfaceBg = p(primary, 13); break;
+      case 'primary-light': surfaceBg = p(primary, 11); break;
       default: surfaceBg = '#ffffff';
     }
   }
 
-  // ── Resolve nav colors ──
-  function navColor(opt: string) {
-    switch (opt) {
-      case 'black': return isDark ? '#0a0a0a' : '#1a1a1a';
-      case 'primary': return p(primary, PC);
-      case 'primary-light': return p(primary, isDark ? 3 : 13);
-      case 'primary-medium': return p(primary, PC >= 11 ? 8 : 7);
-      case 'primary-dark': return p(primary, isDark ? 1 : 3);
-      default: return isDark ? '#1a1a1a' : '#ffffff';
+  // ── Resolve nav colors using adjacent palette tones ──
+  // Determine surface palette and Color-N
+  let surfacePalette: typeof primary;
+  let surfaceN: number;
+  if (isDark) {
+    surfacePalette = darkUsePrimary ? primary : Array.from({ length: 12 }, (_, i) => ({
+      hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
+    })) as typeof primary;
+    surfaceN = 2;
+  } else {
+    switch (sel.background) {
+      case 'black': surfacePalette = Array.from({ length: 12 }, (_, i) => ({
+        hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
+      })) as typeof primary; surfaceN = 1; break;
+      case 'primary-base': surfacePalette = primary; surfaceN = PC; break;
+      case 'primary-light': surfacePalette = primary; surfaceN = 11; break;
+      default: surfacePalette = Array.from({ length: 12 }, (_, i) => ({
+        hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
+      })) as typeof primary; surfaceN = 12; break;
     }
   }
+
+  // Map nav option → { palette, n, theme, surface }
+  function resolveNavOption(opt: string): { palette: string; n: number; theme: string; surface: string } {
+    switch (opt) {
+      case 'black': return { palette: 'Neutral', n: 1, theme: 'Black', surface: 'Surface' };
+      case 'white': return { palette: 'Neutral', n: 12, theme: 'White', surface: 'Surface' };
+      case 'primary-light': return { palette: 'Primary', n: 11, theme: 'Primary-Light', surface: 'Surface' };
+      case 'primary-light-bright': return { palette: 'Primary', n: 12, theme: 'Primary-Light', surface: 'Surface-Bright' };
+      case 'primary-light-dim': return { palette: 'Primary', n: 10, theme: 'Primary-Light', surface: 'Surface-Dim' };
+      case 'primary': return { palette: 'Primary', n: PC, theme: 'Primary', surface: 'Surface' };
+      case 'primary-bright': return { palette: 'Primary', n: Math.min(PC + 1, 12), theme: 'Primary', surface: 'Surface-Bright' };
+      case 'primary-dim': return { palette: 'Primary', n: Math.max(PC - 1, 1), theme: 'Primary', surface: 'Surface-Dim' };
+      default: return { palette: 'Neutral', n: 12, theme: 'White', surface: 'Surface' };
+    }
+  }
+
+  function navColor(opt: string) {
+    const { palette, n } = resolveNavOption(opt);
+    if (palette === 'Neutral') return neutral(n);
+    return p(primary, n);
+  }
+
+  const statusConfig = resolveNavOption(sel.status);
+  const appBarConfig = resolveNavOption(sel.appBar);
+  const navBarConfig = resolveNavOption(sel.navBar);
   const statusBg = navColor(sel.status);
   const appBarBg = navColor(sel.appBar);
   const navBarBg = navColor(sel.navBar);
@@ -212,15 +244,15 @@ export function buildPreviewCSS(input: BuildInput): string {
   // White/Black card coloring ONLY applies to Default theme containers
   // Tertiary (and other themed containers) always keep their palette color
   if (effectiveCardColoring === 'white') {
-    containerBg = neutral(14);
+    containerBg = neutral(12);
   } else if (effectiveCardColoring === 'black') {
-    containerBg = neutral(2);
+    containerBg = neutral(3);
   } else {
     // Tonal
     if (isDark) {
       containerBg = darkUsePrimary ? p(primary, 3) : neutral(3);
     } else {
-      containerBg = p(primary, 12);
+      containerBg = p(primary, 10);
     }
   }
 
@@ -228,24 +260,13 @@ export function buildPreviewCSS(input: BuildInput): string {
   if (isDark) {
     tertiaryContainerBg = darkUsePrimary ? p(tertiary, 3) : p(tertiary, 3);
   } else {
-    tertiaryContainerBg = p(tertiary, 12);
+    tertiaryContainerBg = p(tertiary, 10);
   }
 
   // ── Text coloring (always tonal in dark mode) ──
-  // Determine which Color-N each surface sits at for the lookup
-  let surfaceN: number;
-  if (isDark) {
-    surfaceN = darkUsePrimary ? 2 : 2; // both use tone 2
-  } else {
-    switch (sel.background) {
-      case 'black': surfaceN = 1; break;
-      case 'primary-base': surfaceN = PC; break;
-      case 'primary-light': surfaceN = 13; break;
-      default: surfaceN = 14; // white
-    }
-  }
-  const containerN = isDark ? 3 : 12;
-  const tertiaryContainerN = isDark ? 3 : 12;
+  // surfaceN already computed above for nav color resolution
+  const containerN = isDark ? 3 : 10;
+  const tertiaryContainerN = isDark ? 3 : 10;
 
   let surfaceText: string;
   let surfaceHeader: string;
@@ -308,10 +329,11 @@ export function buildPreviewCSS(input: BuildInput): string {
       btnText = isLight(surfaceBg) ? '#ffffff' : '#1a1a1a';
       btnBorder = btnBg; break;
     case 'laddered': {
-      btnBg = `var(--Colors-Primary-Color-${PC})`;
-      const ladTones = getAccessibleTones(p(vPrimary, PC), PC, vPrimary);
-      btnText = `var(--Colors-Primary-Color-${ladTones.text})`;
-      btnBorder = `var(--Colors-Primary-Color-${PC})`; break;
+      // Laddered: Default button uses Secondary palette
+      btnBg = `var(--Colors-Secondary-Color-${SC})`;
+      const ladTones = getAccessibleTones(p(vSecondary, SC), SC, vSecondary);
+      btnText = `var(--Colors-Secondary-Color-${ladTones.text})`;
+      btnBorder = `var(--Colors-Secondary-Color-${SC})`; break;
     }
     default: {
       btnBg = `var(--Colors-Primary-Color-${PC})`;
@@ -360,38 +382,27 @@ ${NEUTRAL.map((h, i) => `  --Colors-Neutral-Color-${i + 1}: ${h};`).join('\n')}
 
 /* ══ Status Bar ══ */
 ${(() => {
-  let statusN = 14;
-  if (sel.status === 'black') statusN = isDark ? 2 : 1;
-  else if (sel.status === 'primary') statusN = PC;
-  else if (sel.status === 'primary-light') statusN = isDark ? 3 : 13;
-  else if (sel.status === 'primary-medium') statusN = PC >= 11 ? 8 : 7;
-  else if (sel.status === 'primary-dark') statusN = isDark ? 1 : 3;
-  else statusN = isDark ? 2 : 14;
-
-  const statusTones = getAccessibleTones(statusBg, statusN, primaryLight);
+  const sc = statusConfig;
+  const tones = getAccessibleTones(statusBg, sc.n, primaryLight);
   return `[data-theme="Status"] {
-  --Surface-Bright: ${statusBg};
-  --Text: var(--Colors-Primary-Color-${statusTones.text});
+  --Background: ${statusBg};
+  --Text: var(--Colors-${sc.palette}-Color-${tones.text});
 }`;
 })()}
 
 /* ══ App Bar ══ */
 ${(() => {
-  let appBarN = 14;
-  if (sel.appBar === 'black') appBarN = isDark ? 2 : 1;
-  else if (sel.appBar === 'primary') appBarN = PC;
-  else if (sel.appBar === 'primary-light') appBarN = isDark ? 3 : 13;
-  else if (sel.appBar === 'primary-medium') appBarN = PC >= 11 ? 8 : 7;
-  else if (sel.appBar === 'primary-dark') appBarN = isDark ? 1 : 3;
-  else appBarN = isDark ? 2 : 14;
-
-  const appBarTones = getAccessibleTones(appBarBg, appBarN, primaryLight);
+  const ac = appBarConfig;
+  const tones = getAccessibleTones(appBarBg, ac.n, primaryLight);
   return `[data-theme="App-Bar"] {
-  --Surface-Bright: ${appBarBg};
-  --Text: var(--Colors-Primary-Color-${appBarTones.text});
+  --Background: ${appBarBg};
+  --Text: var(--Colors-${ac.palette}-Color-${tones.text});
+  --Header: var(--Colors-${ac.palette}-Color-${tones.header});
+  --Quiet: var(--Colors-${ac.palette}-Color-${tones.quiet});
+  --Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
   --Buttons-Default-Button: transparent;
-  --Buttons-Default-Text: var(--Colors-Primary-Color-${appBarTones.text});
-  --Buttons-Default-Border: ${borderFor(appBarBg)};
+  --Buttons-Default-Text: var(--Colors-${ac.palette}-Color-${tones.text});
+  --Buttons-Default-Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
 }`;
 })()}
 
@@ -451,33 +462,15 @@ ${(() => {
 
 /* ══ Nav Bar ══ */
 ${(() => {
-  // Determine nav bar tone for accessible text lookup
-  let navN = 14; // default white
-  if (sel.navBar === 'black') navN = isDark ? 2 : 1;
-  else if (sel.navBar === 'primary') navN = PC;
-  else if (sel.navBar === 'primary-light') navN = isDark ? 3 : 13;
-  else if (sel.navBar === 'primary-medium') navN = PC >= 11 ? 8 : 7;
-  else if (sel.navBar === 'primary-dark') navN = isDark ? 1 : 3;
-  else navN = isDark ? 2 : 14;
-
-  if (effectiveTextColoring === 'tonal') {
-    const navTones = getAccessibleTones(navBarBg, navN, primaryLight);
-    return `[data-theme="Nav-Bar"] {
-  --Surface-Dim: ${navBarBg};
+  const nc = navBarConfig;
+  const tones = getAccessibleTones(navBarBg, nc.n, primaryLight);
+  return `[data-theme="Nav-Bar"] {
   --Background: ${navBarBg};
-  --Text: var(--Colors-Primary-Color-${navTones.text});
-  --Quiet: var(--Colors-Primary-Color-${navTones.quiet});
-  --Border: ${borderFor(navBarBg)};
+  --Text: var(--Colors-${nc.palette}-Color-${tones.text});
+  --Header: var(--Colors-${nc.palette}-Color-${tones.header});
+  --Quiet: var(--Colors-${nc.palette}-Color-${tones.quiet});
+  --Border: var(--Border-Surfaces-${nc.palette}-Color-${nc.n});
 }`;
-  } else {
-    return `[data-theme="Nav-Bar"] {
-  --Surface-Dim: ${navBarBg};
-  --Background: ${navBarBg};
-  --Text: ${textFor(navBarBg)};
-  --Quiet: ${quietFor(navBarBg)};
-  --Border: ${borderFor(navBarBg)};
-}`;
-  }
 })()}
 
 /* ══ Surface Resolution ══ */

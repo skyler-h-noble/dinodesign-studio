@@ -54,7 +54,7 @@ export default function DesignSystemNameStage({ onNext, onBack, onSubmit }: Prop
 
       <HStack spacing={2}>
         <Button variant="outline" color="default" onClick={onBack}>
-          Back
+          Cancel
         </Button>
         <Button color="default" onClick={handleNext} disabled={!name.trim()}>
           Next

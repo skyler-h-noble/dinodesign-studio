@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Link, Modal,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
 import type { StageProps, TypographyStyle, ColorScheme } from '../../types';
@@ -18,6 +18,8 @@ interface Props extends StageProps {
   savedFontSamples?: FontPair[];
   savedSelectedSample?: number | null;
   onFontSamplesGenerated?: (samples: FontPair[], selected: number | null) => void;
+  decorativeMode?: 'surface-components' | 'only-selected';
+  onDecorativeModeChange?: (mode: 'surface-components' | 'only-selected') => void;
 }
 
 export interface FontPair {
@@ -83,6 +85,7 @@ const moodToFontMood: Record<string, string> = {
 export default function TypographyStage({
   onNext, onBack, colorScheme, moodBoardUrl, onTypographyComplete, designSystemName,
   savedFontSamples, savedSelectedSample, onFontSamplesGenerated,
+  decorativeMode: decorativeModeProp, onDecorativeModeChange,
 }: Props) {
   const hasSaved = savedFontSamples && savedFontSamples.length > 0;
   const [step, setStep] = useState<'detecting' | 'review' | 'samples'>(hasSaved ? 'samples' : 'detecting');
@@ -96,9 +99,28 @@ export default function TypographyStage({
   const [isGenerating, setIsGenerating] = useState(false);
   const [useMoodBased, setUseMoodBased] = useState(false);
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
+  const [customFontsOpen, setCustomFontsOpen] = useState(false);
+  const decorativeMode = decorativeModeProp || 'surface-components';
+  const setDecorativeMode = (mode: 'surface-components' | 'only-selected') => onDecorativeModeChange?.(mode);
+  const [customFonts, setCustomFonts] = useState({
+    headerUrl: '',
+    headerWeight: '700',
+    decorativeUrl: '',
+    decorativeWeight: '600',
+    bodyUrl: '',
+    bodyWeight: '400',
+    bodySemiboldWeight: '600',
+    bodyBoldWeight: '700',
+  });
   const [showSettings, setShowSettings] = useState(false);
 
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
+
+  const roleLabels: Record<string, string> = {
+    header: 'Decorative Header',
+    decorative: 'Decorative Overline',
+    body: 'Body',
+  };
 
   // ─── Phase 1: Detection ───
   useEffect(() => {
@@ -292,28 +314,63 @@ export default function TypographyStage({
         {/* Collapsible typography settings */}
         <Card padding="medium" style={{ width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
           <VStack spacing={2}>
-            <HStack spacing={2} style={{ justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-              <H3 style={{ fontSize: '1rem' }}>Typography Settings</H3>
-              <Button variant="outline" color="default" size="small" onClick={() => setShowSettings(!showSettings)}>
-                {showSettings ? 'Hide' : 'Edit'}
-              </Button>
-            </HStack>
+            <H3 style={{ fontSize: '1rem' }}>Suggested Settings</H3>
 
             {!showSettings && (
-              <HStack spacing={4} style={{ flexWrap: 'wrap' }}>
-                {editedTypography.map((t, i) => (
-                  <BodySmall key={i} style={{ color: 'var(--Quiet)' }}>
-                    <strong>{t.type}:</strong> {t.family}
-                  </BodySmall>
-                ))}
-              </HStack>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, width: '100%' }}>
+                {/* Left column — font assignments */}
+                <VStack spacing={1} style={{ alignItems: 'flex-start' }}>
+                  <HStack spacing={2} style={{ alignItems: 'center' }}>
+                    <BodySmall style={{ fontWeight: 600 }}>Suggested Typography</BodySmall>
+                    <Button variant="outline" color="default" size="small" onClick={() => setShowSettings(true)}>
+                      Edit
+                    </Button>
+                  </HStack>
+                  {editedTypography.map((t, i) => (
+                    <BodySmall key={i} style={{ color: 'var(--Quiet)' }}>
+                      <strong>{roleLabels[t.type] || t.type}:</strong> {t.family}
+                    </BodySmall>
+                  ))}
+                </VStack>
+
+                {/* Right column — decorative application mode */}
+                <VStack spacing={1} style={{ alignItems: 'flex-start' }}>
+                  <BodySmall style={{ fontWeight: 600 }}>Apply Decorative Styles:</BodySmall>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="decorativeMode"
+                      checked={decorativeMode === 'surface-components'}
+                      onChange={() => setDecorativeMode('surface-components')}
+                      style={{ accentColor: 'var(--Buttons-Primary-Button)' }}
+                    />
+                    <BodySmall>Surface Components Only</BodySmall>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="decorativeMode"
+                      checked={decorativeMode === 'only-selected'}
+                      onChange={() => setDecorativeMode('only-selected')}
+                      style={{ accentColor: 'var(--Buttons-Primary-Button)' }}
+                    />
+                    <BodySmall>Only Where Selected</BodySmall>
+                  </label>
+                </VStack>
+              </div>
             )}
 
             {showSettings && (
               <VStack spacing={4} style={{ width: '100%' }}>
+                <HStack spacing={2} style={{ alignItems: 'center' }}>
+                  <BodySmall style={{ fontWeight: 600 }}>Edit Typography</BodySmall>
+                  <Button variant="outline" color="default" size="small" onClick={() => setShowSettings(false)}>
+                    Hide
+                  </Button>
+                </HStack>
                 {editedTypography.map((t, i) => (
                   <VStack key={i} spacing={2} style={{ width: '100%', paddingBottom: i < 2 ? 16 : 0, borderBottom: i < 2 ? '1px solid var(--Border)' : 'none' }}>
-                    <H3 style={{ fontSize: '1rem' }}>{t.type.charAt(0).toUpperCase() + t.type.slice(1)}</H3>
+                    <H3 style={{ fontSize: '1rem' }}>{roleLabels[t.type] || t.type}</H3>
 
                     <div className="typo-field-header">
                       <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Font Style</BodySmall>
@@ -382,9 +439,17 @@ export default function TypographyStage({
         {/* Font samples grid */}
         {fontSamples.length > 0 && (
           <VStack spacing={2} style={{ width: '100%' }}>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
-              Select a font combination ({fontSamples.length} options)
-            </BodySmall>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
+                Select a font combination ({fontSamples.length} options)
+              </BodySmall>
+              <Link
+                onClick={(e: React.MouseEvent) => { e.preventDefault(); setCustomFontsOpen(true); }}
+                style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+              >
+                Need to use custom fonts?
+              </Link>
+            </div>
 
             <div className="typo-samples-grid">
               {fontSamples.map(sample => {
@@ -519,19 +584,142 @@ export default function TypographyStage({
           </VStack>
         )}
 
-        {/* Navigation */}
-        <HStack spacing={2} style={{ marginTop: 16 }}>
-          <Button variant="outline" color="default" onClick={onBack}>Back</Button>
-          <Button
-            variant="solid"
-            color="default"
-            onClick={handleComplete}
-            disabled={selectedSample === null}
-          >
-            Next
-          </Button>
-        </HStack>
+        {/* Navigation handled by CreationTopBar/BottomBar */}
       </VStack>
+
+      {/* Custom Fonts Modal */}
+      <Modal
+        open={customFontsOpen}
+        onClose={() => setCustomFontsOpen(false)}
+        title="Custom Fonts"
+      >
+        <VStack spacing={3}>
+          <BodySmall style={{ color: 'var(--Quiet)' }}>
+            Provide URLs to your custom font files (WOFF2, WOFF, or TTF). These will be used instead of the suggested Google Fonts.
+          </BodySmall>
+
+          {/* Header Font */}
+          <VStack spacing={1}>
+            <Label>Header Font URL</Label>
+            <input
+              type="url"
+              placeholder="https://example.com/fonts/header.woff2"
+              value={customFonts.headerUrl}
+              onChange={e => setCustomFonts({ ...customFonts, headerUrl: e.target.value })}
+              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+            />
+            <HStack spacing={2}>
+              <VStack spacing={0} style={{ flex: 1 }}>
+                <Label>Weight</Label>
+                <input
+                  type="text"
+                  placeholder="700"
+                  value={customFonts.headerWeight}
+                  onChange={e => setCustomFonts({ ...customFonts, headerWeight: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </VStack>
+            </HStack>
+          </VStack>
+
+          {/* Decorative Font */}
+          <VStack spacing={1}>
+            <Label>Decorative Font URL</Label>
+            <input
+              type="url"
+              placeholder="https://example.com/fonts/decorative.woff2"
+              value={customFonts.decorativeUrl}
+              onChange={e => setCustomFonts({ ...customFonts, decorativeUrl: e.target.value })}
+              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+            />
+            <HStack spacing={2}>
+              <VStack spacing={0} style={{ flex: 1 }}>
+                <Label>Weight</Label>
+                <input
+                  type="text"
+                  placeholder="600"
+                  value={customFonts.decorativeWeight}
+                  onChange={e => setCustomFonts({ ...customFonts, decorativeWeight: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </VStack>
+            </HStack>
+          </VStack>
+
+          {/* Body Font */}
+          <VStack spacing={1}>
+            <Label>Body Font URL</Label>
+            <input
+              type="url"
+              placeholder="https://example.com/fonts/body.woff2"
+              value={customFonts.bodyUrl}
+              onChange={e => setCustomFonts({ ...customFonts, bodyUrl: e.target.value })}
+              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+            />
+            <HStack spacing={2}>
+              <VStack spacing={0} style={{ flex: 1 }}>
+                <Label>Body Weight</Label>
+                <input
+                  type="text"
+                  placeholder="400"
+                  value={customFonts.bodyWeight}
+                  onChange={e => setCustomFonts({ ...customFonts, bodyWeight: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </VStack>
+              <VStack spacing={0} style={{ flex: 1 }}>
+                <Label>Semibold Weight</Label>
+                <input
+                  type="text"
+                  placeholder="600"
+                  value={customFonts.bodySemiboldWeight}
+                  onChange={e => setCustomFonts({ ...customFonts, bodySemiboldWeight: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </VStack>
+              <VStack spacing={0} style={{ flex: 1 }}>
+                <Label>Bold Weight</Label>
+                <input
+                  type="text"
+                  placeholder="700"
+                  value={customFonts.bodyBoldWeight}
+                  onChange={e => setCustomFonts({ ...customFonts, bodyBoldWeight: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </VStack>
+            </HStack>
+          </VStack>
+
+          {/* Figma note */}
+          <Card padding="small" style={{ background: 'var(--Container-Low)', border: '1px solid var(--Border)' }}>
+            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.75rem' }}>
+              <strong>Note for Figma:</strong> Custom fonts must be installed on your computer for them to render properly in the Figma Design System Library. Figma does not support loading fonts from URLs — fonts must be locally installed.
+            </BodySmall>
+          </Card>
+
+          <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+            <Button variant="outline" color="default" onClick={() => setCustomFontsOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="solid"
+              color="default"
+              onClick={() => {
+                // Apply custom fonts as typography styles
+                const styles: TypographyStyle[] = [
+                  { type: 'header', family: customFonts.headerUrl || 'Custom Header', weight: customFonts.headerWeight, letterSpacing: '0em', allCaps: false },
+                  { type: 'decorative', family: customFonts.decorativeUrl || 'Custom Decorative', weight: customFonts.decorativeWeight, letterSpacing: '0em', allCaps: false },
+                  { type: 'body', family: customFonts.bodyUrl || 'Custom Body', weight: customFonts.bodyWeight, letterSpacing: '0em', allCaps: false },
+                ];
+                onTypographyComplete(styles);
+                setCustomFontsOpen(false);
+              }}
+            >
+              Apply Custom Fonts
+            </Button>
+          </HStack>
+        </VStack>
+      </Modal>
     </div>
   );
 }

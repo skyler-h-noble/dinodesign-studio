@@ -219,6 +219,46 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
         textColoring: input.userSelections.textColoring,
       },
     );
+
+    // Add Platform section to JSON
+    designSystemJSON.Platform = {
+      Desktop: {
+        'Container-Padding': { value: 'var(--Sizing-4)', type: 'spacing' },
+        'Button-Height': { value: '32px', type: 'sizing' },
+        'Min-Button-Width': { value: '80px', type: 'sizing' },
+        'Min-Stack-Gap': { value: '0px', type: 'spacing' },
+        'Platform-Label': { value: 'Desktop', type: 'string' },
+      },
+      'IOS-Mobile': {
+        'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
+        'Button-Height': { value: '44px', type: 'sizing' },
+        'Min-Stack-Gap': { value: '10px', type: 'spacing' },
+        'Platform-Label': { value: 'IOS-Mobile', type: 'string' },
+      },
+      'IOS-Tablet': {
+        'Container-Padding': { value: 'var(--Sizing-3)', type: 'spacing' },
+        'Button-Height': { value: '48px', type: 'sizing' },
+        'Min-Stack-Gap': { value: '10px', type: 'spacing' },
+        'Platform-Label': { value: 'IOS-Tablet', type: 'string' },
+      },
+      Android: {
+        'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
+        'Button-Height': { value: '48px', type: 'sizing' },
+        'Min-Stack-Gap': { value: '12px', type: 'spacing' },
+        'Platform-Label': { value: 'Android', type: 'string' },
+      },
+    };
+
+    // Add Cognitive Accessibility section to JSON
+    designSystemJSON.Cognitive = {
+      Dyslexia: {
+        'Cognitive-Multiplier': { value: '1.5', type: 'number' },
+        'Body-Font-Family': { value: 'OpenDyslexic', type: 'fontFamily' },
+      },
+      ADHD: {
+        'Cognitive-Multiplier': { value: '1.5', type: 'number' },
+      },
+    };
   } catch (err) {
     console.error('JSON generation failed, using fallback:', err);
     // Fallback to simplified JSON
@@ -260,42 +300,284 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   }, null, 2);
 
   // 5. Build foundation.css and styles.css (simple static files)
+  const headerFamily = header?.family || 'sans-serif';
+  const decorativeFamily = decorative?.family || 'sans-serif';
+  const bodyFamily = body?.family || 'sans-serif';
+  const headerWeight = header?.weight || '700';
+  const bodyWeight = body?.weight || '400';
+  const borderRadius = BORDER_RADII[input.componentStyle].medium;
+
   const foundationCSS = `:root {
+  --Effects-Level-0: none;
+  --Effects-Level-1: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --Effects-Level-2: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --Effects-Level-3: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --Effects-Level-4: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --Effects-Level-5: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
   --Shadow-1: 0px 0px 0px 1px #eeeeee;
   --Shadow-2: 0px 0px 0px 0px rgba(0, 0, 0, 0.0);
-  --Style-Border-Radius: ${BORDER_RADII[input.componentStyle].medium}px;
+  --Style-Border-Radius: ${borderRadius}px;
   --Style-Gradient-Color-1: var(--Buttons-Primary-Button);
   --Style-Gradient-Color-2: var(--Buttons-Primary-Button);
   --Style-Gradient-Angle: 0;
-}
-`;
 
-  const coreCSS = `/* Core - Sizing */
-:root {
-  --Container-Padding: 24px;
   --Sizing-1: 8px;
   --Sizing-2: 16px;
   --Sizing-3: 24px;
   --Sizing-4: 32px;
   --Sizing-Half: 4px;
   --Sizing-Quarter: 2px;
-  --Body-Font-Size: 16px;
-  --Body-Line-Height: 24px;
-  --H1-Font-Size: 40px;
-  --H1-Line-Height: 40px;
-  --H2-Font-Size: 32px;
-  --H2-Line-Height: 40px;
-  --H3-Font-Size: 28px;
-  --H3-Line-Height: 36px;
-  --Button-Font-Size: 16px;
-  --Button-Line-Height: 20px;
-  --Set-Font-Family-Header: '${header?.family || 'sans-serif'}', serif;
-  --Set-Font-Family-Header-Weight: ${header?.weight || '700'};
-  --Set-Font-Family-Decorative: '${decorative?.family || 'sans-serif'}', sans-serif;
-  --Set-Font-Family-Body: '${body?.family || 'sans-serif'}', sans-serif;
-  --Set-Font-Family-Body-Weight: ${body?.weight || '400'};
+  --Sizing-Negative-1: -8px;
+  --Sizing-Negative-Half: -4px;
+  --Sizing-Negative-Quarter: -2px;
+  --Sizing-Negative-1-and-Half: -12px;
+  --Min-Stack-Gap: 0px;
+}
+`;
+
+  const coreCSS = `/* Platform Font Overrides */
+[data-platform="IOS-Mobile"][data-fonts] {
+  --Platform-Family-Body: var(--Set-Font-Family-Body);
+  --Platform-Family-Header: var(--Set-Font-Family-Header);
+  --Platform-Family-Decorative: var(--Set-Font-Family-Decorative);
+}
+[data-platform="IOS-Tablet"][data-fonts] {
+  --Platform-Family-Body: var(--Set-Font-Family-Body);
+  --Platform-Family-Header: var(--Set-Font-Family-Header);
+  --Platform-Family-Decorative: var(--Set-Font-Family-Decorative);
+}
+[data-platform="Android"][data-fonts] {
+  --Platform-Family-Body: var(--Set-Font-Family-Body);
+  --Platform-Family-Header: var(--Set-Font-Family-Header);
+  --Platform-Family-Decorative: var(--Set-Font-Family-Decorative);
+}
+
+[data-platform="IOS-Mobile"][data-fonts="Default"] {
+  --Platform-Family-Body: "SF Pro";
+  --Platform-Family-Header: "SF Pro";
+  --Platform-Family-Decorative: "SF Pro";
+}
+[data-platform="IOS-Tablet"][data-fonts="Default"] {
+  --Platform-Family-Body: "SF Pro";
+  --Platform-Family-Header: "SF Pro";
+  --Platform-Family-Decorative: "SF Pro";
+}
+[data-platform="Android"][data-fonts="Default"] {
+  --Platform-Font-Family-Body: "Roboto";
+  --Platform-Font-Family-Header: "Roboto";
+  --Platform-Font-Family-Decorative: "Roboto";
+}
+
+/* Desktop Defaults */
+:root {
+  --Container-Padding: var(--Sizing-4);
+  --Platform-Label: "Desktop";
+  --Button-Height: 32px;
+  --Min-Button-Width: 80px;
+  --Set-Font-Family-Header: '${headerFamily}', serif;
+  --Set-Font-Family-Header-Weight: ${headerWeight};
+  --Set-Font-Family-Decorative: '${decorativeFamily}', sans-serif;
+  --Set-Font-Family-Body: '${bodyFamily}', sans-serif;
+  --Set-Font-Family-Body-Weight: ${bodyWeight};
   --Set-Font-Family-Body-Semibold-Weight: 600;
   --Set-Font-Family-Body-Bold-Weight: 700;
+  --Body-Font-Size: 16px;
+  --Body-Letter-Spacing: 0;
+  --Body-Line-Height: 24px;
+  --Body-Paragraph-Spacing: 16px;
+  --H1-Font-Size: 40px;
+  --H1-Line-Height: 40px;
+  --H1-Letter-Spacing: -1px;
+  --H1-Paragraph-Spacing: 32px;
+  --H2-Font-Size: 32px;
+  --H2-Line-Height: 40px;
+  --H2-Letter-Spacing: -1px;
+  --H2-Paragraph-Spacing: 24px;
+  --H3-Font-Size: 28px;
+  --H3-Line-Height: 36px;
+  --H3-Letter-Spacing: -.5px;
+  --H3-Paragraph-Spacing: 20px;
+  --H4-Font-Size: 24px;
+  --H4-Line-Height: 32px;
+  --H4-Letter-Spacing: -.5px;
+  --H4-Paragraph-Spacing: 16px;
+  --H5-Font-Size: 20px;
+  --H5-Line-Height: 28px;
+  --H5-Letter-Spacing: 0px;
+  --H5-Paragraph-Spacing: 12px;
+  --H6-Font-Size: 18px;
+  --H6-Line-Height: 26px;
+  --H6-Letter-Spacing: 0px;
+  --H6-Paragraph-Spacing: 12px;
+  --Label-Font-Size: 14px;
+  --Label-Line-Height: 20px;
+  --Label-Letter-Spacing: 0px;
+  --Label-Paragraph-Spacing: 4px;
+  --Button-Font-Size: 16px;
+  --Button-Line-Height: 20px;
+}
+
+/* iOS Mobile */
+[data-platform="IOS-Mobile"] {
+  --Container-Padding: var(--Sizing-2);
+  --Platform-Label: "IOS-Mobile";
+  --Button-Height: 44px;
+  --Min-Stack-Gap: 10px;
+  --Body-Font-Size: 16px;
+  --Body-Letter-Spacing: -.5px;
+  --Body-Line-Height: 24px;
+  --Body-Paragraph-Spacing: 16px;
+  --H1-Font-Size: 32px;
+  --H1-Line-Height: 40px;
+  --H1-Letter-Spacing: -1px;
+  --H1-Paragraph-Spacing: 24px;
+  --H2-Font-Size: 28px;
+  --H2-Line-Height: 32px;
+  --H2-Letter-Spacing: -.5px;
+  --H2-Paragraph-Spacing: 20px;
+  --H3-Font-Size: 24px;
+  --H3-Line-Height: 32px;
+  --H3-Letter-Spacing: -.5px;
+  --H3-Paragraph-Spacing: 16px;
+  --H4-Font-Size: 20px;
+  --H4-Line-Height: 28px;
+  --H4-Letter-Spacing: 0px;
+  --H4-Paragraph-Spacing: 12px;
+  --H5-Font-Size: 18px;
+  --H5-Line-Height: 26px;
+  --H5-Letter-Spacing: 0px;
+  --H5-Paragraph-Spacing: 12px;
+  --H6-Font-Size: 16px;
+  --H6-Line-Height: 24px;
+  --H6-Letter-Spacing: .5px;
+  --H6-Paragraph-Spacing: 8px;
+  --Label-Font-Size: 13px;
+  --Label-Line-Height: 18px;
+  --Label-Letter-Spacing: 0px;
+  --Label-Paragraph-Spacing: 4px;
+  --Button-Font-Size: 16px;
+  --Button-Line-Height: 20px;
+}
+
+/* iOS Tablet */
+[data-platform="IOS-Tablet"] {
+  --Container-Padding: var(--Sizing-3);
+  --Platform-Label: "IOS-Tablet";
+  --Button-Height: 48px;
+  --Min-Stack-Gap: 10px;
+  --Body-Font-Size: 17px;
+  --Body-Letter-Spacing: -.5px;
+  --Body-Line-Height: 25.5px;
+  --Body-Paragraph-Spacing: 16px;
+  --H1-Font-Size: 40px;
+  --H1-Line-Height: 48px;
+  --H1-Letter-Spacing: -1.5px;
+  --H1-Paragraph-Spacing: 32px;
+  --H2-Font-Size: 32px;
+  --H2-Line-Height: 40px;
+  --H2-Letter-Spacing: -1px;
+  --H2-Paragraph-Spacing: 24px;
+  --H3-Font-Size: 28px;
+  --H3-Line-Height: 36px;
+  --H3-Letter-Spacing: -.5px;
+  --H3-Paragraph-Spacing: 20px;
+  --H4-Font-Size: 24px;
+  --H4-Line-Height: 32px;
+  --H4-Letter-Spacing: -.5px;
+  --H4-Paragraph-Spacing: 16px;
+  --H5-Font-Size: 20px;
+  --H5-Line-Height: 28px;
+  --H5-Letter-Spacing: 0px;
+  --H5-Paragraph-Spacing: 12px;
+  --H6-Font-Size: 18px;
+  --H6-Line-Height: 26px;
+  --H6-Letter-Spacing: 0px;
+  --H6-Paragraph-Spacing: 12px;
+  --Label-Font-Size: 14px;
+  --Label-Line-Height: 20px;
+  --Label-Letter-Spacing: 0px;
+  --Label-Paragraph-Spacing: 4px;
+  --Button-Font-Size: 17px;
+  --Button-Line-Height: 21px;
+}
+
+/* Android */
+[data-platform="Android"] {
+  --Container-Padding: var(--Sizing-2);
+  --Platform-Label: "Android";
+  --Button-Height: 48px;
+  --Min-Stack-Gap: 12px;
+  --Body-Font-Size: 16px;
+  --Body-Line-Height: 24px;
+  --Body-Letter-Spacing: .5px;
+  --Body-Paragraph-Spacing: 16px;
+  --H1-Font-Size: 36px;
+  --H1-Line-Height: 40px;
+  --H1-Letter-Spacing: -.5px;
+  --H1-Paragraph-Spacing: 20px;
+  --H2-Font-Size: 28px;
+  --H2-Line-Height: 36px;
+  --H2-Letter-Spacing: -.5px;
+  --H2-Paragraph-Spacing: 20px;
+  --H3-Font-Size: 24px;
+  --H3-Line-Height: 32px;
+  --H3-Letter-Spacing: 0px;
+  --H3-Paragraph-Spacing: 16px;
+  --H4-Font-Size: 20px;
+  --H4-Line-Height: 28px;
+  --H4-Letter-Spacing: 0px;
+  --H4-Paragraph-Spacing: 12px;
+  --H5-Font-Size: 18px;
+  --H5-Line-Height: 26px;
+  --H5-Letter-Spacing: 0px;
+  --H5-Paragraph-Spacing: 12px;
+  --H6-Font-Size: 16px;
+  --H6-Line-Height: 24px;
+  --H6-Letter-Spacing: .5px;
+  --H6-Paragraph-Spacing: 8px;
+  --Label-Font-Size: 13px;
+  --Label-Line-Height: 18px;
+  --Label-Letter-Spacing: 0px;
+  --Label-Paragraph-Spacing: 4px;
+  --Button-Font-Size: 16px;
+  --Button-Line-Height: 20px;
+}
+
+/* Decorative Font Application */
+/* Typography variants: Header uses body font by default, Decorative Header uses decorative font */
+/* In "surface-components" mode, surface-level elements get decorative font automatically */
+${input.userSelections.decorativeMode === 'surface-components' ? `
+[data-surface="Surface"] [data-decorative],
+[data-surface="Surface-Dim"] [data-decorative],
+[data-surface="Surface-Dimmest"] [data-decorative],
+[data-surface="Surface-Bright"] [data-decorative] {
+  --Font-Family-Header: var(--Set-Font-Family-Header);
+  --Font-Family-Header-Weight: var(--Set-Font-Family-Header-Weight);
+  --Font-Family-Overline: var(--Set-Font-Family-Decorative);
+}
+` : '/* Decorative mode: only-selected — decorative fonts applied only via explicit variant */'}
+
+/* Explicit decorative variants — always available regardless of mode */
+[data-typography="decorative-header"] {
+  font-family: var(--Set-Font-Family-Header);
+  font-weight: var(--Set-Font-Family-Header-Weight);
+}
+[data-typography="decorative-overline"] {
+  font-family: var(--Set-Font-Family-Decorative);
+}
+
+/* Cognitive Accessibility Overrides */
+[data-cognitive="Dyslexia"] {
+  --Cognitive-Multiplier: 1.5;
+  --Body-Font-Family: "OpenDyslexic";
+  --Body-Font-Weight: 400;
+  --Body-Semibold-Font-Weight: 700;
+  --Body-Bold-Font-Weight: 700;
+}
+
+[data-cognitive="ADHD"] {
+  --Cognitive-Multiplier: 1.5;
 }
 `;
 

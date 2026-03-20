@@ -162,19 +162,8 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
             );
           })}
 
-          <Button
-            color="default"
-            fullWidth
-            onClick={() => onGenerate(mode)}
-          >
-            Generate
-          </Button>
         </VStack>
       )}
-
-      <HStack spacing={2}>
-        <Button variant="outline" color="default" onClick={onBack}>Back</Button>
-      </HStack>
     </VStack>
   );
 }

@@ -99,7 +99,7 @@ export default function ExportStage({
 
   return (
     <div className="export-page">
-      <VStack spacing={4} style={{ maxWidth: 800, margin: '0 auto' }}>
+      <VStack spacing={4}>
         <VStack spacing={1}>
           <H2>Start Using Your Design System</H2>
           <Body style={{ color: 'var(--Quiet)' }}>
@@ -107,28 +107,20 @@ export default function ExportStage({
           </Body>
         </VStack>
 
-        {/* Color preview strip */}
-        <HStack spacing={1}>
+        {/* Color preview strip + ID */}
+        <HStack spacing={2} style={{ alignItems: 'center' }}>
           {colors.slice(0, 3).map((c, i) => (
-            <div key={i} style={{ width: 40, height: 40, borderRadius: 8, background: c, border: '1px solid var(--Border)' }} />
+            <div key={i} style={{ width: 32, height: 32, borderRadius: 8, background: c, border: '1px solid var(--Border)' }} />
           ))}
+          <div style={{ flex: 1 }} />
+          <code className="export-id-code" style={{ maxWidth: 280 }}>{uniqueId}</code>
+          <Button variant="outline" color="default" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
+            {copiedId ? 'Copied' : 'Copy'}
+          </Button>
         </HStack>
 
-        {/* Your unique ID */}
-        <div className="export-card">
-          <VStack spacing={2}>
-            <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Your Design System ID</BodySmall>
-            <div className="export-id-row">
-              <code className="export-id-code">{uniqueId}</code>
-              <Button variant="outline" color="default" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
-                {copiedId ? 'Copied' : 'Copy'}
-              </Button>
-            </div>
-          </VStack>
-        </div>
-
         <div className="export-cards-grid">
-          {/* 1. Hosted Design System */}
+          {/* Row 1: Hosted + Figma (50/50) */}
           <div className="export-card">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: colors[0] }}>
@@ -141,19 +133,12 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 View your complete design system with all 49 components rendered with your brand tokens. Share the playground link with your team.
               </BodySmall>
-              <Button
-                variant="solid"
-                color="default"
-                style={{ width: '100%' }}
-                disabled={!hasId}
-                onClick={() => window.open(playgroundUrl, '_blank')}
-              >
+              <Button variant="solid" color="default" style={{ width: '100%' }} disabled={!hasId} onClick={() => window.open(playgroundUrl, '_blank')}>
                 Open Playground
               </Button>
             </VStack>
           </div>
 
-          {/* 2. Figma Design System */}
           <div className="export-card">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: '#1e1e1e' }}>
@@ -169,20 +154,13 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Get a full Figma design system with your brand tokens applied to every component, style, and variable.
               </BodySmall>
-              <VStack spacing={1} style={{ width: '100%' }}>
-                <BodySmall style={{ fontWeight: 600 }}>How to use:</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>1. Open the DinoDesign Figma Design System Template</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>2. Run the DinoDesign Figma Plugin inside the template</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>3. Enter your ID: <code className="export-inline-code">{uniqueId}</code></BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>4. Watch your design system update with your brand tokens</BodySmall>
-              </VStack>
               <Button variant="solid" color="default" style={{ width: '100%' }} disabled>
                 Open Figma Template (Coming Soon)
               </Button>
             </VStack>
           </div>
 
-          {/* 3. Add to Your Code Project */}
+          {/* Row 2: Code Project + Storybook (50/50) */}
           <div className="export-card">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: colors[2] || colors[0] }}>
@@ -198,24 +176,14 @@ export default function ExportStage({
                 <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
                 <div className="export-code-block">
                   <code>{installCmd}</code>
-                  <Button
-                    variant="outline"
-                    color="default"
-                    size="small"
-                    onClick={() => handleCopy(installCmd, setCopiedInstall)}
-                    style={{ flexShrink: 0 }}
-                  >
+                  <Button variant="outline" color="default" size="small" onClick={() => handleCopy(installCmd, setCopiedInstall)} style={{ flexShrink: 0 }}>
                     {copiedInstall ? 'Copied' : 'Copy'}
                   </Button>
                 </div>
-                <BodySmall style={{ color: 'var(--Quiet)', marginTop: 4 }}>
-                  This installs the component library and downloads your CSS token files automatically.
-                </BodySmall>
               </VStack>
             </VStack>
           </div>
 
-          {/* 4. Storybook */}
           <div className="export-card">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: '#FF4785' }}>
@@ -227,19 +195,14 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Browse interactive component documentation with usage examples, prop tables, and live previews for all 49 components.
               </BodySmall>
-              <Button
-                variant="solid"
-                color="default"
-                style={{ width: '100%' }}
-                onClick={() => window.open(storybookUrl, '_blank')}
-              >
+              <Button variant="solid" color="default" style={{ width: '100%' }} onClick={() => window.open(storybookUrl, '_blank')}>
                 Open Storybook
               </Button>
             </VStack>
           </div>
 
-          {/* 5. Start Using in AI — full width */}
-          <div className="export-card" style={{ gridColumn: '1 / -1' }}>
+          {/* Row 3: AI + Accessibility Report (50/50) */}
+          <div className="export-card">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: 'var(--Buttons-Primary-Button)' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -249,81 +212,37 @@ export default function ExportStage({
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Start Using in AI</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Connect your design system to Cursor, Claude Code, or any AI coding assistant. Your hosted design system includes a CLAUDE.md file that teaches AI how to use your tokens and components correctly.
+                Connect your design system to Cursor, Claude Code, or any AI coding assistant.
               </BodySmall>
-
-              <VStack spacing={2} style={{ width: '100%' }}>
-                <BodySmall style={{ fontWeight: 600 }}>For Claude Code:</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
-                  Add this URL to your project's CLAUDE.md so Claude knows your design system:
-                </BodySmall>
+              <VStack spacing={1} style={{ width: '100%' }}>
+                <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
                 <div className="export-code-block">
                   <code>{claudeMdUrl}</code>
-                  <Button
-                    variant="outline"
-                    color="default"
-                    size="small"
-                    onClick={() => handleCopy(claudeMdUrl, setCopiedClaude)}
-                    style={{ flexShrink: 0 }}
-                  >
+                  <Button variant="outline" color="default" size="small" onClick={() => handleCopy(claudeMdUrl, setCopiedClaude)} style={{ flexShrink: 0 }}>
                     {copiedClaude ? 'Copied' : 'Copy'}
                   </Button>
                 </div>
-
-                <BodySmall style={{ fontWeight: 600, marginTop: 4 }}>For Cursor:</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
-                  Add the same URL as a doc reference in your .cursorrules file. It explains all 49 components, every token variable, and the correct usage patterns for your design system.
-                </BodySmall>
               </VStack>
             </VStack>
           </div>
-        </div>
 
-        {/* Temporary: Download All as ZIP */}
-        {hasId && (
-          <div className="export-card" style={{ width: '100%' }}>
-            <VStack spacing={2}>
-              <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Temporary: Download All Files</BodySmall>
-              <Button
-                variant="solid"
-                color="default"
-                style={{ width: '100%' }}
-                onClick={async () => {
-                  const zip = new JSZip();
-                  const base = `https://aqpmdqlhffjakkznxudv.supabase.co/storage/v1/object/public/design-system/${dinoId}`;
-                  const files = ['foundation.css', 'core.css', 'Light-Mode.css', 'Dark-Mode.css', 'base.css', 'styles.css', 'tokens.json', 'DINO-TOKENS.md', 'theme.json'];
-                  for (const f of files) {
-                    try {
-                      const res = await fetch(`${base}/${f}`);
-                      if (res.ok) zip.file(f, await res.text());
-                    } catch { /* skip */ }
-                  }
-                  if (moodBoardUrl) {
-                    try {
-                      const res = await fetch(moodBoardUrl);
-                      if (res.ok) zip.file('mood-board.png', await res.blob());
-                    } catch { /* skip */ }
-                  }
-                  const blob = await zip.generateAsync({ type: 'blob' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `${designSystemName || 'design-system'}.zip`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Download All (.zip)
+          <div className="export-card">
+            <VStack spacing={3}>
+              <div className="export-card-icon" style={{ background: '#2e7d32' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="10" />
+                </svg>
+              </div>
+              <H3 style={{ fontSize: '1.1rem' }}>Accessibility Report</H3>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
+                Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
+              </BodySmall>
+              <Button variant="solid" color="default" style={{ width: '100%' }} disabled>
+                Download Report (Coming Soon)
               </Button>
             </VStack>
           </div>
-        )}
-
-        <HStack spacing={2} style={{ marginTop: 16 }}>
-          <Button variant="outline" color="default" onClick={onBack}>Back</Button>
-        </HStack>
+        </div>
       </VStack>
     </div>
   );

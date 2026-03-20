@@ -1,7 +1,7 @@
 /**
  * Fixed Icons structure for Light-Mode-Professional
  * This structure is constant and does not change based on color extraction
- * Updated to support 14 background levels
+ * Updated to support 12 background levels
  * NOTE: Default icons use Neutral palette instead of Primary
  */
 
@@ -28,35 +28,31 @@ const createIconSet = (mainColor: string, variantColor: string) => ({
 
 export const lightModeProfessionalIconsFixed = {
   Surfaces: {
-    'Background-1': createIconSet('Color-10', 'Color-8'),
-    'Background-2': createIconSet('Color-10', 'Color-8'),
-    'Background-3': createIconSet('Color-10', 'Color-8'),
-    'Background-4': createIconSet('Color-10', 'Color-8'),
-    'Background-5': createIconSet('Color-10', 'Color-8'),
-    'Background-6': createIconSet('Color-10', 'Color-8'),
-    'Background-7': createIconSet('Color-10', 'Color-8'),
-    'Background-8': createIconSet('Color-10', 'Color-8'),
-    'Background-9': createIconSet('Color-6', 'Color-4'),
-    'Background-10': createIconSet('Color-6', 'Color-4'),
-    'Background-11': createIconSet('Color-6', 'Color-4'),
-    'Background-12': createIconSet('Color-7', 'Color-5'),
-    'Background-13': createIconSet('Color-7', 'Color-5'),
-    'Background-14': createIconSet('Color-7', 'Color-5')
+    'Background-1': createIconSet('Color-8', 'Color-6'),
+    'Background-2': createIconSet('Color-8', 'Color-6'),
+    'Background-3': createIconSet('Color-8', 'Color-6'),
+    'Background-4': createIconSet('Color-8', 'Color-6'),
+    'Background-5': createIconSet('Color-8', 'Color-6'),
+    'Background-6': createIconSet('Color-5', 'Color-4'),
+    'Background-7': createIconSet('Color-5', 'Color-4'),
+    'Background-8': createIconSet('Color-5', 'Color-4'),
+    'Background-9': createIconSet('Color-5', 'Color-5'),
+    'Background-10': createIconSet('Color-5', 'Color-5'),
+    'Background-11': createIconSet('Color-5', 'Color-5'),
+    'Background-12': createIconSet('Color-5', 'Color-5')
   },
   Containers: {
-    'Background-1': createIconSet('Color-10', 'Color-8'),
-    'Background-2': createIconSet('Color-10', 'Color-8'),
-    'Background-3': createIconSet('Color-10', 'Color-8'),
-    'Background-4': createIconSet('Color-10', 'Color-8'),
-    'Background-5': createIconSet('Color-10', 'Color-8'),
-    'Background-6': createIconSet('Color-10', 'Color-8'),
-    'Background-7': createIconSet('Color-10', 'Color-8'),
-    'Background-8': createIconSet('Color-10', 'Color-8'),
-    'Background-9': createIconSet('Color-6', 'Color-4'),
-    'Background-10': createIconSet('Color-6', 'Color-4'),
-    'Background-11': createIconSet('Color-6', 'Color-4'),
-    'Background-12': createIconSet('Color-7', 'Color-5'),
-    'Background-13': createIconSet('Color-7', 'Color-5'),
-    'Background-14': createIconSet('Color-7', 'Color-5')
+    'Background-1': createIconSet('Color-8', 'Color-6'),
+    'Background-2': createIconSet('Color-8', 'Color-6'),
+    'Background-3': createIconSet('Color-8', 'Color-6'),
+    'Background-4': createIconSet('Color-8', 'Color-6'),
+    'Background-5': createIconSet('Color-8', 'Color-6'),
+    'Background-6': createIconSet('Color-5', 'Color-4'),
+    'Background-7': createIconSet('Color-5', 'Color-4'),
+    'Background-8': createIconSet('Color-5', 'Color-4'),
+    'Background-9': createIconSet('Color-5', 'Color-5'),
+    'Background-10': createIconSet('Color-5', 'Color-5'),
+    'Background-11': createIconSet('Color-5', 'Color-5'),
+    'Background-12': createIconSet('Color-5', 'Color-5')
   }
 };

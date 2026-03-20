@@ -2,6 +2,7 @@
  * Default Theme Logic
  * Determines default theme settings based on Primary Color tone, surface style, and scheme type
  */
+import { toneToColorNumber } from '../colorScale';
 
 export interface DefaultThemeSettings {
   // Default Theme
@@ -51,9 +52,9 @@ export function calculateDefaultThemeSettings(
   userSelections?: {
     defaultTheme?: 'light' | 'dark';
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    status?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'surface' | 'surface-dim' | 'surface-bright' | 'black' | 'white';
+    navBar?: 'surface' | 'surface-dim' | 'surface-bright' | 'black' | 'white';
+    status?: 'surface' | 'surface-dim' | 'surface-bright' | 'black' | 'white';
     button?: 'primary-adaptive' | 'primary-fixed' | 'black-white';
     cardsText?: 'tonal' | 'professional';
     cardColoring?: 'tonal' | 'white' | 'black';
@@ -61,14 +62,14 @@ export function calculateDefaultThemeSettings(
   }
 ): DefaultThemeSettings {
   
-  // Convert HCT tone (0-100) to Color-N (1-14)
+  // Convert HCT tone (0-100) to Color-N (1-12)
   const toneToColorN = (tone: number): number => {
-    const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-    
+    const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
     // Find the closest tone in the scale
     let closestIndex = 0;
     let minDiff = Math.abs(tone - toneScale[0]);
-    
+
     for (let i = 1; i < toneScale.length; i++) {
       const diff = Math.abs(tone - toneScale[i]);
       if (diff < minDiff) {
@@ -76,10 +77,10 @@ export function calculateDefaultThemeSettings(
         closestIndex = i;
       }
     }
-    
+
     return closestIndex + 1; // Color-N is 1-indexed
   };
-  
+
   // Convert tone values to Color-N at the start
   const primaryColorN = toneToColorN(primaryColorTone);
   const secondaryColorN = toneToColorN(secondaryColorTone);
@@ -92,27 +93,27 @@ export function calculateDefaultThemeSettings(
     return {
       defaultThemeName: 'Default',
       defaultTheme: 'Primary',
-      defaultN: 13,
-      
+      defaultN: 11,
+
       appBar: 'Primary',
       appBarTheme: 'Primary',
       appBarN: primaryColorN,
-      
+
       navBar: 'Primary',
       navBarTheme: 'Primary',
       navBarN: primaryColorN,
-      
+
       status: 'Primary',
       statusTheme: 'Primary',
       statusN: primaryColorN,
-      
+
       buttonDefault: 'Laddered', // Laddered, Fixed per spec
       buttonDefaultN: primaryColorN, // Use PC
-      
+
       containerTheme: 'Primary',
-      containerN: 13,
+      containerN: 11,
       containerShade: 'Light',
-      
+
       textColoringMode: 'tonal'
     };
   }
@@ -123,147 +124,147 @@ export function calculateDefaultThemeSettings(
       defaultThemeName: 'Default',
       defaultTheme: 'Neutral',
       defaultN: 1,
-      
+
       appBar: 'Black',
       appBarTheme: 'Neutral',
       appBarN: 1,
-      
+
       navBar: 'Black',
       navBarTheme: 'Neutral',
       navBarN: 1,
-      
+
       status: 'Black',
       statusTheme: 'Neutral',
       statusN: 1,
-      
+
       buttonDefault: 'Primary',
       buttonDefaultN: primaryColorN,
-      
+
       containerTheme: 'Neutral',
-      containerN: 1, // Black cards (was 14)
+      containerN: 3, // Black cards — surface is 2, container is 3
       containerShade: 'Light',
-      
-      textColoringMode: 'black-white' // B&W text (was tonal)
+
+      textColoringMode: 'black-white'
     };
   }
-  
+
   // grey-professional: Black nav elements, Neutral backgrounds, Primary buttons
   if (surfaceStyle === 'grey-professional') {
     return {
       defaultThemeName: 'Default',
       defaultTheme: 'Neutral',
-      defaultN: 14,
-      
+      defaultN: 12,
+
       appBar: 'Black',
       appBarTheme: 'Neutral',
       appBarN: 1,
-      
+
       navBar: 'Black',
       navBarTheme: 'Neutral',
       navBarN: 1,
-      
+
       status: 'Black',
       statusTheme: 'Neutral',
       statusN: 1,
-      
+
       buttonDefault: 'Primary',
       buttonDefaultN: primaryColorN,
-      
+
       containerTheme: 'Neutral',
-      containerN: 14,
+      containerN: 12,
       containerShade: 'Light',
-      
-      textColoringMode: 'black-white' // B&W text (was tonal)
+
+      textColoringMode: 'black-white'
     };
   }
   
   // light-tonal (default): Logic based on Primary Color tone
   
-  // Dark Primary (PC <= 6)
-  if (primaryColorN <= 6) {
+  // Dark Primary (PC <= 5)
+  if (primaryColorN <= 5) {
     return {
       defaultThemeName: 'Default',
       defaultTheme: 'Primary',
-      defaultN: 13,
-      
+      defaultN: 11,
+
       appBar: 'Primary',
       appBarTheme: 'Primary',
       appBarN: primaryColorN,
-      
+
       navBar: 'Primary',
       navBarTheme: 'Primary',
       navBarN: primaryColorN,
-      
+
       status: 'Primary',
       statusTheme: 'Primary',
       statusN: primaryColorN,
-      
-      buttonDefault: 'Laddered', // Laddered (was Secondary)
-      buttonDefaultN: primaryColorN, // Use PC
-      
-      containerTheme: 'Neutral', // White cards (was Primary)
-      containerN: 14, // White cards (was 13)
+
+      buttonDefault: 'Laddered',
+      buttonDefaultN: primaryColorN,
+
+      containerTheme: 'Neutral',
+      containerN: 12,
       containerShade: 'Light',
-      
+
       textColoringMode: 'tonal'
     };
   }
-  
-  // Bright Primary (PC > 6 and < 11)
-  if (primaryColorN > 6 && primaryColorN < 11) {
+
+  // Bright Primary (PC > 5 and < 9)
+  if (primaryColorN > 5 && primaryColorN < 9) {
     return {
       defaultThemeName: 'Default',
       defaultTheme: 'Neutral',
-      defaultN: 14,
-      
-      appBar: 'Primary', // Primary at PC (was White)
-      appBarTheme: 'Primary', // Primary (was Neutral)
-      appBarN: primaryColorN, // PC (was 14)
-      
+      defaultN: 12,
+
+      appBar: 'Primary',
+      appBarTheme: 'Primary',
+      appBarN: primaryColorN,
+
       navBar: 'Primary',
       navBarTheme: 'Primary',
       navBarN: primaryColorN,
-      
+
       status: 'Black',
       statusTheme: 'Neutral',
       statusN: 1,
-      
+
       buttonDefault: 'Secondary',
-      buttonDefaultN: secondaryColorN, // Use SC for Secondary Fixed behavior
-      
+      buttonDefaultN: secondaryColorN,
+
       containerTheme: 'Neutral',
-      containerN: 14,
+      containerN: 12,
       containerShade: 'Light',
-      
-      textColoringMode: 'black-white' // B&W text (was tonal)
+
+      textColoringMode: 'black-white'
     };
   }
-  
-  // Light Primary (PC >= 11)
+
+  // Light Primary (PC >= 9)
   return {
     defaultThemeName: 'Default',
     defaultTheme: 'Primary',
-    defaultN: 13,
-    
+    defaultN: 11,
+
     appBar: 'Primary',
     appBarTheme: 'Primary',
     appBarN: primaryColorN,
-    
+
     navBar: 'Primary',
     navBarTheme: 'Primary',
     navBarN: primaryColorN,
-    
+
     status: 'Primary',
     statusTheme: 'Primary',
     statusN: primaryColorN,
-    
-    buttonDefault: 'Laddered', // Laddered, Fixed per spec
-    buttonDefaultN: primaryColorN, // Use PC for Laddered Fixed behavior
-    
+
+    buttonDefault: 'Laddered',
+    buttonDefaultN: primaryColorN,
+
     containerTheme: 'Primary',
-    containerN: 13,
+    containerN: 11,
     containerShade: 'Light',
-    
+
     textColoringMode: 'tonal'
   };
 }
@@ -272,14 +273,14 @@ export function calculateDefaultThemeSettings(
  * Helper function to map user selection strings to theme and N values
  */
 function mapSelectionToThemeAndN(selection: string, primaryColorTone: number): { theme: string; n: number } {
-  // Convert HCT tone (0-100) to Color-N (1-14)
+  // Convert HCT tone (0-100) to Color-N (1-12)
   const toneToColorN = (tone: number): number => {
-    const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-    
+    const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
     // Find the closest tone in the scale
     let closestIndex = 0;
     let minDiff = Math.abs(tone - toneScale[0]);
-    
+
     for (let i = 1; i < toneScale.length; i++) {
       const diff = Math.abs(tone - toneScale[i]);
       if (diff < minDiff) {
@@ -287,21 +288,45 @@ function mapSelectionToThemeAndN(selection: string, primaryColorTone: number): {
         closestIndex = i;
       }
     }
-    
+
     return closestIndex + 1; // Color-N is 1-indexed
   };
-  
+
   const primaryColorN = toneToColorN(primaryColorTone);
-  
+
   const mapping: Record<string, { theme: string; n: number }> = {
-    'white': { theme: 'Neutral', n: 14 },
+    'white': { theme: 'Neutral', n: 12 },
     'black': { theme: 'Neutral', n: 1 },
     'primary': { theme: 'Primary', n: primaryColorN },
-    'primary-light': { theme: 'Primary', n: 13 },
+    'primary-light': { theme: 'Primary', n: 11 },
     'primary-medium': { theme: 'Primary', n: 6 },
     'primary-dark': { theme: 'Primary', n: 3 }
   };
   return mapping[selection] || { theme: 'Primary', n: primaryColorN };
+}
+
+/**
+ * Map nav selection to theme and N, with surface-relative options
+ */
+function mapNavSelectionToThemeAndN(
+  selection: string,
+  surfaceTheme: string,
+  surfaceN: number,
+  primaryColorTone: number,
+  navKey: string = 'appBar',
+): { theme: string; n: number } {
+  const isNavBar = navKey === 'navBar';
+  switch (selection) {
+    case 'white': return { theme: 'Neutral', n: 12 };
+    case 'black': return { theme: 'Neutral', n: 1 };
+    case 'primary-light': return { theme: 'Primary', n: 11 };
+    case 'primary-light-bright': return { theme: 'Primary', n: 12 };
+    case 'primary-light-dim': return { theme: 'Primary', n: 10 };
+    case 'primary': { const pcN = toneToColorNumber(primaryColorTone); return { theme: 'Primary', n: pcN }; }
+    case 'primary-bright': { const pcN = toneToColorNumber(primaryColorTone); return { theme: 'Primary', n: Math.min(pcN + 1, 12) }; }
+    case 'primary-dim': { const pcN = toneToColorNumber(primaryColorTone); return { theme: 'Primary', n: Math.max(pcN - 1, 1) }; }
+    default: return mapSelectionToThemeAndN(selection, primaryColorTone);
+  }
 }
 
 /**
@@ -351,7 +376,7 @@ export function applyUserSelections(
 
   // Apply App Bar if selected
   if (userSelections.appBar) {
-    const { theme, n } = mapSelectionToThemeAndN(userSelections.appBar, primaryColorTone);
+    const { theme, n } = mapNavSelectionToThemeAndN(userSelections.appBar, updated.defaultTheme, updated.defaultN, primaryColorTone, 'appBar');
     updated.appBar = getSelectionName(theme, n);
     updated.appBarTheme = theme;
     updated.appBarN = n;
@@ -359,7 +384,7 @@ export function applyUserSelections(
 
   // Apply Nav Bar if selected
   if (userSelections.navBar) {
-    const { theme, n } = mapSelectionToThemeAndN(userSelections.navBar, primaryColorTone);
+    const { theme, n } = mapNavSelectionToThemeAndN(userSelections.navBar, updated.defaultTheme, updated.defaultN, primaryColorTone, 'navBar');
     updated.navBar = getSelectionName(theme, n);
     updated.navBarTheme = theme;
     updated.navBarN = n;
@@ -367,7 +392,7 @@ export function applyUserSelections(
 
   // Apply Status Bar if selected
   if (userSelections.status) {
-    const { theme, n } = mapSelectionToThemeAndN(userSelections.status, primaryColorTone);
+    const { theme, n } = mapNavSelectionToThemeAndN(userSelections.status, updated.defaultTheme, updated.defaultN, primaryColorTone, 'status');
     updated.status = getSelectionName(theme, n);
     updated.statusTheme = theme;
     updated.statusN = n;
@@ -428,14 +453,14 @@ export function applyUserSelections(
       updated.containerN = updated.defaultN;
       updated.containerShade = 'Light';
     } else if (userSelections.cardColoring === 'white') {
-      // White uses Neutral 14 (White background for containers)
+      // White uses Neutral 12 (White background for containers)
       updated.containerTheme = 'Neutral';
-      updated.containerN = 14;
+      updated.containerN = 12;
       updated.containerShade = 'Light';
     } else if (userSelections.cardColoring === 'black') {
-      // Black uses Neutral 1 (Black background for containers)
+      // Black uses Neutral 3 (dark container on dark surface 2)
       updated.containerTheme = 'Neutral';
-      updated.containerN = 1;
+      updated.containerN = 3;
       updated.containerShade = 'Light';
     }
   } else if (userSelections.cardsText) {
@@ -446,11 +471,12 @@ export function applyUserSelections(
       updated.containerShade = 'Light';
     } else if (userSelections.cardsText === 'professional' || userSelections.cardsText === 'primary') {
       updated.containerTheme = 'Neutral';
-      updated.containerN = 14;
+      updated.containerN = 12;
       updated.containerShade = 'Light';
     } else if (userSelections.cardsText === 'black') {
+      // Black uses Neutral 3 (dark container on dark surface 2)
       updated.containerTheme = 'Neutral';
-      updated.containerN = 1;
+      updated.containerN = 3;
       updated.containerShade = 'Light';
     }
   }
@@ -469,9 +495,9 @@ export function applyUserSelections(
  * Get the selection name based on theme and tone
  */
 export function getSelectionName(theme: string, n: number): string {
-  if (theme === 'Neutral' && n === 14) return 'White';
+  if (theme === 'Neutral' && n === 12) return 'White';
   if (theme === 'Neutral' && n === 1) return 'Black';
-  if (theme === 'Primary' && n === 13) return 'Primary-Light';
+  if (theme === 'Primary' && n === 11) return 'Primary-Light';
   if (theme === 'Primary' && n === 6) return 'Primary-Medium';
   if (theme === 'Primary' && n === 3) return 'Primary-Dark';
   return 'Primary'; // Default to Primary if it's the primary color tone

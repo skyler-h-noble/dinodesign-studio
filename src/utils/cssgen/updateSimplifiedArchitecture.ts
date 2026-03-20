@@ -7,18 +7,18 @@ import type { DesignSystem } from '../../types/designSystem';
 
 /**
  * Helper function to convert tone value to Color-N number
- * NEW 14-TONE SYSTEM: [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99]
- *                      1   2   3   4   5    6    7   8   9  10  11  12  13  14
+ * 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
+ *                   1   2   3   4   5   6   7   8   9  10  11  12
  */
 function toneToColorNumber(tone: number): number {
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
   // Find exact match
   const exactIndex = toneScale.findIndex(t => Math.abs(t - tone) < 0.1);
   if (exactIndex !== -1) {
-    return exactIndex + 1; // Color-1 through Color-14
+    return exactIndex + 1; // Color-1 through Color-12
   }
-  
+
   // Find closest tone
   let closestIndex = 0;
   let minDiff = Math.abs(toneScale[0] - tone);
@@ -29,8 +29,8 @@ function toneToColorNumber(tone: number): number {
       closestIndex = i;
     }
   }
-  
-  return closestIndex + 1; // Color-N (1-14)
+
+  return closestIndex + 1; // Color-N (1-12)
 }
 
 // Map background style to Theme and N values
@@ -40,10 +40,10 @@ export function getThemeAndNFromBackgroundStyle(
 ): { theme: string; n: number; colorName: string } {
   switch (backgroundStyle) {
     case 'light-tonal':
-      return { theme: 'Primary', n: 13, colorName: 'Default' };
-    
+      return { theme: 'Primary', n: 11, colorName: 'Default' };
+
     case 'light-professional':
-      return { theme: 'Neutral', n: 14, colorName: 'Default' };
+      return { theme: 'Neutral', n: 12, colorName: 'Default' };
     
     case 'colorful':
       return { 

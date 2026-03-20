@@ -2,16 +2,16 @@ import chroma from 'chroma-js';
 
 // Helper function to convert tone value (e.g., 71) to color number (e.g., 11)
 function toneToColorNumber(tone: number): number {
-  // NEW 14-TONE SYSTEM: [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99]
-  //                      1   2   3   4   5    6    7   8   9  10  11  12  13  14
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  
+  // 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
+  //                   1   2   3   4   5   6   7   8   9  10  11  12
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
   // Find exact match
   const exactIndex = toneScale.findIndex(t => Math.abs(t - tone) < 0.1);
   if (exactIndex !== -1) {
-    return exactIndex + 1; // Color-1 through Color-14
+    return exactIndex + 1; // Color-1 through Color-12
   }
-  
+
   // Find closest tone
   let closestIndex = 0;
   let minDiff = Math.abs(toneScale[0] - tone);
@@ -22,8 +22,8 @@ function toneToColorNumber(tone: number): number {
       closestIndex = i;
     }
   }
-  
-  return closestIndex + 1; // Color-N (1-14)
+
+  return closestIndex + 1; // Color-N (1-12)
 }
 
 /**
@@ -36,18 +36,18 @@ function generateBWButtons(mode: 'Light-Mode' | 'Dark-Mode', theme: string) {
     Containers: {}
   };
   
-  // For both Surfaces and Containers, backgrounds 1-6 use White button, backgrounds 7-14 use Color-1 button
-  for (let n = 1; n <= 14; n++) {
-    const isLightBackground = n <= 6;
+  // For both Surfaces and Containers, backgrounds 1-5 use White button, backgrounds 6-12 use Color-1 button
+  for (let n = 1; n <= 12; n++) {
+    const isLightBackground = n <= 5;
     
     const surfaceButtonConfig = isLightBackground ? {
       Button: { value: `{White}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Neutral.Color-1}`, type: 'color' },
-      Hover: { value: `{Hover.Neutral.Color-13}`, type: 'color' },
-      Active: { value: n === 4 ? `{Active.Neutral.Color-13}` : `{Active.Neutral.Color-12}`, type: 'color' }
+      Hover: { value: `{Hover.Neutral.Color-11}`, type: 'color' },
+      Active: { value: n === 4 ? `{Active.Neutral.Color-11}` : `{Active.Neutral.Color-10}`, type: 'color' }
     } : {
       Button: { value: `{Colors.Neutral.Color-1}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Neutral.Color-14}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Neutral.Color-12}`, type: 'color' },
       Hover: { value: `{Hover.Neutral.Color-2}`, type: 'color' },
       Active: { value: `{Active.Neutral.Color-3}`, type: 'color' }
     };
@@ -55,11 +55,11 @@ function generateBWButtons(mode: 'Light-Mode' | 'Dark-Mode', theme: string) {
     const containerButtonConfig = isLightBackground ? {
       Button: { value: `{White}`, type: 'color' },
       Text: { value: `{Text.Containers.Neutral.Color-1}`, type: 'color' },
-      Hover: { value: `{Hover.Neutral.Color-13}`, type: 'color' },
-      Active: { value: n === 4 ? `{Active.Neutral.Color-13}` : `{Active.Neutral.Color-12}`, type: 'color' }
+      Hover: { value: `{Hover.Neutral.Color-11}`, type: 'color' },
+      Active: { value: n === 4 ? `{Active.Neutral.Color-11}` : `{Active.Neutral.Color-10}`, type: 'color' }
     } : {
       Button: { value: `{Colors.Neutral.Color-1}`, type: 'color' },
-      Text: { value: `{Text.Containers.Neutral.Color-14}`, type: 'color' },
+      Text: { value: `{Text.Containers.Neutral.Color-12}`, type: 'color' },
       Hover: { value: `{Hover.Neutral.Color-2}`, type: 'color' },
       Active: { value: `{Active.Neutral.Color-3}`, type: 'color' }
     };
@@ -69,25 +69,25 @@ function generateBWButtons(mode: 'Light-Mode' | 'Dark-Mode', theme: string) {
   }
   
   // Add Background-Vibrant for both Light-Mode and Dark-Mode
-  // In Light-Mode: uses same references as Background-11
-  // In Dark-Mode: will be replaced with hex values from Light-Mode Background-11 in exportColorSystem.ts
-  
-  // Determine button color for vibrant background (same logic as Background-11)
+  // In Light-Mode: uses same references as Background-9
+  // In Dark-Mode: will be replaced with hex values from Light-Mode Background-9 in exportColorSystem.ts
+
+  // Determine button color for vibrant background (same logic as Background-9)
   let vibrantButtonN: number | string;
-  
+
   if (mode === 'Light-Mode') {
-    vibrantButtonN = 11;
+    vibrantButtonN = 9;
   } else {
     vibrantButtonN = 'Vibrant';
   }
-  
+
   const surfaceVariantConfig = {
     Button: { value: `{Colors.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Surfaces.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Active: { value: `{Active.Neutral.Color-${vibrantButtonN}}`, type: 'color' }
   };
-  
+
   const containerVariantConfig = {
     Button: { value: `{Colors.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Containers.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
@@ -118,8 +118,8 @@ function generateButtonsForMode(
     Containers: {}
   };
   
-  // Generate for Color-1 through Color-14
-  for (let n = 1; n <= 14; n++) {
+  // Generate for Color-1 through Color-12
+  for (let n = 1; n <= 12; n++) {
     // Determine which Color-N to use for Button, Text, Hover, Active
     let buttonColorN: number | string;
     
@@ -150,15 +150,15 @@ function generateButtonsForMode(
   }
   
   // Add Background-Vibrant for both Light-Mode and Dark-Mode
-  // In Light-Mode: uses same references as Background-11
-  // In Dark-Mode: will be replaced with hex values from Light-Mode Background-11 in exportColorSystem.ts
-  
-  // Determine button color for vibrant background (same logic as Background-11)
+  // In Light-Mode: uses same references as Background-9
+  // In Dark-Mode: will be replaced with hex values from Light-Mode Background-9 in exportColorSystem.ts
+
+  // Determine button color for vibrant background (same logic as Background-9)
   let vibrantButtonN: number | string;
-  
+
   if (defaultN === 'adaptive') {
-    // Adaptive: use 11 for Light-Mode, Vibrant for Dark-Mode
-    vibrantButtonN = mode === 'Light-Mode' ? 11 : 'Vibrant';
+    // Adaptive: use 9 for Light-Mode, Vibrant for Dark-Mode
+    vibrantButtonN = mode === 'Light-Mode' ? 9 : 'Vibrant';
   } else if (defaultN === 'Vibrant') {
     // Vibrant: use Color-Vibrant
     vibrantButtonN = 'Vibrant';
@@ -195,21 +195,21 @@ function getAutoCalculatedDefault(
   if (!extractedTones) {
     return {
       theme: 'Primary',
-      colorN: 11
+      colorN: 9
     };
   }
-  
+
   const PC = extractedTones.primary;
   const SC = extractedTones.secondary;
-  
-  // Dark Primary (PC < 11) OR Monochromatic
-  if (PC < 11 || colorScheme === 'Monochromatic') {
+
+  // Dark Primary (PC < 9) OR Monochromatic
+  if (PC < 9 || colorScheme === 'Monochromatic') {
     return {
       theme: 'Primary',
       colorN: toneToColorNumber(PC)
     };
   } else {
-    // Light Primary (PC >= 11): Secondary, Fixed
+    // Light Primary (PC >= 9): Secondary, Fixed
     return {
       theme: 'Secondary',
       colorN: toneToColorNumber(SC)
@@ -241,14 +241,14 @@ function getDefaultButtonConfig(
       // {Default} = Primary, {Default-N} = {PC}
       return {
         theme: 'Primary',
-        colorN: extractedTones ? toneToColorNumber(extractedTones.primary) : 11
+        colorN: extractedTones ? toneToColorNumber(extractedTones.primary) : 9
       };
-    
+
     case 'secondary-fixed':
       // {Default} = Secondary, {Default-N} = {SC}
       return {
         theme: 'Secondary',
-        colorN: extractedTones ? toneToColorNumber(extractedTones.secondary) : 11
+        colorN: extractedTones ? toneToColorNumber(extractedTones.secondary) : 9
       };
     
     case 'secondary-adaptive':
@@ -269,14 +269,14 @@ function getDefaultButtonConfig(
       // {Default} uses the theme of the current surface, fixed to PC
       return {
         theme: 'tonal', // Special marker to indicate tonal behavior
-        colorN: extractedTones ? toneToColorNumber(extractedTones.primary) : 11
+        colorN: extractedTones ? toneToColorNumber(extractedTones.primary) : 9
       };
-    
+
     case 'black-white':
-      // {Default} = BW, {Default-N} = 11 (fixed)
+      // {Default} = BW, {Default-N} = 9 (fixed)
       return {
         theme: 'BW',
-        colorN: 11
+        colorN: 9
       };
     
     default:
@@ -332,19 +332,19 @@ export function generateAllButtonsForMode(
   
   // Primary Button (always uses Primary theme)
   const primaryColorN = buttonStyle === 'primary-fixed'
-    ? (extractedTones ? toneToColorNumber(extractedTones.primary) : 11)
+    ? (extractedTones ? toneToColorNumber(extractedTones.primary) : 9)
     : 'adaptive';
   buttons['Primary'] = generateButtonsForMode(mode, 'Primary', 'Primary', primaryColorN, extractedTones);
   
   // Secondary Button (always uses Secondary theme)
   const secondaryColorN = buttonStyle === 'primary-fixed' || buttonStyle === 'secondary-fixed' || buttonStyle === 'tonal-fixed'
-    ? (extractedTones ? toneToColorNumber(extractedTones.secondary) : 11)
+    ? (extractedTones ? toneToColorNumber(extractedTones.secondary) : 9)
     : 'adaptive';
   buttons['Secondary'] = generateButtonsForMode(mode, 'Secondary', 'Secondary', secondaryColorN, extractedTones);
-  
+
   // Tertiary Button (always uses Tertiary theme)
   const tertiaryColorN = buttonStyle === 'primary-fixed' || buttonStyle === 'secondary-fixed' || buttonStyle === 'tonal-fixed'
-    ? (extractedTones ? toneToColorNumber(extractedTones.tertiary) : 11)
+    ? (extractedTones ? toneToColorNumber(extractedTones.tertiary) : 9)
     : 'adaptive';
   buttons['Tertiary'] = generateButtonsForMode(mode, 'Tertiary', 'Tertiary', tertiaryColorN, extractedTones);
   
@@ -352,7 +352,7 @@ export function generateAllButtonsForMode(
   buttons['Neutral'] = generateButtonsForMode(mode, 'Neutral', 'Neutral', 'adaptive', extractedTones);
   
   // Semantic buttons (Info, Success, Warning, Error) - always fixed at extracted tone
-  const semanticColorN = extractedTones ? toneToColorNumber(extractedTones.primary) : 11;
+  const semanticColorN = extractedTones ? toneToColorNumber(extractedTones.primary) : 9;
   buttons['Info'] = generateButtonsForMode(mode, 'Info', 'Info', semanticColorN, extractedTones);
   buttons['Success'] = generateButtonsForMode(mode, 'Success', 'Success', semanticColorN, extractedTones);
   buttons['Warning'] = generateButtonsForMode(mode, 'Warning', 'Warning', semanticColorN, extractedTones);

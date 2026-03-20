@@ -12,22 +12,22 @@
  * - Based on button mode selection (Primary, Secondary, Tonal, Laddered, Black/White)
  * - Handles text coloring (Tonal vs Black/White)
  * 
- * UPDATE: OB now uses 10 when PC >= 11 (was 9 before)
+ * UPDATE: OB now uses 8 when PC >= 9, else 6
  * UPDATE: Primary/Secondary/Tertiary buttons use PC/SC/TC instead of OB
  */
 
 // Helper function to convert tone value (e.g., 71) to color number (e.g., 11)
 function toneToColorNumber(tone: number): number {
-  // NEW 14-TONE SYSTEM: [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99]
-  //                      1   2   3   4   5    6    7   8   9  10  11  12  13  14
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  
+  // 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
+  //                   1   2   3   4   5   6   7   8   9  10  11  12
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
   // Find exact match
   const exactIndex = toneScale.findIndex(t => Math.abs(t - tone) < 0.1);
   if (exactIndex !== -1) {
-    return exactIndex + 1; // Color-1 through Color-14
+    return exactIndex + 1; // Color-1 through Color-12
   }
-  
+
   // Find closest tone
   let closestIndex = 0;
   let minDiff = Math.abs(toneScale[0] - tone);
@@ -38,8 +38,8 @@ function toneToColorNumber(tone: number): number {
       closestIndex = i;
     }
   }
-  
-  return closestIndex + 1; // Color-N (1-14)
+
+  return closestIndex + 1; // Color-N (1-12)
 }
 
 /**
@@ -51,12 +51,12 @@ export function generateBaseButtons(
   mode: 'Light-Mode' | 'Dark-Mode',
   extractedTones?: { primary: number; secondary: number; tertiary: number }
 ): any {
-  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 10;
-  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 10;
-  
-  // Calculate {OB} (Other Buttons): if PC >= 11 then 10, else 8
-  const OB = PC >= 11 ? 10 : 8;
+  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
+  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8;
+
+  // Calculate {OB} (Other Buttons): if PC >= 9 then 8, else 6
+  const OB = PC >= 9 ? 8 : 6;
   
   console.log(`🔘 [generateBaseButtons] Mode: ${mode}`);
   console.log(`  📊 EXTRACTED TONES INPUT:`, extractedTones);
@@ -207,12 +207,12 @@ export function generateBaseButtons(
       Light: {
         Button: { value: '{White}', type: 'color' },
         Text: { value: '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
-        Hover: { value: '{Hover.Neutral.Color-13}', type: 'color' },
-        Active: { value: '{Active.Neutral.Color-14}', type: 'color' }
+        Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
+        Active: { value: '{Active.Neutral.Color-12}', type: 'color' }
       },
       Medium: {
         Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        Text: { value: '{Text.Surfaces.BW-Button.Color-14}', type: 'color' },
+        Text: { value: '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
         Hover: { value: '{Hover.Neutral.Color-1}', type: 'color' },
         Active: { value: '{Active.Neutral.Color-1}', type: 'color' }
       }
@@ -222,15 +222,15 @@ export function generateBaseButtons(
     buttons.BlackWhite = {
       Light: {
         Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        Text: { value: '{Text.Surfaces.BW-Button.Color-14}', type: 'color' },
+        Text: { value: '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
         Hover: { value: '{Hover.Neutral.Color-2}', type: 'color' },
         Active: { value: '{Active.Neutral.Color-3}', type: 'color' }
       },
       Medium: {
         Button: { value: '{White}', type: 'color' },
         Text: { value: '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
-        Hover: { value: '{Hover.Neutral.Color-13}', type: 'color' },
-        Active: { value: '{Active.Neutral.Color-12}', type: 'color' }
+        Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
+        Active: { value: '{Active.Neutral.Color-10}', type: 'color' }
       }
     };
   }

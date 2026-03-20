@@ -1009,32 +1009,54 @@ function generateThemesVariables(modeData: any): string {
     console.log(`  ├─ Processing theme: ${themeName}`);
     console.log(`      Has Surfaces: ${!!theme.Surfaces}, Has Containers: ${!!theme.Containers}`);
     
-    // Surfaces selector: [data-theme="Primary-Light"], [data-theme="Primary-Light"][data-surface^="Surface"]
-    if (theme.Surfaces && typeof theme.Surfaces === 'object') {
-      const surfaceLines: string[] = [];
-      surfaceLines.push(`/* Theme: ${themeName} - Surfaces */`);
-      surfaceLines.push(`[data-theme="${themeName}"], [data-theme="${themeName}"][data-surface^="Surface"] {`);
-      
-      // DEBUG: Check if Buttons and Tag exist in Surfaces
-      if (theme.Surfaces.Buttons) {
-        console.log(`      ✓ Found Surfaces.Buttons with keys:`, Object.keys(theme.Surfaces.Buttons));
-      } else {
-        console.log(`      ✗ Surfaces.Buttons NOT FOUND`);
+    // Surfaces selectors: default (Surface) on theme element, variants on descendants
+    const surfaceVariants: { key: string; selector: string }[] = [
+      {
+        key: 'Surfaces',
+        selector: `[data-theme="${themeName}"]`
+      },
+      {
+        key: 'Surfaces-Dim',
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dim"]`
+      },
+      {
+        key: 'Surfaces-Dimmest',
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dimmest"]`
+      },
+      {
+        key: 'Surfaces-Bright',
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Bright"]`
       }
-      if (theme.Surfaces.Tag) {
-        console.log(`      ✓ Found Surfaces.Tag with keys:`, Object.keys(theme.Surfaces.Tag));
-      } else {
-        console.log(`      ✗ Surfaces.Tag NOT FOUND`);
+    ];
+
+    for (const variant of surfaceVariants) {
+      const variantData = theme[variant.key];
+      if (variantData && typeof variantData === 'object') {
+        const surfaceLines: string[] = [];
+        surfaceLines.push(`/* Theme: ${themeName} - ${variant.key} */`);
+        surfaceLines.push(`${variant.selector} {`);
+
+        // DEBUG: Check if Buttons and Tag exist
+        if (variantData.Buttons) {
+          console.log(`      ✓ Found ${variant.key}.Buttons with keys:`, Object.keys(variantData.Buttons));
+        } else {
+          console.log(`      ✗ ${variant.key}.Buttons NOT FOUND`);
+        }
+        if (variantData.Tag) {
+          console.log(`      ✓ Found ${variant.key}.Tag with keys:`, Object.keys(variantData.Tag));
+        } else {
+          console.log(`      ✗ ${variant.key}.Tag NOT FOUND`);
+        }
+
+        // Recursively process all tokens
+        const tokenLines = processTokens(variantData);
+        surfaceLines.push(...tokenLines);
+
+        console.log(`      └─ ${variant.key} tokens generated: ${tokenLines.length}`);
+        surfaceLines.push('}');
+        surfaceLines.push('');
+        sections.push(surfaceLines.join('\n'));
       }
-      
-      // Recursively process all tokens in Surfaces
-      const tokenLines = processTokens(theme.Surfaces);
-      surfaceLines.push(...tokenLines);
-      
-      console.log(`      └─ Surface tokens generated: ${tokenLines.length}`);
-      surfaceLines.push('}');
-      surfaceLines.push('');
-      sections.push(surfaceLines.join('\n'));
     }
     
     // Containers selector: [data-theme="Primary-Light"] [data-surface^="Container"]
@@ -2523,7 +2545,11 @@ function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJson
     lines.push(generateCSSHeader(fullJsonData).trim());
     lines.push('');
   }
-  
+
+  // Reset body margin
+  lines.push('body { margin: 0; }');
+  lines.push('');
+
   lines.push(`/* ========================================`);
   lines.push(` * ${modeName} CSS Variables`);
   lines.push(` * Generated from DynoDesign JSON`);
@@ -3293,31 +3319,21 @@ function generateSurfacesContainersCSS(jsonData: any): string {
   lines.push(' * ======================================== */');
   lines.push('');
   
-  // Process ALL surface types
-  const surfaceTypes = [
-    'Surface',
-    'Surface-Dim',
-    'Surface-Bright',
-    'Container',
-    'Container-Low',
-    'Container-Lowest',
-    'Container-High',
-    'Container-Highest'
+  // Container types only — Surface variants are now per-theme
+  const containerTypes = [
+    { key: 'Container', effects: 'Effects-Level-2' },
+    { key: 'Container-Low', effects: 'Effects-Level-1' },
+    { key: 'Container-Lowest', effects: 'Effects-Level-negative-1' },
+    { key: 'Container-High', effects: 'Effects-Level-3' },
+    { key: 'Container-Highest', effects: 'Effects-Level-4' },
   ];
-  
-  surfaceTypes.forEach((surfaceType) => {
-    if (surfacesContainers[surfaceType] && surfacesContainers[surfaceType].Background) {
-      const backgroundValue = surfacesContainers[surfaceType].Background.value;
-      // Convert {Surface} to var(--Surface), etc.
-      const cssValue = tokenToVar(backgroundValue);
-      
-      lines.push(`[data-surface="${surfaceType}"] {`);
-      lines.push(`  --Background: ${cssValue};`);
-      lines.push(`}`);
-      lines.push('');
-    } else {
-      console.log(`⚠️ Surface type "${surfaceType}" not found in SurfacesContainers`);
-    }
+
+  containerTypes.forEach(({ key, effects }) => {
+    lines.push(`[data-surface="${key}"] {`);
+    lines.push(`  --Background: var(--${key});`);
+    lines.push(`  --Effects: var(--${effects});`);
+    lines.push('}');
+    lines.push('');
   });
   
   console.log(`✅ generateSurfacesContainersCSS: Generated ${lines.length} lines of CSS`);
@@ -4239,15 +4255,19 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push(' * ======================================== *\/');
   lines.push('');
   lines.push('[data-surface="Surface"] {');
-  lines.push('  --Background: var(--Surface);');
+  lines.push('  --Surface: var(--Surface);');
   lines.push('}');
   lines.push('');
   lines.push('[data-surface="Surface-Dim"] {');
-  lines.push('  --Background: var(--Surface-Dim);');
+  lines.push('  --Surface: var(--Surface-Dim);');
+  lines.push('}');
+  lines.push('');
+  lines.push('[data-surface="Surface-Dimmest"] {');
+  lines.push('  --Surface: var(--Surface-Dimmest);');
   lines.push('}');
   lines.push('');
   lines.push('[data-surface="Surface-Bright"] {');
-  lines.push('  --Background: var(--Surface-Bright);');
+  lines.push('  --Surface: var(--Surface-Bright);');
   lines.push('}');
   lines.push('');
   lines.push('[data-surface="Container"] {');

@@ -21,6 +21,9 @@ interface Props extends StageProps {
   onSchemesGenerated?: (schemes: ColorScheme[]) => void;
   savedTopColors?: ExtractedColor[];
   onTopColorsExtracted?: (colors: ExtractedColor[]) => void;
+  onCustomBackChange?: (handler: (() => void) | null) => void;
+  onCustomNextChange?: (handler: (() => void) | null) => void;
+  onNextLabelChange?: (label: string | null) => void;
 }
 
 export default function ColorStage({
@@ -33,6 +36,9 @@ export default function ColorStage({
   onSchemesGenerated,
   savedTopColors,
   onTopColorsExtracted,
+  onCustomBackChange,
+  onCustomNextChange,
+  onNextLabelChange,
 }: Props) {
   const [step, setStep] = useState<ColorStep>(selectedScheme ? 'theme' : 'extraction');
   const [colorData, setColorData] = useState<ExtractedColorData | null>(null);
@@ -120,6 +126,31 @@ export default function ColorStage({
     regenerateSchemes(topColors, primaryIndex);
     setStep('theme');
   }, [topColors, primaryIndex, regenerateSchemes]);
+
+  // Register custom back handler: theme step → extraction, extraction → previous stage
+  useEffect(() => {
+    if (step === 'theme') {
+      onCustomBackChange?.(() => setStep('extraction'));
+    } else {
+      onCustomBackChange?.(null);
+    }
+    return () => onCustomBackChange?.(null);
+  }, [step, onCustomBackChange]);
+
+  // Register custom next handler: extraction → generate themes, theme → next stage
+  useEffect(() => {
+    if (step === 'extraction') {
+      onCustomNextChange?.(() => {
+        regenerateSchemes(topColors, primaryIndex);
+        setStep('theme');
+      });
+      onNextLabelChange?.('Generate Themes');
+    } else {
+      onCustomNextChange?.(null);
+      onNextLabelChange?.(null);
+    }
+    return () => { onCustomNextChange?.(null); onNextLabelChange?.(null); };
+  }, [step, topColors, primaryIndex, regenerateSchemes, onCustomNextChange, onNextLabelChange]);
 
   if (isLoading) {
     return (
@@ -257,10 +288,7 @@ export default function ColorStage({
           </Card>
         )}
 
-        <Button color="default" fullWidth style={{ maxWidth: 500 }} onClick={handleGenerateThemes}>
-          Generate Themes
-        </Button>
-        <Button variant="outline" color="default" onClick={onBack}>Back</Button>
+        {/* Generate Themes handled by bottom bar */}
       </VStack>
     );
   }
@@ -366,6 +394,7 @@ export default function ColorStage({
 
               <BodySmall style={{ fontSize: '0.75rem' }}>
                 <strong>Click any tone</strong> to update which tone represents each color.
+                {' '}(Mode: {toneMode}, Max Chroma: {toneMode === 'light' ? chromaPerColor[0] : darkChromaPerColor[0]})
               </BodySmall>
 
               {topColors.map((color, colorIdx) => {
@@ -407,23 +436,38 @@ export default function ColorStage({
                           <div
                             key={i}
                             style={{
-                              minWidth: 24,
-                              height: 24,
                               flex: 1,
-                              background: step.hex,
-                              cursor: 'pointer',
-                              borderRadius: 4,
-                              outline: isCurrentTone ? '2px solid var(--Focus-Visible)' : 'none',
-                              outlineOffset: isCurrentTone ? 1 : 0,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 2,
                             }}
-                            title={`Color-${step.colorNumber}: ${step.hex}`}
-                            onClick={() => {
-                              const updated = [...topColors];
-                              updated[colorIdx] = { ...updated[colorIdx], hex: step.hex };
-                              setTopColors(updated);
-                              regenerateSchemes(updated, primaryIndex);
-                            }}
-                          />
+                          >
+                            <div
+                              style={{
+                                width: '100%',
+                                height: 24,
+                                background: step.hex,
+                                cursor: toneMode === 'light' ? 'pointer' : 'default',
+                                borderRadius: 4,
+                                outline: isCurrentTone ? '2px solid var(--Focus-Visible)' : 'none',
+                                outlineOffset: isCurrentTone ? 1 : 0,
+                              }}
+                              title={`Color-${step.colorNumber}: ${step.hex}`}
+                              onClick={() => {
+                                if (toneMode === 'dark') return;
+                                const updated = [...topColors];
+                                updated[colorIdx] = { ...updated[colorIdx], hex: step.hex };
+                                setTopColors(updated);
+                                regenerateSchemes(updated, primaryIndex);
+                              }}
+                            />
+                            {isCurrentTone && (
+                              <span style={{ fontSize: '0.55rem', color: 'var(--Quiet)', whiteSpace: 'nowrap' }}>
+                                {colorIdx === primaryIndex ? 'Primary' : ['Secondary', 'Tertiary'][colorIdx - (primaryIndex < colorIdx ? 1 : 0)] || `Color ${colorIdx + 1}`}
+                              </span>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -498,7 +542,7 @@ export default function ColorStage({
                             }
                           }}
                         >
-                          Reset to Natural ({naturalChroma})
+                          Reset to Natural
                         </Button>
                       </VStack>
                     )}
@@ -645,10 +689,7 @@ export default function ColorStage({
         })}
       </VStack>
 
-      <HStack spacing={2}>
-        <Button variant="outline" color="default" onClick={() => setStep('extraction')}>Back</Button>
-        <Button color="default" onClick={onNext} disabled={!selectedScheme}>Next</Button>
-      </HStack>
+      {/* Navigation handled by CreationTopBar — Back goes to extraction step first */}
     </VStack>
   );
 }

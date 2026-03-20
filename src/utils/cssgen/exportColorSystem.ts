@@ -1,4 +1,4 @@
-// Button logic update - OB=11 when PC>=11 - cache bust v2024-03-13
+// Button logic update - OB=8 when PC>=9 - 12-tone scale
 import { blendColors } from '../colorScale';
 import chroma from 'chroma-js';
 import { 
@@ -18,17 +18,17 @@ import { generateCompleteButtonSystem } from './generateButtonsSimplified';
 import { generateCompleteSimplifiedSystem } from './completeSimplifiedSystem';
 
 // Helper function to convert tone value to Color-X number
-// NEW 14-TONE SYSTEM: [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99]
-//                      1   2   3   4   5    6    7   8   9  10  11  12  13  14
+// 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
+//                   1   2   3   4   5   6   7   8   9  10  11  12
 function toneToColorNumber(tone: number): number {
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
   // Find exact match
   const exactIndex = toneScale.findIndex(t => Math.abs(t - tone) < 0.1);
   if (exactIndex !== -1) {
-    return exactIndex + 1; // Color-1 through Color-14
+    return exactIndex + 1; // Color-1 through Color-12
   }
-  
+
   // Find closest tone
   let closestIndex = 0;
   let minDiff = Math.abs(toneScale[0] - tone);
@@ -39,8 +39,8 @@ function toneToColorNumber(tone: number): number {
       closestIndex = i;
     }
   }
-  
-  return closestIndex + 1; // Color-N (1-14)
+
+  return closestIndex + 1; // Color-N (1-12)
 }
 
 // Types for the export structure
@@ -569,7 +569,7 @@ function getTextColor(bgColor: string, palette: { tone: number; color: string }[
       // Medium backgrounds: use medium-dark text
       return palette[1]?.color || '#1A1A1A';
     } else {
-      // Dark backgrounds: use light text (Color-12 or Color-13)
+      // Dark backgrounds: use light text (Color-10 or Color-11)
       return palette.length > 11 ? palette[11].color : '#FFFFFF';
     }
   } else {
@@ -578,7 +578,7 @@ function getTextColor(bgColor: string, palette: { tone: number; color: string }[
       // Light backgrounds: use dark text (Color-1 or Color-2)
       return palette[0]?.color || '#000000';
     } else {
-      // Dark backgrounds: use light text (Color-12 or Color-13)
+      // Dark backgrounds: use light text (Color-10 or Color-11)
       return palette.length > 11 ? palette[11].color : '#FFFFFF';
     }
   }
@@ -695,7 +695,7 @@ function getBorderVariantColor(bgColor: string, palette: { tone: number; color: 
  * Get hotlink color (typically primary color)
  */
 function getHotlinkColor(primaryPalette: { tone: number; color: string }[], isDark: boolean = false): string {
-  // Use Color-11 from primary palette (vibrant color)
+  // Use Color-9 from primary palette (vibrant color)
   return primaryPalette.length > 10 ? primaryPalette[10].color : primaryPalette[primaryPalette.length - 1].color;
 }
 
@@ -703,7 +703,7 @@ function getHotlinkColor(primaryPalette: { tone: number; color: string }[], isDa
  * Get hotlink-visited color (typically a variation of primary)
  */
 function getHotlinkVisitedColor(primaryPalette: { tone: number; color: string }[], isDark: boolean = false): string {
-  // Use Color-9 from primary palette (slightly darker/different than regular hotlink)
+  // Use Color-7 from primary palette (slightly darker/different than regular hotlink)
   return primaryPalette.length > 8 ? primaryPalette[8].color : primaryPalette[Math.max(0, primaryPalette.length - 3)].color;
 }
 
@@ -712,22 +712,20 @@ function getHotlinkVisitedColor(primaryPalette: { tone: number; color: string }[
  */
 function getFixedHeaderToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
   const colorMap: { [key: string]: { surfaces: number; containers: number } } = {
-    '1': { surfaces: 9, containers: 10 },
-    '2': { surfaces: 9, containers: 10 },
-    '3': { surfaces: 10, containers: 11 },
-    '4': { surfaces: 11, containers: 3 },
-    '5': { surfaces: 12, containers: 4 },
-    '6': { surfaces: 4, containers: 4 },
-    '7': { surfaces: 4, containers: 4 },
+    '1': { surfaces: 7, containers: 8 },
+    '2': { surfaces: 7, containers: 8 },
+    '3': { surfaces: 8, containers: 9 },
+    '4': { surfaces: 9, containers: 3 },
+    '5': { surfaces: 10, containers: 4 },
+    '6': { surfaces: 5, containers: 5 },
+    '7': { surfaces: 5, containers: 5 },
     '8': { surfaces: 5, containers: 5 },
     '9': { surfaces: 6, containers: 6 },
-    '10': { surfaces: 5, containers: 5 },
-    '11': { surfaces: 7, containers: 7 },
-    '99': { surfaces: 6, containers: 6 }, // Background-Vibrant
+    '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
-  
+
   const colorNumber = colorMap[backgroundNumber.toString()];
-  if (!colorNumber) return '{Colors.Neutral.Color-9}';
+  if (!colorNumber) return '{Colors.Neutral.Color-5}';
   
   const num = isContainer ? colorNumber.containers : colorNumber.surfaces;
   return `{Colors.${paletteName}.Color-${num}}`;
@@ -738,22 +736,20 @@ function getFixedHeaderToken(backgroundNumber: number, isContainer: boolean, pal
  */
 function getFixedTextToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
   const colorMap: { [key: string]: { surfaces: number | string; containers: number | string } } = {
-    '1': { surfaces: 10, containers: 12 },
-    '2': { surfaces: 11, containers: 12 },
-    '3': { surfaces: 12, containers: 12 },
+    '1': { surfaces: 8, containers: 10 },
+    '2': { surfaces: 9, containers: 10 },
+    '3': { surfaces: 10, containers: 10 },
     '4': { surfaces: '#f9f9f9', containers: '#f9f9f9' },
     '5': { surfaces: 2, containers: 1 },
     '6': { surfaces: 3, containers: 3 },
     '7': { surfaces: 3, containers: 3 },
-    '8': { surfaces: 3, containers: 3 },
-    '9': { surfaces: 4, containers: 4 },
-    '10': { surfaces: 4, containers: 4 },
-    '11': { surfaces: 5, containers: 5 },
+    '8': { surfaces: 4, containers: 4 },
+    '9': { surfaces: 5, containers: 5 },
     '99': { surfaces: 4, containers: 4 }, // Background-Vibrant
   };
   
   const colorNumber = colorMap[backgroundNumber.toString()];
-  if (!colorNumber) return '{Colors.Neutral.Color-10}';
+  if (!colorNumber) return '{Colors.Neutral.Color-8}';
   
   const num = isContainer ? colorNumber.containers : colorNumber.surfaces;
   if (typeof num === 'string') return num; // Return hex color directly
@@ -765,22 +761,20 @@ function getFixedTextToken(backgroundNumber: number, isContainer: boolean, palet
  */
 function getFixedBorderToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
   const colorMap: { [key: string]: { surfaces: number | string; containers: number | string } } = {
-    '1': { surfaces: 7, containers: 8 },
-    '2': { surfaces: 9, containers: 10 },
-    '3': { surfaces: 10, containers: '#fcfcfc' },
-    '4': { surfaces: 11, containers: 3 },
-    '5': { surfaces: 12, containers: 4 },
-    '6': { surfaces: 4, containers: 4 },
-    '7': { surfaces: 4, containers: 4 },
+    '1': { surfaces: 5, containers: 6 },
+    '2': { surfaces: 7, containers: 8 },
+    '3': { surfaces: 8, containers: '#fcfcfc' },
+    '4': { surfaces: 9, containers: 3 },
+    '5': { surfaces: 10, containers: 4 },
+    '6': { surfaces: 5, containers: 5 },
+    '7': { surfaces: 5, containers: 5 },
     '8': { surfaces: 5, containers: 5 },
-    '9': { surfaces: 6, containers: 6 },
-    '10': { surfaces: 6, containers: 5 },
-    '11': { surfaces: 7, containers: 7 },
-    '99': { surfaces: 6, containers: 6 }, // Background-Vibrant
+    '9': { surfaces: 5, containers: 5 },
+    '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
-  
+
   const colorNumber = colorMap[backgroundNumber.toString()];
-  if (!colorNumber) return '{Colors.Neutral.Color-7}';
+  if (!colorNumber) return '{Colors.Neutral.Color-5}';
   
   const num = isContainer ? colorNumber.containers : colorNumber.surfaces;
   if (typeof num === 'string') return num; // Return hex color directly
@@ -792,24 +786,22 @@ function getFixedBorderToken(backgroundNumber: number, isContainer: boolean, pal
  */
 function getFixedBorderHexColor(backgroundNumber: number, isContainer: boolean, palette: { tone: number; color: string }[]): string {
   const colorMap: { [key: string]: { surfaces: number | string; containers: number | string } } = {
-    '1': { surfaces: 7, containers: 8 },
-    '2': { surfaces: 9, containers: 10 },
-    '3': { surfaces: 10, containers: '#fcfcfc' },
-    '4': { surfaces: 11, containers: 3 },
-    '5': { surfaces: 12, containers: 4 },
-    '6': { surfaces: 4, containers: 4 },
-    '7': { surfaces: 4, containers: 4 },
+    '1': { surfaces: 5, containers: 6 },
+    '2': { surfaces: 7, containers: 8 },
+    '3': { surfaces: 8, containers: '#fcfcfc' },
+    '4': { surfaces: 9, containers: 3 },
+    '5': { surfaces: 10, containers: 4 },
+    '6': { surfaces: 5, containers: 5 },
+    '7': { surfaces: 5, containers: 5 },
     '8': { surfaces: 5, containers: 5 },
-    '9': { surfaces: 6, containers: 6 },
-    '10': { surfaces: 6, containers: 5 },
-    '11': { surfaces: 7, containers: 7 },
-    '99': { surfaces: 6, containers: 6 }, // Background-Vibrant
+    '9': { surfaces: 5, containers: 5 },
+    '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
-  
+
   const colorNumber = colorMap[backgroundNumber.toString()];
   if (!colorNumber) {
-    // Fallback to Color-7 from palette (index 6)
-    return palette[6]?.color || palette[palette.length - 1]?.color || '#000000';
+    // Fallback to Color-5 from palette (index 4)
+    return palette[4]?.color || palette[palette.length - 1]?.color || '#000000';
   }
   
   const num = isContainer ? colorNumber.containers : colorNumber.surfaces;
@@ -856,13 +848,13 @@ function generateLightModeTonalSurfacesAndContainers(
   const tone80Data = palette.find(p => p.tone === 80);
   const tone80Color = tone80Data ? tone80Data.color : baseColor;
 
-  // Get Color-9 (index 8) for Background-8, 9, and Vibrant container calculations
+  // Get tone 71 (palette index 8) for Background-6, 7, and Vibrant container calculations
   const color9 = palette.length > 8 ? palette[8].color : tone80Color;
-  
-  // Get Color-10 (index 9) for Background-1 to Background-5, 6-7, and 10-11 container calculations
+
+  // Get tone 81 (palette index 9) for Background-1 to Background-5, 8-9 container calculations
   const color10 = palette.length > 9 ? palette[9].color : tone80Color;
-  
-  // Get Color-11 (index 10) - no longer used for containers
+
+  // Get tone 90 (palette index 10) - no longer used for containers
   const color11 = palette.length > 10 ? palette[10].color : tone80Color;
 
   let surfaceDimBlack = 0.04;
@@ -874,9 +866,9 @@ function generateLightModeTonalSurfacesAndContainers(
   let containerBlend = 0.08;
   let containerHighBlend = 0.14;
   let containerHighestBlend = 0.16;
-  let useColor9ForContainers = false; // Flag to use Color-9 for Backgrounds 8-9 and Vibrant
-  let useColor10ForContainers = false; // Flag to use Color-10 for Backgrounds 1-5, 6-7, 10-11
-  let useColor11ForContainers = false; // Flag to use Color-11 (deprecated)
+  let useColor9ForContainers = false; // Flag to use Color-7 for Backgrounds 8-9 and Vibrant
+  let useColor10ForContainers = false; // Flag to use Color-8 for Backgrounds 1-5, 6-7, 10-11
+  let useColor11ForContainers = false; // Flag to use Color-9 (deprecated)
 
   // Different logic for chromatic (Primary/Secondary/Tertiary) vs Neutral
   if (isChromatic) {
@@ -937,51 +929,51 @@ function generateLightModeTonalSurfacesAndContainers(
       containerBlend = 0.18;
       containerHighBlend = 0.20;
       containerHighestBlend = 0.22;
-    } else if (tone === 46.6) { // Background-6 → Color-6
+    } else if (tone === 58) { // Background-6 → Color-6
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 5; // Color-6 (index 5)
       surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.30;
-      containerBlend = 0.40;
-      containerHighBlend = 0.50;
-      containerHighestBlend = 0.60;
-    } else if (tone === 53) { // Background-7 → Color-7
+      useColor9ForContainers = true;
+      containerLowestBlend = 0.10;
+      containerLowBlend = 0.15;
+      containerBlend = 0.18;
+      containerHighBlend = 0.20;
+      containerHighestBlend = 0.22;
+    } else if (tone === 71) { // Background-7 → Color-7
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 6; // Color-7 (index 6)
       surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.30;
-      containerBlend = 0.40;
-      containerHighBlend = 0.50;
-      containerHighestBlend = 0.60;
-    } else if (tone === 62) { // Background-8 → Color-8
+      useColor9ForContainers = true;
+      containerLowestBlend = 0.10;
+      containerLowBlend = 0.15;
+      containerBlend = 0.18;
+      containerHighBlend = 0.20;
+      containerHighestBlend = 0.22;
+    } else if (tone === 81) { // Background-8 → Color-8
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 7; // Color-8 (index 7)
       surfaceBrightWhite = 0.04;
-      useColor9ForContainers = true;
+      useColor10ForContainers = true;
       containerLowestBlend = 0.10;
       containerLowBlend = 0.15;
       containerBlend = 0.18;
       containerHighBlend = 0.20;
       containerHighestBlend = 0.22;
-    } else if (tone === 71) { // Background-9 → Color-9
+    } else if (tone === 90) { // Background-9 → Color-9
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 8; // Color-9 (index 8)
       surfaceBrightWhite = 0.04;
-      useColor9ForContainers = true;
+      useColor10ForContainers = true;
       containerLowestBlend = 0.10;
       containerLowBlend = 0.15;
       containerBlend = 0.18;
       containerHighBlend = 0.20;
       containerHighestBlend = 0.22;
-    } else if (tone === 81) { // Background-10 → Color-10
+    } else if (tone === 95) { // Background-10 → Color-10
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 9; // Color-10 (index 9)
@@ -992,7 +984,7 @@ function generateLightModeTonalSurfacesAndContainers(
       containerBlend = 0.18;
       containerHighBlend = 0.20;
       containerHighestBlend = 0.22;
-    } else if (tone === 90) { // Background-11 → Color-11
+    } else if (tone === 98) { // Background-11 → Color-11
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 10; // Color-11 (index 10)
@@ -1003,32 +995,10 @@ function generateLightModeTonalSurfacesAndContainers(
       containerBlend = 0.18;
       containerHighBlend = 0.20;
       containerHighestBlend = 0.22;
-    } else if (tone === 95) { // Background-12 → Color-12
+    } else if (tone === 99) { // Background-12 → Color-12
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 98) { // Background-13 → Color-13
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 12; // Color-13 (index 12)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 99) { // Background-14 → Color-14
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 13; // Color-14 (index 13)
       surfaceBrightWhite = 0.04;
       useColor10ForContainers = true;
       containerLowestBlend = 0.10;
@@ -1064,50 +1034,40 @@ function generateLightModeTonalSurfacesAndContainers(
       surfaceWhite = 0.05;
       surfaceBaseTone = 4; // Color-5 (index 4)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 46.6) { // Background-6 → Color-6
+    } else if (tone === 58) { // Background-6 → Color-6
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.01;
+      surfaceWhite = 0.0;
       surfaceBaseTone = 5; // Color-6 (index 5)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 53) { // Background-7 → Color-7
+    } else if (tone === 71) { // Background-7 → Color-7
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 6; // Color-7 (index 6)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 62) { // Background-8 → Color-8
+    } else if (tone === 81) { // Background-8 → Color-8
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 7; // Color-8 (index 7)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 71) { // Background-9 → Color-9
+    } else if (tone === 90) { // Background-9 → Color-9
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
+      surfaceWhite = 0.01;
       surfaceBaseTone = 8; // Color-9 (index 8)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 81) { // Background-10 → Color-10
+    } else if (tone === 95) { // Background-10 → Color-10
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 9; // Color-10 (index 9)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 90) { // Background-11 → Color-11
+    } else if (tone === 98) { // Background-11 → Color-11
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.01;
+      surfaceWhite = 0.05;
       surfaceBaseTone = 10; // Color-11 (index 10)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 95) { // Background-12 → Color-12
+    } else if (tone === 99) { // Background-12 → Color-12
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
+      surfaceWhite = 0.05;
       surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 98) { // Background-13 → Color-13
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 12; // Color-13 (index 12)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 99) { // Background-14 → Color-14
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 13; // Color-14 (index 13)
       surfaceBrightWhite = 0.04;
     }
   }
@@ -1118,36 +1078,40 @@ function generateLightModeTonalSurfacesAndContainers(
     : baseColor;
 
   // Surface = pure Color-N (no blending)
-  // Surface-Dim = Color-N + black blend (4% black on 96% surface as background)
-  // Surface-Bright = Color-N + white blend (4% white on 96% surface as background)
+  // Surface-Dim = adjacent tone one step darker (Color-1 Dim = black)
+  // Surface-Bright = adjacent tone one step lighter (Color-12 Bright = white)
   const surfaceColor = surfaceBaseColor; // Pure color, no blending
-  const surfaceDimColor = blendColors('#000000', surfaceBaseColor, surfaceDimBlack);
-  const surfaceBrightColor = blendColors('#FFFFFF', surfaceBaseColor, surfaceBrightWhite);
+  const surfaceDimColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone > 0
+    ? palette[surfaceBaseTone - 1].color
+    : '#000000'; // Color-1 Dim = black
+  const surfaceBrightColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone < palette.length - 1
+    ? palette[surfaceBaseTone + 1].color
+    : '#FFFFFF'; // Color-12 Bright = white
   
   // Determine which color to use for container blending
   let containerBaseColor: string;
   let containerColorNumber = 5; // Default to Color-5 (tone80)
   if (useColor9ForContainers) {
     containerBaseColor = color9;
-    containerColorNumber = 9;
+    containerColorNumber = 7;
   } else if (useColor10ForContainers) {
     containerBaseColor = color10;
-    containerColorNumber = 10;
+    containerColorNumber = 8;
   } else if (useColor11ForContainers) {
     containerBaseColor = color11;
-    containerColorNumber = 11;
+    containerColorNumber = 9;
   } else {
     containerBaseColor = tone80Color;
     containerColorNumber = 5;
   }
   
-  // Mix the container base color with Surface-Bright (not Surface)
-  // In light mode, all containers are set to white (#ffffff)
-  const containerColor = '#ffffff';
-  const containerLowestColor = '#ffffff';
-  const containerLowColor = '#ffffff';
-  const containerHighColor = '#ffffff';
-  const containerHighestColor = '#ffffff';
+  // Light mode: all containers use Color-11 (L=98) — use drop shadows for elevation
+  const containerToneColor = palette[10]?.color || '#f0f0f0'; // Color-11 (0-based index 10)
+  const containerColor = containerToneColor;
+  const containerLowestColor = containerToneColor;
+  const containerLowColor = containerToneColor;
+  const containerHighColor = containerToneColor;
+  const containerHighestColor = containerToneColor;
   
   console.log(`📦 [CONTAINER DEBUG] ${paletteName || 'Unknown'}-Background-${backgroundNumber || '?'}:`);
   console.log(`   Base: Color-${containerColorNumber} = ${containerBaseColor}`);
@@ -1197,11 +1161,11 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Hotlink': {
-        value: '{Colors.Primary.Color-9}',
+        value: '{Colors.Primary.Color-7}',
         type: 'color'
       },
       'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-8}',
+        value: '{Colors.Hotlink-Visited.Color-6}',
         type: 'color'
       },
       'Hover': {
@@ -1255,11 +1219,11 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Hotlink': {
-        value: '{Colors.Primary.Color-9}',
+        value: '{Colors.Primary.Color-7}',
         type: 'color'
       },
       'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-8}',
+        value: '{Colors.Hotlink-Visited.Color-6}',
         type: 'color'
       },
       'Hover': {
@@ -1298,7 +1262,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
   // SIMPLIFIED 1:1 MAPPING: Background-N → Color-N (same as Tonal mode)
   if (isChromatic) {
     // Primary, Secondary, Tertiary surfaces
-    // LIGHT_MODE_TONES = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99]
+    // LIGHT_MODE_TONES = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
     // Index (palette[]):   0   1   2   3   4    5     6   7   8   9  10  11  12  13
     // Color-N:             1   2   3   4   5    6     7   8   9  10  11  12  13  14
     if (tone === 1) { // Background-1 → Color-1
@@ -1326,50 +1290,40 @@ function generateLightModeProfessionalSurfacesAndContainers(
       surfaceWhite = 0.0;
       surfaceBaseTone = 4; // Color-5 (index 4)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 46.6) { // Background-6 → Color-6
+    } else if (tone === 58) { // Background-6 → Color-6
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 5; // Color-6 (index 5)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 53) { // Background-7 → Color-7
+    } else if (tone === 71) { // Background-7 → Color-7
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 6; // Color-7 (index 6)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 62) { // Background-8 → Color-8
+    } else if (tone === 81) { // Background-8 → Color-8
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 7; // Color-8 (index 7)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 71) { // Background-9 → Color-9
+    } else if (tone === 90) { // Background-9 → Color-9
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 8; // Color-9 (index 8)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 81) { // Background-10 → Color-10
+    } else if (tone === 95) { // Background-10 → Color-10
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 9; // Color-10 (index 9)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 90) { // Background-11 → Color-11
+    } else if (tone === 98) { // Background-11 → Color-11
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 10; // Color-11 (index 10)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 95) { // Background-12 → Color-12
+    } else if (tone === 99) { // Background-12 → Color-12
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 98) { // Background-13 → Color-13
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 12; // Color-13 (index 12)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 99) { // Background-14 → Color-14
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 13; // Color-14 (index 13)
       surfaceBrightWhite = 0.04;
     }
   } else {
@@ -1399,50 +1353,40 @@ function generateLightModeProfessionalSurfacesAndContainers(
       surfaceWhite = 0.05;
       surfaceBaseTone = 4; // Color-5 (index 4)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 46.6) { // Background-6 → Color-6
+    } else if (tone === 58) { // Background-6 → Color-6
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.01;
+      surfaceWhite = 0.0;
       surfaceBaseTone = 5; // Color-6 (index 5)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 53) { // Background-7 → Color-7
+    } else if (tone === 71) { // Background-7 → Color-7
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 6; // Color-7 (index 6)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 62) { // Background-8 → Color-8
+    } else if (tone === 81) { // Background-8 → Color-8
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 7; // Color-8 (index 7)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 71) { // Background-9 → Color-9
+    } else if (tone === 90) { // Background-9 → Color-9
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
+      surfaceWhite = 0.01;
       surfaceBaseTone = 8; // Color-9 (index 8)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 81) { // Background-10 → Color-10
+    } else if (tone === 95) { // Background-10 → Color-10
       surfaceDimBlack = 0.04;
       surfaceWhite = 0.0;
       surfaceBaseTone = 9; // Color-10 (index 9)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 90) { // Background-11 → Color-11
+    } else if (tone === 98) { // Background-11 → Color-11
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.01;
+      surfaceWhite = 0.05;
       surfaceBaseTone = 10; // Color-11 (index 10)
       surfaceBrightWhite = 0.04;
-    } else if (tone === 95) { // Background-12 → Color-12
+    } else if (tone === 99) { // Background-12 → Color-12
       surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
+      surfaceWhite = 0.05;
       surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 98) { // Background-13 → Color-13
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 12; // Color-13 (index 12)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 99) { // Background-14 → Color-14
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 13; // Color-14 (index 13)
       surfaceBrightWhite = 0.04;
     }
   }
@@ -1453,11 +1397,15 @@ function generateLightModeProfessionalSurfacesAndContainers(
     : baseColor;
 
   // Surface = pure Color-N (no blending)
-  // Surface-Dim = Color-N + black blend (4% black on 96% surface as background)
-  // Surface-Bright = Color-N + white blend (4% white on 96% surface as background)
+  // Surface-Dim = adjacent tone one step darker (Color-1 Dim = black)
+  // Surface-Bright = adjacent tone one step lighter (Color-12 Bright = white)
   const surfaceColor = surfaceBaseColor; // Pure color, no blending
-  const surfaceDimColor = blendColors('#000000', surfaceBaseColor, surfaceDimBlack);
-  const surfaceBrightColor = blendColors('#FFFFFF', surfaceBaseColor, surfaceBrightWhite);
+  const surfaceDimColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone > 0
+    ? palette[surfaceBaseTone - 1].color
+    : '#000000'; // Color-1 Dim = black
+  const surfaceBrightColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone < palette.length - 1
+    ? palette[surfaceBaseTone + 1].color
+    : '#FFFFFF'; // Color-12 Bright = white
   
   // Professional mode: all containers are white
   const containerColor = '#FFFFFF';
@@ -1501,11 +1449,11 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Hotlink': {
-        value: '{Colors.Primary.Color-9}',
+        value: '{Colors.Primary.Color-7}',
         type: 'color'
       },
       'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-8}',
+        value: '{Colors.Hotlink-Visited.Color-6}',
         type: 'color'
       },
       'Hover': {
@@ -1567,19 +1515,19 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Hotlink': {
-        value: '{Colors.Primary.Color-9}',
+        value: '{Colors.Primary.Color-7}',
         type: 'color'
       },
       'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-8}',
+        value: '{Colors.Hotlink-Visited.Color-6}',
         type: 'color'
       },
       'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-13}` : blendColors('#000000', containerColor, 0.08),
+        value: paletteName ? `{Hover.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.08),
         type: 'color'
       },
       'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-13}` : blendColors('#000000', containerColor, 0.12),
+        value: paletteName ? `{Active.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.12),
         type: 'color'
       },
       'Focus-Active': {
@@ -1646,42 +1594,34 @@ function generateDarkModeSurfacesAndContainers(
     surfaceDimBlend050505 = 0.24;
     surfaceBrightBlendFFFFFF = 0.12;
     surfaceColorNumber = 5;
-  } else if (tone === 30) { // Background-6 → Color-6
-    surfaceDimBlend050505 = 0.18;
-    surfaceBrightBlendFFFFFF = 0.12;
-    surfaceColorNumber = 6;
-  } else if (tone === 36) { // Background-7 → Color-7
-    surfaceDimBlend050505 = 0.16;
-    surfaceBrightBlendFFFFFF = 0.07;
-    surfaceColorNumber = 7;
-  } else if (tone === 58) { // Background-8 → Color-8
+  } else if (tone === 58) { // Background-6 → Color-6
     surfaceDimBlend050505 = 0.10;
     surfaceBrightBlendFFFFFF = 0.12;
-    surfaceColorNumber = 8;
-  } else if (tone === 64) { // Background-9 → Color-9
+    surfaceColorNumber = 6;
+  } else if (tone === 64) { // Background-7 → Color-7
     surfaceDimBlend050505 = 0.09;
     surfaceBrightBlendFFFFFF = 0.15;
-    surfaceColorNumber = 9;
-  } else if (tone === 70) { // Background-10 → Color-10
+    surfaceColorNumber = 7;
+  } else if (tone === 70) { // Background-8 → Color-8
     surfaceDimBlend050505 = 0.08;
     surfaceBrightBlendFFFFFF = 0.20;
-    surfaceColorNumber = 10;
-  } else if (tone === 76) { // Background-11 → Color-11
+    surfaceColorNumber = 8;
+  } else if (tone === 76) { // Background-9 → Color-9
     surfaceDimBlend050505 = 0.08;
     surfaceBrightBlendFFFFFF = 0.25;
-    surfaceColorNumber = 11;
-  } else if (tone === 82) { // Background-12 → Color-12
+    surfaceColorNumber = 9;
+  } else if (tone === 82) { // Background-10 → Color-10
     surfaceDimBlend050505 = 0.08;
     surfaceBrightBlendFFFFFF = 0.30;
-    surfaceColorNumber = 12;
-  } else if (tone === 85) { // Background-13 → Color-13
+    surfaceColorNumber = 10;
+  } else if (tone === 85) { // Background-11 → Color-11
     surfaceDimBlend050505 = 0.04;
     surfaceBrightBlendFFFFFF = 0.18;
-    surfaceColorNumber = 13;
-  } else if (tone === 89) { // Background-14 → Color-14
+    surfaceColorNumber = 11;
+  } else if (tone === 89) { // Background-12 → Color-12
     surfaceDimBlend050505 = 0.04;
     surfaceBrightBlendFFFFFF = 0.15;
-    surfaceColorNumber = 14;
+    surfaceColorNumber = 12;
   } else {
     // Default values for any other tones
     surfaceDimBlend050505 = 0.08;
@@ -1690,19 +1630,27 @@ function generateDarkModeSurfacesAndContainers(
 
   // Surface is always the base color (the specific Dark Mode Color-N)
   const surfaceColor = baseColor;
+
+  // Surface-Dim = adjacent tone one step darker (Color-1 Dim = black)
+  // Surface-Bright = adjacent tone one step lighter (Color-12 Bright = white)
+  const darkToneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+  const currentToneIndex = darkToneScale.indexOf(tone);
+  const dimTone = currentToneIndex > 0 ? darkToneScale[currentToneIndex - 1] : -1;
+  const brightTone = currentToneIndex < darkToneScale.length - 1 ? darkToneScale[currentToneIndex + 1] : -1;
+  const dimPaletteEntry = dimTone >= 0 ? palette.find(p => p.tone === dimTone) : null;
+  const brightPaletteEntry = brightTone >= 0 ? palette.find(p => p.tone === brightTone) : null;
+  const surfaceDimColor = dimPaletteEntry ? dimPaletteEntry.color : '#000000';
+  const surfaceBrightColor = brightPaletteEntry ? brightPaletteEntry.color : '#FFFFFF';
   
-  // Surface-Dim is Surface blended with #050505 (blend #050505 on surface as background)
-  const surfaceDimColor = blendColors('#050505', surfaceColor, surfaceDimBlend050505);
-  
-  // Surface-Bright is Surface blended with #ffffff (blend white on surface as background)
-  const surfaceBrightColor = blendColors('#FFFFFF', surfaceColor, surfaceBrightBlendFFFFFF);
-  
-  // Mix containers with Surface-Bright instead of Surface (baseColor)
-  const containerColor = blendColors(tone80Color, surfaceBrightColor, containerTone80);
-  const containerLowestColor = blendColors(tone80Color, surfaceBrightColor, containerLowestTone80);
-  const containerLowColor = blendColors(tone80Color, surfaceBrightColor, containerLowTone80);
-  const containerHighColor = blendColors(tone80Color, surfaceBrightColor, containerHighTone80);
-  const containerHighestColor = blendColors(tone80Color, surfaceBrightColor, containerHighestTone80);
+  // Dark mode containers: step through adjacent tones, blend for mid-levels
+  const darkColor2 = palette.find(p => p.tone === 10)?.color || '#1a1a1a'; // Color-2
+  const darkColor3 = palette.find(p => p.tone === 19)?.color || '#2e2e2e'; // Color-3
+  const darkColor4 = palette.find(p => p.tone === 28)?.color || '#434343'; // Color-4
+  const containerLowestColor = darkColor2;                                  // Color-2
+  const containerLowColor = blendColors(darkColor3, darkColor2, 0.50);     // blend of 2 and 3
+  const containerColor = darkColor3;                                        // Color-3
+  const containerHighColor = blendColors(darkColor4, darkColor3, 0.50);    // blend of 3 and 4
+  const containerHighestColor = darkColor4;                                 // Color-4
 
   // Use neutral palette for text colors if available, otherwise use current palette
   const textPalette = allPalettes?.neutral || palette;
@@ -1853,10 +1801,20 @@ function createThemeReference(
     type: 'color' as const
   });
 
-  const createButtonReference = (section: 'Surfaces' | 'Containers', bgNameRef: string, property: string) => ({
-    value: `{Buttons.${section}.${bgNameRef}.${property}}`,
-    type: 'color' as const
-  });
+  const createButtonReference = (section: 'Surfaces' | 'Containers', bgNameRef: string, property: string) => {
+    // For Border properties, reference the Border token system instead of Buttons
+    if (property.endsWith('.Border')) {
+      const palette = property.replace('.Border', '');
+      return {
+        value: `{Border.${section}.${palette}.${bgNameRef.replace('Background-', 'Color-')}}`,
+        type: 'color' as const
+      };
+    }
+    return {
+      value: `{Buttons.${section}.${bgNameRef}.${property}}`,
+      type: 'color' as const
+    };
+  };
 
   const createIconReference = (section: 'Surfaces' | 'Containers', bgNameRef: string, property: string) => ({
     value: `{Icons.${section}.${bgNameRef}.${property}}`,
@@ -2277,18 +2235,18 @@ function generateButtonsForBackground(
   extractedTones?: { primary: number; secondary: number; tertiary: number }
 ): ButtonsForBackground {
   // Calculate Color-N values based on extracted tones
-  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const secondaryExtractedN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const tertiaryExtractedN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
+  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const secondaryExtractedN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
+  const tertiaryExtractedN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
+
+  // Secondary button N logic: If Secondary Color is NOT 9, use it. If it IS 9, use 7 or 6 based on Primary
+  const secondaryN = secondaryExtractedN !== 9 ? secondaryExtractedN : (primaryN >= 7 ? 7 : 6);
+
+  // Tertiary button N logic: If Tertiary Color is 9, use 7 or 6 based on Primary. Otherwise use extracted tertiary
+  const tertiaryN = tertiaryExtractedN === 9 ? (primaryN >= 7 ? 7 : 6) : tertiaryExtractedN;
   
-  // Secondary button N logic: If Secondary Color is NOT 11, use it. If it IS 11, use 9 or 8 based on Primary
-  const secondaryN = secondaryExtractedN !== 11 ? secondaryExtractedN : (primaryN >= 9 ? 9 : 8);
-  
-  // Tertiary button N logic: If Tertiary Color is 11, use 9 or 8 based on Primary. Otherwise use extracted tertiary
-  const tertiaryN = tertiaryExtractedN === 11 ? (primaryN >= 9 ? 9 : 8) : tertiaryExtractedN;
-  
-  // For Neutral, Info, Success, Warning, Error: use 9 or 8 based on Primary
-  const semanticN = primaryN >= 9 ? 9 : 8;
+  // For Neutral, Info, Success, Warning, Error: use 7 or 6 based on Primary
+  const semanticN = primaryN >= 7 ? 7 : 6;
   
   // Primary buttons reference top-level Primary-Button.Default
   const getPrimaryButtonTokens = (paletteName: string) => {
@@ -2312,14 +2270,14 @@ function generateButtonsForBackground(
     };
   };
 
-  // Light button tokens (always uses Color-11)
+  // Light button tokens (always uses Color-9)
   const getLightButtonTokens = (paletteName: string) => {
     return {
-      buttonBg: `{Colors.${paletteName}.Color-11}`,
-      buttonText: `{Text.${surfaceOrContainer}.${paletteName}.Color-11}`,
+      buttonBg: `{Colors.${paletteName}.Color-9}`,
+      buttonText: `{Text.${surfaceOrContainer}.${paletteName}.Color-9}`,
       buttonBorder: `{Border.${surfaceOrContainer}.${paletteName}.${bgName}}`,
-      buttonHover: `{Hover.${paletteName}.Color-11}`,
-      buttonActive: `{Active.${paletteName}.Color-11}`
+      buttonHover: `{Hover.${paletteName}.Color-9}`,
+      buttonActive: `{Active.${paletteName}.Color-9}`
     };
   };
 
@@ -2473,23 +2431,23 @@ function generateIconsForBackground(
 ): IconsForBackground {
   // Icons should use token references instead of direct color values
   // Default icons use Text.Neutral Color-1
-  // Chromatic icons use the extracted tone (e.g., Color-11 for tone 90, Color-8 for tone 62)
+  // Chromatic icons use the extracted tone (e.g., Color-9 for tone 90, Color-6 for tone 58)
   
   // Convert extracted tones to Color-N numbers
-  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const secondaryN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const tertiaryN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
-  
+  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const secondaryN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
+  const tertiaryN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
+
   return {
     Default: { value: `{Text.${surfaceOrContainer}.Neutral.Color-1}`, type: 'color' },
     Primary: { value: `{Text.${surfaceOrContainer}.Primary.Color-${primaryN}}`, type: 'color' },
     Secondary: { value: `{Text.${surfaceOrContainer}.Secondary.Color-${secondaryN}}`, type: 'color' },
     Tertiary: { value: `{Text.${surfaceOrContainer}.Tertiary.Color-${tertiaryN}}`, type: 'color' },
-    Neutral: { value: `{Text.${surfaceOrContainer}.Neutral.Color-9}`, type: 'color' },
-    Info: { value: `{Text.${surfaceOrContainer}.Info.Color-9}`, type: 'color' },
-    Success: { value: `{Text.${surfaceOrContainer}.Success.Color-9}`, type: 'color' },
-    Warning: { value: `{Text.${surfaceOrContainer}.Warning.Color-9}`, type: 'color' },
-    Error: { value: `{Text.${surfaceOrContainer}.Error.Color-9}`, type: 'color' }
+    Neutral: { value: `{Text.${surfaceOrContainer}.Neutral.Color-7}`, type: 'color' },
+    Info: { value: `{Text.${surfaceOrContainer}.Info.Color-7}`, type: 'color' },
+    Success: { value: `{Text.${surfaceOrContainer}.Success.Color-7}`, type: 'color' },
+    Warning: { value: `{Text.${surfaceOrContainer}.Warning.Color-7}`, type: 'color' },
+    Error: { value: `{Text.${surfaceOrContainer}.Error.Color-7}`, type: 'color' }
   };
 }
 
@@ -2511,11 +2469,11 @@ function generateIconVariantsForBackground(
   // Icon variants use one tone lighter/darker than base icons
   // For Primary/Secondary/Tertiary, use one tone lighter (N-1) if possible, otherwise same tone
   // Default variant uses Text.Neutral Color-2
-  
+
   // Convert extracted tones to Color-N numbers, then use one tone lighter (N-1) for variants
-  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const secondaryN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const tertiaryN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
+  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const secondaryN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
+  const tertiaryN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
   
   // Use one tone lighter for variants (min of Color-1)
   const primaryVariantN = Math.max(1, primaryN - 1);
@@ -2527,11 +2485,11 @@ function generateIconVariantsForBackground(
     Primary: { value: `{Text.${surfaceOrContainer}.Primary.Color-${primaryVariantN}}`, type: 'color' },
     Secondary: { value: `{Text.${surfaceOrContainer}.Secondary.Color-${secondaryVariantN}}`, type: 'color' },
     Tertiary: { value: `{Text.${surfaceOrContainer}.Tertiary.Color-${tertiaryVariantN}}`, type: 'color' },
-    Neutral: { value: `{Text.${surfaceOrContainer}.Neutral.Color-8}`, type: 'color' },
-    Info: { value: `{Text.${surfaceOrContainer}.Info.Color-8}`, type: 'color' },
-    Success: { value: `{Text.${surfaceOrContainer}.Success.Color-8}`, type: 'color' },
-    Warning: { value: `{Text.${surfaceOrContainer}.Warning.Color-8}`, type: 'color' },
-    Error: { value: `{Text.${surfaceOrContainer}.Error.Color-8}`, type: 'color' }
+    Neutral: { value: `{Text.${surfaceOrContainer}.Neutral.Color-6}`, type: 'color' },
+    Info: { value: `{Text.${surfaceOrContainer}.Info.Color-6}`, type: 'color' },
+    Success: { value: `{Text.${surfaceOrContainer}.Success.Color-6}`, type: 'color' },
+    Warning: { value: `{Text.${surfaceOrContainer}.Warning.Color-6}`, type: 'color' },
+    Error: { value: `{Text.${surfaceOrContainer}.Error.Color-6}`, type: 'color' }
   };
 }
 
@@ -2566,30 +2524,30 @@ function generateIconPaletteStructure(isDark: boolean = false) {
   const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
   const surfaces = ['Surfaces', 'Containers'];
   
-  // LIGHT MODE: Color values for background levels 1-8 (light backgrounds) and 9-14 (dark backgrounds)
-  const lightMode_LightBackgroundColors = [12, 12, 12, 12, 10, 11, 12, 4];  // For Color-1 through Color-8
-  const lightMode_DarkBackgroundColors = [4, 5, 6, 7, 7, 7];                 // For Color-9 through Color-14
-  
-  // DARK MODE: Different mappings for dark mode backgrounds  
-  const darkMode_LightBackgroundColors = [4, 5, 6, 7, 7, 7, 4, 12];         // For Color-1 through Color-8
-  const darkMode_DarkBackgroundColors = [12, 12, 12, 12, 10, 11];            // For Color-9 through Color-14
-  
-  const lightBackgroundColors = isDark ? darkMode_LightBackgroundColors : lightMode_LightBackgroundColors;
-  const darkBackgroundColors = isDark ? darkMode_DarkBackgroundColors : lightMode_DarkBackgroundColors;
-  
+  // LIGHT MODE: Color values for background levels 1-6 (dark backgrounds) and 7-12 (light backgrounds)
+  const lightMode_DarkBackgroundColors = [10, 10, 10, 10, 8, 4];   // For Color-1 through Color-6
+  const lightMode_LightBackgroundColors = [4, 5, 5, 6, 6, 6];      // For Color-7 through Color-12
+
+  // DARK MODE: Different mappings for dark mode backgrounds
+  const darkMode_DarkBackgroundColors = [4, 5, 5, 6, 6, 10];       // For Color-1 through Color-6
+  const darkMode_LightBackgroundColors = [10, 10, 10, 10, 8, 9];   // For Color-7 through Color-12
+
+  const darkBgColors = isDark ? darkMode_DarkBackgroundColors : lightMode_DarkBackgroundColors;
+  const lightBgColors = isDark ? darkMode_LightBackgroundColors : lightMode_LightBackgroundColors;
+
   surfaces.forEach(surface => {
     palettes.forEach(palette => {
-      // Color-1 through Color-8 (light backgrounds)
-      lightBackgroundColors.forEach((colorValue, index) => {
+      // Color-1 through Color-6
+      darkBgColors.forEach((colorValue, index) => {
         iconStructure[surface][palette][`Color-${index + 1}`] = {
           value: `{Colors.${palette}.Color-${colorValue}}`,
           type: 'color'
         };
       });
-      
-      // Color-9 through Color-14 (dark backgrounds)
-      darkBackgroundColors.forEach((colorValue, index) => {
-        iconStructure[surface][palette][`Color-${index + 9}`] = {
+
+      // Color-7 through Color-12
+      lightBgColors.forEach((colorValue, index) => {
+        iconStructure[surface][palette][`Color-${index + 7}`] = {
           value: `{Colors.${palette}.Color-${colorValue}}`,
           type: 'color'
         };
@@ -2597,7 +2555,7 @@ function generateIconPaletteStructure(isDark: boolean = false) {
       
       // Color-Vibrant
       iconStructure[surface][palette]['Color-Vibrant'] = {
-        value: `{Colors.${palette}.Color-11}`,
+        value: `{Colors.${palette}.Color-9}`,
         type: 'color'
       };
     });
@@ -2632,41 +2590,41 @@ function generateTagsForBackground(
   isDark: boolean = false,
   surfaceOrContainer: 'Surfaces' | 'Containers' = 'Surfaces'
 ): TagsForBackground {
-  // Tags should use Color-11 from each palette and the corresponding text color
+  // Tags should use Color-9 from each palette and the corresponding text color
   // We're using token references instead of direct color values
   
   return {
     Primary: {
-      BG: { value: '{Colors.Primary.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Primary.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-9}`, type: 'color' }
     },
     Secondary: {
-      BG: { value: '{Colors.Secondary.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Secondary.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Secondary.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Secondary.Color-9}`, type: 'color' }
     },
     Tertiary: {
-      BG: { value: '{Colors.Tertiary.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Tertiary.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Tertiary.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Tertiary.Color-9}`, type: 'color' }
     },
     Neutral: {
-      BG: { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Neutral.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Neutral.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Neutral.Color-9}`, type: 'color' }
     },
     Info: {
-      BG: { value: '{Colors.Info.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Info.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Info.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Info.Color-9}`, type: 'color' }
     },
     Success: {
-      BG: { value: '{Colors.Success.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Success.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Success.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Success.Color-9}`, type: 'color' }
     },
     Warning: {
-      BG: { value: '{Colors.Warning.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Warning.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Warning.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Warning.Color-9}`, type: 'color' }
     },
     Error: {
-      BG: { value: '{Colors.Error.Color-11}', type: 'color' },
-      Text: { value: `{Text.${surfaceOrContainer}.Error.Color-11}`, type: 'color' }
+      BG: { value: '{Colors.Error.Color-9}', type: 'color' },
+      Text: { value: `{Text.${surfaceOrContainer}.Error.Color-9}`, type: 'color' }
     }
   };
 }
@@ -2678,38 +2636,34 @@ function generateTagsForBackground(
 function generateFocusVisibleSection(): FocusVisibleSection {
   return {
     Surfaces: {
-      'Background-1': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-2': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-3': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-4': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-5': { value: '{Colors.Info.Color-10}', type: 'color' },
-      'Background-6': { value: '{Colors.Info.Color-11}', type: 'color' },
-      'Background-7': { value: '{Colors.Info.Color-3}', type: 'color' },
-      'Background-8': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Background-9': { value: '{Colors.Info.Color-4}', type: 'color' },
+      'Background-1': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-2': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-3': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-4': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-5': { value: '{Colors.Info.Color-8}', type: 'color' },
+      'Background-6': { value: '{Colors.Info.Color-4}', type: 'color' },
+      'Background-7': { value: '{Colors.Info.Color-4}', type: 'color' },
+      'Background-8': { value: '{Colors.Info.Color-5}', type: 'color' },
+      'Background-9': { value: '{Colors.Info.Color-5}', type: 'color' },
       'Background-10': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-11': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-12': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Background-13': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Background-14': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Background-Vibrant': { value: '{Colors.Info.Color-6}', type: 'color' }
+      'Background-11': { value: '{Colors.Info.Color-5}', type: 'color' },
+      'Background-12': { value: '{Colors.Info.Color-5}', type: 'color' },
+      'Background-Vibrant': { value: '{Colors.Info.Color-5}', type: 'color' }
     },
     Containers: {
-      'Background-1': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-2': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-3': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-4': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-5': { value: '{Colors.Info.Color-10}', type: 'color' },
-      'Background-6': { value: '{Colors.Info.Color-11}', type: 'color' },
-      'Background-7': { value: '{Colors.Info.Color-3}', type: 'color' },
-      'Background-8': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Background-9': { value: '{Colors.Info.Color-4}', type: 'color' },
+      'Background-1': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-2': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-3': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-4': { value: '{Colors.Info.Color-6}', type: 'color' },
+      'Background-5': { value: '{Colors.Info.Color-8}', type: 'color' },
+      'Background-6': { value: '{Colors.Info.Color-4}', type: 'color' },
+      'Background-7': { value: '{Colors.Info.Color-4}', type: 'color' },
+      'Background-8': { value: '{Colors.Info.Color-5}', type: 'color' },
+      'Background-9': { value: '{Colors.Info.Color-5}', type: 'color' },
       'Background-10': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-11': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-12': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Background-13': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Background-14': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Background-Vibrant': { value: '{Colors.Info.Color-6}', type: 'color' }
+      'Background-11': { value: '{Colors.Info.Color-5}', type: 'color' },
+      'Background-12': { value: '{Colors.Info.Color-5}', type: 'color' },
+      'Background-Vibrant': { value: '{Colors.Info.Color-5}', type: 'color' }
     }
   };
 }
@@ -2740,72 +2694,58 @@ function generateHoverColors(paletteColors: { [key: string]: ColorToken }, palet
     };
   
   // Color-5: Blend Color-5 + #000000 @ 12%
-  hover['Color-5'] = { 
-    value: chroma.mix(color5, '#000000', 0.12, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-5'] = {
+    value: chroma.mix(color5, '#000000', 0.12, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-6: Blend Color-6 + #FFFFFF @ 10%
+
+  // Color-6: Blend Color-6 + #FFFFFF @ 12%
   const color6 = paletteColors['Color-6']?.value || '#000000';
-  hover['Color-6'] = { 
-    value: chroma.mix(color6, '#FFFFFF', 0.10, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-6'] = {
+    value: chroma.mix(color6, '#FFFFFF', 0.12, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-7: Blend Color-7 + #FFFFFF @ 10%
+
+  // Color-7: Blend Color-7 + #FFFFFF @ 15%
   const color7 = paletteColors['Color-7']?.value || '#000000';
-  hover['Color-7'] = { 
-    value: chroma.mix(color7, '#FFFFFF', 0.10, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-7'] = {
+    value: chroma.mix(color7, '#FFFFFF', 0.15, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-8: Blend Color-8 + #FFFFFF @ 12%
+
+  // Color-8: Blend Color-8 + #FFFFFF @ 15%
   const color8 = paletteColors['Color-8']?.value || '#000000';
-  hover['Color-8'] = { 
-    value: chroma.mix(color8, '#FFFFFF', 0.12, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-8'] = {
+    value: chroma.mix(color8, '#FFFFFF', 0.15, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-9: Blend Color-9 + #FFFFFF @ 15%
+
+  // Color-9: Blend Color-9 + #FFFFFF @ 20%
   const color9 = paletteColors['Color-9']?.value || '#000000';
-  hover['Color-9'] = { 
-    value: chroma.mix(color9, '#FFFFFF', 0.15, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-9'] = {
+    value: chroma.mix(color9, '#FFFFFF', 0.20, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-10: Blend Color-10 + #FFFFFF @ 15%
+
+  // Color-10: Blend Color-10 + Color-9 @ 25%
   const color10 = paletteColors['Color-10']?.value || '#000000';
-  hover['Color-10'] = { 
-    value: chroma.mix(color10, '#FFFFFF', 0.15, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-10'] = {
+    value: chroma.mix(color10, color9, 0.25, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-11: Blend Color-11 + #FFFFFF @ 20%
+
+  // Color-11: Blend Color-11 + Color-9 @ 25%
   const color11 = paletteColors['Color-11']?.value || '#000000';
-  hover['Color-11'] = { 
-    value: chroma.mix(color11, '#FFFFFF', 0.20, 'lab').hex(), 
-    type: 'color' 
+  hover['Color-11'] = {
+    value: chroma.mix(color11, color9, 0.25, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-12: Blend Color-12 + Color-11 @ 25%
-  const color12 = paletteColors['Color-12']?.value || '#000000';
-  hover['Color-12'] = { 
-    value: chroma.mix(color12, color11, 0.25, 'lab').hex(), 
-    type: 'color' 
-  };
-  
-  // Color-13: Blend Color-13 + Color-11 @ 25%
-  const color13 = paletteColors['Color-13']?.value || '#000000';
-  hover['Color-13'] = { 
-    value: chroma.mix(color13, color11, 0.25, 'lab').hex(), 
-    type: 'color' 
-  };
-  
-  // Color-14: Blend Color-14 + Color-11 @ 25%
-  const color14 = paletteColors['Color-14']?.value || '#FFFFFF';
-  hover['Color-14'] = { 
-    value: chroma.mix(color14, color11, 0.25, 'lab').hex(), 
-    type: 'color' 
+
+  // Color-12: Blend Color-12 + Color-9 @ 25%
+  const color12 = paletteColors['Color-12']?.value || '#FFFFFF';
+  hover['Color-12'] = {
+    value: chroma.mix(color12, color9, 0.25, 'lab').hex(),
+    type: 'color'
   };
   
   } catch (error) {
@@ -2843,72 +2783,58 @@ function generateActiveColors(paletteColors: { [key: string]: ColorToken }, pale
     };
   
   // Color-5: Blend Color-5 + #000000 @ 20%
-  active['Color-5'] = { 
-    value: chroma.mix(color5, '#000000', 0.20, 'lab').hex(), 
-    type: 'color' 
+  active['Color-5'] = {
+    value: chroma.mix(color5, '#000000', 0.20, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-6: Blend Color-6 + #FFFFFF @ 15%
+
+  // Color-6: Blend Color-6 + #FFFFFF @ 18%
   const color6 = paletteColors['Color-6']?.value || '#000000';
-  active['Color-6'] = { 
-    value: chroma.mix(color6, '#FFFFFF', 0.15, 'lab').hex(), 
-    type: 'color' 
+  active['Color-6'] = {
+    value: chroma.mix(color6, '#FFFFFF', 0.18, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-7: Blend Color-7 + #FFFFFF @ 15%
+
+  // Color-7: Blend Color-7 + #FFFFFF @ 20%
   const color7 = paletteColors['Color-7']?.value || '#000000';
-  active['Color-7'] = { 
-    value: chroma.mix(color7, '#FFFFFF', 0.15, 'lab').hex(), 
-    type: 'color' 
+  active['Color-7'] = {
+    value: chroma.mix(color7, '#FFFFFF', 0.20, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-8: Blend Color-8 + #FFFFFF @ 18%
+
+  // Color-8: Blend Color-8 + #FFFFFF @ 20%
   const color8 = paletteColors['Color-8']?.value || '#000000';
-  active['Color-8'] = { 
-    value: chroma.mix(color8, '#FFFFFF', 0.18, 'lab').hex(), 
-    type: 'color' 
+  active['Color-8'] = {
+    value: chroma.mix(color8, '#FFFFFF', 0.20, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-9: Blend Color-9 + #FFFFFF @ 20%
+
+  // Color-9: Blend Color-9 + #FFFFFF @ 25%
   const color9 = paletteColors['Color-9']?.value || '#000000';
-  active['Color-9'] = { 
-    value: chroma.mix(color9, '#FFFFFF', 0.20, 'lab').hex(), 
-    type: 'color' 
+  active['Color-9'] = {
+    value: chroma.mix(color9, '#FFFFFF', 0.25, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-10: Blend Color-10 + #FFFFFF @ 20%
+
+  // Color-10: Blend Color-10 + Color-9 @ 30%
   const color10 = paletteColors['Color-10']?.value || '#000000';
-  active['Color-10'] = { 
-    value: chroma.mix(color10, '#FFFFFF', 0.20, 'lab').hex(), 
-    type: 'color' 
+  active['Color-10'] = {
+    value: chroma.mix(color10, color9, 0.30, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-11: Blend Color-11 + #FFFFFF @ 25%
+
+  // Color-11: Blend Color-11 + Color-9 @ 30%
   const color11 = paletteColors['Color-11']?.value || '#000000';
-  active['Color-11'] = { 
-    value: chroma.mix(color11, '#FFFFFF', 0.25, 'lab').hex(), 
-    type: 'color' 
+  active['Color-11'] = {
+    value: chroma.mix(color11, color9, 0.30, 'lab').hex(),
+    type: 'color'
   };
-  
-  // Color-12: Blend Color-12 + Color-11 @ 30%
-  const color12 = paletteColors['Color-12']?.value || '#000000';
-  active['Color-12'] = { 
-    value: chroma.mix(color12, color11, 0.30, 'lab').hex(), 
-    type: 'color' 
-  };
-  
-  // Color-13: Blend Color-13 + Color-11 @ 30%
-  const color13 = paletteColors['Color-13']?.value || '#000000';
-  active['Color-13'] = { 
-    value: chroma.mix(color13, color11, 0.30, 'lab').hex(), 
-    type: 'color' 
-  };
-  
-  // Color-14: Blend Color-14 + Color-11 @ 30%
-  const color14 = paletteColors['Color-14']?.value || '#FFFFFF';
-  active['Color-14'] = { 
-    value: chroma.mix(color14, color11, 0.30, 'lab').hex(), 
-    type: 'color' 
+
+  // Color-12: Blend Color-12 + Color-9 @ 30%
+  const color12 = paletteColors['Color-12']?.value || '#FFFFFF';
+  active['Color-12'] = {
+    value: chroma.mix(color12, color9, 0.30, 'lab').hex(),
+    type: 'color'
   };
   
   } catch (error) {
@@ -2961,14 +2887,14 @@ function generateModesThemes(
   componentStyle?: 'professional' | 'modern' | 'bold' | 'playful',
   buttonStyle?: 'primary-adaptive' | 'primary-fixed' | 'black-white' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed',
   navigationSelections?: {
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    status?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
   },
   userSelections?: {
     background?: 'white' | 'black' | 'primary';
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
     buttonBehavior?: 'adaptive' | 'fixed';
     cardColoring?: 'tonal' | 'white' | 'black';
@@ -2979,28 +2905,28 @@ function generateModesThemes(
   const isDark = modeName === 'Dark-Mode';
   
   // Convert extracted tones to Color-N positions (PC, SC, TC)
-  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 10;
-  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 10;
-  const NC = 11; // Neutral is always fixed
-  const OB = PC >= 11 ? 11 : 8; // Other buttons (OB = 11 if PC >= 11, else 8)
+  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
+  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8;
+  const NC = 9; // Neutral is always fixed
+  const OB = PC >= 9 ? 8 : 6; // Other buttons (OB = 8 if PC >= 9, else 6)
   
   // {X} values per Background (from theme-definitions-3.md)
   const getXValue = (backgroundN: number): number => {
     if (isDark) {
-      // Dark Mode {X} values
+      // Dark Mode {X} values (12-tone)
       const darkXMap: Record<number, number> = {
-        1: 8, 2: 8, 3: 8, 4: 8, 5: 8, 6: 9, 7: 9, 8: 10,
-        9: 4, 10: 5, 11: 6, 12: 7, 13: 7, 14: 7
+        1: 6, 2: 6, 3: 6, 4: 6, 5: 6, 6: 8,
+        7: 4, 8: 5, 9: 5, 10: 6, 11: 6, 12: 6
       };
-      return darkXMap[backgroundN] || 8;
+      return darkXMap[backgroundN] || 6;
     } else {
-      // Light Mode {X} values
+      // Light Mode {X} values (12-tone)
       const lightXMap: Record<number, number> = {
-        1: 8, 2: 8, 3: 9, 4: 11, 5: 12, 6: 13, 7: 3, 8: 4,
-        9: 5, 10: 5, 11: 7, 12: 7, 13: 7, 14: 7
+        1: 6, 2: 6, 3: 7, 4: 9, 5: 10, 6: 4,
+        7: 5, 8: 5, 9: 6, 10: 6, 11: 6, 12: 6
       };
-      return lightXMap[backgroundN] || 8;
+      return lightXMap[backgroundN] || 6;
     }
   };
   
@@ -3020,12 +2946,12 @@ function generateModesThemes(
     // Container text theme - based on container theme (varies by card coloring)
     let containerTextTheme: string;
     
-    // White Cards (Light or Dark Mode): All containers use Neutral Color-14
+    // White Cards (Light or Dark Mode): All containers use Neutral Color-12
     if (cardColoringSelection === 'white') {
       containerTextTheme = textColoringSelection === 'black-white' ? 'BW' : 'Neutral';
       return {
         ContTheme: 'Neutral',
-        ContN: 14,
+        ContN: 12,
         SurfaceDefaultTextTheme: surfaceTextTheme, // For Surfaces: based on background theme
         ContDefaultTextTheme: containerTextTheme,  // For Containers: based on container theme (Neutral for white cards)
         ContQuiet: containerTextTheme,
@@ -3412,8 +3338,8 @@ function generateModesThemes(
     let obContN: number | string;
     
     if (cardColoringSelection === 'white') {
-      defaultContN = 14;
-      obContN = 14;
+      defaultContN = 12;
+      obContN = 12;
     } else if (cardColoringSelection === 'black') {
       defaultContN = 1;
       obContN = 1;
@@ -3442,17 +3368,17 @@ function generateModesThemes(
     const calculateShade = (nValue: number | string): 'Light' | 'Medium' => {
       if (typeof nValue === 'string') {
         // If it's 'Vibrant' or 'X', we need to check against a threshold
-        // For 'Vibrant' in dark mode, it's typically high (>=11)
+        // For 'Vibrant' in dark mode, it's typically high (>=9)
         // For now, default to 'Medium' for string values as they're typically adaptive/high
         return 'Medium';
       }
-      return nValue >= 11 ? 'Medium' : 'Light';
+      return nValue >= 9 ? 'Medium' : 'Light';
     };
-    
+
     const Shade = calculateShade(defaultN); // For Surfaces.Buttons and Surfaces.Tag
-    const CShade = calculateShade(typeof cont.ContN === 'number' ? cont.ContN : 
-                                  (cont.ContN === 14 ? 14 : 
-                                   cont.ContN === 1 ? 1 : 
+    const CShade = calculateShade(typeof cont.ContN === 'number' ? cont.ContN :
+                                  (cont.ContN === 12 ? 12 :
+                                   cont.ContN === 1 ? 1 :
                                    defaultN)); // For Containers.Buttons and Containers.Tag
     
     console.log('🎨 [SHADE CALCULATIONS]');
@@ -3744,38 +3670,34 @@ function generateModesThemes(
   };
   
   // Helper: Map user selection to Theme and N value
-  const getThemeAndN = (selection: string | undefined, defaultTheme: string = 'Primary', defaultN: number = PC): { theme: string; n: number } => {
+  // For surface/surface-dim/surface-bright, requires surfaceTheme and surfaceN to be passed in
+  const getNavThemeAndN = (selection: string | undefined, surfaceTheme: string, surfaceN: number, defaultTheme: string = 'Primary', defaultN: number = PC, navKey: string = 'appBar'): { theme: string; n: number } => {
     if (!selection) return { theme: defaultTheme, n: defaultN };
-    
+    const isNavBar = navKey === 'navBar';
+
     switch (selection) {
       case 'white':
-        // White: Neutral-14 in light mode, Neutral-1 in dark mode (Surface-Bright inverts!)
-        return { theme: 'Neutral', n: isDark ? 1 : 14 };
+        return { theme: 'Neutral', n: 12 };
       case 'black':
-        // Black: Neutral-1 in light mode, Neutral-14 in dark mode (Surface-Bright inverted!)
-        return { theme: 'Neutral', n: isDark ? 14 : 1 };
+        return { theme: 'Neutral', n: 1 };
+      case 'primary-light':
+        return { theme: 'Primary', n: 11 };
+      case 'primary-light-bright':
+        return { theme: 'Primary', n: 12 };
+      case 'primary-light-dim':
+        return { theme: 'Primary', n: 10 };
       case 'primary':
         return { theme: 'Primary', n: PC };
-      case 'primary-light':
-        return { theme: 'Primary', n: 13 };
-      case 'primary-medium':
-        return { theme: 'Primary', n: 6 };
-      case 'primary-dark':
-        return { theme: 'Primary', n: 3 };
+      case 'primary-bright':
+        return { theme: 'Primary', n: Math.min(PC + 1, 12) };
+      case 'primary-dim':
+        return { theme: 'Primary', n: Math.max(PC - 1, 1) };
       default:
         return { theme: defaultTheme, n: defaultN };
     }
   };
-  
-  const appBarConfig = getThemeAndN(navigationSelections?.appBar, 'Primary', PC);
-  const navBarConfig = getThemeAndN(navigationSelections?.navBar, 'Primary', PC);
-  const statusConfig = getThemeAndN(userSelections?.status, 'Neutral', 14);  // Use userSelections.status instead of navigationSelections.status
-  
-  console.log(`🚨 [STATUS DEBUG] statusConfig from getThemeAndN:`, statusConfig);
-  console.log(`🚨 [STATUS DEBUG] userSelections?.status:`, userSelections?.status);
-  console.log(`🚨 [STATUS DEBUG] isDark:`, isDark);
-  console.log(`🚨 [STATUS DEBUG] Expected for "black" in light mode: { theme: "Neutral", n: 1 }`);
-  console.log(`🚨 [STATUS DEBUG] Expected for "black" in dark mode: { theme: "Neutral", n: 14 }`);
+
+  // NOTE: appBarConfig, navBarConfig, statusConfig are computed after defaultConfig below
   
   // Calculate Default theme based on background selection from userSelections (from Color Assignment Stage)
   // This determines which theme the user sees by default
@@ -3810,8 +3732,8 @@ function generateModesThemes(
   } else {
     // LIGHT MODE DEFAULTS (existing logic)
     if (backgroundSelection === 'white' || backgroundSelection === 'neutral-light') {
-      defaultConfig = { theme: 'Neutral', n: 14 };
-      console.log('🎨 [Default Theme] Background=White/Neutral-Light → Neutral Color-14');
+      defaultConfig = { theme: 'Neutral', n: 12 };
+      console.log('🎨 [Default Theme] Background=White/Neutral-Light → Neutral Color-12');
     } else if (backgroundSelection === 'black' || backgroundSelection === 'neutral-dark') {
       defaultConfig = { theme: 'Neutral', n: 1 };
       console.log('🎨 [Default Theme] Background=Black/Neutral-Dark → Neutral Color-1');
@@ -3819,13 +3741,13 @@ function generateModesThemes(
       defaultConfig = { theme: 'Primary', n: PC };
       console.log(`🎨 [Default Theme] Background=Primary → Primary Color-${PC}`);
     } else if (backgroundSelection === 'primary-light') {
-      defaultConfig = { theme: 'Primary', n: 13 };
-      console.log(`🎨 [Default Theme] Background=Primary-Light → Primary Color-13`);
+      defaultConfig = { theme: 'Primary', n: 11 };
+      console.log(`🎨 [Default Theme] Background=Primary-Light → Primary Color-11`);
     } else if (backgroundSelection === 'primary-dark') {
       defaultConfig = { theme: 'Primary', n: 3 };
       console.log(`🎨 [Default Theme] Background=Primary-Dark → Primary Color-3`);
     } else {
-      // Use backgroundN from userSelections if available, otherwise default to Primary Color-11
+      // Use backgroundN from userSelections if available, otherwise default to Primary Color-9
       // This handles 'primary-base' and any other background options by using the actual extracted tone
       const fallbackN = userSelections?.backgroundN || PC;
       const fallbackTheme = userSelections?.backgroundTheme || 'Primary';
@@ -3833,7 +3755,12 @@ function generateModesThemes(
       console.log(`🎨 [Default Theme] Using userSelections.backgroundN=${fallbackN}, backgroundTheme=${fallbackTheme} (from Color Assignment Stage)`);
     }
   }
-  
+
+  // Now that defaultConfig is resolved, compute nav configs using surface theme/N
+  const appBarConfig = getNavThemeAndN(navigationSelections?.appBar, defaultConfig.theme, defaultConfig.n, 'Primary', PC, 'appBar');
+  const navBarConfig = getNavThemeAndN(navigationSelections?.navBar, defaultConfig.theme, defaultConfig.n, 'Primary', PC, 'navBar');
+  const statusConfig = getNavThemeAndN(userSelections?.status, defaultConfig.theme, defaultConfig.n, 'Neutral', 12, 'status');
+
   console.log('');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('🎯 [DEFAULT THEME CREATION]');
@@ -3891,44 +3818,67 @@ function generateThemesSection(
   extractedTones?: { primary: number; secondary: number; tertiary: number },
   backgroundSelection?: 'primary' | 'white' | 'black',
   navigationSelections?: {
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    status?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
   }
 ): any {
-  // Convert extracted tones to Color-N positions using the 14-tone system
-  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const secondaryN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const tertiaryN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
-  
+  // Convert extracted tones to Color-N positions using the 12-tone system
+  const primaryN = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const secondaryN = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
+  const tertiaryN = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
+
   console.log(`🎨 [Themes] Using extracted tones → Primary: tone ${extractedTones?.primary || 71} = Color-${primaryN}, Secondary: tone ${extractedTones?.secondary || 71} = Color-${secondaryN}, Tertiary: tone ${extractedTones?.tertiary || 71} = Color-${tertiaryN}`);
   
-  // Helper: Map user selection to Theme and N value
-  const getThemeAndN = (selection: string | undefined, defaultTheme: string = 'Primary', defaultN: number = 11): { theme: string; n: number } => {
+  // Helper: Map background selection to Theme and N value
+  const getBgThemeAndN = (selection: string | undefined, defaultTheme: string = 'Primary', defaultN: number = 9): { theme: string; n: number } => {
     if (!selection) return { theme: defaultTheme, n: defaultN };
-    
+
     switch (selection) {
       case 'white':
-        return { theme: 'Neutral', n: 14 };
+        return { theme: 'Neutral', n: 12 };
       case 'black':
         return { theme: 'Neutral', n: 1 };
       case 'primary':
-        return { theme: 'Primary', n: primaryN }; // Use extracted primary tone
+        return { theme: 'Primary', n: primaryN };
       case 'primary-light':
-        return { theme: 'Primary', n: 13 };
-      case 'primary-medium':
-        return { theme: 'Primary', n: 6 };
-      case 'primary-dark':
-        return { theme: 'Primary', n: 3 };
+        return { theme: 'Primary', n: 11 };
       default:
         return { theme: defaultTheme, n: defaultN };
     }
   };
-  
-  const defaultConfig = getThemeAndN(backgroundSelection, 'Primary', primaryN);
-  const appBarConfig = getThemeAndN(navigationSelections?.appBar, 'Neutral', 1);
-  const navBarConfig = getThemeAndN(navigationSelections?.navBar, 'Neutral', 2);
-  const statusConfig = getThemeAndN(navigationSelections?.status, 'Neutral', 14);
+
+  // Helper: Map nav selection to Theme and N value (uses surface-based options)
+  const getNavThemeAndN2 = (selection: string | undefined, surfaceTheme: string, surfaceN: number, defaultTheme: string, defaultN: number, navKey: string = 'appBar'): { theme: string; n: number } => {
+    if (!selection) return { theme: defaultTheme, n: defaultN };
+    const isNavBar = navKey === 'navBar';
+
+    switch (selection) {
+      case 'white':
+        return { theme: 'Neutral', n: 12 };
+      case 'black':
+        return { theme: 'Neutral', n: 1 };
+      case 'primary-light':
+        return { theme: 'Primary', n: 11 };
+      case 'primary-light-bright':
+        return { theme: 'Primary', n: 12 };
+      case 'primary-light-dim':
+        return { theme: 'Primary', n: 10 };
+      case 'primary':
+        return { theme: 'Primary', n: primaryN };
+      case 'primary-bright':
+        return { theme: 'Primary', n: Math.min(primaryN + 1, 12) };
+      case 'primary-dim':
+        return { theme: 'Primary', n: Math.max(primaryN - 1, 1) };
+      default:
+        return { theme: defaultTheme, n: defaultN };
+    }
+  };
+
+  const defaultConfig = getBgThemeAndN(backgroundSelection, 'Primary', primaryN);
+  const appBarConfig = getNavThemeAndN2(navigationSelections?.appBar, defaultConfig.theme, defaultConfig.n, 'Neutral', 1, 'appBar');
+  const navBarConfig = getNavThemeAndN2(navigationSelections?.navBar, defaultConfig.theme, defaultConfig.n, 'Neutral', 2, 'navBar');
+  const statusConfig = getNavThemeAndN2(navigationSelections?.status, defaultConfig.theme, defaultConfig.n, 'Neutral', 12, 'status');
   
   console.log(`🎨 [Themes] Selections → Default: ${defaultConfig.theme} Color-${defaultConfig.n}, App-Bar: ${appBarConfig.theme} Color-${appBarConfig.n}, Nav-Bar: ${navBarConfig.theme} Color-${navBarConfig.n}, Status: ${statusConfig.theme} Color-${statusConfig.n}`);
   
@@ -3974,24 +3924,24 @@ function generateThemesSection(
           Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
-          Button: { value: `{Colors.Primary.Color-12}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.Primary.Color-12}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-12}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-12}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Button}`, type: 'color' },
           Text: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Text}`, type: 'color' },
           Border: { value: `{Border.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Hover}`, type: 'color' },
-          Active: { value: `{Primary-Button.Surfaces.Background-9.Active}`, type: 'color' }
+          Active: { value: `{Primary-Button.Surfaces.Background-7.Active}`, type: 'color' }
         },
         'Primary-Light': {
-          Button: { value: `{Colors.Primary.Color-12}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.Primary.Color-12}`, type: 'color' },
-          Border: { value: `{Border.Surfaces.Primary.Color-12}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-12}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-12}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
+          Border: { value: `{Border.Surfaces.Primary.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
         },
         'Primary-Outline': {
           Button: { value: '#00000000', type: 'color' },
@@ -4001,53 +3951,53 @@ function generateThemesSection(
           Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' }
         },
         Secondary: {
-          Button: { value: '{Colors.Secondary.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Secondary.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Secondary.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Secondary.Color-12}', type: 'color' },
-          Active: { value: '{Active.Secondary.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Secondary.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Secondary.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Secondary.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Secondary.Color-10}', type: 'color' },
+          Active: { value: '{Active.Secondary.Color-10}', type: 'color' }
         },
         Tertiary: {
-          Button: { value: '{Colors.Tertiary.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Tertiary.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Tertiary.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Tertiary.Color-12}', type: 'color' },
-          Active: { value: '{Active.Tertiary.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Tertiary.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Tertiary.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Tertiary.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Tertiary.Color-10}', type: 'color' },
+          Active: { value: '{Active.Tertiary.Color-10}', type: 'color' }
         },
         Neutral: {
-          Button: { value: '{Colors.Neutral.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Neutral.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Neutral.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Neutral.Color-12}', type: 'color' },
-          Active: { value: '{Active.Neutral.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Neutral.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Neutral.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Neutral.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Neutral.Color-10}', type: 'color' },
+          Active: { value: '{Active.Neutral.Color-10}', type: 'color' }
         },
         Info: {
-          Button: { value: '{Colors.Info.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Info.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Info.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Info.Color-12}', type: 'color' },
-          Active: { value: '{Active.Info.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Info.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Info.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Info.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Info.Color-10}', type: 'color' },
+          Active: { value: '{Active.Info.Color-10}', type: 'color' }
         },
         Success: {
-          Button: { value: '{Colors.Success.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Success.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Success.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Success.Color-12}', type: 'color' },
-          Active: { value: '{Active.Success.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Success.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Success.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Success.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Success.Color-10}', type: 'color' },
+          Active: { value: '{Active.Success.Color-10}', type: 'color' }
         },
         Warning: {
-          Button: { value: '{Colors.Warning.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Warning.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Warning.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Warning.Color-12}', type: 'color' },
-          Active: { value: '{Active.Warning.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Warning.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Warning.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Warning.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Warning.Color-10}', type: 'color' },
+          Active: { value: '{Active.Warning.Color-10}', type: 'color' }
         },
         Error: {
-          Button: { value: '{Colors.Error.Color-12}', type: 'color' },
-          Text: { value: '{Text.Surfaces.Error.Color-12}', type: 'color' },
-          Border: { value: '{Border.Surfaces.Error.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Error.Color-12}', type: 'color' },
-          Active: { value: '{Active.Error.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Error.Color-10}', type: 'color' },
+          Text: { value: '{Text.Surfaces.Error.Color-10}', type: 'color' },
+          Border: { value: '{Border.Surfaces.Error.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Error.Color-10}', type: 'color' },
+          Active: { value: '{Active.Error.Color-10}', type: 'color' }
         }
       },
       Icons: {
@@ -4122,24 +4072,24 @@ function generateThemesSection(
           Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
-          Button: { value: `{Colors.Primary.Color-12}`, type: 'color' },
-          Text: { value: `{Text.Containers.Primary.Color-12}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-12}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-12}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Containers.Primary.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Button}`, type: 'color' },
           Text: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Text}`, type: 'color' },
           Border: { value: `{Border.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Hover}`, type: 'color' },
-          Active: { value: `{Primary-Button.Containers.Background-9.Active}`, type: 'color' }
+          Active: { value: `{Primary-Button.Containers.Background-7.Active}`, type: 'color' }
         },
         'Primary-Light': {
-          Button: { value: '{Colors.Primary.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Primary.Color-12}', type: 'color' },
+          Button: { value: '{Colors.Primary.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Primary.Color-10}', type: 'color' },
           Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Hover: { value: '{Hover.Primary.Color-12}', type: 'color' },
-          Active: { value: '{Active.Primary.Color-12}', type: 'color' }
+          Hover: { value: '{Hover.Primary.Color-10}', type: 'color' },
+          Active: { value: '{Active.Primary.Color-10}', type: 'color' }
         },
         'Primary-Outline': {
           Button: { value: '#00000000', type: 'color' },
@@ -4149,53 +4099,53 @@ function generateThemesSection(
           Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' }
         },
         Secondary: {
-          Button: { value: '{Colors.Secondary.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Secondary.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Secondary.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Secondary.Color-12}', type: 'color' },
-          Active: { value: '{Active.Secondary.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Secondary.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Secondary.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Secondary.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Secondary.Color-10}', type: 'color' },
+          Active: { value: '{Active.Secondary.Color-10}', type: 'color' }
         },
         Tertiary: {
-          Button: { value: '{Colors.Tertiary.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Tertiary.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Tertiary.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Tertiary.Color-12}', type: 'color' },
-          Active: { value: '{Active.Tertiary.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Tertiary.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Tertiary.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Tertiary.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Tertiary.Color-10}', type: 'color' },
+          Active: { value: '{Active.Tertiary.Color-10}', type: 'color' }
         },
         Neutral: {
-          Button: { value: '{Colors.Neutral.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Neutral.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Neutral.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Neutral.Color-12}', type: 'color' },
-          Active: { value: '{Active.Neutral.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Neutral.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Neutral.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Neutral.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Neutral.Color-10}', type: 'color' },
+          Active: { value: '{Active.Neutral.Color-10}', type: 'color' }
         },
         Info: {
-          Button: { value: '{Colors.Info.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Info.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Info.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Info.Color-12}', type: 'color' },
-          Active: { value: '{Active.Info.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Info.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Info.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Info.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Info.Color-10}', type: 'color' },
+          Active: { value: '{Active.Info.Color-10}', type: 'color' }
         },
         Success: {
-          Button: { value: '{Colors.Success.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Success.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Success.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Success.Color-12}', type: 'color' },
-          Active: { value: '{Active.Success.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Success.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Success.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Success.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Success.Color-10}', type: 'color' },
+          Active: { value: '{Active.Success.Color-10}', type: 'color' }
         },
         Warning: {
-          Button: { value: '{Colors.Warning.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Warning.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Warning.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Warning.Color-12}', type: 'color' },
-          Active: { value: '{Active.Warning.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Warning.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Warning.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Warning.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Warning.Color-10}', type: 'color' },
+          Active: { value: '{Active.Warning.Color-10}', type: 'color' }
         },
         Error: {
-          Button: { value: '{Colors.Error.Color-12}', type: 'color' },
-          Text: { value: '{Text.Containers.Error.Color-12}', type: 'color' },
-          Border: { value: '{Border.Containers.Error.Color-13}', type: 'color' },
-          Hover: { value: '{Hover.Error.Color-12}', type: 'color' },
-          Active: { value: '{Active.Error.Color-12}', type: 'color' }
+          Button: { value: '{Colors.Error.Color-10}', type: 'color' },
+          Text: { value: '{Text.Containers.Error.Color-10}', type: 'color' },
+          Border: { value: '{Border.Containers.Error.Color-11}', type: 'color' },
+          Hover: { value: '{Hover.Error.Color-10}', type: 'color' },
+          Active: { value: '{Active.Error.Color-10}', type: 'color' }
         }
       },
       Icons: {
@@ -4249,31 +4199,31 @@ function generateThemesSection(
   return {
     Default: createTheme(defaultConfig.n, defaultConfig.theme),  // Use background selection
     Primary: createTheme(primaryN, 'Primary'),  // Use extracted tone → Color-N
-    'Primary-Light': createTheme(13, 'Primary'),
+    'Primary-Light': createTheme(11, 'Primary'),
     'Primary-Medium': createTheme(6, 'Primary'),  // Medium always uses Color-6
     'Primary-Dark': createTheme(3, 'Primary'),
     Secondary: createTheme(secondaryN, 'Secondary'),  // Use extracted tone → Color-N
-    'Secondary-Light': createTheme(13, 'Secondary'),
+    'Secondary-Light': createTheme(11, 'Secondary'),
     'Secondary-Medium': createTheme(6, 'Secondary'),  // Medium always uses Color-6
     'Secondary-Dark': createTheme(3, 'Secondary'),
     Tertiary: createTheme(tertiaryN, 'Tertiary'),  // Use extracted tone → Color-N
-    'Tertiary-Light': createTheme(13, 'Tertiary'),
+    'Tertiary-Light': createTheme(11, 'Tertiary'),
     'Tertiary-Medium': createTheme(6, 'Tertiary'),  // Medium always uses Color-6
     'Tertiary-Dark': createTheme(3, 'Tertiary'),
     Neutral: createTheme(9, 'Neutral'),
-    'Neutral-Light': createTheme(13, 'Neutral'),
+    'Neutral-Light': createTheme(11, 'Neutral'),
     'Neutral-Medium': createTheme(6, 'Neutral'),
     'Neutral-Dark': createTheme(3, 'Neutral'),
-    'Info-Light': createTheme(13, 'Info'),
+    'Info-Light': createTheme(11, 'Info'),
     'Info-Medium': createTheme(6, 'Info'),
     'Info-Dark': createTheme(3, 'Info'),
-    'Success-Light': createTheme(13, 'Success'),
+    'Success-Light': createTheme(11, 'Success'),
     'Success-Medium': createTheme(6, 'Success'),
     'Success-Dark': createTheme(3, 'Success'),
-    'Warning-Light': createTheme(13, 'Warning'),
+    'Warning-Light': createTheme(11, 'Warning'),
     'Warning-Medium': createTheme(6, 'Warning'),
     'Warning-Dark': createTheme(3, 'Warning'),
-    'Error-Light': createTheme(13, 'Error'),
+    'Error-Light': createTheme(11, 'Error'),
     'Error-Medium': createTheme(6, 'Error'),
     'Error-Dark': createTheme(3, 'Error'),
     'App-Bar': createTheme(appBarConfig.n, appBarConfig.theme),  // Use App Bar selection
@@ -4332,9 +4282,9 @@ export function exportColorSystemToJSON(
   userSelections?: { // User selections from ColorAssignmentStage - takes precedence over calculated defaults
     defaultTheme?: 'light' | 'dark';
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    appBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    navBar?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
-    status?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary-adaptive' | 'primary-fixed' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
     textColoring?: 'tonal' | 'black-white';
@@ -4432,8 +4382,8 @@ export function exportColorSystemToJSON(
   console.log('🎯 [JSON Export] Final Default Settings:', defaultSettings);
   
   // Calculate OB (Other Buttons) value based on Primary Color position
-  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-  const OB = PC >= 11 ? 11 : 8; // Other buttons (OB = 11 if PC >= 11, else 8)
+  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const OB = PC >= 9 ? 8 : 6; // Other buttons (OB = 8 if PC >= 9, else 6)
   console.log(`🎯 [JSON Export] OB calculated: ${OB} (PC = ${PC})`);
   
   const colorSystem: ColorSystemExport = {
@@ -4704,16 +4654,16 @@ export function exportColorSystemToJSON(
   console.log(`  ├─ [JSON Export] Typography/Congative-Family-Body → ${congativeFamily}`);
 
   // Light mode backgrounds - all 14 backgrounds with 1:1 mapping to Color-N
-  const lightModeBackgroundTones = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  const lightModeBackgroundNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  const lightModeBackgroundTones = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+  const lightModeBackgroundNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-  // Dark mode backgrounds - all 14 backgrounds with 1:1 mapping to Color-N
-  const darkModeBackgroundTones = [1, 5, 12, 18, 24, 30, 36, 58, 64, 70, 76, 82, 85, 89];
-  // Neutral and Chromatic both use the same 14 tones (Background-N → Color-N)
-  const darkModeNeutralBackgroundTones = [1, 5, 12, 18, 24, 30, 36, 58, 64, 70, 76, 82, 85, 89];
-  const darkModeNeutralBackgroundNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-  const darkModeChromaticBackgroundTones = [1, 5, 12, 18, 24, 30, 36, 58, 64, 70, 76, 82, 85, 89];
-  const darkModeChromaticBackgroundNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  // Dark mode backgrounds - all 12 backgrounds with 1:1 mapping to Color-N
+  const darkModeBackgroundTones = [1, 5, 12, 18, 24, 58, 64, 70, 76, 82, 85, 89];
+  // Neutral and Chromatic both use the same 12 tones (Background-N → Color-N)
+  const darkModeNeutralBackgroundTones = [1, 5, 12, 18, 24, 58, 64, 70, 76, 82, 85, 89];
+  const darkModeNeutralBackgroundNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const darkModeChromaticBackgroundTones = [1, 5, 12, 18, 24, 58, 64, 70, 76, 82, 85, 89];
+  const darkModeChromaticBackgroundNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
   // Process each palette
   console.log('🎨 [JSON Export] Processing color palettes...');
@@ -4722,8 +4672,8 @@ export function exportColorSystemToJSON(
   console.log('🔍 [exportColorSystem ENTRY] Primary palette received:', tonePalettes.primary);
   if (tonePalettes.primary) {
     console.log('   Color-1:', tonePalettes.primary[0]);
-    console.log('   Color-8:', tonePalettes.primary[7]);
-    console.log('   Color-14:', tonePalettes.primary[13]);
+    console.log('   Color-6:', tonePalettes.primary[5]);
+    console.log('   Color-12:', tonePalettes.primary[11]);
   }
   
   (['neutral', 'primary', 'secondary', 'tertiary', 'info', 'success', 'warning', 'error', 'hotlink-visited'] as const).forEach((paletteKey) => {
@@ -4737,8 +4687,8 @@ export function exportColorSystemToJSON(
       console.log('  darkPalette:', darkPalette);
       if (palette && palette.length > 0) {
         console.log('  Color-1:', palette[0]);
-        console.log('  Color-8:', palette[7]);
-        console.log('  Color-14:', palette[13]);
+        console.log('  Color-6:', palette[5]);
+        console.log('  Color-12:', palette[11]);
       }
     }
     
@@ -4764,41 +4714,41 @@ export function exportColorSystemToJSON(
 
     // Add to Colors.Light-Mode section
     // Color-Vibrant:
-    // - For Primary/Secondary/Tertiary: Use the extracted tone (e.g., tone 90 = Color-11, tone 62 = Color-8)
-    // - For semantic palettes (10 colors): Color-8 (index 7) which corresponds to tone 62
-    // - For Neutral: Color-11 (index 10)
+    // - For Primary/Secondary/Tertiary: Use the extracted tone (e.g., tone 90 = Color-9, tone 58 = Color-6)
+    // - For semantic palettes (10 colors): Color-6 (index 7) which corresponds to tone 58
+    // - For Neutral: Color-9 (index 10)
     const isSemanticColor = paletteKey === 'info' || paletteKey === 'success' || paletteKey === 'warning' || paletteKey === 'error' || paletteKey === 'hotlink-visited';
     
-    // Light Mode Color-Vibrant is ALWAYS Color-11 (tone 90) for ALL palettes
-    // Per specification: Color-Vibrant in Light Mode = Color-11
+    // Light Mode Color-Vibrant is ALWAYS Color-9 (tone 90) for ALL palettes
+    // Per specification: Color-Vibrant in Light Mode = Color-9
     let lightColorVibrant: string;
     lightColorVibrant = palette.length > 10 ? palette[10].color : palette[palette.length - 1].color;
-    console.log(`🎨 [Color-Vibrant] ${paletteName} Light Mode using Color-11 (index 10)`);
+    console.log(`🎨 [Color-Vibrant] ${paletteName} Light Mode using Color-9 (index 10)`);
 
     colorSystem.Modes['Light-Mode'].Colors[paletteName] = {};
     
     // Add all light mode tones to Colors section
-    // Ensure we have all 14 colors (Color-1 through Color-14)
-    for (let i = 0; i < 14; i++) {
+    // Ensure we have all 12 colors (Color-1 through Color-12)
+    for (let i = 0; i < 12; i++) {
       const colorKey = `Color-${i + 1}`;
       let colorValue: string;
-      
+
       if (i < palette.length) {
         // Use existing palette color
         colorValue = palette[i].color;
-        
+
         // DEBUG: Log ALL colors for Primary to see what's being used
         if (paletteName === 'Primary') {
           console.log(`🔍 [exportColorSystem ASSIGNMENT] ${paletteName} ${colorKey}: palette[${i}].color = "${palette[i].color}"`);
         }
-        
-        // DEBUG: Log Color-1, Color-8, and Color-14 for Primary
-        if (paletteName === 'Primary' && (i === 0 || i === 7 || i === 13)) {
+
+        // DEBUG: Log Color-1, Color-6, and Color-12 for Primary
+        if (paletteName === 'Primary' && (i === 0 || i === 5 || i === 11)) {
           console.log(`🔍 [exportColorSystem] ${paletteName} ${colorKey}: palette[${i}] =`, palette[i]);
           console.log(`   └─ Using color value: ${colorValue}`);
         }
-      } else if (i === 13) {
-        // Color-14: Blend last available color with white
+      } else if (i === 11) {
+        // Color-12: Blend last available color with white
         const lastColor = palette[palette.length - 1].color;
         colorValue = chroma.mix(lastColor, '#FFFFFF', 0.5, 'lab').hex();
       } else {
@@ -4816,26 +4766,26 @@ export function exportColorSystemToJSON(
     if (paletteName === 'Primary') {
       console.log(`🔍 [exportColorSystem] ${paletteName} JSON Colors verification:`);
       console.log('  Color-1:', colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-1']);
-      console.log('  Color-8:', colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-8']);
-      console.log('  Color-14:', colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-14']);
+      console.log('  Color-6:', colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-6']);
+      console.log('  Color-12:', colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-12']);
     }
     
-    // Add Color-Vibrant for light mode (Color-11)
+    // Add Color-Vibrant for light mode (Color-9)
     colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-Vibrant'] = {
       value: lightColorVibrant,
       type: 'color'
     };
 
     // Add to Colors.Dark-Mode section
-    // Color-Vibrant for dark mode uses the SAME color as Light Mode Color-Vibrant (Light Mode Color-11)
-    // This ensures consistency: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-11
+    // Color-Vibrant for dark mode uses the SAME color as Light Mode Color-Vibrant (Light Mode Color-9)
+    // This ensures consistency: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-9
     colorSystem.Modes['Dark-Mode'].Colors[paletteName] = {};
     
     // For dark mode:
-    // - Neutral starts at Color-3 (has 12 colors: Color-3 through Color-14)
-    // - ALL other colors (primary, secondary, tertiary, info, success, warning, error, hotlink-visited) start at Color-1 (has 14 colors: Color-1 through Color-14)
+    // - Neutral starts at Color-3 (has 10 colors: Color-3 through Color-12)
+    // - ALL other colors (primary, secondary, tertiary, info, success, warning, error, hotlink-visited) start at Color-1 (has 12 colors: Color-1 through Color-12)
     const darkStartIndex = paletteKey === 'neutral' ? 3 : 1;
-    const darkEndIndex = paletteKey === 'neutral' ? 14 : 14;
+    const darkEndIndex = paletteKey === 'neutral' ? 12 : 12;
     const darkColorCount = darkEndIndex - darkStartIndex + 1;
     
     // Ensure we have all required dark mode colors
@@ -4846,8 +4796,8 @@ export function exportColorSystemToJSON(
       if (i < darkPalette.length) {
         // Use existing dark palette color
         colorValue = darkPalette[i].color;
-      } else if (darkStartIndex + i === 14) {
-        // Color-14: Blend last available color with white
+      } else if (darkStartIndex + i === 12) {
+        // Color-12: Blend last available color with white
         const lastColor = darkPalette[darkPalette.length - 1].color;
         colorValue = chroma.mix(lastColor, '#FFFFFF', 0.3, 'lab').hex();
       } else {
@@ -4861,14 +4811,14 @@ export function exportColorSystemToJSON(
       };
     }
     
-    // Add Color-Vibrant for dark mode - USE LIGHT MODE Color-11
-    // Per specification: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-11
+    // Add Color-Vibrant for dark mode - USE LIGHT MODE Color-9
+    // Per specification: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-9
     colorSystem.Modes['Dark-Mode'].Colors[paletteName]['Color-Vibrant'] = {
-      value: lightColorVibrant, // Use the SAME value as light mode (Light Mode Color-11)
+      value: lightColorVibrant, // Use the SAME value as light mode (Light Mode Color-9)
       type: 'color'
     };
     
-    console.log(`🎨 [Color-Vibrant] ${paletteName} DARK MODE Color-Vibrant = ${lightColorVibrant} (using Light Mode Color-11)`);
+    console.log(`🎨 [Color-Vibrant] ${paletteName} DARK MODE Color-Vibrant = ${lightColorVibrant} (using Light Mode Color-9)`);
 
     // Add modes for Neutral, Primary, Secondary, Tertiary, and semantic colors (Error, Warning, Success, Info)
     if (paletteKey === 'neutral' || paletteKey === 'primary' || paletteKey === 'secondary' || paletteKey === 'tertiary' ||
@@ -5262,38 +5212,42 @@ export function exportColorSystemToJSON(
       });
 
       // For chromatic backgrounds (Primary, Secondary, Tertiary) in Dark Mode:
-      // Background-11 uses Dark Mode Color-13, Background-Vibrant uses Light Mode Color-11
+      // Background-9 uses Dark Mode Color-11, Background-Vibrant uses Light Mode Color-9
       if (paletteKey === 'primary' || paletteKey === 'secondary' || paletteKey === 'tertiary') {
         // paletteName is already defined in outer scope
         
-        // Get Dark Mode Color-13 (tone 89) for Background-11
+        // Get Dark Mode Color-11 (tone 89) for Background-9
         const darkModePalette = colorSystem.Modes['Dark-Mode'].Colors[paletteName];
-        const darkModeColor13 = darkModePalette['Color-13'].value;
+        const darkModeColor13 = darkModePalette['Color-11'].value;
         
-        // Get Light Mode Color-11 (tone 90) for Background-Vibrant
+        // Get Light Mode Color-9 (tone 90) for Background-Vibrant
         const lightModePalette = tonePalettes[paletteKey];
-        const lightModeColor11 = lightModePalette.length > 10 ? lightModePalette[10].color : '#E5C2D5'; // Color-11 (tone 90)
+        const lightModeColor11 = lightModePalette.length > 10 ? lightModePalette[10].color : '#E5C2D5'; // Color-9 (tone 90)
         
-        // Get Light Mode Background-11 Container values (actual hex values, not references)
-        const lightModeBg11Containers = colorSystem.Modes['Light-Mode'].Backgrounds[paletteName]['Background-11'].Containers;
+        // Get Light Mode Background-9 Container values (actual hex values, not references)
+        const lightModeBg11Containers = colorSystem.Modes['Light-Mode'].Backgrounds[paletteName]['Background-9'].Containers;
         const lightModeContainer = lightModeBg11Containers.Container.value;
         const lightModeContainerLow = lightModeBg11Containers['Container-Low'].value;
         const lightModeContainerLowest = lightModeBg11Containers['Container-Lowest'].value;
         const lightModeContainerHigh = lightModeBg11Containers['Container-High']?.value || lightModeContainer;
         const lightModeContainerHighest = lightModeBg11Containers['Container-Highest']?.value || lightModeContainer;
         
-        // Calculate Surface-Dim and Surface-Bright from Dark Mode Color-13
-        // Apply same blend percentages as Light Mode tone 99: 4% black, 4% white
-        const surfaceDim = blendColors('#000000', darkModeColor13, 0.04);
-        const surfaceBright = blendColors('#FFFFFF', darkModeColor13, 0.04);
+        // Surface-Dim = adjacent tone one step darker, Surface-Bright = one step lighter
+        const surfaceDim = darkPalette[10]?.color || '#000000'; // Color-11 dim → Color-10
+        const surfaceBright = darkPalette[12]?.color || '#FFFFFF'; // Color-11 bright → Color-12 (or white)
         
-        // Calculate Container colors for Background-11
+        // Calculate Container colors for Background-9
         // For tone 89 in Dark Mode, containers use Color-4 (index 3)
         const containerColor = darkPalette[3]?.color || '#000000'; // Color-4
         
-        // Calculate Surface-Dim and Surface-Bright from Light Mode Color-11 for Background-Vibrant
-        const vibrantSurfaceDim = blendColors('#000000', lightModeColor11, 0.04);
-        const vibrantSurfaceBright = blendColors('#FFFFFF', lightModeColor11, 0.04);
+        // Surface-Dim/Bright for Vibrant background — adjacent tones from light palette
+        const lightPalette = colorSystem.Modes['Light-Mode']?.Colors ?
+          Object.entries(colorSystem.Modes['Light-Mode'].Colors)
+            .filter(([k]) => k.startsWith('Color-') && !k.includes('Vibrant'))
+            .sort(([a], [b]) => parseInt(a.split('-')[1]) - parseInt(b.split('-')[1]))
+            .map(([, v]: [string, any]) => v.value) : [];
+        const vibrantSurfaceDim = lightPalette[8] || lightModeColor11; // Color-9 dim → Color-8 (index 7... but vibrant is Color-9=index 8)
+        const vibrantSurfaceBright = lightPalette[10] || '#FFFFFF'; // Color-9 bright → Color-10
         
         // Defensive: Ensure the entire chain exists
         if (!colorSystem.Modes['Dark-Mode']) {
@@ -5307,18 +5261,18 @@ export function exportColorSystemToJSON(
           colorSystem.Modes['Dark-Mode'].Backgrounds = {};
         }
         
-        console.log(`      Setting Dark-Mode.Backgrounds.${paletteName}['Background-11'] (special chromatic)`);
+        console.log(`      Setting Dark-Mode.Backgrounds.${paletteName}['Background-9'] (special chromatic)`);
         
-        // Background-11 uses Dark Mode Color-13 - NESTED structure with Surfaces/Containers
+        // Background-9 uses Dark Mode Color-11 - NESTED structure with Surfaces/Containers
         try {
           const backgroundsRef = colorSystem.Modes['Dark-Mode'].Backgrounds[paletteName];
           if (backgroundsRef === undefined || backgroundsRef === null) {
             console.error(`❌ CRITICAL: Dark-Mode Backgrounds.${paletteName} reference is ${backgroundsRef}!`);
             throw new Error(`Dark-Mode Backgrounds.${paletteName} reference is ${backgroundsRef}`);
           }
-          backgroundsRef['Background-11'] = {
+          backgroundsRef['Background-9'] = {
             Surfaces: {
-              Surface: { value: `{Colors.${paletteName}.Color-13}`, type: 'color' },
+              Surface: { value: `{Colors.${paletteName}.Color-11}`, type: 'color' },
               'Surface-Dim': { value: surfaceDim, type: 'color' },
               'Surface-Bright': { value: surfaceBright, type: 'color' },
             },
@@ -5330,9 +5284,9 @@ export function exportColorSystemToJSON(
               'Container-Highest': { value: containerColor, type: 'color' },
             }
           };
-          console.log(`        ✅ Successfully set Background-11 (chromatic)`);
+          console.log(`        ✅ Successfully set Background-9 (chromatic)`);
         } catch (assignError) {
-          console.error(`❌❌❌ ASSIGNMENT ERROR for Background-11 (chromatic) in Dark-Mode:`, assignError);
+          console.error(`❌❌❌ ASSIGNMENT ERROR for Background-9 (chromatic) in Dark-Mode:`, assignError);
           console.error(`   Backgrounds exists:`, !!colorSystem?.Modes?.['Dark-Mode']?.Backgrounds);
           console.error(`   Backgrounds value:`, colorSystem?.Modes?.['Dark-Mode']?.Backgrounds);
           throw assignError;
@@ -5341,7 +5295,7 @@ export function exportColorSystemToJSON(
         
         console.log(`      Setting Dark-Mode.Backgrounds.${paletteName}['Background-Vibrant'] (special chromatic)`);
         
-        // Background-Vibrant uses Light Mode Color-11 - NESTED structure with Surfaces/Containers
+        // Background-Vibrant uses Light Mode Color-9 - NESTED structure with Surfaces/Containers
         // IMPORTANT: Use actual hex values, not references, for Vibrant tokens
         try {
           const backgroundsRef = colorSystem.Modes['Dark-Mode'].Backgrounds[paletteName];
@@ -5382,18 +5336,16 @@ export function exportColorSystemToJSON(
     'Color-3': { value: '#ffffff', type: 'color' },
     'Color-4': { value: '#ffffff', type: 'color' },
     'Color-5': { value: '#ffffff', type: 'color' },
-    'Color-6': { value: '#ffffff', type: 'color' },
+    'Color-6': { value: '#040404', type: 'color' },
     'Color-7': { value: '#040404', type: 'color' },
     'Color-8': { value: '#040404', type: 'color' },
     'Color-9': { value: '#040404', type: 'color' },
     'Color-10': { value: '#040404', type: 'color' },
     'Color-11': { value: '#040404', type: 'color' },
     'Color-12': { value: '#040404', type: 'color' },
-    'Color-13': { value: '#040404', type: 'color' },
-    'Color-14': { value: '#040404', type: 'color' },
     'Color-Vibrant': { value: '#040404', type: 'color' }
   };
-  console.log('      ✓ BW palette added: 14 colors + Color-Vibrant');
+  console.log('      ✓ BW palette added: 12 colors + Color-Vibrant');
 
   // Override all mode-specific structures with fixed structures
   console.log('🎨 [JSON Export] Applying all fixed structures...');
@@ -5440,11 +5392,11 @@ export function exportColorSystemToJSON(
   console.log(`      ✓ Border applied: Surfaces has ${Object.keys(darkModeBorderFixed.Surfaces || {}).length} palettes`);
   console.log(`      ✓ Border applied: Containers has ${Object.keys(darkModeBorderFixed.Containers || {}).length} palettes`);
 
-  // Patch Dark Mode Vibrant tokens with actual Light Mode Color-11 hex values
-  console.log('🎨 [JSON Export] Patching Dark-Mode Color-Vibrant tokens with Light-Mode Color-11 hex values...');
+  // Patch Dark Mode Vibrant tokens with actual Light Mode Color-9 hex values
+  console.log('🎨 [JSON Export] Patching Dark-Mode Color-Vibrant tokens with Light-Mode Color-9 hex values...');
   const palettesToPatch = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'BW', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
   palettesToPatch.forEach(paletteName => {
-    const lightModeColor11 = colorSystem.Modes['Light-Mode'].Colors[paletteName]?.['Color-11']?.value;
+    const lightModeColor11 = colorSystem.Modes['Light-Mode'].Colors[paletteName]?.['Color-9']?.value;
     if (lightModeColor11) {
       // Patch Header
       if (colorSystem.Modes['Dark-Mode'].Header?.Surfaces?.[paletteName]) {
@@ -5521,38 +5473,34 @@ export function exportColorSystemToJSON(
       const colorRef = palette === 'Error' ? 'Tertiary' : palette;
       
       buttonBorder.Surfaces[palette] = {
-        'Color-1': { value: `{Colors.${colorRef}.Color-8}`, type: 'color' },
-        'Color-2': { value: `{Colors.${colorRef}.Color-8}`, type: 'color' },
-        'Color-3': { value: `{Colors.${colorRef}.Color-9}`, type: 'color' },
-        'Color-4': { value: `{Colors.${colorRef}.Color-11}`, type: 'color' },
-        'Color-5': { value: `{Colors.${colorRef}.Color-12}`, type: 'color' },
-        'Color-6': { value: `{Colors.${colorRef}.Color-13}`, type: 'color' },
-        'Color-7': { value: `{Colors.${colorRef}.Color-3}`, type: 'color' },
-        'Color-8': { value: `{Colors.${colorRef}.Color-4}`, type: 'color' },
+        'Color-1': { value: `{Colors.${colorRef}.Color-6}`, type: 'color' },
+        'Color-2': { value: `{Colors.${colorRef}.Color-6}`, type: 'color' },
+        'Color-3': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
+        'Color-4': { value: `{Colors.${colorRef}.Color-9}`, type: 'color' },
+        'Color-5': { value: `{Colors.${colorRef}.Color-10}`, type: 'color' },
+        'Color-6': { value: `{Colors.${colorRef}.Color-2}`, type: 'color' },
+        'Color-7': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
+        'Color-8': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-9': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-10': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
-        'Color-11': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
-        'Color-12': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
-        'Color-13': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
-        'Color-14': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
+        'Color-11': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
+        'Color-12': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-Vibrant': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' }
       };
 
       buttonBorder.Containers[palette] = {
-        'Color-1': { value: `{Colors.${colorRef}.Color-8}`, type: 'color' },
-        'Color-2': { value: `{Colors.${colorRef}.Color-8}`, type: 'color' },
-        'Color-3': { value: `{Colors.${colorRef}.Color-9}`, type: 'color' },
-        'Color-4': { value: `{Colors.${colorRef}.Color-11}`, type: 'color' },
-        'Color-5': { value: `{Colors.${colorRef}.Color-12}`, type: 'color' },
-        'Color-6': { value: `{Colors.${colorRef}.Color-13}`, type: 'color' },
-        'Color-7': { value: `{Colors.${colorRef}.Color-3}`, type: 'color' },
-        'Color-8': { value: `{Colors.${colorRef}.Color-4}`, type: 'color' },
+        'Color-1': { value: `{Colors.${colorRef}.Color-6}`, type: 'color' },
+        'Color-2': { value: `{Colors.${colorRef}.Color-6}`, type: 'color' },
+        'Color-3': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
+        'Color-4': { value: `{Colors.${colorRef}.Color-9}`, type: 'color' },
+        'Color-5': { value: `{Colors.${colorRef}.Color-10}`, type: 'color' },
+        'Color-6': { value: `{Colors.${colorRef}.Color-2}`, type: 'color' },
+        'Color-7': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
+        'Color-8': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-9': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-10': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
-        'Color-11': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
-        'Color-12': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
-        'Color-13': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
-        'Color-14': { value: `{Colors.${colorRef}.Color-7}`, type: 'color' },
+        'Color-11': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
+        'Color-12': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-Vibrant': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' }
       };
     });
@@ -5614,25 +5562,25 @@ export function exportColorSystemToJSON(
   
   /*
   const backgroundNames = ['Background-1', 'Background-2', 'Background-3', 'Background-4', 'Background-5', 
-                           'Background-6', 'Background-7', 'Background-8', 'Background-9', 'Background-10', 
-                           'Background-11', 'Background-12', 'Background-13', 'Background-14', 'Background-Vibrant'];
+                           'Background-6', 'Background-7', 'Background-6', 'Background-7', 'Background-8', 
+                           'Background-9', 'Background-10', 'Background-11', 'Background-12', 'Background-Vibrant'];
 
   // Helper function to convert button color reference to Hover/Active references
   const getHoverActiveReferences = (buttonColorValue: string) => {
     // Extract the color reference from button value
     // Examples: 
-    // - "{Primary.Color-11}" → Hover: "{Hover.Primary.Color-11}", Active: "{Active.Primary.Color-11}"
-    // - "{Colors.Primary.Color-8}" → Hover: "{Hover.Primary.Color-8}", Active: "{Active.Primary.Color-8}"
-    // - "#FFFFFF" (White) → Hover: "{Hover.Neutral.Color-13}", Active: "{Active.Neutral.Color-13}"
+    // - "{Primary.Color-9}" → Hover: "{Hover.Primary.Color-9}", Active: "{Active.Primary.Color-9}"
+    // - "{Colors.Primary.Color-6}" → Hover: "{Hover.Primary.Color-6}", Active: "{Active.Primary.Color-6}"
+    // - "#FFFFFF" (White) → Hover: "{Hover.Neutral.Color-11}", Active: "{Active.Neutral.Color-11}"
     // - "#000000" (Black) → Hover: "{Hover.Neutral.Color-1}", Active: "{Active.Neutral.Color-1}"
     
     let hover = '';
     let active = '';
     
     if (buttonColorValue === '#FFFFFF' || buttonColorValue === '#ffffff') {
-      // White button → use Neutral Color-13
-      hover = '{Hover.Neutral.Color-13}';
-      active = '{Active.Neutral.Color-13}';
+      // White button → use Neutral Color-11
+      hover = '{Hover.Neutral.Color-11}';
+      active = '{Active.Neutral.Color-11}';
     } else if (buttonColorValue === '#000000' || buttonColorValue === '#000') {
       // Black button → use Neutral Color-1
       hover = '{Hover.Neutral.Color-1}';
@@ -5643,11 +5591,11 @@ export function exportColorSystemToJSON(
       let ref = buttonColorValue.replace(/[{}]/g, '');
       ref = ref.replace('Colors.', '');
       
-      // ref is now like "Primary.Color-11" or "Neutral.Color-5"
+      // ref is now like "Primary.Color-9" or "Neutral.Color-5"
       const parts = ref.split('.');
       if (parts.length >= 2) {
         const palette = parts[0]; // "Primary", "Secondary", "Neutral", etc.
-        const colorNum = parts[1]; // "Color-11", "Color-5", etc.
+        const colorNum = parts[1]; // "Color-9", "Color-5", etc.
         
         hover = `{Hover.${palette}.${colorNum}}`;
         active = `{Active.${palette}.${colorNum}}`;
@@ -5673,9 +5621,9 @@ export function exportColorSystemToJSON(
       if (style === 'Primary-Adaptive') {
         if (mode === 'Light-Mode') {
           // Light-Mode: Adaptive button colors per background
-          // Special case for Background-11 and Background-Vibrant (both Surfaces and Containers)
+          // Special case for Background-9 and Background-Vibrant (both Surfaces and Containers)
           if (bgNumber === 11 || bgName === 'Background-Vibrant') {
-            const buttonColor = '{Colors.Primary.Color-8}';
+            const buttonColor = '{Colors.Primary.Color-6}';
             const { hover, active } = getHoverActiveReferences(buttonColor);
             result[bgName] = {
               Button: { value: buttonColor, type: 'color' },
@@ -5685,15 +5633,15 @@ export function exportColorSystemToJSON(
             };
           } else {
             const tonalConfig: { [key: number]: { button: string; text: string } } = {
-              1: { button: '{Colors.Primary.Color-11}', text: `{Text.${surfaceOrContainer}.Primary.Color-11}` },
-              2: { button: '{Colors.Primary.Color-11}', text: `{Text.${surfaceOrContainer}.Primary.Color-5}` },
-              3: { button: '{Colors.Primary.Color-11}', text: `{Text.${surfaceOrContainer}.Primary.Color-5}` },
-              4: { button: '{Colors.Primary.Color-3}', text: `{Text.${surfaceOrContainer}.Primary.Color-11}` },
-              5: { button: '{Colors.Primary.Color-3}', text: `{Text.${surfaceOrContainer}.Primary.Color-11}` },
-              6: { button: '{Colors.Primary.Color-4}', text: `{Text.${surfaceOrContainer}.Primary.Color-10}` },
-              7: { button: '{Colors.Primary.Color-4}', text: `{Text.${surfaceOrContainer}.Primary.Color-10}` },
-              8: { button: '{Colors.Primary.Color-5}', text: `{Text.${surfaceOrContainer}.Primary.Color-11}` },
-              9: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-12}` },
+              1: { button: '{Colors.Primary.Color-9}', text: `{Text.${surfaceOrContainer}.Primary.Color-9}` },
+              2: { button: '{Colors.Primary.Color-9}', text: `{Text.${surfaceOrContainer}.Primary.Color-5}` },
+              3: { button: '{Colors.Primary.Color-9}', text: `{Text.${surfaceOrContainer}.Primary.Color-5}` },
+              4: { button: '{Colors.Primary.Color-3}', text: `{Text.${surfaceOrContainer}.Primary.Color-9}` },
+              5: { button: '{Colors.Primary.Color-3}', text: `{Text.${surfaceOrContainer}.Primary.Color-9}` },
+              6: { button: '{Colors.Primary.Color-4}', text: `{Text.${surfaceOrContainer}.Primary.Color-8}` },
+              7: { button: '{Colors.Primary.Color-4}', text: `{Text.${surfaceOrContainer}.Primary.Color-8}` },
+              8: { button: '{Colors.Primary.Color-5}', text: `{Text.${surfaceOrContainer}.Primary.Color-9}` },
+              9: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-10}` },
               10: { button: '{Colors.Primary.Color-7}', text: `{Text.${surfaceOrContainer}.Primary.Color-2}` },
               11: { button: '{Colors.Primary.Color-7}', text: `{Text.${surfaceOrContainer}.Primary.Color-2}` },
               12: { button: '{Colors.Primary.Color-7}', text: `{Text.${surfaceOrContainer}.Primary.Color-2}` },
@@ -5715,26 +5663,26 @@ export function exportColorSystemToJSON(
           }
         } else if (mode === 'Dark-Mode') {
           // Dark-Mode: Adaptive pattern for dark backgrounds
-          // Special case for Background-11 and Background-Vibrant (both Surfaces and Containers)
+          // Special case for Background-9 and Background-Vibrant (both Surfaces and Containers)
           if (bgNumber === 11 || bgName === 'Background-Vibrant') {
             const buttonColor = '{Colors.Primary.Color-7}';
             const { hover, active } = getHoverActiveReferences(buttonColor);
             result[bgName] = {
               Button: { value: buttonColor, type: 'color' },
-              Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-13}`, type: 'color' },
+              Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-11}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
               Active: { value: active, type: 'color' }
             };
           } else {
             const darkConfig: { [key: number]: { button: string; text: string } } = {
-              1: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              2: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              3: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              4: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              5: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              6: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              7: { button: '{Colors.Primary.Color-11}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
-              8: { button: '{Colors.Primary.Color-8}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              1: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              2: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              3: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              4: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              5: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              6: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              7: { button: '{Colors.Primary.Color-9}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
+              8: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
               9: { button: '{Colors.Primary.Color-6}', text: `{Text.${surfaceOrContainer}.Primary.Color-2}` },
               10: { button: '{Colors.Primary.Color-7}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
               11: { button: '{Colors.Primary.Color-7}', text: `{Text.${surfaceOrContainer}.Primary.Color-3}` },
@@ -5814,7 +5762,7 @@ export function exportColorSystemToJSON(
         } else if (mode === 'Dark-Mode') {
           if (bgNumber <= 7) {
             // Background-1 to 7: Light button with dark text
-            const buttonColor = '{Colors.Primary.Color-13}';
+            const buttonColor = '{Colors.Primary.Color-11}';
             const { hover, active } = getHoverActiveReferences(buttonColor);
             result[bgName] = {
               Button: { value: buttonColor, type: 'color' },
@@ -5823,12 +5771,12 @@ export function exportColorSystemToJSON(
               Active: { value: active, type: 'color' }
             };
           } else {
-            // Background-8 to Vibrant: Dark button with light text
+            // Background-6 to Vibrant: Dark button with light text
             const buttonColor = '{Colors.Primary.Color-2}';
             const { hover, active } = getHoverActiveReferences(buttonColor);
             result[bgName] = {
               Button: { value: buttonColor, type: 'color' },
-              Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-13}`, type: 'color' },
+              Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-11}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
               Active: { value: active, type: 'color' }
             };
@@ -5942,14 +5890,14 @@ export function exportColorSystemToJSON(
   console.log('  ✓ [JSON Export] Complete Simplified System generated for both modes');
   
   // ========================================
-  // Replace Dark-Mode Background-Vibrant with hex values from Light-Mode Background-11
+  // Replace Dark-Mode Background-Vibrant with hex values from Light-Mode Background-9
   // ========================================
-  console.log('🎨 [JSON Export] Replacing Dark-Mode Background-Vibrant with hex values from Light-Mode Background-11...');
+  console.log('🎨 [JSON Export] Replacing Dark-Mode Background-Vibrant with hex values from Light-Mode Background-9...');
   
   // Helper function to resolve token reference to hex color
   const resolveTokenToHex = (tokenRef: string, theme: string): string => {
     // Extract the Color-N from the token reference
-    // E.g., "{Colors.Primary.Color-11}" -> 11
+    // E.g., "{Colors.Primary.Color-9}" -> 11
     const colorMatch = tokenRef.match(/Color-(\d+|Vibrant)/);
     if (!colorMatch) return tokenRef;
     
@@ -5971,11 +5919,11 @@ export function exportColorSystemToJSON(
     if (!palette) return tokenRef;
     
     // Map Color-N to tone value
-    const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
+    const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
     const colorIndex = parseInt(colorN) - 1;
     
     if (colorN === 'Vibrant') {
-      // For Vibrant, use tone 71 (Color-9)
+      // For Vibrant, use tone 71 (Color-7)
       return interpolateTone(71, palette);
     } else if (colorIndex >= 0 && colorIndex < toneScale.length) {
       return interpolateTone(toneScale[colorIndex], palette);
@@ -6090,10 +6038,10 @@ export function exportColorSystemToJSON(
   // Add top-level Theme section with references to Mode themes
   console.log('🎨 [JSON Export] Generating top-level Theme references...');
   
-  // Check if Backgrounds.Neutral.Background-11 exists (with palette nesting)
-  const neutralBg11 = colorSystem.Modes['Light-Mode']?.Backgrounds?.Neutral?.['Background-11'];
+  // Check if Backgrounds.Neutral.Background-9 exists (with palette nesting)
+  const neutralBg11 = colorSystem.Modes['Light-Mode']?.Backgrounds?.Neutral?.['Background-9'];
   if (!neutralBg11) {
-    console.warn('⚠️  [JSON Export] Backgrounds.Neutral.Background-11 not found - Surfaces and Containers will be empty');
+    console.warn('⚠️  [JSON Export] Backgrounds.Neutral.Background-9 not found - Surfaces and Containers will be empty');
     console.warn('⚠️  Available Backgrounds:', Object.keys(colorSystem.Modes['Light-Mode']?.Backgrounds || {}));
     if (colorSystem.Modes['Light-Mode']?.Backgrounds?.Neutral) {
       console.warn('⚠️  Available Neutral Backgrounds:', Object.keys(colorSystem.Modes['Light-Mode']?.Backgrounds?.Neutral || {}));
@@ -6181,9 +6129,9 @@ export function exportColorSystemToJSON(
     if (!obj || typeof obj !== 'object') return obj;
     
     if (obj.value && typeof obj.value === 'string') {
-      // Convert references like {Modes.Light-Mode.Buttons.Surfaces.Background-11.Primary.Button}
+      // Convert references like {Modes.Light-Mode.Buttons.Surfaces.Background-9.Primary.Button}
       // to {Theme.Buttons.Surfaces.Primary.Button}
-      const referenceMatch = obj.value.match(/\{Modes\.Light-Mode\.(Buttons|Icons|Tags)\.(Surfaces|Containers)\.Background-11\.(.*)\}/);
+      const referenceMatch = obj.value.match(/\{Modes\.Light-Mode\.(Buttons|Icons|Tags)\.(Surfaces|Containers)\.Background-9\.(.*)\}/);
       if (referenceMatch) {
         const path = referenceMatch[3];
         return {
@@ -6379,14 +6327,14 @@ export function exportColorSystemToJSON(
 
   // ========================================
   // Add Color-Vibrant and Color-Variant to Dark-Mode Header, Text, Quiet, Hover, and Active
-  // Both should use hex values from Light-Mode's Color-11
+  // Both should use hex values from Light-Mode's Color-9
   // ========================================
   console.log('🎨 [JSON Export] Adding Color-Vibrant and Color-Variant to Dark-Mode...');
   
   const themes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
   
-  // Helper to get hex value for Color-11 from a theme's palette (for Text, Quiet, Hover, Active)
+  // Helper to get hex value for Color-9 from a theme's palette (for Text, Quiet, Hover, Active)
   const getColor11Hex = (themeName: string): string => {
     const themeMap: { [key: string]: any } = {
       'Neutral': tonePalettes.neutral,
@@ -6403,12 +6351,12 @@ export function exportColorSystemToJSON(
     const palette = themeMap[themeName];
     if (!palette) return '#000000';
     
-    // Color-11 corresponds to tone 90 (index 10)
-    return interpolateTone(toneScale[10], palette);
+    // Color-9 corresponds to tone 90 (index 8)
+    return interpolateTone(toneScale[8], palette);
   };
-  
-  // Helper to get hex value for Light-Mode Header Color-11 from a theme's palette
-  // Light-Mode Header Color-11 points to Colors.{Theme}.Color-6
+
+  // Helper to get hex value for Light-Mode Header Color-9 from a theme's palette
+  // Light-Mode Header Color-9 points to Colors.{Theme}.Color-6
   const getHeaderColor11Hex = (themeName: string): string => {
     const themeMap: { [key: string]: any } = {
       'Neutral': tonePalettes.neutral,
@@ -6425,15 +6373,15 @@ export function exportColorSystemToJSON(
     const palette = themeMap[themeName];
     if (!palette) return '#000000';
     
-    // Light-Mode Header Color-11 points to Color-6, which corresponds to tone 53 (index 6)
-    return interpolateTone(toneScale[6], palette);
+    // Light-Mode Header Color-9 points to Color-6, which corresponds to tone 58 (index 5)
+    return interpolateTone(toneScale[5], palette);
   };
   
   // Add Color-Vibrant and Color-Variant to Header (Surfaces and Containers)
   themes.forEach(theme => {
     // Header has Surfaces and Containers sub-objects
     if (colorSystem.Modes['Dark-Mode'].Header.Surfaces && colorSystem.Modes['Dark-Mode'].Header.Surfaces[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Header.Surfaces[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Header.Surfaces[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Header.Surfaces[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6446,7 +6394,7 @@ export function exportColorSystemToJSON(
       }
     }
     if (colorSystem.Modes['Dark-Mode'].Header.Containers && colorSystem.Modes['Dark-Mode'].Header.Containers[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Header.Containers[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Header.Containers[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Header.Containers[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6463,7 +6411,7 @@ export function exportColorSystemToJSON(
   // Add Color-Vibrant and Color-Variant to Text (for Surfaces and Containers)
   themes.forEach(theme => {
     if (colorSystem.Modes['Dark-Mode'].Text.Surfaces[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Text.Surfaces[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Text.Surfaces[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Text.Surfaces[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6476,7 +6424,7 @@ export function exportColorSystemToJSON(
       }
     }
     if (colorSystem.Modes['Dark-Mode'].Text.Containers[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Text.Containers[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Text.Containers[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Text.Containers[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6493,7 +6441,7 @@ export function exportColorSystemToJSON(
   // Add Color-Vibrant and Color-Variant to Quiet
   themes.forEach(theme => {
     if (colorSystem.Modes['Dark-Mode'].Quiet[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Quiet[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Quiet[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Quiet[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6510,7 +6458,7 @@ export function exportColorSystemToJSON(
   // Add Color-Vibrant and Color-Variant to Hover
   themes.forEach(theme => {
     if (colorSystem.Modes['Dark-Mode'].Hover[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Hover[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Hover[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Hover[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6527,7 +6475,7 @@ export function exportColorSystemToJSON(
   // Add Color-Vibrant and Color-Variant to Active
   themes.forEach(theme => {
     if (colorSystem.Modes['Dark-Mode'].Active[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Active[theme]['Color-11']?.value;
+      const color11Value = colorSystem.Modes['Dark-Mode'].Active[theme]['Color-9']?.value;
       if (color11Value) {
         colorSystem.Modes['Dark-Mode'].Active[theme]['Color-Vibrant'] = {
           value: color11Value,
@@ -6557,8 +6505,8 @@ export function exportColorSystemToJSON(
   
   // Recalculate if defaultSettings wasn't created earlier (shouldn't happen, but be safe)
   if (!defaultSettings && extractedTones) {
-    const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 11;
-    const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 10;
+    const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+    const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
     
     defaultSettings = calculateDefaultThemeSettings(
       PC,
