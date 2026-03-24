@@ -45,6 +45,11 @@ const QUIET_LOOKUP_LIGHT_BG: number[] = [
   6, 6, 7, 8, 9, 2, 3, 4, 5, 5, 5, 5,
 ];
 
+// Border lookup: index = surface Color-N (0-based), value = border Color-N (1-based)
+const BORDER_LOOKUP_LIGHT_BG: number[] = [
+  6, 6, 7, 9, 10, 2, 4, 4, 5, 5, 5, 5,
+];
+
 function contrastRatio(hex1: string, hex2: string): number {
   const l1 = chroma(hex1).luminance();
   const l2 = chroma(hex2).luminance();
@@ -98,6 +103,16 @@ function isLight(hex: string): boolean {
 }
 
 function textFor(hex: string) { return isLight(hex) ? '#1a1a1a' : '#ffffff'; }
+
+/** Compute dropshadow color: same hue/chroma, L * 0.625 */
+function dropshadowFor(hex: string): string {
+  try {
+    const [l, c, h] = chroma(hex).lch();
+    return chroma.lch(l * 0.625, c, h).hex();
+  } catch {
+    return 'rgba(0,0,0,0.15)';
+  }
+}
 function quietFor(hex: string) { return isLight(hex) ? '#777777' : '#aaaaaa'; }
 function borderFor(hex: string) { return isLight(hex) ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'; }
 
@@ -109,18 +124,20 @@ function getAccessibleTones(
   bgHex: string,
   surfaceN: number,
   palette: Array<{ hex: string }>,
-): { text: number; header: number; quiet: number } {
+): { text: number; header: number; quiet: number; border: number } {
   const idx = surfaceN - 1; // 0-based index into lookup tables
   const safeIdx = Math.max(0, Math.min(idx, 11));
 
   const textStart = TEXT_LOOKUP_LIGHT_BG[safeIdx];
   const headerStart = HEADER_LOOKUP_LIGHT_BG[safeIdx];
   const quietStart = QUIET_LOOKUP_LIGHT_BG[safeIdx];
+  const borderStart = BORDER_LOOKUP_LIGHT_BG[safeIdx];
 
   return {
     text: findAccessibleTone(bgHex, palette, textStart, 4.5),
     header: findAccessibleTone(bgHex, palette, headerStart, 3.1),
-    quiet: findAccessibleTone(bgHex, palette, quietStart, 4.5),
+    quiet: findAccessibleTone(bgHex, palette, quietStart, 3.1),
+    border: findAccessibleTone(bgHex, palette, borderStart, 3.1),
   };
 }
 
@@ -244,7 +261,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // White/Black card coloring ONLY applies to Default theme containers
   // Tertiary (and other themed containers) always keep their palette color
   if (effectiveCardColoring === 'white') {
-    containerBg = neutral(12);
+    containerBg = '#ffffff';
   } else if (effectiveCardColoring === 'black') {
     containerBg = neutral(3);
   } else {
@@ -271,33 +288,40 @@ export function buildPreviewCSS(input: BuildInput): string {
   let surfaceText: string;
   let surfaceHeader: string;
   let surfaceQuiet: string;
+  let surfaceBorder: string;
   let containerText: string;
   let containerHeader: string;
   let containerQuiet: string;
+  let containerBorder: string;
 
   if (effectiveTextColoring === 'tonal') {
-    // Tonal: use contrast-verified lookup against actual palette hex values
-    // ALWAYS use the light (vibrant) palette for text — even in dark mode
-    // Dark palette is only for surfaces/containers
     const textPalette = primaryLight;
 
     const surfaceTones = getAccessibleTones(surfaceBg, surfaceN, textPalette);
-    surfaceText = `var(--Colors-Primary-Color-${surfaceTones.text})`;
-    surfaceHeader = `var(--Colors-Primary-Color-${surfaceTones.header})`;
-    surfaceQuiet = `var(--Colors-Primary-Color-${surfaceTones.quiet})`;
+    surfaceText = p(textPalette, surfaceTones.text);
+    surfaceHeader = p(textPalette, surfaceTones.header);
+    surfaceQuiet = p(textPalette, surfaceTones.quiet);
+    surfaceBorder = p(textPalette, surfaceTones.border);
 
     const containerTones = getAccessibleTones(containerBg, containerN, textPalette);
-    containerText = `var(--Colors-Primary-Color-${containerTones.text})`;
-    containerHeader = `var(--Colors-Primary-Color-${containerTones.header})`;
-    containerQuiet = `var(--Colors-Primary-Color-${containerTones.quiet})`;
+    containerText = p(textPalette, containerTones.text);
+    containerHeader = p(textPalette, containerTones.header);
+    containerQuiet = p(textPalette, containerTones.quiet);
+    containerBorder = p(textPalette, containerTones.border);
   } else {
-    // BW (light mode only)
+    // BW (light mode only) — text is black/white, but borders still need 3:1 contrast
+    const neutralPalette = NEUTRAL.map(h => ({ hex: h }));
+    const surfaceBorderTones = getAccessibleTones(surfaceBg, surfaceN, neutralPalette);
+    const containerBorderTones = getAccessibleTones(containerBg, containerN, neutralPalette);
+
     surfaceText = textFor(surfaceBg);
     surfaceHeader = textFor(surfaceBg);
     surfaceQuiet = quietFor(surfaceBg);
+    surfaceBorder = neutral(surfaceBorderTones.border);
     containerText = textFor(containerBg);
     containerHeader = textFor(containerBg);
     containerQuiet = quietFor(containerBg);
+    containerBorder = neutral(containerBorderTones.border);
   }
 
   // ── Buttons ──
@@ -310,36 +334,56 @@ export function buildPreviewCSS(input: BuildInput): string {
   const effectiveButton = (isDark && sel.button === 'black-white') ? 'laddered' : sel.button;
   // Button text uses contrast-verified tones against the button background
   // Buttons always use vibrant (light) palette
+  // btnBg = button fill color (RESOLVED hex from palette, not var() reference)
+  // btnText = accessible text on btnBg (resolved hex)
+  // btnBorder = border with 3.1:1 contrast to SURFACE (resolved hex)
   let btnBg: string, btnText: string, btnBorder: string;
+
+  // On Primary/Primary-Light backgrounds, primary/tonal buttons use border color
+  // (primary color too similar to background)
+  const isPrimaryBg = sel.background === 'primary-light' || sel.background === 'primary-base';
+  const borderToneN = getAccessibleTones(surfaceBg, surfaceN, primaryLight).border;
+
   switch (effectiveButton) {
-    case 'secondary': {
-      btnBg = `var(--Colors-Secondary-Color-${SC})`;
-      const scTones = getAccessibleTones(p(vSecondary, SC), SC, vSecondary);
-      btnText = `var(--Colors-Secondary-Color-${scTones.text})`;
-      btnBorder = `var(--Colors-Secondary-Color-${SC})`; break;
-    }
     case 'tonal': {
-      btnBg = `var(--Colors-Primary-Color-${PC})`;
-      const pcTones = getAccessibleTones(p(vPrimary, PC), PC, vPrimary);
-      btnText = `var(--Colors-Primary-Color-${pcTones.text})`;
-      btnBorder = `var(--Colors-Primary-Color-${PC})`; break;
+      // Tonal: button fill = border color (has 3.1:1 contrast to surface)
+      btnBg = p(primaryLight, borderToneN);
+      const tonalTones = getAccessibleTones(btnBg, borderToneN, primaryLight);
+      btnText = p(primaryLight, tonalTones.text);
+      btnBorder = p(primaryLight, getAccessibleTones(surfaceBg, surfaceN, primaryLight).border);
+      break;
+    }
+    case 'secondary': {
+      btnBg = p(vSecondary, SC);
+      const scTones = getAccessibleTones(btnBg, SC, vSecondary);
+      btnText = p(vSecondary, scTones.text);
+      btnBorder = p(vSecondary, getAccessibleTones(surfaceBg, surfaceN, vSecondary).border);
+      break;
+    }
+    case 'laddered': {
+      btnBg = p(vSecondary, SC);
+      const ladTones = getAccessibleTones(btnBg, SC, vSecondary);
+      btnText = p(vSecondary, ladTones.text);
+      btnBorder = p(vSecondary, getAccessibleTones(surfaceBg, surfaceN, vSecondary).border);
+      break;
     }
     case 'black-white':
       btnBg = isLight(surfaceBg) ? '#1a1a1a' : '#ffffff';
       btnText = isLight(surfaceBg) ? '#ffffff' : '#1a1a1a';
-      btnBorder = btnBg; break;
-    case 'laddered': {
-      // Laddered: Default button uses Secondary palette
-      btnBg = `var(--Colors-Secondary-Color-${SC})`;
-      const ladTones = getAccessibleTones(p(vSecondary, SC), SC, vSecondary);
-      btnText = `var(--Colors-Secondary-Color-${ladTones.text})`;
-      btnBorder = `var(--Colors-Secondary-Color-${SC})`; break;
-    }
+      btnBorder = surfaceBorder;
+      break;
     default: {
-      btnBg = `var(--Colors-Primary-Color-${PC})`;
-      const defTones = getAccessibleTones(p(vPrimary, PC), PC, vPrimary);
-      btnText = `var(--Colors-Primary-Color-${defTones.text})`;
-      btnBorder = `var(--Colors-Primary-Color-${PC})`;
+      // Primary: use border color on primary backgrounds, PC on other backgrounds
+      if (isPrimaryBg) {
+        btnBg = p(primaryLight, borderToneN);
+        const bgTones = getAccessibleTones(btnBg, borderToneN, primaryLight);
+        btnText = p(primaryLight, bgTones.text);
+      } else {
+        btnBg = p(vPrimary, PC);
+        const defTones = getAccessibleTones(btnBg, PC, vPrimary);
+        btnText = p(vPrimary, defTones.text);
+      }
+      btnBorder = p(primaryLight, getAccessibleTones(surfaceBg, surfaceN, primaryLight).border);
     }
   }
 
@@ -384,8 +428,9 @@ ${NEUTRAL.map((h, i) => `  --Colors-Neutral-Color-${i + 1}: ${h};`).join('\n')}
 ${(() => {
   const sc = statusConfig;
   const tones = getAccessibleTones(statusBg, sc.n, primaryLight);
-  return `[data-theme="Status"] {
+  return `[data-theme="Brand-Status"] {
   --Background: ${statusBg};
+  --Dropshadow-Color: ${dropshadowFor(statusBg)};
   --Text: var(--Colors-${sc.palette}-Color-${tones.text});
 }`;
 })()}
@@ -394,57 +439,153 @@ ${(() => {
 ${(() => {
   const ac = appBarConfig;
   const tones = getAccessibleTones(appBarBg, ac.n, primaryLight);
-  return `[data-theme="App-Bar"] {
+  // App bar hover/active for buttons
+  const abHoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
+  const abActiveMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+  let abPal = 'Primary', abN = PC;
+  switch (effectiveButton) {
+    case 'secondary': case 'laddered': abPal = 'Secondary'; abN = SC; break;
+    case 'black-white': abPal = 'Neutral'; abN = isLight(appBarBg) ? 1 : 12; break;
+    default: abPal = 'Primary'; abN = PC; break;
+  }
+  const abHover = abHoverMap[abN - 1] || Math.min(abN + 1, 12);
+  const abActive = abActiveMap[abN - 1] || Math.min(abN + 2, 12);
+
+  return `[data-theme="Brand-App-Bar"] {
   --Background: ${appBarBg};
+  --Dropshadow-Color: ${dropshadowFor(appBarBg)};
   --Text: var(--Colors-${ac.palette}-Color-${tones.text});
   --Header: var(--Colors-${ac.palette}-Color-${tones.header});
   --Quiet: var(--Colors-${ac.palette}-Color-${tones.quiet});
   --Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
-  --Buttons-Default-Button: transparent;
-  --Buttons-Default-Text: var(--Colors-${ac.palette}-Color-${tones.text});
-  --Buttons-Default-Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
-}`;
-})()}
-
-/* ══ Default Theme ══ */
-[data-theme="Default"] {
-  --Surface: ${surfaceBg};
-  --Surface-Dim: ${isDark ? '#111111' : '#f2f2f2'};
-  --Text: ${surfaceText};
-  --Header: ${surfaceHeader};
-  --Quiet: ${surfaceQuiet};
-  --Border: ${borderFor(surfaceBg)};
-  --Border-Variant: ${borderFor(surfaceBg)};
-
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${btnBorder};
+  --Buttons-Primary-Hover: var(--Colors-${abPal}-Color-${abHover});
+  --Buttons-Primary-Active: var(--Colors-${abPal}-Color-${abActive});
   --Buttons-Default-Button: transparent;
-  --Buttons-Default-Text: ${surfaceText};
-  --Buttons-Default-Border: ${borderFor(surfaceBg)};
+  --Buttons-Default-Text: var(--Colors-${ac.palette}-Color-${tones.text});
+  --Buttons-Default-Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
+  --Buttons-Default-Hover: var(--Colors-${abPal}-Color-${abHover});
+  --Buttons-Default-Active: var(--Colors-${abPal}-Color-${abActive});
+}`;
+})()}
+
+/* ══ Brand Theme — uses unique selector to avoid provider conflicts ══ */
+[data-theme="Brand"] {
+  --Background: ${surfaceBg};
+  --Surface: ${surfaceBg};
+  --Surface-Dim: ${isDark ? '#111111' : '#f2f2f2'};
+  --Dropshadow-Color: ${dropshadowFor(surfaceBg)};
+  --Text: ${surfaceText};
+  --Header: ${surfaceHeader};
+  --Quiet: ${surfaceQuiet};
+  --Border: ${surfaceBorder};
+  --Border-Variant: ${surfaceBorder};
+  --Hover: ${p(primaryLight, [3,4,4,3,4,7,8,7,8,8,8,8][surfaceN - 1] || surfaceN)};
+  --Active: ${p(primaryLight, [4,4,5,3,6,8,9,6,7,7,7,7][surfaceN - 1] || surfaceN)};
+  --Focus-Visible: #3b82f6;
+
+${(() => {
+    // Hover/Active lookup tables (from verified 12-tone)
+    const hoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
+    const activeMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+
+    // Generate all button palette tokens
+    const allPalettes = [
+      { name: 'Primary', palette: vPrimary, n: PC, paletteName: 'Primary' },
+      { name: 'Secondary', palette: vSecondary, n: SC, paletteName: 'Secondary' },
+      { name: 'Tertiary', palette: vTertiary, n: TC, paletteName: 'Tertiary' },
+    ];
+    return allPalettes.map(({ name, palette: pal, n }) => {
+      const bg = p(pal, n);
+      const tones = getAccessibleTones(bg, n, pal);
+      const palBorder = p(pal, getAccessibleTones(surfaceBg, surfaceN, pal).border);
+      const hoverN = hoverMap[n - 1] || Math.min(n + 1, 12);
+      const activeN = activeMap[n - 1] || Math.min(n + 2, 12);
+      return `  --Buttons-${name}-Button: ${p(pal, n)};
+  --Buttons-${name}-Text: ${p(pal, tones.text)};
+  --Buttons-${name}-Border: ${palBorder};
+  --Buttons-${name}-Hover: ${p(pal, hoverN)};
+  --Buttons-${name}-Active: ${p(pal, activeN)};`;
+    }).join('\n');
+  })()}
+${(() => {
+    // Default button uses the selected button mode's palette and tones
+    const hoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
+    const activeMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+    // Determine which palette/N the default button resolves to
+    let defPal: typeof vPrimary = vPrimary;
+    let defN = PC;
+    switch (effectiveButton) {
+      case 'secondary': case 'laddered': defPal = vSecondary; defN = SC; break;
+      case 'tonal': defPal = vPrimary; defN = PC; break;
+      case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(surfaceBg) ? 1 : 12; break;
+      default: defPal = vPrimary; defN = PC; break;
+    }
+    const defHover = hoverMap[defN - 1] || Math.min(defN + 1, 12);
+    const defActive = activeMap[defN - 1] || Math.min(defN + 2, 12);
+    return `  --Buttons-Default-Button: ${btnBg};
+  --Buttons-Default-Text: ${btnText};
+  --Buttons-Default-Border: ${btnBorder};
+  --Buttons-Default-Hover: ${p(defPal, defHover)};
+  --Buttons-Default-Active: ${p(defPal, defActive)};`;
+  })()}
 
   --Container: ${containerBg};
   --Container-Low: ${containerBg};
   --Container-Lowest: ${containerBg};
   --Container-High: ${containerBg};
   --Container-Highest: ${containerBg};
+  --Container-Dropshadow-Color: ${dropshadowFor(containerBg)};
   --Container-Text: ${containerText};
   --Container-Header: ${containerHeader};
   --Container-Quiet: ${containerQuiet};
-  --Container-Border: ${borderFor(containerBg)};
-  --Container-Buttons-Default-Text: ${defaultBtnText};
-  --Container-Buttons-Default-Border: ${defaultBtnBorder};
+  --Container-Border: ${containerBorder};
+${(() => {
+    const hm = [3,4,4,3,4,7,8,7,8,8,8,8];
+    const am = [4,4,5,3,6,8,9,6,7,7,7,7];
+    let cp = 'Primary', cn = PC;
+    switch (effectiveButton) {
+      case 'secondary': case 'laddered': cp = 'Secondary'; cn = SC; break;
+      case 'black-white': cp = 'Neutral'; cn = isLight(containerBg) ? 1 : 12; break;
+      default: cp = 'Primary'; cn = PC; break;
+    }
+    // Container button border uses the button mode's palette
+    let contBtnBorder = containerBorder;
+    if (cp !== 'Neutral') {
+      const contPal = cp === 'Secondary' ? vSecondary : cp === 'Tertiary' ? vTertiary : vPrimary;
+      contBtnBorder = p(contPal, getAccessibleTones(containerBg, containerN, contPal).border);
+    }
+    return `  --Container-Buttons-Default-Button: ${btnBg};
+  --Container-Buttons-Default-Text: ${btnText};
+  --Container-Buttons-Default-Border: ${contBtnBorder};
+  --Container-Buttons-Default-Hover: var(--Colors-${cp}-Color-${hm[cn - 1] || cn});
+  --Container-Buttons-Default-Active: var(--Colors-${cp}-Color-${am[cn - 1] || cn});`;
+  })()}
 }
 
 /* ══ Container Surface ══ */
-[data-surface="Container"] {
-  --Background: var(--Container);
-  --Text: var(--Container-Text);
-  --Header: var(--Container-Header);
-  --Quiet: var(--Container-Quiet);
-  --Border-Variant: var(--Container-Border);
-  --Buttons-Default-Text: var(--Container-Buttons-Default-Text);
-  --Buttons-Default-Border: var(--Container-Buttons-Default-Border);
+[data-theme="Brand"][data-surface="Container"],
+[data-theme="Brand"] [data-surface="Container"],
+[data-surface] [data-surface="Container"] {
+  --Background: ${containerBg};
+  --Dropshadow-Color: ${dropshadowFor(containerBg)};
+  --Text: ${containerText};
+  --Header: ${containerHeader};
+  --Quiet: ${containerQuiet};
+  --Border: ${containerBorder};
+  --Border-Variant: ${containerBorder};
+  --Buttons-Primary-Button: ${btnBg};
+  --Buttons-Primary-Text: ${btnText};
+  --Buttons-Primary-Border: ${containerBorder};
+  --Buttons-Default-Button: ${btnBg};
+  --Buttons-Default-Text: ${btnText};
+  --Buttons-Default-Border: ${containerBorder};
+  --Hover: ${p(primaryLight, [3,4,4,3,4,7,8,7,8,8,8,8][containerN - 1] || containerN)};
+  --Active: ${p(primaryLight, [4,4,5,3,6,8,9,6,7,7,7,7][containerN - 1] || containerN)};
+  --Buttons-Default-Hover: ${p(primaryLight, [3,4,4,3,4,7,8,7,8,8,8,8][containerN - 1] || containerN)};
+  --Buttons-Default-Active: ${p(primaryLight, [4,4,5,3,6,8,9,6,7,7,7,7][containerN - 1] || containerN)};
 }
 
 /* ══ Tertiary Theme ══ */
@@ -453,9 +594,9 @@ ${(() => {
   --Container-Text: ${tertiaryText};
   --Container-Header: ${tertiaryHeader};
   --Container-Quiet: ${tertiaryQuiet};
-  --Container-Border: ${borderFor(tertiaryContainerBg)};
+  --Container-Border: var(--Colors-Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
   --Container-Buttons-Default-Text: ${tertiaryText};
-  --Container-Buttons-Default-Border: ${borderFor(tertiaryContainerBg)};
+  --Container-Buttons-Default-Border: var(--Colors-Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
   --Tag-Tertiary-BG: ${tagBg};
   --Tag-Tertiary-Text: ${tagText};
 }
@@ -464,12 +605,37 @@ ${(() => {
 ${(() => {
   const nc = navBarConfig;
   const tones = getAccessibleTones(navBarBg, nc.n, primaryLight);
-  return `[data-theme="Nav-Bar"] {
+  const hoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
+  const activeMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+  // Use the button mode's palette for hover/active
+  let navDefPal: typeof vPrimary = vPrimary;
+  let navDefN = PC;
+  switch (effectiveButton) {
+    case 'secondary': case 'laddered': navDefPal = vSecondary; navDefN = SC; break;
+    case 'black-white': navDefPal = NEUTRAL.map(h => ({ hex: h })) as any; navDefN = isLight(navBarBg) ? 1 : 12; break;
+    default: navDefPal = vPrimary; navDefN = PC; break;
+  }
+  const navDefHover = hoverMap[navDefN - 1] || Math.min(navDefN + 1, 12);
+  const navDefActive = activeMap[navDefN - 1] || Math.min(navDefN + 2, 12);
+  const navBorderN = tones.border;
+
+  return `[data-theme="Brand-Nav-Bar"] {
   --Background: ${navBarBg};
-  --Text: var(--Colors-${nc.palette}-Color-${tones.text});
-  --Header: var(--Colors-${nc.palette}-Color-${tones.header});
-  --Quiet: var(--Colors-${nc.palette}-Color-${tones.quiet});
-  --Border: var(--Border-Surfaces-${nc.palette}-Color-${nc.n});
+  --Dropshadow-Color: ${dropshadowFor(navBarBg)};
+  --Text: ${p(primaryLight, tones.text)};
+  --Header: ${p(primaryLight, tones.header)};
+  --Quiet: ${p(primaryLight, tones.quiet)};
+  --Border: ${p(primaryLight, navBorderN)};
+  --Buttons-Primary-Button: ${btnBg};
+  --Buttons-Primary-Text: ${btnText};
+  --Buttons-Primary-Border: ${p(primaryLight, navBorderN)};
+  --Buttons-Primary-Hover: ${p(navDefPal, navDefHover)};
+  --Buttons-Primary-Active: ${p(navDefPal, navDefActive)};
+  --Buttons-Default-Button: ${btnBg};
+  --Buttons-Default-Text: ${btnText};
+  --Buttons-Default-Border: ${p(primaryLight, navBorderN)};
+  --Buttons-Default-Hover: ${p(navDefPal, navDefHover)};
+  --Buttons-Default-Active: ${p(navDefPal, navDefActive)};
 }`;
 })()}
 
@@ -478,18 +644,27 @@ ${(() => {
 [data-surface="Surface-Bright"] { --Background: var(--Surface-Bright); }
 [data-surface="Surface-Dim"]    { --Background: var(--Surface-Dim); }
 
+/* ══ Clickable Elements — border inherits 3.1:1 contrast from context ══ */
+.clickable { border-color: var(--Border); }
+
 /* ══ Typography ══ */
 ${(() => {
   const header = input.typographyStyles?.find(t => t.type === 'header');
   const decorative = input.typographyStyles?.find(t => t.type === 'decorative');
   const body = input.typographyStyles?.find(t => t.type === 'body');
   if (!header && !body) return '';
-  return `:root {
-  --Set-Font-Family-Header: '${header?.family || 'sans-serif'}', serif;
+  const headerFamily = `'${header?.family || 'sans-serif'}', serif`;
+  const decorativeFamily = `'${decorative?.family || header?.family || 'sans-serif'}', sans-serif`;
+  const bodyFamily = `'${body?.family || 'sans-serif'}', sans-serif`;
+  return `[data-theme="Brand"], [data-theme="Brand"] * {
+  --Set-Font-Family-Header: ${headerFamily};
   --Set-Font-Family-Header-Weight: ${header?.weight || '700'};
-  --Set-Font-Family-Decorative: '${decorative?.family || header?.family || 'sans-serif'}', sans-serif;
-  --Set-Font-Family-Body: '${body?.family || 'sans-serif'}', sans-serif;
+  --Set-Font-Family-Decorative: ${decorativeFamily};
+  --Set-Font-Family-Body: ${bodyFamily};
   --Set-Font-Family-Body-Weight: ${body?.weight || '400'};
+  --Font-Family-Header: ${headerFamily};
+  --Body-Font-Family: ${bodyFamily};
+  --Font-Family-Body: ${bodyFamily};
 }`;
 })()}
 

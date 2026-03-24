@@ -1,4 +1,5 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
+import { toneToColorNumber } from '../colorScale';
 
 /**
  * Theme configuration for generating Surfaces and Containers
@@ -188,13 +189,26 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
 
     // Buttons in Surfaces
     'Buttons': {
-      'Default': {
-        'Button': { value: `{Default-Button.Default.${shade}.Button}`, type: 'color' },
-        'Text': { value: `{Default-Button.Default.${shade}.Text}`, type: 'color' },
-        'Border': { value: `{Default-Button-Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
-        'Hover': { value: `{Default-Button.Default.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Default-Button.Default.${shade}.Active}`, type: 'color' }
-      },
+      'Default': (() => {
+        // Semantic themes (Info, Success, Warning, Error) use their own palette for Default button
+        const semanticThemes = ['Info', 'Success', 'Warning', 'Error'];
+        if (semanticThemes.includes(config.theme)) {
+          return {
+            'Button': { value: `{Buttons.${config.theme}.${shade}.Button}`, type: 'color' },
+            'Text': { value: `{Buttons.${config.theme}.${shade}.Text}`, type: 'color' },
+            'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
+            'Hover': { value: `{Buttons.${config.theme}.${shade}.Hover}`, type: 'color' },
+            'Active': { value: `{Buttons.${config.theme}.${shade}.Active}`, type: 'color' }
+          };
+        }
+        return {
+          'Button': { value: `{Default-Button.Default.${shade}.Button}`, type: 'color' },
+          'Text': { value: `{Default-Button.Default.${shade}.Text}`, type: 'color' },
+          'Border': { value: `{Default-Button-Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
+          'Hover': { value: `{Default-Button.Default.${shade}.Hover}`, type: 'color' },
+          'Active': { value: `{Default-Button.Default.${shade}.Active}`, type: 'color' }
+        };
+      })(),
       'Primary': {
         'Button': { value: `{Buttons.Primary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Primary.${shade}.Text}`, type: 'color' },
@@ -326,7 +340,7 @@ function generateSingleTheme(config: ThemeConfig): any {
 
   // Base Surface
   theme.Surfaces = {
-    'Surface': {
+    'Background': {
       value: `{Colors.${config.theme}.Color-${config.n}}`,
       type: 'color'
     },
@@ -335,7 +349,7 @@ function generateSingleTheme(config: ThemeConfig): any {
 
   // Surface-Dim
   theme['Surfaces-Dim'] = {
-    'Surface': {
+    'Background': {
       value: config.n > 1 ? `{Colors.${config.theme}.Color-${dimN}}` : '#000000',
       type: 'color'
     },
@@ -344,7 +358,7 @@ function generateSingleTheme(config: ThemeConfig): any {
 
   // Surface-Dimmest
   theme['Surfaces-Dimmest'] = {
-    'Surface': {
+    'Background': {
       value: config.n > 2 ? `{Colors.${config.theme}.Color-${dimmestN}}` : '#000000',
       type: 'color'
     },
@@ -353,7 +367,7 @@ function generateSingleTheme(config: ThemeConfig): any {
 
   // Surface-Bright
   theme['Surfaces-Bright'] = {
-    'Surface': {
+    'Background': {
       value: config.n < 12 ? `{Colors.${config.theme}.Color-${brightN}}` : '#FFFFFF',
       type: 'color'
     },
@@ -493,13 +507,25 @@ function generateSingleTheme(config: ThemeConfig): any {
     
     // Buttons in Containers
     'Buttons': {
-      'Default': {
-        'Button': { value: `{Default-Button.Default.${config.cShade}.Button}`, type: 'color' },
-        'Text': { value: `{Default-Button.Default.${config.cShade}.Text}`, type: 'color' },
-        'Border': { value: `{Default-Button-Border.Containers.${config.contTheme}.Color-${config.contN}}`, type: 'color' },
-        'Hover': { value: `{Default-Button.Default.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Default-Button.Default.${config.cShade}.Active}`, type: 'color' }
-      },
+      'Default': (() => {
+        const semanticThemes = ['Info', 'Success', 'Warning', 'Error'];
+        if (semanticThemes.includes(config.theme)) {
+          return {
+            'Button': { value: `{Buttons.${config.theme}.${config.cShade}.Button}`, type: 'color' },
+            'Text': { value: `{Buttons.${config.theme}.${config.cShade}.Text}`, type: 'color' },
+            'Border': { value: `{Border.Containers.${config.theme}.Color-${config.contN}}`, type: 'color' },
+            'Hover': { value: `{Buttons.${config.theme}.${config.cShade}.Hover}`, type: 'color' },
+            'Active': { value: `{Buttons.${config.theme}.${config.cShade}.Active}`, type: 'color' }
+          };
+        }
+        return {
+          'Button': { value: `{Default-Button.Default.${config.cShade}.Button}`, type: 'color' },
+          'Text': { value: `{Default-Button.Default.${config.cShade}.Text}`, type: 'color' },
+          'Border': { value: `{Default-Button-Border.Containers.${config.contTheme}.Color-${config.contN}}`, type: 'color' },
+          'Hover': { value: `{Default-Button.Default.${config.cShade}.Hover}`, type: 'color' },
+          'Active': { value: `{Default-Button.Default.${config.cShade}.Active}`, type: 'color' }
+        };
+      })(),
       'Primary': {
         'Button': { value: `{Buttons.Primary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Primary.${config.cShade}.Text}`, type: 'color' },
@@ -714,7 +740,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     themeName: 'App-Bar',
     theme: defaultSettings.appBarTheme,
     n: defaultSettings.appBarN,
-    contTheme: defaultSettings.containerTheme,
+    contTheme: defaultSettings.appBarTheme,
     contN: defaultSettings.containerN,
     shade: defaultSettings.appBarN >= 11 ? 'Medium' : 'Light',
     cShade: defaultSettings.containerShade,
@@ -743,7 +769,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     themeName: 'Nav-Bar',
     theme: defaultSettings.navBarTheme,
     n: defaultSettings.navBarN,
-    contTheme: defaultSettings.containerTheme,
+    contTheme: defaultSettings.navBarTheme,
     contN: defaultSettings.containerN,
     shade: defaultSettings.navBarN >= 11 ? 'Medium' : 'Light',
     cShade: defaultSettings.containerShade,
@@ -772,7 +798,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     themeName: 'Status',
     theme: defaultSettings.statusTheme,
     n: defaultSettings.statusN,
-    contTheme: defaultSettings.containerTheme,
+    contTheme: defaultSettings.statusTheme,
     contN: defaultSettings.containerN,
     shade: defaultSettings.statusN >= 11 ? 'Medium' : 'Light',
     cShade: defaultSettings.containerShade,
@@ -796,10 +822,10 @@ export function generateAllThemesWithSurfacesAndContainers(
     errorHeader: 'Error'
   });
   
-  // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC)
-  const PC = Math.round(extractedTones.primary);
-  const SC = Math.round(extractedTones.secondary);
-  const TC = Math.round(extractedTones.tertiary);
+  // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC converted to Color-N)
+  const PC = toneToColorNumber(extractedTones.primary);
+  const SC = toneToColorNumber(extractedTones.secondary);
+  const TC = toneToColorNumber(extractedTones.tertiary);
   const OB = PC >= 9 ? 8 : 6;
 
   // Helper to build common theme config
@@ -807,7 +833,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     themeName,
     theme,
     n,
-    contTheme: defaultSettings.containerTheme,
+    contTheme: theme,
     contN: defaultSettings.containerN,
     shade: n >= 9 ? 'Medium' as const : 'Light' as const,
     cShade: defaultSettings.containerShade,
@@ -841,9 +867,10 @@ export function generateAllThemesWithSurfacesAndContainers(
   themes['Secondary-Light'] = generateSingleTheme(makeConfig('Secondary-Light', 'Secondary', 11));
   themes['Tertiary-Light'] = generateSingleTheme(makeConfig('Tertiary-Light', 'Tertiary', 11));
 
-  // White and Black (replace Neutral/Neutral-Light/Neutral-Dark)
+  // White, Black, and Light-Grey
   themes.White = generateSingleTheme(makeConfig('White', 'Neutral', 12));
   themes.Black = generateSingleTheme(makeConfig('Black', 'Neutral', 1));
+  themes['Light-Grey'] = generateSingleTheme(makeConfig('Light-Grey', 'Neutral', 10));
 
   // Info, Success, Warning, Error — N = OB
   ['Info', 'Success', 'Warning', 'Error'].forEach(themeName => {

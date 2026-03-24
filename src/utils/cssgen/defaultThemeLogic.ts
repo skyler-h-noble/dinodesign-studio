@@ -4,6 +4,16 @@
  */
 import { toneToColorNumber } from '../colorScale';
 
+/**
+ * Map 12-tone Color-N to 14-tone Background-N.
+ * The Backgrounds system still uses the old 14-tone numbering.
+ * 12-tone: 1-5 map 1:1, 6-12 shift by +2 (dead zone tones 6,7 removed in 12-tone).
+ */
+function colorNToBackgroundN(n: number): number {
+  if (n <= 5) return n;
+  return n + 2; // Color-6→BG-8, Color-7→BG-9, ... Color-12→BG-14
+}
+
 export interface DefaultThemeSettings {
   // Default Theme
   defaultThemeName: string;
@@ -358,9 +368,10 @@ export function applyUserSelections(
   // Apply Default Theme (background) if selected
   // PRIORITY: Use backgroundTheme/backgroundN if they exist (new direct mapping)
   if (userSelections.backgroundTheme && userSelections.backgroundN !== undefined) {
-    console.log('✅ Using direct backgroundTheme/backgroundN:', userSelections.backgroundTheme, userSelections.backgroundN);
+    const bgN = colorNToBackgroundN(userSelections.backgroundN);
+    console.log('✅ Using direct backgroundTheme/backgroundN:', userSelections.backgroundTheme, userSelections.backgroundN, '→ Background-' + bgN);
     updated.defaultTheme = userSelections.backgroundTheme;
-    updated.defaultN = userSelections.backgroundN;
+    updated.defaultN = bgN;
     updated.defaultThemeName = userSelections.defaultTheme || 'light';
   } else if (userSelections.background) {
     // FALLBACK: Use old string-based mapping for backwards compatibility
@@ -448,17 +459,17 @@ export function applyUserSelections(
   // - Black: ContTheme = \"Neutral\", ContN = \"1\"
   if (userSelections.cardColoring) {
     if (userSelections.cardColoring === 'tonal') {
-      // Tonal uses the background theme and N
+      // Tonal uses the background theme and N (already in 14-tone from defaultN)
       updated.containerTheme = updated.defaultTheme;
       updated.containerN = updated.defaultN;
       updated.containerShade = 'Light';
     } else if (userSelections.cardColoring === 'white') {
-      // White uses Neutral 12 (White background for containers)
+      // White uses Neutral Background-14 (L=99, white)
       updated.containerTheme = 'Neutral';
-      updated.containerN = 12;
+      updated.containerN = 14;
       updated.containerShade = 'Light';
     } else if (userSelections.cardColoring === 'black') {
-      // Black uses Neutral 3 (dark container on dark surface 2)
+      // Black uses Neutral Background-3 (dark container)
       updated.containerTheme = 'Neutral';
       updated.containerN = 3;
       updated.containerShade = 'Light';
@@ -471,10 +482,9 @@ export function applyUserSelections(
       updated.containerShade = 'Light';
     } else if (userSelections.cardsText === 'professional' || userSelections.cardsText === 'primary') {
       updated.containerTheme = 'Neutral';
-      updated.containerN = 12;
+      updated.containerN = 14;
       updated.containerShade = 'Light';
     } else if (userSelections.cardsText === 'black') {
-      // Black uses Neutral 3 (dark container on dark surface 2)
       updated.containerTheme = 'Neutral';
       updated.containerN = 3;
       updated.containerShade = 'Light';

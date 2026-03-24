@@ -451,44 +451,43 @@ export async function loadGoogleFonts(fontFamilies: string[]): Promise<void> {
 
   console.log(`📦 Loading ${fontFamilies.length} Google Fonts...`);
 
-  // Remove existing Google Fonts link elements
-  const existingLinks = document.querySelectorAll('link[href*="fonts.googleapis.com"]');
+  // Remove old typography font links (keep other Google Font links)
+  const existingLinks = document.querySelectorAll('link[data-typography-fonts]');
   existingLinks.forEach(link => link.remove());
 
-  // Create URL-safe font family string
-  const fontString = fontFamilies
-    .map(family => {
-      // Replace spaces with +
-      const urlFamily = family.replace(/\s+/g, '+');
-      // Add weight variants
-      return `${urlFamily}:wght@100;200;300;400;500;600;700;800;900`;
-    })
-    .join('&family=');
+  // Split into batches of 10 to avoid URL length limits
+  const batchSize = 10;
+  for (let i = 0; i < fontFamilies.length; i += batchSize) {
+    const batch = fontFamilies.slice(i, i + batchSize);
+    const fontString = batch
+      .map(family => {
+        const urlFamily = family.replace(/\s+/g, '+');
+        return `${urlFamily}:wght@300;400;600;700`;
+      })
+      .join('&family=');
 
-  // Create and append link element
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${fontString}&display=swap`;
-  link.setAttribute('data-typography-fonts', 'true');
-  
-  document.head.appendChild(link);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${fontString}&display=swap`;
+    link.setAttribute('data-typography-fonts', 'true');
+    document.head.appendChild(link);
+  }
 
   // Wait for fonts to load with Font Loading API
   if ('fonts' in document) {
     try {
-      const fontPromises = fontFamilies.map(family => 
+      const fontPromises = fontFamilies.map(family =>
         (document as any).fonts.load(`400 16px "${family}"`)
       );
-      await Promise.all(fontPromises);
+      await Promise.allSettled(fontPromises);
       console.log('✅ Fonts loaded via Font Loading API');
     } catch (error) {
       console.warn('⚠️ Font loading warning:', error);
-      // Continue anyway - fonts will load eventually
     }
   }
 
-  // Additional safety timeout
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  // Brief wait for CSS to apply
+  await new Promise(resolve => setTimeout(resolve, 500));
   console.log('✅ Google Fonts ready');
 }
 

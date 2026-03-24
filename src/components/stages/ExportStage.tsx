@@ -59,7 +59,7 @@ export default function ExportStage({
   const uniqueId = dinoId || 'generating...';
   const showcaseBase = 'https://sunny-cendol-af27ce.netlify.app';
   const playgroundUrl = `${showcaseBase}/?user=${dinoId || ''}`;
-  const storybookUrl = 'https://dinodesign.ai/storybook';
+  const storybookUrl = `${showcaseBase}/storybook/?user=${dinoId || ''}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${dinoId || ''}/md`;
   const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${dinoId || ''}`;
   const hasId = !!dinoId;
@@ -243,6 +243,48 @@ export default function ExportStage({
             </VStack>
           </div>
         </div>
+
+        {/* Download All as ZIP */}
+        {hasId && (
+          <div className="export-card" style={{ width: '100%' }}>
+            <VStack spacing={2}>
+              <BodySmall style={{ fontWeight: 600 }}>Download All Files</BodySmall>
+              <Button
+                variant="solid"
+                color="default"
+                style={{ width: '100%' }}
+                onClick={async () => {
+                  const zip = new JSZip();
+                  const base = `https://aqpmdqlhffjakkznxudv.supabase.co/storage/v1/object/public/design-system/${dinoId}`;
+                  const files = ['foundation.css', 'core.css', 'typography-tokens.css', 'Light-Mode.css', 'Dark-Mode.css', 'base.css', 'styles.css', 'tokens.json', 'figma.json', 'DINO-TOKENS.md', 'theme.json'];
+                  for (const f of files) {
+                    try {
+                      const res = await fetch(`${base}/${f}`);
+                      if (res.ok) zip.file(f, await res.text());
+                    } catch { /* skip */ }
+                  }
+                  if (moodBoardUrl) {
+                    try {
+                      const res = await fetch(moodBoardUrl);
+                      if (res.ok) zip.file('mood-board.png', await res.blob());
+                    } catch { /* skip */ }
+                  }
+                  const blob = await zip.generateAsync({ type: 'blob' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${designSystemName || 'design-system'}.zip`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download All (.zip)
+              </Button>
+            </VStack>
+          </div>
+        )}
       </VStack>
     </div>
   );

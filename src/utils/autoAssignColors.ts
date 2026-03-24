@@ -4,7 +4,7 @@ import type { SurfaceStyle, UserSelections, ColorScheme } from '../types';
 /**
  * Auto-assign color selections based on:
  * 1. Surface style (light-tonal / grey-professional / dark-professional)
- * 2. Primary color lightness (PC) — light (>=9), medium (6-8), dark (<6)
+ * 2. Primary color lightness (PC) — light (>=8), medium (5-7), dark (1-4)
  * 3. Color scheme type (monochromatic vs multi-color)
  */
 export function autoAssignColors(
@@ -12,9 +12,9 @@ export function autoAssignColors(
   colorScheme: ColorScheme,
 ): UserSelections {
   const PC = toneToColorNumber(colorScheme.extractedTones.primary);
-  const isLightPrimary = PC >= 9;
-  const isMediumPrimary = PC >= 6 && PC < 9;
-  const isDarkPrimary = PC < 6;
+  const isLightPrimary = PC >= 8;
+  const isMediumPrimary = PC >= 5 && PC < 8;
+  const isDarkPrimary = PC < 5;
   const isMonochromatic = colorScheme.name?.toLowerCase() === 'monochromatic';
 
   let background: string;
@@ -30,15 +30,15 @@ export function autoAssignColors(
   const decorativeMode: UserSelections['decorativeMode'] = 'surface-components';
 
   // ── Dark Professional ──
-  // Dark background, dark nav with subtle elevation, BW text, black cards
+  // Dark background, black nav with surface variants, BW text, black cards
   if (surfaceStyle === 'dark-professional') {
     defaultTheme = 'dark';
     background = 'black';
     backgroundTheme = 'Neutral';
     backgroundN = 2;
-    appBar = 'black';        // Neutral Surface-Bright (Color-3 in dark mode)
-    navBar = 'black';        // Neutral Surface-Dim (Color-1 in dark mode)
-    status = 'black';        // Neutral Surface-Bright
+    appBar = 'black';        // Black Surface-Bright
+    navBar = 'black';        // Black Surface-Dim
+    status = 'black';        // Black Surface-Bright
     button = 'primary';
     textColoring = 'black-white';
     cardColoring = 'black';
@@ -46,15 +46,15 @@ export function autoAssignColors(
   }
 
   // ── Grey Professional ──
-  // White background, dark nav for contrast, BW text, white cards
+  // White background, black nav with surface variants, BW text, white cards
   if (surfaceStyle === 'grey-professional') {
     defaultTheme = 'light';
     backgroundTheme = 'Neutral';
     backgroundN = 12;
     background = 'white';
-    appBar = 'black';        // Dark nav on light page
-    navBar = 'black';        // Dark nav on light page
-    status = 'black';        // Dark status
+    appBar = 'black';        // Black Surface-Bright
+    navBar = 'black';        // Black Surface-Dim
+    status = 'black';        // Black Surface-Bright
     button = 'primary';
     textColoring = 'black-white';
     cardColoring = 'white';
@@ -93,13 +93,13 @@ export function autoAssignColors(
     cardColoring = 'tonal';
 
   } else if (isMediumPrimary) {
-    // Medium primary (PC 6-8) — white bg lets colors breathe
+    // Medium primary (PC 7-10) — white bg, primary nav accent
     background = 'white';
     backgroundTheme = 'Neutral';
     backgroundN = 12;
-    appBar = 'white';        // Neutral Surface-Bright
-    status = 'white';        // Neutral Surface-Bright
-    navBar = 'white';        // Neutral Surface-Dim
+    appBar = 'primary-bright';
+    status = 'primary-bright';
+    navBar = 'primary-dim';
     button = 'laddered';
     textColoring = 'black-white';
     cardColoring = 'white';

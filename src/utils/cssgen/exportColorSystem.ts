@@ -821,7 +821,7 @@ function getBorderVariantValue(borderValue: string): string {
   // If borderValue is a direct hex color
   if (borderValue.startsWith('#')) {
     // Append 66 for 40% opacity
-    return `${borderValue}66`;
+    return `${borderValue}40`;
   }
   // Fallback for references: return black with 20% opacity (this shouldn't happen)
   console.warn(`getBorderVariantValue received a reference token: ${borderValue}. This should be resolved to hex first.`);
@@ -1157,7 +1157,7 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}66` : `${getBorderColor(surfaceColor, palette, false)}66`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}40` : `${getBorderColor(surfaceColor, palette, false)}40`,
         type: 'color'
       },
       'Hotlink': {
@@ -1215,7 +1215,7 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}66` : `${getBorderColor(containerColor, palette, false)}66`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}40` : `${getBorderColor(containerColor, palette, false)}40`,
         type: 'color'
       },
       'Hotlink': {
@@ -1445,7 +1445,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}66` : `${getBorderColor(surfaceColor, palette, false)}66`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}40` : `${getBorderColor(surfaceColor, palette, false)}40`,
         type: 'color'
       },
       'Hotlink': {
@@ -1511,7 +1511,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}66` : `${getBorderColor(containerColor, palette, false)}66`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}40` : `${getBorderColor(containerColor, palette, false)}40`,
         type: 'color'
       },
       'Hotlink': {
@@ -1687,7 +1687,7 @@ function generateDarkModeSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: `${getBorderColor(surfaceColor, palette, true)}66`,
+        value: `${getBorderColor(surfaceColor, palette, true)}40`,
         type: 'color'
       },
       'Hotlink': {
@@ -1753,7 +1753,7 @@ function generateDarkModeSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: `${getBorderColor(containerColor, palette, true)}66`,
+        value: `${getBorderColor(containerColor, palette, true)}40`,
         type: 'color'
       },
       'Hotlink': {
@@ -4781,10 +4781,8 @@ export function exportColorSystemToJSON(
     // This ensures consistency: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-9
     colorSystem.Modes['Dark-Mode'].Colors[paletteName] = {};
     
-    // For dark mode:
-    // - Neutral starts at Color-3 (has 10 colors: Color-3 through Color-12)
-    // - ALL other colors (primary, secondary, tertiary, info, success, warning, error, hotlink-visited) start at Color-1 (has 12 colors: Color-1 through Color-12)
-    const darkStartIndex = paletteKey === 'neutral' ? 3 : 1;
+    // For dark mode: all palettes start at Color-1 (12 colors each)
+    const darkStartIndex = 1;
     const darkEndIndex = paletteKey === 'neutral' ? 12 : 12;
     const darkColorCount = darkEndIndex - darkStartIndex + 1;
     
@@ -5470,7 +5468,7 @@ export function exportColorSystemToJSON(
     };
 
     palettes.forEach(palette => {
-      const colorRef = palette === 'Error' ? 'Tertiary' : palette;
+      const colorRef = palette;
       
       buttonBorder.Surfaces[palette] = {
         'Color-1': { value: `{Colors.${colorRef}.Color-6}`, type: 'color' },
@@ -5888,7 +5886,301 @@ export function exportColorSystemToJSON(
   });
   
   console.log('  ✓ [JSON Export] Complete Simplified System generated for both modes');
-  
+
+  // ========================================
+  // Add Dropshadow-Color to every theme's Surfaces and Containers
+  // Dropshadow = same hue/chroma, L × 0.625
+  // ========================================
+  console.log('🎨 [JSON Export] Adding Dropshadow-Color to all themes...');
+  const computeDropshadow = (hex: string, lightOffset = -25, satMultiplier = 1.5): string => {
+    try {
+      const clean = hex.replace('#', '');
+      const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+      const n = parseInt(full, 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      // RGB → HSL
+      const rn = r / 255, gn = g / 255, bn = b / 255;
+      const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+      let h = 0, s = 0, l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+        else if (max === gn) h = (bn - rn) / d + 2;
+        else h = (rn - gn) / d + 4;
+        h /= 6;
+      }
+      const hDeg = h * 360, sPct = s * 100, lPct = l * 100;
+      // Apply offsets
+      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+      const newS = clamp(sPct * satMultiplier, 0, 100);
+      const newL = clamp(lPct + lightOffset, 8, 92);
+      // HSL → RGB
+      const s2 = newS / 100, l2 = newL / 100, h2 = hDeg / 360;
+      let sr: number, sg: number, sb: number;
+      if (s2 === 0) {
+        sr = sg = sb = Math.round(l2 * 255);
+      } else {
+        const q = l2 < 0.5 ? l2 * (1 + s2) : l2 + s2 - l2 * s2;
+        const p = 2 * l2 - q;
+        const hue2rgb = (p: number, q: number, t: number) => {
+          if (t < 0) t += 1; if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        sr = Math.round(hue2rgb(p, q, h2 + 1/3) * 255);
+        sg = Math.round(hue2rgb(p, q, h2) * 255);
+        sb = Math.round(hue2rgb(p, q, h2 - 1/3) * 255);
+      }
+      return `${sr}, ${sg}, ${sb}`;
+    } catch {
+      return '0, 0, 0';
+    }
+  };
+
+  // Lowlight: same hue, slightly boosted chroma, darker
+  const computeLowlight = (hex: string): string => computeDropshadow(hex, -15, 1.2);
+
+  // Highlight: same hue, slightly lower chroma, lighter
+  const computeHighlight = (hex: string): string => computeDropshadow(hex, 15, 0.8);
+
+  const resolveColorToken = (tokenValue: string, modeColors: any, modeBackgrounds: any): string | null => {
+    if (!tokenValue) return null;
+    // Match {Colors.Palette.Color-N}
+    let match = tokenValue.match(/\{Colors\.(\w+)\.Color-(\d+)\}/);
+    if (match) {
+      return modeColors?.[match[1]]?.['Color-' + match[2]]?.value || null;
+    }
+    // Match {Backgrounds.Palette.Background-N.Surfaces.Surface}
+    match = tokenValue.match(/\{Backgrounds\.(\w+)\.Background-(\d+)\.Surfaces\.Surface\}/);
+    if (match) {
+      return modeBackgrounds?.[match[1]]?.['Background-' + match[2]]?.Surfaces?.Surface?.value || null;
+    }
+    // Match {Backgrounds.Palette.Background-N.Surfaces.Surface-Dim}
+    match = tokenValue.match(/\{Backgrounds\.(\w+)\.Background-(\d+)\.Surfaces\.(Surface-\w+)\}/);
+    if (match) {
+      return modeBackgrounds?.[match[1]]?.['Background-' + match[2]]?.Surfaces?.[match[3]]?.value || null;
+    }
+    // Match {Backgrounds.Palette.Background-N.Containers.Container}
+    match = tokenValue.match(/\{Backgrounds\.(\w+)\.Background-(\d+)\.Containers\.(Container[\w-]*)\}/);
+    if (match) {
+      return modeBackgrounds?.[match[1]]?.['Background-' + match[2]]?.Containers?.[match[3]]?.value || null;
+    }
+    // Direct hex
+    if (tokenValue.startsWith('#')) return tokenValue;
+    return null;
+  };
+
+  modesForSystem.forEach(mode => {
+    const themes = (colorSystem.Modes[mode] as any).Themes;
+    const colors = (colorSystem.Modes[mode] as any).Colors;
+    const backgrounds = (colorSystem.Modes[mode] as any).Backgrounds;
+    if (!themes) { console.log(`  ⚠️ No themes found for ${mode}`); return; }
+
+    console.log(`  🔍 Processing ${Object.keys(themes).length} themes for ${mode}`);
+    console.log(`  🔍 Colors palettes available: ${colors ? Object.keys(colors).join(', ') : 'NONE'}`);
+    console.log(`  🔍 Backgrounds available: ${backgrounds ? Object.keys(backgrounds).join(', ') : 'NONE'}`);
+
+    Object.keys(themes).forEach(themeName => {
+      const theme = themes[themeName];
+
+      // Helper: resolve a theme token's Border to hex, then compute Border-Variant (40% opacity)
+      const resolveBorderVariant = (sectionData: any) => {
+        const borderToken = sectionData?.Border?.value;
+        if (!borderToken) return;
+        // Border token is like "{Border.Surfaces.Neutral.Color-11}" — resolve through color ref
+        const borderResolved = resolveColorToken(borderToken, colors, backgrounds);
+        if (borderResolved) {
+          // Border-Variant = border color at 40% opacity as 8-digit hex
+          sectionData['Border-Variant'] = { value: `${borderResolved}40`, type: 'color' };
+        } else {
+          // Try to resolve via the intermediate: navigate the token path through modeData
+          const path = borderToken.replace(/[{}]/g, '').split('.');
+          let current: any = (colorSystem.Modes[mode] as any);
+          for (const part of path) {
+            if (!current || typeof current !== 'object') { current = null; break; }
+            current = current[part];
+          }
+          if (current?.value) {
+            const innerHex = resolveColorToken(current.value, colors, backgrounds);
+            if (innerHex) {
+              sectionData['Border-Variant'] = { value: `${innerHex}40`, type: 'color' };
+            }
+          }
+        }
+      };
+
+      // Helper: resolve any token to hex by following the full chain
+      const resolveToHex = (tokenValue: string): string | null => {
+        if (!tokenValue) return null;
+        if (tokenValue.startsWith('#')) return tokenValue;
+
+        // Try resolveColorToken first
+        let hex = resolveColorToken(tokenValue, colors, backgrounds);
+        if (hex) return hex;
+
+        // Navigate the modeData by token path
+        const path = tokenValue.replace(/[{}]/g, '').split('.');
+        let current: any = (colorSystem.Modes[mode] as any);
+        for (const part of path) {
+          if (!current || typeof current !== 'object') { current = null; break; }
+          current = current[part];
+        }
+        if (current?.value) {
+          if (current.value.startsWith('#')) return current.value;
+          // One more level
+          hex = resolveColorToken(current.value, colors, backgrounds);
+          if (hex) return hex;
+          // Navigate again
+          const innerPath = current.value.replace(/[{}]/g, '').split('.');
+          let inner: any = (colorSystem.Modes[mode] as any);
+          for (const part of innerPath) {
+            if (!inner || typeof inner !== 'object') { inner = null; break; }
+            inner = inner[part];
+          }
+          if (inner?.value && inner.value.startsWith('#')) return inner.value;
+        }
+        return null;
+      };
+
+      // Add Dropshadow-Color and Border-Variant to all sections
+      const allThemeSections = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'];
+      allThemeSections.forEach(section => {
+        const sectionData = theme[section];
+        if (!sectionData) return;
+
+        // Find the background token for this section
+        let bgToken: string | null = null;
+        if (section === 'Containers') {
+          bgToken = sectionData.Container?.value;
+        } else {
+          bgToken = sectionData.Surface?.value || sectionData.Background?.value;
+        }
+
+        if (bgToken) {
+          const hex = resolveToHex(bgToken);
+          if (hex) {
+            sectionData['Dropshadow-Color'] = { value: computeDropshadow(hex), type: 'color' };
+          }
+        }
+
+        // Border-Variant
+        resolveBorderVariant(sectionData);
+      });
+      // Add Highlight and Lowlight to each button theme
+      // Resolve button color: token is like "{Buttons.Primary.Medium.Button}"
+      // Navigate modeData.Buttons.Primary to find button hex, or resolve through the chain
+      const resolveButtonHex = (btnToken: string): string | null => {
+        if (!btnToken) return null;
+        // Direct hex
+        if (btnToken.startsWith('#')) return btnToken;
+        // Try resolveColorToken first
+        let hex = resolveColorToken(btnToken, colors, backgrounds);
+        if (hex) return hex;
+        // Parse token like "{Buttons.Primary.Medium.Button}" and resolve via Buttons section
+        const btnMatch = btnToken.replace(/[{}]/g, '').match(/^Buttons\.(\w+)\.(\w+)\.Button$/);
+        if (btnMatch) {
+          const [, palette, shade] = btnMatch;
+          // The Buttons section in mode has Surfaces/Containers with Background-N keys
+          // Each entry has a Button.value that references Colors
+          const modeBtns = (colorSystem.Modes[mode] as any).Buttons?.[palette];
+          if (modeBtns) {
+            // Try Surfaces first, then Containers — find any Background-N with a Button value
+            for (const section of ['Surfaces', 'Containers']) {
+              if (modeBtns[section]) {
+                for (const bgKey of Object.keys(modeBtns[section])) {
+                  const btnVal = modeBtns[section][bgKey]?.Button?.value;
+                  if (btnVal) {
+                    hex = resolveColorToken(btnVal, colors, backgrounds);
+                    if (hex) return hex;
+                    // One more level
+                    if (btnVal.startsWith('#')) return btnVal;
+                  }
+                }
+              }
+            }
+          }
+          // Fallback: look up directly from Colors palette
+          // For Primary → Colors.Primary, etc.
+          if (colors?.[palette]) {
+            // Use extracted tone for this palette
+            const toneMap: Record<string, number> = { Primary: PC, Secondary: SC, Tertiary: TC, Neutral: NC };
+            const colorN = toneMap[palette] || 8;
+            const colorHex = colors[palette]?.['Color-' + colorN]?.value;
+            if (colorHex) return colorHex;
+          }
+        }
+        return null;
+      };
+
+      // Compute extracted tone numbers for fallback
+      const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+      const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
+      const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8;
+      const NC = 9;
+      const OB = PC >= 9 ? 8 : 6;
+
+      const buttonThemes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+      const btnColorNMap: Record<string, number> = {
+        Primary: PC, Secondary: SC, Tertiary: TC, Neutral: OB,
+        Info: OB, Success: OB, Warning: OB, Error: OB,
+      };
+
+      // Add Highlight/Lowlight to ALL sections that have Buttons
+      const allSections = [
+        'Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'
+      ];
+
+      buttonThemes.forEach(btnTheme => {
+        // Resolve a base hex for this button theme (fallback for all sections)
+        const colorN = btnColorNMap[btnTheme] || 8;
+        const fallbackHex = colors?.[btnTheme]?.['Color-' + colorN]?.value;
+
+        allSections.forEach(section => {
+          const sectionData = theme[section];
+          if (!sectionData) return;
+
+          const btnToken = sectionData.Buttons?.[btnTheme]?.Button?.value;
+          let hex = resolveButtonHex(btnToken || '');
+          if (!hex) hex = fallbackHex;
+          if (!hex) return;
+
+          if (!sectionData.Buttons) sectionData.Buttons = {};
+          if (!sectionData.Buttons[btnTheme]) sectionData.Buttons[btnTheme] = {};
+          sectionData.Buttons[btnTheme].Highlight = { value: computeHighlight(hex), type: 'color' };
+          sectionData.Buttons[btnTheme].Lowlight = { value: computeLowlight(hex), type: 'color' };
+        });
+      });
+    });
+    // Also add Highlight/Lowlight to mode-level Buttons section
+    const modeButtons = (colorSystem.Modes[mode] as any).Buttons;
+    if (modeButtons) {
+      const buttonThemes2 = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+      buttonThemes2.forEach(btnTheme => {
+        // Check Surfaces and Containers in the Buttons section
+        ['Surfaces', 'Containers'].forEach(section => {
+          if (modeButtons[btnTheme]?.[section]) {
+            const bgKeys = Object.keys(modeButtons[btnTheme][section]);
+            bgKeys.forEach(bgKey => {
+              const btnData = modeButtons[btnTheme][section][bgKey];
+              if (btnData?.Button?.value) {
+                const hex = resolveColorToken(btnData.Button.value, colors, backgrounds);
+                if (hex) {
+                  btnData.Highlight = { value: computeHighlight(hex), type: 'color' };
+                  btnData.Lowlight = { value: computeLowlight(hex), type: 'color' };
+                }
+              }
+            });
+          }
+        });
+      });
+    }
+
+    console.log(`  ✓ Added Dropshadow-Color, Highlight, Lowlight to ${mode} themes`);
+  });
+
   // ========================================
   // Replace Dark-Mode Background-Vibrant with hex values from Light-Mode Background-9
   // ========================================

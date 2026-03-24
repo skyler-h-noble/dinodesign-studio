@@ -10,7 +10,7 @@ interface TopBarProps {
 export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps) {
   return (
     <div
-      data-theme={themed ? 'App-Bar' : undefined}
+      data-theme={themed ? 'Brand-App-Bar' : undefined}
       style={{
         position: 'sticky',
         top: 0,
@@ -33,7 +33,7 @@ export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps
         <ArrowBackIcon style={{ fontSize: 16 }} />
         Back
       </Button>
-      <Body style={{ fontWeight: 700, fontSize: '1.2rem', textAlign: 'center' }}>{designSystemName}</Body>
+      <h3 style={{ fontWeight: 700, fontSize: '1.4rem', textAlign: 'center', margin: 0, color: 'var(--Header)' }}>{designSystemName}</h3>
       <div />
     </div>
   );
@@ -49,7 +49,7 @@ interface BottomBarProps {
 export function CreationBottomBar({ onNext, nextLabel = 'Continue', disabled, themed }: BottomBarProps) {
   return (
     <div
-      data-theme={themed ? 'Nav-Bar' : undefined}
+      data-theme={themed ? 'Brand-Nav-Bar' : undefined}
       style={{
         position: 'fixed',
         bottom: 0,
@@ -63,8 +63,8 @@ export function CreationBottomBar({ onNext, nextLabel = 'Continue', disabled, th
       justifyContent: 'center',
     }}>
       <Button
-        variant="solid"
-        color="default"
+        variant="primary"
+        size="medium"
         onClick={onNext}
         disabled={disabled}
         style={{ minWidth: 200, padding: '12px 32px', fontWeight: 700 }}

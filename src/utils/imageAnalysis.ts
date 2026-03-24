@@ -182,9 +182,9 @@ export async function assessImageStyle(
         const avgLightness = totalLightness / count;
         const avgChroma = totalChroma / count;
 
-        if (avgLightness < 40) {
+        if (avgLightness < 30) {
           resolve('dark-professional');
-        } else if (avgChroma < 20) {
+        } else if (avgChroma < 10) {
           resolve('grey-professional');
         } else {
           resolve('light-tonal');

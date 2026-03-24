@@ -12,6 +12,7 @@ import {
 import { assessImageStyle } from './utils/imageAnalysis';
 import { autoAssignColors } from './utils/autoAssignColors';
 import { suggestComponentStyle } from './utils/autoSuggestStyle';
+import { buildPreviewCSS } from './utils/buildPreviewCSS';
 
 import TopNav from './components/TopNav';
 import { CreationTopBar, CreationBottomBar } from './components/CreationNav';
@@ -39,7 +40,7 @@ function MainApp() {
     defaultTheme: 'light',
     background: 'white',
     backgroundTheme: 'Neutral',
-    backgroundN: 14,
+    backgroundN: 12,
     appBar: 'primary-light-bright',
     navBar: 'primary-light-dim',
     status: 'primary-light-bright',
@@ -269,86 +270,58 @@ function MainApp() {
   // Bottom bar label
   const nextLabel = customNextLabel || (stage === 'review' ? 'Get Your Design System' : 'Continue');
 
-  // Component style radii
-  const STYLE_BUTTON_RADII: Record<ComponentStyle, number> = { professional: 2, modern: 4, bold: 8, playful: 64 };
+  // Component style radii — from saved customizations or defaults
   const cardRadius = savedStyleCustomizations?.[componentStyle]?.radius ?? { professional: 4, modern: 8, bold: 16, playful: 24 }[componentStyle];
-  const buttonRadius = STYLE_BUTTON_RADII[componentStyle];
-
-  // Build brand token CSS variables from the selected color scheme
-  const brandTokens = useMemo(() => {
-    if (!selectedColorScheme?.tonePalettes) return {};
-    const p = selectedColorScheme.tonePalettes.primary || [];
-    const pc = toneToColorNumber(selectedColorScheme.extractedTones?.primary || 60);
-    const sc = toneToColorNumber(selectedColorScheme.extractedTones?.secondary || 60);
-
-    // Surface background based on user selection
-    const bgN = userSelections.background === 'primary-light' ? 11
-      : userSelections.background === 'primary-base' ? pc
-      : 12; // white default
-    const bgPalette = (userSelections.background === 'white' || userSelections.background === 'black')
-      ? ['#050505','#1a1a1a','#2e2e2e','#434343','#585858','#8e8e8e','#a3a3a3','#b8b8b8','#cccccc','#e0e0e0','#f0f0f0','#fafafa']
-      : p.map(t => t.hex);
-
-    const containerHex = bgPalette[10] || '#f0f0f0'; // Color-11
-    const bgHex = bgPalette[bgN - 1] || '#ffffff';
-    const headerHex = p[3]?.hex || '#333';
-    const textHex = p[3]?.hex || '#333';
-    const quietHex = p[4]?.hex || '#666';
-    const borderHex = p[7]?.hex || '#ccc';
-    const btnBg = p[pc - 1]?.hex || '#888';
-    const btnText = pc >= 9 ? (p[1]?.hex || '#fff') : (p[10]?.hex || '#fff');
-    const scHex = (selectedColorScheme.tonePalettes.secondary || [])[sc - 1]?.hex || '#888';
-
-    return {
-      '--Background': bgHex,
-      '--Surface': bgHex,
-      '--Container': containerHex,
-      '--Container-Low': containerHex,
-      '--Container-Lowest': containerHex,
-      '--Header': headerHex,
-      '--Text': textHex,
-      '--Quiet': quietHex,
-      '--Border': borderHex,
-      '--Border-Variant': borderHex,
-      '--Hotlink': p[5]?.hex || '#5276cf',
-      '--Buttons-Primary-Button': btnBg,
-      '--Buttons-Primary-Text': btnText,
-      '--Buttons-Primary-Border': btnBg,
-      '--Buttons-Secondary-Button': scHex,
-      '--Buttons-Secondary-Text': btnText,
-      '--Buttons-Secondary-Border': scHex,
-      '--Buttons-Default-Button': containerHex,
-      '--Buttons-Default-Text': textHex,
-      '--Buttons-Default-Border': borderHex,
-      '--Focus-Visible': '#3b82f6',
-    };
-  }, [selectedColorScheme, userSelections.background]);
-
-  // Resolve nav option to hex color
-  const resolveNavColor = (opt: string): string | undefined => {
-    if (!selectedColorScheme?.tonePalettes) return undefined;
-    const p = selectedColorScheme.tonePalettes.primary || [];
-    const pc = toneToColorNumber(selectedColorScheme.extractedTones?.primary || 60);
-    const neutral = ['#050505','#1a1a1a','#2e2e2e','#434343','#585858','#8e8e8e','#a3a3a3','#b8b8b8','#cccccc','#e0e0e0','#f0f0f0','#fafafa'];
-    switch (opt) {
-      case 'black': return neutral[0];
-      case 'white': return '#ffffff';
-      case 'primary-light': return p[10]?.hex;
-      case 'primary-light-bright': return p[11]?.hex;
-      case 'primary-light-dim': return p[9]?.hex;
-      case 'primary': return p[pc - 1]?.hex;
-      case 'primary-bright': return p[Math.min(pc, 11)]?.hex;
-      case 'primary-dim': return p[Math.max(pc - 2, 0)]?.hex;
-      default: return undefined;
-    }
-  };
+  const buttonRadius = savedStyleCustomizations?.[componentStyle]?.buttonRadius ?? { professional: 2, modern: 4, bold: 8, playful: 64 }[componentStyle];
 
   // Apply brand tokens after color-assignment stage
   const applyBrand = ['color-assignment', 'typography', 'component-style', 'review', 'export'].includes(stage);
+
+  // Build full brand CSS from the same logic as the phone preview
+  // Post-process to add !important so it overrides DynoDesignProvider's theme
+  const brandCSS = useMemo(() => {
+    if (!applyBrand || !selectedColorScheme) return '';
+    try {
+      const css = buildPreviewCSS({
+        colorScheme: selectedColorScheme,
+        userSelections,
+        componentStyle,
+        mode: 'light',
+        typographyStyles,
+      });
+      // No !important needed — Brand theme selectors don't conflict with provider
+      return css;
+    } catch {
+      return '';
+    }
+  }, [applyBrand, selectedColorScheme, userSelections, componentStyle, typographyStyles]);
+  // Typography font families for inline style injection
+  const headerFont = typographyStyles.find(t => t.type === 'header');
+  const decorativeFont = typographyStyles.find(t => t.type === 'decorative');
+  const bodyFont = typographyStyles.find(t => t.type === 'body');
+
   const styleVars = {
     '--Style-Border-Radius': `${buttonRadius}px`,
     '--Card-Radius': `${cardRadius}px`,
-    ...(applyBrand ? brandTokens : {}),
+    ...(applyBrand && headerFont ? {
+      '--Font-Family-Header': `'${headerFont.family}', serif`,
+      '--Set-Font-Family-Header': `'${headerFont.family}', serif`,
+      '--Set-Font-Family-Header-Weight': headerFont.weight,
+      '--Set-Font-Family-Header-Letter-Spacing': headerFont.letterSpacing || '0em',
+    } : {}),
+    ...(applyBrand && decorativeFont ? {
+      '--Set-Font-Family-Decorative': `'${decorativeFont.family}', sans-serif`,
+      '--Set-Font-Family-Decorative-Weight': decorativeFont.weight,
+      '--Set-Font-Family-Decorative-Letter-Spacing': decorativeFont.letterSpacing || '0em',
+      '--Set-Font-Family-Decorative-Text-Transform': decorativeFont.allCaps ? 'uppercase' : 'none',
+    } : {}),
+    ...(applyBrand && bodyFont ? {
+      '--Body-Font-Family': `'${bodyFont.family}', sans-serif`,
+      '--Font-Family-Body': `'${bodyFont.family}', sans-serif`,
+      '--Set-Font-Family-Body': `'${bodyFont.family}', sans-serif`,
+      '--Set-Font-Family-Body-Weight': bodyFont.weight,
+      '--Set-Font-Family-Body-Letter-Spacing': bodyFont.letterSpacing || '0em',
+    } : {}),
   } as React.CSSProperties;
 
   return (
@@ -357,27 +330,13 @@ function MainApp() {
       defaultStyle="Modern"
       defaultSurface="Surface"
     >
+      {/* Inject brand CSS — same tokens as the phone preview */}
+      {brandCSS && <style id="dino-brand-css" dangerouslySetInnerHTML={{ __html: brandCSS }} />}
       {isExport && <TopNav designSystemName={designSystemName} />}
       {showTopBar && (
         <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
       )}
-      {applyBrand && Object.keys(brandTokens).length > 0 && (
-        <style>{`
-          [data-theme="Default"],
-          [data-theme="Default"] [data-surface] {
-            ${Object.entries(brandTokens).map(([k, v]) => `${k}: ${v} !important;`).join('\n            ')}
-          }
-          [data-theme="App-Bar"] {
-            --Background: ${resolveNavColor(userSelections.appBar) || 'var(--Surface)'} !important;
-            ${Object.entries(brandTokens).filter(([k]) => k !== '--Background' && k !== '--Surface').map(([k, v]) => `${k}: ${v} !important;`).join('\n            ')}
-          }
-          [data-theme="Nav-Bar"] {
-            --Background: ${resolveNavColor(userSelections.navBar) || 'var(--Surface)'} !important;
-            ${Object.entries(brandTokens).filter(([k]) => k !== '--Background' && k !== '--Surface').map(([k, v]) => `${k}: ${v} !important;`).join('\n            ')}
-          }
-        `}</style>
-      )}
-      <main style={{ ...styleVars, minHeight: '100vh', paddingBottom: showBottomBar ? 72 : 0, overflowX: 'hidden' }}>
+      <main data-theme={applyBrand ? 'Brand' : undefined} style={{ ...styleVars, minHeight: '100vh', paddingBottom: showBottomBar ? 72 : 0, overflowX: 'hidden', background: applyBrand ? 'var(--Background)' : undefined }}>
         {renderStage()}
       </main>
       {showBottomBar && !isFirstStage && (

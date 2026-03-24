@@ -89,11 +89,16 @@
     .icon-btn svg line,
     .icon-btn svg circle { stroke: var(--Buttons-Default-Text); }
     .card-text { font-size: 15px; color: var(--Text); line-height: 1.5; }
-    .card-placeholder { width: 100%; height: 56px; min-height: 40px; border-radius: 8px; background: var(--Border-Variant, rgba(0,0,0,0.05)); flex-shrink: 0; }
+    .card-placeholder { width: 100%; height: 56px; min-height: 40px; border-radius: 8px; background: var(--Border-Variant, rgba(0,0,0,0.05)); flex-shrink: 0; overflow: hidden; position: relative; }
+    .card-placeholder img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(2.2); }
     .card-action-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      height: 40px; width: 78px; background: var(--Buttons-Default-Button, transparent); border: 1px solid var(--Buttons-Default-Border, rgba(0,0,0,0.12));
+      height: 40px; padding: 0 16px; background: var(--Buttons-Default-Button, transparent); border: 1px solid var(--Buttons-Default-Border, rgba(0,0,0,0.12));
       border-radius: var(--Style-Border-Radius, 8px); font-family: var(--Set-Font-Family-Body, Arial, sans-serif); font-weight: 700; font-size: 14px; color: var(--Buttons-Default-Text);
+    }
+    .card-action-btn.outline {
+      background: transparent; border: 1px solid var(--Buttons-Default-Border, rgba(0,0,0,0.12));
+      color: var(--Buttons-Default-Text);
     }
     .tag { display: inline-flex; align-items: center; justify-content: center; padding: 4px 16px; background: var(--Tag-Tertiary-BG, #e8e8e8); border-radius: 2px; font-family: Arial, sans-serif; font-weight: 700; font-size: 12px; color: var(--Tag-Tertiary-Text, #333); }
     .card-row-2col { display: flex; gap: 16px; flex-shrink: 0; }
@@ -131,6 +136,11 @@
       if (data.type === 'update-moodboard') {
         var img = document.getElementById('mood-board-img');
         if (img) img.src = data.src || '';
+        var crops = document.querySelectorAll('.mood-crop');
+        crops.forEach(function(crop) {
+          crop.src = data.src || '';
+          crop.style.objectPosition = crop.dataset.crop === 'left' ? '0% 30%' : '100% 70%';
+        });
       }
       if (data.type === 'update-name') {
         var el = document.getElementById('design-system-name');
@@ -175,7 +185,10 @@
         </div>
       </div>
       <p class="card-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ali.</p>
-      <button class="card-action-btn">Button</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="card-action-btn">Button</button>
+        <button class="card-action-btn outline">Outline</button>
+      </div>
     </div>
 
     <div class="card-row-2col">
@@ -189,7 +202,7 @@
             <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>
           </div>
         </div>
-        <div class="card-placeholder"></div>
+        <div class="card-placeholder"><img class="mood-crop" data-crop="left" src="" alt="" /></div>
         <p class="card-text">Incididunt ut labore et dolore.</p>
       </div>
       <div class="card" data-theme="Tertiary" data-surface="Container">
@@ -199,7 +212,7 @@
             <div class="card-quiet sans">Have fun!</div>
           </div>
         </div>
-        <div class="card-placeholder"></div>
+        <div class="card-placeholder"><img class="mood-crop" data-crop="right" src="" alt="" /></div>
         <p class="card-text">Incididunt ut labore et dolore.</p>
       </div>
     </div>

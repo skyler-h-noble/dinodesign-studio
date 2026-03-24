@@ -1,4 +1,4 @@
-import { Button, H2, H3, Body, BodySmall, VStack, HStack, Card } from '@dynodesign/components';
+import { Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Radio } from '@dynodesign/components';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import TuneIcon from '@mui/icons-material/Tune';
 import BoltIcon from '@mui/icons-material/Bolt';
@@ -140,11 +140,11 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
                   width: '100%',
                 }}
               >
-                <input
-                  type="radio"
+                <Radio
+                  variant="default-outline"
+                  size="small"
                   checked={isSelected}
                   onChange={() => setMode(opt.value)}
-                  style={{ width: 18, height: 18, accentColor: 'var(--Buttons-Primary-Button)', flexShrink: 0 }}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   {opt.icon}

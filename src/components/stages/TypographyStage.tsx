@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Link, Modal,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Link, Modal, RadioGroup, Select,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
 import type { StageProps, TypographyStyle, ColorScheme } from '../../types';
@@ -178,7 +178,7 @@ export default function TypographyStage({
       setEditedTypography([
         { type: 'header', family: headerMood, weight: '700', letterSpacing: '-0.02em', allCaps: false },
         { type: 'decorative', family: decorativeMood, weight: '600', letterSpacing: '0.05em', allCaps: false },
-        { type: 'body', family: 'Business', weight: '400', letterSpacing: '0em', allCaps: false },
+        { type: 'body', family: 'Sans Serif, Neo Grotesque', weight: '400', letterSpacing: '0em', allCaps: false },
       ]);
       setUseMoodBased(true);
       setStep('review');
@@ -194,7 +194,7 @@ export default function TypographyStage({
     try {
       const headerFonts = await getFontsForStyleCategory(editedTypography[0].family, 20, useMoodBased);
       const decorativeFonts = await getFontsForStyleCategory(editedTypography[1].family, 20, useMoodBased);
-      const bodyFonts = await getFontsForStyleCategory(editedTypography[2].family, 20, useMoodBased);
+      const bodyFonts = await getFontsForStyleCategory('Sans Serif, Neo Grotesque', 20, useMoodBased);
 
       const pairs: FontPair[] = [];
       for (let i = 0; i < 20; i++) {
@@ -255,7 +255,8 @@ export default function TypographyStage({
     }));
   };
 
-  const handleComplete = () => {
+  // Push typography to parent whenever selection or sample edits change
+  useEffect(() => {
     if (selectedSample === null) return;
     const sample = fontSamples.find(s => s.id === selectedSample);
     if (!sample) return;
@@ -266,8 +267,7 @@ export default function TypographyStage({
       { type: 'body', family: sample.body.family, weight: sample.body.weight, letterSpacing: sample.body.letterSpacing, allCaps: false },
     ];
     onTypographyComplete(finalStyles);
-    onNext();
-  };
+  }, [selectedSample, fontSamples]);
 
   const categoryOptions = useMoodBased ? MOOD_NAMES : STYLE_CATEGORIES;
 
@@ -335,27 +335,17 @@ export default function TypographyStage({
 
                 {/* Right column — decorative application mode */}
                 <VStack spacing={1} style={{ alignItems: 'flex-start' }}>
-                  <BodySmall style={{ fontWeight: 600 }}>Apply Decorative Styles:</BodySmall>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="decorativeMode"
-                      checked={decorativeMode === 'surface-components'}
-                      onChange={() => setDecorativeMode('surface-components')}
-                      style={{ accentColor: 'var(--Buttons-Primary-Button)' }}
-                    />
-                    <BodySmall>Surface Components Only</BodySmall>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="decorativeMode"
-                      checked={decorativeMode === 'only-selected'}
-                      onChange={() => setDecorativeMode('only-selected')}
-                      style={{ accentColor: 'var(--Buttons-Primary-Button)' }}
-                    />
-                    <BodySmall>Only Where Selected</BodySmall>
-                  </label>
+                  <RadioGroup
+                    variant="default-outline"
+                    size="small"
+                    label="Apply Decorative Styles:"
+                    options={[
+                      { value: 'surface-components', label: 'Surface Components Only' },
+                      { value: 'only-selected', label: 'Only Where Selected' },
+                    ]}
+                    value={decorativeMode}
+                    onChange={(_e: any, val: string) => setDecorativeMode(val as any)}
+                  />
                 </VStack>
               </div>
             )}
@@ -533,49 +523,60 @@ export default function TypographyStage({
                     </Button>
 
                     {isExpanded && (
-                      <div className="typo-expanded-controls" onClick={e => e.stopPropagation()}>
-                        {(['header', 'decorative', 'body'] as const).map(role => (
-                          <VStack key={role} spacing={1}>
-                            <Label style={{ fontSize: '0.75rem', textTransform: 'capitalize', fontWeight: 600 }}>{role}</Label>
-                            <div className="typo-control-row">
-                              <BodySmall style={{ fontSize: '0.7rem' }}>Weight</BodySmall>
-                              <select
-                                value={sample[role].weight}
-                                onChange={e => handleSampleEdit(sample.id, role, 'weight', e.target.value)}
-                                style={{ ...selectStyle, fontSize: '0.75rem', padding: '4px 8px' }}
-                              >
-                                {WEIGHT_OPTIONS.map(w => (
-                                  <option key={w.value} value={w.value}>{w.label}</option>
-                                ))}
-                              </select>
+                      <VStack spacing={3} onClick={e => e.stopPropagation()} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--Border)', width: '100%' }}>
+                        {/* Role headers */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                          {(['header', 'decorative', 'body'] as const).map(role => (
+                            <Label key={role} style={{ fontSize: '0.75rem', textTransform: 'capitalize', fontWeight: 600 }}>{role}</Label>
+                          ))}
+                        </div>
+                        {/* Weight row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                          {(['header', 'decorative', 'body'] as const).map(role => (
+                            <Select
+                              key={role}
+                              label="Weight"
+                              labelPosition="top"
+                              size="small"
+                              fullWidth
+                              value={sample[role].weight}
+                              onChange={(val: string) => handleSampleEdit(sample.id, role, 'weight', val)}
+                              options={WEIGHT_OPTIONS.map(w => ({ value: w.value, label: w.label }))}
+                            />
+                          ))}
+                        </div>
+                        {/* Spacing row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                          {(['header', 'decorative', 'body'] as const).map(role => (
+                            <Select
+                              key={role}
+                              label="Spacing"
+                              labelPosition="top"
+                              size="small"
+                              fullWidth
+                              value={sample[role].letterSpacing}
+                              onChange={(val: string) => handleSampleEdit(sample.id, role, 'letterSpacing', val)}
+                              options={SPACING_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
+                            />
+                          ))}
+                        </div>
+                        {/* All Caps row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                          {(['header', 'decorative', 'body'] as const).map(role => (
+                            <div key={role}>
+                              {role !== 'body' ? (
+                                <Checkbox
+                                  label="All Caps"
+                                  checked={(sample[role] as any).allCaps || false}
+                                  onChange={(e: any) => handleSampleEdit(sample.id, role, 'allCaps', e.target.checked)}
+                                  variant="primary"
+                                  size="small"
+                                />
+                              ) : <div />}
                             </div>
-                            <div className="typo-control-row">
-                              <BodySmall style={{ fontSize: '0.7rem' }}>Spacing</BodySmall>
-                              <select
-                                value={sample[role].letterSpacing}
-                                onChange={e => handleSampleEdit(sample.id, role, 'letterSpacing', e.target.value)}
-                                style={{ ...selectStyle, fontSize: '0.75rem', padding: '4px 8px' }}
-                              >
-                                {SPACING_OPTIONS.map(s => (
-                                  <option key={s.value} value={s.value}>{s.label}</option>
-                                ))}
-                              </select>
-                            </div>
-                            {role !== 'body' && (
-                              <div className="typo-control-row">
-                                <BodySmall style={{ fontSize: '0.7rem' }}>All Caps</BodySmall>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={(sample[role] as any).allCaps || false}
-                                    onChange={e => handleSampleEdit(sample.id, role, 'allCaps', e.target.checked)}
-                                  />
-                                </label>
-                              </div>
-                            )}
-                          </VStack>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      </VStack>
                     )}
                   </div>
                 );

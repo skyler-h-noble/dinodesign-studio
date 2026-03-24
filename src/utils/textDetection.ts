@@ -522,7 +522,7 @@ export async function classifyTextRegions(
     }
     
     // BODY: Default readable style (no classification needed)
-    const bodyStyle = 'Serif, Transitional';
+    const bodyStyle = 'Sans Serif, Neo Grotesque';
     const bodyWeight = 400;
     
     console.log('\n🎯 Font Role Assignment:');

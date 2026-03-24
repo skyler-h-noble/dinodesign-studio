@@ -1,10 +1,10 @@
 import {
-  Button, H2, H3, BodySmall, VStack, HStack, Card, ButtonGroup, Select,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, ButtonGroup, Select, Link, Modal,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';
-import { buildPreviewCSS } from '../../utils/buildPreviewCSS';
+import PhonePreview from '../PhonePreview';
 import '../../styles/assign-colors.css';
 
 import type { StageProps, UserSelections, ColorScheme } from '../../types';
@@ -79,6 +79,7 @@ export default function ColorAssignmentStage({
 }: Props) {
   const [activeTab, setActiveTab] = useState<'preview' | 'customize'>('customize');
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
+  const [showButtonInfo, setShowButtonInfo] = useState(false);
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
   const palettes = colorScheme?.tonePalettes;
   const PC = toneToColorNumber(colorScheme?.extractedTones?.primary || 60);
@@ -141,33 +142,6 @@ export default function ColorAssignmentStage({
     }
   };
 
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  const sendThemeToIframe = useCallback(() => {
-    const iframe = iframeRef.current;
-    if (!iframe?.contentWindow || !colorScheme) return;
-
-    // Generate the real CSS from the cascade — same logic as export
-    const css = buildPreviewCSS({
-      colorScheme,
-      userSelections,
-      componentStyle: 'modern',
-      mode: previewMode,
-    });
-
-    iframe.contentWindow.postMessage({ type: 'update-css', css }, '*');
-    iframe.contentWindow.postMessage({ type: 'update-moodboard', src: moodBoardUrl || '' }, '*');
-    iframe.contentWindow.postMessage({ type: 'update-name', name: designSystemName || 'Lise' }, '*');
-  }, [userSelections, colorScheme, moodBoardUrl, designSystemName, previewMode]);
-
-  useEffect(() => {
-    sendThemeToIframe();
-  }, [sendThemeToIframe]);
-
-  const handleIframeLoad = () => {
-    sendThemeToIframe();
-  };
-
   return (
     <div className="assign-colors-page">
       <H2>Assign Colors</H2>
@@ -175,16 +149,14 @@ export default function ColorAssignmentStage({
       {/* Mobile tab toggle */}
       <div className="assign-colors-tabs">
         <Button
-          variant={activeTab === 'preview' ? 'solid' : 'outline'}
-          color="default"
+          variant={activeTab === 'preview' ? 'default' : 'outline'}
           onClick={() => setActiveTab('preview')}
           style={{ flex: 1, borderRadius: 0 }}
         >
           Preview
         </Button>
         <Button
-          variant={activeTab === 'customize' ? 'solid' : 'outline'}
-          color="default"
+          variant={activeTab === 'customize' ? 'default' : 'outline'}
           onClick={() => setActiveTab('customize')}
           style={{ flex: 1, borderRadius: 0 }}
         >
@@ -196,16 +168,14 @@ export default function ColorAssignmentStage({
         {/* ─── Left: Preview ─── */}
         <div className={`assign-colors-preview ${activeTab !== 'preview' ? 'hidden' : ''}`}>
           <div className="assign-preview-toggle">
-            <ButtonGroup size="small" variant="default-outline">
+            <ButtonGroup size="small" variant="outline">
               <Button
-                variant={previewMode === 'light' ? 'solid' : 'outline'}
-                color="default"
+                variant={previewMode === 'light' ? 'default' : 'outline'}
                 size="small"
                 onClick={() => setPreviewMode('light')}
               >Light</Button>
               <Button
-                variant={previewMode === 'dark' ? 'solid' : 'outline'}
-                color="default"
+                variant={previewMode === 'dark' ? 'default' : 'outline'}
                 size="small"
                 onClick={() => setPreviewMode('dark')}
               >Dark</Button>
@@ -214,12 +184,13 @@ export default function ColorAssignmentStage({
 
           <div className="assign-preview-container">
             <div className="assign-preview-scaler">
-              <iframe
-                ref={iframeRef}
-                src="/phone-frame.html"
-                onLoad={handleIframeLoad}
-                title="Design System Preview"
-                style={{ width: 406, height: 860, border: 'none', overflow: 'hidden' }}
+              <PhonePreview
+                colorScheme={colorScheme}
+                userSelections={userSelections}
+                componentStyle="modern"
+                mode={previewMode}
+                moodBoardUrl={moodBoardUrl}
+                designSystemName={designSystemName}
               />
             </div>
           </div>
@@ -326,8 +297,7 @@ export default function ColorAssignmentStage({
             {BG_OPTIONS.map(opt => (
               <Button
                 key={opt.value}
-                variant={userSelections.background === opt.value ? 'solid' : 'outline'}
-                color="default"
+                variant={userSelections.background === opt.value ? 'default' : 'outline'}
                 size="small"
                 onClick={() => update({ background: opt.value })}
                 style={{ flex: 1 }}
@@ -348,8 +318,7 @@ export default function ColorAssignmentStage({
               {CARD_OPTIONS.map(opt => (
                 <Button
                   key={opt.value}
-                  variant={userSelections.cardColoring === opt.value ? 'solid' : 'outline'}
-                  color="default"
+                  variant={userSelections.cardColoring === opt.value ? 'default' : 'outline'}
                   size="small"
                   onClick={() => update({ cardColoring: opt.value })}
                   style={{ flex: 1 }}
@@ -368,8 +337,7 @@ export default function ColorAssignmentStage({
               {TEXT_OPTIONS.map(opt => (
                 <Button
                   key={opt.value}
-                  variant={userSelections.textColoring === opt.value ? 'solid' : 'outline'}
-                  color="default"
+                  variant={userSelections.textColoring === opt.value ? 'default' : 'outline'}
                   size="small"
                   onClick={() => update({ textColoring: opt.value })}
                   style={{ flex: 1 }}
@@ -385,13 +353,15 @@ export default function ColorAssignmentStage({
       {/* Default Buttons */}
       <Card padding="medium" style={cardStyle}>
         <VStack spacing={2}>
-          <H3 style={{ fontSize: '1rem' }}>Default Buttons</H3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <H3 style={{ fontSize: '1rem' }}>Default Buttons</H3>
+            <Link style={{ fontSize: '0.8rem', cursor: 'pointer' }} onClick={() => setShowButtonInfo(true)}>Learn more</Link>
+          </div>
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             {BUTTON_MODES.map(mode => (
               <Button
                 key={mode.value}
-                variant={userSelections.button === mode.value ? 'solid' : 'outline'}
-                color="default"
+                variant={userSelections.button === mode.value ? 'default' : 'outline'}
                 size="small"
                 onClick={() => update({ button: mode.value })}
                 style={{ flex: 1 }}
@@ -402,6 +372,45 @@ export default function ColorAssignmentStage({
           </div>
         </VStack>
       </Card>
+
+      {/* Button Modes Info Modal */}
+      <Modal open={showButtonInfo} onClose={() => setShowButtonInfo(false)} title="Button Color Modes">
+        <VStack spacing={3} style={{ maxWidth: 520 }}>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Primary</H3>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Buttons use your primary theme color. On primary-tinted backgrounds, the border tone is used instead to maintain contrast.
+            </BodySmall>
+          </VStack>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Secondary</H3>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Buttons use your secondary theme color, creating a complementary accent against primary surfaces and navigation.
+            </BodySmall>
+          </VStack>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Tonal</H3>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Buttons use the primary border tone — a mid-range shade from your palette that has verified 3:1 contrast against the surface background.
+            </BodySmall>
+          </VStack>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Laddered</H3>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Primary actions use the secondary color, secondary actions use tertiary, and so on — creating a visual hierarchy that cascades through your palette.
+            </BodySmall>
+          </VStack>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Black/White</H3>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Buttons are pure black on light backgrounds and pure white on dark backgrounds. In dark mode, this automatically switches to Laddered to preserve usability.
+            </BodySmall>
+          </VStack>
+          <Button variant="outline" color="default" size="small" onClick={() => setShowButtonInfo(false)} style={{ alignSelf: 'flex-end' }}>
+            Close
+          </Button>
+        </VStack>
+      </Modal>
 
         </div>
       </div>

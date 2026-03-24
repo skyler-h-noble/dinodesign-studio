@@ -1,0 +1,692 @@
+/* typography-tokens.css
+ * Auto-generated — do not edit by hand.
+ * Apply [data-platform="Desktop"] etc to your root element.
+ */
+
+[data-platform="Desktop"] {
+
+  /* Display */
+  --Font-Family-Display: var(--Platform-Font-Families-Header);
+  --Display-Small-Font-Size:     42px;
+  --Display-Small-Font-Weight:   600;
+  --Display-Small-Line-Height:   42px;
+  --Display-Small-Letter-Spacing: 0px;
+  --Font-Family-Display: var(--Platform-Font-Families-Header);
+  --Display-Large-Font-Size:     48px;
+  --Display-Large-Font-Weight:   600;
+  --Display-Large-Line-Height:   48px;
+  --Display-Large-Letter-Spacing: 0px;
+
+  /* Headers */
+  --Font-Family-Header: var(--Platform-Font-Families-Header);
+  --H1-Font-Size:     32px;
+  --H1-Font-Weight:   600;
+  --H1-Line-Height:   32px;
+  --H1-Letter-Spacing: 1.25px;
+  --Font-Family-Header: var(--Platform-Font-Families-Header);
+  --H2-Font-Size:     28px;
+  --H2-Font-Weight:   600;
+  --H2-Line-Height:   28px;
+  --H2-Letter-Spacing: 1.25px;
+  --Font-Family-Header: var(--Platform-Font-Families-Header);
+  --H3-Font-Size:     24px;
+  --H3-Font-Weight:   600;
+  --H3-Line-Height:   24px;
+  --H3-Letter-Spacing: 0px;
+  --Font-Family-Header: var(--Platform-Font-Families-Header);
+  --H4-Font-Size:     20px;
+  --H4-Font-Weight:   600;
+  --H4-Line-Height:   20px;
+  --H4-Letter-Spacing: 0px;
+  --Font-Family-Header: var(--Platform-Font-Families-Header);
+  --H5-Font-Size:     18px;
+  --H5-Font-Weight:   600;
+  --H5-Line-Height:   18px;
+  --H5-Letter-Spacing: 0px;
+  --Font-Family-Header: var(--Platform-Font-Families-Header);
+  --H6-Font-Size:     16px;
+  --H6-Font-Weight:   600;
+  --H6-Line-Height:   16px;
+  --H6-Letter-Spacing: 0px;
+
+  /* Subtitle */
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Small-Font-Size:     16px;
+  --Subtitle-Small-Font-Weight:   700;
+  --Subtitle-Small-Line-Height:   24px;
+  --Subtitle-Small-Letter-Spacing: 0px;
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Large-Font-Size:     18px;
+  --Subtitle-Large-Font-Weight:   700;
+  --Subtitle-Large-Line-Height:   32px;
+  --Subtitle-Large-Letter-Spacing: 0px;
+
+  /* Body */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Small-Font-Size:     14px;
+  --Body-Small-Font-Weight:   500;
+  --Body-Small-Line-Height:   21px;
+  --Body-Small-Letter-Spacing: 0px;
+  --Body-Small-Semibold-Font-Weight: 600;
+  --Body-Small-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Medium-Font-Size:     16px;
+  --Body-Medium-Font-Weight:   500;
+  --Body-Medium-Line-Height:   24px;
+  --Body-Medium-Letter-Spacing: 0px;
+  --Body-Medium-Semibold-Font-Weight: 600;
+  --Body-Medium-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Large-Font-Size:     18px;
+  --Body-Large-Font-Weight:   500;
+  --Body-Large-Line-Height:   27px;
+  --Body-Large-Letter-Spacing: 0px;
+  --Body-Large-Semibold-Font-Weight: 600;
+  --Body-Large-Bold-Font-Weight: 700;
+
+  /* Caption */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Caption-Font-Size:     14px;
+  --Caption-Font-Weight:   500;
+  --Caption-Line-Height:   21px;
+  --Caption-Letter-Spacing: 0px;
+  --Caption-Bold-Font-Weight: 700;
+
+  /* Label */
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-ExtraSmall-Font-Size:     11px;
+  --Label-ExtraSmall-Font-Weight:   600;
+  --Label-ExtraSmall-Line-Height:   16.5px;
+  --Label-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Small-Font-Size:     12.5px;
+  --Label-Small-Font-Weight:   600;
+  --Label-Small-Line-Height:   18.75px;
+  --Label-Small-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Medium-Font-Size:     16px;
+  --Label-Medium-Font-Weight:   600;
+  --Label-Medium-Line-Height:   24px;
+  --Label-Medium-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Large-Font-Size:     18px;
+  --Label-Large-Font-Weight:   600;
+  --Label-Large-Line-Height:   27px;
+  --Label-Large-Letter-Spacing: 0px;
+
+  /* Legal */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Legal-Font-Size:     10px;
+  --Legal-Font-Weight:   400;
+  --Legal-Line-Height:   15px;
+  --Legal-Letter-Spacing: 0px;
+  --Legal-Semibold-Font-Weight: 600;
+
+  /* Overline */
+  --Font-Family-Overline: var(--Platform-Font-Families-Decorative);
+  --Overline-Small-Font-Size:     14px;
+  --Overline-Small-Font-Weight:   500;
+  --Overline-Small-Line-Height:   21px;
+  --Overline-Small-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Decorative);
+  --Overline-Medium-Font-Size:     16px;
+  --Overline-Medium-Font-Weight:   600;
+  --Overline-Medium-Line-Height:   24px;
+  --Overline-Medium-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Decorative);
+  --Overline-Large-Font-Size:     18px;
+  --Overline-Large-Font-Weight:   600;
+  --Overline-Large-Line-Height:   27px;
+  --Overline-Large-Letter-Spacing: 0px;
+
+  /* Number */
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Small-Font-Size:     16px;
+  --Number-Small-Font-Weight:   700;
+  --Number-Small-Line-Height:   16px;
+  --Number-Small-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Medium-Font-Size:     28px;
+  --Number-Medium-Font-Weight:   700;
+  --Number-Medium-Line-Height:   28px;
+  --Number-Medium-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Large-Font-Size:     36px;
+  --Number-Large-Font-Weight:   700;
+  --Number-Large-Line-Height:   36px;
+  --Number-Large-Letter-Spacing: 0px;
+
+  /* Button */
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-ExtraSmall-Font-Size:     11px;
+  --Button-ExtraSmall-Font-Weight:   600;
+  --Button-ExtraSmall-Line-Height:   11px;
+  --Button-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Small-Font-Size:     14px;
+  --Button-Small-Font-Weight:   600;
+  --Button-Small-Line-Height:   14px;
+  --Button-Small-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Standard-Font-Size:     16px;
+  --Button-Standard-Font-Weight:   600;
+  --Button-Standard-Line-Height:   16px;
+  --Button-Standard-Letter-Spacing: 0px;
+
+}
+
+[data-platform="IOS-Mobile"] {
+
+  /* Display */
+  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Display-Small-Font-Size:     28px;
+  --Display-Small-Font-Weight:   600;
+  --Display-Small-Line-Height:   28px;
+  --Display-Small-Letter-Spacing: 0px;
+  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Display-Large-Font-Size:     28px;
+  --Display-Large-Font-Weight:   600;
+  --Display-Large-Line-Height:   28px;
+  --Display-Large-Letter-Spacing: 0px;
+
+  /* Headers */
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H1-Font-Size:     28px;
+  --H1-Font-Weight:   600;
+  --H1-Line-Height:   28px;
+  --H1-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H2-Font-Size:     26px;
+  --H2-Font-Weight:   600;
+  --H2-Line-Height:   26px;
+  --H2-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H3-Font-Size:     24px;
+  --H3-Font-Weight:   600;
+  --H3-Line-Height:   24px;
+  --H3-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H4-Font-Size:     20px;
+  --H4-Font-Weight:   600;
+  --H4-Line-Height:   20px;
+  --H4-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H5-Font-Size:     18px;
+  --H5-Font-Weight:   600;
+  --H5-Line-Height:   18px;
+  --H5-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H6-Font-Size:     16px;
+  --H6-Font-Weight:   600;
+  --H6-Line-Height:   16px;
+  --H6-Letter-Spacing: 0px;
+
+  /* Subtitle */
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Small-Font-Size:     16px;
+  --Subtitle-Small-Font-Weight:   700;
+  --Subtitle-Small-Line-Height:   24px;
+  --Subtitle-Small-Letter-Spacing: 0px;
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Large-Font-Size:     16px;
+  --Subtitle-Large-Font-Weight:   700;
+  --Subtitle-Large-Line-Height:   24px;
+  --Subtitle-Large-Letter-Spacing: 0px;
+
+  /* Body */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Small-Font-Size:     14px;
+  --Body-Small-Font-Weight:   500;
+  --Body-Small-Line-Height:   21px;
+  --Body-Small-Letter-Spacing: 0px;
+  --Body-Small-Semibold-Font-Weight: 600;
+  --Body-Small-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Medium-Font-Size:     16px;
+  --Body-Medium-Font-Weight:   600;
+  --Body-Medium-Line-Height:   24px;
+  --Body-Medium-Letter-Spacing: 0px;
+  --Body-Medium-Semibold-Font-Weight: 600;
+  --Body-Medium-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Large-Font-Size:     18px;
+  --Body-Large-Font-Weight:   600;
+  --Body-Large-Line-Height:   27px;
+  --Body-Large-Letter-Spacing: 0px;
+  --Body-Large-Semibold-Font-Weight: 600;
+  --Body-Large-Bold-Font-Weight: 700;
+
+  /* Caption */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Caption-Font-Size:     14px;
+  --Caption-Font-Weight:   500;
+  --Caption-Line-Height:   21px;
+  --Caption-Letter-Spacing: 0px;
+  --Caption-Bold-Font-Weight: 700;
+
+  /* Label */
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-ExtraSmall-Font-Size:     11px;
+  --Label-ExtraSmall-Font-Weight:   600;
+  --Label-ExtraSmall-Line-Height:   16.5px;
+  --Label-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Small-Font-Size:     12.5px;
+  --Label-Small-Font-Weight:   600;
+  --Label-Small-Line-Height:   18.75px;
+  --Label-Small-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Medium-Font-Size:     16px;
+  --Label-Medium-Font-Weight:   600;
+  --Label-Medium-Line-Height:   24px;
+  --Label-Medium-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Large-Font-Size:     18px;
+  --Label-Large-Font-Weight:   600;
+  --Label-Large-Line-Height:   27px;
+  --Label-Large-Letter-Spacing: 0px;
+
+  /* Legal */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Legal-Font-Size:     10px;
+  --Legal-Font-Weight:   400;
+  --Legal-Line-Height:   15px;
+  --Legal-Letter-Spacing: 0px;
+  --Legal-Semibold-Font-Weight: 600;
+
+  /* Overline */
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Small-Font-Size:     14px;
+  --Overline-Small-Font-Weight:   500;
+  --Overline-Small-Line-Height:   21px;
+  --Overline-Small-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Medium-Font-Size:     16px;
+  --Overline-Medium-Font-Weight:   600;
+  --Overline-Medium-Line-Height:   24px;
+  --Overline-Medium-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Large-Font-Size:     18px;
+  --Overline-Large-Font-Weight:   600;
+  --Overline-Large-Line-Height:   27px;
+  --Overline-Large-Letter-Spacing: 0px;
+
+  /* Number */
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Small-Font-Size:     16px;
+  --Number-Small-Font-Weight:   700;
+  --Number-Small-Line-Height:   16px;
+  --Number-Small-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Medium-Font-Size:     28px;
+  --Number-Medium-Font-Weight:   700;
+  --Number-Medium-Line-Height:   28px;
+  --Number-Medium-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Large-Font-Size:     18px;
+  --Number-Large-Font-Weight:   700;
+  --Number-Large-Line-Height:   27px;
+  --Number-Large-Letter-Spacing: 0px;
+
+  /* Button */
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-ExtraSmall-Font-Size:     11px;
+  --Button-ExtraSmall-Font-Weight:   600;
+  --Button-ExtraSmall-Line-Height:   11px;
+  --Button-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Small-Font-Size:     14px;
+  --Button-Small-Font-Weight:   600;
+  --Button-Small-Line-Height:   14px;
+  --Button-Small-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Standard-Font-Size:     16px;
+  --Button-Standard-Font-Weight:   600;
+  --Button-Standard-Line-Height:   16px;
+  --Button-Standard-Letter-Spacing: 0px;
+
+}
+
+[data-platform="IOS-Tablet"] {
+
+  /* Display */
+  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Display-Small-Font-Size:     28px;
+  --Display-Small-Font-Weight:   600;
+  --Display-Small-Line-Height:   28px;
+  --Display-Small-Letter-Spacing: 0px;
+  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Display-Large-Font-Size:     28px;
+  --Display-Large-Font-Weight:   600;
+  --Display-Large-Line-Height:   28px;
+  --Display-Large-Letter-Spacing: 0px;
+
+  /* Headers */
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H1-Font-Size:     28px;
+  --H1-Font-Weight:   600;
+  --H1-Line-Height:   28px;
+  --H1-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H2-Font-Size:     26px;
+  --H2-Font-Weight:   600;
+  --H2-Line-Height:   26px;
+  --H2-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H3-Font-Size:     24px;
+  --H3-Font-Weight:   600;
+  --H3-Line-Height:   24px;
+  --H3-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H4-Font-Size:     20px;
+  --H4-Font-Weight:   600;
+  --H4-Line-Height:   20px;
+  --H4-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H5-Font-Size:     18px;
+  --H5-Font-Weight:   600;
+  --H5-Line-Height:   18px;
+  --H5-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H6-Font-Size:     16px;
+  --H6-Font-Weight:   600;
+  --H6-Line-Height:   16px;
+  --H6-Letter-Spacing: 0px;
+
+  /* Subtitle */
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Small-Font-Size:     16px;
+  --Subtitle-Small-Font-Weight:   700;
+  --Subtitle-Small-Line-Height:   24px;
+  --Subtitle-Small-Letter-Spacing: 0px;
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Large-Font-Size:     18px;
+  --Subtitle-Large-Font-Weight:   700;
+  --Subtitle-Large-Line-Height:   32px;
+  --Subtitle-Large-Letter-Spacing: 0px;
+
+  /* Body */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Small-Font-Size:     14px;
+  --Body-Small-Font-Weight:   500;
+  --Body-Small-Line-Height:   21px;
+  --Body-Small-Letter-Spacing: 0px;
+  --Body-Small-Semibold-Font-Weight: 600;
+  --Body-Small-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Medium-Font-Size:     16px;
+  --Body-Medium-Font-Weight:   500;
+  --Body-Medium-Line-Height:   24px;
+  --Body-Medium-Letter-Spacing: 0px;
+  --Body-Medium-Semibold-Font-Weight: 600;
+  --Body-Medium-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Large-Font-Size:     18px;
+  --Body-Large-Font-Weight:   600;
+  --Body-Large-Line-Height:   27px;
+  --Body-Large-Letter-Spacing: 0px;
+  --Body-Large-Semibold-Font-Weight: 600;
+  --Body-Large-Bold-Font-Weight: 700;
+
+  /* Caption */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Caption-Font-Size:     14px;
+  --Caption-Font-Weight:   500;
+  --Caption-Line-Height:   21px;
+  --Caption-Letter-Spacing: 0px;
+  --Caption-Bold-Font-Weight: 700;
+
+  /* Label */
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-ExtraSmall-Font-Size:     11px;
+  --Label-ExtraSmall-Font-Weight:   600;
+  --Label-ExtraSmall-Line-Height:   16.5px;
+  --Label-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Small-Font-Size:     12.5px;
+  --Label-Small-Font-Weight:   600;
+  --Label-Small-Line-Height:   18.75px;
+  --Label-Small-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Medium-Font-Size:     16px;
+  --Label-Medium-Font-Weight:   600;
+  --Label-Medium-Line-Height:   24px;
+  --Label-Medium-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Large-Font-Size:     18px;
+  --Label-Large-Font-Weight:   600;
+  --Label-Large-Line-Height:   27px;
+  --Label-Large-Letter-Spacing: 0px;
+
+  /* Legal */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Legal-Font-Size:     10px;
+  --Legal-Font-Weight:   400;
+  --Legal-Line-Height:   15px;
+  --Legal-Letter-Spacing: 0px;
+  --Legal-Semibold-Font-Weight: 600;
+
+  /* Overline */
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Small-Font-Size:     14px;
+  --Overline-Small-Font-Weight:   500;
+  --Overline-Small-Line-Height:   21px;
+  --Overline-Small-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Medium-Font-Size:     16px;
+  --Overline-Medium-Font-Weight:   600;
+  --Overline-Medium-Line-Height:   24px;
+  --Overline-Medium-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Large-Font-Size:     18px;
+  --Overline-Large-Font-Weight:   600;
+  --Overline-Large-Line-Height:   27px;
+  --Overline-Large-Letter-Spacing: 0px;
+
+  /* Number */
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Small-Font-Size:     16px;
+  --Number-Small-Font-Weight:   700;
+  --Number-Small-Line-Height:   16px;
+  --Number-Small-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Medium-Font-Size:     28px;
+  --Number-Medium-Font-Weight:   700;
+  --Number-Medium-Line-Height:   16px;
+  --Number-Medium-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Large-Font-Size:     36px;
+  --Number-Large-Font-Weight:   700;
+  --Number-Large-Line-Height:   36px;
+  --Number-Large-Letter-Spacing: 0px;
+
+  /* Button */
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-ExtraSmall-Font-Size:     11px;
+  --Button-ExtraSmall-Font-Weight:   600;
+  --Button-ExtraSmall-Line-Height:   28px;
+  --Button-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Small-Font-Size:     14px;
+  --Button-Small-Font-Weight:   600;
+  --Button-Small-Line-Height:   16px;
+  --Button-Small-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Standard-Font-Size:     16px;
+  --Button-Standard-Font-Weight:   600;
+  --Button-Standard-Line-Height:   16px;
+  --Button-Standard-Letter-Spacing: 0px;
+
+}
+
+[data-platform="Android"] {
+
+  /* Display */
+  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Display-Small-Font-Size:     28px;
+  --Display-Small-Font-Weight:   600;
+  --Display-Small-Line-Height:   28px;
+  --Display-Small-Letter-Spacing: 0px;
+  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Display-Large-Font-Size:     28px;
+  --Display-Large-Font-Weight:   600;
+  --Display-Large-Line-Height:   28px;
+  --Display-Large-Letter-Spacing: 0px;
+
+  /* Headers */
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H1-Font-Size:     28px;
+  --H1-Font-Weight:   600;
+  --H1-Line-Height:   28px;
+  --H1-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H2-Font-Size:     26px;
+  --H2-Font-Weight:   600;
+  --H2-Line-Height:   26px;
+  --H2-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H3-Font-Size:     24px;
+  --H3-Font-Weight:   600;
+  --H3-Line-Height:   24px;
+  --H3-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H4-Font-Size:     20px;
+  --H4-Font-Weight:   600;
+  --H4-Line-Height:   20px;
+  --H4-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H5-Font-Size:     18px;
+  --H5-Font-Weight:   600;
+  --H5-Line-Height:   18px;
+  --H5-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H6-Font-Size:     16px;
+  --H6-Font-Weight:   600;
+  --H6-Line-Height:   16px;
+  --H6-Letter-Spacing: 0px;
+
+  /* Subtitle */
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Small-Font-Size:     16px;
+  --Subtitle-Small-Font-Weight:   700;
+  --Subtitle-Small-Line-Height:   24px;
+  --Subtitle-Small-Letter-Spacing: 0px;
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Large-Font-Size:     18px;
+  --Subtitle-Large-Font-Weight:   700;
+  --Subtitle-Large-Line-Height:   32px;
+  --Subtitle-Large-Letter-Spacing: 0px;
+
+  /* Body */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Small-Font-Size:     14px;
+  --Body-Small-Font-Weight:   500;
+  --Body-Small-Line-Height:   21px;
+  --Body-Small-Letter-Spacing: 0px;
+  --Body-Small-Semibold-Font-Weight: 600;
+  --Body-Small-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Medium-Font-Size:     16px;
+  --Body-Medium-Font-Weight:   500;
+  --Body-Medium-Line-Height:   24px;
+  --Body-Medium-Letter-Spacing: 0px;
+  --Body-Medium-Semibold-Font-Weight: 600;
+  --Body-Medium-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Large-Font-Size:     18px;
+  --Body-Large-Font-Weight:   600;
+  --Body-Large-Line-Height:   27px;
+  --Body-Large-Letter-Spacing: 0px;
+  --Body-Large-Semibold-Font-Weight: 600;
+  --Body-Large-Bold-Font-Weight: 700;
+
+  /* Caption */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Caption-Font-Size:     14px;
+  --Caption-Font-Weight:   500;
+  --Caption-Line-Height:   21px;
+  --Caption-Letter-Spacing: 0px;
+  --Caption-Bold-Font-Weight: 700;
+
+  /* Label */
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-ExtraSmall-Font-Size:     11px;
+  --Label-ExtraSmall-Font-Weight:   600;
+  --Label-ExtraSmall-Line-Height:   16.5px;
+  --Label-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Small-Font-Size:     12.5px;
+  --Label-Small-Font-Weight:   600;
+  --Label-Small-Line-Height:   18.75px;
+  --Label-Small-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Medium-Font-Size:     16px;
+  --Label-Medium-Font-Weight:   600;
+  --Label-Medium-Line-Height:   24px;
+  --Label-Medium-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Large-Font-Size:     18px;
+  --Label-Large-Font-Weight:   600;
+  --Label-Large-Line-Height:   27px;
+  --Label-Large-Letter-Spacing: 0px;
+
+  /* Legal */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Legal-Font-Size:     10px;
+  --Legal-Font-Weight:   400;
+  --Legal-Line-Height:   15px;
+  --Legal-Letter-Spacing: 0px;
+  --Legal-Semibold-Font-Weight: 600;
+
+  /* Overline */
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Small-Font-Size:     14px;
+  --Overline-Small-Font-Weight:   500;
+  --Overline-Small-Line-Height:   21px;
+  --Overline-Small-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Medium-Font-Size:     16px;
+  --Overline-Medium-Font-Weight:   600;
+  --Overline-Medium-Line-Height:   24px;
+  --Overline-Medium-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Large-Font-Size:     18px;
+  --Overline-Large-Font-Weight:   600;
+  --Overline-Large-Line-Height:   27px;
+  --Overline-Large-Letter-Spacing: 0px;
+
+  /* Number */
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Small-Font-Size:     16px;
+  --Number-Small-Font-Weight:   700;
+  --Number-Small-Line-Height:   16px;
+  --Number-Small-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Medium-Font-Size:     28px;
+  --Number-Medium-Font-Weight:   700;
+  --Number-Medium-Line-Height:   16px;
+  --Number-Medium-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Large-Font-Size:     36px;
+  --Number-Large-Font-Weight:   700;
+  --Number-Large-Line-Height:   36px;
+  --Number-Large-Letter-Spacing: 0px;
+
+  /* Button */
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-ExtraSmall-Font-Size:     11px;
+  --Button-ExtraSmall-Font-Weight:   600;
+  --Button-ExtraSmall-Line-Height:   28px;
+  --Button-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Small-Font-Size:     14px;
+  --Button-Small-Font-Weight:   600;
+  --Button-Small-Line-Height:   16px;
+  --Button-Small-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Standard-Font-Size:     16px;
+  --Button-Standard-Font-Weight:   600;
+  --Button-Standard-Line-Height:   16px;
+  --Button-Standard-Letter-Spacing: 0px;
+
+}

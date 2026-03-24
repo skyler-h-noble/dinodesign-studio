@@ -53,10 +53,10 @@ export default function DesignSystemNameStage({ onNext, onBack, onSubmit }: Prop
       </Card>
 
       <HStack spacing={2}>
-        <Button variant="outline" color="default" onClick={onBack}>
+        <Button variant="outline" color="default" size="medium" onClick={onBack}>
           Cancel
         </Button>
-        <Button color="default" onClick={handleNext} disabled={!name.trim()}>
+        <Button variant="primary" size="medium" onClick={handleNext} disabled={!name.trim()}>
           Next
         </Button>
       </HStack>

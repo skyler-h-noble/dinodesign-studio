@@ -4,6 +4,7 @@ import { toneToColorNumber } from './colorScale';
 import { generateFullLightPalettes, generateFullDarkPalettes } from './generateFullPalettes';
 import { exportColorSystemToJSON } from './cssgen/exportColorSystem';
 import { generateCSSFiles, generateBaseCSS } from './cssgen/exportToCSS';
+import { generateFigmaJSON } from './generateFigmaJSON';
 
 const SUPABASE_STORAGE_BASE = `https://aqpmdqlhffjakkznxudv.supabase.co/storage/v1/object/public/design-system`;
 const BUCKET = 'design-system';
@@ -41,7 +42,7 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
   const colors = input.colorScheme.colors;
   const radii = BORDER_RADII[input.componentStyle];
   const showcaseBase = 'https://sunny-cendol-af27ce.netlify.app';
-  const storybookUrl = 'https://dinodesign.ai/storybook';
+  const storybookUrl = `${showcaseBase}/storybook/?user=${uuid}`;
 
   return `# ${input.designSystemName} — Dino Design System
 
@@ -271,11 +272,8 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 
   // 3. Generate CSS files from the JSON
   let cssFiles: Record<string, string> = {};
-  try {
-    cssFiles = generateCSSFiles(designSystemJSON);
-  } catch (err) {
-    console.error('CSS generation failed:', err);
-  }
+  cssFiles = generateCSSFiles(designSystemJSON);
+  console.log('✅ CSS files generated:', Object.keys(cssFiles));
 
   // Also generate base.css
   let baseCSS = '';
@@ -308,16 +306,20 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const borderRadius = BORDER_RADII[input.componentStyle].medium;
 
   const foundationCSS = `:root {
+  --Dropshadow-Color: rgba(0, 0, 0, 0.1);
   --Effects-Level-0: none;
-  --Effects-Level-1: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --Effects-Level-2: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --Effects-Level-3: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --Effects-Level-4: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --Effects-Level-5: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --Effects-Level-1: 0 1px 2px 0 var(--Dropshadow-Color);
+  --Effects-Level-2: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 var(--Dropshadow-Color);
+  --Effects-Level-3: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px var(--Dropshadow-Color);
+  --Effects-Level-4: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px var(--Dropshadow-Color);
+  --Effects-Level-5: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px var(--Dropshadow-Color);
 
   --Shadow-1: 0px 0px 0px 1px #eeeeee;
   --Shadow-2: 0px 0px 0px 0px rgba(0, 0, 0, 0.0);
-  --Style-Border-Radius: ${borderRadius}px;
+  --Button-Radius: ${borderRadius}px;
+  --Style-Border-Radius: var(--Button-Radius);
+  --Card-Radius: ${Math.round(borderRadius * 1.33)}px;
+  --Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;
   --Style-Gradient-Color-1: var(--Buttons-Primary-Button);
   --Style-Gradient-Color-2: var(--Buttons-Primary-Button);
   --Style-Gradient-Angle: 0;
@@ -336,37 +338,81 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 }
 `;
 
-  const coreCSS = `/* Platform Font Overrides */
+  const coreCSS = `:root {
+  --Body-Font-Family: var(--Set-Font-Family-Body);
+  --Font-Family-Body: var(--Set-Font-Family-Body);
+  --Header-Font-Family: var(--Set-Font-Family-Header);
+  --Font-Family-Header: var(--Set-Font-Family-Header);
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: var(--Set-Font-Family-Decorative);
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
+  --Cognitive-Multiplier: 1;
+}
+
+/* Platform Font Overrides */
 [data-platform="IOS-Mobile"][data-fonts] {
-  --Platform-Family-Body: var(--Set-Font-Family-Body);
-  --Platform-Family-Header: var(--Set-Font-Family-Header);
-  --Platform-Family-Decorative: var(--Set-Font-Family-Decorative);
+  --Body-Font-Family: var(--Set-Font-Family-Body);
+  --Header-Font-Family: var(--Set-Font-Family-Header);
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: var(--Set-Font-Family-Decorative);
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 [data-platform="IOS-Tablet"][data-fonts] {
-  --Platform-Family-Body: var(--Set-Font-Family-Body);
-  --Platform-Family-Header: var(--Set-Font-Family-Header);
-  --Platform-Family-Decorative: var(--Set-Font-Family-Decorative);
+  --Body-Font-Family: var(--Set-Font-Family-Body);
+  --Header-Font-Family: var(--Set-Font-Family-Header);
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: var(--Set-Font-Family-Decorative);
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 [data-platform="Android"][data-fonts] {
-  --Platform-Family-Body: var(--Set-Font-Family-Body);
-  --Platform-Family-Header: var(--Set-Font-Family-Header);
-  --Platform-Family-Decorative: var(--Set-Font-Family-Decorative);
+  --Body-Font-Family: var(--Set-Font-Family-Body);
+  --Header-Font-Family: var(--Set-Font-Family-Header);
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: var(--Set-Font-Family-Decorative);
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 
 [data-platform="IOS-Mobile"][data-fonts="Default"] {
-  --Platform-Family-Body: "SF Pro";
-  --Platform-Family-Header: "SF Pro";
-  --Platform-Family-Decorative: "SF Pro";
+  --Body-Font-Family: "SF Pro";
+  --Header-Font-Family: "SF Pro";
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: "SF Pro";
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 [data-platform="IOS-Tablet"][data-fonts="Default"] {
-  --Platform-Family-Body: "SF Pro";
-  --Platform-Family-Header: "SF Pro";
-  --Platform-Family-Decorative: "SF Pro";
+  --Body-Font-Family: "SF Pro";
+  --Header-Font-Family: "SF Pro";
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: "SF Pro";
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 [data-platform="Android"][data-fonts="Default"] {
-  --Platform-Font-Family-Body: "Roboto";
-  --Platform-Font-Family-Header: "Roboto";
-  --Platform-Font-Family-Decorative: "Roboto";
+  --Body-Font-Family: "Roboto";
+  --Header-Font-Family: "Roboto";
+  --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Decorative-Font-Family: "Roboto";
+  --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
+  --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
+  --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 
 /* Desktop Defaults */
@@ -546,8 +592,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 
 /* Decorative Font Application */
 /* Typography variants: Header uses body font by default, Decorative Header uses decorative font */
-/* In "surface-components" mode, surface-level elements get decorative font automatically */
-${input.userSelections.decorativeMode === 'surface-components' ? `
+
 [data-surface="Surface"] [data-decorative],
 [data-surface="Surface-Dim"] [data-decorative],
 [data-surface="Surface-Dimmest"] [data-decorative],
@@ -556,7 +601,6 @@ ${input.userSelections.decorativeMode === 'surface-components' ? `
   --Font-Family-Header-Weight: var(--Set-Font-Family-Header-Weight);
   --Font-Family-Overline: var(--Set-Font-Family-Decorative);
 }
-` : '/* Decorative mode: only-selected — decorative fonts applied only via explicit variant */'}
 
 /* Explicit decorative variants — always available regardless of mode */
 [data-typography="decorative-header"] {
@@ -583,13 +627,18 @@ ${input.userSelections.decorativeMode === 'surface-components' ? `
 
   const stylesCSS = `/* Overrides */\n`;
 
-  // 6. Assemble all files for upload
+  // 6. Import typography-tokens.css
+  const { typographyTokensCSS } = await import('./typographyTokens');
+
+  // 7. Assemble all files for upload
   const uploadFiles: { name: string; content: string; type: string }[] = [
     { name: 'foundation.css', content: foundationCSS, type: 'text/css' },
     { name: 'core.css', content: coreCSS, type: 'text/css' },
+    { name: 'typography-tokens.css', content: typographyTokensCSS, type: 'text/css' },
     { name: 'styles.css', content: stylesCSS, type: 'text/css' },
     { name: 'theme.json', content: themeJson, type: 'application/json' },
     { name: 'tokens.json', content: JSON.stringify(designSystemJSON, null, 2), type: 'application/json' },
+    { name: 'figma.json', content: (() => { try { return JSON.stringify(generateFigmaJSON(designSystemJSON), null, 2); } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; } })(), type: 'application/json' },
     { name: 'DINO-TOKENS.md', content: buildDinoTokensMd(uuid, input), type: 'text/markdown' },
   ];
 

@@ -1,6 +1,6 @@
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack, Card,
-  CircularProgress, Checkbox, Link,
+  CircularProgress, Checkbox, Link, Radio,
 } from '@dynodesign/components';
 import StarIcon from '@mui/icons-material/Star';
 import { useState, useEffect, useCallback } from 'react';
@@ -337,21 +337,21 @@ export default function ColorStage({
                       transition: 'all 0.15s ease',
                     }}
                   />
-                  {isPrimary && (
-                    <BodySmall style={{ color: 'var(--Buttons-Default-Button)', fontWeight: 700, fontSize: '0.65rem', textAlign: 'center' }}>
-                      Primary
-                    </BodySmall>
-                  )}
-                  <input
-                    type="radio"
+                  <Radio
+                    variant="default-outline"
+                    size="small"
                     name="primaryColor"
                     checked={isPrimary}
                     onChange={() => {
                       setPrimaryIndex(i);
                       regenerateSchemes(topColors, i);
                     }}
-                    style={{ accentColor: 'var(--Buttons-Default-Button)', cursor: 'pointer' }}
                   />
+                  {isPrimary && (
+                    <BodySmall style={{ color: 'var(--Buttons-Default-Button)', fontWeight: 700, fontSize: '0.65rem', textAlign: 'center' }}>
+                      Primary
+                    </BodySmall>
+                  )}
                 </VStack>
               );
             })}
@@ -375,7 +375,7 @@ export default function ColorStage({
             <VStack spacing={3}>
               <HStack spacing={2}>
                 <Button
-                  variant={toneMode === 'light' ? 'solid' : 'outline'}
+                  variant={toneMode === 'light' ? 'default' : 'outline'}
                   color="default"
                   size="small"
                   onClick={() => setToneMode('light')}
@@ -383,7 +383,7 @@ export default function ColorStage({
                   Light Mode
                 </Button>
                 <Button
-                  variant={toneMode === 'dark' ? 'solid' : 'outline'}
+                  variant={toneMode === 'dark' ? 'default' : 'outline'}
                   color="default"
                   size="small"
                   onClick={() => setToneMode('dark')}

@@ -8,6 +8,7 @@
  * 3. Nested modes: { Backgrounds: {...}, Modes: { "Light-Mode-Tonal": {...}, ... }, Theme: {...} }
  */
 
+import chroma from 'chroma-js';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
@@ -240,25 +241,25 @@ function tokenToVar(tokenValue: string): string {
  */
 function generateColorVariables(colors: any, paletteName: string): string {
   if (!colors) return '';
-  
+
   const lines: string[] = [];
-  
+
   // Process each color in the palette (Color-1 through Color-14, Color-Vibrant)
   Object.keys(colors).forEach(colorKey => {
     const colorToken = colors[colorKey];
-    
+
     // Skip if not a color token object
     if (!colorToken || typeof colorToken !== 'object' || !colorToken.value) {
       return;
     }
-    
+
     // Generate CSS variable name: --Primary-Color-1, --Neutral-Color-2, etc.
     const cssVarName = `--${paletteName}-${colorKey}`;
     const cssValue = colorToken.value;
-    
+
     lines.push(`  ${cssVarName}: ${cssValue};`);
   });
-  
+
   return lines.join('\n');
 }
 
@@ -949,54 +950,203 @@ function generateThemesVariables(modeData: any): string {
   }
   
   if (!modeData || !modeData.Themes) return '';
-  
+
+  /**
+   * Resolve a token reference through the JSON to its final Color variable.
+   * E.g. "{Border.Surfaces.Primary.Color-11}" → look up modeData.Border.Surfaces.Primary['Color-11'].value
+   *   → "{Primary.Color-5}" → "var(--Primary-Color-5)"
+   * For Dropshadow-Color and Border-Variant, returns resolved hex instead.
+   */
+  // Build a flat lookup: token path → final resolved value
+  // This traverses ALL JSON sections and follows references until we reach a Color-N or hex
+  const tokenLookup: Record<string, string> = {};
+
+  function buildLookup(obj: any, prefix: string) {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val && typeof val === 'object' && 'value' in val && 'type' in val) {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        tokenLookup[fullKey] = val.value;
+      } else if (val && typeof val === 'object' && !('value' in val)) {
+        buildLookup(val, prefix ? `${prefix}.${key}` : key);
+      }
+    }
+  }
+
+  // Index ALL sections that tokens might reference
+  // This ensures every token path can be resolved to its final value
+  for (const section of Object.keys(modeData)) {
+    if (modeData[section] && typeof modeData[section] === 'object' && section !== 'Themes') {
+      buildLookup(modeData[section], section);
+    }
+  }
+
+  // Add hardcoded BW (Black/White) text mappings — these aren't in JSON
+  // Colors 1-6 = White text on dark backgrounds, 7-14 = Black text on light backgrounds
+  for (let i = 1; i <= 14; i++) {
+    const textVal = i <= 6 ? '#ffffff' : '{Neutral.Color-1}';
+    const headerVal = i <= 7 ? '#ffffff' : '{Neutral.Color-1}';
+    tokenLookup[`Text.Surfaces.BW.Color-${i}`] = textVal;
+    tokenLookup[`Text.Containers.BW.Color-${i}`] = textVal;
+    tokenLookup[`Header.Surfaces.BW.Color-${i}`] = headerVal;
+    tokenLookup[`Header.Containers.BW.Color-${i}`] = headerVal;
+    tokenLookup[`Quiet.Surfaces.BW.Color-${i}`] = textVal;
+    tokenLookup[`Quiet.Containers.BW.Color-${i}`] = textVal;
+    // BW Button text
+    tokenLookup[`Text.Surfaces.BW.Button.Color-${i}`] = textVal;
+  }
+  // Vibrant variants
+  tokenLookup['Text.Surfaces.BW.Color-Vibrant'] = '{Neutral.Color-1}';
+  tokenLookup['Text.Containers.BW.Color-Vibrant'] = '{Neutral.Color-1}';
+  tokenLookup['Header.Surfaces.BW.Color-Vibrant'] = '{Neutral.Color-11}';
+  tokenLookup['Header.Containers.BW.Color-Vibrant'] = '{Neutral.Color-11}';
+
+  // Add Focus-Visible fallbacks if not in JSON
+  if (!tokenLookup['Focus-Visible.Surfaces.Color-1']) {
+    for (let i = 1; i <= 14; i++) {
+      tokenLookup[`Focus-Visible.Surfaces.Color-${i}`] = '#3b82f6';
+      tokenLookup[`Focus-Visible.Containers.Color-${i}`] = '#3b82f6';
+    }
+  }
+
+  // Log unresolved tokens for debugging
+  console.log(`  📊 Token lookup built with ${Object.keys(tokenLookup).length} entries`);
+
+  // Debug: check for key patterns we expect
+  const sampleKeys = Object.keys(tokenLookup).filter(k =>
+    k.includes('Default-Button') || k.includes('Hotlink-Visited') || k.includes('BW')
+  );
+  console.log(`  📊 Sample lookup keys: ${sampleKeys.slice(0, 10).join(', ')}`);
+
+  /**
+   * Resolve a token to its final Color variable or hex value.
+   * Follows the reference chain: token → lookup → inner token → ... → Color-N or hex
+   */
+  function resolveTokenForCSS(tokenValue: string, cssVarName: string): string {
+    try {
+      if (!tokenValue || typeof tokenValue !== 'string') return tokenToVar(tokenValue);
+      if (tokenValue.startsWith('#')) return tokenValue;
+      if (!tokenValue.includes('{')) return tokenValue;
+
+      // Already computed RGB (dropshadow, highlight, lowlight)
+      if (!tokenValue.includes('{') && tokenValue.includes(',')) return tokenValue;
+
+      let current = tokenValue;
+
+      // Follow the chain up to 5 levels
+      for (let depth = 0; depth < 5; depth++) {
+        if (!current.includes('{')) break;
+
+        const path = current.replace(/[{}]/g, '');
+
+        // Check if it's already a final Colors reference
+        const colorMatch = path.match(/^(?:Colors\.)?(\w+)\.(Color-\d+)$/);
+        if (colorMatch) {
+          return `var(--${colorMatch[1]}-${colorMatch[2]})`;
+        }
+
+        // Look up in our flat index
+        const resolved = tokenLookup[path];
+        if (resolved) {
+          // Special cases: return resolved value directly (no Color-N mapping needed)
+          if (cssVarName === '--Dropshadow-Color' && !resolved.includes('{')) return resolved;
+          if (cssVarName === '--Border-Variant' && resolved.startsWith('#')) return resolved;
+          if (!resolved.includes('{') && resolved.includes(',')) return resolved; // RGB triplet
+
+          // If resolved is a hex, try to find which Color-N it matches
+          if (resolved.startsWith('#')) {
+            // Search all palettes for this exact hex
+            const palettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited', 'BW'];
+            for (const pal of palettes) {
+              if (modeData?.Colors?.[pal]) {
+                for (const [key, val] of Object.entries(modeData.Colors[pal])) {
+                  if ((val as any)?.value === resolved && key.startsWith('Color-')) {
+                    return `var(--${pal}-${key})`;
+                  }
+                }
+              }
+            }
+            // No Color-N match found — return hex directly
+            return resolved;
+          }
+
+          current = resolved;
+          continue;
+        }
+
+        // Not found in lookup — try stripping "Colors." prefix
+        const withoutColors = path.startsWith('Colors.') ? path.substring(7) : null;
+        if (withoutColors) {
+          const stripped = tokenLookup[withoutColors];
+          if (stripped) { current = stripped; continue; }
+        }
+
+        // Not resolvable further
+        break;
+      }
+
+      // Final check on the resolved value
+      if (!current.includes('{')) {
+        if (current.includes(',')) return current; // RGB
+        if (current.startsWith('#')) {
+          // Try to find which Color-N this hex matches
+          const palettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited', 'BW'];
+          for (const pal of palettes) {
+            if (modeData?.Colors?.[pal]) {
+              for (const [key, val] of Object.entries(modeData.Colors[pal])) {
+                if ((val as any)?.value === current && key.startsWith('Color-')) {
+                  return `var(--${pal}-${key})`;
+                }
+              }
+            }
+          }
+          return current; // No match, return hex
+        }
+      }
+      // Check one more time for Color reference
+      const finalPath = current.replace(/[{}]/g, '');
+      const finalMatch = finalPath.match(/^(?:Colors\.)?(\w+)\.(Color-\d+)$/);
+      if (finalMatch) {
+        return `var(--${finalMatch[1]}-${finalMatch[2]})`;
+      }
+    } catch {
+      // Silent fallback
+    }
+
+    return tokenToVar(tokenValue);
+  }
+
   /**
    * Recursively process nested token structures
-   * Flattens nested objects like Buttons.Primary.Button into --Buttons-Primary-Button
+   * Resolves intermediate references to final Color variables for smaller CSS
    */
   function processTokens(obj: any, prefix: string = ''): string[] {
     const lines: string[] = [];
-    
+
     Object.keys(obj).forEach(key => {
       const value = obj[key];
-      
+
       // SPECIAL FILTER: Skip non-Default button types in Surfaces/Containers Buttons
-      // The Buttons section should only output Default (which references Default-Button)
-      // Individual button types (Primary, Secondary, etc.) should not be in theme CSS
       if (prefix.includes('Surfaces-Buttons') || prefix.includes('Containers-Buttons')) {
         if (key !== 'Default' && ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].includes(key)) {
-          // Skip this button type - we only want Default in themes
           return;
         }
       }
-      
+
       // Check if this is a token with a .value property
       if (value && typeof value === 'object' && 'value' in value && 'type' in value) {
         const cssVarName = prefix ? `--${prefix}-${key}` : `--${key}`;
-        const cssValue = tokenToVar(value.value);
-        const cssLine = `  ${cssVarName}: ${cssValue};`;
-        lines.push(cssLine);
-        // DEBUG: Log Buttons and Tag CSS variables
-        if (prefix.includes('Buttons') || prefix.includes('Tag')) {
-          console.log(`          🎨 CSS: ${cssLine.trim()}`);
-        }
+        const cssValue = resolveTokenForCSS(value.value, cssVarName);
+        lines.push(`  ${cssVarName}: ${cssValue};`);
       }
       // Check if this is a nested object (like Buttons, Icons, etc.)
       else if (value && typeof value === 'object' && !('value' in value)) {
         const newPrefix = prefix ? `${prefix}-${key}` : key;
-        // DEBUG: Log when processing Buttons or Tag
-        if (key === 'Buttons' || key === 'Tag') {
-          console.log(`        🔍 processTokens: Processing ${key}, prefix="${prefix}", newPrefix="${newPrefix}"`);
-          console.log(`        🔍 ${key} has keys:`, Object.keys(value));
-        }
-        const nestedLines = processTokens(value, newPrefix);
-        if (key === 'Buttons' || key === 'Tag') {
-          console.log(`        🔍 ${key} generated ${nestedLines.length} CSS lines`);
-        }
-        lines.push(...nestedLines);
+        lines.push(...processTokens(value, newPrefix));
       }
     });
-    
+
     return lines;
   }
   
@@ -1013,19 +1163,19 @@ function generateThemesVariables(modeData: any): string {
     const surfaceVariants: { key: string; selector: string }[] = [
       {
         key: 'Surfaces',
-        selector: `[data-theme="${themeName}"]`
+        selector: `[data-theme="${themeName}"],\n[data-theme="${themeName}"][data-surface="Surface"]`
       },
       {
         key: 'Surfaces-Dim',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dim"]`
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dim"],\n[data-theme="${themeName}"][data-surface="Surface-Dim"]`
       },
       {
         key: 'Surfaces-Dimmest',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dimmest"]`
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dimmest"],\n[data-theme="${themeName}"][data-surface="Surface-Dimmest"]`
       },
       {
         key: 'Surfaces-Bright',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Bright"]`
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Bright"],\n[data-theme="${themeName}"][data-surface="Surface-Bright"]`
       }
     ];
 
@@ -1052,6 +1202,8 @@ function generateThemesVariables(modeData: any): string {
         const tokenLines = processTokens(variantData);
         surfaceLines.push(...tokenLines);
 
+        // Dropshadow-Color is already in the JSON as RGB values — output by processTokens above
+
         console.log(`      └─ ${variant.key} tokens generated: ${tokenLines.length}`);
         surfaceLines.push('}');
         surfaceLines.push('');
@@ -1063,7 +1215,8 @@ function generateThemesVariables(modeData: any): string {
     if (theme.Containers && typeof theme.Containers === 'object') {
       const containerLines: string[] = [];
       containerLines.push(`/* Theme: ${themeName} - Containers */`);
-      containerLines.push(`[data-theme="${themeName}"] [data-surface^="Container"] {`);
+      containerLines.push(`[data-theme="${themeName}"] [data-surface^="Container"],`);
+      containerLines.push(`[data-theme="${themeName}"][data-surface^="Container"] {`);
       
       // DEBUG: Check if Buttons and Tag exist in Containers
       if (theme.Containers.Buttons) {
@@ -1080,7 +1233,9 @@ function generateThemesVariables(modeData: any): string {
       // Recursively process all tokens in Containers
       const tokenLines = processTokens(theme.Containers);
       containerLines.push(...tokenLines);
-      
+
+      // Dropshadow-Color is already in the JSON as RGB values — output by processTokens above
+
       console.log(`      └─ Container tokens generated: ${tokenLines.length}`);
       containerLines.push('}');
       containerLines.push('');
@@ -2518,19 +2673,13 @@ function generateFocusVisibleVariables(modeData: any): string {
 
 /**
  * Helper function to generate CSS from a single mode's data
+ * Optimized: Only outputs Color palettes + Theme selectors with resolved Color vars
  */
 function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJsonData?: any): string {
   const lines: string[] = [];
-  const funcMarker2 = 'generateModeCSSFromSingleMode';
-  
+
   console.log(`🔍 [generateModeCSSFromSingleMode] Called for mode: ${modeName}`);
-  console.log(`🔍 [generateModeCSSFromSingleMode] modeData has Colors:`, !!modeData?.Colors);
-  if (modeData?.Colors?.Primary) {
-    console.log(`🔍 [generateModeCSSFromSingleMode] Primary Color-1:`, modeData.Colors.Primary['Color-1']);
-    console.log(`🔍 [generateModeCSSFromSingleMode] Primary Color-8:`, modeData.Colors.Primary['Color-8']);
-    console.log(`🔍 [generateModeCSSFromSingleMode] Primary Color-14:`, modeData.Colors.Primary['Color-14']);
-  }
-  
+
   // Google Fonts imports (at the very top of the file)
   if (fullJsonData) {
     const googleFontsImports = generateGoogleFontsImports(fullJsonData);
@@ -2539,7 +2688,7 @@ function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJson
       lines.push('');
     }
   }
-  
+
   // File header with metadata if available
   if (fullJsonData && fullJsonData.Basics) {
     lines.push(generateCSSHeader(fullJsonData).trim());
@@ -2556,314 +2705,19 @@ function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJson
   lines.push(` * Auto-generated - do not edit manually`);
   lines.push(` * ======================================== */`);
   lines.push('');
-  
-  // Root CSS variables for this mode
+
+  // Root CSS variables — only Color palettes
   lines.push(':root {');
   lines.push('');
-  
-  // Colors section
+
+  // Colors section (the only :root variables needed)
   lines.push('  /* ========================================');
-  lines.push('   * Base Color Palette');
+  lines.push('   * Color Palettes');
   lines.push('   * ======================================== */');
   lines.push('');
   const colorVars = generateAllColorVariables(modeData);
   if (colorVars) {
     lines.push(colorVars);
-  }
-  
-  // Header section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Header Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const headerVars = generateHeaderVariables(modeData);
-  if (headerVars) {
-    lines.push(headerVars);
-  }
-  
-  // Hover States section (from JSON)
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Hover States');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const hoverVars = generateHoverVariablesFromJSON(modeData);
-  if (hoverVars) {
-    lines.push(hoverVars);
-  }
-  
-  // Active States section (from JSON)
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Active States');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const activeVars = generateActiveVariablesFromJSON(modeData);
-  if (activeVars) {
-    lines.push(activeVars);
-  }
-  
-  // Focus-Visible section (from JSON)
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Focus-Visible (Surfaces & Containers)');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const focusVisibleVars = generateFocusVisibleVariables(modeData);
-  if (focusVisibleVars) {
-    lines.push(focusVisibleVars);
-  }
-  
-  // Text section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Text Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const textVars = generateAllTextVariables(modeData);
-  if (textVars) {
-    lines.push(textVars);
-  }
-  
-  // BW (Black/White) variables - ONLY for Light Mode
-  // BW palette doesn't have --BW-Color-X base palette, so we map to White and Neutral
-  if (modeName === 'Light-Mode') {
-    lines.push('');
-    lines.push('  /* Text Surfaces Black/White */');
-    lines.push('  --Text-Surfaces-BW-Color-1: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-2: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-3: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-4: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-5: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-6: var(--White);');
-    lines.push('  --Text-Surfaces-BW-Color-7: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-8: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-9: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-10: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-11: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-12: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-13: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-14: var(--Neutral-Color-1);');
-    lines.push('  --Text-Surfaces-BW-Color-Vibrant: var(--Neutral-Color-1);');
-    lines.push('');
-    lines.push('  /* Text Containers Black/White */');
-    lines.push('  --Text-Containers-BW-Color-1: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-2: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-3: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-4: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-5: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-6: var(--White);');
-    lines.push('  --Text-Containers-BW-Color-7: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-8: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-9: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-10: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-11: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-12: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-13: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-14: var(--Neutral-Color-1);');
-    lines.push('  --Text-Containers-BW-Color-Vibrant: var(--Neutral-Color-1);');
-    lines.push('');
-    lines.push('  /* Header Surfaces Black/White */');
-    lines.push('  --Header-Surfaces-BW-Color-1: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-2: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-3: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-4: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-5: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-6: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-7: var(--White);');
-    lines.push('  --Header-Surfaces-BW-Color-8: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-9: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-10: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-11: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-12: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-13: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-14: var(--Neutral-Color-1);');
-    lines.push('  --Header-Surfaces-BW-Color-Vibrant: var(--Neutral-Color-11);');
-    lines.push('');
-    lines.push('  /* Header Containers Black/White */');
-    lines.push('  --Header-Containers-BW-Color-1: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-2: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-3: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-4: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-5: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-6: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-7: var(--White);');
-    lines.push('  --Header-Containers-BW-Color-8: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-9: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-10: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-11: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-12: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-13: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-14: var(--Neutral-Color-1);');
-    lines.push('  --Header-Containers-BW-Color-Vibrant: var(--Neutral-Color-11);');
-    lines.push('');
-    // REMOVED: Hardcoded Border-Surfaces-BW, Border-Containers-BW, Hover-BW, and Active-BW 
-    // Now all generated from JSON by generateBorderVariables, generateHoverVariablesFromJSON, and generateActiveVariablesFromJSON
-  }
-  
-  // Quiet section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Quiet Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const quietVars = generateQuietVariables(modeData);
-  if (quietVars) {
-    lines.push(quietVars);
-  }
-  
-  // Border section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Border Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const borderVars = generateBorderVariables(modeData);
-  if (borderVars) {
-    lines.push(borderVars);
-  }
-  
-  // Border-Variant section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Border-Variant Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const borderVariantVars = generateBorderVariantVariables(modeData);
-  if (borderVariantVars) {
-    lines.push(borderVariantVars);
-  }
-  
-  // Hotlink section (with background mapping)
-  lines.push('');
-  const hotlinkVars = generateHotlinkVariables(modeData);
-  if (hotlinkVars) {
-    lines.push(hotlinkVars);
-  }
-  
-  // Button-Border section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Button Border Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const buttonBorderVars_v2 = generateButtonBorderVariables(modeData);
-  if (buttonBorderVars_v2) {
-    lines.push(buttonBorderVars_v2);
-  }
-  
-  // Theme Colors section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Theme Colors (Primary, Secondary, Tertiary)');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const themeColorsVars = generateThemeColorsVariables(modeData);
-  if (themeColorsVars) {
-    lines.push(themeColorsVars);
-  }
-  
-  // Icons section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Icon Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const iconsVars = generateIconsVariables(modeData);
-  if (iconsVars) {
-    lines.push(iconsVars);
-  }
-  
-  // Icon-Variant section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Icon-Variant Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const iconVariantVars2 = generateIconVariantVariables(modeData);
-  if (iconVariantVars2) {
-    lines.push(iconVariantVars2);
-  }
-  
-  // Tags section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Tag Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const tagsVars = generateTagsVariables(modeData);
-  if (tagsVars) {
-    lines.push(tagsVars);
-  }
-  
-  // Default-Button section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Default-Button Variables');
-  lines.push('   * References to Buttons based on user selections');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const defaultButtonVars2 = generateDefaultButtonVariables(modeData);
-  if (defaultButtonVars2) {
-    lines.push(defaultButtonVars2);
-  }
-  
-  // Default-Button-Borders section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Default-Button-Borders Variables');
-  lines.push('   * Border colors for default buttons on surfaces and containers');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const defaultButtonBorderVars2 = generateDefaultButtonBorderVariables(modeData);
-  if (defaultButtonBorderVars2) {
-    lines.push(defaultButtonBorderVars2);
-  }
-  
-  // Backgrounds section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Background Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const backgroundsVars = generateBackgroundsVariables(modeData);
-  if (backgroundsVars) {
-    lines.push(backgroundsVars);
-  }
-  
-  // Charts section
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Chart Color Variables');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const chartsVars = generateChartsVariables(modeData);
-  if (chartsVars) {
-    lines.push(chartsVars);
-  }
-  
-  // Primary-Buttons section (MUST come before Buttons section because Buttons reference these)
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Primary Button Styles');
-  lines.push('   * All three styles: Primary-Fixed, Primary-Adaptive, Black-White');
-  lines.push('   * ======================================== */');
-  const primaryButtonsVarsV2 = generateModePrimaryButtonsVariables(modeData);
-  if (primaryButtonsVarsV2) {
-    lines.push(primaryButtonsVarsV2);
-  }
-  
-  // Buttons section (NEW: Now needed for mode-level button definitions)
-  lines.push('');
-  lines.push('  /* ========================================');
-  lines.push('   * Buttons Section');
-  lines.push('   * Base button definitions with Surfaces and Containers');
-  lines.push('   * ======================================== */');
-  lines.push('');
-  const buttonsVarsV2 = generateButtonsVariables(modeData);
-  if (buttonsVarsV2) {
-    lines.push(buttonsVarsV2);
   }
   
   // Close root selector
@@ -3025,7 +2879,10 @@ function generateStyleCSS(jsonData: any): string {
     // Border-Radius
     if (styleData['Border-Radius']) {
       const borderRadius = styleData['Border-Radius']['offset-x']?.value || 4;
-      props.push(`${indent}--Style-Border-Radius: ${borderRadius}px;`);
+      props.push(`${indent}--Button-Radius: ${borderRadius}px;`);
+      props.push(`${indent}--Style-Border-Radius: var(--Button-Radius);`);
+      props.push(`${indent}--Card-Radius: ${Math.round(borderRadius * 1.33)}px;`);
+      props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
     }
     
     // Gradient
@@ -3320,18 +3177,72 @@ function generateSurfacesContainersCSS(jsonData: any): string {
   lines.push('');
   
   // Container types only — Surface variants are now per-theme
-  const containerTypes = [
-    { key: 'Container', effects: 'Effects-Level-2' },
-    { key: 'Container-Low', effects: 'Effects-Level-1' },
-    { key: 'Container-Lowest', effects: 'Effects-Level-negative-1' },
-    { key: 'Container-High', effects: 'Effects-Level-3' },
-    { key: 'Container-Highest', effects: 'Effects-Level-4' },
-  ];
+  const containerKeys = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
 
-  containerTypes.forEach(({ key, effects }) => {
+  // Helper: derive dropshadow RGB from hex using HSL (same as computeDropshadow in exportColorSystem)
+  const deriveShadowRGB = (hex: string): string | null => {
+    try {
+      const clean = hex.replace('#', '');
+      const full = clean.length === 3 ? clean.split('').map((c: string) => c + c).join('') : clean;
+      const n = parseInt(full, 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      const rn = r / 255, gn = g / 255, bn = b / 255;
+      const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+      let h = 0, s = 0, l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+        else if (max === gn) h = (bn - rn) / d + 2;
+        else h = (rn - gn) / d + 4;
+        h /= 6;
+      }
+      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+      const newS = clamp(s * 100 * 1.5, 0, 100) / 100;
+      const newL = clamp(l * 100 - 25, 8, 92) / 100;
+      const h2 = h;
+      let sr: number, sg: number, sb: number;
+      if (newS === 0) {
+        sr = sg = sb = Math.round(newL * 255);
+      } else {
+        const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
+        const p = 2 * newL - q;
+        const hue2rgb = (p: number, q: number, t: number) => {
+          if (t < 0) t += 1; if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        sr = Math.round(hue2rgb(p, q, h2 + 1/3) * 255);
+        sg = Math.round(hue2rgb(p, q, h2) * 255);
+        sb = Math.round(hue2rgb(p, q, h2 - 1/3) * 255);
+      }
+      return `${sr}, ${sg}, ${sb}`;
+    } catch { return null; }
+  };
+
+  containerKeys.forEach(key => {
     lines.push(`[data-surface="${key}"] {`);
     lines.push(`  --Background: var(--${key});`);
-    lines.push(`  --Effects: var(--${effects});`);
+    // Dropshadow-Color as RGB: resolve from first available theme's container hex
+    try {
+      const modeData = jsonData.Modes?.['Light-Mode'] || jsonData;
+      const backgrounds = modeData?.Backgrounds;
+      if (backgrounds) {
+        const theme = Object.keys(backgrounds).find(t => t !== 'Default' && t !== 'BW' && backgrounds[t]);
+        if (theme) {
+          const bgKey = Object.keys(backgrounds[theme]).find(k => k.startsWith('Background-'));
+          if (bgKey) {
+            const contHex = backgrounds[theme][bgKey]?.Containers?.[key]?.value;
+            if (contHex && contHex.startsWith('#')) {
+              const rgb = deriveShadowRGB(contHex);
+              if (rgb) lines.push(`  --Dropshadow-Color: ${rgb};`);
+            }
+          }
+        }
+      }
+    } catch { /* skip */ }
     lines.push('}');
     lines.push('');
   });
@@ -4116,8 +4027,10 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('');
   
   // Start with :root selector for Default theme variables
+  // LOCKED: This MUST be :root — NOT [data-theme] or [data-theme="Default"]
+  // Charts, Effects, Typography go in :root for global availability
   lines.push(':root {');
-  
+
   // System Metadata variables (at the very top of :root)
   if (jsonData && jsonData.Basics) {
     lines.push('  /* ========================================');
@@ -4210,15 +4123,19 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('');
   */
   
-  // Style section (data attributes, outside :root)
-  lines.push('/* ========================================');
-  lines.push(' * Style Variants');
-  lines.push(' * Use data-style attribute to apply');
-  lines.push(' * ======================================== */');
-  lines.push('');
-  const styleCSS = generateStyleCSS(jsonData);
-  if (styleCSS) {
-    lines.push(styleCSS);
+  // Style section — selected style radii in :root
+  if (jsonData?.Style) {
+    const selectedStyle = jsonData.Metadata?.['Component-Style']?.value || 'Modern';
+    const styleData = jsonData.Style[selectedStyle] || jsonData.Style.Modern || Object.values(jsonData.Style)[0];
+    if (styleData?.['Border-Radius']) {
+      const borderRadius = styleData['Border-Radius']['offset-x']?.value || 8;
+      lines.push(':root {');
+      lines.push(`  --Button-Radius: ${borderRadius}px;`);
+      lines.push(`  --Card-Radius: ${Math.round(borderRadius * 1.33)}px;`);
+      lines.push(`  --Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
+      lines.push('}');
+      lines.push('');
+    }
   }
   
   // NOTE (2026-03-06): Primary-Buttons and Themes sections REMOVED from base.css
@@ -4226,21 +4143,7 @@ export function generateBaseCSS(jsonData: any): string {
   // They reference mode-specific variables, so they must be in the mode files
   
   // SurfacesContainers data-attribute selectors
-  // Re-enabled to include SurfacesContainers in base.css
-  lines.push('');
-  lines.push('/* ========================================');
-  lines.push(' * Surfaces/Containers Data Attributes');
-  lines.push(' * Use data-surface attribute to apply');
-  lines.push(' * ======================================== *\/');
-  lines.push('');
-  // Use NEW function that reads from JSON instead of hardcoding
-  const surfaceDataAttributesCSS = generateSurfaceDataAttributesFromJSON(jsonData);
-  if (surfaceDataAttributesCSS) {
-    lines.push(surfaceDataAttributesCSS);
-    console.log('✅ Added SurfacesContainers data-attribute CSS to base.css');
-  } else {
-    console.log('⚠️ No SurfacesContainers CSS generated');
-  }
+  // Container data-surface selectors generated by generateSurfacesContainersCSS below
   
   // NOTE: :root button colors section moved to the top of base.css (after Google Fonts)
   
@@ -4270,24 +4173,7 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('  --Surface: var(--Surface-Bright);');
   lines.push('}');
   lines.push('');
-  lines.push('[data-surface="Container"] {');
-  lines.push('  --Background: var(--Container);');
-  lines.push('}');
-  lines.push('');
-  lines.push('[data-surface="Container-Low"] {');
-  lines.push('  --Background: var(--Container-Low);');
-  lines.push('}');
-  lines.push('');
-  lines.push('[data-surface="Container-Lowest"] {');
-  lines.push('  --Background: var(--Container-Lowest);');
-  lines.push('}');
-  lines.push('');
-  lines.push('[data-surface="Container-High"] {');
-  lines.push('  --Background: var(--Container-High);');
-  lines.push('}');
-  lines.push('');
-  lines.push('[data-surface="Container-Highest"] {');
-  lines.push('  --Background: var(--Container-Highest);');
+  // Container data-surface selectors are generated by generateSurfacesContainersCSS (with --Effects)
   lines.push('}');
   */
   
@@ -4679,9 +4565,22 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
           console.log(`      🎨 Generated CSS: ${cssVar.trim()}`);
         }
       }
-      // If the key is 'Colors', 'Themes', 'Surfaces', or 'Containers', skip it and process children directly
-      else if (key === 'Colors' || key === 'Themes' || key === 'Surfaces' || key === 'Containers') {
-        if (key === 'Surfaces' || key === 'Containers') {
+      // Skip Charts — they belong in :root, not in theme selectors
+      else if (key === 'Charts' || key === 'Chart-BG' || key === 'Chart-Lines') {
+        // Charts are global and already output in :root
+      }
+      // Dropshadow-Color — pass through from JSON (already computed as RGB values)
+      // Skip surface variants — they get their own selectors below
+      else if (key === 'Surfaces-Dim' || key === 'Surfaces-Dimmest' || key === 'Surfaces-Bright') {
+        // Handled as separate descendant selectors after the main theme block
+      }
+      // Containers get their own descendant selector — skip here
+      else if (key === 'Containers') {
+        // Handled as separate [data-surface^="Container"] selector after the main theme block
+      }
+      // If the key is 'Colors', 'Themes', or 'Surfaces', skip it and process children directly
+      else if (key === 'Colors' || key === 'Themes' || key === 'Surfaces') {
+        if (key === 'Surfaces') {
           console.log(`    🔍 Processing ${key} section (skipping level, processing children)...`);
         }
         processThemeData(value, prefix, lines, indent);
@@ -4700,37 +4599,37 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
   // All theme variants to generate
   const themeVariants = [
     { name: 'Default', selector: ':root' },
-    { name: 'Primary', selector: '[data-theme="Primary"]' },
-    { name: 'Primary-Light', selector: '[data-theme="Primary-Light"]' },
-    { name: 'Primary-Medium', selector: '[data-theme="Primary-Medium"]' },
-    { name: 'Primary-Dark', selector: '[data-theme="Primary-Dark"]' },
-    { name: 'Secondary', selector: '[data-theme="Secondary"]' },
-    { name: 'Secondary-Light', selector: '[data-theme="Secondary-Light"]' },
-    { name: 'Secondary-Medium', selector: '[data-theme="Secondary-Medium"]' },
-    { name: 'Secondary-Dark', selector: '[data-theme="Secondary-Dark"]' },
-    { name: 'Tertiary', selector: '[data-theme="Tertiary"]' },
-    { name: 'Tertiary-Light', selector: '[data-theme="Tertiary-Light"]' },
-    { name: 'Tertiary-Medium', selector: '[data-theme="Tertiary-Medium"]' },
-    { name: 'Tertiary-Dark', selector: '[data-theme="Tertiary-Dark"]' },
-    { name: 'Neutral', selector: '[data-theme="Neutral"]' },
-    { name: 'Neutral-Light', selector: '[data-theme="Neutral-Light"]' },
-    { name: 'Neutral-Medium', selector: '[data-theme="Neutral-Medium"]' },
-    { name: 'Neutral-Dark', selector: '[data-theme="Neutral-Dark"]' },
-    { name: 'Info-Light', selector: '[data-theme="Info-Light"]' },
-    { name: 'Info-Medium', selector: '[data-theme="Info-Medium"]' },
-    { name: 'Info-Dark', selector: '[data-theme="Info-Dark"]' },
-    { name: 'Success-Light', selector: '[data-theme="Success-Light"]' },
-    { name: 'Success-Medium', selector: '[data-theme="Success-Medium"]' },
-    { name: 'Success-Dark', selector: '[data-theme="Success-Dark"]' },
-    { name: 'Warning-Light', selector: '[data-theme="Warning-Light"]' },
-    { name: 'Warning-Medium', selector: '[data-theme="Warning-Medium"]' },
-    { name: 'Warning-Dark', selector: '[data-theme="Warning-Dark"]' },
-    { name: 'Error-Light', selector: '[data-theme="Error-Light"]' },
-    { name: 'Error-Medium', selector: '[data-theme="Error-Medium"]' },
-    { name: 'Error-Dark', selector: '[data-theme="Error-Dark"]' },
-    { name: 'App-Bar', selector: '[data-theme="App-Bar"]' },
-    { name: 'Nav-Bar', selector: '[data-theme="Nav-Bar"]' },
-    { name: 'Status', selector: '[data-theme="Status"]' }
+    { name: 'Primary', selector: '[data-theme="Primary"],\n[data-theme="Primary"][data-surface="Surface"]' },
+    { name: 'Primary-Light', selector: '[data-theme="Primary-Light"],\n[data-theme="Primary-Light"][data-surface="Surface"]' },
+    { name: 'Primary-Medium', selector: '[data-theme="Primary-Medium"],\n[data-theme="Primary-Medium"][data-surface="Surface"]' },
+    { name: 'Primary-Dark', selector: '[data-theme="Primary-Dark"],\n[data-theme="Primary-Dark"][data-surface="Surface"]' },
+    { name: 'Secondary', selector: '[data-theme="Secondary"],\n[data-theme="Secondary"][data-surface="Surface"]' },
+    { name: 'Secondary-Light', selector: '[data-theme="Secondary-Light"],\n[data-theme="Secondary-Light"][data-surface="Surface"]' },
+    { name: 'Secondary-Medium', selector: '[data-theme="Secondary-Medium"],\n[data-theme="Secondary-Medium"][data-surface="Surface"]' },
+    { name: 'Secondary-Dark', selector: '[data-theme="Secondary-Dark"],\n[data-theme="Secondary-Dark"][data-surface="Surface"]' },
+    { name: 'Tertiary', selector: '[data-theme="Tertiary"],\n[data-theme="Tertiary"][data-surface="Surface"]' },
+    { name: 'Tertiary-Light', selector: '[data-theme="Tertiary-Light"],\n[data-theme="Tertiary-Light"][data-surface="Surface"]' },
+    { name: 'Tertiary-Medium', selector: '[data-theme="Tertiary-Medium"],\n[data-theme="Tertiary-Medium"][data-surface="Surface"]' },
+    { name: 'Tertiary-Dark', selector: '[data-theme="Tertiary-Dark"],\n[data-theme="Tertiary-Dark"][data-surface="Surface"]' },
+    { name: 'Neutral', selector: '[data-theme="Neutral"],\n[data-theme="Neutral"][data-surface="Surface"]' },
+    { name: 'Neutral-Light', selector: '[data-theme="Neutral-Light"],\n[data-theme="Neutral-Light"][data-surface="Surface"]' },
+    { name: 'Neutral-Medium', selector: '[data-theme="Neutral-Medium"],\n[data-theme="Neutral-Medium"][data-surface="Surface"]' },
+    { name: 'Neutral-Dark', selector: '[data-theme="Neutral-Dark"],\n[data-theme="Neutral-Dark"][data-surface="Surface"]' },
+    { name: 'Info-Light', selector: '[data-theme="Info-Light"],\n[data-theme="Info-Light"][data-surface="Surface"]' },
+    { name: 'Info-Medium', selector: '[data-theme="Info-Medium"],\n[data-theme="Info-Medium"][data-surface="Surface"]' },
+    { name: 'Info-Dark', selector: '[data-theme="Info-Dark"],\n[data-theme="Info-Dark"][data-surface="Surface"]' },
+    { name: 'Success-Light', selector: '[data-theme="Success-Light"],\n[data-theme="Success-Light"][data-surface="Surface"]' },
+    { name: 'Success-Medium', selector: '[data-theme="Success-Medium"],\n[data-theme="Success-Medium"][data-surface="Surface"]' },
+    { name: 'Success-Dark', selector: '[data-theme="Success-Dark"],\n[data-theme="Success-Dark"][data-surface="Surface"]' },
+    { name: 'Warning-Light', selector: '[data-theme="Warning-Light"],\n[data-theme="Warning-Light"][data-surface="Surface"]' },
+    { name: 'Warning-Medium', selector: '[data-theme="Warning-Medium"],\n[data-theme="Warning-Medium"][data-surface="Surface"]' },
+    { name: 'Warning-Dark', selector: '[data-theme="Warning-Dark"],\n[data-theme="Warning-Dark"][data-surface="Surface"]' },
+    { name: 'Error-Light', selector: '[data-theme="Error-Light"],\n[data-theme="Error-Light"][data-surface="Surface"]' },
+    { name: 'Error-Medium', selector: '[data-theme="Error-Medium"],\n[data-theme="Error-Medium"][data-surface="Surface"]' },
+    { name: 'Error-Dark', selector: '[data-theme="Error-Dark"],\n[data-theme="Error-Dark"][data-surface="Surface"]' },
+    { name: 'App-Bar', selector: '[data-theme="App-Bar"],\n[data-theme="App-Bar"][data-surface="Surface"]' },
+    { name: 'Nav-Bar', selector: '[data-theme="Nav-Bar"],\n[data-theme="Nav-Bar"][data-surface="Surface"]' },
+    { name: 'Status', selector: '[data-theme="Status"],\n[data-theme="Status"][data-surface="Surface"]' }
   ];
   
   themeVariants.forEach(({ name, selector }) => {
@@ -4763,8 +4662,23 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
       }
       
       processThemeData(themes[name], '', lines);
+      // Dropshadow-Color comes from JSON via processThemeData above
+
       lines.push('}');
       lines.push('');
+
+      // Containers as descendant selector
+      const contData = themes[name]?.Containers;
+      if (contData && typeof contData === 'object') {
+        lines.push(`[data-theme="${name}"] [data-surface^="Container"],`);
+        lines.push(`[data-theme="${name}"][data-surface^="Container"] {`);
+        const contLines: string[] = [];
+        processThemeData(contData, '', contLines);
+        lines.push(...contLines);
+        // Dropshadow-Color comes from JSON via processThemeData above
+        lines.push('}');
+        lines.push('');
+      }
     }
   });
   

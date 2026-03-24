@@ -88,6 +88,8 @@ declare module '@dynodesign/components' {
   export const CheckboxGroup: FC<any>;
   export const CheckboxWithDescription: FC<any>;
   export const IndeterminateCheckbox: FC<any>;
+  export const Radio: FC<any>;
+  export const RadioInput: FC<any>;
   export const RadioGroup: FC<any>;
   export const SwitchInput: FC<any>;
   export const SliderInput: FC<any>;
