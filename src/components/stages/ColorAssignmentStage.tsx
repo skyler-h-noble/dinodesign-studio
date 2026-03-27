@@ -18,25 +18,13 @@ interface Props extends StageProps {
   designSystemName?: string;
 }
 
-type NavOption = 'primary-light' | 'primary-light-bright' | 'primary' | 'primary-bright' | 'primary-light-dim' | 'primary-dim' | 'white' | 'black';
+type NavOption = 'primary-light' | 'primary' | 'white' | 'black';
 type ButtonMode = 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
 
 // App Bar / Status: theme + Surface or Surface-Bright
-const APPBAR_OPTIONS: { value: NavOption; label: string }[] = [
+const NAV_OPTIONS: { value: NavOption; label: string }[] = [
   { value: 'primary-light', label: 'Primary Light' },
-  { value: 'primary-light-bright', label: 'Primary Light, Bright' },
   { value: 'primary', label: 'Primary' },
-  { value: 'primary-bright', label: 'Primary, Bright' },
-  { value: 'white', label: 'White' },
-  { value: 'black', label: 'Black' },
-];
-
-// Nav Bar: theme + Surface or Surface-Dim
-const NAVBAR_OPTIONS: { value: NavOption; label: string }[] = [
-  { value: 'primary-light', label: 'Primary Light' },
-  { value: 'primary-light-dim', label: 'Primary Light, Dim' },
-  { value: 'primary', label: 'Primary' },
-  { value: 'primary-dim', label: 'Primary, Dim' },
   { value: 'white', label: 'White' },
   { value: 'black', label: 'Black' },
 ];
@@ -264,9 +252,9 @@ export default function ColorAssignmentStage({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, width: '100%' }}>
             {([
-              { key: 'status' as const, label: 'Status Bar', options: APPBAR_OPTIONS },
-              { key: 'appBar' as const, label: 'App Bar', options: APPBAR_OPTIONS },
-              { key: 'navBar' as const, label: 'Navigation Bar', options: NAVBAR_OPTIONS },
+              { key: 'status' as const, label: 'Status Bar', options: NAV_OPTIONS },
+              { key: 'appBar' as const, label: 'App Bar', options: NAV_OPTIONS },
+              { key: 'navBar' as const, label: 'Navigation Bar', options: NAV_OPTIONS },
             ]).map(nav => (
               <Select
                 key={nav.key}

@@ -3139,10 +3139,10 @@ function generateChartsCSS(jsonData: any): string {
  * Creates --Effects-Level-X variables with box-shadow values
  */
 function generateEffectCSS(jsonData: any): string {
-  if (!jsonData || !jsonData.Effect) return '';
-  
+  const effect = jsonData?.Effects || jsonData?.Effect;
+  if (!effect) return '';
+
   const lines: string[] = [];
-  const effect = jsonData.Effect;
   
   // Level-0 through Level-5
   const levels = ['Level-0', 'Level-1', 'Level-2', 'Level-3', 'Level-4', 'Level-5'];

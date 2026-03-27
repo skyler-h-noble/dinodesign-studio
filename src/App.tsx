@@ -34,16 +34,16 @@ function MainApp() {
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
   const [moodBoardUrl, setMoodBoardUrl] = useState<string | null>(null);
-  const [, setMoodBoardFile] = useState<File | null>(null);
+  const [moodBoardFile, setMoodBoardFile] = useState<File | null>(null);
   const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme | null>(null);
   const [userSelections, setUserSelections] = useState<UserSelections>({
     defaultTheme: 'light',
     background: 'white',
     backgroundTheme: 'Neutral',
     backgroundN: 12,
-    appBar: 'primary-light-bright',
-    navBar: 'primary-light-dim',
-    status: 'primary-light-bright',
+    appBar: 'primary-light',
+    navBar: 'primary-light',
+    status: 'primary-light',
     button: 'primary',
     cardColoring: 'tonal',
     textColoring: 'tonal',
@@ -58,7 +58,9 @@ function MainApp() {
   const [savedTopColors, setSavedTopColors] = useState<any[]>([]);
   const [savedFontSamples, setSavedFontSamples] = useState<any[]>([]);
   const [savedSelectedSample, setSavedSelectedSample] = useState<number | null>(null);
-  const [savedStyleCustomizations, setSavedStyleCustomizations] = useState<any>(null);
+  const [savedStyleCustomizations, setSavedStyleCustomizations] = useState<any>({
+    modern: { radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
+  });
 
   const goNext = useCallback(() => {
     if (customNextRef.current) {
@@ -254,7 +256,9 @@ function MainApp() {
             dinoId={dinoId}
             onDinoIdGenerated={setDinoId}
             moodBoardUrl={moodBoardUrl}
+            moodBoardFile={moodBoardFile}
             surfaceStyle={surfaceStyle}
+            styleCustomizations={savedStyleCustomizations?.[componentStyle]}
           />
         );
       default:

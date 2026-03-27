@@ -402,56 +402,56 @@ function generateTagSection(mode: 'Light-Mode' | 'Dark-Mode', OB: number): any {
       Primary: {
         BG: { value: `{Color-Palettes.Primary.Color-9}`, type: 'color' },
         Text: {
-          Primary: { value: `{Text.Tag.Primary.Color-9}`, type: 'color' },
+          Primary: { value: `{Text.Surfaces.Primary.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Secondary: {
         BG: { value: `{Color-Palettes.Secondary.Color-9}`, type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Tag.Secondary.Color-9}`, type: 'color' },
+          Secondary: { value: `{Text.Surfaces.Secondary.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: `{Color-Palettes.Tertiary.Color-9}`, type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Tag.Tertiary.Color-9}`, type: 'color' },
+          Tertiary: { value: `{Text.Surfaces.Tertiary.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Neutral: {
         BG: { value: `{Color-Palettes.Neutral.Color-9}`, type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Tag.Neutral.Color-9}`, type: 'color' },
+          Neutral: { value: `{Text.Surfaces.Neutral.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Info: {
         BG: { value: `{Color-Palettes.Info.Color-9}`, type: 'color' },
         Text: {
-          Info: { value: `{Text.Tag.Info.Color-9}`, type: 'color' },
+          Info: { value: `{Text.Surfaces.Info.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Success: {
         BG: { value: `{Color-Palettes.Success.Color-9}`, type: 'color' },
         Text: {
-          Success: { value: `{Text.Tag.Success.Color-9}`, type: 'color' },
+          Success: { value: `{Text.Surfaces.Success.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Warning: {
         BG: { value: `{Color-Palettes.Warning.Color-9}`, type: 'color' },
         Text: {
-          Warning: { value: `{Text.Tag.Warning.Color-9}`, type: 'color' },
+          Warning: { value: `{Text.Surfaces.Warning.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       },
       Error: {
         BG: { value: `{Color-Palettes.Error.Color-9}`, type: 'color' },
         Text: {
-          Error: { value: `{Text.Tag.Error.Color-9}`, type: 'color' },
+          Error: { value: `{Text.Surfaces.Error.Color-9}`, type: 'color' },
           BW: { value: '{Color-Scale.White}', type: 'color' }
         }
       }
@@ -460,56 +460,56 @@ function generateTagSection(mode: 'Light-Mode' | 'Dark-Mode', OB: number): any {
       Primary: {
         BG: { value: `{Color-Palettes.Primary.Color-${OB}}`, type: 'color' },
         Text: {
-          Primary: { value: `{Text.Tag.Primary.Color-${OB}}`, type: 'color' },
+          Primary: { value: `{Text.Surfaces.Primary.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Secondary: {
         BG: { value: `{Color-Palettes.Secondary.Color-${OB}}`, type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Tag.Secondary.Color-${OB}}`, type: 'color' },
+          Secondary: { value: `{Text.Surfaces.Secondary.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: `{Color-Palettes.Tertiary.Color-${OB}}`, type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Tag.Tertiary.Color-${OB}}`, type: 'color' },
+          Tertiary: { value: `{Text.Surfaces.Tertiary.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Neutral: {
         BG: { value: `{Color-Palettes.Neutral.Color-${OB}}`, type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Tag.Neutral.Color-${OB}}`, type: 'color' },
+          Neutral: { value: `{Text.Surfaces.Neutral.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Info: {
         BG: { value: `{Color-Palettes.Info.Color-${OB}}`, type: 'color' },
         Text: {
-          Info: { value: `{Text.Tag.Info.Color-${OB}}`, type: 'color' },
+          Info: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Success: {
         BG: { value: `{Color-Palettes.Success.Color-${OB}}`, type: 'color' },
         Text: {
-          Success: { value: `{Text.Tag.Success.Color-${OB}}`, type: 'color' },
+          Success: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Warning: {
         BG: { value: `{Color-Palettes.Warning.Color-${OB}}`, type: 'color' },
         Text: {
-          Warning: { value: `{Text.Tag.Warning.Color-${OB}}`, type: 'color' },
+          Warning: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Error: {
         BG: { value: `{Color-Palettes.Error.Color-${OB}}`, type: 'color' },
         Text: {
-          Error: { value: `{Text.Tag.Error.Color-${OB}}`, type: 'color' },
+          Error: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
           BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       }

@@ -450,6 +450,7 @@ export default function TypographyStage({
                   <div
                     key={sample.id}
                     className={`typo-sample-card ${isSelected ? 'selected' : ''}`}
+                    data-surface="Container"
                     onClick={() => { setSelectedSample(sample.id); onFontSamplesGenerated?.(fontSamples, sample.id); }}
                   >
                     <div className="typo-sample-header-row">

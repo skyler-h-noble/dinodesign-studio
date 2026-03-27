@@ -5,297 +5,80 @@
 
 export { getStaticQuietTokensForLightMode, getStaticQuietTokensForDarkMode } from './staticQuietStructures';
 
+/**
+ * Generate hover tokens for a palette.
+ *
+ * These values become ACTIVE after post-processing swap.
+ * Post-processing: Active = these values, Hover = mix(bg, these values)
+ *
+ * Dark colors (1-5): one step darker (Color-1 → Black)
+ * Gap color (6): one step darker
+ * Light colors (7-12): one step lighter (Color-12 → White)
+ * Color-Vibrant: follows Color-9 pattern (one step lighter)
+ */
+function buildHoverForPalette(palette: string): any {
+  return {
+    'Color-1': { value: '{Black}', type: 'color' },
+    'Color-2': { value: `{Colors.${palette}.Color-1}`, type: 'color' },
+    'Color-3': { value: `{Colors.${palette}.Color-2}`, type: 'color' },
+    'Color-4': { value: `{Colors.${palette}.Color-3}`, type: 'color' },
+    'Color-5': { value: `{Colors.${palette}.Color-4}`, type: 'color' },
+    'Color-6': { value: `{Colors.${palette}.Color-5}`, type: 'color' },
+    'Color-7': { value: `{Colors.${palette}.Color-8}`, type: 'color' },
+    'Color-8': { value: `{Colors.${palette}.Color-9}`, type: 'color' },
+    'Color-9': { value: `{Colors.${palette}.Color-10}`, type: 'color' },
+    'Color-10': { value: `{Colors.${palette}.Color-11}`, type: 'color' },
+    'Color-11': { value: `{Colors.${palette}.Color-12}`, type: 'color' },
+    'Color-12': { value: '{White}', type: 'color' },
+    'Color-Vibrant': { value: `{Colors.${palette}.Color-10}`, type: 'color' },
+  };
+}
+
 export function getStaticHoverTokens() {
   return {
-    Neutral: {
-      'Color-1': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Neutral.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Neutral.Color-4}', type: 'color' },
+    Neutral: buildHoverForPalette('Neutral'),
+    Primary: buildHoverForPalette('Primary'),
+    Secondary: buildHoverForPalette('Secondary'),
+    Tertiary: buildHoverForPalette('Tertiary'),
+    Info: buildHoverForPalette('Info'),
+    Success: buildHoverForPalette('Success'),
+    Warning: buildHoverForPalette('Warning'),
+    Error: buildHoverForPalette('Error'),
+    'Hotlink-Visited': buildHoverForPalette('Hotlink-Visited'),
+    BW: {
+      'Color-1': { value: '{Black}', type: 'color' },
+      'Color-2': { value: '{Colors.Neutral.Color-1}', type: 'color' },
+      'Color-3': { value: '{Colors.Neutral.Color-2}', type: 'color' },
       'Color-4': { value: '{Colors.Neutral.Color-3}', type: 'color' },
       'Color-5': { value: '{Colors.Neutral.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Neutral.Color-7}', type: 'color' },
+      'Color-6': { value: '{Colors.Neutral.Color-5}', type: 'color' },
       'Color-7': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Neutral.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Neutral.Color-9}', type: 'color' }
-    },
-    Primary: {
-      'Color-1': { value: '{Colors.Primary.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Primary.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Primary.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Primary.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Primary.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Primary.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Primary.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Primary.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Primary.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Primary.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Primary.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Primary.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Primary.Color-9}', type: 'color' }
-    },
-    Secondary: {
-      'Color-1': { value: '{Colors.Secondary.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Secondary.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Secondary.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Secondary.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Secondary.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Secondary.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Secondary.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Secondary.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Secondary.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Secondary.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Secondary.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Secondary.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Secondary.Color-9}', type: 'color' }
-    },
-    Tertiary: {
-      'Color-1': { value: '{Colors.Tertiary.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Tertiary.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Tertiary.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Tertiary.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Tertiary.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Tertiary.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Tertiary.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Tertiary.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Tertiary.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Tertiary.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Tertiary.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Tertiary.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Tertiary.Color-9}', type: 'color' }
-    },
-    Info: {
-      'Color-1': { value: '{Colors.Info.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Info.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Info.Color-9}', type: 'color' }
-    },
-    Success: {
-      'Color-1': { value: '{Colors.Success.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Success.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Success.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Success.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Success.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Success.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Success.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Success.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Success.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Success.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Success.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Success.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Success.Color-9}', type: 'color' }
-    },
-    Warning: {
-      'Color-1': { value: '{Colors.Warning.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Warning.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Warning.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Warning.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Warning.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Warning.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Warning.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Warning.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Warning.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Warning.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Warning.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Warning.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Warning.Color-9}', type: 'color' }
-    },
-    Error: {
-      'Color-1': { value: '{Colors.Error.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Error.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Error.Color-4}', type: 'color' },
-      'Color-4': { value: '{Colors.Error.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Error.Color-4}', type: 'color' },
-      'Color-6': { value: '{Colors.Error.Color-7}', type: 'color' },
-      'Color-7': { value: '{Colors.Error.Color-8}', type: 'color' },
-      'Color-8': { value: '{Colors.Error.Color-7}', type: 'color' },
-      'Color-9': { value: '{Colors.Error.Color-8}', type: 'color' },
-      'Color-10': { value: '{Colors.Error.Color-8}', type: 'color' },
-      'Color-11': { value: '{Colors.Error.Color-8}', type: 'color' },
-      'Color-12': { value: '{Colors.Error.Color-8}', type: 'color' },
-      'Color-Vibrant': { value: '{Hover.Error.Color-9}', type: 'color' }
-    },
-    'Hotlink-Visited': {
-      'Color-1': { value: '{Colors.Hotlink-Visited.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-5': { value: '{Colors.Hotlink-Visited.Color-10}', type: 'color' },
-      'Color-6': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-7': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-8': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-9': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-10': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-11': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-12': { value: '{Colors.Hotlink-Visited.Color-11}', type: 'color' },
-      'Color-Vibrant': { value: '{Colors.Hotlink-Visited.Color-10}', type: 'color' }
-    },
-    BW: {
-      'Color-1': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-3': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-4': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-6': { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      'Color-7': { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      'Color-8': { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      'Color-9': { value: '{Colors.Neutral.Color-11}', type: 'color' },
+      'Color-8': { value: '{Colors.Neutral.Color-9}', type: 'color' },
+      'Color-9': { value: '{Colors.Neutral.Color-10}', type: 'color' },
       'Color-10': { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      'Color-11': { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      'Color-12': { value: '{Colors.Neutral.Color-11}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.BW.Color-10}', type: 'color' }
+      'Color-11': { value: '{Colors.Neutral.Color-12}', type: 'color' },
+      'Color-12': { value: '{White}', type: 'color' },
+      'Color-Vibrant': { value: '{Colors.Neutral.Color-10}', type: 'color' }
     }
   };
 }
 
+/**
+ * Active tokens use the same pattern as Hover.
+ * Post-processing replaces these with the Hover values anyway,
+ * so these are just placeholders that follow the same logic.
+ */
 export function getStaticActiveTokens() {
   return {
-    Neutral: {
-      'Color-1': { value: '{Colors.Neutral.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Neutral.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Neutral.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Neutral.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Neutral.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Neutral.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Neutral.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Neutral.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Neutral.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Neutral.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Neutral.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Neutral.Color-10}', type: 'color' }
-    },
-    Primary: {
-      'Color-1': { value: '{Colors.Primary.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Primary.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Primary.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Primary.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Primary.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Primary.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Primary.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Primary.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Primary.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Primary.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Primary.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Primary.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Primary.Color-10}', type: 'color' }
-    },
-    Secondary: {
-      'Color-1': { value: '{Colors.Secondary.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Secondary.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Secondary.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Secondary.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Secondary.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Secondary.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Secondary.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Secondary.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Secondary.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Secondary.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Secondary.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Secondary.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Secondary.Color-10}', type: 'color' }
-    },
-    Tertiary: {
-      'Color-1': { value: '{Colors.Tertiary.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Tertiary.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Tertiary.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Tertiary.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Tertiary.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Tertiary.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Tertiary.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Tertiary.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Tertiary.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Tertiary.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Tertiary.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Tertiary.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Tertiary.Color-10}', type: 'color' }
-    },
-    Info: {
-      'Color-1': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Info.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Info.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Info.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Info.Color-10}', type: 'color' }
-    },
-    Success: {
-      'Color-1': { value: '{Colors.Success.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Success.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Success.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Success.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Success.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Success.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Success.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Success.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Success.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Success.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Success.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Success.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Success.Color-10}', type: 'color' }
-    },
-    Warning: {
-      'Color-1': { value: '{Colors.Warning.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Warning.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Warning.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Warning.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Warning.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Warning.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Warning.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Warning.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Warning.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Warning.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Warning.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Warning.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Warning.Color-10}', type: 'color' }
-    },
-    Error: {
-      'Color-1': { value: '{Colors.Error.Color-4}', type: 'color' },
-      'Color-2': { value: '{Colors.Error.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Error.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Error.Color-3}', type: 'color' },
-      'Color-5': { value: '{Colors.Error.Color-6}', type: 'color' },
-      'Color-6': { value: '{Colors.Error.Color-8}', type: 'color' },
-      'Color-7': { value: '{Colors.Error.Color-9}', type: 'color' },
-      'Color-8': { value: '{Colors.Error.Color-6}', type: 'color' },
-      'Color-9': { value: '{Colors.Error.Color-7}', type: 'color' },
-      'Color-10': { value: '{Colors.Error.Color-7}', type: 'color' },
-      'Color-11': { value: '{Colors.Error.Color-7}', type: 'color' },
-      'Color-12': { value: '{Colors.Error.Color-7}', type: 'color' },
-      'Color-Vibrant': { value: '{Active.Error.Color-10}', type: 'color' }
-    },
-    'Hotlink-Visited': {
-      'Color-1': { value: '{Colors.Hotlink-Visited.Color-3}', type: 'color' },
-      'Color-2': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-3': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-4': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-5': { value: '{Colors.Hotlink-Visited.Color-10}', type: 'color' },
-      'Color-6': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-7': { value: '{Colors.Hotlink-Visited.Color-4}', type: 'color' },
-      'Color-8': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-9': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-10': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-11': { value: '{Colors.Hotlink-Visited.Color-5}', type: 'color' },
-      'Color-12': { value: '{Colors.Hotlink-Visited.Color-11}', type: 'color' },
-      'Color-Vibrant': { value: '{Colors.Hotlink-Visited.Color-10}', type: 'color' }
-    }
+    Neutral: buildHoverForPalette('Neutral'),
+    Primary: buildHoverForPalette('Primary'),
+    Secondary: buildHoverForPalette('Secondary'),
+    Tertiary: buildHoverForPalette('Tertiary'),
+    Info: buildHoverForPalette('Info'),
+    Success: buildHoverForPalette('Success'),
+    Warning: buildHoverForPalette('Warning'),
+    Error: buildHoverForPalette('Error'),
+    'Hotlink-Visited': buildHoverForPalette('Hotlink-Visited'),
+    BW: buildHoverForPalette('Neutral'), // BW uses Neutral palette for hover/active
   };
 }

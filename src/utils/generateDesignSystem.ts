@@ -22,7 +22,10 @@ interface GenerateInput {
   userSelections: UserSelections;
   typographyStyles: TypographyStyle[];
   componentStyle: ComponentStyle;
+  styleCustomizations?: any;
   surfaceStyle?: SurfaceStyle;
+  moodBoardUrl?: string | null;
+  moodBoardFile?: File | null;
 }
 
 // ─── Map our button mode names to the pipeline's button style names ───
@@ -303,23 +306,39 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const bodyFamily = body?.family || 'sans-serif';
   const headerWeight = header?.weight || '700';
   const bodyWeight = body?.weight || '400';
-  const borderRadius = BORDER_RADII[input.componentStyle].medium;
+  // Get customizations from input, fallback to preset defaults
+  const sc = input.styleCustomizations;
+  const buttonRadius = sc?.buttonRadius ?? BORDER_RADII[input.componentStyle].medium;
+  const cardRadius = sc?.radius ?? Math.round(buttonRadius * 1.33);
+  const cardPadding = cardRadius >= 16 ? 20 : 16;
+  const buttonHeight = sc?.buttonHeight ?? 36;
+  const smallButtonHeight = sc?.smallButtonHeight ?? 24;
+  const largeButtonHeight = sc?.largeButtonHeight ?? 56;
+  const minButtonWidth = sc?.minButtonWidth ?? 60;
+  const iconButtonRadius = sc?.iconButtonRadius ?? buttonRadius;
+  const bevelPercent = sc?.bevel ?? 0;
+  const bevelOpacity = sc?.bevelOpacity ?? 50;
+  const bevelPx = Math.round(buttonHeight * bevelPercent / 100);
 
   const foundationCSS = `:root {
-  --Dropshadow-Color: rgba(0, 0, 0, 0.1);
-  --Effects-Level-0: none;
-  --Effects-Level-1: 0 1px 2px 0 var(--Dropshadow-Color);
-  --Effects-Level-2: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 var(--Dropshadow-Color);
-  --Effects-Level-3: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px var(--Dropshadow-Color);
-  --Effects-Level-4: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px var(--Dropshadow-Color);
-  --Effects-Level-5: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px var(--Dropshadow-Color);
 
-  --Shadow-1: 0px 0px 0px 1px #eeeeee;
-  --Shadow-2: 0px 0px 0px 0px rgba(0, 0, 0, 0.0);
-  --Button-Radius: ${borderRadius}px;
+  /* Button */
+  --Button-Radius: ${buttonRadius}px;
+  --Button-Icon-Radius: ${iconButtonRadius}px;
+  --Button-Height: ${buttonHeight}px;
+  --Small-Button-Height: ${smallButtonHeight}px;
+  --Large-Button-Height: ${largeButtonHeight}px;
+  --Button-Min-Width: ${minButtonWidth}px;
+  --Button-Bevel: ${bevelPercent}%;
+  --Button-Bevel-Px: ${bevelPx}px;
+  --Button-Bevel-Opacity: ${bevelOpacity}%;
+  --Button-Bevel-Shadow: ${bevelPx > 0 ? `inset -${bevelPx}px -${bevelPx}px ${bevelPx}px color-mix(in srgb, var(--Buttons-Default-Highlight, #ffffff) ${bevelOpacity}%, transparent), inset ${bevelPx}px ${bevelPx}px ${bevelPx}px color-mix(in srgb, var(--Buttons-Default-Lowlight, #000000) ${bevelOpacity}%, transparent)` : 'none'};
   --Style-Border-Radius: var(--Button-Radius);
-  --Card-Radius: ${Math.round(borderRadius * 1.33)}px;
-  --Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;
+
+  /* Card */
+  --Card-Radius: ${cardRadius}px;
+  --Card-Focus-Radius: ${cardRadius + 3}px;
+  --Card-Padding: ${cardPadding}px;
   --Style-Gradient-Color-1: var(--Buttons-Primary-Button);
   --Style-Gradient-Color-2: var(--Buttons-Primary-Button);
   --Style-Gradient-Angle: 0;
@@ -638,7 +657,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     { name: 'styles.css', content: stylesCSS, type: 'text/css' },
     { name: 'theme.json', content: themeJson, type: 'application/json' },
     { name: 'tokens.json', content: JSON.stringify(designSystemJSON, null, 2), type: 'application/json' },
-    { name: 'figma.json', content: (() => { try { return JSON.stringify(generateFigmaJSON(designSystemJSON), null, 2); } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; } })(), type: 'application/json' },
+    { name: 'figma.json', content: (() => { try { if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations; designSystemJSON._userSelections = input.userSelections; return JSON.stringify(generateFigmaJSON(designSystemJSON), null, 2); } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; } })(), type: 'application/json' },
     { name: 'DINO-TOKENS.md', content: buildDinoTokensMd(uuid, input), type: 'text/markdown' },
   ];
 
@@ -660,7 +679,31 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     }
   }
 
-  // 7. Upload all files to Supabase Storage
+  // 7. Upload mood board image if available
+  const moodBoardSource = input.moodBoardFile || input.moodBoardUrl;
+  if (moodBoardSource) {
+    try {
+      let blob: Blob;
+      if (input.moodBoardFile) {
+        blob = input.moodBoardFile;
+      } else {
+        const response = await fetch(input.moodBoardUrl!);
+        blob = await response.blob();
+      }
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(`${uuid}/moodboard.png`, blob, {
+          contentType: blob.type || 'image/png',
+          upsert: true,
+        });
+      if (error) console.error('Mood board upload failed:', error);
+      else console.log(`Mood board uploaded (${(blob.size / 1024).toFixed(0)}KB)`);
+    } catch (e) {
+      console.error('Mood board upload error:', e);
+    }
+  }
+
+  // 8. Upload all files to Supabase Storage
   for (const file of uploadFiles) {
     const { error } = await supabase.storage
       .from(BUCKET)

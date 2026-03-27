@@ -4719,11 +4719,10 @@ export function exportColorSystemToJSON(
     // - For Neutral: Color-9 (index 10)
     const isSemanticColor = paletteKey === 'info' || paletteKey === 'success' || paletteKey === 'warning' || paletteKey === 'error' || paletteKey === 'hotlink-visited';
     
-    // Light Mode Color-Vibrant is ALWAYS Color-9 (tone 90) for ALL palettes
-    // Per specification: Color-Vibrant in Light Mode = Color-9
+    // Color-Vibrant = Color-8 (index 7 in 0-based array) for BOTH Light and Dark mode
     let lightColorVibrant: string;
-    lightColorVibrant = palette.length > 10 ? palette[10].color : palette[palette.length - 1].color;
-    console.log(`🎨 [Color-Vibrant] ${paletteName} Light Mode using Color-9 (index 10)`);
+    lightColorVibrant = palette.length > 7 ? palette[7].color : palette[palette.length - 1].color;
+    console.log(`🎨 [Color-Vibrant] ${paletteName} using Color-8 (index 7)`);
 
     colorSystem.Modes['Light-Mode'].Colors[paletteName] = {};
     
@@ -4770,7 +4769,7 @@ export function exportColorSystemToJSON(
       console.log('  Color-12:', colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-12']);
     }
     
-    // Add Color-Vibrant for light mode (Color-9)
+    // Add Color-Vibrant for light mode (= Color-8)
     colorSystem.Modes['Light-Mode'].Colors[paletteName]['Color-Vibrant'] = {
       value: lightColorVibrant,
       type: 'color'
@@ -4809,14 +4808,14 @@ export function exportColorSystemToJSON(
       };
     }
     
-    // Add Color-Vibrant for dark mode - USE LIGHT MODE Color-9
-    // Per specification: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-9
+    // Add Color-Vibrant for dark mode - USE LIGHT MODE Color-8
+    // Per specification: Dark Mode Vibrant = Light Mode Vibrant = Light Mode Color-8
     colorSystem.Modes['Dark-Mode'].Colors[paletteName]['Color-Vibrant'] = {
-      value: lightColorVibrant, // Use the SAME value as light mode (Light Mode Color-9)
+      value: lightColorVibrant, // Use the SAME value as light mode (Light Mode Color-8)
       type: 'color'
     };
     
-    console.log(`🎨 [Color-Vibrant] ${paletteName} DARK MODE Color-Vibrant = ${lightColorVibrant} (using Light Mode Color-9)`);
+    console.log(`🎨 [Color-Vibrant] ${paletteName} DARK MODE Color-Vibrant = ${lightColorVibrant} (using Light Mode Color-8)`);
 
     // Add modes for Neutral, Primary, Secondary, Tertiary, and semantic colors (Error, Warning, Success, Info)
     if (paletteKey === 'neutral' || paletteKey === 'primary' || paletteKey === 'secondary' || paletteKey === 'tertiary' ||
@@ -6605,11 +6604,69 @@ export function exportColorSystemToJSON(
   const staticHover = getStaticHoverTokens();
   const staticActive = getStaticActiveTokens();
   
-  colorSystem.Modes['Light-Mode'].Hover = staticHover;
-  colorSystem.Modes['Light-Mode'].Active = staticActive;
-  colorSystem.Modes['Dark-Mode'].Hover = staticHover;
-  colorSystem.Modes['Dark-Mode'].Active = staticActive;
+  // Deep clone static tokens so Light and Dark can differ
+  const lightHover = JSON.parse(JSON.stringify(staticHover));
+  const lightActive = JSON.parse(JSON.stringify(staticActive));
+  const darkHover = JSON.parse(JSON.stringify(staticHover));
+  const darkActive = JSON.parse(JSON.stringify(staticActive));
+
+  colorSystem.Modes['Light-Mode'].Hover = lightHover;
+  colorSystem.Modes['Light-Mode'].Active = lightActive;
+  colorSystem.Modes['Dark-Mode'].Hover = darkHover;
+  colorSystem.Modes['Dark-Mode'].Active = darkActive;
   console.log('  ✓ [JSON Export] Static Hover and Active tokens applied to all modes');
+
+  // Post-process: new Active = old Hover, new Hover = mix(Button, old Hover)
+  function mixHexColors(hex1: string, hex2: string): string {
+    const parse = (h: string) => {
+      const c = h.replace('#', '');
+      const f = c.length === 3 ? c.split('').map(x => x + x).join('') : c;
+      const n = parseInt(f.substring(0, 6), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const [r1, g1, b1] = parse(hex1);
+    const [r2, g2, b2] = parse(hex2);
+    const m = (a: number, b: number) => Math.round((a + b) / 2);
+    return '#' + [m(r1, r2), m(g1, g2), m(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+
+  function resolveColorRef(ref: string, modeColors: any): string | null {
+    if (!ref || !ref.includes('{')) return ref?.startsWith('#') ? ref : null;
+    const path = ref.replace(/[{}]/g, '');
+    const match = path.match(/Colors\.([\w-]+)\.([\w-]+)/);
+    if (match) return modeColors?.[match[1]]?.[match[2]]?.value || null;
+    return null;
+  }
+
+  try {
+    for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+      const modeColors = colorSystem.Modes[modeName].Colors;
+      const hover = colorSystem.Modes[modeName].Hover;
+      const active = colorSystem.Modes[modeName].Active;
+      if (!modeColors || !hover || !active) continue;
+
+      for (const palette of Object.keys(hover)) {
+        if (!modeColors?.[palette] || !active?.[palette]) continue;
+        for (const colorKey of Object.keys(hover[palette])) {
+          try {
+            const oldHoverRef = hover[palette][colorKey]?.value;
+            const oldHoverHex = resolveColorRef(oldHoverRef, modeColors);
+            const buttonHex = modeColors[palette]?.[colorKey]?.value;
+
+            if (oldHoverHex && buttonHex && oldHoverHex.startsWith('#') && buttonHex.startsWith('#')) {
+              // new Active = old Hover hex
+              active[palette][colorKey] = { value: oldHoverHex, type: 'color' };
+              // new Hover = mix(Button, old Hover)
+              hover[palette][colorKey] = { value: mixHexColors(buttonHex, oldHoverHex), type: 'color' };
+            }
+          } catch { /* skip individual color */ }
+        }
+      }
+    }
+    console.log('  ✓ [JSON Export] Hover/Active swapped: Active=oldHover, Hover=mix(Button,oldHover)');
+  } catch (e) {
+    console.error('  ✗ Hover/Active post-processing failed:', e);
+  }
   
   // Apply static Quiet tokens
   console.log('📋 [JSON Export] Applying static Quiet (Text-Quiet) token structures...');

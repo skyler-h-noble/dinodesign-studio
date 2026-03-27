@@ -53,9 +53,9 @@ export interface UserSelections {
   background: string;
   backgroundTheme: 'Primary' | 'Neutral';
   backgroundN: number;
-  appBar: 'primary-light' | 'primary-light-bright' | 'primary' | 'primary-bright' | 'white' | 'black';
-  navBar: 'primary-light' | 'primary-light-dim' | 'primary' | 'primary-dim' | 'white' | 'black';
-  status: 'primary-light' | 'primary-light-bright' | 'primary' | 'primary-bright' | 'white' | 'black';
+  appBar: 'primary-light' | 'primary' | 'white' | 'black';
+  navBar: 'primary-light' | 'primary' | 'white' | 'black';
+  status: 'primary-light' | 'primary' | 'white' | 'black';
   button: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
   cardColoring: 'tonal' | 'white' | 'black';
   textColoring: 'tonal' | 'black-white';

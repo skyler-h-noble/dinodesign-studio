@@ -10,7 +10,7 @@
  * 
  * Structure:
  * Tag.Light.Primary.BG = {Colors.Primary.Color-9}
- * Tag.Light.Primary.Text.Primary = {Text.Tag.{Primary-Button-Text}.Color-9}
+ * Tag.Light.Primary.Text.Primary = {Text.Surfaces.{Primary-Button-Text}.Color-9}
  */
 
 /**
@@ -75,49 +75,49 @@ export function generateLightModeTags(
       Primary: {
         BG: { value: '{Colors.Primary.Color-9}', type: 'color' },
         Text: {
-          Primary: { value: `{Text.Tag.${textMappings.Primary}.Color-9}`, type: 'color' }
+          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-9}`, type: 'color' }
         }
       },
       Secondary: {
         BG: { value: '{Colors.Secondary.Color-9}', type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Tag.${textMappings.Secondary}.Color-9}`, type: 'color' }
+          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-9}`, type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: '{Colors.Tertiary.Color-9}', type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Tag.${textMappings.Tertiary}.Color-9}`, type: 'color' }
+          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-9}`, type: 'color' }
         }
       },
       Neutral: {
         BG: { value: '{Colors.Neutral.Color-9}', type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Tag.${textMappings.Neutral}.Color-9}`, type: 'color' }
+          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-9}`, type: 'color' }
         }
       },
       Info: {
         BG: { value: '{Colors.Info.Color-9}', type: 'color' },
         Text: {
-          Info: { value: `{Text.Tag.${textMappings.Info}.Color-9}`, type: 'color' }
+          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-9}`, type: 'color' }
         }
       },
       Success: {
         BG: { value: '{Colors.Success.Color-9}', type: 'color' },
         Text: {
-          Success: { value: `{Text.Tag.${textMappings.Success}.Color-9}`, type: 'color' }
+          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-9}`, type: 'color' }
         }
       },
       Warning: {
         BG: { value: '{Colors.Warning.Color-9}', type: 'color' },
         Text: {
-          Warning: { value: `{Text.Tag.${textMappings.Warning}.Color-9}`, type: 'color' }
+          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-9}`, type: 'color' }
         }
       },
       Error: {
         BG: { value: '{Colors.Error.Color-9}', type: 'color' },
         Text: {
-          Error: { value: `{Text.Tag.${textMappings.Error}.Color-9}`, type: 'color' }
+          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-9}`, type: 'color' }
         }
       }
     },
@@ -125,49 +125,49 @@ export function generateLightModeTags(
       Primary: {
         BG: { value: `{Colors.Primary.Color-${OB}}`, type: 'color' },
         Text: {
-          Primary: { value: `{Text.Tag.${textMappings.Primary}.Color-${OB}}`, type: 'color' }
+          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-${OB}}`, type: 'color' }
         }
       },
       Secondary: {
         BG: { value: `{Colors.Secondary.Color-${OB}}`, type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Tag.${textMappings.Secondary}.Color-${OB}}`, type: 'color' }
+          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-${OB}}`, type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: `{Colors.Tertiary.Color-${OB}}`, type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Tag.${textMappings.Tertiary}.Color-${OB}}`, type: 'color' }
+          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-${OB}}`, type: 'color' }
         }
       },
       Neutral: {
         BG: { value: `{Colors.Neutral.Color-${OB}}`, type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Tag.${textMappings.Neutral}.Color-${OB}}`, type: 'color' }
+          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-${OB}}`, type: 'color' }
         }
       },
       Info: {
         BG: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
         Text: {
-          Info: { value: `{Text.Tag.${textMappings.Info}.Color-${OB}}`, type: 'color' }
+          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-${OB}}`, type: 'color' }
         }
       },
       Success: {
         BG: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
         Text: {
-          Success: { value: `{Text.Tag.${textMappings.Success}.Color-${OB}}`, type: 'color' }
+          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-${OB}}`, type: 'color' }
         }
       },
       Warning: {
         BG: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
         Text: {
-          Warning: { value: `{Text.Tag.${textMappings.Warning}.Color-${OB}}`, type: 'color' }
+          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-${OB}}`, type: 'color' }
         }
       },
       Error: {
         BG: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },
         Text: {
-          Error: { value: `{Text.Tag.${textMappings.Error}.Color-${OB}}`, type: 'color' }
+          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-${OB}}`, type: 'color' }
         }
       }
     }
@@ -191,49 +191,49 @@ export function generateDarkModeTags(
       Primary: {
         BG: { value: '{Colors.Primary.Color-Vibrant}', type: 'color' },
         Text: {
-          Primary: { value: `{Text.Tag.${textMappings.Primary}.Color-Vibrant}`, type: 'color' }
+          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-Vibrant}`, type: 'color' }
         }
       },
       Secondary: {
         BG: { value: '{Colors.Secondary.Color-Vibrant}', type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Tag.${textMappings.Secondary}.Color-Vibrant}`, type: 'color' }
+          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-Vibrant}`, type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: '{Colors.Tertiary.Color-Vibrant}', type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Tag.${textMappings.Tertiary}.Color-Vibrant}`, type: 'color' }
+          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-Vibrant}`, type: 'color' }
         }
       },
       Neutral: {
         BG: { value: '{Colors.Neutral.Color-Vibrant}', type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Tag.${textMappings.Neutral}.Color-Vibrant}`, type: 'color' }
+          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-Vibrant}`, type: 'color' }
         }
       },
       Info: {
         BG: { value: '{Colors.Info.Color-Vibrant}', type: 'color' },
         Text: {
-          Info: { value: `{Text.Tag.${textMappings.Info}.Color-Vibrant}`, type: 'color' }
+          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-Vibrant}`, type: 'color' }
         }
       },
       Success: {
         BG: { value: '{Colors.Success.Color-Vibrant}', type: 'color' },
         Text: {
-          Success: { value: `{Text.Tag.${textMappings.Success}.Color-Vibrant}`, type: 'color' }
+          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-Vibrant}`, type: 'color' }
         }
       },
       Warning: {
         BG: { value: '{Colors.Warning.Color-Vibrant}', type: 'color' },
         Text: {
-          Warning: { value: `{Text.Tag.${textMappings.Warning}.Color-Vibrant}`, type: 'color' }
+          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-Vibrant}`, type: 'color' }
         }
       },
       Error: {
         BG: { value: '{Colors.Error.Color-Vibrant}', type: 'color' },
         Text: {
-          Error: { value: `{Text.Tag.${textMappings.Error}.Color-Vibrant}`, type: 'color' }
+          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-Vibrant}`, type: 'color' }
         }
       }
     },
@@ -241,49 +241,49 @@ export function generateDarkModeTags(
       Primary: {
         BG: { value: '{Colors.Primary.Color-Vibrant}', type: 'color' },
         Text: {
-          Primary: { value: `{Text.Tag.${textMappings.Primary}.Color-Vibrant}`, type: 'color' }
+          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-Vibrant}`, type: 'color' }
         }
       },
       Secondary: {
         BG: { value: '{Colors.Secondary.Color-Vibrant}', type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Tag.${textMappings.Secondary}.Color-Vibrant}`, type: 'color' }
+          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-Vibrant}`, type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: '{Colors.Tertiary.Color-Vibrant}', type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Tag.${textMappings.Tertiary}.Color-Vibrant}`, type: 'color' }
+          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-Vibrant}`, type: 'color' }
         }
       },
       Neutral: {
         BG: { value: '{Colors.Neutral.Color-Vibrant}', type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Tag.${textMappings.Neutral}.Color-Vibrant}`, type: 'color' }
+          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-Vibrant}`, type: 'color' }
         }
       },
       Info: {
         BG: { value: '{Colors.Info.Color-Vibrant}', type: 'color' },
         Text: {
-          Info: { value: `{Text.Tag.${textMappings.Info}.Color-Vibrant}`, type: 'color' }
+          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-Vibrant}`, type: 'color' }
         }
       },
       Success: {
         BG: { value: '{Colors.Success.Color-Vibrant}', type: 'color' },
         Text: {
-          Success: { value: `{Text.Tag.${textMappings.Success}.Color-Vibrant}`, type: 'color' }
+          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-Vibrant}`, type: 'color' }
         }
       },
       Warning: {
         BG: { value: '{Colors.Warning.Color-Vibrant}', type: 'color' },
         Text: {
-          Warning: { value: `{Text.Tag.${textMappings.Warning}.Color-Vibrant}`, type: 'color' }
+          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-Vibrant}`, type: 'color' }
         }
       },
       Error: {
         BG: { value: '{Colors.Error.Color-Vibrant}', type: 'color' },
         Text: {
-          Error: { value: `{Text.Tag.${textMappings.Error}.Color-Vibrant}`, type: 'color' }
+          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-Vibrant}`, type: 'color' }
         }
       }
     }

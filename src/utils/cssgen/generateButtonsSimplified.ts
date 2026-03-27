@@ -51,12 +51,16 @@ export function generateBaseButtons(
   mode: 'Light-Mode' | 'Dark-Mode',
   extractedTones?: { primary: number; secondary: number; tertiary: number }
 ): any {
-  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
-  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8;
+  const isDark = mode === 'Dark-Mode';
 
-  // Calculate {OB} (Other Buttons): if PC >= 9 then 8, else 6
-  const OB = PC >= 9 ? 8 : 6;
+  // In Dark Mode, all buttons use Color-12 for both Light and Medium
+  // In Light Mode, buttons use the extracted tone values
+  const PC = isDark ? 12 : (extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9);
+  const SC = isDark ? 12 : (extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8);
+  const TC = isDark ? 12 : (extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8);
+
+  // Calculate {OB} (Other Buttons): if PC >= 9 then 8, else 6. In Dark Mode = 12.
+  const OB = isDark ? 12 : (PC >= 9 ? 8 : 6);
   
   console.log(`🔘 [generateBaseButtons] Mode: ${mode}`);
   console.log(`  📊 EXTRACTED TONES INPUT:`, extractedTones);
@@ -74,12 +78,14 @@ export function generateBaseButtons(
   const buttons: any = {};
   
   // PRIMARY BUTTON
+  // Both Light and Medium use Color-PC (the user's actual extracted primary)
+  // This matches the UI preview which always uses p(vPrimary, PC)
   buttons.Primary = {
     Light: {
-      Button: { value: '{Colors.Primary.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Primary.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Primary.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Primary.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Primary.Color-${PC}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Primary.Color-${PC}}`, type: 'color' },
+      Hover: { value: `{Hover.Primary.Color-${PC}}`, type: 'color' },
+      Active: { value: `{Active.Primary.Color-${PC}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Primary.Color-${PC}}`, type: 'color' },
@@ -89,13 +95,13 @@ export function generateBaseButtons(
     }
   };
   
-  // SECONDARY BUTTON
+  // SECONDARY BUTTON — both shades use Color-SC
   buttons.Secondary = {
     Light: {
-      Button: { value: '{Colors.Secondary.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Secondary.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Secondary.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Secondary.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Secondary.Color-${SC}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Secondary.Color-${SC}}`, type: 'color' },
+      Hover: { value: `{Hover.Secondary.Color-${SC}}`, type: 'color' },
+      Active: { value: `{Active.Secondary.Color-${SC}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Secondary.Color-${SC}}`, type: 'color' },
@@ -104,14 +110,14 @@ export function generateBaseButtons(
       Active: { value: `{Active.Secondary.Color-${SC}}`, type: 'color' }
     }
   };
-  
-  // TERTIARY BUTTON
+
+  // TERTIARY BUTTON — both shades use Color-TC
   buttons.Tertiary = {
     Light: {
-      Button: { value: '{Colors.Tertiary.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Tertiary.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Tertiary.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Tertiary.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Tertiary.Color-${TC}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Tertiary.Color-${TC}}`, type: 'color' },
+      Hover: { value: `{Hover.Tertiary.Color-${TC}}`, type: 'color' },
+      Active: { value: `{Active.Tertiary.Color-${TC}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Tertiary.Color-${TC}}`, type: 'color' },
@@ -120,14 +126,14 @@ export function generateBaseButtons(
       Active: { value: `{Active.Tertiary.Color-${TC}}`, type: 'color' }
     }
   };
-  
-  // NEUTRAL BUTTON (always adaptive - uses Vibrant for Light, OB for Medium)
+
+  // NEUTRAL BUTTON — both shades use Color-OB
   buttons.Neutral = {
     Light: {
-      Button: { value: '{Colors.Neutral.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Neutral.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Neutral.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Neutral.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Neutral.Color-${OB}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Neutral.Color-${OB}}`, type: 'color' },
+      Hover: { value: `{Hover.Neutral.Color-${OB}}`, type: 'color' },
+      Active: { value: `{Active.Neutral.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Neutral.Color-${OB}}`, type: 'color' },
@@ -136,14 +142,14 @@ export function generateBaseButtons(
       Active: { value: `{Active.Neutral.Color-${OB}}`, type: 'color' }
     }
   };
-  
-  // INFO BUTTON
+
+  // INFO BUTTON — both shades use Color-OB
   buttons.Info = {
     Light: {
-      Button: { value: '{Colors.Info.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Info.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Info.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Info.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
+      Hover: { value: `{Hover.Info.Color-${OB}}`, type: 'color' },
+      Active: { value: `{Active.Info.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
@@ -153,13 +159,13 @@ export function generateBaseButtons(
     }
   };
   
-  // SUCCESS BUTTON
+  // SUCCESS BUTTON — both shades use Color-OB
   buttons.Success = {
     Light: {
-      Button: { value: '{Colors.Success.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Success.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Success.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Success.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
+      Hover: { value: `{Hover.Success.Color-${OB}}`, type: 'color' },
+      Active: { value: `{Active.Success.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
@@ -168,14 +174,14 @@ export function generateBaseButtons(
       Active: { value: `{Active.Success.Color-${OB}}`, type: 'color' }
     }
   };
-  
-  // WARNING BUTTON
+
+  // WARNING BUTTON — both shades use Color-OB
   buttons.Warning = {
     Light: {
-      Button: { value: '{Colors.Warning.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Warning.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Warning.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Warning.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
+      Hover: { value: `{Hover.Warning.Color-${OB}}`, type: 'color' },
+      Active: { value: `{Active.Warning.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
@@ -184,14 +190,14 @@ export function generateBaseButtons(
       Active: { value: `{Active.Warning.Color-${OB}}`, type: 'color' }
     }
   };
-  
-  // ERROR BUTTON
+
+  // ERROR BUTTON — both shades use Color-OB
   buttons.Error = {
     Light: {
-      Button: { value: '{Colors.Error.Color-Vibrant}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Error.Color-Vibrant}', type: 'color' },
-      Hover: { value: '{Hover.Error.Color-Vibrant}', type: 'color' },
-      Active: { value: '{Active.Error.Color-Vibrant}', type: 'color' }
+      Button: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },
+      Text: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
+      Hover: { value: `{Hover.Error.Color-${OB}}`, type: 'color' },
+      Active: { value: `{Active.Error.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },

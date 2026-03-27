@@ -466,7 +466,7 @@ export function applyUserSelections(
     } else if (userSelections.cardColoring === 'white') {
       // White uses Neutral Background-14 (L=99, white)
       updated.containerTheme = 'Neutral';
-      updated.containerN = 14;
+      updated.containerN = 12;
       updated.containerShade = 'Light';
     } else if (userSelections.cardColoring === 'black') {
       // Black uses Neutral Background-3 (dark container)
@@ -482,7 +482,7 @@ export function applyUserSelections(
       updated.containerShade = 'Light';
     } else if (userSelections.cardsText === 'professional' || userSelections.cardsText === 'primary') {
       updated.containerTheme = 'Neutral';
-      updated.containerN = 14;
+      updated.containerN = 12;
       updated.containerShade = 'Light';
     } else if (userSelections.cardsText === 'black') {
       updated.containerTheme = 'Neutral';

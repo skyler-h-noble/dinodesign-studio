@@ -104,6 +104,77 @@ function isLight(hex: string): boolean {
 
 function textFor(hex: string) { return isLight(hex) ? '#1a1a1a' : '#ffffff'; }
 
+/** Derive highlight (lighter) or lowlight (darker) from a hex color via HSL shift */
+function deriveHex(hex: string, lightOffset: number, satMul: number): string {
+  try {
+    const c = hex.replace('#', '');
+    const n = parseInt(c.substring(0, 6), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+    let h = 0, s = 0, l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+      else if (max === gn) h = (bn - rn) / d + 2;
+      else h = (rn - gn) / d + 4;
+      h /= 6;
+    }
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    const ns = clamp(s * 100 * satMul, 0, 100) / 100;
+    const nl = clamp(l * 100 + lightOffset, 8, 92) / 100;
+    if (ns === 0) {
+      const v = Math.round(nl * 255);
+      return '#' + [v, v, v].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    const q = nl < 0.5 ? nl * (1 + ns) : nl + ns - nl * ns;
+    const p = 2 * nl - q;
+    const h2r = (t: number) => { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1/6) return p + (q - p) * 6 * t; if (t < 1/2) return q; if (t < 2/3) return p + (q - p) * (2/3 - t) * 6; return p; };
+    return '#' + [h2r(h + 1/3), h2r(h), h2r(h - 1/3)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+  } catch { return hex; }
+}
+/**
+ * Compute highlight/lowlight that guarantee 4.5:1 text contrast is preserved.
+ *
+ * Given a button BG and its text color, the bevel overlay (at any opacity) must not
+ * push the perceived color past the point where text contrast drops below 4.5:1.
+ *
+ * We find the max lightness shift where contrast(mix(bg, shifted, opacity), textColor) >= 4.5.
+ * Since opacity is user-controlled (0-100%), we compute for worst case (100% opacity).
+ */
+function highlightFor(hex: string): string {
+  // Try progressively smaller shifts until contrast is safe
+  const textColor = isLight(hex) ? '#1a1a1a' : '#ffffff';
+  for (let shift = 25; shift >= 2; shift -= 2) {
+    const candidate = deriveHex(hex, shift, 0.7);
+    if (contrastRatio(candidate, textColor) >= 4.5) return candidate;
+  }
+  return hex; // No shift if nothing passes
+}
+
+function lowlightFor(hex: string): string {
+  const textColor = isLight(hex) ? '#1a1a1a' : '#ffffff';
+  for (let shift = 25; shift >= 2; shift -= 2) {
+    const candidate = deriveHex(hex, -shift, 1.3);
+    if (contrastRatio(candidate, textColor) >= 4.5) return candidate;
+  }
+  return hex;
+}
+
+/** Mix two hex colors at 50% */
+function mixHex(hex1: string, hex2: string): string {
+  const parse = (h: string) => {
+    const c = h.replace('#', '');
+    const n = parseInt(c.substring(0, 6), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const [r1, g1, b1] = parse(hex1);
+  const [r2, g2, b2] = parse(hex2);
+  const m = (a: number, b: number) => Math.round((a + b) / 2);
+  return '#' + [m(r1, r2), m(g1, g2), m(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 /** Compute dropshadow color: same hue/chroma, L * 0.625 */
 function dropshadowFor(hex: string): string {
   try {
@@ -282,7 +353,10 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // ── Text coloring (always tonal in dark mode) ──
   // surfaceN already computed above for nav color resolution
-  const containerN = isDark ? 3 : 10;
+  // containerN must match the actual container background, not the mode
+  const containerN = effectiveCardColoring === 'white' ? 12
+    : effectiveCardColoring === 'black' ? 3
+    : isDark ? 3 : 10;
   const tertiaryContainerN = isDark ? 3 : 10;
 
   let surfaceText: string;
@@ -439,17 +513,18 @@ ${(() => {
 ${(() => {
   const ac = appBarConfig;
   const tones = getAccessibleTones(appBarBg, ac.n, primaryLight);
-  // App bar hover/active for buttons
-  const abHoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
-  const abActiveMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+  // App bar hover/active for buttons — swapped: Active=oldHover, Hover=mix(button,oldHover)
+  const abOldHoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
   let abPal = 'Primary', abN = PC;
   switch (effectiveButton) {
     case 'secondary': case 'laddered': abPal = 'Secondary'; abN = SC; break;
     case 'black-white': abPal = 'Neutral'; abN = isLight(appBarBg) ? 1 : 12; break;
     default: abPal = 'Primary'; abN = PC; break;
   }
-  const abHover = abHoverMap[abN - 1] || Math.min(abN + 1, 12);
-  const abActive = abActiveMap[abN - 1] || Math.min(abN + 2, 12);
+  const abOldHover = abOldHoverMap[abN - 1] || Math.min(abN + 1, 12);
+  const abPalArr = abPal === 'Secondary' ? secondaryLight : abPal === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
+  const abOldHoverHex = p(abPalArr, abOldHover);
+  const abHoverHex = mixHex(btnBg, abOldHoverHex);
 
   return `[data-theme="Brand-App-Bar"] {
   --Background: ${appBarBg};
@@ -461,13 +536,13 @@ ${(() => {
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${btnBorder};
-  --Buttons-Primary-Hover: var(--Colors-${abPal}-Color-${abHover});
-  --Buttons-Primary-Active: var(--Colors-${abPal}-Color-${abActive});
+  --Buttons-Primary-Hover: ${abHoverHex};
+  --Buttons-Primary-Active: ${abOldHoverHex};
   --Buttons-Default-Button: transparent;
   --Buttons-Default-Text: var(--Colors-${ac.palette}-Color-${tones.text});
   --Buttons-Default-Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
-  --Buttons-Default-Hover: var(--Colors-${abPal}-Color-${abHover});
-  --Buttons-Default-Active: var(--Colors-${abPal}-Color-${abActive});
+  --Buttons-Default-Hover: ${abHoverHex};
+  --Buttons-Default-Active: ${abOldHoverHex};
 }`;
 })()}
 
@@ -482,14 +557,14 @@ ${(() => {
   --Quiet: ${surfaceQuiet};
   --Border: ${surfaceBorder};
   --Border-Variant: ${surfaceBorder};
-  --Hover: ${p(primaryLight, [3,4,4,3,4,7,8,7,8,8,8,8][surfaceN - 1] || surfaceN)};
-  --Active: ${p(primaryLight, [4,4,5,3,6,8,9,6,7,7,7,7][surfaceN - 1] || surfaceN)};
+  --Hover: ${mixHex(p(primaryLight, surfaceN), p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][surfaceN - 1] || surfaceN))};
+  --Active: ${p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][surfaceN - 1] || surfaceN)};
   --Focus-Visible: #3b82f6;
 
 ${(() => {
     // Hover/Active lookup tables (from verified 12-tone)
-    const hoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
-    const activeMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+    const hoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
+
 
     // Generate all button palette tokens
     const allPalettes = [
@@ -501,19 +576,19 @@ ${(() => {
       const bg = p(pal, n);
       const tones = getAccessibleTones(bg, n, pal);
       const palBorder = p(pal, getAccessibleTones(surfaceBg, surfaceN, pal).border);
-      const hoverN = hoverMap[n - 1] || Math.min(n + 1, 12);
-      const activeN = activeMap[n - 1] || Math.min(n + 2, 12);
+      const oldHoverN = hoverMap[n - 1] || Math.min(n + 1, 12);
+      const oldHoverHex = p(pal, oldHoverN);
       return `  --Buttons-${name}-Button: ${p(pal, n)};
   --Buttons-${name}-Text: ${p(pal, tones.text)};
   --Buttons-${name}-Border: ${palBorder};
-  --Buttons-${name}-Hover: ${p(pal, hoverN)};
-  --Buttons-${name}-Active: ${p(pal, activeN)};`;
+  --Buttons-${name}-Hover: ${mixHex(p(pal, n), oldHoverHex)};
+  --Buttons-${name}-Active: ${oldHoverHex};`;
     }).join('\n');
   })()}
 ${(() => {
     // Default button uses the selected button mode's palette and tones
-    const hoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
-    const activeMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+    const hoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
+
     // Determine which palette/N the default button resolves to
     let defPal: typeof vPrimary = vPrimary;
     let defN = PC;
@@ -523,13 +598,15 @@ ${(() => {
       case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(surfaceBg) ? 1 : 12; break;
       default: defPal = vPrimary; defN = PC; break;
     }
-    const defHover = hoverMap[defN - 1] || Math.min(defN + 1, 12);
-    const defActive = activeMap[defN - 1] || Math.min(defN + 2, 12);
+    const defOldHover = hoverMap[defN - 1] || Math.min(defN + 1, 12);
+    const defOldHoverHex = p(defPal, defOldHover);
     return `  --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${btnBorder};
-  --Buttons-Default-Hover: ${p(defPal, defHover)};
-  --Buttons-Default-Active: ${p(defPal, defActive)};`;
+  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
+  --Buttons-Default-Hover: ${mixHex(btnBg, defOldHoverHex)};
+  --Buttons-Default-Active: ${defOldHoverHex};`;
   })()}
 
   --Container: ${containerBg};
@@ -543,8 +620,8 @@ ${(() => {
   --Container-Quiet: ${containerQuiet};
   --Container-Border: ${containerBorder};
 ${(() => {
-    const hm = [3,4,4,3,4,7,8,7,8,8,8,8];
-    const am = [4,4,5,3,6,8,9,6,7,7,7,7];
+    const hm = [1,1,2,3,4,5,8,9,10,11,12,12];
+
     let cp = 'Primary', cn = PC;
     switch (effectiveButton) {
       case 'secondary': case 'laddered': cp = 'Secondary'; cn = SC; break;
@@ -557,11 +634,15 @@ ${(() => {
       const contPal = cp === 'Secondary' ? vSecondary : cp === 'Tertiary' ? vTertiary : vPrimary;
       contBtnBorder = p(contPal, getAccessibleTones(containerBg, containerN, contPal).border);
     }
+    const cpArr = cp === 'Secondary' ? secondaryLight : cp === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
+    const contOldHoverHex = p(cpArr, hm[cn - 1] || cn);
     return `  --Container-Buttons-Default-Button: ${btnBg};
   --Container-Buttons-Default-Text: ${btnText};
   --Container-Buttons-Default-Border: ${contBtnBorder};
-  --Container-Buttons-Default-Hover: var(--Colors-${cp}-Color-${hm[cn - 1] || cn});
-  --Container-Buttons-Default-Active: var(--Colors-${cp}-Color-${am[cn - 1] || cn});`;
+  --Container-Buttons-Default-Highlight: ${highlightFor(btnBg)};
+  --Container-Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
+  --Container-Buttons-Default-Hover: ${mixHex(btnBg, contOldHoverHex)};
+  --Container-Buttons-Default-Active: ${contOldHoverHex};`;
   })()}
 }
 
@@ -582,10 +663,10 @@ ${(() => {
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${containerBorder};
-  --Hover: ${p(primaryLight, [3,4,4,3,4,7,8,7,8,8,8,8][containerN - 1] || containerN)};
-  --Active: ${p(primaryLight, [4,4,5,3,6,8,9,6,7,7,7,7][containerN - 1] || containerN)};
-  --Buttons-Default-Hover: ${p(primaryLight, [3,4,4,3,4,7,8,7,8,8,8,8][containerN - 1] || containerN)};
-  --Buttons-Default-Active: ${p(primaryLight, [4,4,5,3,6,8,9,6,7,7,7,7][containerN - 1] || containerN)};
+  --Hover: ${mixHex(p(primaryLight, containerN), p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN))};
+  --Active: ${p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN)};
+  --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN))};
+  --Buttons-Default-Active: ${p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN)};
 }
 
 /* ══ Tertiary Theme ══ */
@@ -605,8 +686,7 @@ ${(() => {
 ${(() => {
   const nc = navBarConfig;
   const tones = getAccessibleTones(navBarBg, nc.n, primaryLight);
-  const hoverMap = [3,4,4,3,4,7,8,7,8,8,8,8];
-  const activeMap = [4,4,5,3,6,8,9,6,7,7,7,7];
+  const hoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
   // Use the button mode's palette for hover/active
   let navDefPal: typeof vPrimary = vPrimary;
   let navDefN = PC;
@@ -615,8 +695,9 @@ ${(() => {
     case 'black-white': navDefPal = NEUTRAL.map(h => ({ hex: h })) as any; navDefN = isLight(navBarBg) ? 1 : 12; break;
     default: navDefPal = vPrimary; navDefN = PC; break;
   }
-  const navDefHover = hoverMap[navDefN - 1] || Math.min(navDefN + 1, 12);
-  const navDefActive = activeMap[navDefN - 1] || Math.min(navDefN + 2, 12);
+  const navDefOldHover = hoverMap[navDefN - 1] || Math.min(navDefN + 1, 12);
+  const navDefOldHoverHex = p(navDefPal, navDefOldHover);
+  const navDefHoverHex = mixHex(btnBg, navDefOldHoverHex);
   const navBorderN = tones.border;
 
   return `[data-theme="Brand-Nav-Bar"] {
@@ -629,13 +710,13 @@ ${(() => {
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${p(primaryLight, navBorderN)};
-  --Buttons-Primary-Hover: ${p(navDefPal, navDefHover)};
-  --Buttons-Primary-Active: ${p(navDefPal, navDefActive)};
+  --Buttons-Primary-Hover: ${navDefHoverHex};
+  --Buttons-Primary-Active: ${navDefOldHoverHex};
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${p(primaryLight, navBorderN)};
-  --Buttons-Default-Hover: ${p(navDefPal, navDefHover)};
-  --Buttons-Default-Active: ${p(navDefPal, navDefActive)};
+  --Buttons-Default-Hover: ${navDefHoverHex};
+  --Buttons-Default-Active: ${navDefOldHoverHex};
 }`;
 })()}
 

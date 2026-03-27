@@ -14,7 +14,7 @@ interface ColorToken {
 
 const THEMES = [
   'Default', 'Primary', 'Primary-Light', 'Secondary', 'Secondary-Light',
-  'Tertiary', 'Tertiary-Light', 'White', 'Light-Grey', 'Black',
+  'Tertiary', 'Tertiary-Light', 'White', 'Light-Gray', 'Black',
   'Info', 'Info-Light', 'Success', 'Success-Light',
   'Warning', 'Warning-Light', 'Error', 'Error-Light',
 ];
@@ -164,6 +164,43 @@ function resolveToColorRef(tokenValue: string, lookup: Record<string, string>, c
 }
 
 /**
+ * Follow a token chain to find its {Colors.Palette.Color-N} reference
+ * WITHOUT reverse hex lookup. Returns the Color ref if found, or the
+ * raw value if it can't resolve to a Color ref.
+ */
+function resolveToColorAlias(tokenValue: string, lookup: Record<string, string>): string {
+  if (!tokenValue || !tokenValue.includes('{')) return tokenValue;
+
+  let current = tokenValue;
+  for (let depth = 0; depth < 10; depth++) {
+    if (!current.includes('{')) break;
+    const path = current.replace(/[{}]/g, '');
+
+    // Already a Colors reference
+    const colorMatch = path.match(/^(?:Colors\.)?([\w-]+)\.(Color-[\w-]+)$/);
+    if (colorMatch) return `{Colors.${colorMatch[1]}.${colorMatch[2]}}`;
+
+    const resolved = lookup[path];
+    if (resolved) {
+      if (resolved.startsWith('#')) return resolved; // Hit hex, no further
+      if (resolved.includes('{')) { current = resolved; continue; }
+      break;
+    }
+
+    // Try Colors. prefix for {White}, {Black}
+    if (!path.includes('.')) {
+      const withPrefix = lookup[`Colors.${path}`];
+      if (withPrefix) {
+        if (withPrefix.startsWith('#')) return withPrefix;
+        if (withPrefix.includes('{')) { current = withPrefix; continue; }
+      }
+    }
+    break;
+  }
+  return current;
+}
+
+/**
  * Resolve a token to its final hex value
  */
 function resolveToHex(tokenValue: string, lookup: Record<string, string>, colors: any): string | null {
@@ -200,6 +237,15 @@ function resolveToHex(tokenValue: string, lookup: Record<string, string>, colors
       }
     }
 
+    // Try adding "Colors." prefix for simple color names like {White}, {Black}
+    if (!path.includes('.')) {
+      const withPrefix = lookup[`Colors.${path}`];
+      if (withPrefix) {
+        if (withPrefix.startsWith('#')) return withPrefix;
+        if (withPrefix.includes('{')) { current = withPrefix; continue; }
+      }
+    }
+
     break;
   }
   return null;
@@ -212,6 +258,37 @@ function deriveColorHex(hex: string, lightOffset: number, satMultiplier: number)
   const rgb = deriveShadowRGB(hex, lightOffset, satMultiplier);
   const parts = rgb.split(',').map(s => parseInt(s.trim()));
   return '#' + parts.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Get the "one step" Active Color-N for a given Color-N.
+ * Dark (1-6): step darker. Light (7-12): step lighter.
+ * Color-1 → 1 (black end), Color-12 → 12 (white end).
+ */
+const ACTIVE_MAP: Record<string, number> = {
+  '1': 1, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5,
+  '7': 8, '8': 9, '9': 10, '10': 11, '11': 12, '12': 12,
+};
+function getActiveColorN(colorN: string): string {
+  const n = colorN.replace('Color-', '');
+  if (n === 'Vibrant') return 'Color-10';
+  return `Color-${ACTIVE_MAP[n] || n}`;
+}
+
+/**
+ * Mix two hex colors at 50%
+ */
+function mixHex(hex1: string, hex2: string): string {
+  const parse = (h: string) => {
+    const c = h.replace('#', '');
+    const f = c.length === 3 ? c.split('').map(x => x + x).join('') : c;
+    const n = parseInt(f.substring(0, 6), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const [r1, g1, b1] = parse(hex1);
+  const [r2, g2, b2] = parse(hex2);
+  const mix = (a: number, b: number) => Math.round((a + b) / 2);
+  return '#' + [mix(r1, r2), mix(g1, g2), mix(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
 export function generateFigmaJSON(designSystemJSON: any): any {
@@ -227,50 +304,125 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     const themes = modeData.Themes;
     const lookup = buildTokenLookup(modeData);
 
-    // ── Modes section ──
-    const modeSection: any = {
-      Colors: {},
-      Containers: {},
-    };
+    // ── Modes section — export ALL computed groups ──
+    const modeSection: any = {};
 
-    // Colors: copy all palette colors as hex
-    if (colors) {
-      for (const palette of Object.keys(colors)) {
-        modeSection.Colors[palette] = {};
-        for (const [key, val] of Object.entries(colors[palette])) {
-          if ((val as any)?.value && key.startsWith('Color-')) {
-            modeSection.Colors[palette][key] = { value: (val as any).value, type: 'color' };
+    // Recursively extract all leaf tokens (with value+type) to hex
+    function extractTokens(source: any, target: any) {
+      for (const [key, val] of Object.entries(source)) {
+        if (val && typeof val === 'object' && 'value' in (val as any) && 'type' in (val as any)) {
+          let hex = (val as any).value;
+          // Resolve token references to hex
+          if (hex && typeof hex === 'string' && hex.includes('{')) {
+            const resolved = resolveToHex(hex, lookup, colors);
+            hex = resolved || hex;
           }
+          if (hex && typeof hex === 'string') {
+            target[key] = { value: hex, type: 'color' };
+          }
+        } else if (val && typeof val === 'object' && !('value' in (val as any))) {
+          target[key] = {};
+          extractTokens(val, target[key]);
         }
       }
     }
 
-    // Image-Overlay: transparent in light mode, 50% black in dark mode
-    modeSection.Colors['Image-Overlay'] = {
-      'Color-1': {
-        value: modeName === 'Dark-Mode' ? '#00000080' : '#00000000',
-        type: 'color',
-      },
-    };
+    // Export all sections from the design system (except Themes which go in their own collection)
+    const MODES_SECTIONS = [
+      'Colors', 'Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
+      'Hover', 'Active', 'Focus-Visible',
+      'Icon', 'Icon-Variant', 'Tag',
+      'Buttons', 'Default-Button', 'Default-Button-Border',
+      'Backgrounds',
+    ];
 
-    // Transparent
+    for (const section of MODES_SECTIONS) {
+      if (modeData[section]) {
+        modeSection[section] = {};
+        extractTokens(modeData[section], modeSection[section]);
+      }
+    }
+
+    // Add utility colors
+    if (!modeSection.Colors) modeSection.Colors = {};
+    modeSection.Colors['Image-Overlay'] = {
+      'Color-1': { value: modeName === 'Dark-Mode' ? '#0000004D' : '#00000000', type: 'color' },
+    };
     modeSection.Colors['Transparent'] = {
       'Color-1': { value: '#00000000', type: 'color' },
     };
 
-    // Backgrounds per theme (Container backgrounds)
-    if (themes) {
-      const containerKeys = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
-      for (const themeName of THEMES) {
-        const theme = themes[themeName];
-        if (!theme?.Containers) continue;
+    // Add computed Button-Hover, Button-Active, Button-Highlight, Button-Lowlight
+    if (colors) {
+      const btnSections = ['Button-Hover', 'Button-Active', 'Button-Highlight', 'Button-Lowlight'];
+      for (const s of btnSections) modeSection[s] = {};
+      const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
+      for (const palette of palettes) {
+        if (!colors[palette]) continue;
+        for (const s of btnSections) modeSection[s][palette] = {};
+        for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
+          if (!colorKey.startsWith('Color-')) continue;
+          const btnHex = (colorVal as any).value;
+          const activeColorN = getActiveColorN(colorKey);
+          const activeHex = colors[palette]?.[activeColorN]?.value || btnHex;
+          modeSection['Button-Active'][palette][colorKey] = { value: activeHex, type: 'color' };
+          modeSection['Button-Hover'][palette][colorKey] = { value: mixHex(btnHex, activeHex), type: 'color' };
+          const hlHex = deriveColorHex(btnHex, 25, 0.6);
+          const llHex = deriveColorHex(btnHex, -25, 1.4);
+          // Apply bevel opacity as alpha channel
+          const bevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
+          const alphaHex = Math.round(bevelOpacity * 255 / 100).toString(16).padStart(2, '0');
+          modeSection['Button-Highlight'][palette][colorKey] = { value: `${hlHex}${alphaHex}`, type: 'color' };
+          modeSection['Button-Lowlight'][palette][colorKey] = { value: `${llHex}${alphaHex}`, type: 'color' };
+        }
+      }
+    }
 
-        modeSection.Containers[themeName] = {};
-        for (const key of containerKeys) {
-          const token = theme.Containers[key]?.value;
-          const hex = token ? resolveToHex(token, lookup, colors) : null;
-          if (hex) {
-            modeSection.Containers[themeName][key] = { value: hex, type: 'color' };
+    // Computed groups: Border-Variant, Dropshadow-Color per palette per Color-N
+    if (colors) {
+      const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
+
+      // Border-Variant: border color at 25% opacity (hex + '40')
+      // Uses the Border section values if available, otherwise derives from palette
+      modeSection['Border-Variant'] = {};
+      const borderData = modeSection.Border || {};
+      for (const section of ['Surfaces', 'Containers']) {
+        modeSection['Border-Variant'][section] = {};
+        const borderSection = borderData[section] || {};
+        for (const palette of palettes) {
+          modeSection['Border-Variant'][section][palette] = {};
+          const borderPalette = borderSection[palette] || {};
+          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
+            if (!colorKey.startsWith('Color-')) continue;
+            // Get border hex from Border section or derive from palette
+            const borderToken = borderPalette[colorKey] as any;
+            const borderHex = borderToken?.value || (colorVal as any).value;
+            if (borderHex && borderHex.startsWith('#')) {
+              modeSection['Border-Variant'][section][palette][colorKey] = {
+                value: `${borderHex.substring(0, 7)}40`, type: 'color'
+              };
+            }
+          }
+        }
+      }
+
+      // Dropshadow-Color: 5 levels with different opacities, derived from background
+      const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
+      for (let level = 1; level <= 5; level++) {
+        const sectionName = `Dropshadow-Color-${level}`;
+        modeSection[sectionName] = {};
+        for (const palette of palettes) {
+          modeSection[sectionName][palette] = {};
+          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
+            if (!colorKey.startsWith('Color-')) continue;
+            const bgHex = (colorVal as any).value;
+            if (bgHex && bgHex.startsWith('#')) {
+              const baseHex = deriveColorHex(bgHex, -25, 1.5);
+              const alphaHex = Math.round(opacities[level - 1] * 255).toString(16).padStart(2, '0');
+              modeSection[sectionName][palette][colorKey] = {
+                value: `${baseHex}${alphaHex}`, type: 'color'
+              };
+            }
           }
         }
       }
@@ -281,7 +433,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // ── Themes section (only build once from Light-Mode) ──
     if (modeName === 'Light-Mode' && themes) {
       for (const themeName of THEMES) {
-        // Light-Grey isn't in the source themes — skip if not found
+        // Light-Gray isn't in the source themes — skip if not found
         const theme = themes[themeName];
         if (!theme) continue;
 
@@ -296,24 +448,39 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
           // Recursively resolve all tokens to Color references
           // Compute Dropshadow-Color, Border-Variant, Highlight, Lowlight as hex
-          function processGroup(source: any, target: any) {
+          // Capture internalKey for this iteration
+          const currentInternalKey = internalKey;
+          const processGroup = (source: any, target: any) => {
             for (const [key, val] of Object.entries(source)) {
-              // Dropshadow-Color → generate 5 levels with different opacities
+              // Dropshadow-Color → link to Modes/Dropshadow-Color-{1-5} entries
               if (key === 'Dropshadow-Color') {
                 const bgToken = source['Background']?.value || source['Surface']?.value;
-                const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
                 if (bgToken) {
-                  const bgHex = resolveToHex(bgToken, lookup, colors);
-                  if (bgHex) {
-                    const baseHex = deriveColorHex(bgHex, -25, 1.5);
-                    for (let i = 0; i < 5; i++) {
-                      const alphaHex = Math.round(opacities[i] * 255).toString(16).padStart(2, '0');
-                      target[`Dropshadow-Color-${i + 1}`] = { value: `${baseHex}${alphaHex}`, type: 'color' };
+                  // Check if it's a Default-Background reference
+                  if (bgToken.includes('Default-Background')) {
+                    for (let i = 1; i <= 5; i++) {
+                      target[`Dropshadow-Color-${i}`] = {
+                        value: `{Default-Background.Dropshadow-Color-${i}}`,
+                        type: 'color'
+                      };
+                    }
+                    continue;
+                  }
+                  // Extract palette and Color-N from the background ref
+                  const bgAlias = resolveToColorAlias(bgToken, lookup);
+                  const bgMatch = bgAlias.match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
+                  if (bgMatch) {
+                    for (let i = 1; i <= 5; i++) {
+                      target[`Dropshadow-Color-${i}`] = {
+                        value: `{Dropshadow-Color-${i}.${bgMatch[1]}.${bgMatch[2]}}`,
+                        type: 'color'
+                      };
                     }
                     continue;
                   }
                 }
-                // Fallback
+                // Fallback: compute hex inline
+                const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
                 for (let i = 0; i < 5; i++) {
                   const alphaHex = Math.round(opacities[i] * 255).toString(16).padStart(2, '0');
                   target[`Dropshadow-Color-${i + 1}`] = { value: `#00000047${alphaHex}`, type: 'color' };
@@ -321,143 +488,86 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                 continue;
               }
 
-              // Container background keys → reference Modes/Containers
+              // Container background keys → keep as Modes ref (Backgrounds/Containers)
               const containerBgKeys = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
-              if (containerBgKeys.includes(key) && groupKey === 'Containers') {
-                target[key] = {
-                  value: `{Modes.Light-Mode.Containers.${sourceThemeName}.${key}}`,
-                  type: 'color',
-                };
-                continue;
-              }
-
-              // Quiet — when BW text, resolve to hex (Neutral gray, not BW black/white)
-              if (key === 'Quiet') {
+              if (containerBgKeys.includes(key) && currentInternalKey === 'Containers') {
                 if (val && typeof val === 'object' && 'value' in val) {
-                  const tokenVal = (val as any).value as string;
-                  // If it references BW, resolve to the Neutral quiet color instead
-                  if (tokenVal.includes('BW')) {
-                    // Get the Color-N from the token and look up the Neutral quiet value
-                    const nMatch = tokenVal.match(/Color-(\d+)/);
-                    if (nMatch) {
-                      const quietToken = `{Quiet.Surfaces.Neutral.Color-${nMatch[1]}}`;
-                      const hex = resolveToHex(quietToken, lookup, colors);
-                      if (hex) {
-                        target[key] = { value: hex, type: 'color' };
-                        continue;
-                      }
-                    }
-                  }
-                  // Non-BW or fallback — try normal resolution
-                  const resolved = resolveToColorRef(tokenVal, lookup, colors);
-                  // If it resolved to a Color ref, keep it; if not, resolve to hex
-                  if (resolved.includes('{Colors.')) {
-                    target[key] = { value: resolved, type: 'color' };
+                  const tokenVal = (val as any).value;
+                  // Check if it's already a Backgrounds ref
+                  const bgRef = tokenVal.replace(/[{}]/g, '');
+                  if (bgRef.startsWith('Backgrounds.') || bgRef.startsWith('Containers.')) {
+                    target[key] = { value: tokenVal, type: 'color' };
                   } else {
+                    // Resolve to hex as fallback
                     const hex = resolveToHex(tokenVal, lookup, colors);
-                    target[key] = { value: hex || resolved, type: 'color' };
+                    target[key] = { value: hex || tokenVal, type: 'color' };
                   }
                 }
                 continue;
               }
 
-              // Icon Variants — resolve to hex with 40% opacity
-              if (key.endsWith('-Variant') && key !== 'Border-Variant') {
-                if (val && typeof val === 'object' && 'value' in val) {
-                  const hex = resolveToHex((val as any).value, lookup, colors);
-                  if (hex) {
-                    target[key] = { value: `${hex}66`, type: 'color' };
-                    continue;
-                  }
-                }
-                // Fallback — resolve normally
-                if (val && typeof val === 'object' && 'value' in val) {
-                  const resolved = resolveToColorRef((val as any).value, lookup, colors);
-                  target[key] = { value: resolved, type: 'color' };
-                }
-                continue;
-              }
-
-              // Focus-Visible — resolve to hex (not a Color reference)
-              if (key === 'Focus-Visible') {
-                if (val && typeof val === 'object' && 'value' in val) {
-                  const fvHex = resolveToHex((val as any).value, lookup, colors);
-                  target[key] = { value: fvHex || '#3b82f6', type: 'color' };
-                }
-                continue;
-              }
-
-              // Border-Variant — border color at 40% opacity
-              if (key === 'Border-Variant') {
-                const borderToken = source['Border']?.value;
-                if (borderToken) {
-                  const borderHex = resolveToHex(borderToken, lookup, colors);
-                  if (borderHex) {
-                    target[key] = { value: `${borderHex}40`, type: 'color' };
-                    continue;
-                  }
-                }
-                if (val && typeof val === 'object' && 'value' in val) {
-                  target[key] = { value: (val as any).value, type: 'color' };
-                }
-                continue;
-              }
-
-              // Highlight/Lowlight — compute from the sibling Button color
-              if (key === 'Highlight' || key === 'Lowlight') {
-                const btnToken = source['Button'];
-                if (btnToken?.value) {
-                  // Try direct hex resolution
-                  let btnHex = resolveToHex(btnToken.value, lookup, colors);
-                  // If that fails, try resolving the Color ref and looking up its hex
-                  if (!btnHex) {
-                    const colorRef = resolveToColorRef(btnToken.value, lookup, colors);
-                    const colorMatch = colorRef.match(/\{Colors\.([\w-]+)\.([\w-]+)\}/);
-                    if (colorMatch) {
-                      btnHex = colors?.[colorMatch[1]]?.[colorMatch[2]]?.value;
-                    }
-                  }
-                  if (btnHex) {
-                    if (key === 'Highlight') {
-                      target[key] = { value: deriveColorHex(btnHex, 15, 0.8), type: 'color' };
-                    } else {
-                      target[key] = { value: deriveColorHex(btnHex, -15, 1.2), type: 'color' };
-                    }
-                    continue;
-                  }
-                }
-                // Fallback
-                if (val && typeof val === 'object' && 'value' in val) {
-                  target[key] = { value: (val as any).value, type: 'color' };
-                }
-                continue;
-              }
+              // All special handlers removed — everything goes through generic resolution below.
+              // Quiet, Icon-Variant, Focus-Visible, Border-Variant, Highlight, Lowlight
+              // are all now in Modes and get kept as token refs via MODES_GROUPS check.
 
               if (val && typeof val === 'object' && 'value' in val && 'type' in val) {
-                const resolved = resolveToColorRef((val as any).value, lookup, colors);
-                // If still unresolved (contains {), fall back to hex
-                if (resolved.includes('{') && !resolved.includes('{Colors.')) {
-                  const hex = resolveToHex((val as any).value, lookup, colors);
-                  target[key] = { value: hex || resolved, type: 'color' };
+                const tokenVal = (val as any).value;
+
+                // Try to resolve to a Modes-aliasable reference:
+                // 1. {Colors.Palette.Color-N} → direct alias
+                // 2. {Hover/Active.Palette.Color-N} → alias to Modes/Hover or Modes/Active
+                // 3. {Text/Header/etc.Section.Palette.Color-N} → keep as token ref for plugin
+                // 4. Fall back to hex if nothing resolves
+
+                if (tokenVal.includes('{')) {
+                  const modesRef = tokenVal.replace(/[{}]/g, '');
+                  const topLevel = modesRef.split('.')[0];
+                  const MODES_GROUPS = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
+                    'Hover', 'Active', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
+                    'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
+                    'Button-Hover', 'Button-Active', 'Button-Highlight', 'Button-Lowlight',
+                    'Dropshadow-Color-1', 'Dropshadow-Color-2', 'Dropshadow-Color-3',
+                    'Dropshadow-Color-4', 'Dropshadow-Color-5',
+                    'Default-Background'];
+
+                  // If the token already references a Modes group, keep it as-is
+                  // (don't resolve further — the plugin will alias to the Modes variable)
+                  if (MODES_GROUPS.includes(topLevel)) {
+                    target[key] = { value: tokenVal, type: 'color' };
+                  } else {
+                    // Try to resolve to a Colors ref
+                    const alias = resolveToColorAlias(tokenVal, lookup);
+                    if (alias.includes('{Colors.')) {
+                      target[key] = { value: alias, type: 'color' };
+                    } else {
+                      // Resolve to hex as fallback
+                      const hex = resolveToHex(tokenVal, lookup, colors);
+                      target[key] = { value: hex || tokenVal, type: 'color' };
+                    }
+                  }
+                } else if (tokenVal.startsWith('#')) {
+                  target[key] = { value: tokenVal, type: 'color' };
                 } else {
-                  target[key] = { value: resolved, type: 'color' };
+                  target[key] = { value: tokenVal, type: 'color' };
                 }
               } else if (val && typeof val === 'object' && !('value' in val)) {
                 target[key] = {};
                 processGroup(val, target[key]);
-                // If this is a button group with a Button key but no Highlight/Lowlight, compute them
-                if ((val as any)['Button'] && !target[key]['Highlight']) {
+                // If this is a button group with a Button key, compute Highlight/Lowlight and swap Hover/Active
+                if ((val as any)['Button']) {
                   const btnToken = (val as any)['Button'];
                   if (btnToken?.value) {
-                    let btnHex = resolveToHex(btnToken.value, lookup, colors);
-                    if (!btnHex) {
-                      const colorRef = resolveToColorRef(btnToken.value, lookup, colors);
-                      const colorMatch = colorRef.match(/\{Colors\.([\w-]+)\.([\w-]+)\}/);
-                      if (colorMatch) btnHex = colors?.[colorMatch[1]]?.[colorMatch[2]]?.value;
-                    }
-                    if (btnHex) {
-                      target[key]['Highlight'] = { value: deriveColorHex(btnHex, 15, 0.8), type: 'color' };
-                      target[key]['Lowlight'] = { value: deriveColorHex(btnHex, -15, 1.2), type: 'color' };
+                    // Extract palette and Color-N from the button's Color ref
+                    const btnRef = resolveToColorAlias(btnToken.value, lookup);
+                    const btnMatch = btnRef.match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
+                    if (btnMatch) {
+                      const palette = btnMatch[1];
+                      const colorN = btnMatch[2];
+                      // Link to Modes entries for button interactions
+                      target[key]['Hover'] = { value: `{Button-Hover.${palette}.${colorN}}`, type: 'color' };
+                      target[key]['Active'] = { value: `{Button-Active.${palette}.${colorN}}`, type: 'color' };
+                      target[key]['Highlight'] = { value: `{Button-Highlight.${palette}.${colorN}}`, type: 'color' };
+                      target[key]['Lowlight'] = { value: `{Button-Lowlight.${palette}.${colorN}}`, type: 'color' };
                     }
                   }
                 }
@@ -506,13 +616,12 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     figma.SurfacesContainers[surfaceName] = sc;
   }
 
-  // Container variants — link to Tone.Standard.Containers (which links to Theme)
-  // Background comes from Modes.Containers, rest from Tone
+  // Container variants — all from Theme.Containers
   const containerKeys2 = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
   for (const containerName of containerKeys2) {
     const sc: any = {};
-    // Background from Modes
-    sc.Background = { value: `{Modes.Light-Mode.Containers.Default.${containerName}}`, type: 'color' };
+    // Background from Theme.Containers (hex value, resolved per theme)
+    sc.Background = { value: `{Theme.Containers/${containerName}}`, type: 'color' };
 
     // Rest from Theme.Containers
     const themeContainers = figma.Themes?.Default?.Containers;
@@ -537,54 +646,207 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
   // ── Navigation settings ──
   // Maps user's nav selections to Theme/Tone/Surface modes for the Figma plugin
+  // ── Default Background — add to both Light and Dark mode sections ──
   const defaultSettings = designSystemJSON.Metadata?.['Default-Settings'];
   if (defaultSettings) {
-    function mapNavToModes(selection: string, n: number): { theme: string; tone: string; surface: string } {
-      // Parse selection like "primary-light-bright", "primary-dim", "black", "white"
-      let theme = 'Default';
-      let tone = 'Standard';
-      let surface = 'Surface';
+    const defTheme = defaultSettings['Default-Theme']?.Theme?.value || 'Neutral';
+    const defN = defaultSettings['Default-Theme']?.N?.value || 12;
+    const userBg = designSystemJSON._userSelections?.background || 'white';
 
-      if (selection === 'black') {
-        theme = 'Black'; tone = 'Standard'; surface = 'Surface';
-      } else if (selection === 'white') {
-        theme = 'White'; tone = 'Standard'; surface = 'Surface';
-      } else if (selection.includes('-light')) {
-        // primary-light, primary-light-bright, primary-light-dim
-        const palette = selection.split('-')[0];
-        theme = palette.charAt(0).toUpperCase() + palette.slice(1);
-        tone = 'Light';
-        if (selection.endsWith('-bright')) surface = 'Surface-Bright';
-        else if (selection.endsWith('-dim')) surface = 'Surface-Dim';
-        else surface = 'Surface';
-      } else if (selection.includes('-bright')) {
-        const palette = selection.split('-')[0];
-        theme = palette.charAt(0).toUpperCase() + palette.slice(1);
-        tone = 'Standard';
-        surface = 'Surface-Bright';
-      } else if (selection.includes('-dim')) {
-        const palette = selection.split('-')[0];
-        theme = palette.charAt(0).toUpperCase() + palette.slice(1);
-        tone = 'Standard';
-        surface = 'Surface-Dim';
-      } else {
-        // "primary", "secondary", etc.
-        theme = selection.charAt(0).toUpperCase() + selection.slice(1);
-        tone = 'Standard';
-        surface = 'Surface';
+    // Determine Dark Mode palette and N based on user's Light Mode selection:
+    // Primary/Primary-Light → Primary Color-2
+    // White/Black → Neutral Color-2
+    const darkUsePrimary = (userBg === 'primary-light' || userBg === 'primary-base' || userBg === 'primary');
+    const darkPalette = darkUsePrimary ? 'Primary' : 'Neutral';
+    const darkN = 2;
+    // Dark mode containers are always tonal: Primary Color-3 or Neutral Color-3
+    const darkContainerN = 3;
+
+    // Add Default-Background to Modes
+    for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+      const modeData = designSystemJSON.Modes?.[modeName];
+      if (!modeData) continue;
+
+      const isDark = modeName === 'Dark-Mode';
+      const bgPalette = isDark ? darkPalette : defTheme;
+      const bgN = isDark ? darkN : defN;
+      const contPalette = isDark ? darkPalette : defTheme;
+      const contN = isDark ? darkContainerN : (defaultSettings['Card-Coloring']?.ContN?.value || 12);
+
+      const modeColors = modeData.Colors;
+      const modeLookup = buildTokenLookup(modeData);
+      const bgKey = `Background-${bgN}`;
+      const bgData = modeData.Backgrounds?.[bgPalette]?.[bgKey];
+
+      const defBg: any = {
+        'Surface': { value: modeColors?.[bgPalette]?.[`Color-${bgN}`]?.value || '#ffffff', type: 'color' },
+      };
+
+      // Surface variants from Backgrounds
+      if (bgData?.Surfaces) {
+        for (const [sk, sv] of Object.entries(bgData.Surfaces)) {
+          let hex = (sv as any)?.value;
+          if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+          if (hex) defBg[sk] = { value: hex, type: 'color' };
+        }
       }
 
-      return { theme, tone, surface };
+      // Container variants — use the appropriate container N
+      const contBgKey = `Background-${contN}`;
+      const contBgData = modeData.Backgrounds?.[contPalette]?.[contBgKey];
+      if (contBgData?.Containers) {
+        for (const [ck, cv] of Object.entries(contBgData.Containers)) {
+          let hex = (cv as any)?.value;
+          if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+          if (hex) defBg[ck] = { value: hex, type: 'color' };
+        }
+      }
+
+      // Helper: resolve a token path to hex for this mode
+      const resolveHex = (path: string): string | null => {
+        const val = modeLookup[path];
+        if (!val) return null;
+        if (val.startsWith('#')) return val;
+        if (val.includes('{')) return resolveToHex(val, modeLookup, modeColors);
+        return val;
+      };
+
+      // Surface properties — Text, Header, Quiet, Border, etc. for the default bg
+      const surfaceColorN = `Color-${bgN}`;
+      const textSections = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant', 'Focus-Visible'];
+      for (const section of textSections) {
+        const sectionData = modeData[section];
+        if (!sectionData?.Surfaces?.[bgPalette]?.[surfaceColorN]) continue;
+        const token = sectionData.Surfaces[bgPalette][surfaceColorN];
+        let hex = token?.value;
+        if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        if (hex) defBg[section] = { value: hex, type: 'color' };
+      }
+
+      // Hover and Active for the default bg
+      const hoverData = modeData.Hover?.[bgPalette]?.[surfaceColorN];
+      const activeData = modeData.Active?.[bgPalette]?.[surfaceColorN];
+      if (hoverData?.value) {
+        let hex = hoverData.value;
+        if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        // Post-process: Active = old hover, Hover = mix(bg, old hover)
+        const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value || '#000000';
+        defBg['Active'] = { value: hex, type: 'color' };
+        defBg['Hover'] = { value: mixHex(bgHex, hex), type: 'color' };
+      }
+
+      // Dropshadow for the default bg
+      const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value;
+      if (bgHex) {
+        const baseHex = deriveColorHex(bgHex, -25, 1.5);
+        const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
+        for (let i = 0; i < 5; i++) {
+          const alphaHex = Math.round(opacities[i] * 255).toString(16).padStart(2, '0');
+          defBg[`Dropshadow-Color-${i + 1}`] = { value: `${baseHex}${alphaHex}`, type: 'color' };
+        }
+      }
+
+      // Container properties — Text, Header, Quiet, Border for containers
+      const contColorN = `Color-${contN}`;
+      for (const section of textSections) {
+        const sectionData = modeData[section];
+        if (!sectionData?.Containers?.[contPalette]?.[contColorN]) continue;
+        const token = sectionData.Containers[contPalette][contColorN];
+        let hex = token?.value;
+        if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        if (hex) defBg[`Container-${section}`] = { value: hex, type: 'color' };
+      }
+
+      figma.Modes[modeName]['Default-Background'] = defBg;
+    }
+  }
+
+  if (defaultSettings) {
+    // Derive Figma theme name from stored Theme + N values
+    function deriveThemeName(navSettings: any): string {
+      const theme = navSettings?.Theme?.value;
+      const n = navSettings?.N?.value;
+      if (!theme) return 'Primary-Light';
+      if (theme === 'Neutral' && n <= 2) return 'Black';
+      if (theme === 'Neutral' && n >= 11) return 'White';
+      // Primary with N=11 is Primary-Light, otherwise Primary
+      if (n >= 11) return `${theme}-Light`;
+      return theme;
     }
 
-    const navBarSelection = defaultSettings['Nav-Bar']?.Selection?.value || 'primary-light-dim';
-    const appBarSelection = defaultSettings['App-Bar']?.Selection?.value || 'primary-light-bright';
-    const statusSelection = defaultSettings['Status']?.Selection?.value || 'primary-light-bright';
-
     figma.Navigation = {
-      'Nav-Bar': mapNavToModes(navBarSelection, defaultSettings['Nav-Bar']?.N?.value || 10),
-      'App-Bar': mapNavToModes(appBarSelection, defaultSettings['App-Bar']?.N?.value || 12),
-      'Status': mapNavToModes(statusSelection, defaultSettings['Status']?.N?.value || 12),
+      'Nav-Bar': { theme: deriveThemeName(defaultSettings['Nav-Bar']) },
+      'App-Bar': { theme: deriveThemeName(defaultSettings['App-Bar']) },
+      'Status': { theme: deriveThemeName(defaultSettings['Status']) },
+    };
+  }
+
+  // ── Font Families from user selections ──
+  const typo = designSystemJSON.Typography;
+  if (typo) {
+    figma.Fonts = {
+      Body: typo['Set-Font-Family-Body']?.value || '',
+      Header: typo['Set-Font-Family-Header']?.value || '',
+      Decorative: typo['Set-Font-Family-Decorative']?.value || '',
+      'Body-Font-Weight': parseInt(typo['Set-Body-Font-Weight']?.value || '400'),
+      'Body-Semibold-Font-Weight': parseInt(typo['Set-Body-Semibold-Font-Weight']?.value || '600'),
+      'Body-Bold-Font-Weight': parseInt(typo['Set-Body-Bold-Font-Weight']?.value || '700'),
+      'Header-Font-Weight': parseInt(typo['Set-Header-Font-Weight']?.value || '600'),
+      'Header-Character-Spacing': 0,
+      'Decorative-Font-Weight': parseInt(typo['Set-Decorative-Font-Weight']?.value || '400'),
+      'Decorative-Character-Spacing': 0,
+      'Header-Caps': typo['Set-Header-Caps']?.value === 'uppercase',
+      'Decorative-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
+    };
+  }
+
+  // ── Component Style (Button, Card) ──
+  const cs = designSystemJSON._componentStyle;
+  if (cs) {
+    const cardPadding = cs.radius >= 16 ? 20 : 16;
+    // Bevel is a % of button height — compute px values per size
+    const bevelMed = Math.round(cs.buttonHeight * cs.bevel / 100);
+    const bevelSm = Math.round(cs.smallButtonHeight * cs.bevel / 100);
+    const bevelLg = Math.round(cs.largeButtonHeight * cs.bevel / 100);
+    figma.Components = {
+      Button: {
+        'Button-Radius': cs.buttonRadius,
+        'Button-Focus-Radius': cs.buttonRadius + 3,
+        'Button-Icon-Radius': cs.iconButtonRadius,
+        'Button-Icon-Focus-Radius': cs.iconButtonRadius + 3,
+        'Button-Height': cs.buttonHeight - 2,
+        'Small-Button-Height': cs.smallButtonHeight - 2,
+        'Large-Button-Height': cs.largeButtonHeight - 2,
+        'Button-Min-Width': cs.minButtonWidth,
+        // Medium (default) — top-left highlight, bottom-right lowlight
+        'Button-Highlight-Offset-x': -bevelMed,
+        'Button-Highlight-Offset-y': -bevelMed,
+        'Button-Highlight-Blur-Radius': bevelMed,
+        'Button-Highlight-Spread-Radius': 0,
+        'Button-Lowlight-Offset-x': bevelMed,
+        'Button-Lowlight-Offset-y': bevelMed,
+        'Button-Lowlight-Blur-Radius': bevelMed,
+        'Button-Lowlight-Spread-Radius': 0,
+        // Small
+        'Small-Button-Highlight-Offset-x': -bevelSm,
+        'Small-Button-Highlight-Offset-y': -bevelSm,
+        'Small-Button-Highlight-Blur-Radius': bevelSm,
+        'Small-Button-Lowlight-Offset-x': bevelSm,
+        'Small-Button-Lowlight-Offset-y': bevelSm,
+        'Small-Button-Lowlight-Blur-Radius': bevelSm,
+        // Large
+        'Large-Button-Highlight-Offset-x': -bevelLg,
+        'Large-Button-Highlight-Offset-y': -bevelLg,
+        'Large-Button-Highlight-Blur-Radius': bevelLg,
+        'Large-Button-Lowlight-Offset-x': bevelLg,
+        'Large-Button-Lowlight-Offset-y': bevelLg,
+        'Large-Button-Lowlight-Blur-Radius': bevelLg,
+      },
+      Card: {
+        'Card-Radius': cs.radius,
+        'Card-Focus-Radius': cs.radius + 3,
+        'Card-Padding': cardPadding,
+      },
     };
   }
 

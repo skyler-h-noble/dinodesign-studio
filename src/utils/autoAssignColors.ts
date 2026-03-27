@@ -46,15 +46,15 @@ export function autoAssignColors(
   }
 
   // ── Grey Professional ──
-  // White background, black nav with surface variants, BW text, white cards
+  // White background, primary nav, BW text, white cards
   if (surfaceStyle === 'grey-professional') {
     defaultTheme = 'light';
     backgroundTheme = 'Neutral';
     backgroundN = 12;
     background = 'white';
-    appBar = 'black';        // Black Surface-Bright
-    navBar = 'black';        // Black Surface-Dim
-    status = 'black';        // Black Surface-Bright
+    appBar = 'primary';
+    navBar = 'primary';
+    status = 'primary';
     button = 'primary';
     textColoring = 'black-white';
     cardColoring = 'white';
@@ -68,9 +68,9 @@ export function autoAssignColors(
     background = 'primary-light';
     backgroundTheme = 'Primary';
     backgroundN = 11;
-    appBar = 'primary-bright';
-    status = 'primary-bright';
-    navBar = 'primary-dim';
+    appBar = 'primary';
+    status = 'primary';
+    navBar = 'primary';
     button = 'laddered';
     textColoring = 'tonal';
     cardColoring = 'tonal';
@@ -85,9 +85,9 @@ export function autoAssignColors(
     background = 'primary-light';
     backgroundTheme = 'Primary';
     backgroundN = 11;
-    appBar = 'primary-light-bright';
-    status = 'primary-light-bright';
-    navBar = 'primary-light-dim';
+    appBar = 'primary-light';
+    status = 'primary-light';
+    navBar = 'primary-light';
     button = 'laddered';
     textColoring = 'tonal';
     cardColoring = 'tonal';
@@ -97,9 +97,9 @@ export function autoAssignColors(
     background = 'white';
     backgroundTheme = 'Neutral';
     backgroundN = 12;
-    appBar = 'primary-bright';
-    status = 'primary-bright';
-    navBar = 'primary-dim';
+    appBar = 'primary';
+    status = 'primary';
+    navBar = 'primary';
     button = 'laddered';
     textColoring = 'black-white';
     cardColoring = 'white';
@@ -109,9 +109,9 @@ export function autoAssignColors(
     background = 'white';
     backgroundTheme = 'Neutral';
     backgroundN = 12;
-    appBar = 'primary-bright';
-    status = 'primary-bright';
-    navBar = 'primary-dim';
+    appBar = 'primary';
+    status = 'primary';
+    navBar = 'primary';
     button = 'primary';
     textColoring = 'tonal';
     cardColoring = 'tonal';

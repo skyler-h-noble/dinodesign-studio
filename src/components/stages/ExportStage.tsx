@@ -16,12 +16,14 @@ interface Props extends StageProps {
   dinoId: string | null;
   onDinoIdGenerated: (id: string) => void;
   moodBoardUrl?: string | null;
+  moodBoardFile?: File | null;
+  styleCustomizations?: any;
   surfaceStyle?: SurfaceStyle;
 }
 
 export default function ExportStage({
   onBack, designSystemName, colorScheme, userSelections,
-  typographyStyles, componentStyle, dinoId, onDinoIdGenerated, moodBoardUrl, surfaceStyle,
+  typographyStyles, componentStyle, dinoId, onDinoIdGenerated, moodBoardUrl, moodBoardFile, surfaceStyle, styleCustomizations,
 }: Props) {
   const [copiedId, setCopiedId] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
@@ -44,6 +46,9 @@ export default function ExportStage({
       typographyStyles,
       componentStyle,
       surfaceStyle,
+      moodBoardUrl,
+      moodBoardFile,
+      styleCustomizations,
     })
       .then(id => {
         onDinoIdGenerated(id);
@@ -113,7 +118,7 @@ export default function ExportStage({
             <div key={i} style={{ width: 32, height: 32, borderRadius: 8, background: c, border: '1px solid var(--Border)' }} />
           ))}
           <div style={{ flex: 1 }} />
-          <code className="export-id-code" style={{ maxWidth: 280 }}>{uniqueId}</code>
+          <code className="export-id-code" data-surface="Container" style={{ maxWidth: 280 }}>{uniqueId}</code>
           <Button variant="outline" color="default" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
             {copiedId ? 'Copied' : 'Copy'}
           </Button>
@@ -121,7 +126,7 @@ export default function ExportStage({
 
         <div className="export-cards-grid">
           {/* Row 1: Hosted + Figma (50/50) */}
-          <div className="export-card">
+          <div className="export-card" data-surface="Container">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: colors[0] }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,7 +144,7 @@ export default function ExportStage({
             </VStack>
           </div>
 
-          <div className="export-card">
+          <div className="export-card" data-surface="Container">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: '#1e1e1e' }}>
                 <svg width="20" height="20" viewBox="0 0 38 57" fill="none">
@@ -161,7 +166,7 @@ export default function ExportStage({
           </div>
 
           {/* Row 2: Code Project + Storybook (50/50) */}
-          <div className="export-card">
+          <div className="export-card" data-surface="Container">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: colors[2] || colors[0] }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -184,7 +189,7 @@ export default function ExportStage({
             </VStack>
           </div>
 
-          <div className="export-card">
+          <div className="export-card" data-surface="Container">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: '#FF4785' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
@@ -202,7 +207,7 @@ export default function ExportStage({
           </div>
 
           {/* Row 3: AI + Accessibility Report (50/50) */}
-          <div className="export-card">
+          <div className="export-card" data-surface="Container">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: 'var(--Buttons-Primary-Button)' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -226,7 +231,7 @@ export default function ExportStage({
             </VStack>
           </div>
 
-          <div className="export-card">
+          <div className="export-card" data-surface="Container">
             <VStack spacing={3}>
               <div className="export-card-icon" style={{ background: '#2e7d32' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

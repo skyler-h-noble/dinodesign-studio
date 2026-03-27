@@ -80,8 +80,8 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
   return {
     'Quiet': {
       value: config.defaultText === 'BW'
-        ? `{Quiet.Surfaces.BW.Color-${n}}`
-        : `{Quiet.Surfaces.${config.defaultText}.Color-${n}}`,
+        ? `{Quiet.Surfaces.Neutral.Color-${n}}`
+        : `{Quiet.Surfaces.${config.theme}.Color-${n}}`,
       type: 'color'
     },
     'Text': {
@@ -159,19 +159,19 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       type: 'color'
     },
     'Border': {
-      value: `{Border.Surfaces.Neutral.Color-${n}}`,
+      value: `{Border.Surfaces.${config.theme}.Color-${n}}`,
       type: 'color'
     },
     'Border-Variant': {
-      value: `{Border-Variant.Surfaces.Neutral.Color-${n}}`,
+      value: `{Border-Variant.Surfaces.${config.theme}.Color-${n}}`,
       type: 'color'
     },
     'Hover': {
-      value: `{Hover.Neutral.Color-${n}}`,
+      value: `{Hover.${config.theme}.Color-${n}}`,
       type: 'color'
     },
     'Active': {
-      value: `{Active.Neutral.Color-${n}}`,
+      value: `{Active.${config.theme}.Color-${n}}`,
       type: 'color'
     },
     'Hotlink': {
@@ -338,10 +338,10 @@ function generateSingleTheme(config: ThemeConfig): any {
   const dimmestN = Math.max(config.n - 2, 1);
   const brightN = Math.min(config.n + 1, 12);
 
-  // Base Surface
+  // Base Surface — reference Backgrounds structure for Light/Dark mode adaptation
   theme.Surfaces = {
     'Background': {
-      value: `{Colors.${config.theme}.Color-${config.n}}`,
+      value: `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface}`,
       type: 'color'
     },
     ...buildSurfaceTokens(config, config.n)
@@ -350,7 +350,7 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Surface-Dim
   theme['Surfaces-Dim'] = {
     'Background': {
-      value: config.n > 1 ? `{Colors.${config.theme}.Color-${dimN}}` : '#000000',
+      value: `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface-Dim}`,
       type: 'color'
     },
     ...buildSurfaceTokens(config, dimN)
@@ -359,7 +359,7 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Surface-Dimmest
   theme['Surfaces-Dimmest'] = {
     'Background': {
-      value: config.n > 2 ? `{Colors.${config.theme}.Color-${dimmestN}}` : '#000000',
+      value: config.n > 2 ? `{Backgrounds.${config.theme}.Background-${dimmestN}.Surfaces.Surface}` : '#000000',
       type: 'color'
     },
     ...buildSurfaceTokens(config, dimmestN)
@@ -368,38 +368,38 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Surface-Bright
   theme['Surfaces-Bright'] = {
     'Background': {
-      value: config.n < 12 ? `{Colors.${config.theme}.Color-${brightN}}` : '#FFFFFF',
+      value: `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface-Bright}`,
       type: 'color'
     },
     ...buildSurfaceTokens(config, brightN)
   };
 
-  // Containers Section
+  // Containers Section — reference Modes/Containers for Light/Dark mode adaptation
   theme.Containers = {
     'Container': {
-      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container}`,
+      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container}`,
       type: 'color'
     },
     'Container-Low': {
-      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Low}`,
+      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-Low}`,
       type: 'color'
     },
     'Container-Lowest': {
-      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Lowest}`,
+      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-Lowest}`,
       type: 'color'
     },
     'Container-High': {
-      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-High}`,
+      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-High}`,
       type: 'color'
     },
     'Container-Highest': {
-      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Highest}`,
+      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-Highest}`,
       type: 'color'
     },
     'Quiet': {
       value: getContainerTextPalette(config.contTheme, config) === 'BW'
-        ? `{Quiet.Containers.BW.Color-${config.contN}}`
-        : `{Quiet.Containers.${getContainerTextPalette(config.contTheme, config)}.Color-${config.contN}}`,
+        ? `{Quiet.Containers.Neutral.Color-${config.contN}}`
+        : `{Quiet.Containers.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
     },
     'Text': {
@@ -730,97 +730,63 @@ export function generateAllThemesWithSurfacesAndContainers(
     errorHeader: 'Error'
   });
   
+  // Override Default theme's Surface to reference Default-Background (Light/Dark adaptive)
+  if (themes.Default?.Surfaces) {
+    themes.Default.Surfaces['Background'] = { value: '{Default-Background.Surface}', type: 'color' };
+    themes.Default.Surfaces['Text'] = { value: '{Default-Background.Text}', type: 'color' };
+    themes.Default.Surfaces['Header'] = { value: '{Default-Background.Header}', type: 'color' };
+    themes.Default.Surfaces['Quiet'] = { value: '{Default-Background.Quiet}', type: 'color' };
+    themes.Default.Surfaces['Border'] = { value: '{Default-Background.Border}', type: 'color' };
+    themes.Default.Surfaces['Border-Variant'] = { value: '{Default-Background.Border-Variant}', type: 'color' };
+    themes.Default.Surfaces['Hover'] = { value: '{Default-Background.Hover}', type: 'color' };
+    themes.Default.Surfaces['Active'] = { value: '{Default-Background.Active}', type: 'color' };
+    themes.Default.Surfaces['Focus-Visible'] = { value: '{Default-Background.Focus-Visible}', type: 'color' };
+    // Dropshadow-Color is handled by processGroup which reads the Background sibling
+  }
+  // Override Default Surface-Dim and Surface-Bright
+  if (themes.Default?.['Surfaces-Dim']) {
+    themes.Default['Surfaces-Dim']['Background'] = { value: '{Default-Background.Surface-Dim}', type: 'color' };
+  }
+  if (themes.Default?.['Surfaces-Bright']) {
+    themes.Default['Surfaces-Bright']['Background'] = { value: '{Default-Background.Surface-Bright}', type: 'color' };
+  }
+  // Override Default Containers
+  if (themes.Default?.Containers) {
+    themes.Default.Containers['Container'] = { value: '{Default-Background.Container}', type: 'color' };
+    themes.Default.Containers['Container-Low'] = { value: '{Default-Background.Container-Low}', type: 'color' };
+    themes.Default.Containers['Container-Lowest'] = { value: '{Default-Background.Container-Lowest}', type: 'color' };
+    themes.Default.Containers['Container-High'] = { value: '{Default-Background.Container-High}', type: 'color' };
+    themes.Default.Containers['Container-Highest'] = { value: '{Default-Background.Container-Highest}', type: 'color' };
+    themes.Default.Containers['Text'] = { value: '{Default-Background.Container-Text}', type: 'color' };
+    themes.Default.Containers['Header'] = { value: '{Default-Background.Container-Header}', type: 'color' };
+    themes.Default.Containers['Quiet'] = { value: '{Default-Background.Container-Quiet}', type: 'color' };
+    themes.Default.Containers['Border'] = { value: '{Default-Background.Container-Border}', type: 'color' };
+    themes.Default.Containers['Border-Variant'] = { value: '{Default-Background.Container-Border-Variant}', type: 'color' };
+    themes.Default.Containers['Focus-Visible'] = { value: '{Default-Background.Container-Focus-Visible}', type: 'color' };
+  }
+
   console.log('🔍 [generateAllThemes] Default theme generated with:');
-  console.log('   Surfaces references:', defaultSettings.defaultTheme, '-', defaultSettings.defaultN);
+  console.log('   Surfaces references: Default-Background (Light/Dark adaptive)');
   console.log('   Containers references:', defaultSettings.containerTheme, '-', defaultSettings.containerN);
   console.log('   CShade:', defaultSettings.containerShade);
   
-  // 2. App-Bar Theme
-  themes['App-Bar'] = generateSingleTheme({
-    themeName: 'App-Bar',
-    theme: defaultSettings.appBarTheme,
-    n: defaultSettings.appBarN,
-    contTheme: defaultSettings.appBarTheme,
-    contN: defaultSettings.containerN,
-    shade: defaultSettings.appBarN >= 11 ? 'Medium' : 'Light',
-    cShade: defaultSettings.containerShade,
-    defaultText: textPalettes.default,
-    primaryText: textPalettes.primary,
-    secondaryText: textPalettes.secondary,
-    tertiaryText: textPalettes.tertiary,
-    neutralText: textPalettes.neutral,
-    infoText: textPalettes.info,
-    successText: textPalettes.success,
-    warningText: textPalettes.warning,
-    errorText: textPalettes.error,
-    defaultHeader: textColoring === 'tonal' ? 'Primary' : 'Primary',
-    primaryHeader: 'Primary',
-    secondaryHeader: 'Secondary',
-    tertiaryHeader: 'Tertiary',
-    neutralHeader: 'Neutral',
-    infoHeader: 'Info',
-    successHeader: 'Success',
-    warningHeader: 'Warning',
-    errorHeader: 'Error'
-  });
-  
-  // 3. Nav-Bar Theme
-  themes['Nav-Bar'] = generateSingleTheme({
-    themeName: 'Nav-Bar',
-    theme: defaultSettings.navBarTheme,
-    n: defaultSettings.navBarN,
-    contTheme: defaultSettings.navBarTheme,
-    contN: defaultSettings.containerN,
-    shade: defaultSettings.navBarN >= 11 ? 'Medium' : 'Light',
-    cShade: defaultSettings.containerShade,
-    defaultText: textPalettes.default,
-    primaryText: textPalettes.primary,
-    secondaryText: textPalettes.secondary,
-    tertiaryText: textPalettes.tertiary,
-    neutralText: textPalettes.neutral,
-    infoText: textPalettes.info,
-    successText: textPalettes.success,
-    warningText: textPalettes.warning,
-    errorText: textPalettes.error,
-    defaultHeader: textColoring === 'tonal' ? 'Primary' : 'Primary',
-    primaryHeader: 'Primary',
-    secondaryHeader: 'Secondary',
-    tertiaryHeader: 'Tertiary',
-    neutralHeader: 'Neutral',
-    infoHeader: 'Info',
-    successHeader: 'Success',
-    warningHeader: 'Warning',
-    errorHeader: 'Error'
-  });
-  
-  // 4. Status Theme
-  themes.Status = generateSingleTheme({
-    themeName: 'Status',
-    theme: defaultSettings.statusTheme,
-    n: defaultSettings.statusN,
-    contTheme: defaultSettings.statusTheme,
-    contN: defaultSettings.containerN,
-    shade: defaultSettings.statusN >= 11 ? 'Medium' : 'Light',
-    cShade: defaultSettings.containerShade,
-    defaultText: textPalettes.default,
-    primaryText: textPalettes.primary,
-    secondaryText: textPalettes.secondary,
-    tertiaryText: textPalettes.tertiary,
-    neutralText: textPalettes.neutral,
-    infoText: textPalettes.info,
-    successText: textPalettes.success,
-    warningText: textPalettes.warning,
-    errorText: textPalettes.error,
-    defaultHeader: textColoring === 'tonal' ? 'Primary' : 'Primary',
-    primaryHeader: 'Primary',
-    secondaryHeader: 'Secondary',
-    tertiaryHeader: 'Tertiary',
-    neutralHeader: 'Neutral',
-    infoHeader: 'Info',
-    successHeader: 'Success',
-    warningHeader: 'Warning',
-    errorHeader: 'Error'
-  });
+  // 2-4. Nav component themes — alias the user's chosen theme
+  // Maps user selection → existing theme name
+  function navSelectionToThemeName(selection: string): string {
+    switch (selection) {
+      case 'primary-light': return 'Primary-Light';
+      case 'primary': return 'Primary';
+      case 'white': return 'White';
+      case 'black': return 'Black';
+      default: return 'Primary-Light';
+    }
+  }
+
+  const appBarSource = navSelectionToThemeName(defaultSettings.appBar);
+  const navBarSource = navSelectionToThemeName(defaultSettings.navBar);
+  const statusSource = navSelectionToThemeName(defaultSettings.status);
+
+  console.log(`  Nav themes: App-Bar→${appBarSource}, Nav-Bar→${navBarSource}, Status→${statusSource}`);
   
   // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC converted to Color-N)
   const PC = toneToColorNumber(extractedTones.primary);
@@ -867,10 +833,10 @@ export function generateAllThemesWithSurfacesAndContainers(
   themes['Secondary-Light'] = generateSingleTheme(makeConfig('Secondary-Light', 'Secondary', 11));
   themes['Tertiary-Light'] = generateSingleTheme(makeConfig('Tertiary-Light', 'Tertiary', 11));
 
-  // White, Black, and Light-Grey
+  // White, Black, and Light-Gray
   themes.White = generateSingleTheme(makeConfig('White', 'Neutral', 12));
   themes.Black = generateSingleTheme(makeConfig('Black', 'Neutral', 1));
-  themes['Light-Grey'] = generateSingleTheme(makeConfig('Light-Grey', 'Neutral', 10));
+  themes['Light-Gray'] = generateSingleTheme(makeConfig('Light-Gray', 'Neutral', 10));
 
   // Info, Success, Warning, Error — N = OB
   ['Info', 'Success', 'Warning', 'Error'].forEach(themeName => {
@@ -882,9 +848,12 @@ export function generateAllThemesWithSurfacesAndContainers(
     themes[`${themeName}-Light`] = generateSingleTheme(makeConfig(`${themeName}-Light`, themeName, 11));
   });
   
-  // REMOVED: Dark and Medium variants — only {Theme} and {Theme}-Light remain
-  
+  // Nav component themes — alias the user's chosen theme
+  if (themes[appBarSource]) themes['App-Bar'] = JSON.parse(JSON.stringify(themes[appBarSource]));
+  if (themes[navBarSource]) themes['Nav-Bar'] = JSON.parse(JSON.stringify(themes[navBarSource]));
+  if (themes[statusSource]) themes['Status'] = JSON.parse(JSON.stringify(themes[statusSource]));
+
   console.log(`  ✓ Generated ${Object.keys(themes).length} complete themes with Surfaces and Containers for ${mode}`);
-  
+
   return themes;
 }
