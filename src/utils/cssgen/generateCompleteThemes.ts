@@ -204,7 +204,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         return {
           'Button': { value: `{Default-Button.Default.${shade}.Button}`, type: 'color' },
           'Text': { value: `{Default-Button.Default.${shade}.Text}`, type: 'color' },
-          'Border': { value: `{Default-Button-Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
+          'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
           'Hover': { value: `{Default-Button.Default.${shade}.Hover}`, type: 'color' },
           'Active': { value: `{Default-Button.Default.${shade}.Active}`, type: 'color' }
         };
@@ -521,7 +521,7 @@ function generateSingleTheme(config: ThemeConfig): any {
         return {
           'Button': { value: `{Default-Button.Default.${config.cShade}.Button}`, type: 'color' },
           'Text': { value: `{Default-Button.Default.${config.cShade}.Text}`, type: 'color' },
-          'Border': { value: `{Default-Button-Border.Containers.${config.contTheme}.Color-${config.contN}}`, type: 'color' },
+          'Border': { value: `{Border.Containers.${config.contTheme}.Color-${config.contN}}`, type: 'color' },
           'Hover': { value: `{Default-Button.Default.${config.cShade}.Hover}`, type: 'color' },
           'Active': { value: `{Default-Button.Default.${config.cShade}.Active}`, type: 'color' }
         };

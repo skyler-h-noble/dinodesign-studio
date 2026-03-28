@@ -23,7 +23,7 @@ function buildHoverForPalette(palette: string): any {
     'Color-3': { value: `{Colors.${palette}.Color-2}`, type: 'color' },
     'Color-4': { value: `{Colors.${palette}.Color-3}`, type: 'color' },
     'Color-5': { value: `{Colors.${palette}.Color-4}`, type: 'color' },
-    'Color-6': { value: `{Colors.${palette}.Color-5}`, type: 'color' },
+    'Color-6': { value: `{Colors.${palette}.Color-7}`, type: 'color' },
     'Color-7': { value: `{Colors.${palette}.Color-8}`, type: 'color' },
     'Color-8': { value: `{Colors.${palette}.Color-9}`, type: 'color' },
     'Color-9': { value: `{Colors.${palette}.Color-10}`, type: 'color' },

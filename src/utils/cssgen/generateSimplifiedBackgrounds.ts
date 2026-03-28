@@ -73,25 +73,25 @@ export function generateSimplifiedLightModeBackgrounds(
     useColor10ForContainers = true;
   } else if (tone === 62) { // Background-8 → Color-8
     surfaceBaseTone = 7;
-    useColor10ForContainers = false; // Use Color-13
+    useColor10ForContainers = false; // Use Color-12
   } else if (tone === 71) { // Background-9 → Color-9
     surfaceBaseTone = 8;
-    useColor10ForContainers = false; // Use Color-13
+    useColor10ForContainers = false; // Use Color-12
   } else if (tone === 81) { // Background-10 → Color-10
     surfaceBaseTone = 9;
-    useColor10ForContainers = false; // Use Color-13
+    useColor10ForContainers = false; // Use Color-12
   } else if (tone === 90) { // Background-11 → Color-11
     surfaceBaseTone = 10;
-    useColor10ForContainers = false; // Use Color-13
+    useColor10ForContainers = false; // Use Color-12
   } else if (tone === 95) { // Background-12 → Color-12
     surfaceBaseTone = 11;
-    useColor10ForContainers = false; // Use Color-13
-  } else if (tone === 98) { // Background-13 → Color-13
-    surfaceBaseTone = 12;
-    useColor10ForContainers = false; // Use Color-13
-  } else if (tone === 99) { // Background-14 → Color-14
-    surfaceBaseTone = 13;
-    useColor10ForContainers = false; // Use Color-13
+    useColor10ForContainers = false; // Use Color-12
+  } else if (tone === 98) { // Background-11 (tone 98) → Color-12 (capped)
+    surfaceBaseTone = 11;
+    useColor10ForContainers = false; // Use Color-12
+  } else if (tone === 99) { // Background-12 (tone 99) → Color-12 (capped)
+    surfaceBaseTone = 11;
+    useColor10ForContainers = false; // Use Color-12
   }
 
   const surfaceColor = palette[surfaceBaseTone]?.color || baseColor;
@@ -109,8 +109,8 @@ export function generateSimplifiedLightModeBackgrounds(
   // ========================================================================
   
   // Convert Color-N index (0-13) to Color-N name (1-14)
-  const surfaceColorNumber = surfaceBaseTone + 1; // e.g., 0 → Color-1, 12 → Color-13
-  const containerColorNumber = useColor10ForContainers ? 10 : 13; // Color-10 or Color-13
+  const surfaceColorNumber = Math.min(surfaceBaseTone + 1, 12); // Cap at Color-12 (max in 12-tone scale)
+  const containerColorNumber = useColor10ForContainers ? 10 : 12; // Color-10 or Color-12 (capped)
   
   // DEBUG: Log for Tertiary palette specifically
   if (paletteName === 'Tertiary') {
@@ -419,10 +419,10 @@ export function generateSimplifiedDarkModeBackgrounds(
     surfaceBaseTone = 11;  // Background-12 → Color-12
     useColor5ForContainers = false;
   } else if (tone === 85) {
-    surfaceBaseTone = 12;  // Background-13 → Color-13
+    surfaceBaseTone = 11;  // Capped at Color-12
     useColor5ForContainers = false;
   } else if (tone === 89) {
-    surfaceBaseTone = 13;  // Background-14 → Color-14
+    surfaceBaseTone = 11;  // Capped at Color-12
     useColor5ForContainers = false;
   }
 
@@ -439,7 +439,7 @@ export function generateSimplifiedDarkModeBackgrounds(
   // CRITICAL FIX: Return TOKEN REFERENCES for Dark Mode too!
   // ========================================================================
   
-  const surfaceColorNumber = surfaceBaseTone + 1; // e.g., 0 → Color-1, 12 → Color-13
+  const surfaceColorNumber = Math.min(surfaceBaseTone + 1, 12); // Cap at Color-12 (max in 12-tone scale)
   
   if (paletteName) {
     return {

@@ -319,7 +319,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // ── Card coloring ──
   // Tonal light: Color-12 of theme palette
   // Tonal dark:  Color-3 of theme palette (or Neutral-3 if surface is neutral)
-  // White: Neutral Color-14
+  // White: Neutral Color-12
   // Black: Neutral Color-2
   let containerBg: string;
   let containerLow: string;
@@ -514,7 +514,7 @@ ${(() => {
   const ac = appBarConfig;
   const tones = getAccessibleTones(appBarBg, ac.n, primaryLight);
   // App bar hover/active for buttons — swapped: Active=oldHover, Hover=mix(button,oldHover)
-  const abOldHoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
+  const abOldHoverMap = [1,1,2,3,4,7,8,9,10,11,12,12];
   let abPal = 'Primary', abN = PC;
   switch (effectiveButton) {
     case 'secondary': case 'laddered': abPal = 'Secondary'; abN = SC; break;
@@ -557,13 +557,13 @@ ${(() => {
   --Quiet: ${surfaceQuiet};
   --Border: ${surfaceBorder};
   --Border-Variant: ${surfaceBorder};
-  --Hover: ${mixHex(p(primaryLight, surfaceN), p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][surfaceN - 1] || surfaceN))};
-  --Active: ${p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][surfaceN - 1] || surfaceN)};
+  --Hover: ${mixHex(p(primaryLight, surfaceN), p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][surfaceN - 1] || surfaceN))};
+  --Active: ${p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][surfaceN - 1] || surfaceN)};
   --Focus-Visible: #3b82f6;
 
 ${(() => {
     // Hover/Active lookup tables (from verified 12-tone)
-    const hoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
+    const hoverMap = [1,1,2,3,4,7,8,9,10,11,12,12];
 
 
     // Generate all button palette tokens
@@ -587,7 +587,7 @@ ${(() => {
   })()}
 ${(() => {
     // Default button uses the selected button mode's palette and tones
-    const hoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
+    const hoverMap = [1,1,2,3,4,7,8,9,10,11,12,12];
 
     // Determine which palette/N the default button resolves to
     let defPal: typeof vPrimary = vPrimary;
@@ -620,7 +620,7 @@ ${(() => {
   --Container-Quiet: ${containerQuiet};
   --Container-Border: ${containerBorder};
 ${(() => {
-    const hm = [1,1,2,3,4,5,8,9,10,11,12,12];
+    const hm = [1,1,2,3,4,7,8,9,10,11,12,12];
 
     let cp = 'Primary', cn = PC;
     switch (effectiveButton) {
@@ -663,10 +663,10 @@ ${(() => {
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${containerBorder};
-  --Hover: ${mixHex(p(primaryLight, containerN), p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN))};
-  --Active: ${p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN)};
-  --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN))};
-  --Buttons-Default-Active: ${p(primaryLight, [1,1,2,3,4,5,8,9,10,11,12,12][containerN - 1] || containerN)};
+  --Hover: ${mixHex(p(primaryLight, containerN), p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN))};
+  --Active: ${p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN)};
+  --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN))};
+  --Buttons-Default-Active: ${p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN)};
 }
 
 /* ══ Tertiary Theme ══ */
@@ -686,7 +686,7 @@ ${(() => {
 ${(() => {
   const nc = navBarConfig;
   const tones = getAccessibleTones(navBarBg, nc.n, primaryLight);
-  const hoverMap = [1,1,2,3,4,5,8,9,10,11,12,12];
+  const hoverMap = [1,1,2,3,4,7,8,9,10,11,12,12];
   // Use the button mode's palette for hover/active
   let navDefPal: typeof vPrimary = vPrimary;
   let navDefN = PC;

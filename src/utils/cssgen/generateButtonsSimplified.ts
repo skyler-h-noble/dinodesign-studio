@@ -127,19 +127,19 @@ export function generateBaseButtons(
     }
   };
 
-  // NEUTRAL BUTTON — both shades use Color-OB
+  // NEUTRAL BUTTON — always Color-8
   buttons.Neutral = {
     Light: {
-      Button: { value: `{Colors.Neutral.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Neutral.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Neutral.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Neutral.Color-${OB}}`, type: 'color' }
+      Button: { value: '{Colors.Neutral.Color-8}', type: 'color' },
+      Text: { value: '{Text.Surfaces.Neutral.Color-8}', type: 'color' },
+      Hover: { value: '{Hover.Neutral.Color-8}', type: 'color' },
+      Active: { value: '{Active.Neutral.Color-8}', type: 'color' }
     },
     Medium: {
-      Button: { value: `{Colors.Neutral.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Neutral.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Neutral.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Neutral.Color-${OB}}`, type: 'color' }
+      Button: { value: '{Colors.Neutral.Color-8}', type: 'color' },
+      Text: { value: '{Text.Surfaces.Neutral.Color-8}', type: 'color' },
+      Hover: { value: '{Hover.Neutral.Color-8}', type: 'color' },
+      Active: { value: '{Active.Neutral.Color-8}', type: 'color' }
     }
   };
 
@@ -370,22 +370,9 @@ function getTextThemeMappings(
   textColoring: 'tonal' | 'black-white',
   buttonThemeMappings: ReturnType<typeof getButtonThemeMappings>
 ): typeof buttonThemeMappings {
-  if (textColoring === 'black-white') {
-    // All button text uses BW
-    return {
-      Default: 'BlackWhite',
-      Primary: 'BlackWhite',
-      Secondary: 'BlackWhite',
-      Tertiary: 'BlackWhite',
-      Neutral: 'BlackWhite',
-      Info: 'BlackWhite',
-      Success: 'BlackWhite',
-      Warning: 'BlackWhite',
-      Error: 'BlackWhite'
-    };
-  }
-  
-  // Tonal: Use the same theme as the button itself
+  // Button text ALWAYS uses the button's own palette for contrast
+  // BW text coloring only affects surface/container text, not button text
+  // Button text must have 4.5:1 contrast against the BUTTON BG, not the surface BG
   return buttonThemeMappings;
 }
 

@@ -265,9 +265,11 @@ function deriveColorHex(hex: string, lightOffset: number, satMultiplier: number)
  * Dark (1-6): step darker. Light (7-12): step lighter.
  * Color-1 → 1 (black end), Color-12 → 12 (white end).
  */
+// Dark tones (1-5, tone ≤ 37): active goes darker
+// Light tones (6-12, tone ≥ 58): active goes lighter
 const ACTIVE_MAP: Record<string, number> = {
-  '1': 1, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5,
-  '7': 8, '8': 9, '9': 10, '10': 11, '11': 12, '12': 12,
+  '1': 1, '2': 1, '3': 2, '4': 3, '5': 4,
+  '6': 7, '7': 8, '8': 9, '9': 10, '10': 11, '11': 12, '12': 12,
 };
 function getActiveColorN(colorN: string): string {
   const n = colorN.replace('Color-', '');
@@ -811,8 +813,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     figma.Components = {
       Button: {
         'Button-Radius': cs.buttonRadius,
+        'Button-Inner-Radius': Math.max(cs.buttonRadius - 1, 0),
         'Button-Focus-Radius': cs.buttonRadius + 3,
         'Button-Icon-Radius': cs.iconButtonRadius,
+        'Button-Icon-Inner-Radius': Math.max(cs.iconButtonRadius - 1, 0),
         'Button-Icon-Focus-Radius': cs.iconButtonRadius + 3,
         'Button-Height': cs.buttonHeight - 2,
         'Small-Button-Height': cs.smallButtonHeight - 2,
@@ -844,7 +848,8 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       },
       Card: {
         'Card-Radius': cs.radius,
-        'Card-Focus-Radius': cs.radius + 3,
+        'Card-Inner-Border-Radius': Math.max(cs.radius - 1, 0),
+        'Card-Focus-Border-Radius': cs.radius + 3,
         'Card-Padding': cardPadding,
       },
     };

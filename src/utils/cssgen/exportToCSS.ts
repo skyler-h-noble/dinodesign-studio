@@ -244,7 +244,7 @@ function generateColorVariables(colors: any, paletteName: string): string {
 
   const lines: string[] = [];
 
-  // Process each color in the palette (Color-1 through Color-14, Color-Vibrant)
+  // Process each color in the palette (Color-1 through Color-12, Color-Vibrant)
   Object.keys(colors).forEach(colorKey => {
     const colorToken = colors[colorKey];
 
@@ -541,8 +541,7 @@ function generateHotlinkVariables(modeData: any): string {
     'Color-10': 'Info-Color-4',
     'Color-11': 'Info-Color-5',
     'Color-12': 'Info-Color-6',
-    'Color-13': 'Info-Color-6',
-    'Color-14': 'Info-Color-6',
+    // Color-13 and Color-14 removed — 12-tone scale max is Color-12
     'Color-Vibrant': 'Info-Color-5'
   };
   
@@ -3989,10 +3988,10 @@ export function generateBaseCSS(jsonData: any): string {
   // BlackWhite buttons
   lines.push('  --Buttons-BlackWhite-Light-Button: var(--White);');
   lines.push('  --Buttons-BlackWhite-Light-Text: var(--Text-Surfaces-BW-Button-Color-1);');
-  lines.push('  --Buttons-BlackWhite-Light-Hover: var(--Hover-Neutral-Color-13);');
-  lines.push('  --Buttons-BlackWhite-Light-Active: var(--Active-Neutral-Color-14);');
+  lines.push('  --Buttons-BlackWhite-Light-Hover: var(--Hover-Neutral-Color-12);');
+  lines.push('  --Buttons-BlackWhite-Light-Active: var(--Active-Neutral-Color-12);');
   lines.push('  --Buttons-BlackWhite-Medium-Button: var(--Neutral-Color-1);');
-  lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-14);');
+  lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-12);');
   lines.push('  --Buttons-BlackWhite-Medium-Hover: var(--Hover-Neutral-Color-1);');
   lines.push('  --Buttons-BlackWhite-Medium-Active: var(--Active-Neutral-Color-1);');
   // Default button — points to the user's selected button mode via Default-Button indirection
