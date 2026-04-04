@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import JSZip from 'jszip';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, IconBadge, Icon,
 } from '@dynodesign/components';
+import ComputerIcon from '@mui/icons-material/Computer';
+import CodeIcon from '@mui/icons-material/Code';
+import GridViewIcon from '@mui/icons-material/GridView';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../../types';
 import { generateAndUploadDesignSystem } from '../../utils/generateDesignSystem';
 import '../../styles/export.css';
@@ -62,7 +66,7 @@ export default function ExportStage({
   }, []);
 
   const uniqueId = dinoId || 'generating...';
-  const showcaseBase = 'https://sunny-cendol-af27ce.netlify.app';
+  const showcaseBase = 'https://designology.netlify.app';
   const playgroundUrl = `${showcaseBase}/?user=${dinoId || ''}`;
   const storybookUrl = `${showcaseBase}/storybook/?user=${dinoId || ''}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${dinoId || ''}/md`;
@@ -80,8 +84,8 @@ export default function ExportStage({
       <div className="export-page">
         <VStack spacing={4} style={{ maxWidth: 800, margin: '0 auto', alignItems: 'center', paddingTop: 80 }}>
           <div className="typo-spinner" />
-          <H2>Generating Your Design System</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>Uploading CSS tokens, Figma JSON, and documentation...</Body>
+          <H2 sx={{ textAlign: 'center', width: 'auto' }}>Generating Your Design System</H2>
+          <Body sx={{ color: 'var(--Quiet)', textAlign: 'center', width: 'auto' }}>Uploading CSS tokens, Figma JSON, and documentation...</Body>
         </VStack>
       </div>
     );
@@ -106,8 +110,8 @@ export default function ExportStage({
     <div className="export-page">
       <VStack spacing={4}>
         <VStack spacing={1}>
-          <H2>Start Using Your Design System</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>
+          <H2 sx={{ textAlign: 'center', width: 'auto' }}>Start Using Your Design System</H2>
+          <Body sx={{ color: 'var(--Quiet)', textAlign: 'center', width: 'auto' }}>
             {designSystemName} is ready. Choose how you want to use it.
           </Body>
         </VStack>
@@ -126,14 +130,11 @@ export default function ExportStage({
 
         <div className="export-cards-grid">
           {/* Row 1: Hosted + Figma (50/50) */}
-          <div className="export-card" data-surface="Container">
+          <Card padding="medium">
             <VStack spacing={3}>
-              <div className="export-card-icon" style={{ background: colors[0] }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <path d="M8 21h8" /><path d="M12 17v4" />
-                </svg>
-              </div>
+              <IconBadge color="primary">
+                <ComputerIcon />
+              </IconBadge>
               <H3 style={{ fontSize: '1.1rem' }}>Hosted Design System</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 View your complete design system with all 49 components rendered with your brand tokens. Share the playground link with your team.
@@ -142,11 +143,11 @@ export default function ExportStage({
                 Open Playground
               </Button>
             </VStack>
-          </div>
+          </Card>
 
-          <div className="export-card" data-surface="Container">
+          <Card padding="medium">
             <VStack spacing={3}>
-              <div className="export-card-icon" style={{ background: '#1e1e1e' }}>
+              <IconBadge color="black">
                 <svg width="20" height="20" viewBox="0 0 38 57" fill="none">
                   <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" fill="#1ABCFE"/>
                   <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" fill="#0ACF83"/>
@@ -154,7 +155,7 @@ export default function ExportStage({
                   <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" fill="#F24E1E"/>
                   <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" fill="#A259FF"/>
                 </svg>
-              </div>
+              </IconBadge>
               <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Get a full Figma design system with your brand tokens applied to every component, style, and variable.
@@ -163,16 +164,14 @@ export default function ExportStage({
                 Open Figma Template (Coming Soon)
               </Button>
             </VStack>
-          </div>
+          </Card>
 
           {/* Row 2: Code Project + Storybook (50/50) */}
-          <div className="export-card" data-surface="Container">
+          <Card padding="medium">
             <VStack spacing={3}>
-              <div className="export-card-icon" style={{ background: colors[2] || colors[0] }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
-                </svg>
-              </div>
+              <IconBadge color="tertiary">
+                <CodeIcon />
+              </IconBadge>
               <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Install the DinoDesign component library and connect your design system to your React project.
@@ -187,15 +186,15 @@ export default function ExportStage({
                 </div>
               </VStack>
             </VStack>
-          </div>
+          </Card>
 
-          <div className="export-card" data-surface="Container">
+          <Card padding="medium">
             <VStack spacing={3}>
-              <div className="export-card-icon" style={{ background: '#FF4785' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <IconBadge color="error">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M16.34.24l-.12 2.71a.18.18 0 0 0 .29.15l1.06-.8.9.7a.18.18 0 0 0 .28-.14L18.65.1l1.33-.1a1.2 1.2 0 0 1 1.28 1.2v21.6A1.2 1.2 0 0 1 20 24l-16.1-.72a1.2 1.2 0 0 1-1.15-1.16L2 2.32a1.2 1.2 0 0 1 1.13-1.27l13.2-.83.01.02zM13.27 9.3c0 .47 3.16.24 3.59-.08 0-3.2-1.72-4.89-4.86-4.89-3.15 0-4.9 1.72-4.9 4.29 0 4.45 6 4.53 6 6.96 0 .7-.32 1.1-1.05 1.1-.96 0-1.35-.49-1.3-2.16 0-.36-3.65-.48-3.77 0-.27 4.03 2.23 5.2 5.1 5.2 2.79 0 4.97-1.49 4.97-4.18 0-4.77-6.1-4.64-6.1-7 0-.97.72-1.1 1.13-1.1.45 0 1.25.07 1.19 1.87z"/>
                 </svg>
-              </div>
+              </IconBadge>
               <H3 style={{ fontSize: '1.1rem' }}>Storybook</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Browse interactive component documentation with usage examples, prop tables, and live previews for all 49 components.
@@ -204,17 +203,14 @@ export default function ExportStage({
                 Open Storybook
               </Button>
             </VStack>
-          </div>
+          </Card>
 
           {/* Row 3: AI + Accessibility Report (50/50) */}
-          <div className="export-card" data-surface="Container">
+          <Card padding="medium">
             <VStack spacing={3}>
-              <div className="export-card-icon" style={{ background: 'var(--Buttons-Primary-Button)' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 8V4H8" /><rect x="2" y="2" width="20" height="20" rx="5" />
-                  <path d="M2 12h20" /><path d="M12 2v20" />
-                </svg>
-              </div>
+              <IconBadge color="secondary">
+                <GridViewIcon />
+              </IconBadge>
               <H3 style={{ fontSize: '1.1rem' }}>Start Using in AI</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Connect your design system to Cursor, Claude Code, or any AI coding assistant.
@@ -229,15 +225,13 @@ export default function ExportStage({
                 </div>
               </VStack>
             </VStack>
-          </div>
+          </Card>
 
-          <div className="export-card" data-surface="Container">
+          <Card padding="medium">
             <VStack spacing={3}>
-              <div className="export-card-icon" style={{ background: '#2e7d32' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="10" />
-                </svg>
-              </div>
+              <IconBadge color="success">
+                <CheckCircleOutlineIcon />
+              </IconBadge>
               <H3 style={{ fontSize: '1.1rem' }}>Accessibility Report</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
@@ -246,12 +240,12 @@ export default function ExportStage({
                 Download Report (Coming Soon)
               </Button>
             </VStack>
-          </div>
+          </Card>
         </div>
 
         {/* Download All as ZIP */}
         {hasId && (
-          <div className="export-card" style={{ width: '100%' }}>
+          <Card padding="medium" sx={{ width: '100%' }}>
             <VStack spacing={2}>
               <BodySmall style={{ fontWeight: 600 }}>Download All Files</BodySmall>
               <Button
@@ -288,7 +282,7 @@ export default function ExportStage({
                 Download All (.zip)
               </Button>
             </VStack>
-          </div>
+          </Card>
         )}
       </VStack>
     </div>

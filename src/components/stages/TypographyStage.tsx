@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Link, Modal, RadioGroup, Select,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Link, Modal, RadioGroup, Select, TextField,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
 import type { StageProps, TypographyStyle, ColorScheme } from '../../types';
@@ -286,10 +286,10 @@ export default function TypographyStage({
   if (step === 'detecting') {
     return (
       <VStack spacing={4} style={{ padding: '64px 24px', maxWidth: 800, margin: '0 auto', alignItems: 'center' }}>
-        <H2>Typography Selection</H2>
+        <H2 style={{ textAlign: 'center' }}>Typography Selection</H2>
         <div className="typo-spinner" />
-        <Body>Analyzing mood board for typography...</Body>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>Detecting text regions and classifying styles</BodySmall>
+        <Body style={{ textAlign: 'center' }}>Analyzing mood board for typography...</Body>
+        <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Detecting text regions and classifying styles</BodySmall>
       </VStack>
     );
   }
@@ -299,7 +299,7 @@ export default function TypographyStage({
   return (
     <div className="typo-page">
       <VStack spacing={4} style={{ maxWidth: 900, margin: '0 auto' }}>
-        <H2>Typography Selection</H2>
+        <H2 style={{ textAlign: 'center' }}>Typography Selection</H2>
 
         {/* Color palette preview */}
         <HStack spacing={1}>
@@ -365,41 +365,45 @@ export default function TypographyStage({
                     <div className="typo-field-header">
                       <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Font Style</BodySmall>
                     </div>
-                    <select value={t.family} onChange={e => handleEdit(i, 'family', e.target.value)} style={selectStyle}>
-                      {categoryOptions.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <Select
+                      label="Font Style"
+                      labelPosition="top"
+                      size="small"
+                      fullWidth
+                      value={t.family}
+                      onChange={(val: string) => handleEdit(i, 'family', val)}
+                      options={categoryOptions.map(cat => ({ value: cat, label: cat }))}
+                    />
 
                     <div className="typo-two-col">
-                      <VStack spacing={1} style={{ flex: 1 }}>
-                        <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Weight</BodySmall>
-                        <select value={t.weight} onChange={e => handleEdit(i, 'weight', e.target.value)} style={selectStyle}>
-                          {WEIGHT_OPTIONS.map(w => (
-                            <option key={w.value} value={w.value}>{w.label}</option>
-                          ))}
-                        </select>
-                      </VStack>
-                      <VStack spacing={1} style={{ flex: 1 }}>
-                        <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Letter Spacing</BodySmall>
-                        <select value={t.letterSpacing} onChange={e => handleEdit(i, 'letterSpacing', e.target.value)} style={selectStyle}>
-                          {SPACING_OPTIONS.map(s => (
-                            <option key={s.value} value={s.value}>{s.label}</option>
-                          ))}
-                        </select>
-                      </VStack>
+                      <Select
+                        label="Weight"
+                        labelPosition="top"
+                        size="small"
+                        fullWidth
+                        value={t.weight}
+                        onChange={(val: string) => handleEdit(i, 'weight', val)}
+                        options={WEIGHT_OPTIONS}
+                      />
+                      <Select
+                        label="Letter Spacing"
+                        labelPosition="top"
+                        size="small"
+                        fullWidth
+                        value={t.letterSpacing}
+                        onChange={(val: string) => handleEdit(i, 'letterSpacing', val)}
+                        options={SPACING_OPTIONS}
+                      />
                     </div>
 
                     {t.type !== 'body' && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={t.allCaps}
-                          onChange={e => handleEdit(i, 'allCaps', e.target.checked)}
-                          style={{ width: 18, height: 18, accentColor: 'var(--Buttons-Primary-Button)' }}
-                        />
-                        <BodySmall>All Caps</BodySmall>
-                      </label>
+                      <Checkbox
+                        variant="default-outline"
+                        size="small"
+                        label="All Caps"
+                        checked={t.allCaps}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleEdit(i, 'allCaps', e.target.checked)}
+                      />
                     )}
                   </VStack>
                 ))}
@@ -447,10 +451,11 @@ export default function TypographyStage({
                 const isExpanded = expandedCard === sample.id;
 
                 return (
-                  <div
+                  <Card
                     key={sample.id}
-                    className={`typo-sample-card ${isSelected ? 'selected' : ''}`}
-                    data-surface="Container"
+                    clickable
+                    selected={isSelected}
+                    padding="medium"
                     onClick={() => { setSelectedSample(sample.id); onFontSamplesGenerated?.(fontSamples, sample.id); }}
                   >
                     <div className="typo-sample-header-row">
@@ -579,7 +584,7 @@ export default function TypographyStage({
                         </div>
                       </VStack>
                     )}
-                  </div>
+                  </Card>
                 );
               })}
             </div>
@@ -602,93 +607,23 @@ export default function TypographyStage({
 
           {/* Header Font */}
           <VStack spacing={1}>
-            <Label>Header Font URL</Label>
-            <input
-              type="url"
-              placeholder="https://example.com/fonts/header.woff2"
-              value={customFonts.headerUrl}
-              onChange={e => setCustomFonts({ ...customFonts, headerUrl: e.target.value })}
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-            />
-            <HStack spacing={2}>
-              <VStack spacing={0} style={{ flex: 1 }}>
-                <Label>Weight</Label>
-                <input
-                  type="text"
-                  placeholder="700"
-                  value={customFonts.headerWeight}
-                  onChange={e => setCustomFonts({ ...customFonts, headerWeight: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </VStack>
-            </HStack>
+            <TextField label="Header Font URL" placeholder="https://example.com/fonts/header.woff2" value={customFonts.headerUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, headerUrl: e.target.value })} size="small" />
+            <TextField label="Weight" placeholder="700" value={customFonts.headerWeight} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, headerWeight: e.target.value })} size="small" />
           </VStack>
 
           {/* Decorative Font */}
           <VStack spacing={1}>
-            <Label>Decorative Font URL</Label>
-            <input
-              type="url"
-              placeholder="https://example.com/fonts/decorative.woff2"
-              value={customFonts.decorativeUrl}
-              onChange={e => setCustomFonts({ ...customFonts, decorativeUrl: e.target.value })}
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-            />
-            <HStack spacing={2}>
-              <VStack spacing={0} style={{ flex: 1 }}>
-                <Label>Weight</Label>
-                <input
-                  type="text"
-                  placeholder="600"
-                  value={customFonts.decorativeWeight}
-                  onChange={e => setCustomFonts({ ...customFonts, decorativeWeight: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </VStack>
-            </HStack>
+            <TextField label="Decorative Font URL" placeholder="https://example.com/fonts/decorative.woff2" value={customFonts.decorativeUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, decorativeUrl: e.target.value })} size="small" />
+            <TextField label="Weight" placeholder="600" value={customFonts.decorativeWeight} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, decorativeWeight: e.target.value })} size="small" />
           </VStack>
 
           {/* Body Font */}
           <VStack spacing={1}>
-            <Label>Body Font URL</Label>
-            <input
-              type="url"
-              placeholder="https://example.com/fonts/body.woff2"
-              value={customFonts.bodyUrl}
-              onChange={e => setCustomFonts({ ...customFonts, bodyUrl: e.target.value })}
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-            />
+            <TextField label="Body Font URL" placeholder="https://example.com/fonts/body.woff2" value={customFonts.bodyUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, bodyUrl: e.target.value })} size="small" />
             <HStack spacing={2}>
-              <VStack spacing={0} style={{ flex: 1 }}>
-                <Label>Body Weight</Label>
-                <input
-                  type="text"
-                  placeholder="400"
-                  value={customFonts.bodyWeight}
-                  onChange={e => setCustomFonts({ ...customFonts, bodyWeight: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </VStack>
-              <VStack spacing={0} style={{ flex: 1 }}>
-                <Label>Semibold Weight</Label>
-                <input
-                  type="text"
-                  placeholder="600"
-                  value={customFonts.bodySemiboldWeight}
-                  onChange={e => setCustomFonts({ ...customFonts, bodySemiboldWeight: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </VStack>
-              <VStack spacing={0} style={{ flex: 1 }}>
-                <Label>Bold Weight</Label>
-                <input
-                  type="text"
-                  placeholder="700"
-                  value={customFonts.bodyBoldWeight}
-                  onChange={e => setCustomFonts({ ...customFonts, bodyBoldWeight: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--Border)', borderRadius: 'var(--Style-Border-Radius)', background: 'var(--Container-Low)', color: 'var(--Text)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </VStack>
+              <TextField label="Body Weight" placeholder="400" value={customFonts.bodyWeight} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, bodyWeight: e.target.value })} size="small" />
+              <TextField label="Semibold Weight" placeholder="600" value={customFonts.bodySemiboldWeight} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, bodySemiboldWeight: e.target.value })} size="small" />
+              <TextField label="Bold Weight" placeholder="700" value={customFonts.bodyBoldWeight} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFonts({ ...customFonts, bodyBoldWeight: e.target.value })} size="small" />
             </HStack>
           </VStack>
 

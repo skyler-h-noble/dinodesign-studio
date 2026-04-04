@@ -689,9 +689,9 @@ export function generateCompleteSimplifiedSystem(
   // Get default settings
   const config = getSimplifiedDefaultSettings(extractedTones, surfaceStyle, schemeType, userSelections);
   
-  // Calculate OB - PC >= 9 then OB = 8, else OB = 6
+  // Calculate OB - PC >= 9 then OB = 9, else OB = 8
   const PC = toneToColorNumber(extractedTones.primary);
-  const OB = PC >= 9 ? 8 : 6;
+  const OB = PC >= 9 ? 9 : 8;
   
   // Generate all sections with COMPLETE THEMES (includes Surfaces and Containers)
   const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections);

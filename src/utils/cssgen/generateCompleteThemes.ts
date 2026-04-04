@@ -289,39 +289,39 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Error-Variant': { value: `{Icon-Variant.Surfaces.Error.Color-${n}}`, type: 'color' }
     },
 
-    // Tags in Surfaces
+    // Tags in Surfaces — text references the tag's own text token (already has correct tonal/BW palette)
     'Tag': {
       'Primary': {
         'BG': { value: `{Tag.${shade}.Primary.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.primaryText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Primary.Text.Primary}`, type: 'color' }
       },
       'Secondary': {
         'BG': { value: `{Tag.${shade}.Secondary.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.secondaryText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Secondary.Text.Secondary}`, type: 'color' }
       },
       'Tertiary': {
         'BG': { value: `{Tag.${shade}.Tertiary.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.tertiaryText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Tertiary.Text.Tertiary}`, type: 'color' }
       },
       'Info': {
         'BG': { value: `{Tag.${shade}.Info.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.infoText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Info.Text.Info}`, type: 'color' }
       },
       'Success': {
         'BG': { value: `{Tag.${shade}.Success.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.successText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Success.Text.Success}`, type: 'color' }
       },
       'Warning': {
         'BG': { value: `{Tag.${shade}.Warning.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.warningText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Warning.Text.Warning}`, type: 'color' }
       },
       'Error': {
         'BG': { value: `{Tag.${shade}.Error.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.errorText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Error.Text.Error}`, type: 'color' }
       },
       'Neutral': {
         'BG': { value: `{Tag.${shade}.Neutral.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${shade}.${config.neutralText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${shade}.Neutral.Text.Neutral}`, type: 'color' }
       }
     }
   };
@@ -335,7 +335,7 @@ function generateSingleTheme(config: ThemeConfig): any {
 
   // Surfaces Section — each surface variant gets its own complete token set
   const dimN = Math.max(config.n - 1, 1);
-  const dimmestN = Math.max(config.n - 2, 1);
+  const dimmestN = 4; // Surface-Dimmest always uses Color-4
   const brightN = Math.min(config.n + 1, 12);
 
   // Base Surface — reference Backgrounds structure for Light/Dark mode adaptation
@@ -606,39 +606,39 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Error-Variant': { value: `{Icon-Variant.Containers.Error.Color-${config.contN}}`, type: 'color' }
     },
     
-    // Tags in Containers
+    // Tags in Containers — text references the tag's own text token
     'Tag': {
       'Primary': {
         'BG': { value: `{Tag.${config.cShade}.Primary.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.primaryText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Primary.Text.Primary}`, type: 'color' }
       },
       'Secondary': {
         'BG': { value: `{Tag.${config.cShade}.Secondary.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.secondaryText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Secondary.Text.Secondary}`, type: 'color' }
       },
       'Tertiary': {
         'BG': { value: `{Tag.${config.cShade}.Tertiary.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.tertiaryText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Tertiary.Text.Tertiary}`, type: 'color' }
       },
       'Info': {
         'BG': { value: `{Tag.${config.cShade}.Info.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.infoText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Info.Text.Info}`, type: 'color' }
       },
       'Success': {
         'BG': { value: `{Tag.${config.cShade}.Success.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.successText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Success.Text.Success}`, type: 'color' }
       },
       'Warning': {
         'BG': { value: `{Tag.${config.cShade}.Warning.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.warningText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Warning.Text.Warning}`, type: 'color' }
       },
       'Error': {
         'BG': { value: `{Tag.${config.cShade}.Error.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.errorText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Error.Text.Error}`, type: 'color' }
       },
       'Neutral': {
         'BG': { value: `{Tag.${config.cShade}.Neutral.BG}`, type: 'color' },
-        'Text': { value: `{Tag.${config.cShade}.${config.neutralText}.Text}`, type: 'color' }
+        'Text': { value: `{Tag.${config.cShade}.Neutral.Text.Neutral}`, type: 'color' }
       }
     }
   };
@@ -789,20 +789,25 @@ export function generateAllThemesWithSurfacesAndContainers(
   console.log(`  Nav themes: App-Bar→${appBarSource}, Nav-Bar→${navBarSource}, Status→${statusSource}`);
   
   // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC converted to Color-N)
-  const PC = toneToColorNumber(extractedTones.primary);
-  const SC = toneToColorNumber(extractedTones.secondary);
-  const TC = toneToColorNumber(extractedTones.tertiary);
-  const OB = PC >= 9 ? 8 : 6;
+  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
+  const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
+  // If SC/TC landed at 11 (very light), adjust based on PC
+  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
+  const TC = rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC;
+  const OB = PC >= 9 ? 9 : 8;
 
   // Helper to build common theme config
+  // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
+  // For other themes, use the default container settings
   const makeConfig = (themeName: string, theme: string, n: number): ThemeConfig => ({
     themeName,
     theme,
     n,
     contTheme: theme,
-    contN: defaultSettings.containerN,
+    contN: n === 11 ? 10 : n === 12 ? 11 : Math.min(n + 1, 12),
     shade: n >= 9 ? 'Medium' as const : 'Light' as const,
-    cShade: defaultSettings.containerShade,
+    cShade: n === 11 ? 'Medium' as const : defaultSettings.containerShade,
     defaultText: textPalettes.default,
     primaryText: textPalettes.primary,
     secondaryText: textPalettes.secondary,

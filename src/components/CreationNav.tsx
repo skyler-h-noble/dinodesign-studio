@@ -1,4 +1,4 @@
-import { Button, BodySmall, Body } from '@dynodesign/components';
+import { Button, H5 } from '@dynodesign/components';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 interface TopBarProps {
@@ -10,31 +10,30 @@ interface TopBarProps {
 export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps) {
   return (
     <div
-      data-theme={themed ? 'Brand-App-Bar' : undefined}
+      data-theme={themed ? 'Brand-App-Bar' : 'App-Bar'}
+      data-surface="Surface"
       style={{
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        display: 'grid',
-        gridTemplateColumns: 'auto 1fr auto',
+        display: 'flex',
         alignItems: 'center',
-        padding: '12px 16px',
-        background: 'var(--Background, var(--Surface, #fff))',
+        padding: '8px 16px',
+        background: 'var(--Background, #fff)',
         borderBottom: '1px solid var(--Border, #e0e0e0)',
+        minHeight: 48,
       }}
     >
       <Button
-        variant="outline"
-        color="default"
+        variant="ghost"
         size="small"
         onClick={onBack}
-        style={{ minWidth: 'auto', padding: '6px 12px', gap: 4 }}
+        startIcon={<ArrowBackIcon style={{ fontSize: 16 }} />}
       >
-        <ArrowBackIcon style={{ fontSize: 16 }} />
         Back
       </Button>
-      <h3 style={{ fontWeight: 700, fontSize: '1.4rem', textAlign: 'center', margin: 0, color: 'var(--Header)' }}>{designSystemName}</h3>
-      <div />
+      <H5 style={{ flex: 1, textAlign: 'center', margin: 0 }}>{designSystemName}</H5>
+      <div style={{ width: 70 }} />
     </div>
   );
 }
@@ -49,7 +48,8 @@ interface BottomBarProps {
 export function CreationBottomBar({ onNext, nextLabel = 'Continue', disabled, themed }: BottomBarProps) {
   return (
     <div
-      data-theme={themed ? 'Brand-Nav-Bar' : undefined}
+      data-theme={themed ? 'Brand-Nav-Bar' : 'Nav-Bar'}
+      data-surface="Surface"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -57,13 +57,14 @@ export function CreationBottomBar({ onNext, nextLabel = 'Continue', disabled, th
         right: 0,
         zIndex: 100,
         padding: '12px 24px',
-        background: 'var(--Background, var(--Surface, #fff))',
+        background: 'var(--Background, #fff)',
         borderTop: '1px solid var(--Border, #e0e0e0)',
-      display: 'flex',
-      justifyContent: 'center',
-    }}>
+        display: 'flex',
+        justifyContent: 'center',
+      }}
+    >
       <Button
-        variant="primary"
+        variant="default"
         size="medium"
         onClick={onNext}
         disabled={disabled}

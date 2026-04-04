@@ -11,15 +11,17 @@ export default function WelcomeStage({ onNext, onLoadSystem }: Props) {
   return (
     <VStack spacing={6} alignItems="center" style={{ padding: '80px 24px' }}>
       <VStack spacing={2} alignItems="center">
-        <H1>DinoDesign</H1>
-        <Body>Evolve your prehistoric design system approach</Body>
+        <H1 style={{ textAlign: 'center' }}>DinoDesign</H1>
+        <Body style={{ textAlign: 'center' }}>Evolve your prehistoric design system approach</Body>
       </VStack>
 
       <VStack spacing={2} style={{ maxWidth: 480, width: '100%' }}>
         <Card
           onClick={onNext}
+          clickable
           padding="medium"
           elevation={1}
+          sx={{ border: '2px solid var(--Buttons-Default-Border)' }}
         >
           <HStack spacing={2} alignItems="center">
             <AddIcon style={{ color: 'var(--Icons-Primary)' }} />
@@ -34,6 +36,7 @@ export default function WelcomeStage({ onNext, onLoadSystem }: Props) {
 
         <Card
           onClick={onLoadSystem}
+          clickable
           padding="medium"
           elevation={1}
         >

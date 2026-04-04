@@ -9,11 +9,11 @@ import type { ColorScheme } from '../types';
 /**
  * Generate tone palettes for an array of 3 colors (primary, secondary, tertiary).
  */
-function generateTonePalettes(colors: string[], maxChroma: number = 64) {
+function generateTonePalettes(colors: string[], maxChroma: number = 64, lockedColors?: (string | undefined)[]) {
   return {
-    primary: generateSemanticLightModeScale(colors[0], maxChroma),
-    secondary: generateSemanticLightModeScale(colors[1], maxChroma),
-    tertiary: generateSemanticLightModeScale(colors[2], maxChroma),
+    primary: generateSemanticLightModeScale(colors[0], maxChroma, lockedColors?.[0]),
+    secondary: generateSemanticLightModeScale(colors[1], maxChroma, lockedColors?.[1]),
+    tertiary: generateSemanticLightModeScale(colors[2], maxChroma, lockedColors?.[2]),
   };
 }
 
@@ -47,13 +47,14 @@ function buildScheme(
   colors: [string, string, string],
   lightMaxChroma: number = 62,
   darkMaxChroma: number = 36,
+  lockedColors?: (string | undefined)[],
 ): ColorScheme {
   return {
     name,
     colors,
     originalColors: [...colors],
     extractedTones: calculateTones(colors),
-    tonePalettes: generateTonePalettes(colors, lightMaxChroma),
+    tonePalettes: generateTonePalettes(colors, lightMaxChroma, lockedColors),
     darkModeTonePalettes: generateDarkModeTonePalettes(colors, darkMaxChroma),
   };
 }
@@ -103,6 +104,7 @@ export function generateColorSchemes(
   topColors: string[],
   lightMaxChroma: number = 62,
   darkMaxChroma: number = 36,
+  lockedColors?: (string | undefined)[],
 ): ColorScheme[] {
   const [c1, c2, c3] = topColors;
   const others = topColors.slice(1);
@@ -143,11 +145,11 @@ export function generateColorSchemes(
   const splitComplementary: [string, string, string] = [c1, split2, split3];
 
   return [
-    buildScheme('Analogous', analogous, lightMaxChroma, darkMaxChroma),
-    buildScheme('Monochromatic', monochromatic, lightMaxChroma, darkMaxChroma),
-    buildScheme('Complementary', complementary, lightMaxChroma, darkMaxChroma),
-    buildScheme('Triadic', triadic, lightMaxChroma, darkMaxChroma),
-    buildScheme('Split-Complementary', splitComplementary, lightMaxChroma, darkMaxChroma),
-    buildScheme('Custom', custom, lightMaxChroma, darkMaxChroma),
+    buildScheme('Analogous', analogous, lightMaxChroma, darkMaxChroma, lockedColors),
+    buildScheme('Monochromatic', monochromatic, lightMaxChroma, darkMaxChroma, lockedColors),
+    buildScheme('Complementary', complementary, lightMaxChroma, darkMaxChroma, lockedColors),
+    buildScheme('Triadic', triadic, lightMaxChroma, darkMaxChroma, lockedColors),
+    buildScheme('Split-Complementary', splitComplementary, lightMaxChroma, darkMaxChroma, lockedColors),
+    buildScheme('Custom', custom, lightMaxChroma, darkMaxChroma, lockedColors),
   ];
 }

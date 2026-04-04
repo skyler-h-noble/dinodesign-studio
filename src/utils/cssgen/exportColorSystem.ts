@@ -2906,10 +2906,12 @@ function generateModesThemes(
   
   // Convert extracted tones to Color-N positions (PC, SC, TC)
   const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
-  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8;
+  const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
+  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
+  const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
+  const TC = rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC;
   const NC = 9; // Neutral is always fixed
-  const OB = PC >= 9 ? 8 : 6; // Other buttons (OB = 8 if PC >= 9, else 6)
+  const OB = PC >= 9 ? 9 : 8; // Other buttons (OB = 8 if PC >= 9, else 6)
   
   // {X} values per Background (from theme-definitions-3.md)
   const getXValue = (backgroundN: number): number => {
@@ -4383,7 +4385,7 @@ export function exportColorSystemToJSON(
   
   // Calculate OB (Other Buttons) value based on Primary Color position
   const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-  const OB = PC >= 9 ? 8 : 6; // Other buttons (OB = 8 if PC >= 9, else 6)
+  const OB = PC >= 9 ? 9 : 8; // Other buttons (OB = 8 if PC >= 9, else 6)
   console.log(`🎯 [JSON Export] OB calculated: ${OB} (PC = ${PC})`);
   
   const colorSystem: ColorSystemExport = {
@@ -5891,7 +5893,7 @@ export function exportColorSystemToJSON(
   // Dropshadow = same hue/chroma, L × 0.625
   // ========================================
   console.log('🎨 [JSON Export] Adding Dropshadow-Color to all themes...');
-  const computeDropshadow = (hex: string, lightOffset = -25, satMultiplier = 1.5): string => {
+  const computeDropshadow = (hex: string, lightOffset = -35, satMultiplier = 1.25): string => {
     try {
       const clean = hex.replace('#', '');
       const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
@@ -5913,7 +5915,9 @@ export function exportColorSystemToJSON(
       // Apply offsets
       const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
       const newS = clamp(sPct * satMultiplier, 0, 100);
-      const newL = clamp(lPct + lightOffset, 8, 92);
+      // Floor at 40% of original lightness so dark colors don't collapse to near-black
+      const minL = Math.max(8, lPct * 0.4);
+      const newL = clamp(lPct + lightOffset, minL, 92);
       // HSL → RGB
       const s2 = newS / 100, l2 = newL / 100, h2 = hDeg / 360;
       let sr: number, sg: number, sb: number;
@@ -6116,14 +6120,16 @@ export function exportColorSystemToJSON(
 
       // Compute extracted tone numbers for fallback
       const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-      const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
-      const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8;
+      const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
+  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
+      const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
+  const TC = rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC;
       const NC = 9;
-      const OB = PC >= 9 ? 8 : 6;
+      const OB = PC >= 9 ? 9 : 8;
 
-      const buttonThemes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+      const buttonThemes = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
       const btnColorNMap: Record<string, number> = {
-        Primary: PC, Secondary: SC, Tertiary: TC, Neutral: OB,
+        Default: SC, Primary: PC, Secondary: SC, Tertiary: TC, Neutral: OB,
         Info: OB, Success: OB, Warning: OB, Error: OB,
       };
 
@@ -6135,7 +6141,23 @@ export function exportColorSystemToJSON(
       buttonThemes.forEach(btnTheme => {
         // Resolve a base hex for this button theme (fallback for all sections)
         const colorN = btnColorNMap[btnTheme] || 8;
-        const fallbackHex = colors?.[btnTheme]?.['Color-' + colorN]?.value;
+        // Default isn't a palette — resolve from the Default-Button section or mapped palette
+        const fallbackHex = btnTheme === 'Default'
+          ? (() => {
+              // Try to resolve Default button color from Default-Button section
+              const defBtn = (colorSystem.Modes[mode] as any)?.['Default-Button'];
+              if (defBtn) {
+                // Find the Medium button value and resolve it
+                const mediumBtnToken = defBtn['Default-Medium-Button']?.value || defBtn['Default-Medium']?.Button?.value;
+                if (mediumBtnToken) {
+                  const resolved = resolveColorToken(mediumBtnToken, colors, backgrounds);
+                  if (resolved) return resolved;
+                }
+              }
+              // Fallback: use Secondary palette (Default button usually maps to Secondary)
+              return colors?.Secondary?.['Color-' + colorN]?.value;
+            })()
+          : colors?.[btnTheme]?.['Color-' + colorN]?.value;
 
         allSections.forEach(section => {
           const sectionData = theme[section];
@@ -6156,7 +6178,7 @@ export function exportColorSystemToJSON(
     // Also add Highlight/Lowlight to mode-level Buttons section
     const modeButtons = (colorSystem.Modes[mode] as any).Buttons;
     if (modeButtons) {
-      const buttonThemes2 = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+      const buttonThemes2 = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
       buttonThemes2.forEach(btnTheme => {
         // Check Surfaces and Containers in the Buttons section
         ['Surfaces', 'Containers'].forEach(section => {
@@ -6855,7 +6877,8 @@ export function exportColorSystemToJSON(
   // Recalculate if defaultSettings wasn't created earlier (shouldn't happen, but be safe)
   if (!defaultSettings && extractedTones) {
     const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-    const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8;
+    const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
+  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
     
     defaultSettings = calculateDefaultThemeSettings(
       PC,

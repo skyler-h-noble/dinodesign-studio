@@ -1,9 +1,12 @@
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack, Card,
-  CircularProgress, Checkbox, Link, Radio,
+  CircularProgress, Checkbox, Link, Radio, Modal, TextField, Alert, Slider,
 } from '@dynodesign/components';
 import StarIcon from '@mui/icons-material/Star';
-import { useState, useEffect, useCallback } from 'react';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
 import { generateColorSchemes } from '../../utils/colorSchemes';
 import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma } from '../../utils/colorScale';
@@ -54,6 +57,67 @@ export default function ColorStage({
   const [toneMode, setToneMode] = useState<'light' | 'dark'>('light');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Hex editor modal
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track which top colors are locked (index → exact hex)
+  const [lockedColorMap, setLockedColorMap] = useState<Record<number, string>>({});
+  const [hexEditIndex, setHexEditIndex] = useState<number | null>(null);
+  const [hexEditValue, setHexEditValue] = useState('');
+  const [hexEditSource, setHexEditSource] = useState<'top' | 'additional'>('top');
+  const [hexLocked, setHexLocked] = useState(false);
+  const [hexError, setHexError] = useState<string | null>(null);
+
+  const openHexEditor = (hex: string, index: number, source: 'top' | 'additional') => {
+    setHexEditValue(hex);
+    setHexEditIndex(index);
+    setHexEditSource(source);
+    setHexLocked(source === 'top' && !!lockedColorMap[index]);
+    setHexError(null);
+  };
+
+  const validateHexForLock = (hex: string): { error: string | null; suggested: string | null } => {
+    try {
+      const [l, c, h] = chroma(hex).lch();
+      const blackContrast = chroma.contrast(hex, '#000000');
+      const whiteContrast = chroma.contrast(hex, '#ffffff');
+      if (blackContrast < 4.5 && whiteContrast < 4.5) {
+        return { error: `Neither black (${blackContrast.toFixed(1)}:1) nor white (${whiteContrast.toFixed(1)}:1) text meets WCAG AA contrast (4.5:1) on this color. Consider adjusting the lightness.`, suggested: null };
+      }
+      const peakChroma = getNaturalPeakChroma(hex);
+      if (c > peakChroma) {
+        const suggested = chroma.lch(l, peakChroma, h).hex();
+        return { error: `Chroma ${c.toFixed(0)} exceeds the safe maximum (${peakChroma.toFixed(0)}) for this hue. Try ${suggested} instead.`, suggested };
+      }
+      return { error: null, suggested: null };
+    } catch {
+      return { error: 'Invalid color value.', suggested: null };
+    }
+  };
+
+  const applyHexEdit = () => {
+    if (!hexEditValue.match(/^#[0-9a-fA-F]{6}$/)) {
+      setHexError('Enter a valid 6-digit hex (e.g. #A1B2C3)');
+      return;
+    }
+    if (hexLocked) {
+      const { error: lockErr } = validateHexForLock(hexEditValue);
+      if (lockErr) { setHexError(lockErr); return; }
+    }
+    if (hexEditSource === 'top' && hexEditIndex !== null) {
+      setTopColors(prev => {
+        const next = [...prev];
+        next[hexEditIndex] = { ...next[hexEditIndex], hex: hexEditValue };
+        return next;
+      });
+      // Track lock state
+      if (hexLocked) {
+        setLockedColorMap(prev => ({ ...prev, [hexEditIndex]: hexEditValue }));
+      } else {
+        setLockedColorMap(prev => { const n = { ...prev }; delete n[hexEditIndex]; return n; });
+      }
+    }
+    setHexEditIndex(null);
+  };
 
   // Extract colors on mount
   useEffect(() => {
@@ -110,8 +174,15 @@ export default function ColorStage({
     const primary = tops[pIdx].hex;
     const others = tops.filter((_, i) => i !== pIdx).map(c => c.hex);
     const reordered = [primary, ...others];
-    // Use the primary color's chroma for scheme generation
-    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx]);
+    // Build locked colors array: [primary locked hex, secondary locked hex, ...]
+    const locked: (string | undefined)[] = [
+      lockedColorMap[pIdx],
+      ...tops.filter((_, i) => i !== pIdx).map((_, i) => {
+        const origIdx = i >= pIdx ? i + 1 : i;
+        return lockedColorMap[origIdx];
+      }),
+    ];
+    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked);
     setSchemes(generated);
     onSchemesGenerated?.(generated);
     if (selectedScheme) {
@@ -120,7 +191,7 @@ export default function ColorStage({
     } else {
       onSchemeSelected(generated[0]);
     }
-  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor]);
+  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, lockedColorMap]);
 
   const handleGenerateThemes = useCallback(() => {
     regenerateSchemes(topColors, primaryIndex);
@@ -164,7 +235,7 @@ export default function ColorStage({
   if (error || !colorData) {
     return (
       <VStack spacing={4} alignItems="center" style={{ padding: '80px 24px' }}>
-        <H2>Color Extraction</H2>
+        <H2 style={{ textAlign: 'center' }}>Color Extraction</H2>
         <Body style={{ color: 'var(--Buttons-Error-Button)' }}>{error || 'No data'}</Body>
         <Button variant="outline" color="default" onClick={onBack}>Back</Button>
       </VStack>
@@ -175,7 +246,7 @@ export default function ColorStage({
   if (step === 'extraction') {
     return (
       <VStack spacing={4} alignItems="center" style={{ padding: '40px 24px' }}>
-        <H2>Color Extraction</H2>
+        <H2 style={{ textAlign: 'center' }}>Color Extraction</H2>
 
         {/* Mood board image */}
         {moodBoardUrl && (
@@ -195,16 +266,16 @@ export default function ColorStage({
         {/* Top Seed Colors */}
         <Card padding="medium" style={{ maxWidth: 500, width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
           <VStack spacing={2}>
-            <HStack spacing={1} alignItems="baseline">
-              <H3 style={{ fontSize: '1rem' }}>Top Seed Colors</H3>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <HStack spacing={1} alignItems="baseline" style={{ justifyContent: 'space-between', width: '100%' }}>
+              <H3 sx={{ fontSize: '1rem', flex: 1, width: 'auto' }}>Top Seed Colors</H3>
+              <BodySmall sx={{ color: 'var(--Quiet)', flexShrink: 0, whiteSpace: 'nowrap', width: 'auto' }}>
                 ({colorData.totalSwatches} swatches detected)
               </BodySmall>
             </HStack>
             <VStack spacing={0}>
               <BodySmall style={{ color: 'var(--Quiet)' }}>Colors sorted by dominance (most to least)</BodySmall>
               <BodySmall style={{ color: 'var(--Quiet)' }}>Color swatches are prioritized</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Click on a color to swap it</BodySmall>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>Click to edit hex · Double-click to select for swap</BodySmall>
             </VStack>
 
             <div style={{ display: 'flex', gap: 16, width: '100%', alignItems: 'flex-start' }}>
@@ -212,27 +283,39 @@ export default function ColorStage({
                 const isSwapActive = swapIndex === i;
                 return (
                   <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
-                    <div
-                      onClick={() => setSwapIndex(isSwapActive ? null : i)}
-                      style={{
+                    <Button
+                      swatch
+                      swatchColor={color.hex}
+                      size="large"
+                      onClick={() => {
+                        if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
+                        clickTimer.current = setTimeout(() => { clickTimer.current = null; openHexEditor(color.hex, i, 'top'); }, 250);
+                      }}
+                      onDoubleClick={() => {
+                        if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
+                        setSwapIndex(isSwapActive ? null : i);
+                      }}
+                      sx={{
                         width: '100%',
                         aspectRatio: '1',
-                        borderRadius: 'var(--Style-Border-Radius)',
-                        background: color.hex,
-                        cursor: 'pointer',
-                        outline: isSwapActive
-                          ? '3px solid var(--Buttons-Default-Border)'
-                          : 'none',
-                        outlineOffset: isSwapActive ? 2 : 0,
-                        transition: 'all 0.15s ease',
+                        height: 'auto',
+                        ...(isSwapActive ? { border: '2px solid var(--Buttons-Default-Border)' } : {}),
                       }}
-                      title={`${color.hex} — click to swap`}
+                      title={`${color.hex} — click to edit · double-click to swap`}
                     />
                     {color.isSwatch && (
                       <HStack spacing={0} alignItems="center">
-                        <StarIcon style={{ fontSize: 14, color: 'var(--Buttons-Primary-Button)' }} />
-                        <BodySmall style={{ color: 'var(--Buttons-Primary-Button)', fontSize: '0.65rem', fontWeight: 600 }}>
+                        <StarIcon style={{ fontSize: 14, color: 'var(--Text-Primary)' }} />
+                        <BodySmall style={{ color: 'var(--Text-Primary)', fontSize: '0.65rem', fontWeight: 600 }}>
                           Swatch
+                        </BodySmall>
+                      </HStack>
+                    )}
+                    {lockedColorMap[i] && (
+                      <HStack spacing={0} alignItems="center">
+                        <LockIcon style={{ fontSize: 12, color: 'var(--Text)' }} />
+                        <BodySmall style={{ color: 'var(--Text)', fontSize: '0.6rem', fontWeight: 600 }}>
+                          Locked
                         </BodySmall>
                       </HStack>
                     )}
@@ -247,9 +330,9 @@ export default function ColorStage({
         {colorData.additionalColors.length > 0 && (
           <Card padding="medium" style={{ maxWidth: 500, width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
             <VStack spacing={2}>
-              <HStack spacing={1} alignItems="baseline">
-                <H3 style={{ fontSize: '1rem' }}>Additional Seed Colors</H3>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <HStack spacing={1} alignItems="baseline" style={{ justifyContent: 'space-between', width: '100%' }}>
+                <H3 sx={{ fontSize: '1rem', flex: 1, width: 'auto' }}>Additional Seed Colors</H3>
+                <BodySmall sx={{ color: 'var(--Quiet)', flexShrink: 0, whiteSpace: 'nowrap', width: 'auto' }}>
                   ({colorData.additionalColors.length} available)
                 </BodySmall>
               </HStack>
@@ -263,23 +346,18 @@ export default function ColorStage({
               }}>
                 {colorData.additionalColors.map((color, i) => (
                   <VStack key={i} spacing={0} alignItems="center">
-                    <div
-                      onClick={() => { if (swapIndex !== null) handleSwap(color); }}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 'var(--Style-Border-Radius)',
-                        background: color.hex,
-                        cursor: swapIndex !== null ? 'pointer' : 'default',
-                        border: swapIndex !== null ? '2px solid var(--Buttons-Primary-Button)' : '1px solid var(--Border)',
-                        opacity: swapIndex !== null ? 1 : 0.7,
-                        transition: 'all 0.15s ease',
-                        boxShadow: swapIndex !== null ? '0 0 0 1px var(--Buttons-Primary-Button)' : 'none',
+                    <Button
+                      swatch
+                      swatchColor={color.hex}
+                      size="large"
+                      onClick={() => {
+                        if (swapIndex !== null) handleSwap(color);
+                        else openHexEditor(color.hex, i, 'additional');
                       }}
-                      title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : color.hex}
+                      title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : `${color.hex} — click to view`}
                     />
                     {color.isSwatch && (
-                      <StarIcon style={{ fontSize: 10, color: 'var(--Buttons-Primary-Button)' }} />
+                      <StarIcon style={{ fontSize: 10, color: 'var(--Text-Primary)' }} />
                     )}
                   </VStack>
                 ))}
@@ -289,6 +367,107 @@ export default function ColorStage({
         )}
 
         {/* Generate Themes handled by bottom bar */}
+
+        {/* Hex Editor Modal */}
+        <Modal open={hexEditIndex !== null} onClose={() => setHexEditIndex(null)} title="Edit Color">
+          <VStack spacing={3} style={{ minWidth: 300 }}>
+            {/* Color preview */}
+            <div style={{
+              width: '100%',
+              height: 80,
+              borderRadius: 'var(--Style-Border-Radius)',
+              background: hexEditValue.match(/^#[0-9a-fA-F]{6}$/) ? hexEditValue : '#ccc',
+              border: '1px solid var(--Border)',
+            }} />
+
+            {/* Hex input */}
+            <TextField
+              label="Hex Color"
+              value={hexEditValue}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                let v = e.target.value;
+                if (!v.startsWith('#')) v = '#' + v;
+                setHexEditValue(v);
+                setHexError(null);
+              }}
+              placeholder="#A1B2C3"
+              size="medium"
+            />
+
+            {/* LCH info */}
+            {hexEditValue.match(/^#[0-9a-fA-F]{6}$/) && (() => {
+              const [l, c, h] = chroma(hexEditValue).lch();
+              return (
+                <BodySmall style={{ color: 'var(--Quiet)' }}>
+                  L: {l.toFixed(0)} · C: {c.toFixed(0)} · H: {(h || 0).toFixed(0)}°
+                </BodySmall>
+              );
+            })()}
+
+            {/* Lock toggle */}
+            {(() => {
+              const isValidHex = !!hexEditValue.match(/^#[0-9a-fA-F]{6}$/);
+              const validation = isValidHex ? validateHexForLock(hexEditValue) : { error: null, suggested: null };
+              const canLock = isValidHex && !validation.error;
+              return (
+                <>
+                  <HStack spacing={1} alignItems="center">
+                    <Button
+                      variant={hexLocked ? 'default' : 'outline'}
+                      size="small"
+                      disabled={!canLock && !hexLocked}
+                      onClick={() => {
+                        if (hexLocked) { setHexLocked(false); setHexError(null); }
+                        else { setHexLocked(true); setHexError(null); }
+                      }}
+                      startIcon={hexLocked ? <LockIcon style={{ fontSize: 14 }} /> : <LockOpenIcon style={{ fontSize: 14 }} />}
+                    >
+                      {hexLocked ? 'Locked' : 'Lock Color'}
+                    </Button>
+                    <BodySmall style={{ color: 'var(--Quiet)', flex: 1 }}>
+                      Lock ensures this exact hex is used in the generated tones, in light mode
+                    </BodySmall>
+                  </HStack>
+
+                  {validation.error && (
+                    <VStack spacing={1}>
+                      <Alert variant="solid" severity="error" size="small">
+                        {validation.error}
+                      </Alert>
+                      {validation.suggested && (
+                        <HStack spacing={2} alignItems="center">
+                          <div style={{
+                            width: 32, height: 32, borderRadius: 'var(--Style-Border-Radius)',
+                            backgroundColor: validation.suggested, border: '1px solid var(--Border)', flexShrink: 0,
+                          }} />
+                          <BodySmall style={{ color: 'var(--Quiet)' }}>Suggested: {validation.suggested}</BodySmall>
+                          <Button size="small" variant="outline" onClick={() => setHexEditValue(validation.suggested!)}>
+                            Use
+                          </Button>
+                        </HStack>
+                      )}
+                    </VStack>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Hex input error */}
+            {hexError && (
+              <Alert variant="solid" severity="error" size="small">
+                {hexError}
+              </Alert>
+            )}
+
+            {/* Actions */}
+            <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+              <Button variant="outline" size="small" onClick={() => setHexEditIndex(null)}>Cancel</Button>
+              <Button variant="primary" size="small" onClick={applyHexEdit}>
+                {hexEditSource === 'top' ? 'Apply' : 'Close'}
+              </Button>
+            </HStack>
+          </VStack>
+        </Modal>
       </VStack>
     );
   }
@@ -298,9 +477,9 @@ export default function ColorStage({
 
   return (
     <VStack spacing={4} style={{ padding: '40px 24px', maxWidth: 500, margin: '0 auto' }}>
-      <VStack spacing={1}>
-        <H2>Theme</H2>
-        <Body style={{ color: 'var(--Quiet)' }}>
+      <VStack spacing={1} alignItems="center">
+        <H2 style={{ textAlign: 'center' }}>Theme</H2>
+        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
           Select a primary color and a color scheme below.
         </Body>
       </VStack>
@@ -319,23 +498,15 @@ export default function ColorStage({
               const isPrimary = i === primaryIndex;
               return (
                 <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
-                  <div
+                  <Button
+                    swatch
+                    swatchColor={color.hex}
+                    size="large"
                     onClick={() => {
                       setPrimaryIndex(i);
                       regenerateSchemes(topColors, i);
                     }}
-                    style={{
-                      width: '100%',
-                      aspectRatio: '1',
-                      borderRadius: 'var(--Style-Border-Radius)',
-                      background: color.hex,
-                      cursor: 'pointer',
-                      outline: isPrimary
-                        ? '3px solid var(--Buttons-Default-Button)'
-                        : 'none',
-                      outlineOffset: isPrimary ? 2 : 0,
-                      transition: 'all 0.15s ease',
-                    }}
+                    sx={isPrimary ? { border: '2px solid var(--Buttons-Default-Border)' } : {}}
                   />
                   <Radio
                     variant="default-outline"
@@ -348,7 +519,7 @@ export default function ColorStage({
                     }}
                   />
                   {isPrimary && (
-                    <BodySmall style={{ color: 'var(--Buttons-Default-Button)', fontWeight: 700, fontSize: '0.65rem', textAlign: 'center' }}>
+                    <BodySmall style={{ color: 'var(--Text)', fontWeight: 700, fontSize: '0.65rem', textAlign: 'center' }}>
                       Primary
                     </BodySmall>
                   )}
@@ -494,26 +665,26 @@ export default function ColorStage({
                         <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
                           Natural chroma: {naturalChroma}. Colors above the max will be desaturated.
                         </BodySmall>
-                        <input
-                          type="range"
+                        <Slider
                           min={20}
                           max={toneMode === 'light' ? 70 : 42}
                           value={toneMode === 'light' ? lc : dc}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
+                          onChange={(_: any, val: number | number[]) => {
+                            const v = val as number;
                             if (toneMode === 'light') {
                               const updatedChroma = [...chromaPerColor];
-                              updatedChroma[colorIdx] = val;
+                              updatedChroma[colorIdx] = v;
                               setChromaPerColor(updatedChroma);
                               regenerateSchemes(topColors, primaryIndex, updatedChroma, undefined);
                             } else {
                               const updatedChroma = [...darkChromaPerColor];
-                              updatedChroma[colorIdx] = val;
+                              updatedChroma[colorIdx] = v;
                               setDarkChromaPerColor(updatedChroma);
                               regenerateSchemes(topColors, primaryIndex, undefined, updatedChroma);
                             }
                           }}
-                          style={{ width: '100%', accentColor: 'var(--Buttons-Default-Button)' }}
+                          size="small"
+                          valueLabelDisplay="auto"
                         />
                         <HStack justifyContent="space-between">
                           <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>20</BodySmall>
@@ -568,7 +739,7 @@ export default function ColorStage({
                 width: '100%',
                 borderRadius: 'var(--Card-Radius, 14px)',
                 outline: isSelected
-                  ? '2px solid var(--Buttons-Default-Button)'
+                  ? '2px solid var(--Buttons-Default-Border)'
                   : '1px solid var(--Border)',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -589,20 +760,20 @@ export default function ColorStage({
                 {/* 3 color swatches */}
                 <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                   {(['primary', 'secondary', 'tertiary'] as const).map((role, i) => {
-                    const activePalettes = toneMode === 'light' ? scheme.tonePalettes : scheme.darkModeTonePalettes;
-                    const tone = Math.round(getLightness(scheme.colors[i]));
-                    const colorN = toneToColorNumber(tone);
-                    const displayColor = activePalettes[role]?.[colorN - 1]?.hex || scheme.colors[i];
+                    const displayColor = scheme.colors[i];
                     const label = ['Primary', 'Secondary', 'Tertiary'][i];
                     return (
                       <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
-                        <div style={{
-                          width: '100%',
-                          height: 56,
-                          borderRadius: 'var(--Style-Border-Radius)',
-                          background: displayColor,
-                          border: '1px solid var(--Border)',
-                        }} />
+                        <Button
+                          swatch
+                          swatchColor={displayColor}
+                          size="large"
+                          sx={{ width: '100%', height: 56 }}
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            if (isCustom) setCustomEditing(true);
+                          }}
+                        />
                         <BodySmall style={{ fontWeight: 600, fontSize: '0.7rem' }}>{label}</BodySmall>
                       </VStack>
                     );

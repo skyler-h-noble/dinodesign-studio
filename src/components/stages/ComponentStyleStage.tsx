@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider, Accordion,
 } from '@dynodesign/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
@@ -102,8 +102,8 @@ export default function ComponentStyleStage({
   return (
     <div className="comp-style-page">
       <VStack spacing={4} style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <H2>Component Style</H2>
-        <Body style={{ color: 'var(--Quiet)' }}>
+        <H2 style={{ textAlign: 'center' }}>Component Style</H2>
+        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
           Choose a base style then fine-tune the details.
         </Body>
 
@@ -136,104 +136,30 @@ export default function ComponentStyleStage({
         <div className="comp-style-layout">
           {/* Left column — Controls */}
           <div className="comp-style-controls">
-            {/* Button Section */}
-            <div className="comp-section-header" onClick={() => toggleSection('button')}>
-              <H3 style={{ fontSize: '1rem', margin: 0 }}>Button</H3>
-              <span className="comp-section-chevron">{openSections.button ? '−' : '+'}</span>
-            </div>
+            <Accordion title="Button" defaultExpanded>
+              <VStack spacing={2} style={{ width: '100%' }}>
+                <Slider label="Desktop Button Height" min={28} max={48} value={custom.buttonHeight} onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
+                <Slider label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                <Slider label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                <Slider label="Border Radius" min={0} max={64} value={custom.buttonRadius} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                <Slider label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
+                <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
+                <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
+              </VStack>
+            </Accordion>
 
-            {openSections.button && <VStack spacing={2} style={{ width: '100%' }}>
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Desktop Button Height</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.buttonHeight}px</BodySmall>
-              </div>
-              <input type="range" min="28" max="48" value={custom.buttonHeight}
-                onChange={e => updateCustom('buttonHeight', parseInt(e.target.value))}
-                className="comp-slider" />
-              <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem', marginTop: 8, marginBottom: 8 }}>
-                iOS: 44px, Android: 48px
-              </BodySmall>
+            <Accordion title="Icon Button">
+              <VStack spacing={2} style={{ width: '100%' }}>
+                <Slider label="Border Radius" min={0} max={64} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+              </VStack>
+            </Accordion>
 
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Small Button Height</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.smallButtonHeight}px</BodySmall>
-              </div>
-              <input type="range" min="24" max="32" value={custom.smallButtonHeight}
-                onChange={e => updateCustom('smallButtonHeight', parseInt(e.target.value))}
-                className="comp-slider" />
-
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Large Button Height</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.largeButtonHeight}px</BodySmall>
-              </div>
-              <input type="range" min="44" max="72" value={custom.largeButtonHeight}
-                onChange={e => updateCustom('largeButtonHeight', parseInt(e.target.value))}
-                className="comp-slider" />
-
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Border Radius</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.buttonRadius}px</BodySmall>
-              </div>
-              <input type="range" min="0" max="64" value={custom.buttonRadius}
-                onChange={e => updateCustom('buttonRadius', parseInt(e.target.value))}
-                className="comp-slider" />
-
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Minimum Width</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.minButtonWidth}px</BodySmall>
-              </div>
-              <input type="range" min="40" max="120" value={custom.minButtonWidth}
-                onChange={e => updateCustom('minButtonWidth', parseInt(e.target.value))}
-                className="comp-slider" />
-
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Bevel</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.bevel}%</BodySmall>
-              </div>
-              <input type="range" min="0" max="20" value={custom.bevel}
-                onChange={e => updateCustom('bevel', parseInt(e.target.value))}
-                className="comp-slider" />
-
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Bevel Opacity</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.bevelOpacity}%</BodySmall>
-              </div>
-              <input type="range" min="0" max="100" value={custom.bevelOpacity}
-                onChange={e => updateCustom('bevelOpacity', parseInt(e.target.value))}
-                className="comp-slider" />
-            </VStack>}
-
-            {/* Icon Button Section */}
-            <div className="comp-section-header" onClick={() => toggleSection('iconButton')}>
-              <H3 style={{ fontSize: '1rem', margin: 0 }}>Icon Button</H3>
-              <span className="comp-section-chevron">{openSections.iconButton ? '−' : '+'}</span>
-            </div>
-
-            {openSections.iconButton && <VStack spacing={2} style={{ width: '100%' }}>
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Border Radius</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.iconButtonRadius}px</BodySmall>
-              </div>
-              <input type="range" min="0" max="64" value={custom.iconButtonRadius}
-                onChange={e => updateCustom('iconButtonRadius', parseInt(e.target.value))}
-                className="comp-slider" />
-            </VStack>}
-
-            {/* Card Section */}
-            <div className="comp-section-header" onClick={() => toggleSection('card')}>
-              <H3 style={{ fontSize: '1rem', margin: 0 }}>Card</H3>
-              <span className="comp-section-chevron">{openSections.card ? '−' : '+'}</span>
-            </div>
-
-            {openSections.card && <VStack spacing={2} style={{ width: '100%' }}>
-              <div className="comp-slider-label">
-                <Label style={{ fontSize: '0.75rem' }}>Border Radius</Label>
-                <BodySmall className="slider-value" style={{ color: 'var(--Quiet)' }}>{custom.radius}px</BodySmall>
-              </div>
-              <input type="range" min="0" max="32" value={custom.radius}
-                onChange={e => updateCustom('radius', parseInt(e.target.value))}
-                className="comp-slider" />
-            </VStack>}
+            <Accordion title="Card">
+              <VStack spacing={2} style={{ width: '100%' }}>
+                <Slider label="Border Radius" min={0} max={32} value={custom.radius} onChange={(_: any, v: number | number[]) => updateCustom('radius', v as number)} size="small" valueLabelDisplay="auto" />
+              </VStack>
+            </Accordion>
           </div>
 
           {/* Right column — Preview */}
@@ -261,17 +187,14 @@ export default function ComponentStyleStage({
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Style</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
                       <Button variant="solid" color="default" size="medium"
-                        style={{ height: custom.buttonHeight, minWidth: custom.minButtonWidth, borderRadius: custom.buttonRadius, boxShadow: bevelStyle }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Solid
                       </Button>
                       <Button variant="outline" size="medium"
-                        style={{ height: custom.buttonHeight, minWidth: custom.minButtonWidth, borderRadius: custom.buttonRadius }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Outline
                       </Button>
                       <Button variant="ghost" size="medium"
-                        style={{ height: custom.buttonHeight, minWidth: custom.minButtonWidth, borderRadius: custom.buttonRadius }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Ghost
                       </Button>
@@ -283,17 +206,14 @@ export default function ComponentStyleStage({
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Size</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
                       <Button variant="solid" color="default" size="small"
-                        style={{ height: custom.smallButtonHeight, borderRadius: Math.min(custom.buttonRadius, custom.smallButtonHeight / 2), boxShadow: bevelStyleFor(custom.smallButtonHeight), fontSize: 12 }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Small
                       </Button>
                       <Button variant="solid" color="default" size="medium"
-                        style={{ height: custom.buttonHeight, minWidth: custom.minButtonWidth, borderRadius: custom.buttonRadius, boxShadow: bevelStyle }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Medium
                       </Button>
                       <Button variant="solid" color="default" size="large"
-                        style={{ height: custom.largeButtonHeight, borderRadius: custom.buttonRadius, boxShadow: bevelStyleFor(custom.largeButtonHeight) }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Large
                       </Button>
@@ -305,7 +225,6 @@ export default function ComponentStyleStage({
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Icon Buttons</Label>
                     <HStack spacing={2}>
                       <Button variant="solid" color="default" size="medium" iconOnly
-                        style={{ height: custom.buttonHeight, width: custom.buttonHeight, borderRadius: custom.iconButtonRadius, boxShadow: bevelStyle }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>

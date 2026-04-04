@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack,
-  ButtonGroup,
+  ButtonGroup, Card,
 } from '@dynodesign/components';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
@@ -43,8 +43,8 @@ export default function ReviewStage({
     <div className="review-page">
       <VStack spacing={4} style={{ maxWidth: 1100, margin: '0 auto' }}>
         <VStack spacing={1}>
-          <H2>Review Your Design System</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>
+          <H2 style={{ textAlign: 'center' }}>Review Your Design System</H2>
+          <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
             Preview how your design system will look across your application.
           </Body>
         </VStack>
@@ -89,36 +89,39 @@ export default function ReviewStage({
           {/* ─── Right: QR + CTA ─── */}
           <div className="review-details-col">
             {/* QR Code placeholder */}
-            <div className="review-card" style={{ textAlign: 'center' }}>
-              <BodySmall style={{ fontWeight: 600 }}>Share Preview</BodySmall>
-              <div style={{
-                width: 120, height: 120, margin: '8px auto',
-                background: 'var(--Container-Low, #f0f0f0)', borderRadius: 8,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid var(--Border)',
-              }}>
-                <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>QR Code</BodySmall>
-              </div>
-              <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
-                Scan to preview on mobile
-              </BodySmall>
-            </div>
+            <Card padding="medium">
+              <VStack spacing={2} alignItems="center" style={{ textAlign: 'center' }}>
+                <BodySmall style={{ fontWeight: 600 }}>Share Preview</BodySmall>
+                <div style={{
+                  width: 120, height: 120,
+                  background: 'var(--Container-Low, #f0f0f0)', borderRadius: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid var(--Border)',
+                }}>
+                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>QR Code</BodySmall>
+                </div>
+                <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+                  Scan to preview on mobile
+                </BodySmall>
+              </VStack>
+            </Card>
 
             {/* CTA */}
-            <div className="review-cta">
-              <H3 style={{ fontSize: '1rem' }}>Ready to use your design system?</H3>
-              <BodySmall style={{ color: 'var(--Quiet)', marginBottom: 12 }}>
-                Get your hosted playground, Figma integration, and code package.
-              </BodySmall>
-              <Button
-                variant="solid"
-                color="default"
-                onClick={onNext}
-                style={{ width: '100%', padding: '14px 24px', fontSize: '1rem', fontWeight: 700 }}
-              >
-                Get Your Design System
-              </Button>
-            </div>
+            <Card padding="medium">
+              <VStack spacing={2}>
+                <H3 style={{ fontSize: '1rem' }}>Ready to use your design system?</H3>
+                <BodySmall style={{ color: 'var(--Quiet)' }}>
+                  Get your hosted playground, Figma integration, and code package.
+                </BodySmall>
+                <Button
+                  variant="default"
+                  onClick={onNext}
+                  style={{ width: '100%', padding: '14px 24px', fontSize: '1rem', fontWeight: 700 }}
+                >
+                  Get Your Design System
+                </Button>
+              </VStack>
+            </Card>
 
             <Button variant="outline" color="default" onClick={onBack} style={{ width: '100%' }}>
               Back
@@ -130,36 +133,42 @@ export default function ReviewStage({
         <div style={{ width: '100%', borderTop: '1px solid var(--Border)', marginTop: 16, paddingTop: 24 }}>
           <div className="review-grid">
             {/* Coloring */}
-            <div className="review-card">
-              <BodySmall style={{ fontWeight: 600 }}>Coloring</BodySmall>
-              <HStack spacing={1} style={{ marginTop: 8 }}>
-                {colors.slice(0, 3).map((c, i) => (
-                  <div key={i} style={{ width: 36, height: 36, borderRadius: 6, background: c, border: '1px solid var(--Border)' }} />
-                ))}
-              </HStack>
-              <BodySmall style={{ color: 'var(--Quiet)', marginTop: 8 }}>Theme: {colorScheme?.name || 'Custom'}</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Style: {STYLE_LABELS[componentStyle]}</BodySmall>
-            </div>
+            <Card padding="medium">
+              <VStack spacing={1}>
+                <BodySmall style={{ fontWeight: 600 }}>Coloring</BodySmall>
+                <HStack spacing={1}>
+                  {colors.slice(0, 3).map((c, i) => (
+                    <Button key={i} swatch swatchColor={c} size="medium" />
+                  ))}
+                </HStack>
+                <BodySmall style={{ color: 'var(--Quiet)' }}>Theme: {colorScheme?.name || 'Custom'}</BodySmall>
+                <BodySmall style={{ color: 'var(--Quiet)' }}>Style: {STYLE_LABELS[componentStyle]}</BodySmall>
+              </VStack>
+            </Card>
 
             {/* Typography */}
             {typographyStyles.length > 0 && (
-              <div className="review-card">
-                <BodySmall style={{ fontWeight: 600 }}>Typography</BodySmall>
-                {typographyStyles.map((t, i) => (
-                  <BodySmall key={i} style={{ color: 'var(--Quiet)', marginTop: 2, textTransform: 'capitalize' }}>
-                    {t.type}: {t.family} ({t.weight}){t.allCaps ? ' ALL CAPS' : ''}
-                  </BodySmall>
-                ))}
-              </div>
+              <Card padding="medium">
+                <VStack spacing={1}>
+                  <BodySmall style={{ fontWeight: 600 }}>Typography</BodySmall>
+                  {typographyStyles.map((t, i) => (
+                    <BodySmall key={i} style={{ color: 'var(--Quiet)', textTransform: 'capitalize' }}>
+                      {t.type}: {t.family} ({t.weight}){t.allCaps ? ' ALL CAPS' : ''}
+                    </BodySmall>
+                  ))}
+                </VStack>
+              </Card>
             )}
 
             {/* Settings summary */}
-            <div className="review-card">
-              <BodySmall style={{ fontWeight: 600 }}>Settings</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)', marginTop: 2 }}>Background: {userSelections.background}</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Cards: {userSelections.cardColoring} &bull; Text: {userSelections.textColoring}</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Buttons: {userSelections.button}</BodySmall>
-            </div>
+            <Card padding="medium">
+              <VStack spacing={1}>
+                <BodySmall style={{ fontWeight: 600 }}>Settings</BodySmall>
+                <BodySmall style={{ color: 'var(--Quiet)' }}>Background: {userSelections.background}</BodySmall>
+                <BodySmall style={{ color: 'var(--Quiet)' }}>Cards: {userSelections.cardColoring} &bull; Text: {userSelections.textColoring}</BodySmall>
+                <BodySmall style={{ color: 'var(--Quiet)' }}>Buttons: {userSelections.button}</BodySmall>
+              </VStack>
+            </Card>
           </div>
         </div>
       </VStack>

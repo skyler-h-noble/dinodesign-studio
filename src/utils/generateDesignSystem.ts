@@ -44,8 +44,10 @@ function mapButtonStyle(button: string): string {
 function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
   const colors = input.colorScheme.colors;
   const radii = BORDER_RADII[input.componentStyle];
-  const showcaseBase = 'https://sunny-cendol-af27ce.netlify.app';
+  const showcaseBase = 'https://designology.netlify.app';
   const storybookUrl = `${showcaseBase}/storybook/?user=${uuid}`;
+
+  const styleName = input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1);
 
   return `# ${input.designSystemName} — Dino Design System
 
@@ -58,12 +60,29 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
 | **Figma** | Open the Dino Figma plugin and paste your Dino ID |
 | **Storybook** | [${storybookUrl}](${storybookUrl}) |
 
-### Connect to Claude or Cursor
+### Install in Your Project
 
 \`\`\`bash
 npm install @dynodesign/components
 npx @dynodesign/init ${uuid}
 \`\`\`
+
+This downloads the CSS token files into your project and sets up the provider.
+
+---
+
+## STRICT RULES
+
+1. **NEVER hardcode hex colors.** Use CSS token variables: \`var(--Background)\`, \`var(--Text)\`, \`var(--Container)\`, \`var(--Border)\`, \`var(--Header)\`, \`var(--Quiet)\`, \`var(--Buttons-Primary-Button)\`, \`var(--Buttons-Primary-Text)\`, etc.
+2. **NEVER style buttons manually.** Use \`<Button>\` with \`variant\` and \`color\` props (\`variant="solid"\`, \`color="primary|secondary|tertiary|error|success|warning|info"\`).
+3. **NEVER set font styles manually.** Use typography components: \`<H1>\`, \`<H2>\`, \`<H3>\`, \`<H4>\`, \`<H5>\`, \`<H6>\`, \`<Body>\`, \`<BodySmall>\`, \`<Caption>\`, \`<Label>\`.
+4. **Use \`data-theme\`** for theming sections: \`Default\`, \`Primary-Light\`, \`Primary\`, \`Secondary-Dark\`, \`Error-Light\`, \`App-Bar\`, \`Nav-Bar\`, etc.
+5. **Use \`data-surface\`** for surface levels: \`Surface\`, \`Surface-Dim\`, \`Surface-Bright\`, \`Container\`, \`Container-Low\`, \`Container-High\`.
+6. **Use \`<Alert variant="error|success|warning|info">\`** for status messages — never manually color error text.
+7. **Use design system layout components**: \`<Card>\`, \`<TextField>\`, \`<TextArea>\`, \`<Select>\`, \`<VStack>\`, \`<HStack>\`, \`<Tabs>\`, \`<Dialog>\`, \`<Modal>\`.
+8. **All components** are imported from \`'@dynodesign/components'\`.
+9. **Check the Storybook** for component API before building custom UI: [${storybookUrl}](${storybookUrl})
+10. **The design system is the source of truth** — treat it as a requirement, not a suggestion.
 
 ---
 
@@ -77,35 +96,11 @@ npx @dynodesign/init ${uuid}
 }
 \`\`\`
 
-## Available data-theme Values
+Each brand color generates a 12-tone LCH palette (Color-1 = darkest, Color-12 = lightest). Access raw palette colors with \`var(--Primary-Color-1)\` through \`var(--Primary-Color-12)\`. Same for Secondary, Tertiary, Neutral, Info, Success, Warning, Error.
 
-### Light Themes
-Default, Primary-Light, Primary, Secondary-Light, Secondary, Tertiary-Light, Tertiary, Neutral-Light, Neutral
+---
 
-### Dark Themes
-Primary-Dark, Secondary-Dark, Tertiary-Dark, Neutral-Dark
-
-### Semantic Themes
-Error-Light, Success-Light, Warning-Light, Info-Light, Error-Dark, Success-Dark, Warning-Dark, Info-Dark
-
-### Navigation Themes
-App-Bar, Nav-Bar, Status
-
-## data-style Values
-Professional (${radii.small}px), Modern (${radii.medium}px), Bold, Playful
-
-Selected: **${input.componentStyle}**
-
-## data-surface Values
-Surface, Surface-Dim, Surface-Bright, Container, Container-Low, Container-Lowest, Container-High
-
-## Typography
-
-| Role | Family | Weight |
-|------|--------|--------|
-${input.typographyStyles.map(t => `| ${t.type} | ${t.family} | ${t.weight} |`).join('\n')}
-
-## DynoDesignProvider Setup
+## Provider Setup
 
 \`\`\`jsx
 import { DynoDesignProvider } from '@dynodesign/components';
@@ -117,7 +112,7 @@ function App() {
     <DynoDesignProvider
       themeURL={\`\${SUPABASE_BASE}\`}
       defaultTheme="Default"
-      defaultStyle="${input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1)}"
+      defaultStyle="${styleName}"
       defaultSurface="Surface"
     >
       {/* Your app */}
@@ -126,32 +121,490 @@ function App() {
 }
 \`\`\`
 
-## Token Reference
+---
 
-\`\`\`css
-var(--Background)         /* page background */
-var(--Text)               /* body text */
-var(--Header)             /* heading text */
-var(--Quiet)              /* muted text */
-var(--Container)          /* card background */
-var(--Border)             /* borders */
-var(--Style-Border-Radius) /* border radius */
-var(--Buttons-Primary-Button) /* button fill */
-var(--Buttons-Primary-Text)   /* button label */
+## Theme System (\`data-theme\`)
+
+Apply \`data-theme\` to any element to change the color context for it and all children.
+
+### Available Themes
+
+| Category | Values |
+|----------|--------|
+| **Light** | Default, Primary-Light, Primary, Secondary-Light, Secondary, Tertiary-Light, Tertiary, Neutral-Light, Neutral |
+| **Dark** | Primary-Dark, Secondary-Dark, Tertiary-Dark, Neutral-Dark |
+| **Semantic** | Info-Light, Info, Success-Light, Success, Warning-Light, Warning, Error-Light, Error, Info-Dark, Success-Dark, Warning-Dark, Error-Dark |
+| **Navigation** | App-Bar, Nav-Bar, Status |
+
+\`\`\`jsx
+{/* Page section with primary theme */}
+<section data-theme="Primary">
+  <H2>This section uses Primary colors</H2>
+  <Body>Text, borders, buttons all adapt automatically</Body>
+</section>
+
+{/* Dark hero banner */}
+<div data-theme="Primary-Dark">
+  <H1>Dark themed hero</H1>
+</div>
+
+{/* Error alert area */}
+<div data-theme="Error-Light">
+  <Alert variant="error">Something went wrong</Alert>
+</div>
 \`\`\`
 
-## Components
+**Light themes** (-Light suffix) use the palette's lightest tone as background.
+**Medium themes** (no suffix) use the palette's mid-range tone.
+**Dark themes** (-Dark suffix) use the palette's darkest tone.
+**Default** adapts based on user selection — it can be white, black, tonal, or gray.
+
+---
+
+## Surface System (\`data-surface\`)
+
+Surfaces create depth within a theme. Apply \`data-surface\` to containers, cards, and nested elements.
+
+### Available Surfaces
+
+| Surface | Use For |
+|---------|---------|
+| \`Surface\` | Page-level background (set by the theme) |
+| \`Surface-Dim\` | Slightly darker than Surface |
+| \`Surface-Bright\` | Slightly lighter than Surface |
+| \`Container\` | Cards, dialogs, popovers — elevated from Surface |
+| \`Container-Low\` | Subtle inset containers |
+| \`Container-Lowest\` | Deepest inset level |
+| \`Container-High\` | Raised containers (more prominent) |
+| \`Container-Highest\` | Most elevated containers |
+
+\`\`\`jsx
+{/* Page with nested containers */}
+<div data-theme="Default">
+  <Body>Page-level content on Surface</Body>
+
+  <Card data-surface="Container">
+    <H3>Card Title</H3>
+    <Body>Card content — uses Container colors</Body>
+
+    {/* Nested element inside a card */}
+    <div data-surface="Container-Low">
+      <BodySmall>Inset content within the card</BodySmall>
+    </div>
+  </Card>
+</div>
+\`\`\`
+
+**Important**: When nesting surfaces, text colors automatically adapt. A \`Container\` inside a dark theme gets lighter text. You do NOT need to set text colors manually.
+
+---
+
+## Component Style (\`data-style\`)
+
+Selected style: **${styleName}** (border-radius: ${radii.small}px / ${radii.medium}px / ${radii.large}px for small/medium/large)
+
+| Style | Small Radius | Medium Radius | Large Radius |
+|-------|-------------|---------------|--------------|
+| Professional | 4px | 8px | 12px |
+| Modern | 6px | 12px | 16px |
+| Bold | 2px | 4px | 8px |
+| Playful | 12px | 20px | 28px |
+
+\`\`\`jsx
+<div data-style="${styleName}">
+  {/* All components inside inherit this border radius */}
+  <Button>Styled Button</Button>
+  <Card>Styled Card</Card>
+</div>
+\`\`\`
+
+---
+
+## Token Reference — All CSS Variables
+
+When a theme is applied, these shorthand variables resolve automatically:
+
+### Core Layout Tokens
+
+\`\`\`css
+var(--Background)           /* page background color */
+var(--Surface)              /* surface background */
+var(--Surface-Dim)          /* dimmer surface */
+var(--Surface-Bright)       /* brighter surface */
+var(--Container)            /* card/container background */
+var(--Container-Low)        /* low container */
+var(--Container-Lowest)     /* lowest container */
+var(--Container-High)       /* high container */
+var(--Container-Highest)    /* highest container */
+\`\`\`
+
+### Text Tokens
+
+\`\`\`css
+var(--Text)                 /* body text */
+var(--Header)               /* heading text */
+var(--Quiet)                /* muted/secondary text */
+var(--Container-Text)       /* text on containers */
+var(--Container-Header)     /* heading on containers */
+var(--Container-Quiet)      /* muted text on containers */
+\`\`\`
+
+### Border Tokens
+
+\`\`\`css
+var(--Border)               /* primary borders */
+var(--Border-Variant)       /* subtle/secondary borders */
+var(--Container-Border)     /* borders on containers */
+var(--Container-Border-Variant) /* subtle borders on containers */
+\`\`\`
+
+### Interactive State Tokens
+
+\`\`\`css
+var(--Hover)                /* hover background */
+var(--Active)               /* active/pressed background */
+\`\`\`
+
+### Button Tokens
+
+Buttons have per-color tokens. Replace \`{Color}\` with: Default, Primary, Secondary, Tertiary.
+
+\`\`\`css
+var(--Buttons-{Color}-Button)   /* button fill color */
+var(--Buttons-{Color}-Text)     /* button text color */
+var(--Buttons-{Color}-Hover)    /* button hover color */
+var(--Buttons-{Color}-Active)   /* button active/pressed color */
+var(--Buttons-{Color}-Border)   /* outline button border */
+\`\`\`
+
+Container-level button tokens:
+\`\`\`css
+var(--Container-Buttons-Default-Button)
+var(--Container-Buttons-Default-Text)
+var(--Container-Buttons-Default-Hover)
+var(--Container-Buttons-Default-Active)
+var(--Container-Buttons-Default-Border)
+\`\`\`
+
+### Bevel Tokens (3D Button Effect)
+
+\`\`\`css
+var(--Highlight)            /* bevel top-left highlight (RGBA with opacity) */
+var(--Lowlight)             /* bevel bottom-right shadow (RGBA with opacity) */
+\`\`\`
+
+Bevel is applied as \`box-shadow\` with inset shadows:
+\`\`\`css
+box-shadow:
+  inset <offset>px <offset>px <blur>px var(--Highlight),
+  inset -<offset>px -<offset>px <blur>px var(--Lowlight);
+\`\`\`
+
+Offset/blur scale with button size (Small/Medium/Large).
+
+### Drop Shadow Tokens
+
+\`\`\`css
+var(--Dropshadow-Color)           /* shadow on surfaces */
+var(--Container-Dropshadow-Color) /* shadow on containers */
+\`\`\`
+
+5-level elevation system. Use on the parent surface, not the element itself:
+\`\`\`css
+.level-1 { box-shadow: 0 1px 2px var(--Dropshadow-Color); }
+.level-2 { box-shadow: 0 2px 4px var(--Dropshadow-Color), 0 1px 2px var(--Dropshadow-Color); }
+.level-3 { box-shadow: 0 4px 8px var(--Dropshadow-Color), 0 2px 4px var(--Dropshadow-Color); }
+.level-4 { box-shadow: 0 8px 16px var(--Dropshadow-Color), 0 4px 8px var(--Dropshadow-Color); }
+.level-5 { box-shadow: 0 16px 32px var(--Dropshadow-Color), 0 8px 16px var(--Dropshadow-Color); }
+\`\`\`
+
+### Focus Tokens
+
+\`\`\`css
+var(--Focus-Visible)        /* focus ring color (used with :focus-visible) */
+\`\`\`
+
+### Typography Tokens
+
+\`\`\`css
+var(--Font-Family-Header)   /* heading font */
+var(--Font-Family-Body)     /* body font */
+var(--Style-Border-Radius)  /* component border radius */
+var(--Card-Radius)          /* card border radius */
+\`\`\`
+
+---
+
+## Typography
+
+| Role | Family | Weight |
+|------|--------|--------|
+${input.typographyStyles.map(t => `| ${t.type} | ${t.family} | ${t.weight} |`).join('\n')}
+
+---
+
+## Component Usage
 
 Import from \`@dynodesign/components\`:
 
 \`\`\`jsx
 import {
-  Button, Card, TextField, Alert, AppBar,
-  H1, H2, H3, Body, BodySmall,
-  VStack, HStack, Tabs, Dialog, Modal,
-  // ... 49 components total
+  // Layout
+  VStack, HStack, Grid, Container, Divider,
+
+  // Typography
+  H1, H2, H3, H4, H5, H6, Body, BodySmall, Label, Caption,
+
+  // Inputs
+  Button, TextField, TextArea, Select, Checkbox, Radio, Switch, Slider,
+
+  // Display
+  Card, Alert, Badge, Tag, Avatar, Tooltip, Chip,
+
+  // Navigation
+  AppBar, NavBar, BottomNavigation, Tabs, Breadcrumbs, Pagination, Menu,
+
+  // Theming
+  ThemedZone,
+
+  // Feedback
+  Dialog, Modal, Drawer, Snackbar, Progress, Skeleton,
+
+  // Data
+  Table, List, Accordion,
 } from '@dynodesign/components';
 \`\`\`
+
+### Button
+
+\`\`\`jsx
+{/* Variant pattern: {color}, {color}-outline, {color}-light */}
+{/* Colors: primary, secondary, tertiary, neutral, info, success, warning, error */}
+
+<Button variant="primary">Solid primary</Button>
+<Button variant="primary-outline">Outlined primary</Button>
+<Button variant="primary-light">Light primary</Button>
+<Button variant="neutral-outline">Outlined neutral</Button>
+<Button variant="error">Solid error</Button>
+<Button variant="ghost">Ghost (no background)</Button>
+
+{/* Sizes: small, medium, large */}
+<Button variant="primary" size="large" startIcon={<AddIcon />}>
+  Save Changes
+</Button>
+\`\`\`
+
+**Button color values**: \`default\`, \`primary\`, \`secondary\`, \`tertiary\`, \`neutral\`, \`info\`, \`success\`, \`warning\`, \`error\`
+
+### Card
+
+\`\`\`jsx
+<Card>
+  <H3>Card Title</H3>
+  <Body>Card content is automatically on a Container surface.</Body>
+  <Button variant="solid" color="default">Action</Button>
+</Card>
+\`\`\`
+
+Cards automatically apply \`data-surface="Container"\`, so text colors, button colors, and borders adapt.
+
+### TextField
+
+\`\`\`jsx
+<TextField label="Email" placeholder="you@example.com" />
+<TextField label="Password" type="password" error="Required" />
+\`\`\`
+
+### Alert
+
+\`\`\`jsx
+<Alert variant="info">Informational message</Alert>
+<Alert variant="success">Success message</Alert>
+<Alert variant="warning">Warning message</Alert>
+<Alert variant="error">Error message</Alert>
+\`\`\`
+
+### Layout
+
+\`\`\`jsx
+<VStack spacing={3}>
+  <H2>Vertical Stack</H2>
+  <Body>Items stacked vertically with gap</Body>
+</VStack>
+
+<HStack spacing={2}>
+  <Button>Left</Button>
+  <Button>Right</Button>
+</HStack>
+\`\`\`
+
+---
+
+## Component Prop Patterns
+
+### Typography — Layout Prop
+
+All typography components (H1–H6, Body, BodySmall, Caption, Label, etc.) accept a \`layout\` prop that controls horizontal sizing:
+
+\`\`\`jsx
+{/* "fill" (default) — component stretches to fill available width */}
+<H2 layout="fill">Page Title</H2>
+
+{/* "hug" — component sizes to its content, no stretching */}
+<H2 layout="hug">Page Title</H2>
+<Caption layout="hug">Subtitle text</Caption>
+
+{/* Use "hug" when placing typography side-by-side to prevent wrapping */}
+<div style={{ display: 'flex', justifyContent: 'space-between' }}>
+  <H2 layout="hug">Title</H2>
+  <Caption layout="hug">3 items</Caption>
+</div>
+\`\`\`
+
+### AppBar
+
+\`\`\`jsx
+{/* Always wrap in ThemedZone */}
+{/* Mobile */}
+<ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
+  <AppBar
+    mode="mobile"              {/* "mobile" | "desktop" */}
+    mobileVariant="title"      {/* "title" | "search" (mobile only) */}
+    title="My App"             {/* shown in mobile title variant */}
+    subtitle="Tagline"         {/* optional subtitle */}
+    companyName="My App"       {/* brand name */}
+    barColor="default"         {/* "default" | "white" */}
+    rightContent={<Avatar />}  {/* React node for the right side */}
+  />
+</ThemedZone>
+
+{/* Desktop */}
+<ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
+  <AppBar
+    mode="desktop"
+    companyName="My App"
+    navLinks={['Home', 'About', 'Contact']}
+    showRightButtons           {/* shows action buttons on right */}
+    loginType="login"          {/* login button type */}
+    menuType="hamburger"       {/* menu type */}
+    brandType="name"           {/* "name" | other */}
+    searchPosition="right"     {/* search bar position */}
+  />
+</ThemedZone>
+\`\`\`
+
+### BottomNavigation
+
+\`\`\`jsx
+{/* Wrap in ThemedZone with Nav-Bar theme */}
+<ThemedZone theme="Nav-Bar" surface="Surface-Bright">
+  <BottomNavigation
+    value={selectedIndex}                    {/* currently selected tab index */}
+    onChange={(event, newIndex) => {}}        {/* tab change handler */}
+    items={[
+      { label: 'Home', icon: <HomeIcon /> },
+      { label: 'Search', icon: <SearchIcon /> },
+      { label: 'Settings', icon: <SettingsIcon /> },
+    ]}
+  />
+</ThemedZone>
+\`\`\`
+
+---
+
+## Dark Mode
+
+Dark mode is applied via theme suffixes: \`Primary-Dark\`, \`Secondary-Dark\`, \`Tertiary-Dark\`, \`Neutral-Dark\`.
+
+\`\`\`jsx
+{/* Dark section */}
+<div data-theme="Primary-Dark">
+  <H1>Dark Mode Section</H1>
+  <Card>
+    <Body>Card adapts automatically in dark mode</Body>
+  </Card>
+</div>
+\`\`\`
+
+All tokens (text, borders, buttons, containers, shadows) automatically invert for dark backgrounds. You never need to set text or button colors manually for dark mode.
+
+### Dark Mode Color Scale
+
+In dark mode, the 12-tone palette shifts to darker LCH tones. Color-1 remains darkest, Color-12 remains lightest, but the entire range is compressed toward the dark end. Buttons in dark mode always use Color-12 (lightest in the palette) for visibility.
+
+---
+
+## Nesting Rules — How Tokens Cascade
+
+The design system uses CSS custom property cascading. Here is the precedence:
+
+1. **\`data-theme\`** — sets Background, Text, Header, Quiet, Border, Hover, Active, and button colors
+2. **\`data-surface\`** — overrides Background + provides Container-level text/border/button tokens
+3. **\`data-style\`** — sets border radius
+
+\`\`\`html
+<!-- Full nesting example -->
+<div data-theme="Default" data-style="${styleName}">
+  <!-- Page level: uses Surface tokens -->
+  <h1 style="color: var(--Header)">Page Title</h1>
+  <p style="color: var(--Text)">Body text on surface</p>
+
+  <!-- Card: uses Container tokens -->
+  <div data-surface="Container" style="background: var(--Container); border: 1px solid var(--Container-Border)">
+    <h2 style="color: var(--Container-Header)">Card Title</h2>
+    <p style="color: var(--Container-Text)">Card body text</p>
+    <button style="background: var(--Container-Buttons-Default-Button); color: var(--Container-Buttons-Default-Text)">
+      Action
+    </button>
+  </div>
+
+  <!-- Themed section nested inside -->
+  <section data-theme="Primary-Light">
+    <p style="color: var(--Text)">Now using Primary-Light text color</p>
+  </section>
+</div>
+\`\`\`
+
+**Key rule**: You do NOT need to manually adjust colors when nesting. The CSS cascade handles it. Just set \`data-theme\` and \`data-surface\` — all tokens resolve correctly.
+
+---
+
+## Hover & Active Pattern
+
+Interactive elements follow a one-step pattern:
+
+- **Active** = one step from the background color in the palette
+- **Hover** = 50% mix between background and Active color
+- Dark tones (Color 1-5): step goes darker
+- Light tones (Color 6-12): step goes lighter
+
+\`\`\`css
+/* Surface hover/active */
+.interactive:hover  { background: var(--Hover); }
+.interactive:active { background: var(--Active); }
+
+/* Button hover/active */
+.btn:hover  { background: var(--Buttons-Primary-Hover); }
+.btn:active { background: var(--Buttons-Primary-Active); }
+\`\`\`
+
+---
+
+## CSS Files Reference
+
+Your design system includes these CSS files (all at \`${SUPABASE_STORAGE_BASE}/${uuid}/\`):
+
+| File | Contents |
+|------|----------|
+| \`foundation.css\` | Raw palette colors (Color-1 through Color-12 for each palette), typography tokens, component sizing |
+| \`core.css\` | Text, Header, Quiet, Border, Hover, Active, Tag, Icon, Hotlink colors for all palettes and surfaces |
+| \`typography-tokens.css\` | Font family, weight, and size definitions |
+| \`Light-Mode.css\` | All light theme selectors (Default through Neutral) |
+| \`Dark-Mode.css\` | All dark theme selectors |
+| \`base.css\` | Button tokens, Default-Button mappings, Background/Surface/Container definitions, effects |
+| \`styles.css\` | Border radius values per style (Professional, Modern, Bold, Playful) |
+
+Load order matters: foundation → core → typography-tokens → Light-Mode → Dark-Mode → base → styles.
 
 ---
 

@@ -51,30 +51,39 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
   return (
     <VStack spacing={4} alignItems="center" style={{ padding: '60px 24px' }}>
       <VStack spacing={1} alignItems="center">
-        <H2>Upload Mood Board</H2>
-        <Body style={{ color: 'var(--Quiet)' }}>
+        <H2 style={{ textAlign: 'center' }}>Upload Mood Board</H2>
+        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
           Upload an image to extract colors and styles
         </Body>
       </VStack>
 
-      {/* Drop zone */}
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
         style={{
-          border: `2px dashed ${isDragging ? 'var(--Buttons-Primary-Button)' : 'var(--Border)'}`,
-          borderRadius: 'var(--Style-Border-Radius)',
-          padding: preview ? '16px' : '48px 24px',
-          textAlign: 'center',
-          cursor: 'pointer',
-          background: isDragging ? 'var(--Hover)' : 'transparent',
-          transition: 'all 0.2s ease',
           maxWidth: 560,
           width: '100%',
+          minHeight: 200,
+          border: `2px dashed ${isDragging ? 'var(--Primary)' : 'var(--Buttons-Default-Border)'}`,
+          borderRadius: 'var(--Style-Border-Radius)',
+          background: isDragging ? 'var(--Primary-Container)' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          padding: 24,
         }}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={handleFileInput}
+          style={{ display: 'none' }}
+        />
         {preview ? (
           <VStack spacing={2} alignItems="center">
             <img
@@ -87,30 +96,17 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
                 objectFit: 'contain',
               }}
             />
-            <BodySmall style={{ color: 'var(--Quiet)' }}>{fileName}</BodySmall>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>Click or drag to replace</BodySmall>
+            <BodySmall style={{ color: 'var(--Text-Quiet)' }}>{fileName}</BodySmall>
+            <BodySmall style={{ color: 'var(--Text-Quiet)' }}>Click or drag to replace</BodySmall>
           </VStack>
         ) : (
-          <VStack spacing={2} alignItems="center">
-            <CloudUploadIcon
-              style={{
-                fontSize: 48,
-                color: isDragging ? 'var(--Buttons-Primary-Button)' : 'var(--Quiet)',
-              }}
-            />
-            <Body>Drag and drop image or mood board</Body>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>or click to browse</BodySmall>
+          <VStack spacing={1} alignItems="center">
+            <CloudUploadIcon style={{ fontSize: 48, color: 'var(--Quiet)', opacity: 0.5 }} />
+            <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Drag and drop image or mood board</Body>
+            <BodySmall style={{ color: 'var(--Text-Quiet)', textAlign: 'center' }}>or click to browse</BodySmall>
           </VStack>
         )}
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        onChange={handleFileInput}
-        style={{ display: 'none' }}
-      />
 
       {/* Generation Process */}
       {preview && (

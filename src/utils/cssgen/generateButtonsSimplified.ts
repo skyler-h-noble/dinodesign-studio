@@ -12,7 +12,7 @@
  * - Based on button mode selection (Primary, Secondary, Tonal, Laddered, Black/White)
  * - Handles text coloring (Tonal vs Black/White)
  * 
- * UPDATE: OB now uses 8 when PC >= 9, else 6
+ * UPDATE: OB now uses 9 when PC >= 9, else 8
  * UPDATE: Primary/Secondary/Tertiary buttons use PC/SC/TC instead of OB
  */
 
@@ -56,11 +56,13 @@ export function generateBaseButtons(
   // In Dark Mode, all buttons use Color-12 for both Light and Medium
   // In Light Mode, buttons use the extracted tone values
   const PC = isDark ? 12 : (extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9);
-  const SC = isDark ? 12 : (extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 8);
-  const TC = isDark ? 12 : (extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 8);
+  const rawSC = isDark ? 12 : (extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11);
+  const rawTC = isDark ? 12 : (extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11);
+  const SC = isDark ? 12 : (rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC);
+  const TC = isDark ? 12 : (rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC);
 
-  // Calculate {OB} (Other Buttons): if PC >= 9 then 8, else 6. In Dark Mode = 12.
-  const OB = isDark ? 12 : (PC >= 9 ? 8 : 6);
+  // Calculate {OB} (Other Buttons): if PC >= 9 then 9, else 8. In Dark Mode = 12.
+  const OB = isDark ? 12 : (PC >= 9 ? 9 : 8);
   
   console.log(`🔘 [generateBaseButtons] Mode: ${mode}`);
   console.log(`  📊 EXTRACTED TONES INPUT:`, extractedTones);

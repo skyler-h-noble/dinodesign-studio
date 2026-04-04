@@ -20,7 +20,7 @@ interface BuildInput {
 const NEUTRAL = [
   '#050505', '#1a1a1a', '#2e2e2e', '#434343', '#585858',
   '#8e8e8e', '#a3a3a3', '#b8b8b8', '#cccccc', '#e0e0e0',
-  '#f0f0f0', '#fafafa',
+  '#f0f0f0', '#ffffff',
 ];
 
 // ── Contrast-checked tone lookup ──
@@ -185,6 +185,13 @@ function dropshadowFor(hex: string): string {
   }
 }
 function quietFor(hex: string) { return isLight(hex) ? '#777777' : '#aaaaaa'; }
+
+/** Convert hex to RGB triplet string for use in rgba() */
+function hexToRgb(hex: string): string {
+  const c = hex.replace('#', '');
+  const n = parseInt(c.substring(0, 6), 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
 function borderFor(hex: string) { return isLight(hex) ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'; }
 
 /**
@@ -267,26 +274,28 @@ export function buildPreviewCSS(input: BuildInput): string {
   }
 
   // ── Resolve nav colors using adjacent palette tones ──
-  // Determine surface palette and Color-N
+  // Determine surface palette, Color-N, and palette name for CSS var references
   let surfacePalette: typeof primary;
   let surfaceN: number;
+  let surfacePaletteName: string;
+  const neutralPaletteArr = Array.from({ length: 12 }, (_, i) => ({
+    hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
+  })) as typeof primary;
   if (isDark) {
-    surfacePalette = darkUsePrimary ? primary : Array.from({ length: 12 }, (_, i) => ({
-      hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
-    })) as typeof primary;
+    surfacePalette = darkUsePrimary ? primary : neutralPaletteArr;
+    surfacePaletteName = darkUsePrimary ? 'Primary' : 'Neutral';
     surfaceN = 2;
   } else {
     switch (sel.background) {
-      case 'black': surfacePalette = Array.from({ length: 12 }, (_, i) => ({
-        hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
-      })) as typeof primary; surfaceN = 1; break;
-      case 'primary-base': surfacePalette = primary; surfaceN = PC; break;
-      case 'primary-light': surfacePalette = primary; surfaceN = 11; break;
-      default: surfacePalette = Array.from({ length: 12 }, (_, i) => ({
-        hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
-      })) as typeof primary; surfaceN = 12; break;
+      case 'black': surfacePalette = neutralPaletteArr; surfacePaletteName = 'Neutral'; surfaceN = 1; break;
+      case 'primary-base': surfacePalette = primary; surfacePaletteName = 'Primary'; surfaceN = PC; break;
+      case 'primary-light': surfacePalette = primary; surfacePaletteName = 'Primary'; surfaceN = 11; break;
+      default: surfacePalette = neutralPaletteArr; surfacePaletteName = 'Neutral'; surfaceN = 12; break;
     }
   }
+
+  // Hover map — index 0 = Color-1's hover target, etc.
+  const hoverMap = [1, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 12];
 
   // Map nav option → { palette, n, theme, surface }
   function resolveNavOption(opt: string): { palette: string; n: number; theme: string; surface: string } {
@@ -368,16 +377,23 @@ export function buildPreviewCSS(input: BuildInput): string {
   let containerQuiet: string;
   let containerBorder: string;
 
-  if (effectiveTextColoring === 'tonal') {
-    const textPalette = primaryLight;
+  // Accessible tone numbers for surface and container — used in CSS var refs
+  const textPalette = primaryLight;
+  const surfaceTones = getAccessibleTones(surfaceBg, surfaceN, textPalette);
+  const containerTones = getAccessibleTones(containerBg, containerN, textPalette);
 
-    const surfaceTones = getAccessibleTones(surfaceBg, surfaceN, textPalette);
+  // Container palette name for CSS var references
+  // Tonal always uses Primary palette for the tint; White/Black use Neutral
+  const containerPaletteName = effectiveCardColoring === 'white' ? 'Neutral'
+    : effectiveCardColoring === 'black' ? 'Neutral'
+    : 'Primary';
+
+  if (effectiveTextColoring === 'tonal') {
     surfaceText = p(textPalette, surfaceTones.text);
     surfaceHeader = p(textPalette, surfaceTones.header);
     surfaceQuiet = p(textPalette, surfaceTones.quiet);
     surfaceBorder = p(textPalette, surfaceTones.border);
 
-    const containerTones = getAccessibleTones(containerBg, containerN, textPalette);
     containerText = p(textPalette, containerTones.text);
     containerHeader = p(textPalette, containerTones.header);
     containerQuiet = p(textPalette, containerTones.quiet);
@@ -466,9 +482,9 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // ── Tertiary tag + text — always vibrant (light palette) ──
   const tagN = Math.max(TC - 2, 1);
-  const tagBg = `var(--Colors-Tertiary-Color-${tagN})`;
+  const tagBg = `var(--Tertiary-Color-${tagN})`;
   const tagTones = getAccessibleTones(p(vTertiary, tagN), tagN, vTertiary);
-  const tagText = `var(--Colors-Tertiary-Color-${tagTones.text})`;
+  const tagText = `var(--Tertiary-Color-${tagTones.text})`;
 
   let tertiaryText: string;
   let tertiaryHeader: string;
@@ -477,9 +493,9 @@ export function buildPreviewCSS(input: BuildInput): string {
     // Always use light palette for text accessibility checks
     const tertiaryTextPalette = tertiaryLight;
     const tertiaryTones = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryTextPalette);
-    tertiaryText = `var(--Colors-Tertiary-Color-${tertiaryTones.text})`;
-    tertiaryHeader = `var(--Colors-Tertiary-Color-${tertiaryTones.header})`;
-    tertiaryQuiet = `var(--Colors-Tertiary-Color-${tertiaryTones.quiet})`;
+    tertiaryText = `var(--Tertiary-Color-${tertiaryTones.text})`;
+    tertiaryHeader = `var(--Tertiary-Color-${tertiaryTones.header})`;
+    tertiaryQuiet = `var(--Tertiary-Color-${tertiaryTones.quiet})`;
   } else {
     tertiaryText = textFor(tertiaryContainerBg);
     tertiaryHeader = textFor(tertiaryContainerBg);
@@ -492,10 +508,10 @@ export function buildPreviewCSS(input: BuildInput): string {
 /* Surfaces/containers use direct hex values from dark palette when in dark mode */
 /* Text, buttons, tags, icons reference these vibrant variables */
 :root {
-${primaryLight.map((t, i) => `  --Colors-Primary-Color-${i + 1}: ${t.hex};`).join('\n')}
-${secondaryLight.map((t, i) => `  --Colors-Secondary-Color-${i + 1}: ${t.hex};`).join('\n')}
-${tertiaryLight.map((t, i) => `  --Colors-Tertiary-Color-${i + 1}: ${t.hex};`).join('\n')}
-${NEUTRAL.map((h, i) => `  --Colors-Neutral-Color-${i + 1}: ${h};`).join('\n')}
+${primaryLight.map((t, i) => `  --Primary-Color-${i + 1}: ${t.hex};`).join('\n')}
+${secondaryLight.map((t, i) => `  --Secondary-Color-${i + 1}: ${t.hex};`).join('\n')}
+${tertiaryLight.map((t, i) => `  --Tertiary-Color-${i + 1}: ${t.hex};`).join('\n')}
+${NEUTRAL.map((h, i) => `  --Neutral-Color-${i + 1}: ${h};`).join('\n')}
 }
 
 /* ══ Status Bar ══ */
@@ -505,7 +521,7 @@ ${(() => {
   return `[data-theme="Brand-Status"] {
   --Background: ${statusBg};
   --Dropshadow-Color: ${dropshadowFor(statusBg)};
-  --Text: var(--Colors-${sc.palette}-Color-${tones.text});
+  --Text: var(--${sc.palette}-Color-${tones.text});
 }`;
 })()}
 
@@ -529,43 +545,48 @@ ${(() => {
   return `[data-theme="Brand-App-Bar"] {
   --Background: ${appBarBg};
   --Dropshadow-Color: ${dropshadowFor(appBarBg)};
-  --Text: var(--Colors-${ac.palette}-Color-${tones.text});
-  --Header: var(--Colors-${ac.palette}-Color-${tones.header});
-  --Quiet: var(--Colors-${ac.palette}-Color-${tones.quiet});
-  --Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
+  --Text: var(--${ac.palette}-Color-${tones.text});
+  --Header: var(--${ac.palette}-Color-${tones.header});
+  --Quiet: var(--${ac.palette}-Color-${tones.quiet});
+  --Border: var(--${ac.palette}-Color-${tones.border});
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${btnBorder};
   --Buttons-Primary-Hover: ${abHoverHex};
   --Buttons-Primary-Active: ${abOldHoverHex};
   --Buttons-Default-Button: transparent;
-  --Buttons-Default-Text: var(--Colors-${ac.palette}-Color-${tones.text});
-  --Buttons-Default-Border: var(--Border-Surfaces-${ac.palette}-Color-${ac.n});
+  --Buttons-Default-Text: var(--${ac.palette}-Color-${tones.text});
+  --Buttons-Default-Border: var(--${ac.palette}-Color-${tones.border});
+  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Buttons-Default-Hover: ${abHoverHex};
   --Buttons-Default-Active: ${abOldHoverHex};
+  --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
 }`;
 })()}
 
-/* ══ Brand Theme — uses unique selector to avoid provider conflicts ══ */
+/* ══ Brand Theme — Color-N scales + semantic variables ══ */
 [data-theme="Brand"] {
-  --Background: ${surfaceBg};
-  --Surface: ${surfaceBg};
-  --Surface-Dim: ${isDark ? '#111111' : '#f2f2f2'};
+  /* Color scales */
+${primaryLight.map((c, i) => `  --Primary-Color-${i + 1}: ${c.hex};`).join('\n')}
+${secondaryLight.map((c, i) => `  --Secondary-Color-${i + 1}: ${c.hex};`).join('\n')}
+${tertiaryLight.map((c, i) => `  --Tertiary-Color-${i + 1}: ${c.hex};`).join('\n')}
+${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
+
+  --Background: var(--${surfacePaletteName}-Color-${surfaceN});
+  --Container: var(--${containerPaletteName}-Color-${containerN});
   --Dropshadow-Color: ${dropshadowFor(surfaceBg)};
-  --Text: ${surfaceText};
-  --Header: ${surfaceHeader};
-  --Quiet: ${surfaceQuiet};
-  --Border: ${surfaceBorder};
-  --Border-Variant: ${surfaceBorder};
-  --Hover: ${mixHex(p(primaryLight, surfaceN), p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][surfaceN - 1] || surfaceN))};
-  --Active: ${p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][surfaceN - 1] || surfaceN)};
+  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
+  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
+  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
+  --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
+  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}40` : `${surfaceBorder}40`};
+  --Hover: var(--${surfacePaletteName}-Color-${hoverMap[surfaceN - 1] || surfaceN});
+  --Active: var(--${surfacePaletteName}-Color-${hoverMap[surfaceN - 1] || surfaceN});
   --Focus-Visible: #3b82f6;
 
 ${(() => {
-    // Hover/Active lookup tables (from verified 12-tone)
-    const hoverMap = [1,1,2,3,4,7,8,9,10,11,12,12];
-
-
     // Generate all button palette tokens
     const allPalettes = [
       { name: 'Primary', palette: vPrimary, n: PC, paletteName: 'Primary' },
@@ -582,7 +603,9 @@ ${(() => {
   --Buttons-${name}-Text: ${p(pal, tones.text)};
   --Buttons-${name}-Border: ${palBorder};
   --Buttons-${name}-Hover: ${mixHex(p(pal, n), oldHoverHex)};
-  --Buttons-${name}-Active: ${oldHoverHex};`;
+  --Buttons-${name}-Active: ${oldHoverHex};
+  --Buttons-${name}-Highlight: ${hexToRgb(highlightFor(bg))};
+  --Buttons-${name}-Lowlight: ${hexToRgb(lowlightFor(bg))};`;
     }).join('\n');
   })()}
 ${(() => {
@@ -603,8 +626,8 @@ ${(() => {
     return `  --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${btnBorder};
-  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
-  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
+  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Buttons-Default-Hover: ${mixHex(btnBg, defOldHoverHex)};
   --Buttons-Default-Active: ${defOldHoverHex};`;
   })()}
@@ -639,8 +662,8 @@ ${(() => {
     return `  --Container-Buttons-Default-Button: ${btnBg};
   --Container-Buttons-Default-Text: ${btnText};
   --Container-Buttons-Default-Border: ${contBtnBorder};
-  --Container-Buttons-Default-Highlight: ${highlightFor(btnBg)};
-  --Container-Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
+  --Container-Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Container-Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Container-Buttons-Default-Hover: ${mixHex(btnBg, contOldHoverHex)};
   --Container-Buttons-Default-Active: ${contOldHoverHex};`;
   })()}
@@ -650,23 +673,23 @@ ${(() => {
 [data-theme="Brand"][data-surface="Container"],
 [data-theme="Brand"] [data-surface="Container"],
 [data-surface] [data-surface="Container"] {
-  --Background: ${containerBg};
+  --Background: var(--${containerPaletteName}-Color-${containerN});
   --Dropshadow-Color: ${dropshadowFor(containerBg)};
-  --Text: ${containerText};
-  --Header: ${containerHeader};
-  --Quiet: ${containerQuiet};
-  --Border: ${containerBorder};
-  --Border-Variant: ${containerBorder};
+  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
+  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
+  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
+  --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
+  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}40` : `${containerBorder}40`};
+  --Hover: var(--${containerPaletteName}-Color-${hoverMap[containerN - 1] || containerN});
+  --Active: var(--${containerPaletteName}-Color-${hoverMap[containerN - 1] || containerN});
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: ${containerBorder};
+  --Buttons-Primary-Border: var(--${containerPaletteName}-Color-${containerTones.border});
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Border: ${containerBorder};
-  --Hover: ${mixHex(p(primaryLight, containerN), p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN))};
-  --Active: ${p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN)};
-  --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN))};
-  --Buttons-Default-Active: ${p(primaryLight, [1,1,2,3,4,7,8,9,10,11,12,12][containerN - 1] || containerN)};
+  --Buttons-Default-Border: var(--${containerPaletteName}-Color-${containerTones.border});
+  --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, hoverMap[containerN - 1] || containerN))};
+  --Buttons-Default-Active: ${p(primaryLight, hoverMap[containerN - 1] || containerN)};
 }
 
 /* ══ Tertiary Theme ══ */
@@ -675,9 +698,9 @@ ${(() => {
   --Container-Text: ${tertiaryText};
   --Container-Header: ${tertiaryHeader};
   --Container-Quiet: ${tertiaryQuiet};
-  --Container-Border: var(--Colors-Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
+  --Container-Border: var(--Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
   --Container-Buttons-Default-Text: ${tertiaryText};
-  --Container-Buttons-Default-Border: var(--Colors-Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
+  --Container-Buttons-Default-Border: var(--Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
   --Tag-Tertiary-BG: ${tagBg};
   --Tag-Tertiary-Text: ${tagText};
 }
@@ -715,15 +738,16 @@ ${(() => {
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${p(primaryLight, navBorderN)};
+  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Buttons-Default-Hover: ${navDefHoverHex};
   --Buttons-Default-Active: ${navDefOldHoverHex};
+  --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
 }`;
 })()}
 
-/* ══ Surface Resolution ══ */
-[data-surface="Surface"]        { --Background: var(--Surface); }
-[data-surface="Surface-Bright"] { --Background: var(--Surface-Bright); }
-[data-surface="Surface-Dim"]    { --Background: var(--Surface-Dim); }
+/* ══ Surface Resolution — Background already set by theme selectors ══ */
 
 /* ══ Clickable Elements — border inherits 3.1:1 contrast from context ══ */
 .clickable { border-color: var(--Border); }

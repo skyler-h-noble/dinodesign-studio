@@ -304,8 +304,24 @@ function MainApp() {
   const decorativeFont = typographyStyles.find(t => t.type === 'decorative');
   const bodyFont = typographyStyles.find(t => t.type === 'body');
 
+  const bevel = savedStyleCustomizations?.[componentStyle]?.bevel ?? 0;
+  const bevelOpacity = savedStyleCustomizations?.[componentStyle]?.bevelOpacity ?? 50;
+  const buttonHeight = savedStyleCustomizations?.[componentStyle]?.buttonHeight ?? 36;
+  const smallButtonHeight = savedStyleCustomizations?.[componentStyle]?.smallButtonHeight ?? 24;
+  const largeButtonHeight = savedStyleCustomizations?.[componentStyle]?.largeButtonHeight ?? 56;
+  const minButtonWidth = savedStyleCustomizations?.[componentStyle]?.minButtonWidth ?? 60;
+  const iconButtonRadius = savedStyleCustomizations?.[componentStyle]?.iconButtonRadius ?? buttonRadius;
+
   const styleVars = {
     '--Style-Border-Radius': `${buttonRadius}px`,
+    '--Button-Radius': `${buttonRadius}px`,
+    '--Button-Icon-Radius': `${iconButtonRadius}px`,
+    '--Button-Bevel': `${bevel}`,
+    '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
+    '--Button-Height': `${buttonHeight}px`,
+    '--Small-Button-Height': `${smallButtonHeight}px`,
+    '--Large-Button-Height': `${largeButtonHeight}px`,
+    '--Min-Button-Width': `${minButtonWidth}px`,
     '--Card-Radius': `${cardRadius}px`,
     ...(applyBrand && headerFont ? {
       '--Font-Family-Header': `'${headerFont.family}', serif`,
@@ -334,18 +350,55 @@ function MainApp() {
       defaultStyle="Modern"
       defaultSurface="Surface"
     >
+      {/* Default theme overrides — fix dark containers from library CSS + add effects */}
+      <style id="dino-default-effects" dangerouslySetInnerHTML={{ __html: `
+        [data-theme="Default"],
+        [data-theme="Default"][data-surface="Surface"] {
+          --Background: #f5f5f5;
+          --Text: #1a1a1a;
+          --Header: #1a1a1a;
+          --Quiet: #6b6b6b;
+          --Border: #d4d4d4;
+          --Border-Variant: #d4d4d466;
+          --Dropshadow-Color: 120, 120, 120;
+        }
+        [data-theme="Default"] [data-surface^="Container"],
+        [data-theme="Default"][data-surface^="Container"] {
+          --Container: #ffffff;
+          --Container-Low: #fafafa;
+          --Container-Lowest: #f5f5f5;
+          --Container-High: #ffffff;
+          --Container-Highest: #ffffff;
+          --Text: #1a1a1a;
+          --Header: #1a1a1a;
+          --Quiet: #6b6b6b;
+          --Border: #d4d4d4;
+          --Border-Variant: #d4d4d466;
+          --Dropshadow-Color: 100, 100, 100;
+        }
+        [data-theme="Default"] {
+          --Effect-Level-0: none;
+          --Effect-Level-1: 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
+          --Effect-Level-2: 0 2px 4px rgba(var(--Dropshadow-Color), 0.22), 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
+          --Effect-Level-3: 0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22);
+          --Effect-Level-4: 0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17);
+          --Effect-Level-5: 0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13);
+        }
+      `}} />
       {/* Inject brand CSS — same tokens as the phone preview */}
       {brandCSS && <style id="dino-brand-css" dangerouslySetInnerHTML={{ __html: brandCSS }} />}
-      {isExport && <TopNav designSystemName={designSystemName} />}
-      {showTopBar && (
-        <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
-      )}
-      <main data-theme={applyBrand ? 'Brand' : undefined} style={{ ...styleVars, minHeight: '100vh', paddingBottom: showBottomBar ? 72 : 0, overflowX: 'hidden', background: applyBrand ? 'var(--Background)' : undefined }}>
-        {renderStage()}
-      </main>
-      {showBottomBar && !isFirstStage && (
-        <CreationBottomBar onNext={goNext} nextLabel={nextLabel} themed={applyBrand} />
-      )}
+      <div style={styleVars as React.CSSProperties}>
+        {isExport && <TopNav designSystemName={designSystemName} />}
+        {showTopBar && (
+          <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
+        )}
+        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: showBottomBar ? 72 : 0, overflowX: 'hidden', background: 'var(--Background)' }}>
+          {renderStage()}
+        </main>
+        {showBottomBar && !isFirstStage && (
+          <CreationBottomBar onNext={goNext} nextLabel={nextLabel} themed={applyBrand} />
+        )}
+      </div>
     </DynoDesignProvider>
   );
 }

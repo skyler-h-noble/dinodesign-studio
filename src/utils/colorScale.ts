@@ -109,22 +109,20 @@ function getChromaBellCurve(hue: number, isDarkMode: boolean = false): number[] 
  * maxChroma controls the peak. The peak position shifts based on hue.
  * Each tone is also clamped to the gamut limit at that lightness/hue.
  */
-function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly number[] = TONE_SCALE, isDarkMode: boolean = false): ToneStep[] {
+function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly number[] = TONE_SCALE, isDarkMode: boolean = false, lockedHex?: string): ToneStep[] {
   const [, , h] = chroma(hex).lch();
   const { steps } = generateNaturalScale(hex, toneScale);
   const bellCurve = getChromaBellCurve(h, isDarkMode);
 
-  return steps.map((step, index) => {
-    // Desired chroma from bell curve, clamped to what the gamut can actually display
+  // Generate all tones normally first
+  const tones: ToneStep[] = steps.map((step, index) => {
     const desiredC = Math.min(maxChroma * bellCurve[index], step.chroma);
 
     let result: string;
     try {
       const generated = chroma.lch(step.tone, desiredC, h);
-      // Verify hue didn't drift significantly
       const [, , gh] = generated.lch();
       if (!isNaN(h) && !isNaN(gh) && Math.abs(gh - h) > 10 && desiredC > 0.5) {
-        // Force hue by retrying — chroma.lch handles clamping internally
         result = chroma.lch(step.tone, desiredC * 0.9, h).hex();
       } else {
         result = generated.hex();
@@ -140,6 +138,26 @@ function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly
       colorNumber: index + 1,
     };
   });
+
+  // If a locked hex is provided, replace the closest tone with the exact hex
+  if (lockedHex) {
+    const [lockedL] = chroma(lockedHex).lch();
+    let closestIdx = 0;
+    let closestDist = Infinity;
+    for (let i = 0; i < tones.length; i++) {
+      const dist = Math.abs(tones[i].tone - lockedL);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIdx = i;
+      }
+    }
+    tones[closestIdx] = {
+      ...tones[closestIdx],
+      hex: lockedHex,
+    };
+  }
+
+  return tones;
 }
 
 /**
@@ -147,7 +165,7 @@ function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly
  * maxChroma is the desired peak chroma across all tones.
  * Default: uses the natural peak chroma of the color.
  */
-export function generateSemanticLightModeScale(hex: string, maxChroma?: number): ToneStep[] {
+export function generateSemanticLightModeScale(hex: string, maxChroma?: number, lockedHex?: string): ToneStep[] {
   // Always derive peak from the extracted color's position on the bell curve
   const [l, c, h] = chroma(hex).lch();
   const colorNumber = toneToColorNumber(l);
@@ -159,7 +177,7 @@ export function generateSemanticLightModeScale(hex: string, maxChroma?: number):
   const cap = maxChroma !== undefined ? maxChroma : 64;
   const peakChroma = Math.min(derivedPeak, cap);
 
-  return generateScaledTones(hex, peakChroma);
+  return generateScaledTones(hex, peakChroma, undefined, false, lockedHex);
 }
 
 /**

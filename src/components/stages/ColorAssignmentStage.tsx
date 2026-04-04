@@ -196,12 +196,13 @@ export default function ColorAssignmentStage({
           <BodySmall style={{ color: 'var(--Quiet)' }}>Drag to reorder theme colors</BodySmall>
           <div className="assign-theme-order-row">
             {['Primary', 'Secondary', 'Tertiary'].map((label, i) => (
-              <div
+              <Card
                 key={label}
                 draggable
+                size="small"
                 onDragStart={() => { dragItem.current = i; setDragIndex(i); }}
                 onDragEnter={() => { dragOver.current = i; }}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={(e: React.DragEvent) => e.preventDefault()}
                 onDragEnd={() => {
                   if (dragItem.current !== null && dragOver.current !== null && dragItem.current !== dragOver.current) {
                     const reordered = [...colors] as [string, string, string];
@@ -214,32 +215,17 @@ export default function ColorAssignmentStage({
                   dragOver.current = null;
                   setDragIndex(null);
                 }}
-                style={{
+                sx={{
                   flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  gap: 8,
-                  padding: '8px 12px',
-                  borderRadius: 'var(--Style-Border-Radius)',
-                  border: '1px solid var(--Border)',
-                  cursor: 'grab',
                   opacity: dragIndex === i ? 0.5 : 1,
-                  transition: 'opacity 0.15s ease',
-                  background: 'var(--Container-Low)',
                 }}
               >
-                <BodySmall style={{ color: 'var(--Quiet)', cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 6,
-                  background: colors[i] || '#ccc',
-                  border: '1px solid var(--Border)',
-                  flexShrink: 0,
-                }} />
-                <BodySmall style={{ fontWeight: 600 }}>{label}</BodySmall>
-              </div>
+                <HStack spacing={1} alignItems="center">
+                  <BodySmall style={{ color: 'var(--Quiet)', cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
+                  <Button swatch swatchColor={colors[i] || '#ccc'} size="medium" />
+                  <BodySmall style={{ fontWeight: 600 }}>{label}</BodySmall>
+                </HStack>
+              </Card>
             ))}
           </div>
         </VStack>
@@ -280,7 +266,6 @@ export default function ColorAssignmentStage({
       <Card padding="medium" style={cardStyle}>
         <VStack spacing={2}>
           <H3 style={{ fontSize: '1rem' }}>Background</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>Choose your background style</BodySmall>
           <div className="assign-bg-buttons">
             {BG_OPTIONS.map(opt => (
               <Button
@@ -343,7 +328,7 @@ export default function ColorAssignmentStage({
         <VStack spacing={2}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
             <H3 style={{ fontSize: '1rem' }}>Default Buttons</H3>
-            <Link style={{ fontSize: '0.8rem', cursor: 'pointer' }} onClick={() => setShowButtonInfo(true)}>Learn more</Link>
+            <Link style={{ fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setShowButtonInfo(true)}>Learn more</Link>
           </div>
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             {BUTTON_MODES.map(mode => (

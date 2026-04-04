@@ -115,6 +115,19 @@ function tokenToVar(tokenValue: string): string {
   if (tokenValue.includes('{') && tokenValue.includes('}')) {
     // Extract the token path: "{Colors.Neutral.Color-11}" -> "Colors.Neutral.Color-11"
     let tokenPath = tokenValue.replace(/[{}]/g, '');
+
+    // Resolve Color-Vibrant → Color-8 (Vibrant is always Color-8)
+    tokenPath = tokenPath.replace(/\.Color-Vibrant\b/g, '.Color-8');
+
+    // Resolve BW-Button text references to Black or White
+    const bwButtonMatch = tokenPath.match(/^(?:Text\.(?:Surfaces|Containers)\.)?BW-Button\.Color-(\d+)$/);
+    if (bwButtonMatch) {
+      return parseInt(bwButtonMatch[1], 10) <= 5 ? '#000000' : '#FFFFFF';
+    }
+
+    // Resolve {White}/{Black} to hex
+    if (tokenPath === 'Colors.White' || tokenPath === 'White') return '#FFFFFF';
+    if (tokenPath === 'Colors.Black' || tokenPath === 'Black') return '#000000';
     
     // Remove "Modes.Light-Mode-Tonal.", "Modes.Light-Mode-Professional.", "Modes.Dark-Mode." prefixes
     // "{Modes.Light-Mode-Tonal.Buttons.Surfaces.Background-11.Primary.Button}" -> "Buttons.Surfaces.Background-11.Primary.Button"
@@ -233,6 +246,76 @@ function tokenToVar(tokenValue: string): string {
   
   // If it's already a plain value, return as-is
   return tokenValue;
+}
+
+/**
+ * Hover/Active mapping: for Color-N, return the Color-N that hover/active resolves to.
+ * Mirrors buildHoverForPalette in staticTokenStructures.ts.
+ */
+const HOVER_MAP: Record<number, number | 'black' | 'white'> = {
+  1: 'black', 2: 1, 3: 2, 4: 3, 5: 4,
+  6: 7, 7: 8, 8: 9, 9: 10, 10: 11, 11: 12, 12: 'white',
+};
+
+/** Resolve hover/active to hex for a palette at Color-N */
+function resolveHoverActiveHex(palette: string, colorN: number, colorsData: any): string | null {
+  if (!colorsData?.[palette]) return null;
+  const target = HOVER_MAP[colorN];
+  if (target === undefined) return null;
+  if (target === 'black') return '#000000';
+  if (target === 'white') return '#FFFFFF';
+  return colorsData[palette]?.[`Color-${target}`]?.value || null;
+}
+
+/** Parse a {Hover.Palette.Color-N} or {Active.Palette.Color-N} token and resolve to hex */
+function resolveHoverActiveToken(tokenValue: string, colorsData: any): string | null {
+  if (!tokenValue?.includes('{')) return null;
+  const path = tokenValue.replace(/[{}]/g, '');
+  const match = path.match(/^(?:Hover|Active)\.([\w-]+)\.Color-(\d+)$/);
+  if (!match) return null;
+  return resolveHoverActiveHex(match[1], parseInt(match[2], 10), colorsData);
+}
+
+/** Derive dropshadow RGB from hex. Returns "r, g, b" string. */
+function deriveShadowRGB(hex: string): string | null {
+  try {
+    const clean = hex.replace('#', '');
+    const full = clean.length === 3 ? clean.split('').map((c: string) => c + c).join('') : clean;
+    const n = parseInt(full, 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+    let h = 0, s = 0, l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+      else if (max === gn) h = (bn - rn) / d + 2;
+      else h = (rn - gn) / d + 4;
+      h /= 6;
+    }
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    const newS = clamp(s * 100 * 1.5, 0, 100) / 100;
+    const newL = clamp(l * 100 - 25, 8, 92) / 100;
+    let sr: number, sg: number, sb: number;
+    if (newS === 0) {
+      sr = sg = sb = Math.round(newL * 255);
+    } else {
+      const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
+      const p = 2 * newL - q;
+      const hue2rgb = (pp: number, qq: number, t: number) => {
+        if (t < 0) t += 1; if (t > 1) t -= 1;
+        if (t < 1/6) return pp + (qq - pp) * 6 * t;
+        if (t < 1/2) return qq;
+        if (t < 2/3) return pp + (qq - pp) * (2/3 - t) * 6;
+        return pp;
+      };
+      sr = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+      sg = Math.round(hue2rgb(p, q, h) * 255);
+      sb = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+    }
+    return `${sr}, ${sg}, ${sb}`;
+  } catch { return null; }
 }
 
 /**
@@ -939,7 +1022,7 @@ function generateThemeColorsVariables(modeData: any): string {
  * Creates selectors like [data-theme="Primary-Light"] with scoped variables
  * Returns the CSS outside of :root block (to be appended after :root closes)
  */
-function generateThemesVariables(modeData: any): string {
+function generateThemesVariables(modeData: any, fullJsonData?: any): string {
   console.log('🎨 [generateThemesVariables] Called');
   console.log('  ├─ Has modeData?', !!modeData);
   console.log('  ├─ Has modeData.Themes?', !!modeData?.Themes);
@@ -1001,12 +1084,96 @@ function generateThemesVariables(modeData: any): string {
   tokenLookup['Header.Surfaces.BW.Color-Vibrant'] = '{Neutral.Color-11}';
   tokenLookup['Header.Containers.BW.Color-Vibrant'] = '{Neutral.Color-11}';
 
+  // Add Border-Variant entries — theme references {Border-Variant.Surfaces.Palette.Color-N}
+  // Border-Variant = border color at 40% opacity (8-digit hex)
+  // The Border section has the border color, so we resolve it and append '40'
+  const palettesForBV = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
+  for (const pal of palettesForBV) {
+    for (let i = 1; i <= 12; i++) {
+      const colorN = `Color-${i}`;
+      for (const ctx of ['Surfaces', 'Containers']) {
+        const borderKey = `Border.${ctx}.${pal}.${colorN}`;
+        const borderVal = tokenLookup[borderKey];
+        if (borderVal) {
+          // Follow the chain to get hex
+          let hex = borderVal;
+          if (hex.includes('{')) {
+            const innerPath = hex.replace(/[{}]/g, '');
+            const innerMatch = innerPath.match(/^(?:Colors\.)?([\w-]+)\.(Color-\d+)$/);
+            if (innerMatch) {
+              hex = modeData?.Colors?.[innerMatch[1]]?.[innerMatch[2]]?.value || hex;
+            }
+          }
+          if (hex.startsWith('#') && !hex.includes('{')) {
+            // 8-digit hex with 40% opacity (0x66 ≈ 40%)
+            tokenLookup[`Border-Variant.${ctx}.${pal}.${colorN}`] = `${hex}40`;
+          }
+        }
+      }
+    }
+  }
+
   // Add Focus-Visible fallbacks if not in JSON
   if (!tokenLookup['Focus-Visible.Surfaces.Color-1']) {
     for (let i = 1; i <= 14; i++) {
       tokenLookup[`Focus-Visible.Surfaces.Color-${i}`] = '#3b82f6';
       tokenLookup[`Focus-Visible.Containers.Color-${i}`] = '#3b82f6';
     }
+  }
+
+  // Add Default-Background entries — the Default theme references {Default-Background.Surface}, etc.
+  // These map to the user's selected background palette at their extracted tone.
+  // Use token references (not resolved values) so resolveTokenForCSS can follow the chain.
+  {
+    const metadata = fullJsonData?.Metadata || modeData?.Metadata;
+    const bgSelection = metadata?.['Background']?.value;
+    const primaryToneVal = metadata?.['Extracted-Tones']?.Primary?.value;
+    const primaryN = primaryToneVal ? toneToColorNumber(primaryToneVal) : 9;
+
+    // Map user's background selection to palette + Color-N (same as getBgThemeAndN in exportColorSystem)
+    let defPal = 'Primary';
+    let defN = 11; // default: primary-light
+    switch (bgSelection) {
+      case 'white': defPal = 'Neutral'; defN = 12; break;
+      case 'black': defPal = 'Neutral'; defN = 1; break;
+      case 'primary-base': case 'primary': defPal = 'Primary'; defN = primaryN; break;
+      case 'primary-light': defPal = 'Primary'; defN = 11; break;
+      default: defPal = metadata?.['Background-Theme']?.value || 'Primary'; defN = 11; break;
+    }
+    const colorN = `Color-${defN}`;
+
+    // Background surfaces/containers — reference Backgrounds.{Palette}.Background-{N}
+    const bgKey = `Backgrounds.${defPal}.Background-${defN}`;
+    tokenLookup['Default-Background.Surface'] = `{${bgKey}.Surfaces.Surface}`;
+    tokenLookup['Default-Background.Surface-Dim'] = `{${bgKey}.Surfaces.Surface-Dim}`;
+    tokenLookup['Default-Background.Surface-Bright'] = `{${bgKey}.Surfaces.Surface-Bright}`;
+    tokenLookup['Default-Background.Container'] = `{${bgKey}.Containers.Container}`;
+    tokenLookup['Default-Background.Container-Low'] = `{${bgKey}.Containers.Container-Low}`;
+    tokenLookup['Default-Background.Container-Lowest'] = `{${bgKey}.Containers.Container-Lowest}`;
+    tokenLookup['Default-Background.Container-High'] = `{${bgKey}.Containers.Container-High}`;
+    tokenLookup['Default-Background.Container-Highest'] = `{${bgKey}.Containers.Container-Highest}`;
+
+    // Text, Header, Quiet, Border, etc. — reference {Section.Surfaces.Palette.Color-N}
+    const props = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
+    for (const prop of props) {
+      tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
+      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${colorN}}`;
+    }
+    // Focus-Visible uses flat path (no palette nesting)
+    tokenLookup['Default-Background.Focus-Visible'] = `{Focus-Visible.Surfaces.${colorN}}`;
+    tokenLookup['Default-Background.Container-Focus-Visible'] = `{Focus-Visible.Containers.${colorN}}`;
+
+    // Hover/Active — reference {Hover/Active.Palette.Color-N}
+    tokenLookup['Default-Background.Hover'] = `{Hover.${defPal}.${colorN}}`;
+    tokenLookup['Default-Background.Active'] = `{Active.${defPal}.${colorN}}`;
+    tokenLookup['Default-Background.Container-Hover'] = `{Hover.${defPal}.${colorN}}`;
+    tokenLookup['Default-Background.Container-Active'] = `{Active.${defPal}.${colorN}}`;
+
+    // Hotlink
+    tokenLookup['Default-Background.Hotlink'] = `{Text.Surfaces.Info.${colorN}}`;
+    tokenLookup['Default-Background.Hotlink-Visited'] = `{Text.Surfaces.Hotlink-Visited.${colorN}}`;
+
+    console.log(`  📊 Added Default-Background entries for ${defPal} ${colorN} (${Object.keys(tokenLookup).filter(k => k.startsWith('Default-Background.')).length} entries)`);
   }
 
   // Log unresolved tokens for debugging
@@ -1033,14 +1200,42 @@ function generateThemesVariables(modeData: any): string {
 
       let current = tokenValue;
 
+      // Pre-resolve Color-Vibrant → Color-8
+      current = current.replace(/Color-Vibrant/g, 'Color-8');
+
+      // Pre-resolve BW-Button text to Black/White
+      const bwMatch = current.replace(/[{}]/g, '').match(/^(?:Text\.(?:Surfaces|Containers)\.)?BW-Button\.Color-(\d+)$/);
+      if (bwMatch) return parseInt(bwMatch[1], 10) <= 5 ? '#000000' : '#FFFFFF';
+
+      // Resolve {White}/{Black}
+      const stripped = current.replace(/[{}]/g, '');
+      if (stripped === 'White' || stripped === 'Colors.White') return '#FFFFFF';
+      if (stripped === 'Black' || stripped === 'Colors.Black') return '#000000';
+
+      // Resolve Hover/Active tokens directly to hex when possible
+      if (modeData?.Colors) {
+        const haHex = resolveHoverActiveToken(current, modeData.Colors);
+        if (haHex) return haHex;
+      }
+
+      // Resolve {Buttons.Palette.Shade.Hover/Active} → follow chain to hex
+      const btnHAMatch = current.replace(/[{}]/g, '').match(/^Buttons\.([\w-]+)\.(Light|Medium)\.(Hover|Active)$/);
+      if (btnHAMatch && modeData?.Buttons && modeData?.Colors) {
+        const innerToken = modeData.Buttons?.[btnHAMatch[1]]?.[btnHAMatch[2]]?.[btnHAMatch[3]]?.value;
+        if (innerToken) {
+          const hex = resolveHoverActiveToken(innerToken, modeData.Colors);
+          if (hex) return hex;
+        }
+      }
+
       // Follow the chain up to 5 levels
       for (let depth = 0; depth < 5; depth++) {
         if (!current.includes('{')) break;
 
-        const path = current.replace(/[{}]/g, '');
+        const path = current.replace(/[{}]/g, '').replace(/Color-Vibrant/g, 'Color-8');
 
         // Check if it's already a final Colors reference
-        const colorMatch = path.match(/^(?:Colors\.)?(\w+)\.(Color-\d+)$/);
+        const colorMatch = path.match(/^(?:Colors\.)?([\w-]+)\.(Color-\d+)$/);
         if (colorMatch) {
           return `var(--${colorMatch[1]}-${colorMatch[2]})`;
         }
@@ -1052,6 +1247,9 @@ function generateThemesVariables(modeData: any): string {
           if (cssVarName === '--Dropshadow-Color' && !resolved.includes('{')) return resolved;
           if (cssVarName === '--Border-Variant' && resolved.startsWith('#')) return resolved;
           if (!resolved.includes('{') && resolved.includes(',')) return resolved; // RGB triplet
+          // Surface/Container backgrounds are computed values — keep as hex, don't map to Color-N
+          const isBackgroundVar = /^--(Background|Surface|Surface-Dim|Surface-Bright|Container|Container-Low|Container-Lowest|Container-High|Container-Highest)$/.test(cssVarName);
+          if (isBackgroundVar && resolved.startsWith('#')) return resolved;
 
           // If resolved is a hex, try to find which Color-N it matches
           if (resolved.startsWith('#')) {
@@ -1068,6 +1266,12 @@ function generateThemesVariables(modeData: any): string {
             }
             // No Color-N match found — return hex directly
             return resolved;
+          }
+
+          // Check if resolved is a hover/active token → resolve to hex
+          if (modeData?.Colors) {
+            const haResolved = resolveHoverActiveToken(resolved, modeData.Colors);
+            if (haResolved) return haResolved;
           }
 
           current = resolved;
@@ -1089,6 +1293,9 @@ function generateThemesVariables(modeData: any): string {
       if (!current.includes('{')) {
         if (current.includes(',')) return current; // RGB
         if (current.startsWith('#')) {
+          // Surface/Container backgrounds — keep as hex, don't map to Color-N
+          const isBackgroundVar2 = /^--(Background|Surface|Surface-Dim|Surface-Bright|Container|Container-Low|Container-Lowest|Container-High|Container-Highest)$/.test(cssVarName);
+          if (isBackgroundVar2) return current;
           // Try to find which Color-N this hex matches
           const palettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited', 'BW'];
           for (const pal of palettes) {
@@ -1201,7 +1408,19 @@ function generateThemesVariables(modeData: any): string {
         const tokenLines = processTokens(variantData);
         surfaceLines.push(...tokenLines);
 
-        // Dropshadow-Color is already in the JSON as RGB values — output by processTokens above
+        // Ensure Dropshadow-Color exists — compute from background if missing
+        if (!tokenLines.some(l => l.includes('--Dropshadow-Color'))) {
+          // Find the background hex from the Surface/Background token
+          const bgToken = variantData.Surface?.value || variantData.Background?.value;
+          if (bgToken) {
+            const bgResolved = resolveTokenForCSS(bgToken, '--Background');
+            const bgHex = bgResolved.startsWith('#') ? bgResolved : null;
+            if (bgHex) {
+              const rgb = deriveShadowRGB(bgHex);
+              if (rgb) surfaceLines.push(`  --Dropshadow-Color: ${rgb};`);
+            }
+          }
+        }
 
         console.log(`      └─ ${variant.key} tokens generated: ${tokenLines.length}`);
         surfaceLines.push('}');
@@ -1233,7 +1452,18 @@ function generateThemesVariables(modeData: any): string {
       const tokenLines = processTokens(theme.Containers);
       containerLines.push(...tokenLines);
 
-      // Dropshadow-Color is already in the JSON as RGB values — output by processTokens above
+      // Ensure Dropshadow-Color exists — compute from Container background if missing
+      if (!tokenLines.some(l => l.includes('--Dropshadow-Color'))) {
+        const contToken = theme.Containers.Container?.value;
+        if (contToken) {
+          const contResolved = resolveTokenForCSS(contToken, '--Container');
+          const contHex = contResolved.startsWith('#') ? contResolved : null;
+          if (contHex) {
+            const rgb = deriveShadowRGB(contHex);
+            if (rgb) containerLines.push(`  --Dropshadow-Color: ${rgb};`);
+          }
+        }
+      }
 
       console.log(`      └─ Container tokens generated: ${tokenLines.length}`);
       containerLines.push('}');
@@ -1482,22 +1712,20 @@ function generateButtonsVariables(modeData: any): string {
   console.log('🔘 [generateButtonsVariables] Processing Buttons');
   console.log('  Button types:', Object.keys(buttons));
   
-  // Helper function to process button objects and convert to variable references
+  // Helper: resolve Hover/Active to hex, everything else via tokenToVar
+  const colorsData = modeData.Colors;
   const processButtonObject = (obj: any, prefix: string) => {
     if (!obj || typeof obj !== 'object') return;
-    
     Object.keys(obj).forEach(key => {
       const value = obj[key];
-      
-      // If it has a 'value' property, it's a token - generate CSS variable
       if (value && typeof value === 'object' && value.value !== undefined) {
-        // Keep full property names: "Button", "Text", "Hover", "Active"
         const cssVarName = `${prefix}-${key}`;
-        const cssValue = tokenToVar(value.value);
-        lines.push(`  ${cssVarName}: ${cssValue};`);
-      }
-      // Otherwise, recurse deeper
-      else if (value && typeof value === 'object') {
+        if ((key === 'Hover' || key === 'Active') && colorsData) {
+          const hex = resolveHoverActiveToken(value.value, colorsData);
+          if (hex) { lines.push(`  ${cssVarName}: ${hex};`); return; }
+        }
+        lines.push(`  ${cssVarName}: ${tokenToVar(value.value)};`);
+      } else if (value && typeof value === 'object') {
         processButtonObject(value, `${prefix}-${key}`);
       }
     });
@@ -1540,20 +1768,27 @@ function generateDefaultButtonVariables(modeData: any): string {
   console.log('  Button types:', Object.keys(defaultButton));
   
   // Helper function to process button objects recursively
+  // Resolve Hover/Active through the Buttons reference chain to hex
+  const defColorsData = modeData.Colors;
+  const defButtonsData = modeData.Buttons;
   const processDefaultButtonObject = (obj: any, prefix: string) => {
     if (!obj || typeof obj !== 'object') return;
-    
     Object.keys(obj).forEach(key => {
       const value = obj[key];
-      
-      // If it has a 'value' property, it's a token - generate CSS variable
       if (value && typeof value === 'object' && value.value !== undefined) {
         const cssVarName = `${prefix}-${key}`;
-        const cssValue = tokenToVar(value.value);
-        lines.push(`  ${cssVarName}: ${cssValue};`);
-      }
-      // Otherwise, recurse deeper
-      else if (value && typeof value === 'object') {
+        if ((key === 'Hover' || key === 'Active') && defColorsData && defButtonsData) {
+          const refPath = value.value.replace(/[{}]/g, '').split('.');
+          if (refPath[0] === 'Buttons' && refPath.length === 4) {
+            const innerToken = defButtonsData?.[refPath[1]]?.[refPath[2]]?.[refPath[3]]?.value;
+            if (innerToken) {
+              const hex = resolveHoverActiveToken(innerToken, defColorsData);
+              if (hex) { lines.push(`  ${cssVarName}: ${hex};`); return; }
+            }
+          }
+        }
+        lines.push(`  ${cssVarName}: ${tokenToVar(value.value)};`);
+      } else if (value && typeof value === 'object') {
         processDefaultButtonObject(value, `${prefix}-${key}`);
       }
     });
@@ -2470,7 +2705,7 @@ function generateModeCSS(modeName: string, modeData: any): string {
   lines.push(' * Theme Data-Attribute Selectors (30 Themes)');
   lines.push(' * ======================================== */');
   lines.push('');
-  const themesVars = generateThemesVariables(modeData);
+  const themesVars = generateThemesVariables(modeData, fullJsonData);
   if (themesVars) {
     lines.push(themesVars);
   }
@@ -2728,7 +2963,7 @@ function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJson
   lines.push(' * Theme Data-Attribute Selectors (30 Themes)');
   lines.push(' * ======================================== */');
   lines.push('');
-  const themesVarsV2 = generateThemesVariables(modeData);
+  const themesVarsV2 = generateThemesVariables(modeData, fullJsonData);
   if (themesVarsV2) {
     lines.push(themesVarsV2);
   }
@@ -3175,73 +3410,12 @@ function generateSurfacesContainersCSS(jsonData: any): string {
   lines.push(' * ======================================== */');
   lines.push('');
   
-  // Container types only — Surface variants are now per-theme
+  // Container types — map --Background to container var. Dropshadow-Color comes from theme selectors.
   const containerKeys = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
-
-  // Helper: derive dropshadow RGB from hex using HSL (same as computeDropshadow in exportColorSystem)
-  const deriveShadowRGB = (hex: string): string | null => {
-    try {
-      const clean = hex.replace('#', '');
-      const full = clean.length === 3 ? clean.split('').map((c: string) => c + c).join('') : clean;
-      const n = parseInt(full, 16);
-      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-      const rn = r / 255, gn = g / 255, bn = b / 255;
-      const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
-      let h = 0, s = 0, l = (max + min) / 2;
-      if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
-        else if (max === gn) h = (bn - rn) / d + 2;
-        else h = (rn - gn) / d + 4;
-        h /= 6;
-      }
-      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-      const newS = clamp(s * 100 * 1.5, 0, 100) / 100;
-      const newL = clamp(l * 100 - 25, 8, 92) / 100;
-      const h2 = h;
-      let sr: number, sg: number, sb: number;
-      if (newS === 0) {
-        sr = sg = sb = Math.round(newL * 255);
-      } else {
-        const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
-        const p = 2 * newL - q;
-        const hue2rgb = (p: number, q: number, t: number) => {
-          if (t < 0) t += 1; if (t > 1) t -= 1;
-          if (t < 1/6) return p + (q - p) * 6 * t;
-          if (t < 1/2) return q;
-          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-          return p;
-        };
-        sr = Math.round(hue2rgb(p, q, h2 + 1/3) * 255);
-        sg = Math.round(hue2rgb(p, q, h2) * 255);
-        sb = Math.round(hue2rgb(p, q, h2 - 1/3) * 255);
-      }
-      return `${sr}, ${sg}, ${sb}`;
-    } catch { return null; }
-  };
 
   containerKeys.forEach(key => {
     lines.push(`[data-surface="${key}"] {`);
     lines.push(`  --Background: var(--${key});`);
-    // Dropshadow-Color as RGB: resolve from first available theme's container hex
-    try {
-      const modeData = jsonData.Modes?.['Light-Mode'] || jsonData;
-      const backgrounds = modeData?.Backgrounds;
-      if (backgrounds) {
-        const theme = Object.keys(backgrounds).find(t => t !== 'Default' && t !== 'BW' && backgrounds[t]);
-        if (theme) {
-          const bgKey = Object.keys(backgrounds[theme]).find(k => k.startsWith('Background-'));
-          if (bgKey) {
-            const contHex = backgrounds[theme][bgKey]?.Containers?.[key]?.value;
-            if (contHex && contHex.startsWith('#')) {
-              const rgb = deriveShadowRGB(contHex);
-              if (rgb) lines.push(`  --Dropshadow-Color: ${rgb};`);
-            }
-          }
-        }
-      }
-    } catch { /* skip */ }
     lines.push('}');
     lines.push('');
   });
@@ -3863,6 +4037,12 @@ export function generateBaseCSS(jsonData: any): string {
   
   console.log(`📊 Root Button Colors - SC: ${SC}, TC: ${TC}, OB: ${OB} (Primary: ${primaryTone})`);
   console.log(`📊 Root Backgrounds - Primary: tone ${primaryToneValue} → Color-${primaryTone}, Secondary: tone ${secondaryToneValue} → Color-${secondaryTone}, Tertiary: tone ${tertiaryToneValue} → Color-${tertiaryTone}`);
+
+  // Color data for resolving hover/active to hex
+  const baseColors = jsonData?.Modes?.['Light-Mode']?.Colors || jsonData?.Colors;
+  const hoverHex = (palette: string, colorN: number): string => {
+    return resolveHoverActiveHex(palette, colorN, baseColors) || `var(--Hover-${palette}-Color-${colorN})`;
+  };
   
   // Add :root button color variables at the very start
   lines.push('/* ========================================');
@@ -3897,39 +4077,39 @@ export function generateBaseCSS(jsonData: any): string {
   // REMOVED: lines.push(`  --Buttons-Primary-Button: var(--Primary-Button-Surfaces-Background-${primaryTone}-Button);`);
   // REMOVED: lines.push(`  --Buttons-Primary-Text: var(--Primary-Button-Surfaces-Background-${primaryTone}-Text);`);
   // REMOVED: lines.push(`  --Buttons-Primary-Border: var(--Border-Surfaces-Neutral-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Primary-Hover: var(--Primary-Button-Surfaces-Background-${primaryTone}-Hover);`);
-  lines.push(`  --Buttons-Primary-Active: var(--Primary-Button-Surfaces-Background-${primaryTone}-Active);`);
+  lines.push(`  --Buttons-Primary-Hover: ${hoverHex('Primary', primaryTone)};`);
+  lines.push(`  --Buttons-Primary-Active: ${hoverHex('Primary', primaryTone)};`);
   lines.push('  --Buttons-Primary-Light-Button: var(--Primary-Color-12);');
   lines.push('  --Buttons-Primary-Light-Text: var(--Text-Surfaces-Primary-Color-12);');
   lines.push(`  --Buttons-Primary-Light-Border: var(--Border-Surfaces-Primary-Color-12);`);
-  lines.push('  --Buttons-Primary-Light-Hover: var(--Hover-Primary-Color-12);');
-  lines.push('  --Buttons-Primary-Light-Active: var(--Active-Primary-Color-12);');
+  lines.push(`  --Buttons-Primary-Light-Hover: ${hoverHex('Primary', 12)};`);
+  lines.push(`  --Buttons-Primary-Light-Active: ${hoverHex('Primary', 12)};`);
   lines.push(`  --Buttons-Secondary-Button: var(--Secondary-Color-${SC});`);
   lines.push(`  --Buttons-Secondary-Text: var(--Text-Surfaces-Secondary-Color-${SC});`);
   lines.push(`  --Buttons-Secondary-Border: var(--Border-Surfaces-Secondary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Secondary-Hover: var(--Hover-Secondary-Color-${SC});`);
-  lines.push(`  --Buttons-Secondary-Active: var(--Active-Secondary-Color-${SC});`);
+  lines.push(`  --Buttons-Secondary-Hover: ${hoverHex('Secondary', SC)};`);
+  lines.push(`  --Buttons-Secondary-Active: ${hoverHex('Secondary', SC)};`);
   lines.push('  --Buttons-Secondary-Light-Button: var(--Secondary-Color-12);');
   lines.push('  --Buttons-Secondary-Light-Text: var(--Text-Surfaces-Secondary-Color-12);');
   lines.push(`  --Buttons-Secondary-Light-Border: var(--Border-Surfaces-Secondary-Color-${primaryTone});`);
-  lines.push('  --Buttons-Secondary-Light-Hover: var(--Hover-Secondary-Color-12);');
-  lines.push('  --Buttons-Secondary-Light-Active: var(--Active-Secondary-Color-12);');
+  lines.push(`  --Buttons-Secondary-Light-Hover: ${hoverHex('Secondary', 12)};`);
+  lines.push(`  --Buttons-Secondary-Light-Active: ${hoverHex('Secondary', 12)};`);
   lines.push(`  --Buttons-Tertiary-Button: var(--Tertiary-Color-${TC});`);
   lines.push(`  --Buttons-Tertiary-Text: var(--Text-Surfaces-Tertiary-Color-${TC});`);
   lines.push(`  --Buttons-Tertiary-Border: var(--Border-Surfaces-Tertiary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Tertiary-Hover: var(--Hover-Tertiary-Color-${TC});`);
-  lines.push(`  --Buttons-Tertiary-Active: var(--Active-Tertiary-Color-${TC});`);
+  lines.push(`  --Buttons-Tertiary-Hover: ${hoverHex('Tertiary', TC)};`);
+  lines.push(`  --Buttons-Tertiary-Active: ${hoverHex('Tertiary', TC)};`);
   lines.push('  --Buttons-Tertiary-Light-Button: var(--Tertiary-Color-12);');
   lines.push('  --Buttons-Tertiary-Light-Text: var(--Text-Surfaces-Tertiary-Color-12);');
   lines.push(`  --Buttons-Tertiary-Light-Border: var(--Border-Surfaces-Tertiary-Color-${primaryTone});`);
-  lines.push('  --Buttons-Tertiary-Light-Hover: var(--Hover-Tertiary-Color-12);');
-  lines.push('  --Buttons-Tertiary-Light-Active: var(--Active-Tertiary-Color-12);');
+  lines.push(`  --Buttons-Tertiary-Light-Hover: ${hoverHex('Tertiary', 12)};`);
+  lines.push(`  --Buttons-Tertiary-Light-Active: ${hoverHex('Tertiary', 12)};`);
   // Container section for Primary buttons
   lines.push(`  --Buttons-Primary-Button: var(--Primary-Button-Containers-Background-${primaryTone}-Button);`);
   lines.push(`  --Buttons-Primary-Text: var(--Primary-Button-Containers-Background-${primaryTone}-Text);`);
   lines.push(`  --Buttons-Primary-Border: var(--Border-Containers-Primary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Primary-Hover: var(--Primary-Button-Containers-Background-${primaryTone}-Hover);`);
-  lines.push(`  --Buttons-Primary-Active: var(--Primary-Button-Containers-Background-9-Active);`);
+  lines.push(`  --Buttons-Primary-Hover: ${hoverHex('Primary', primaryTone)};`);
+  lines.push(`  --Buttons-Primary-Active: ${hoverHex('Primary', primaryTone)};`);
   lines.push('  --Buttons-Primary-Light-Border: var(--Border-Containers-Primary-Color-12);');
   lines.push(`  --Buttons-Secondary-Border: var(--Border-Containers-Secondary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Secondary-Light-Border: var(--Border-Containers-Secondary-Color-${primaryTone});`);
@@ -3938,72 +4118,81 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push(`  --Buttons-Neutral-Button: var(--Neutral-Color-${OB});`);
   lines.push(`  --Buttons-Neutral-Text: var(--Text-Surfaces-Neutral-Color-${OB});`);
   lines.push(`  --Buttons-Neutral-Border: var(--Border-Containers-Neutral-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Neutral-Hover: var(--Hover-Neutral-Color-${OB});`);
-  lines.push(`  --Buttons-Neutral-Active: var(--Active-Neutral-Color-${OB});`);
+  lines.push(`  --Buttons-Neutral-Hover: ${hoverHex('Neutral', OB)};`);
+  lines.push(`  --Buttons-Neutral-Active: ${hoverHex('Neutral', OB)};`);
   lines.push('  --Buttons-Neutral-Light-Button: var(--Neutral-Color-12);');
   lines.push('  --Buttons-Neutral-Light-Text: var(--Text-Surfaces-Neutral-Color-12);');
   lines.push(`  --Buttons-Neutral-Light-Border: var(--Border-Containers-Neutral-Color-${primaryTone});`);
-  lines.push('  --Buttons-Neutral-Light-Hover: var(--Hover-Neutral-Color-12);');
-  lines.push('  --Buttons-Neutral-Light-Active: var(--Active-Neutral-Color-12);');
+  lines.push(`  --Buttons-Neutral-Light-Hover: ${hoverHex('Neutral', 12)};`);
+  lines.push(`  --Buttons-Neutral-Light-Active: ${hoverHex('Neutral', 12)};`);
   lines.push(`  --Buttons-Info-Button: var(--Info-Color-${OB});`);
   lines.push(`  --Buttons-Info-Text: var(--Text-Surfaces-Info-Color-${OB});`);
   lines.push(`  --Buttons-Info-Border: var(--Border-Containers-Info-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Info-Hover: var(--Hover-Info-Color-${OB});`);
-  lines.push(`  --Buttons-Info-Active: var(--Active-Info-Color-${OB});`);
+  lines.push(`  --Buttons-Info-Hover: ${hoverHex('Info', OB)};`);
+  lines.push(`  --Buttons-Info-Active: ${hoverHex('Info', OB)};`);
   lines.push('  --Buttons-Info-Light-Button: var(--Info-Color-12);');
   lines.push('  --Buttons-Info-Light-Text: var(--Text-Surfaces-Info-Color-12);');
   lines.push(`  --Buttons-Info-Light-Border: var(--Border-Containers-Info-Color-${primaryTone});`);
-  lines.push('  --Buttons-Info-Light-Hover: var(--Hover-Info-Color-12);');
-  lines.push('  --Buttons-Info-Light-Active: var(--Active-Info-Color-12);');
+  lines.push(`  --Buttons-Info-Light-Hover: ${hoverHex('Info', 12)};`);
+  lines.push(`  --Buttons-Info-Light-Active: ${hoverHex('Info', 12)};`);
   lines.push(`  --Buttons-Success-Button: var(--Success-Color-${OB});`);
   lines.push(`  --Buttons-Success-Text: var(--Text-Surfaces-Success-Color-${OB});`);
   lines.push(`  --Buttons-Success-Border: var(--Border-Containers-Success-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Success-Hover: var(--Hover-Success-Color-${OB});`);
-  lines.push(`  --Buttons-Success-Active: var(--Active-Success-Color-${OB});`);
+  lines.push(`  --Buttons-Success-Hover: ${hoverHex('Success', OB)};`);
+  lines.push(`  --Buttons-Success-Active: ${hoverHex('Success', OB)};`);
   lines.push('  --Buttons-Success-Light-Button: var(--Success-Color-12);');
   lines.push('  --Buttons-Success-Light-Text: var(--Text-Surfaces-Success-Color-12);');
   lines.push(`  --Buttons-Success-Light-Border: var(--Border-Containers-Success-Color-${primaryTone});`);
-  lines.push('  --Buttons-Success-Light-Hover: var(--Hover-Success-Color-12);');
-  lines.push('  --Buttons-Success-Light-Active: var(--Active-Success-Color-12);');
+  lines.push(`  --Buttons-Success-Light-Hover: ${hoverHex('Success', 12)};`);
+  lines.push(`  --Buttons-Success-Light-Active: ${hoverHex('Success', 12)};`);
   lines.push(`  --Buttons-Warning-Button: var(--Warning-Color-${OB});`);
   lines.push(`  --Buttons-Warning-Text: var(--Text-Surfaces-Warning-Color-${OB});`);
   lines.push(`  --Buttons-Warning-Border: var(--Border-Containers-Warning-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Warning-Hover: var(--Hover-Warning-Color-${OB});`);
-  lines.push(`  --Buttons-Warning-Active: var(--Active-Warning-Color-${OB});`);
+  lines.push(`  --Buttons-Warning-Hover: ${hoverHex('Warning', OB)};`);
+  lines.push(`  --Buttons-Warning-Active: ${hoverHex('Warning', OB)};`);
   lines.push('  --Buttons-Warning-Light-Button: var(--Warning-Color-12);');
   lines.push('  --Buttons-Warning-Light-Text: var(--Text-Surfaces-Warning-Color-12);');
   lines.push(`  --Buttons-Warning-Light-Border: var(--Border-Containers-Warning-Color-${primaryTone});`);
-  lines.push('  --Buttons-Warning-Light-Hover: var(--Hover-Warning-Color-12);');
-  lines.push('  --Buttons-Warning-Light-Active: var(--Active-Warning-Color-12);');
+  lines.push(`  --Buttons-Warning-Light-Hover: ${hoverHex('Warning', 12)};`);
+  lines.push(`  --Buttons-Warning-Light-Active: ${hoverHex('Warning', 12)};`);
   lines.push(`  --Buttons-Error-Button: var(--Error-Color-${OB});`);
   lines.push(`  --Buttons-Error-Text: var(--Text-Surfaces-Error-Color-${OB});`);
   lines.push(`  --Buttons-Error-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Error-Hover: var(--Hover-Error-Color-${OB});`);
-  lines.push(`  --Buttons-Error-Active: var(--Active-Error-Color-${OB});`);
+  lines.push(`  --Buttons-Error-Hover: ${hoverHex('Error', OB)};`);
+  lines.push(`  --Buttons-Error-Active: ${hoverHex('Error', OB)};`);
   lines.push('  --Buttons-Error-Light-Button: var(--Error-Color-12);');
   lines.push('  --Buttons-Error-Light-Text: var(--Text-Surfaces-Error-Color-12);');
   lines.push(`  --Buttons-Error-Light-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
-  lines.push('  --Buttons-Error-Light-Hover: var(--Hover-Error-Color-12);');
-  lines.push('  --Buttons-Error-Light-Active: var(--Active-Error-Color-12);');
+  lines.push(`  --Buttons-Error-Light-Hover: ${hoverHex('Error', 12)};`);
+  lines.push(`  --Buttons-Error-Light-Active: ${hoverHex('Error', 12)};`);
   // BlackWhite buttons
   lines.push('  --Buttons-BlackWhite-Light-Button: var(--White);');
   lines.push('  --Buttons-BlackWhite-Light-Text: var(--Text-Surfaces-BW-Button-Color-1);');
-  lines.push('  --Buttons-BlackWhite-Light-Hover: var(--Hover-Neutral-Color-12);');
-  lines.push('  --Buttons-BlackWhite-Light-Active: var(--Active-Neutral-Color-12);');
+  lines.push(`  --Buttons-BlackWhite-Light-Hover: ${hoverHex('Neutral', 12)};`);
+  lines.push(`  --Buttons-BlackWhite-Light-Active: ${hoverHex('Neutral', 12)};`);
   lines.push('  --Buttons-BlackWhite-Medium-Button: var(--Neutral-Color-1);');
   lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-12);');
-  lines.push('  --Buttons-BlackWhite-Medium-Hover: var(--Hover-Neutral-Color-1);');
-  lines.push('  --Buttons-BlackWhite-Medium-Active: var(--Active-Neutral-Color-1);');
-  // Default button — points to the user's selected button mode via Default-Button indirection
+  lines.push(`  --Buttons-BlackWhite-Medium-Hover: ${hoverHex('Neutral', 1)};`);
+  lines.push(`  --Buttons-BlackWhite-Medium-Active: ${hoverHex('Neutral', 1)};`);
+  // Default button
   lines.push('  --Buttons-Default-Button: var(--Default-Button-Default-Medium-Button);');
   lines.push('  --Buttons-Default-Text: var(--Default-Button-Default-Medium-Text);');
   lines.push('  --Buttons-Default-Border: var(--Default-Button-Border-Surfaces-Default-Color-' + primaryTone + ');');
-  lines.push('  --Buttons-Default-Hover: var(--Default-Button-Default-Medium-Hover);');
-  lines.push('  --Buttons-Default-Active: var(--Default-Button-Default-Medium-Active);');
-  lines.push('  --Buttons-Default-Light-Button: var(--Default-Button-Default-Light-Button);');
-  lines.push('  --Buttons-Default-Light-Text: var(--Default-Button-Default-Light-Text);');
-  lines.push('  --Buttons-Default-Light-Hover: var(--Default-Button-Default-Light-Hover);');
-  lines.push('  --Buttons-Default-Light-Active: var(--Default-Button-Default-Light-Active);');
+  // Resolve Default hover/active through the Buttons chain
+  const defaultBtnData = jsonData?.Modes?.['Light-Mode']?.['Default-Button'] || jsonData?.['Default-Button'];
+  const buttonsJsonData = jsonData?.Modes?.['Light-Mode']?.Buttons || jsonData?.Buttons;
+  const resolveDefHA = (shade: string): string | null => {
+    const ref = defaultBtnData?.Default?.[shade]?.Hover?.value;
+    if (!ref) return null;
+    const parts = ref.replace(/[{}]/g, '').split('.');
+    if (parts[0] === 'Buttons' && parts.length === 4) {
+      const inner = buttonsJsonData?.[parts[1]]?.[parts[2]]?.[parts[3]]?.value;
+      if (inner) return resolveHoverActiveToken(inner, baseColors);
+    }
+    return null;
+  };
+  lines.push(`  --Buttons-Default-Hover: ${resolveDefHA('Medium') || 'var(--Default-Button-Default-Medium-Hover)'};`);
+  lines.push(`  --Buttons-Default-Active: ${resolveDefHA('Medium') || 'var(--Default-Button-Default-Medium-Active)'};`);
   lines.push(`  --Icons-Default: var(--Icon-Surfaces-Neutral-Color-${primaryTone});`);
   lines.push(`  --Icons-Default-Variant: var(--Icon-Variant-Surfaces-Neutral-Color-${primaryTone});`);
   lines.push(`  --Icons-Primary: var(--Icon-Surfaces-Primary-Color-${primaryTone});`);
