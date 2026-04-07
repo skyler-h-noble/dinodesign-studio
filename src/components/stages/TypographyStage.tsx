@@ -322,7 +322,7 @@ export default function TypographyStage({
                 <VStack spacing={1} style={{ alignItems: 'flex-start' }}>
                   <HStack spacing={2} style={{ alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 600 }}>Suggested Typography</BodySmall>
-                    <Button variant="outline" color="default" size="small" onClick={() => setShowSettings(true)}>
+                    <Button variant="primary-outline" size="small" onClick={() => setShowSettings(true)}>
                       Edit
                     </Button>
                   </HStack>
@@ -354,7 +354,7 @@ export default function TypographyStage({
               <VStack spacing={4} style={{ width: '100%' }}>
                 <HStack spacing={2} style={{ alignItems: 'center' }}>
                   <BodySmall style={{ fontWeight: 600 }}>Edit Typography</BodySmall>
-                  <Button variant="outline" color="default" size="small" onClick={() => setShowSettings(false)}>
+                  <Button variant="primary-outline" size="small" onClick={() => setShowSettings(false)}>
                     Hide
                   </Button>
                 </HStack>
@@ -409,8 +409,7 @@ export default function TypographyStage({
                 ))}
 
                 <Button
-                  variant="solid"
-                  color="default"
+                  variant="primary"
                   onClick={handleGenerateOptions}
                   disabled={isGenerating}
                   style={{ width: '100%' }}
@@ -516,8 +515,7 @@ export default function TypographyStage({
 
                     {/* Expand/collapse more info */}
                     <Button
-                      variant="outline"
-                      color="default"
+                      variant="primary-outline"
                       size="small"
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
@@ -635,12 +633,11 @@ export default function TypographyStage({
           </Card>
 
           <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-            <Button variant="outline" color="default" onClick={() => setCustomFontsOpen(false)}>
+            <Button variant="primary-outline" onClick={() => setCustomFontsOpen(false)}>
               Cancel
             </Button>
             <Button
-              variant="solid"
-              color="default"
+              variant="primary"
               onClick={() => {
                 // Apply custom fonts as typography styles
                 const styles: TypographyStyle[] = [

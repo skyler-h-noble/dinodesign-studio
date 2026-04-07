@@ -1,5 +1,5 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
-import { toneToColorNumber } from '../colorScale';
+import { toneToColorNumber, generateSemanticLightModeScale, findClosestColorN } from '../colorScale';
 
 /**
  * Theme configuration for generating Surfaces and Containers
@@ -773,12 +773,13 @@ export function generateAllThemesWithSurfacesAndContainers(
   // 2-4. Nav component themes — alias the user's chosen theme
   // Maps user selection → existing theme name
   function navSelectionToThemeName(selection: string): string {
-    switch (selection) {
+    const sel = selection?.toLowerCase?.() || '';
+    switch (sel) {
       case 'primary-light': return 'Primary-Light';
       case 'primary': return 'Primary';
       case 'white': return 'White';
       case 'black': return 'Black';
-      default: return 'Primary-Light';
+      default: return selection || 'Primary-Light'; // Pass through already-formatted names
     }
   }
 
@@ -786,16 +787,16 @@ export function generateAllThemesWithSurfacesAndContainers(
   const navBarSource = navSelectionToThemeName(defaultSettings.navBar);
   const statusSource = navSelectionToThemeName(defaultSettings.status);
 
-  console.log(`  Nav themes: App-Bar→${appBarSource}, Nav-Bar→${navBarSource}, Status→${statusSource}`);
-  
   // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC converted to Color-N)
+  // PC/SC/TC = closest Color-N to the original extracted color's lightness
+  // These determine which tone the theme surface uses
   const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-  const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
-  // If SC/TC landed at 11 (very light), adjust based on PC
-  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
-  const TC = rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC;
+  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
+  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
   const OB = PC >= 9 ? 9 : 8;
+
+  console.log(`  Nav themes: App-Bar→${appBarSource} (from "${defaultSettings.appBar}"), Nav-Bar→${navBarSource} (from "${defaultSettings.navBar}"), Status→${statusSource} (from "${defaultSettings.status}")`);
+  console.log(`  PC=${PC}, SC=${SC}, TC=${TC}, OB=${OB}`);
 
   // Helper to build common theme config
   // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
@@ -854,8 +855,13 @@ export function generateAllThemesWithSurfacesAndContainers(
   });
   
   // Nav component themes — alias the user's chosen theme
+  console.log(`  Available theme keys:`, Object.keys(themes).join(', '));
+  console.log(`  Looking for App-Bar source: "${appBarSource}" → exists: ${!!themes[appBarSource]}`);
+  console.log(`  Looking for Nav-Bar source: "${navBarSource}" → exists: ${!!themes[navBarSource]}`);
   if (themes[appBarSource]) themes['App-Bar'] = JSON.parse(JSON.stringify(themes[appBarSource]));
+  else console.error(`  ❌ App-Bar source "${appBarSource}" NOT FOUND in themes!`);
   if (themes[navBarSource]) themes['Nav-Bar'] = JSON.parse(JSON.stringify(themes[navBarSource]));
+  else console.error(`  ❌ Nav-Bar source "${navBarSource}" NOT FOUND in themes!`);
   if (themes[statusSource]) themes['Status'] = JSON.parse(JSON.stringify(themes[statusSource]));
 
   console.log(`  ✓ Generated ${Object.keys(themes).length} complete themes with Surfaces and Containers for ${mode}`);

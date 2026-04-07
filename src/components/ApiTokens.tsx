@@ -13,14 +13,17 @@ export function ApiTokensJson() {
 
   useEffect(() => {
     if (!uuid) { setError('No UUID provided'); return; }
+    let mounted = true;
 
     fetch(`${SUPABASE_STORAGE_BASE}/${uuid}/tokens.json`)
       .then(res => {
         if (!res.ok) throw new Error('Not found');
         return res.text();
       })
-      .then(setContent)
-      .catch(() => setError('404 — Design system not found'));
+      .then(text => { if (mounted) setContent(text); })
+      .catch(() => { if (mounted) setError('404 — Design system not found'); });
+
+    return () => { mounted = false; };
   }, [uuid]);
 
   if (error) return <pre style={{ padding: 20, fontFamily: 'monospace' }}>{error}</pre>;
@@ -38,14 +41,17 @@ export function ApiTokensMd() {
 
   useEffect(() => {
     if (!uuid) { setError('No UUID provided'); return; }
+    let mounted = true;
 
     fetch(`${SUPABASE_STORAGE_BASE}/${uuid}/DINO-TOKENS.md`)
       .then(res => {
         if (!res.ok) throw new Error('Not found');
         return res.text();
       })
-      .then(setContent)
-      .catch(() => setError('404 — Design system not found'));
+      .then(text => { if (mounted) setContent(text); })
+      .catch(() => { if (mounted) setError('404 — Design system not found'); });
+
+    return () => { mounted = false; };
   }, [uuid]);
 
   if (error) return <pre style={{ padding: 20, fontFamily: 'monospace' }}>{error}</pre>;

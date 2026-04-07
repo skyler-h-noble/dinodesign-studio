@@ -384,7 +384,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     if (colors) {
       const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
 
-      // Border-Variant: border color at 25% opacity (hex + '40')
+      // Border-Variant: border color at 15% opacity (hex + '26')
       // Uses the Border section values if available, otherwise derives from palette
       modeSection['Border-Variant'] = {};
       const borderData = modeSection.Border || {};
@@ -401,7 +401,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
             const borderHex = borderToken?.value || (colorVal as any).value;
             if (borderHex && borderHex.startsWith('#')) {
               modeSection['Border-Variant'][section][palette][colorKey] = {
-                value: `${borderHex.substring(0, 7)}40`, type: 'color'
+                value: `${borderHex.substring(0, 7)}26`, type: 'color'
               };
             }
           }

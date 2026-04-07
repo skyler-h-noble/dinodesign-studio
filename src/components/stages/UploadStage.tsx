@@ -18,14 +18,22 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
   const [isDragging, setIsDragging] = useState(false);
   const [mode, setMode] = useState<GenerationMode>('guided');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevUrlRef = useRef<string | null>(null);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
+    // Revoke previous object URL before creating a new one
+    if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
     setFileName(file.name);
     const url = URL.createObjectURL(file);
+    prevUrlRef.current = url;
     setPreview(url);
     onImageUploaded(url, file);
   }, [onImageUploaded]);
+
+  // Note: we intentionally do NOT revoke the URL on unmount because the parent
+  // (App) holds a reference to it for use in downstream stages (color extraction,
+  // preview, export). The parent is responsible for the URL's lifetime.
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -66,7 +74,7 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
           maxWidth: 560,
           width: '100%',
           minHeight: 200,
-          border: `2px dashed ${isDragging ? 'var(--Primary)' : 'var(--Buttons-Default-Border)'}`,
+          border: `2px dashed ${isDragging ? 'var(--Primary)' : 'var(--Border)'}`,
           borderRadius: 'var(--Style-Border-Radius)',
           background: isDragging ? 'var(--Primary-Container)' : 'transparent',
           display: 'flex',
@@ -128,9 +136,9 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
                   gap: 12,
                   padding: '14px 16px',
                   borderRadius: 'var(--Style-Border-Radius)',
-                  border: '1px solid var(--Buttons-Default-Border)',
-                  background: isSelected ? 'var(--Buttons-Default-Button)' : 'transparent',
-                  color: isSelected ? 'var(--Buttons-Default-Text)' : 'var(--Quiet)',
+                  border: '1px solid var(--Border)',
+                  background: isSelected ? 'var(--Primary)' : 'transparent',
+                  color: isSelected ? 'var(--Text)' : 'var(--Quiet)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   width: '100%',

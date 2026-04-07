@@ -721,6 +721,9 @@ function getFixedHeaderToken(backgroundNumber: number, isContainer: boolean, pal
     '7': { surfaces: 5, containers: 5 },
     '8': { surfaces: 5, containers: 5 },
     '9': { surfaces: 6, containers: 6 },
+    '10': { surfaces: 3, containers: 3 },
+    '11': { surfaces: 2, containers: 2 },
+    '12': { surfaces: 1, containers: 1 },
     '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
 
@@ -745,6 +748,9 @@ function getFixedTextToken(backgroundNumber: number, isContainer: boolean, palet
     '7': { surfaces: 3, containers: 3 },
     '8': { surfaces: 4, containers: 4 },
     '9': { surfaces: 5, containers: 5 },
+    '10': { surfaces: 3, containers: 3 },
+    '11': { surfaces: 2, containers: 2 },
+    '12': { surfaces: 2, containers: 2 },
     '99': { surfaces: 4, containers: 4 }, // Background-Vibrant
   };
   
@@ -770,6 +776,9 @@ function getFixedBorderToken(backgroundNumber: number, isContainer: boolean, pal
     '7': { surfaces: 5, containers: 5 },
     '8': { surfaces: 5, containers: 5 },
     '9': { surfaces: 5, containers: 5 },
+    '10': { surfaces: 7, containers: 7 },
+    '11': { surfaces: 8, containers: 8 },
+    '12': { surfaces: 8, containers: 8 },
     '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
 
@@ -795,6 +804,9 @@ function getFixedBorderHexColor(backgroundNumber: number, isContainer: boolean, 
     '7': { surfaces: 5, containers: 5 },
     '8': { surfaces: 5, containers: 5 },
     '9': { surfaces: 5, containers: 5 },
+    '10': { surfaces: 7, containers: 7 },
+    '11': { surfaces: 8, containers: 8 },
+    '12': { surfaces: 8, containers: 8 },
     '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
 
@@ -820,8 +832,8 @@ function getFixedBorderHexColor(backgroundNumber: number, isContainer: boolean, 
 function getBorderVariantValue(borderValue: string): string {
   // If borderValue is a direct hex color
   if (borderValue.startsWith('#')) {
-    // Append 66 for 40% opacity
-    return `${borderValue}40`;
+    // Append 26 for 15% opacity
+    return `${borderValue}26`;
   }
   // Fallback for references: return black with 20% opacity (this shouldn't happen)
   console.warn(`getBorderVariantValue received a reference token: ${borderValue}. This should be resolved to hex first.`);
@@ -1157,7 +1169,7 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}40` : `${getBorderColor(surfaceColor, palette, false)}40`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}26` : `${getBorderColor(surfaceColor, palette, false)}26`,
         type: 'color'
       },
       'Hotlink': {
@@ -1215,7 +1227,7 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}40` : `${getBorderColor(containerColor, palette, false)}40`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}26` : `${getBorderColor(containerColor, palette, false)}26`,
         type: 'color'
       },
       'Hotlink': {
@@ -1445,7 +1457,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}40` : `${getBorderColor(surfaceColor, palette, false)}40`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}26` : `${getBorderColor(surfaceColor, palette, false)}26`,
         type: 'color'
       },
       'Hotlink': {
@@ -1511,7 +1523,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}40` : `${getBorderColor(containerColor, palette, false)}40`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}26` : `${getBorderColor(containerColor, palette, false)}26`,
         type: 'color'
       },
       'Hotlink': {
@@ -1687,7 +1699,7 @@ function generateDarkModeSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: `${getBorderColor(surfaceColor, palette, true)}40`,
+        value: `${getBorderColor(surfaceColor, palette, true)}26`,
         type: 'color'
       },
       'Hotlink': {
@@ -1753,7 +1765,7 @@ function generateDarkModeSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: `${getBorderColor(containerColor, palette, true)}40`,
+        value: `${getBorderColor(containerColor, palette, true)}26`,
         type: 'color'
       },
       'Hotlink': {
@@ -2907,9 +2919,9 @@ function generateModesThemes(
   // Convert extracted tones to Color-N positions (PC, SC, TC)
   const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
   const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
+  const SC = (rawSC === 11 || rawSC <= 5) ? (PC >= 9 ? 9 : 8) : rawSC;
   const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
-  const TC = rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC;
+  const TC = (rawTC === 11 || rawTC <= 5) ? (PC >= 9 ? 9 : 8) : rawTC;
   const NC = 9; // Neutral is always fixed
   const OB = PC >= 9 ? 9 : 8; // Other buttons (OB = 8 if PC >= 9, else 6)
   
@@ -5997,7 +6009,7 @@ export function exportColorSystemToJSON(
         const borderResolved = resolveColorToken(borderToken, colors, backgrounds);
         if (borderResolved) {
           // Border-Variant = border color at 40% opacity as 8-digit hex
-          sectionData['Border-Variant'] = { value: `${borderResolved}40`, type: 'color' };
+          sectionData['Border-Variant'] = { value: `${borderResolved}26`, type: 'color' };
         } else {
           // Try to resolve via the intermediate: navigate the token path through modeData
           const path = borderToken.replace(/[{}]/g, '').split('.');
@@ -6009,7 +6021,7 @@ export function exportColorSystemToJSON(
           if (current?.value) {
             const innerHex = resolveColorToken(current.value, colors, backgrounds);
             if (innerHex) {
-              sectionData['Border-Variant'] = { value: `${innerHex}40`, type: 'color' };
+              sectionData['Border-Variant'] = { value: `${innerHex}26`, type: 'color' };
             }
           }
         }
@@ -6121,9 +6133,9 @@ export function exportColorSystemToJSON(
       // Compute extracted tone numbers for fallback
       const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
       const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
+  const SC = (rawSC === 11 || rawSC <= 5) ? (PC >= 9 ? 9 : 8) : rawSC;
       const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
-  const TC = rawTC === 11 ? (PC >= 9 ? 9 : 8) : rawTC;
+  const TC = (rawTC === 11 || rawTC <= 5) ? (PC >= 9 ? 9 : 8) : rawTC;
       const NC = 9;
       const OB = PC >= 9 ? 9 : 8;
 
@@ -6340,11 +6352,11 @@ export function exportColorSystemToJSON(
   console.log('✨ [JSON Export] Generating Effects levels...');
   colorSystem.Effects = {
     'Level-0': { value: 'none', type: 'boxShadow' },
-    'Level-1': { value: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', type: 'boxShadow' },
-    'Level-2': { value: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', type: 'boxShadow' },
-    'Level-3': { value: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', type: 'boxShadow' },
-    'Level-4': { value: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', type: 'boxShadow' },
-    'Level-5': { value: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', type: 'boxShadow' }
+    'Level-1': { value: '0 1px 2px rgba(var(--Dropshadow-Color), 0.28)', type: 'boxShadow' },
+    'Level-2': { value: '0 2px 4px rgba(var(--Dropshadow-Color), 0.22), 0 1px 2px rgba(var(--Dropshadow-Color), 0.28)', type: 'boxShadow' },
+    'Level-3': { value: '0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22)', type: 'boxShadow' },
+    'Level-4': { value: '0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17)', type: 'boxShadow' },
+    'Level-5': { value: '0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13)', type: 'boxShadow' }
   };
   console.log('  ✓ [JSON Export] Effects levels generated');
 
@@ -6878,7 +6890,7 @@ export function exportColorSystemToJSON(
   if (!defaultSettings && extractedTones) {
     const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
     const rawSC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11;
-  const SC = rawSC === 11 ? (PC >= 9 ? 9 : 8) : rawSC;
+  const SC = (rawSC === 11 || rawSC <= 5) ? (PC >= 9 ? 9 : 8) : rawSC;
     
     defaultSettings = calculateDefaultThemeSettings(
       PC,

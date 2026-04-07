@@ -15,17 +15,17 @@ export default function Playground() {
       setLoading(false);
       return;
     }
+    let mounted = true;
 
-    // Check if the design system exists by fetching the base CSS
     fetch(`${SUPABASE_STORAGE_BASE}/${uuid}/tokens-base.css`, { method: 'HEAD' })
       .then(res => {
-        setExists(res.ok);
-        setLoading(false);
+        if (mounted) { setExists(res.ok); setLoading(false); }
       })
       .catch(() => {
-        setExists(false);
-        setLoading(false);
+        if (mounted) { setExists(false); setLoading(false); }
       });
+
+    return () => { mounted = false; };
   }, [uuid]);
 
   if (loading) {

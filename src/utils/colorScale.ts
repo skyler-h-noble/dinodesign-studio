@@ -17,6 +17,23 @@ export interface ToneStep {
 }
 
 /**
+ * Find the Color-N (1-12) in a generated tone scale whose hex most closely
+ * matches the original extracted color, using perceptual color distance (Delta E).
+ */
+export function findClosestColorN(extractedHex: string, toneScale: ToneStep[]): number {
+  let closestN = 1;
+  let minDist = Infinity;
+  for (let i = 0; i < toneScale.length; i++) {
+    const dist = chroma.deltaE(extractedHex, toneScale[i].hex);
+    if (dist < minDist) {
+      minDist = dist;
+      closestN = i + 1;
+    }
+  }
+  return closestN;
+}
+
+/**
  * Generate a natural (uncapped) 12-tone scale to find the max achievable chroma.
  * Returns the scale and the peak chroma value.
  */

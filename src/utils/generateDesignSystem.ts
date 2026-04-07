@@ -668,7 +668,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
       {
         defaultTheme: input.userSelections.defaultTheme,
         background: input.userSelections.background as any,
-        appBar: input.userSelections.appBar as any,
+        appBar: (() => { console.log('🔍 [EXPORT] appBar selection:', input.userSelections.appBar); return input.userSelections.appBar; })() as any,
         navBar: input.userSelections.navBar as any,
         status: input.userSelections.status as any,
         button: mapButtonStyle(input.userSelections.button) as any,
@@ -717,19 +717,37 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
       },
     };
   } catch (err) {
-    console.error('JSON generation failed, using fallback:', err);
+    console.error('❌❌❌ JSON generation FAILED:', err);
+    console.error('❌ Stack:', (err as Error).stack);
+    console.error('❌ Input extractedTones:', input.colorScheme.extractedTones);
+    console.error('❌ Input userSelections:', JSON.stringify(input.userSelections));
     // Fallback to simplified JSON
     designSystemJSON = {
       name: input.designSystemName,
       colors: input.colorScheme.colors,
+      error: (err as Error).message,
       error: 'Full generation failed, simplified export',
     };
   }
 
   // 3. Generate CSS files from the JSON
   let cssFiles: Record<string, string> = {};
+  console.log('🔍 [CSS Gen] JSON top keys:', Object.keys(designSystemJSON));
+  console.log('🔍 [CSS Gen] Has Modes?', !!designSystemJSON.Modes);
+  if (designSystemJSON.Modes) {
+    console.log('🔍 [CSS Gen] Mode keys:', Object.keys(designSystemJSON.Modes));
+    const lm = designSystemJSON.Modes['Light-Mode'];
+    if (lm) {
+      console.log('🔍 [CSS Gen] Light-Mode keys:', Object.keys(lm));
+      console.log('🔍 [CSS Gen] Has Colors?', !!lm.Colors, 'Has Themes?', !!lm.Themes);
+      if (lm.Colors?.Primary) console.log('🔍 [CSS Gen] Primary Color-1:', lm.Colors.Primary['Color-1']?.value);
+    }
+  }
   cssFiles = generateCSSFiles(designSystemJSON);
   console.log('✅ CSS files generated:', Object.keys(cssFiles));
+  for (const [name, content] of Object.entries(cssFiles)) {
+    console.log(`  ${name}: ${content.length} chars, ${content.split('\n').length} lines`);
+  }
 
   // Also generate base.css
   let baseCSS = '';
@@ -782,9 +800,9 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Small-Button-Height: ${smallButtonHeight}px;
   --Large-Button-Height: ${largeButtonHeight}px;
   --Button-Min-Width: ${minButtonWidth}px;
-  --Button-Bevel: ${bevelPercent}%;
+  --Button-Bevel: ${bevelPercent};
   --Button-Bevel-Px: ${bevelPx}px;
-  --Button-Bevel-Opacity: ${bevelOpacity}%;
+  --Button-Bevel-Opacity: ${bevelOpacity / 100};
   --Button-Bevel-Shadow: ${bevelPx > 0 ? `inset -${bevelPx}px -${bevelPx}px ${bevelPx}px color-mix(in srgb, var(--Buttons-Default-Highlight, #ffffff) ${bevelOpacity}%, transparent), inset ${bevelPx}px ${bevelPx}px ${bevelPx}px color-mix(in srgb, var(--Buttons-Default-Lowlight, #000000) ${bevelOpacity}%, transparent)` : 'none'};
   --Style-Border-Radius: var(--Button-Radius);
 

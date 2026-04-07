@@ -520,7 +520,7 @@ ${(() => {
   const tones = getAccessibleTones(statusBg, sc.n, primaryLight);
   return `[data-theme="Brand-Status"] {
   --Background: ${statusBg};
-  --Dropshadow-Color: ${dropshadowFor(statusBg)};
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(statusBg))};
   --Text: var(--${sc.palette}-Color-${tones.text});
 }`;
 })()}
@@ -542,9 +542,10 @@ ${(() => {
   const abOldHoverHex = p(abPalArr, abOldHover);
   const abHoverHex = mixHex(btnBg, abOldHoverHex);
 
-  return `[data-theme="Brand-App-Bar"] {
+  return `[data-theme="Brand-App-Bar"],
+  [data-theme="Brand-App-Bar"][data-surface="Surface"] {
   --Background: ${appBarBg};
-  --Dropshadow-Color: ${dropshadowFor(appBarBg)};
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(appBarBg))};
   --Text: var(--${ac.palette}-Color-${tones.text});
   --Header: var(--${ac.palette}-Color-${tones.header});
   --Quiet: var(--${ac.palette}-Color-${tones.quiet});
@@ -567,7 +568,8 @@ ${(() => {
 })()}
 
 /* ══ Brand Theme — Color-N scales + semantic variables ══ */
-[data-theme="Brand"] {
+[data-theme="Brand"],
+[data-theme="Brand"][data-surface="Surface"] {
   /* Color scales */
 ${primaryLight.map((c, i) => `  --Primary-Color-${i + 1}: ${c.hex};`).join('\n')}
 ${secondaryLight.map((c, i) => `  --Secondary-Color-${i + 1}: ${c.hex};`).join('\n')}
@@ -576,15 +578,21 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
 
   --Background: var(--${surfacePaletteName}-Color-${surfaceN});
   --Container: var(--${containerPaletteName}-Color-${containerN});
-  --Dropshadow-Color: ${dropshadowFor(surfaceBg)};
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
-  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}40` : `${surfaceBorder}40`};
+  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}26` : `${surfaceBorder}26`};
   --Hover: var(--${surfacePaletteName}-Color-${hoverMap[surfaceN - 1] || surfaceN});
   --Active: var(--${surfacePaletteName}-Color-${hoverMap[surfaceN - 1] || surfaceN});
   --Focus-Visible: #3b82f6;
+  --Effect-Level-0: none;
+  --Effect-Level-1: 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
+  --Effect-Level-2: 0 2px 4px rgba(var(--Dropshadow-Color), 0.22), 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
+  --Effect-Level-3: 0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22);
+  --Effect-Level-4: 0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17);
+  --Effect-Level-5: 0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13);
 
 ${(() => {
     // Generate all button palette tokens
@@ -637,7 +645,7 @@ ${(() => {
   --Container-Lowest: ${containerBg};
   --Container-High: ${containerBg};
   --Container-Highest: ${containerBg};
-  --Container-Dropshadow-Color: ${dropshadowFor(containerBg)};
+  --Container-Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg))};
   --Container-Text: ${containerText};
   --Container-Header: ${containerHeader};
   --Container-Quiet: ${containerQuiet};
@@ -674,12 +682,12 @@ ${(() => {
 [data-theme="Brand"] [data-surface="Container"],
 [data-surface] [data-surface="Container"] {
   --Background: var(--${containerPaletteName}-Color-${containerN});
-  --Dropshadow-Color: ${dropshadowFor(containerBg)};
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
-  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}40` : `${containerBorder}40`};
+  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}26` : `${containerBorder}26`};
   --Hover: var(--${containerPaletteName}-Color-${hoverMap[containerN - 1] || containerN});
   --Active: var(--${containerPaletteName}-Color-${hoverMap[containerN - 1] || containerN});
   --Buttons-Primary-Button: ${btnBg};
@@ -688,8 +696,12 @@ ${(() => {
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: var(--${containerPaletteName}-Color-${containerTones.border});
+  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, hoverMap[containerN - 1] || containerN))};
   --Buttons-Default-Active: ${p(primaryLight, hoverMap[containerN - 1] || containerN)};
+  --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
+  --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
 }
 
 /* ══ Tertiary Theme ══ */
@@ -723,9 +735,10 @@ ${(() => {
   const navDefHoverHex = mixHex(btnBg, navDefOldHoverHex);
   const navBorderN = tones.border;
 
-  return `[data-theme="Brand-Nav-Bar"] {
+  return `[data-theme="Brand-Nav-Bar"],
+  [data-theme="Brand-Nav-Bar"][data-surface="Surface"] {
   --Background: ${navBarBg};
-  --Dropshadow-Color: ${dropshadowFor(navBarBg)};
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(navBarBg))};
   --Text: ${p(primaryLight, tones.text)};
   --Header: ${p(primaryLight, tones.header)};
   --Quiet: ${p(primaryLight, tones.quiet)};

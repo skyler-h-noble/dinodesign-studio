@@ -53,16 +53,14 @@ export default function ReviewStage({
           {/* ─── Left: Phone Preview ─── */}
           <div className="review-preview-col">
             <VStack spacing={2} alignItems="center">
-              <ButtonGroup size="small" variant="outline">
+              <ButtonGroup size="small" variant="primary-outline">
                 <Button
-                  variant={previewMode === 'light' ? 'default' : 'outline'}
-                  color="default"
+                  variant={previewMode === 'light' ? 'primary' : 'primary-outline'}
                   size="small"
                   onClick={() => setPreviewMode('light')}
                 >Light</Button>
                 <Button
-                  variant={previewMode === 'dark' ? 'default' : 'outline'}
-                  color="default"
+                  variant={previewMode === 'dark' ? 'primary' : 'primary-outline'}
                   size="small"
                   onClick={() => setPreviewMode('dark')}
                 >Dark</Button>
@@ -114,7 +112,7 @@ export default function ReviewStage({
                   Get your hosted playground, Figma integration, and code package.
                 </BodySmall>
                 <Button
-                  variant="default"
+                  variant="primary"
                   onClick={onNext}
                   style={{ width: '100%', padding: '14px 24px', fontSize: '1rem', fontWeight: 700 }}
                 >
@@ -123,7 +121,7 @@ export default function ReviewStage({
               </VStack>
             </Card>
 
-            <Button variant="outline" color="default" onClick={onBack} style={{ width: '100%' }}>
+            <Button variant="primary-outline" onClick={onBack} style={{ width: '100%' }}>
               Back
             </Button>
           </div>

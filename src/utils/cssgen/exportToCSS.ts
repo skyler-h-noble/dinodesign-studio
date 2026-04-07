@@ -1085,8 +1085,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
   tokenLookup['Header.Containers.BW.Color-Vibrant'] = '{Neutral.Color-11}';
 
   // Add Border-Variant entries — theme references {Border-Variant.Surfaces.Palette.Color-N}
-  // Border-Variant = border color at 40% opacity (8-digit hex)
-  // The Border section has the border color, so we resolve it and append '40'
+  // Border-Variant = border color at 15% opacity (8-digit hex suffix '26')
+  // The Border section has the border color, so we resolve it and append '26'
   const palettesForBV = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
   for (const pal of palettesForBV) {
     for (let i = 1; i <= 12; i++) {
@@ -1105,8 +1105,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
             }
           }
           if (hex.startsWith('#') && !hex.includes('{')) {
-            // 8-digit hex with 40% opacity (0x66 ≈ 40%)
-            tokenLookup[`Border-Variant.${ctx}.${pal}.${colorN}`] = `${hex}40`;
+            // 8-digit hex with 15% opacity (0x26)
+            tokenLookup[`Border-Variant.${ctx}.${pal}.${colorN}`] = `${hex}26`;
           }
         }
       }

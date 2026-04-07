@@ -86,6 +86,7 @@ function MainApp() {
       }
 
       setStage(nextStage);
+      window.scrollTo(0, 0);
     }
   }, [stage, autoAssigned, selectedColorScheme, surfaceStyle]);
 
@@ -101,6 +102,7 @@ function MainApp() {
     const currentIndex = STAGE_ORDER.indexOf(stage);
     if (currentIndex > 0) {
       setStage(STAGE_ORDER[currentIndex - 1]);
+      window.scrollTo(0, 0);
     }
   }, [stage]);
 
@@ -285,6 +287,7 @@ function MainApp() {
   // Post-process to add !important so it overrides DynoDesignProvider's theme
   const brandCSS = useMemo(() => {
     if (!applyBrand || !selectedColorScheme) return '';
+    console.log('🎨 [brandCSS] Regenerating. Background:', userSelections.background, 'AppBar:', userSelections.appBar, 'NavBar:', userSelections.navBar);
     try {
       const css = buildPreviewCSS({
         colorScheme: selectedColorScheme,
@@ -321,9 +324,11 @@ function MainApp() {
     '--Button-Height': `${buttonHeight}px`,
     '--Small-Button-Height': `${smallButtonHeight}px`,
     '--Large-Button-Height': `${largeButtonHeight}px`,
-    '--Min-Button-Width': `${minButtonWidth}px`,
+    '--Button-Min-Width': `${minButtonWidth}px`,
     '--Card-Radius': `${cardRadius}px`,
+    '--Card-Padding': `${cardRadius >= 16 ? 20 : 16}px`,
     ...(applyBrand && headerFont ? {
+      '--Header-Font-Family': `'${headerFont.family}', serif`,
       '--Font-Family-Header': `'${headerFont.family}', serif`,
       '--Set-Font-Family-Header': `'${headerFont.family}', serif`,
       '--Set-Font-Family-Header-Weight': headerFont.weight,
@@ -359,7 +364,11 @@ function MainApp() {
           --Header: #1a1a1a;
           --Quiet: #6b6b6b;
           --Border: #d4d4d4;
-          --Border-Variant: #d4d4d466;
+          --Border-Variant: #d4d4d426;
+          --Card-Padding: 16px;
+          --Checkbox-Radius: 4px;
+          --Shadow-1: none;
+          --Shadow-2: none;
           --Dropshadow-Color: 120, 120, 120;
         }
         [data-theme="Default"] [data-surface^="Container"],

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack, Card, IconBadge, Icon,
@@ -39,6 +39,7 @@ export default function ExportStage({
   // Generate on mount if no ID yet
   useEffect(() => {
     if (dinoId || isGenerating || !colorScheme) return;
+    let mounted = true;
 
     setIsGenerating(true);
     setGenError(null);
@@ -55,14 +56,18 @@ export default function ExportStage({
       styleCustomizations,
     })
       .then(id => {
+        if (!mounted) return;
         onDinoIdGenerated(id);
         setIsGenerating(false);
       })
       .catch(err => {
+        if (!mounted) return;
         console.error('Generation failed:', err);
         setGenError(err.message);
         setIsGenerating(false);
       });
+
+    return () => { mounted = false; };
   }, []);
 
   const uniqueId = dinoId || 'generating...';
@@ -72,11 +77,17 @@ export default function ExportStage({
   const claudeMdUrl = `${window.location.origin}/api/tokens/${dinoId || ''}/md`;
   const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${dinoId || ''}`;
   const hasId = !!dinoId;
+  const copyTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  useEffect(() => {
+    return () => { copyTimers.current.forEach(clearTimeout); };
+  }, []);
 
   const handleCopy = (text: string, setter: (v: boolean) => void) => {
     navigator.clipboard.writeText(text);
     setter(true);
-    setTimeout(() => setter(false), 2000);
+    const id = setTimeout(() => { setter(false); copyTimers.current.delete(id); }, 2000);
+    copyTimers.current.add(id);
   };
 
   if (isGenerating) {
@@ -100,7 +111,7 @@ export default function ExportStage({
           <BodySmall style={{ color: 'var(--Quiet)' }}>
             Make sure the Supabase storage bucket &quot;design-systems&quot; exists and allows public uploads.
           </BodySmall>
-          <Button variant="outline" color="default" onClick={onBack}>Back</Button>
+          <Button variant="primary-outline" onClick={onBack}>Back</Button>
         </VStack>
       </div>
     );
@@ -123,7 +134,7 @@ export default function ExportStage({
           ))}
           <div style={{ flex: 1 }} />
           <code className="export-id-code" data-surface="Container" style={{ maxWidth: 280 }}>{uniqueId}</code>
-          <Button variant="outline" color="default" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
+          <Button variant="primary-outline" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
             {copiedId ? 'Copied' : 'Copy'}
           </Button>
         </HStack>
@@ -139,7 +150,7 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 View your complete design system with all 49 components rendered with your brand tokens. Share the playground link with your team.
               </BodySmall>
-              <Button variant="solid" color="default" style={{ width: '100%' }} disabled={!hasId} onClick={() => window.open(playgroundUrl, '_blank')}>
+              <Button variant="primary" style={{ width: '100%' }} disabled={!hasId} onClick={() => window.open(playgroundUrl, '_blank')}>
                 Open Playground
               </Button>
             </VStack>
@@ -160,7 +171,7 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Get a full Figma design system with your brand tokens applied to every component, style, and variable.
               </BodySmall>
-              <Button variant="solid" color="default" style={{ width: '100%' }} disabled>
+              <Button variant="primary" style={{ width: '100%' }} disabled>
                 Open Figma Template (Coming Soon)
               </Button>
             </VStack>
@@ -180,7 +191,7 @@ export default function ExportStage({
                 <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
                 <div className="export-code-block">
                   <code>{installCmd}</code>
-                  <Button variant="outline" color="default" size="small" onClick={() => handleCopy(installCmd, setCopiedInstall)} style={{ flexShrink: 0 }}>
+                  <Button variant="primary-outline" size="small" onClick={() => handleCopy(installCmd, setCopiedInstall)} style={{ flexShrink: 0 }}>
                     {copiedInstall ? 'Copied' : 'Copy'}
                   </Button>
                 </div>
@@ -199,7 +210,7 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Browse interactive component documentation with usage examples, prop tables, and live previews for all 49 components.
               </BodySmall>
-              <Button variant="solid" color="default" style={{ width: '100%' }} onClick={() => window.open(storybookUrl, '_blank')}>
+              <Button variant="primary" style={{ width: '100%' }} onClick={() => window.open(storybookUrl, '_blank')}>
                 Open Storybook
               </Button>
             </VStack>
@@ -219,7 +230,7 @@ export default function ExportStage({
                 <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
                 <div className="export-code-block">
                   <code>{claudeMdUrl}</code>
-                  <Button variant="outline" color="default" size="small" onClick={() => handleCopy(claudeMdUrl, setCopiedClaude)} style={{ flexShrink: 0 }}>
+                  <Button variant="primary-outline" size="small" onClick={() => handleCopy(claudeMdUrl, setCopiedClaude)} style={{ flexShrink: 0 }}>
                     {copiedClaude ? 'Copied' : 'Copy'}
                   </Button>
                 </div>
@@ -236,7 +247,7 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
               </BodySmall>
-              <Button variant="solid" color="default" style={{ width: '100%' }} disabled>
+              <Button variant="primary" style={{ width: '100%' }} disabled>
                 Download Report (Coming Soon)
               </Button>
             </VStack>
@@ -249,8 +260,7 @@ export default function ExportStage({
             <VStack spacing={2}>
               <BodySmall style={{ fontWeight: 600 }}>Download All Files</BodySmall>
               <Button
-                variant="solid"
-                color="default"
+                variant="primary"
                 style={{ width: '100%' }}
                 onClick={async () => {
                   const zip = new JSZip();

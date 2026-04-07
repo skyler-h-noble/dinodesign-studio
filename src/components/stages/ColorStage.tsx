@@ -1,5 +1,5 @@
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card,
+  Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card,
   CircularProgress, Checkbox, Link, Radio, Modal, TextField, Alert, Slider,
 } from '@dynodesign/components';
 import StarIcon from '@mui/icons-material/Star';
@@ -59,6 +59,9 @@ export default function ColorStage({
   const [error, setError] = useState<string | null>(null);
   // Hex editor modal
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => { if (clickTimer.current) clearTimeout(clickTimer.current); };
+  }, []);
   // Track which top colors are locked (index → exact hex)
   const [lockedColorMap, setLockedColorMap] = useState<Record<number, string>>({});
   const [hexEditIndex, setHexEditIndex] = useState<number | null>(null);
@@ -237,7 +240,7 @@ export default function ColorStage({
       <VStack spacing={4} alignItems="center" style={{ padding: '80px 24px' }}>
         <H2 style={{ textAlign: 'center' }}>Color Extraction</H2>
         <Body style={{ color: 'var(--Buttons-Error-Button)' }}>{error || 'No data'}</Body>
-        <Button variant="outline" color="default" onClick={onBack}>Back</Button>
+        <Button variant="primary-outline" onClick={onBack}>Back</Button>
       </VStack>
     );
   }
@@ -441,7 +444,7 @@ export default function ColorStage({
                             backgroundColor: validation.suggested, border: '1px solid var(--Border)', flexShrink: 0,
                           }} />
                           <BodySmall style={{ color: 'var(--Quiet)' }}>Suggested: {validation.suggested}</BodySmall>
-                          <Button size="small" variant="outline" onClick={() => setHexEditValue(validation.suggested!)}>
+                          <Button size="small" variant="primary-outline" onClick={() => setHexEditValue(validation.suggested!)}>
                             Use
                           </Button>
                         </HStack>
@@ -461,7 +464,7 @@ export default function ColorStage({
 
             {/* Actions */}
             <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-              <Button variant="outline" size="small" onClick={() => setHexEditIndex(null)}>Cancel</Button>
+              <Button variant="primary-outline" size="small" onClick={() => setHexEditIndex(null)}>Cancel</Button>
               <Button variant="primary" size="small" onClick={applyHexEdit}>
                 {hexEditSource === 'top' ? 'Apply' : 'Close'}
               </Button>
@@ -544,24 +547,22 @@ export default function ColorStage({
           {/* Expanded: per-color tones + chroma */}
           {showChromaSettings && (
             <VStack spacing={3}>
-              <HStack spacing={2}>
+              <ButtonGroup size="small" variant="primary-outline">
                 <Button
-                  variant={toneMode === 'light' ? 'default' : 'outline'}
-                  color="default"
+                  variant={toneMode === 'light' ? 'primary' : 'primary-outline'}
                   size="small"
                   onClick={() => setToneMode('light')}
                 >
                   Light Mode
                 </Button>
                 <Button
-                  variant={toneMode === 'dark' ? 'default' : 'outline'}
-                  color="default"
+                  variant={toneMode === 'dark' ? 'primary' : 'primary-outline'}
                   size="small"
                   onClick={() => setToneMode('dark')}
                 >
                   Dark Mode
                 </Button>
-              </HStack>
+              </ButtonGroup>
 
               <BodySmall style={{ fontSize: '0.75rem' }}>
                 <strong>Click any tone</strong> to update which tone represents each color.
@@ -696,7 +697,7 @@ export default function ColorStage({
                           </BodySmall>
                         </HStack>
                         <Button
-                          variant="outline"
+                          variant="primary-outline"
                           color="default"
                           size="small"
                           onClick={() => {

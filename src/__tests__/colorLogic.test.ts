@@ -67,10 +67,10 @@ describe('OB calculation', () => {
 // ─── SC/TC calculation ───
 
 describe('SC/TC calculation', () => {
-  // Rule: if raw SC/TC = 11, adjust to PC >= 9 ? 9 : 8
+  // Rule: if raw SC/TC = 11 or <= 5, adjust to PC >= 9 ? 9 : 8
   function calculateSCTC(rawTone: number | undefined, PC: number): number {
     const raw = rawTone ? toneToColorNumber(rawTone) : 11;
-    return raw === 11 ? (PC >= 9 ? 9 : 8) : raw;
+    return (raw === 11 || raw <= 5) ? (PC >= 9 ? 9 : 8) : raw;
   }
 
   it('secondary tone 90 with PC=9 → SC=9 (not adjusted)', () => {
@@ -96,6 +96,22 @@ describe('SC/TC calculation', () => {
 
   it('undefined secondary with PC=7 → SC=8 (default 11 → adjusted)', () => {
     expect(calculateSCTC(undefined, 7)).toBe(8);
+  });
+
+  it('very dark secondary tone 5 (→ Color-1) with PC=9 → SC=9 (too dark, adjusted)', () => {
+    expect(calculateSCTC(5, 9)).toBe(9);
+  });
+
+  it('secondary tone 28 (→ Color-4) with PC=9 → SC=9 (too dark, adjusted)', () => {
+    expect(calculateSCTC(28, 9)).toBe(9);
+  });
+
+  it('secondary tone 37 (→ Color-5) with PC=9 → SC=9 (too dark, adjusted)', () => {
+    expect(calculateSCTC(37, 9)).toBe(9);
+  });
+
+  it('secondary tone 58 (→ Color-6) with PC=9 → SC=6 (kept, not too dark)', () => {
+    expect(calculateSCTC(58, 9)).toBe(6);
   });
 });
 

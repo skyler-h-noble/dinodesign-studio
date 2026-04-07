@@ -507,8 +507,7 @@ export function applyUserSelections(
 export function getSelectionName(theme: string, n: number): string {
   if (theme === 'Neutral' && n === 12) return 'White';
   if (theme === 'Neutral' && n === 1) return 'Black';
-  if (theme === 'Primary' && n === 11) return 'Primary-Light';
-  if (theme === 'Primary' && n === 6) return 'Primary-Medium';
-  if (theme === 'Primary' && n === 3) return 'Primary-Dark';
-  return 'Primary'; // Default to Primary if it's the primary color tone
+  if (theme === 'Neutral') return 'White'; // Other Neutral tones default to White
+  if (n === 11) return `${theme}-Light`;
+  return theme; // Primary, Secondary, Tertiary at their extracted tone
 }

@@ -64,7 +64,7 @@ export function CreationBottomBar({ onNext, nextLabel = 'Continue', disabled, th
       }}
     >
       <Button
-        variant="default"
+        variant="primary"
         size="medium"
         onClick={onNext}
         disabled={disabled}

@@ -156,14 +156,14 @@ export default function ColorAssignmentStage({
         {/* ─── Left: Preview ─── */}
         <div className={`assign-colors-preview ${activeTab !== 'preview' ? 'hidden' : ''}`}>
           <div className="assign-preview-toggle">
-            <ButtonGroup size="small" variant="outline">
+            <ButtonGroup size="small" variant="primary-outline">
               <Button
-                variant={previewMode === 'light' ? 'default' : 'outline'}
+                variant={previewMode === 'light' ? 'primary' : 'primary-outline'}
                 size="small"
                 onClick={() => setPreviewMode('light')}
               >Light</Button>
               <Button
-                variant={previewMode === 'dark' ? 'default' : 'outline'}
+                variant={previewMode === 'dark' ? 'primary' : 'primary-outline'}
                 size="small"
                 onClick={() => setPreviewMode('dark')}
               >Dark</Button>
@@ -272,7 +272,11 @@ export default function ColorAssignmentStage({
                 key={opt.value}
                 variant={userSelections.background === opt.value ? 'default' : 'outline'}
                 size="small"
-                onClick={() => update({ background: opt.value })}
+                onClick={() => {
+                  const bgTheme = (opt.value === 'white' || opt.value === 'black') ? 'Neutral' as const : 'Primary' as const;
+                  const bgN = opt.value === 'white' ? 12 : opt.value === 'black' ? 1 : opt.value === 'primary-light' ? 11 : PC;
+                  update({ background: opt.value, backgroundTheme: bgTheme, backgroundN: bgN });
+                }}
                 style={{ flex: 1 }}
               >
                 {opt.label}
@@ -379,7 +383,7 @@ export default function ColorAssignmentStage({
               Buttons are pure black on light backgrounds and pure white on dark backgrounds. In dark mode, this automatically switches to Laddered to preserve usability.
             </BodySmall>
           </VStack>
-          <Button variant="outline" color="default" size="small" onClick={() => setShowButtonInfo(false)} style={{ alignSelf: 'flex-end' }}>
+          <Button variant="primary-outline" size="small" onClick={() => setShowButtonInfo(false)} style={{ alignSelf: 'flex-end' }}>
             Close
           </Button>
         </VStack>

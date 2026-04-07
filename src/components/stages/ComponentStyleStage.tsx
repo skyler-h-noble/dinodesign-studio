@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider, Accordion,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
+  Accordion, AccordionSummary, AccordionDetails,
 } from '@dynodesign/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
@@ -117,7 +118,7 @@ export default function ComponentStyleStage({
                 key={styleKey}
                 variant={isSelected ? 'solid' : 'outline'}
                 color="default"
-                size="medium"
+                size="small"
                 onClick={() => {
                   setSelected(styleKey);
                   setCustomizations(prev => ({
@@ -136,29 +137,44 @@ export default function ComponentStyleStage({
         <div className="comp-style-layout">
           {/* Left column — Controls */}
           <div className="comp-style-controls">
-            <Accordion title="Button" defaultExpanded>
-              <VStack spacing={2} style={{ width: '100%' }}>
-                <Slider label="Desktop Button Height" min={28} max={48} value={custom.buttonHeight} onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
-                <Slider label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                <Slider label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                <Slider label="Border Radius" min={0} max={64} value={custom.buttonRadius} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
-                <Slider label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
-                <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
-                <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
-              </VStack>
+            <Accordion defaultExpanded>
+              <AccordionSummary>
+                <H3 style={{ fontSize: '1rem', margin: 0 }}>Button</H3>
+              </AccordionSummary>
+              <AccordionDetails>
+                <VStack spacing={2} style={{ width: '100%' }}>
+                  <Slider label="Desktop Button Height" min={28} max={48} value={custom.buttonHeight} onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
+                  <Slider label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Border Radius" min={0} max={64} value={custom.buttonRadius} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
+                </VStack>
+              </AccordionDetails>
             </Accordion>
 
-            <Accordion title="Icon Button">
-              <VStack spacing={2} style={{ width: '100%' }}>
-                <Slider label="Border Radius" min={0} max={64} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
-              </VStack>
+            <Accordion>
+              <AccordionSummary>
+                <H3 style={{ fontSize: '1rem', margin: 0 }}>Icon Button</H3>
+              </AccordionSummary>
+              <AccordionDetails>
+                <VStack spacing={2} style={{ width: '100%' }}>
+                  <Slider label="Border Radius" min={0} max={64} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                </VStack>
+              </AccordionDetails>
             </Accordion>
 
-            <Accordion title="Card">
-              <VStack spacing={2} style={{ width: '100%' }}>
-                <Slider label="Border Radius" min={0} max={32} value={custom.radius} onChange={(_: any, v: number | number[]) => updateCustom('radius', v as number)} size="small" valueLabelDisplay="auto" />
-              </VStack>
+            <Accordion>
+              <AccordionSummary>
+                <H3 style={{ fontSize: '1rem', margin: 0 }}>Card</H3>
+              </AccordionSummary>
+              <AccordionDetails>
+                <VStack spacing={2} style={{ width: '100%' }}>
+                  <Slider label="Border Radius" min={0} max={32} value={custom.radius} onChange={(_: any, v: number | number[]) => updateCustom('radius', v as number)} size="small" valueLabelDisplay="auto" />
+                </VStack>
+              </AccordionDetails>
             </Accordion>
           </div>
 
@@ -186,11 +202,11 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Style</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
-                      <Button variant="solid" color="default" size="medium"
+                      <Button variant="primary" size="medium"
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Solid
                       </Button>
-                      <Button variant="outline" size="medium"
+                      <Button variant="primary-outline" size="medium"
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Outline
                       </Button>
@@ -205,15 +221,15 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Size</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Button variant="solid" color="default" size="small"
+                      <Button variant="primary" size="small"
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Small
                       </Button>
-                      <Button variant="solid" color="default" size="medium"
+                      <Button variant="primary" size="medium"
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Medium
                       </Button>
-                      <Button variant="solid" color="default" size="large"
+                      <Button variant="primary" size="large"
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Large
                       </Button>
@@ -224,11 +240,11 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Icon Buttons</Label>
                     <HStack spacing={2}>
-                      <Button variant="solid" color="default" size="medium" iconOnly
+                      <Button variant="primary" size="medium" iconOnly
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>
-                      <Button variant="outline" size="medium" iconOnly
+                      <Button variant="primary-outline" size="medium" iconOnly
                         style={{ height: custom.buttonHeight, width: custom.buttonHeight, borderRadius: custom.iconButtonRadius }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
