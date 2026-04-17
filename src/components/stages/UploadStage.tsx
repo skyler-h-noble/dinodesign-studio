@@ -63,6 +63,11 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
         <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
           Upload an image to extract colors and styles
         </Body>
+        {!preview && (
+          <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center', fontStyle: 'italic' }}>
+            An image is required to continue.
+          </BodySmall>
+        )}
       </VStack>
 
       <div

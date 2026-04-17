@@ -1,6 +1,12 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { DynoDesignProvider } from '@dynodesign/components';
+import { useAuth } from './contexts/AuthContext';
+import AuthModal from './components/AuthModal';
+import PricingPage, { type PurchaseSelection } from './components/PricingPage';
+import CheckoutSuccess from './components/CheckoutSuccess';
+import { redirectToCheckout } from './utils/stripe/checkout';
+import { db } from './utils/firebase/client';
 import type { Stage, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from './types';
 import { STAGE_ORDER } from './types';
 import {
@@ -28,8 +34,14 @@ import ExportStage from './components/stages/ExportStage';
 import Playground from './components/Playground';
 import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
 import ToneTuner from './components/ToneTuner';
+import AccountPage from './components/AccountPage';
+import LandingPage from './components/LandingPage';
 
 function MainApp() {
+  const { user } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+
   const [stage, setStage] = useState<Stage>('welcome');
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
@@ -63,6 +75,20 @@ function MainApp() {
   });
 
   const goNext = useCallback(() => {
+    // Block leaving the upload stage without a mood board
+    if (stage === 'upload' && !moodBoardUrl) {
+      return;
+    }
+    // Gate: require auth before entering the export stage, then show pricing
+    if (stage === 'review') {
+      if (!user) {
+        setShowAuthModal(true);
+        return;
+      }
+      // User is logged in — show pricing page
+      setShowPricingModal(true);
+      return;
+    }
     if (customNextRef.current) {
       customNextRef.current();
       return;
@@ -88,7 +114,7 @@ function MainApp() {
       setStage(nextStage);
       window.scrollTo(0, 0);
     }
-  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle]);
+  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle, moodBoardUrl, user]);
 
   const customBackRef = useRef<(() => void) | null>(null);
   const customNextRef = useRef<(() => void) | null>(null);
@@ -276,6 +302,12 @@ function MainApp() {
   // Bottom bar label
   const nextLabel = customNextLabel || (stage === 'review' ? 'Get Your Design System' : 'Continue');
 
+  // Bottom bar disabled state — block stage progression when prerequisites aren't met
+  const canProceed = (() => {
+    if (stage === 'upload') return !!moodBoardUrl;
+    return true;
+  })();
+
   // Component style radii — from saved customizations or defaults
   const cardRadius = savedStyleCustomizations?.[componentStyle]?.radius ?? { professional: 4, modern: 8, bold: 16, playful: 24 }[componentStyle];
   const buttonRadius = savedStyleCustomizations?.[componentStyle]?.buttonRadius ?? { professional: 2, modern: 4, bold: 8, playful: 64 }[componentStyle];
@@ -332,7 +364,10 @@ function MainApp() {
       '--Font-Family-Header': `'${headerFont.family}', serif`,
       '--Set-Font-Family-Header': `'${headerFont.family}', serif`,
       '--Set-Font-Family-Header-Weight': headerFont.weight,
-      '--Set-Font-Family-Header-Letter-Spacing': headerFont.letterSpacing || '0em',
+      '--Set-Header-Letter-Spacing': headerFont.letterSpacing || '0em',
+      '--Set-Header-Text-Transform': headerFont.allCaps ? 'uppercase' : 'none',
+      '--Header-Text-Transform': headerFont.allCaps ? 'uppercase' : 'none',
+      '--Header-Letter-Spacing': headerFont.letterSpacing || '0em',
     } : {}),
     ...(applyBrand && decorativeFont ? {
       '--Set-Font-Family-Decorative': `'${decorativeFont.family}', sans-serif`,
@@ -401,12 +436,56 @@ function MainApp() {
         {showTopBar && (
           <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
         )}
-        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: showBottomBar ? 72 : 0, overflowX: 'hidden', background: 'var(--Background)' }}>
-          {renderStage()}
+        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 72 : 0, overflowX: 'hidden', background: 'var(--Background)' }}>
+          {showPricingModal ? (
+            <PricingPage
+              onCheckout={async (selection: PurchaseSelection) => {
+                if (!user) return;
+                try {
+                  const result = await redirectToCheckout({
+                    tierKey: selection.tier.key,
+                    addOns: {
+                      playground: selection.addOns.playground,
+                      storybook: selection.addOns.storybook,
+                      designerPortal: selection.addOns.designerPortal,
+                    },
+                    userId: user.uid,
+                    successUrl: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+                    cancelUrl: window.location.href,
+                  });
+                  // Dev mode: payment handled inline, advance to export
+                  if (result === 'dev_complete') {
+                    setShowPricingModal(false);
+                    const currentIndex = STAGE_ORDER.indexOf(stage);
+                    if (currentIndex < STAGE_ORDER.length - 1) {
+                      setStage(STAGE_ORDER[currentIndex + 1]);
+                      window.scrollTo(0, 0);
+                    }
+                  }
+                  // Production: redirected to Stripe (won't reach here)
+                } catch (err) {
+                  console.error('Checkout failed:', err);
+                }
+              }}
+            />
+          ) : (
+            renderStage()
+          )}
         </main>
-        {showBottomBar && !isFirstStage && (
-          <CreationBottomBar onNext={goNext} nextLabel={nextLabel} themed={applyBrand} />
+        {showBottomBar && !isFirstStage && !showPricingModal && (
+          <CreationBottomBar onNext={goNext} nextLabel={nextLabel} themed={applyBrand} disabled={!canProceed} />
         )}
+
+        <AuthModal
+          open={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => {
+            setShowAuthModal(false);
+            // User just authenticated — show pricing
+            setShowPricingModal(true);
+          }}
+        />
+
       </div>
     </DynoDesignProvider>
   );
@@ -416,11 +495,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainApp />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/create" element={<MainApp />} />
         <Route path="/playground" element={<Playground />} />
         <Route path="/api/tokens/:uuid" element={<ApiTokensJson />} />
         <Route path="/api/tokens/:uuid/md" element={<ApiTokensMd />} />
         <Route path="/tune" element={<ToneTuner />} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/checkout/success" element={<CheckoutSuccess />} />
       </Routes>
     </BrowserRouter>
   );

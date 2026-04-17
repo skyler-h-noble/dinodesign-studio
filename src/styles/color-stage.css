@@ -1,0 +1,40 @@
+/* ColorStage — Theme step layout */
+
+.color-theme-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 40px 24px;
+  margin: 0 auto;
+  max-width: 500px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Wide screens: page is wider, core-colors card stays narrow */
+@media (min-width: 900px) {
+  .color-theme-stage {
+    max-width: 1100px;
+  }
+  .color-theme-core-card {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+}
+
+/* Scheme grid: flex row with wrap. Each card has a min width so they wrap
+   when the container can't fit them side-by-side. */
+.color-theme-scheme-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.color-theme-scheme-grid > * {
+  flex: 1 1 280px;
+  min-width: 280px;
+  max-width: 100%;
+}

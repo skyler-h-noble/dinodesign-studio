@@ -108,7 +108,7 @@ TEST_COLORS.forEach(({ name, hex }) => {
     // ── Button contrast tests ──
     // Buttons use the extracted tone color as background
     const PC = toneToColorNumber(getLightness(hex));
-    const OB = PC >= 9 ? 9 : 8;
+    const OB = PC >= 9 ? 6 : 5;
 
     describe('Button contrast', () => {
       const btnBg = p(PC);

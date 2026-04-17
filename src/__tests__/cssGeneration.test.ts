@@ -118,8 +118,8 @@ describe('Theme surface Color-N assignments', () => {
 
   it('Semantic themes (Info/Success/Warning/Error) use OB', () => {
     const PC = 9;
-    const OB = PC >= 9 ? 9 : 8;
+    const OB = PC >= 9 ? 6 : 5;
     // Semantic theme N should equal OB
-    expect(OB).toBe(9);
+    expect(OB).toBe(6);
   });
 });

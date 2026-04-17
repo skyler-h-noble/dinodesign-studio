@@ -4032,8 +4032,8 @@ export function generateBaseCSS(jsonData: any): string {
     TC = primaryTone >= 9 ? 9 : 8;
   }
   
-  // OB (Other Buttons): If Primary ≥ 9, use 9. If Primary ≤ 8, use 8.
-  const OB = primaryTone >= 9 ? 9 : 8;
+  // OB (Other Buttons): If Primary ≥ 9, use 6. Else use 5.
+  const OB = primaryTone >= 9 ? 6 : 5;
   
   console.log(`📊 Root Button Colors - SC: ${SC}, TC: ${TC}, OB: ${OB} (Primary: ${primaryTone})`);
   console.log(`📊 Root Backgrounds - Primary: tone ${primaryToneValue} → Color-${primaryTone}, Secondary: tone ${secondaryToneValue} → Color-${secondaryTone}, Tertiary: tone ${tertiaryToneValue} → Color-${tertiaryTone}`);

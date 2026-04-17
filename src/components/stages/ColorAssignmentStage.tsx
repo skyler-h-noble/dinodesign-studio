@@ -156,14 +156,14 @@ export default function ColorAssignmentStage({
         {/* ─── Left: Preview ─── */}
         <div className={`assign-colors-preview ${activeTab !== 'preview' ? 'hidden' : ''}`}>
           <div className="assign-preview-toggle">
-            <ButtonGroup size="small" variant="primary-outline">
+            <ButtonGroup size="small">
               <Button
-                variant={previewMode === 'light' ? 'primary' : 'primary-outline'}
+                variant={previewMode === 'light' ? 'default' : 'outline'}
                 size="small"
                 onClick={() => setPreviewMode('light')}
               >Light</Button>
               <Button
-                variant={previewMode === 'dark' ? 'primary' : 'primary-outline'}
+                variant={previewMode === 'dark' ? 'default' : 'outline'}
                 size="small"
                 onClick={() => setPreviewMode('dark')}
               >Dark</Button>
@@ -222,7 +222,7 @@ export default function ColorAssignmentStage({
               >
                 <HStack spacing={1} alignItems="center">
                   <BodySmall style={{ color: 'var(--Quiet)', cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
-                  <Button swatch swatchColor={colors[i] || '#ccc'} size="medium" />
+                  <Button swatch size="medium" sx={{ backgroundColor: colors[i] || '#ccc', '&:hover': { backgroundColor: colors[i] || '#ccc' } }} />
                   <BodySmall style={{ fontWeight: 600 }}>{label}</BodySmall>
                 </HStack>
               </Card>

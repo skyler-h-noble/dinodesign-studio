@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { DynoDesignProvider, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Button, TextField, Alert, Badge, Divider } from '@dynodesign/components';
-import { SUPABASE_STORAGE_BASE } from '../utils/generateDesignSystem';
+import { getPublicFileUrl } from '../utils/firebase/storage';
 
 export default function Playground() {
   const [searchParams] = useSearchParams();
@@ -17,7 +17,7 @@ export default function Playground() {
     }
     let mounted = true;
 
-    fetch(`${SUPABASE_STORAGE_BASE}/${uuid}/tokens-base.css`, { method: 'HEAD' })
+    fetch(getPublicFileUrl(uuid, 'tokens-base.css'), { method: 'HEAD' })
       .then(res => {
         if (mounted) { setExists(res.ok); setLoading(false); }
       })
@@ -48,11 +48,11 @@ export default function Playground() {
   }
 
   const cssUrls = [
-    `${SUPABASE_STORAGE_BASE}/${uuid}/tokens-base.css`,
-    `${SUPABASE_STORAGE_BASE}/${uuid}/tokens-semantic.css`,
-    `${SUPABASE_STORAGE_BASE}/${uuid}/tokens-component.css`,
-    `${SUPABASE_STORAGE_BASE}/${uuid}/tokens-light.css`,
-    `${SUPABASE_STORAGE_BASE}/${uuid}/tokens-dark.css`,
+    getPublicFileUrl(uuid, 'tokens-base.css'),
+    getPublicFileUrl(uuid, 'tokens-semantic.css'),
+    getPublicFileUrl(uuid, 'tokens-component.css'),
+    getPublicFileUrl(uuid, 'tokens-light.css'),
+    getPublicFileUrl(uuid, 'tokens-dark.css'),
   ];
 
   return (

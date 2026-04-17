@@ -1,4 +1,5 @@
-import { supabase } from './supabase/client';
+import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from './firebase/storage';
+import { STORAGE_BUCKET } from './firebase/client';
 import type { ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../types';
 import { toneToColorNumber } from './colorScale';
 import { generateFullLightPalettes, generateFullDarkPalettes } from './generateFullPalettes';
@@ -6,8 +7,13 @@ import { exportColorSystemToJSON } from './cssgen/exportColorSystem';
 import { generateCSSFiles, generateBaseCSS } from './cssgen/exportToCSS';
 import { generateFigmaJSON } from './generateFigmaJSON';
 
-const SUPABASE_STORAGE_BASE = `https://aqpmdqlhffjakkznxudv.supabase.co/storage/v1/object/public/design-system`;
-const BUCKET = 'design-system';
+/**
+ * Returns a public download URL for a file in a design system.
+ * Used by Playground / ApiTokens to load the user's exported tokens.
+ */
+export async function getStoredFileUrl(uuid: string, filename: string): Promise<string> {
+  return getDesignSystemFileUrl(uuid, filename);
+}
 
 const BORDER_RADII: Record<ComponentStyle, { small: number; medium: number; large: number }> = {
   professional: { small: 4, medium: 8, large: 12 },
@@ -105,12 +111,21 @@ Each brand color generates a 12-tone LCH palette (Color-1 = darkest, Color-12 = 
 \`\`\`jsx
 import { DynoDesignProvider } from '@dynodesign/components';
 
-const SUPABASE_BASE = '${SUPABASE_STORAGE_BASE}/${uuid}';
+// Firebase Storage URL pattern. Each file is at:
+// https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2F{filename}?alt=media
+const TOKEN_BASE = 'https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2F';
+const tokenUrl = (file) => TOKEN_BASE + encodeURIComponent(file) + '?alt=media';
 
 function App() {
   return (
     <DynoDesignProvider
-      themeURL={\`\${SUPABASE_BASE}\`}
+      cssUrls={[
+        tokenUrl('tokens-base.css'),
+        tokenUrl('tokens-semantic.css'),
+        tokenUrl('tokens-component.css'),
+        tokenUrl('tokens-light.css'),
+        tokenUrl('tokens-dark.css'),
+      ]}
       defaultTheme="Default"
       defaultStyle="${styleName}"
       defaultSurface="Surface"
@@ -592,7 +607,7 @@ Interactive elements follow a one-step pattern:
 
 ## CSS Files Reference
 
-Your design system includes these CSS files (all at \`${SUPABASE_STORAGE_BASE}/${uuid}/\`):
+Your design system includes these CSS files (all at \`https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2F{filename}?alt=media\`):
 
 | File | Contents |
 |------|----------|
@@ -757,14 +772,15 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     console.error('Base CSS generation failed:', err);
   }
 
-  // 4. Build theme.json
+  // 4. Build theme.json — store absolute Firebase Storage URLs so the Provider
+  // can fetch them directly (Firebase URLs are encoded and can't be path-joined).
   const themeJson = JSON.stringify({
-    foundation: 'foundation.css',
-    core: 'core.css',
-    lightMode: 'Light-Mode.css',
-    darkMode: 'Dark-Mode.css',
-    base: 'base.css',
-    styles: 'styles.css',
+    foundation: getPublicFileUrl(uuid, 'foundation.css'),
+    core:       getPublicFileUrl(uuid, 'core.css'),
+    lightMode:  getPublicFileUrl(uuid, 'Light-Mode.css'),
+    darkMode:   getPublicFileUrl(uuid, 'Dark-Mode.css'),
+    base:       getPublicFileUrl(uuid, 'base.css'),
+    styles:     getPublicFileUrl(uuid, 'styles.css'),
     defaultTheme: 'Default',
     defaultStyle: input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1),
     defaultSurface: 'Surface',
@@ -776,6 +792,11 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const decorativeFamily = decorative?.family || 'sans-serif';
   const bodyFamily = body?.family || 'sans-serif';
   const headerWeight = header?.weight || '700';
+  const headerAllCaps = header?.allCaps ? 'uppercase' : 'none';
+  const headerLetterSpacing = header?.letterSpacing || '0em';
+  const decorativeWeight = decorative?.weight || '600';
+  const decorativeAllCaps = decorative?.allCaps ? 'uppercase' : 'none';
+  const decorativeLetterSpacing = decorative?.letterSpacing || '0em';
   const bodyWeight = body?.weight || '400';
   // Get customizations from input, fallback to preset defaults
   const sc = input.styleCustomizations;
@@ -834,8 +855,12 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Header-Font-Family: var(--Set-Font-Family-Header);
   --Font-Family-Header: var(--Set-Font-Family-Header);
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
+  --Header-Text-Transform: var(--Set-Header-Text-Transform, none);
+  --Header-Letter-Spacing: var(--Set-Header-Letter-Spacing, 0em);
   --Decorative-Font-Family: var(--Set-Font-Family-Decorative);
   --Decorative-Font-Weight: var(--Set-Font-Family-Decorative-Weight);
+  --Decorative-Text-Transform: var(--Set-Decorative-Text-Transform, none);
+  --Decorative-Letter-Spacing: var(--Set-Decorative-Letter-Spacing, 0em);
   --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
@@ -913,7 +938,12 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Min-Button-Width: 80px;
   --Set-Font-Family-Header: '${headerFamily}', serif;
   --Set-Font-Family-Header-Weight: ${headerWeight};
+  --Set-Header-Text-Transform: ${headerAllCaps};
+  --Set-Header-Letter-Spacing: ${headerLetterSpacing};
   --Set-Font-Family-Decorative: '${decorativeFamily}', sans-serif;
+  --Set-Font-Family-Decorative-Weight: ${decorativeWeight};
+  --Set-Decorative-Text-Transform: ${decorativeAllCaps};
+  --Set-Decorative-Letter-Spacing: ${decorativeLetterSpacing};
   --Set-Font-Family-Body: '${bodyFamily}', sans-serif;
   --Set-Font-Family-Body-Weight: ${bodyWeight};
   --Set-Font-Family-Body-Semibold-Weight: 600;
@@ -1161,31 +1191,20 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
         const response = await fetch(input.moodBoardUrl!);
         blob = await response.blob();
       }
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(`${uuid}/moodboard.png`, blob, {
-          contentType: blob.type || 'image/png',
-          upsert: true,
-        });
-      if (error) console.error('Mood board upload failed:', error);
-      else console.log(`Mood board uploaded (${(blob.size / 1024).toFixed(0)}KB)`);
+      await uploadDesignSystemFile(uuid, 'moodboard.png', blob, blob.type || 'image/png');
+      console.log(`Mood board uploaded (${(blob.size / 1024).toFixed(0)}KB)`);
     } catch (e) {
       console.error('Mood board upload error:', e);
     }
   }
 
-  // 8. Upload all files to Supabase Storage
+  // 8. Upload all files to Firebase Storage
   for (const file of uploadFiles) {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(`${uuid}/${file.name}`, file.content, {
-        contentType: file.type,
-        upsert: true,
-      });
-
-    if (error) {
-      console.error(`Failed to upload ${file.name}:`, error);
-      throw new Error(`Upload failed for ${file.name}: ${error.message}`);
+    try {
+      await uploadDesignSystemFile(uuid, file.name, file.content, file.type);
+    } catch (err: any) {
+      console.error(`Failed to upload ${file.name}:`, err);
+      throw new Error(`Upload failed for ${file.name}: ${err?.message || String(err)}`);
     }
   }
 
@@ -1193,5 +1212,3 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   console.log(`Files: ${uploadFiles.map(f => f.name).join(', ')}`);
   return uuid;
 }
-
-export { SUPABASE_STORAGE_BASE };

@@ -461,56 +461,56 @@ function generateTagSection(mode: 'Light-Mode' | 'Dark-Mode', OB: number): any {
         BG: { value: `{Color-Palettes.Primary.Color-${OB}}`, type: 'color' },
         Text: {
           Primary: { value: `{Text.Surfaces.Primary.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Secondary: {
         BG: { value: `{Color-Palettes.Secondary.Color-${OB}}`, type: 'color' },
         Text: {
           Secondary: { value: `{Text.Surfaces.Secondary.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Tertiary: {
         BG: { value: `{Color-Palettes.Tertiary.Color-${OB}}`, type: 'color' },
         Text: {
           Tertiary: { value: `{Text.Surfaces.Tertiary.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Neutral: {
         BG: { value: `{Color-Palettes.Neutral.Color-${OB}}`, type: 'color' },
         Text: {
           Neutral: { value: `{Text.Surfaces.Neutral.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Info: {
         BG: { value: `{Color-Palettes.Info.Color-${OB}}`, type: 'color' },
         Text: {
           Info: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Success: {
         BG: { value: `{Color-Palettes.Success.Color-${OB}}`, type: 'color' },
         Text: {
           Success: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Warning: {
         BG: { value: `{Color-Palettes.Warning.Color-${OB}}`, type: 'color' },
         Text: {
           Warning: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       },
       Error: {
         BG: { value: `{Color-Palettes.Error.Color-${OB}}`, type: 'color' },
         Text: {
           Error: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
-          BW: { value: OB >= 9 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
+          BW: { value: OB >= 7 ? '{Color-Scale.Black}' : '{Color-Scale.White}', type: 'color' }
         }
       }
     }
@@ -689,9 +689,9 @@ export function generateCompleteSimplifiedSystem(
   // Get default settings
   const config = getSimplifiedDefaultSettings(extractedTones, surfaceStyle, schemeType, userSelections);
   
-  // Calculate OB - PC >= 9 then OB = 9, else OB = 8
+  // Calculate OB - PC >= 9 then OB = 6, else OB = 5
   const PC = toneToColorNumber(extractedTones.primary);
-  const OB = PC >= 9 ? 9 : 8;
+  const OB = PC >= 9 ? 6 : 5;
   
   // Generate all sections with COMPLETE THEMES (includes Surfaces and Containers)
   const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections);

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
-  Accordion, AccordionSummary, AccordionDetails,
+  Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
 } from '@dynodesign/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
 import '../../styles/component-style.css';
@@ -30,7 +31,7 @@ export interface StyleCustomizations {
 }
 
 const STYLE_DEFAULTS: Record<ComponentStyle, { label: string; description: string } & StyleCustomizations> = {
-  professional: { label: 'Professional', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2 },
+  professional: { label: 'Pro', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2 },
   modern: { label: 'Modern', description: 'Balanced curves, medium shadows', radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
   bold: { label: 'Bold', description: 'Strong elements, generous rounding', radius: 16, buttonRadius: 8, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 8 },
   playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', radius: 24, buttonRadius: 64, bevel: 10, bevelOpacity: 80, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 64 },
@@ -56,6 +57,8 @@ export default function ComponentStyleStage({
   userSelections, typographyStyles,
 }: Props) {
   const [selected, setSelected] = useState<ComponentStyle>(initialStyle || 'modern');
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ button: true });
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const [customizations, setCustomizations] = useState<Record<ComponentStyle, StyleCustomizations>>(() => {
     if (!savedCustomizations) return DEFAULT_CUSTOMIZATIONS;
     // Merge saved with defaults to fill any missing new fields
@@ -76,8 +79,6 @@ export default function ComponentStyleStage({
   }, [typographyStyles]);
 
   const custom = customizations[selected];
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ button: true, iconButton: true, card: true });
-  const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   const updateCustom = (field: keyof StyleCustomizations, value: number) => {
     setCustomizations(prev => ({
@@ -101,47 +102,51 @@ export default function ComponentStyleStage({
   const bevelStyle = bevelStyleFor(custom.buttonHeight);
 
   return (
-    <div className="comp-style-page">
-      <VStack spacing={4} style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <H2 style={{ textAlign: 'center' }}>Component Style</H2>
-        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
-          Choose a base style then fine-tune the details.
-        </Body>
+    <div className="comp-style-page" style={{ display: 'flex', minHeight: '100vh' }}>
 
-        {/* Style selector row */}
-        <HStack spacing={2} style={{ width: '100%', flexWrap: 'wrap' }}>
-          {STYLE_KEYS.map(styleKey => {
-            const style = STYLE_DEFAULTS[styleKey];
-            const isSelected = selected === styleKey;
-            return (
-              <Button
-                key={styleKey}
-                variant={isSelected ? 'solid' : 'outline'}
-                color="default"
-                size="small"
-                onClick={() => {
-                  setSelected(styleKey);
-                  setCustomizations(prev => ({
-                    ...prev,
-                    [styleKey]: DEFAULT_CUSTOMIZATIONS[styleKey],
-                  }));
-                }}
-              >
-                {style.label}
-              </Button>
-            );
-          })}
-        </HStack>
+      {/* ─── Left: persistent sidebar ─── */}
+      <div style={{
+        width: settingsOpen ? 280 : 0,
+        flexShrink: 0,
+        overflow: 'hidden',
+        transition: 'width 0.2s ease',
+        borderRight: settingsOpen ? '1px solid var(--Border)' : 'none',
+      }}>
+        <div style={{ width: 280, padding: '8px 16px', boxSizing: 'border-box' }}>
+          <VStack spacing={2}>
+            <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style</H3>
 
-        {/* Main layout: controls left, preview right */}
-        <div className="comp-style-layout">
-          {/* Left column — Controls */}
-          <div className="comp-style-controls">
-            <Accordion defaultExpanded>
-              <AccordionSummary>
-                <H3 style={{ fontSize: '1rem', margin: 0 }}>Button</H3>
-              </AccordionSummary>
-              <AccordionDetails>
+            {/* Presets */}
+            <VStack spacing={1}>
+              <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>Presets</BodySmall>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>Choose a base style then fine-tune the details.</BodySmall>
+              <ButtonGroup size="small">
+                {STYLE_KEYS.map(styleKey => {
+                  const style = STYLE_DEFAULTS[styleKey];
+                  const isSelected = selected === styleKey;
+                  return (
+                    <Button
+                      key={styleKey}
+                      variant={isSelected ? 'default' : 'outline'}
+                      size="small"
+                      onClick={() => {
+                        setSelected(styleKey);
+                        setCustomizations(prev => ({
+                          ...prev,
+                          [styleKey]: DEFAULT_CUSTOMIZATIONS[styleKey],
+                        }));
+                      }}
+                    >
+                      {style.label}
+                    </Button>
+                  );
+                })}
+              </ButtonGroup>
+            </VStack>
+
+            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)', marginTop: 24 }}>Components</BodySmall>
+            {[
+              { key: 'button', label: 'Button', defaultOpen: true, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
                   <Slider label="Desktop Button Height" min={28} max={48} value={custom.buttonHeight} onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                   <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
@@ -152,50 +157,69 @@ export default function ComponentStyleStage({
                   <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
-              </AccordionDetails>
-            </Accordion>
-
-            <Accordion>
-              <AccordionSummary>
-                <H3 style={{ fontSize: '1rem', margin: 0 }}>Icon Button</H3>
-              </AccordionSummary>
-              <AccordionDetails>
+              )},
+              { key: 'icon', label: 'Icon Button', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
                   <Slider label="Border Radius" min={0} max={64} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
-              </AccordionDetails>
-            </Accordion>
-
-            <Accordion>
-              <AccordionSummary>
-                <H3 style={{ fontSize: '1rem', margin: 0 }}>Card</H3>
-              </AccordionSummary>
-              <AccordionDetails>
+              )},
+              { key: 'card', label: 'Card', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
                   <Slider label="Border Radius" min={0} max={32} value={custom.radius} onChange={(_: any, v: number | number[]) => updateCustom('radius', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
-              </AccordionDetails>
-            </Accordion>
-          </div>
+              )},
+            ].map(section => {
+              const isOpen = openSections[section.key] ?? section.defaultOpen;
+              return (
+                <div key={section.key} style={{ borderBottom: '1px solid var(--Border)' }}>
+                  <div
+                    onClick={() => setOpenSections(prev => ({ ...prev, [section.key]: !isOpen }))}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', cursor: 'pointer' }}
+                  >
+                    <H3 style={{ fontSize: '0.9rem', margin: 0 }}>{section.label}</H3>
+                    {isOpen
+                      ? <ExpandMoreIcon style={{ color: 'var(--Quiet)', fontSize: 18 }} />
+                      : <ChevronRightIcon style={{ color: 'var(--Quiet)', fontSize: 18 }} />
+                    }
+                  </div>
+                  {isOpen && <div style={{ paddingBottom: 8 }}>{section.content}</div>}
+                </div>
+              );
+            })}
+          </VStack>
+        </div>
+      </div>
 
-          {/* Right column — Preview */}
-          <div className="comp-style-preview-area">
-            <div
+      {/* ─── Right: main content ─── */}
+      <div style={{ flex: 1, minWidth: 0, transition: 'margin 0.2s ease' }}>
+        <VStack spacing={4} style={{ maxWidth: 600, margin: '0 auto', padding: '40px 24px' }}>
+
+          {!settingsOpen && (
+            <HStack spacing={2} style={{ justifyContent: 'center' }}>
+              <Button variant="outline" size="small" onClick={() => setSettingsOpen(true)}>
+                Customize
+              </Button>
+            </HStack>
+          )}
+
+          {/* Preview */}
+          <div
+            style={{
+              '--Style-Border-Radius': `${custom.buttonRadius}px`,
+              '--Card-Radius': `${custom.radius}px`,
+              '--Icon-Button-Radius': `${custom.iconButtonRadius}px`,
+              '--Button-Height': `${custom.buttonHeight}px`,
+              '--Button-Min-Width': `${custom.minButtonWidth}px`,
+            } as React.CSSProperties}
+          >
+            <Card
+              padding="medium"
               style={{
-                '--Style-Border-Radius': `${custom.buttonRadius}px`,
-                '--Card-Radius': `${custom.radius}px`,
-                '--Icon-Button-Radius': `${custom.iconButtonRadius}px`,
-                '--Button-Height': `${custom.buttonHeight}px`,
-                '--Button-Min-Width': `${custom.minButtonWidth}px`,
-              } as React.CSSProperties}
-            >
-              <Card
-                padding="medium"
-                style={{
-                  borderRadius: custom.radius,
-                  maxWidth: 400,
-                  width: '100%',
-                }}
+                borderRadius: custom.radius,
+                maxWidth: 400,
+                width: '100%',
+                margin: '0 auto',
+              }}
               >
                 <VStack spacing={4}>
                   {/* Style: Solid, Outline, Ghost */}
@@ -258,10 +282,9 @@ export default function ComponentStyleStage({
                   </VStack>
                 </VStack>
               </Card>
-            </div>
           </div>
-        </div>
-      </VStack>
+        </VStack>
+      </div>
     </div>
   );
 }

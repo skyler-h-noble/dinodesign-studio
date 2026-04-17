@@ -10,8 +10,13 @@
 .export-cards-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 24px;
   width: 100%;
+}
+
+/* Ensure card children have visible vertical spacing */
+.export-cards-grid .MuiStack-root {
+  gap: 12px !important;
 }
 
 .export-card {

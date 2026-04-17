@@ -4,27 +4,36 @@ import {
   generateSemanticDarkModeScale,
   getLightness,
 } from './colorScale';
-import type { ColorScheme } from '../types';
+import type { ColorScheme, HueOverridesMap } from '../types';
 
 /**
  * Generate tone palettes for an array of 3 colors (primary, secondary, tertiary).
  */
-function generateTonePalettes(colors: string[], maxChroma: number = 64, lockedColors?: (string | undefined)[]) {
+function generateTonePalettes(
+  colors: string[],
+  maxChroma: number = 64,
+  lockedColors?: (string | undefined)[],
+  hueOverrides?: HueOverridesMap,
+) {
   return {
-    primary: generateSemanticLightModeScale(colors[0], maxChroma, lockedColors?.[0]),
-    secondary: generateSemanticLightModeScale(colors[1], maxChroma, lockedColors?.[1]),
-    tertiary: generateSemanticLightModeScale(colors[2], maxChroma, lockedColors?.[2]),
+    primary: generateSemanticLightModeScale(colors[0], maxChroma, lockedColors?.[0], hueOverrides?.[0]?.light),
+    secondary: generateSemanticLightModeScale(colors[1], maxChroma, lockedColors?.[1], hueOverrides?.[1]?.light),
+    tertiary: generateSemanticLightModeScale(colors[2], maxChroma, lockedColors?.[2], hueOverrides?.[2]?.light),
   };
 }
 
 /**
  * Generate dark mode tone palettes.
  */
-function generateDarkModeTonePalettes(colors: string[], maxChroma: number = 50) {
+function generateDarkModeTonePalettes(
+  colors: string[],
+  maxChroma: number = 50,
+  hueOverrides?: HueOverridesMap,
+) {
   return {
-    primary: generateSemanticDarkModeScale(colors[0], maxChroma),
-    secondary: generateSemanticDarkModeScale(colors[1], maxChroma),
-    tertiary: generateSemanticDarkModeScale(colors[2], maxChroma),
+    primary: generateSemanticDarkModeScale(colors[0], maxChroma, hueOverrides?.[0]?.dark),
+    secondary: generateSemanticDarkModeScale(colors[1], maxChroma, hueOverrides?.[1]?.dark),
+    tertiary: generateSemanticDarkModeScale(colors[2], maxChroma, hueOverrides?.[2]?.dark),
   };
 }
 
@@ -48,14 +57,16 @@ function buildScheme(
   lightMaxChroma: number = 62,
   darkMaxChroma: number = 36,
   lockedColors?: (string | undefined)[],
+  hueOverrides?: HueOverridesMap,
 ): ColorScheme {
   return {
     name,
     colors,
     originalColors: [...colors],
     extractedTones: calculateTones(colors),
-    tonePalettes: generateTonePalettes(colors, lightMaxChroma, lockedColors),
-    darkModeTonePalettes: generateDarkModeTonePalettes(colors, darkMaxChroma),
+    tonePalettes: generateTonePalettes(colors, lightMaxChroma, lockedColors, hueOverrides),
+    darkModeTonePalettes: generateDarkModeTonePalettes(colors, darkMaxChroma, hueOverrides),
+    hueOverrides,
   };
 }
 
@@ -105,6 +116,7 @@ export function generateColorSchemes(
   lightMaxChroma: number = 62,
   darkMaxChroma: number = 36,
   lockedColors?: (string | undefined)[],
+  hueOverrides?: HueOverridesMap,
 ): ColorScheme[] {
   const [c1, c2, c3] = topColors;
   const others = topColors.slice(1);
@@ -145,11 +157,11 @@ export function generateColorSchemes(
   const splitComplementary: [string, string, string] = [c1, split2, split3];
 
   return [
-    buildScheme('Analogous', analogous, lightMaxChroma, darkMaxChroma, lockedColors),
-    buildScheme('Monochromatic', monochromatic, lightMaxChroma, darkMaxChroma, lockedColors),
-    buildScheme('Complementary', complementary, lightMaxChroma, darkMaxChroma, lockedColors),
-    buildScheme('Triadic', triadic, lightMaxChroma, darkMaxChroma, lockedColors),
-    buildScheme('Split-Complementary', splitComplementary, lightMaxChroma, darkMaxChroma, lockedColors),
-    buildScheme('Custom', custom, lightMaxChroma, darkMaxChroma, lockedColors),
+    buildScheme('Analogous', analogous, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
+    buildScheme('Monochromatic', monochromatic, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
+    buildScheme('Complementary', complementary, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
+    buildScheme('Triadic', triadic, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
+    buildScheme('Split-Complementary', splitComplementary, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
+    buildScheme('Custom', custom, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
   ];
 }

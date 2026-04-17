@@ -112,7 +112,14 @@ export default function TypographyStage({
     bodySemiboldWeight: '600',
     bodyBoldWeight: '700',
   });
-  const [showSettings, setShowSettings] = useState(false);
+  // Per-role expanded state for the collapsible settings sections
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    header: true,
+    decorative: false,
+    body: false,
+  });
+  const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+  const [settingsOpen, setSettingsOpen] = useState(true);
 
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
 
@@ -242,6 +249,16 @@ export default function TypographyStage({
     }
   }, [step === 'review']);
 
+  // Auto-regenerate (debounced) when typography settings change after initial samples exist
+  useEffect(() => {
+    if (step !== 'samples' || fontSamples.length === 0) return;
+    const timer = setTimeout(() => {
+      handleGenerateOptions();
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editedTypography]);
+
   const handleEdit = (index: number, field: keyof TypographyStyle, value: string | boolean) => {
     const updated = [...editedTypography];
     updated[index] = { ...updated[index], [field]: value };
@@ -296,153 +313,136 @@ export default function TypographyStage({
 
   // ─── Review step (shown briefly before auto-advance) ───
   // ─── Samples step ───
-  return (
-    <div className="typo-page">
-      <VStack spacing={4} style={{ maxWidth: 900, margin: '0 auto' }}>
-        <H2 style={{ textAlign: 'center' }}>Typography Selection</H2>
-
-        {/* Color palette preview */}
-        <HStack spacing={1}>
-          {colors.slice(0, 3).map((c, i) => (
-            <div key={i} style={{ width: 32, height: 32, borderRadius: 6, background: c, border: '1px solid var(--Border)' }} />
-          ))}
-          <BodySmall style={{ color: 'var(--Quiet)', marginLeft: 8 }}>
-            {useMoodBased ? 'Mood-based detection (no text found)' : 'Text-based detection'}
-          </BodySmall>
-        </HStack>
-
-        {/* Collapsible typography settings */}
-        <Card padding="medium" style={{ width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
-          <VStack spacing={2}>
-            <H3 style={{ fontSize: '1rem' }}>Suggested Settings</H3>
-
-            {!showSettings && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, width: '100%' }}>
-                {/* Left column — font assignments */}
-                <VStack spacing={1} style={{ alignItems: 'flex-start' }}>
-                  <HStack spacing={2} style={{ alignItems: 'center' }}>
-                    <BodySmall style={{ fontWeight: 600 }}>Suggested Typography</BodySmall>
-                    <Button variant="primary-outline" size="small" onClick={() => setShowSettings(true)}>
-                      Edit
-                    </Button>
-                  </HStack>
-                  {editedTypography.map((t, i) => (
-                    <BodySmall key={i} style={{ color: 'var(--Quiet)' }}>
-                      <strong>{roleLabels[t.type] || t.type}:</strong> {t.family}
-                    </BodySmall>
-                  ))}
-                </VStack>
-
-                {/* Right column — decorative application mode */}
-                <VStack spacing={1} style={{ alignItems: 'flex-start' }}>
-                  <RadioGroup
-                    variant="default-outline"
-                    size="small"
-                    label="Apply Decorative Styles:"
-                    options={[
-                      { value: 'surface-components', label: 'Surface Components Only' },
-                      { value: 'only-selected', label: 'Only Where Selected' },
-                    ]}
-                    value={decorativeMode}
-                    onChange={(_e: any, val: string) => setDecorativeMode(val as any)}
-                  />
-                </VStack>
-              </div>
-            )}
-
-            {showSettings && (
-              <VStack spacing={4} style={{ width: '100%' }}>
-                <HStack spacing={2} style={{ alignItems: 'center' }}>
-                  <BodySmall style={{ fontWeight: 600 }}>Edit Typography</BodySmall>
-                  <Button variant="primary-outline" size="small" onClick={() => setShowSettings(false)}>
-                    Hide
-                  </Button>
-                </HStack>
-                {editedTypography.map((t, i) => (
-                  <VStack key={i} spacing={2} style={{ width: '100%', paddingBottom: i < 2 ? 16 : 0, borderBottom: i < 2 ? '1px solid var(--Border)' : 'none' }}>
-                    <H3 style={{ fontSize: '1rem' }}>{roleLabels[t.type] || t.type}</H3>
-
-                    <div className="typo-field-header">
-                      <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600 }}>Font Style</BodySmall>
-                    </div>
-                    <Select
-                      label="Font Style"
-                      labelPosition="top"
-                      size="small"
-                      fullWidth
-                      value={t.family}
-                      onChange={(val: string) => handleEdit(i, 'family', val)}
-                      options={categoryOptions.map(cat => ({ value: cat, label: cat }))}
-                    />
-
-                    <div className="typo-two-col">
-                      <Select
-                        label="Weight"
-                        labelPosition="top"
-                        size="small"
-                        fullWidth
-                        value={t.weight}
-                        onChange={(val: string) => handleEdit(i, 'weight', val)}
-                        options={WEIGHT_OPTIONS}
-                      />
-                      <Select
-                        label="Letter Spacing"
-                        labelPosition="top"
-                        size="small"
-                        fullWidth
-                        value={t.letterSpacing}
-                        onChange={(val: string) => handleEdit(i, 'letterSpacing', val)}
-                        options={SPACING_OPTIONS}
-                      />
-                    </div>
-
-                    {t.type !== 'body' && (
-                      <Checkbox
-                        variant="default-outline"
-                        size="small"
-                        label="All Caps"
-                        checked={t.allCaps}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleEdit(i, 'allCaps', e.target.checked)}
-                      />
-                    )}
-                  </VStack>
-                ))}
-
-                <Button
-                  variant="primary"
-                  onClick={handleGenerateOptions}
-                  disabled={isGenerating}
-                  style={{ width: '100%' }}
-                >
-                  {isGenerating ? 'Generating...' : 'Regenerate Typography Options'}
-                </Button>
-              </VStack>
-            )}
-          </VStack>
-        </Card>
-
-        {/* Loading state */}
-        {isGenerating && fontSamples.length === 0 && (
-          <VStack spacing={2} style={{ alignItems: 'center', padding: 32 }}>
-            <div className="typo-spinner" />
-            <Body>Generating font options...</Body>
-          </VStack>
+  // Helper: render one collapsible role section
+  const renderRoleSection = (key: 'header' | 'decorative' | 'body', i: number) => {
+    const t = editedTypography[i];
+    const isOpen = openSections[key];
+    return (
+      <div key={key} className="typo-section">
+        <div className="typo-section-header" onClick={() => toggleSection(key)}>
+          <BodySmall style={{ fontWeight: 700 }}>{roleLabels[key]}</BodySmall>
+          <span className={`typo-section-chevron ${isOpen ? 'open' : ''}`}>▶</span>
+        </div>
+        {isOpen && (
+          <div className="typo-section-body">
+            <VStack spacing={2}>
+              <Select
+                label="Font Style"
+                labelPosition="top"
+                size="small"
+                fullWidth
+                value={t.family}
+                onChange={(val: string) => handleEdit(i, 'family', val)}
+                options={categoryOptions.map(cat => ({ value: cat, label: cat }))}
+              />
+              <Select
+                label="Weight"
+                labelPosition="top"
+                size="small"
+                fullWidth
+                value={t.weight}
+                onChange={(val: string) => handleEdit(i, 'weight', val)}
+                options={WEIGHT_OPTIONS}
+              />
+              <Select
+                label="Letter Spacing"
+                labelPosition="top"
+                size="small"
+                fullWidth
+                value={t.letterSpacing}
+                onChange={(val: string) => handleEdit(i, 'letterSpacing', val)}
+                options={SPACING_OPTIONS}
+              />
+              {key !== 'body' && (
+                <Checkbox
+                  variant="default-outline"
+                  size="small"
+                  label="All Caps"
+                  checked={t.allCaps}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleEdit(i, 'allCaps', e.target.checked)}
+                />
+              )}
+            </VStack>
+          </div>
         )}
+      </div>
+    );
+  };
 
-        {/* Font samples grid */}
-        {fontSamples.length > 0 && (
-          <VStack spacing={2} style={{ width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Select a font combination ({fontSamples.length} options)
-              </BodySmall>
-              <Link
-                onClick={(e: React.MouseEvent) => { e.preventDefault(); setCustomFontsOpen(true); }}
-                style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-              >
-                Need to use custom fonts?
-              </Link>
+  return (
+    <div className="typo-page" style={{ display: 'flex', minHeight: '100vh' }}>
+
+      {/* ─── Left: persistent sidebar ─── */}
+      <div style={{
+        width: settingsOpen ? 280 : 0,
+        flexShrink: 0,
+        overflow: 'hidden',
+        transition: 'width 0.2s ease',
+        borderRight: settingsOpen ? '1px solid var(--Border)' : 'none',
+      }}>
+        <div style={{ width: 280, padding: '8px 16px', boxSizing: 'border-box' }}>
+          <VStack spacing={2}>
+            <H3 style={{ fontSize: '1rem', margin: 0 }}>Typography Settings</H3>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              {useMoodBased ? 'Mood-based detection' : 'Text-based detection'}
+              {' · '}Changes auto-regenerate
+            </BodySmall>
+
+            <div>
+              {renderRoleSection('header', 0)}
+              {renderRoleSection('decorative', 1)}
+              {renderRoleSection('body', 2)}
             </div>
+
+            <RadioGroup
+              variant="default-outline"
+              size="small"
+              label="Apply Decorative Styles:"
+              options={[
+                { value: 'surface-components', label: 'Surface Components Only' },
+                { value: 'only-selected', label: 'Only Where Selected' },
+              ]}
+              value={decorativeMode}
+              onChange={(_e: any, val: string) => setDecorativeMode(val as any)}
+            />
+
+            <Link
+              onClick={(e: React.MouseEvent) => { e.preventDefault(); setCustomFontsOpen(true); }}
+              style={{ fontSize: '0.8rem' }}
+            >
+              Need to use custom fonts?
+            </Link>
+          </VStack>
+        </div>
+      </div>
+
+      {/* ─── Right: main content ─── */}
+      <div style={{ flex: 1, minWidth: 0, transition: 'margin 0.2s ease' }}>
+        <VStack spacing={3} style={{ maxWidth: 1000, margin: '0 auto', width: '100%', padding: '40px 24px' }}>
+
+          {!settingsOpen && (
+            <HStack spacing={2} style={{ justifyContent: 'center' }}>
+              <Button variant="outline" size="small" onClick={() => setSettingsOpen(true)}>
+                Settings
+              </Button>
+            </HStack>
+          )}
+
+          {/* Loading state */}
+          {isGenerating && fontSamples.length === 0 && (
+            <VStack spacing={2} style={{ alignItems: 'center', padding: 32 }}>
+              <div className="typo-spinner" />
+              <Body>Generating font options...</Body>
+            </VStack>
+          )}
+
+          {/* Font samples grid */}
+          {fontSamples.length > 0 && (
+            <VStack spacing={2} style={{ width: '100%' }}>
+              <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+                Select a font combination ({fontSamples.length} options)
+                {isGenerating && ' · regenerating…'}
+              </BodySmall>
 
             <div className="typo-samples-grid">
               {fontSamples.map(sample => {
@@ -588,9 +588,10 @@ export default function TypographyStage({
             </div>
           </VStack>
         )}
+        </VStack>
+      </div>
 
-        {/* Navigation handled by CreationTopBar/BottomBar */}
-      </VStack>
+      {/* Navigation handled by CreationTopBar/BottomBar */}
 
       {/* Custom Fonts Modal */}
       <Modal

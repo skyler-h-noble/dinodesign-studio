@@ -62,8 +62,8 @@ export function generateBaseButtons(
   const SC = isDark ? 12 : adjustTone(rawSC);
   const TC = isDark ? 12 : adjustTone(rawTC);
 
-  // Calculate {OB} (Other Buttons): if PC >= 9 then 9, else 8. In Dark Mode = 12.
-  const OB = isDark ? 12 : (PC >= 9 ? 9 : 8);
+  // Calculate {OB} (Other Buttons): if PC >= 9 then 6, else 5. In Dark Mode = 12.
+  const OB = isDark ? 12 : (PC >= 9 ? 6 : 5);
   
   console.log(`🔘 [generateBaseButtons] Mode: ${mode}`);
   console.log(`  📊 EXTRACTED TONES INPUT:`, extractedTones);

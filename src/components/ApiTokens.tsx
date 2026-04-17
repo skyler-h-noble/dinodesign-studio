@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
-import { SUPABASE_STORAGE_BASE } from '../utils/generateDesignSystem';
+import { getPublicFileUrl } from '../utils/firebase/storage';
 
 /**
  * Route: /api/tokens/:uuid
@@ -15,7 +15,7 @@ export function ApiTokensJson() {
     if (!uuid) { setError('No UUID provided'); return; }
     let mounted = true;
 
-    fetch(`${SUPABASE_STORAGE_BASE}/${uuid}/tokens.json`)
+    fetch(getPublicFileUrl(uuid, 'tokens.json'))
       .then(res => {
         if (!res.ok) throw new Error('Not found');
         return res.text();
@@ -43,7 +43,7 @@ export function ApiTokensMd() {
     if (!uuid) { setError('No UUID provided'); return; }
     let mounted = true;
 
-    fetch(`${SUPABASE_STORAGE_BASE}/${uuid}/DINO-TOKENS.md`)
+    fetch(getPublicFileUrl(uuid, 'DINO-TOKENS.md'))
       .then(res => {
         if (!res.ok) throw new Error('Not found');
         return res.text();

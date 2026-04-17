@@ -793,7 +793,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
   const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
   const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
-  const OB = PC >= 9 ? 9 : 8;
+  const OB = PC >= 9 ? 6 : 5;
 
   console.log(`  Nav themes: App-Bar→${appBarSource} (from "${defaultSettings.appBar}"), Nav-Bar→${navBarSource} (from "${defaultSettings.navBar}"), Status→${statusSource} (from "${defaultSettings.status}")`);
   console.log(`  PC=${PC}, SC=${SC}, TC=${TC}, OB=${OB}`);

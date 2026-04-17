@@ -122,30 +122,127 @@ function getChromaBellCurve(hue: number, isDarkMode: boolean = false): number[] 
 }
 
 /**
+ * Hue overrides for the endpoints of a tone scale.
+ * darkHue applies to Color-1 (darkest tone), lightHue applies to Color-12 (lightest).
+ * The user's exact color hue is preserved at its locked Color-N position.
+ * Hues interpolate linearly between the three control points (dark → user → light).
+ */
+export interface HueEasing {
+  darkHue?: number;  // 0-360, hue at Color-1
+  lightHue?: number; // 0-360, hue at Color-12
+}
+
+/**
+ * Linearly interpolate hue along the shortest path around the color wheel.
+ * Both hues are 0-360. t is 0-1.
+ */
+function lerpHue(h1: number, h2: number, t: number): number {
+  let diff = h2 - h1;
+  // Take the shortest path around the circle
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  let result = h1 + diff * t;
+  // Normalize to 0-360
+  result = ((result % 360) + 360) % 360;
+  return result;
+}
+
+/**
+ * Compute the per-tone hue array for a 12-tone scale, applying hue easing.
+ * Returns an array of 12 hues, one per Color-N.
+ *
+ * Without easing: every tone uses userHue (constant).
+ * With easing: hue interpolates linearly from darkHue (Color-1) to userHue
+ * (at lockedColorN) to lightHue (Color-12). The locked position keeps userHue exactly.
+ */
+function computeHueScale(
+  userHue: number,
+  lockedColorN: number,
+  easing?: HueEasing
+): number[] {
+  const hues: number[] = new Array(12);
+  const darkHue = easing?.darkHue;
+  const lightHue = easing?.lightHue;
+
+  // Locked index (0-based)
+  const lockedIdx = Math.max(0, Math.min(11, lockedColorN - 1));
+
+  for (let i = 0; i < 12; i++) {
+    if (i === lockedIdx) {
+      hues[i] = userHue;
+    } else if (i < lockedIdx) {
+      // Below locked: interpolate dark → user
+      if (darkHue === undefined) {
+        hues[i] = userHue;
+      } else {
+        // t=0 at Color-1 (i=0), t=1 at locked
+        const t = lockedIdx === 0 ? 1 : i / lockedIdx;
+        hues[i] = lerpHue(darkHue, userHue, t);
+      }
+    } else {
+      // Above locked: interpolate user → light
+      if (lightHue === undefined) {
+        hues[i] = userHue;
+      } else {
+        // t=0 at locked, t=1 at Color-12 (i=11)
+        const span = 11 - lockedIdx;
+        const t = span === 0 ? 0 : (i - lockedIdx) / span;
+        hues[i] = lerpHue(userHue, lightHue, t);
+      }
+    }
+  }
+
+  return hues;
+}
+
+/**
  * Generate a 12-tone scale using a bell-curve chroma distribution.
  * maxChroma controls the peak. The peak position shifts based on hue.
  * Each tone is also clamped to the gamut limit at that lightness/hue.
  */
-function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly number[] = TONE_SCALE, isDarkMode: boolean = false, lockedHex?: string): ToneStep[] {
-  const [, , h] = chroma(hex).lch();
+function generateScaledTones(
+  hex: string,
+  maxChroma: number,
+  toneScale: readonly number[] = TONE_SCALE,
+  isDarkMode: boolean = false,
+  lockedHex?: string,
+  hueEasing?: HueEasing
+): ToneStep[] {
+  const [userL, , userH] = chroma(hex).lch();
   const { steps } = generateNaturalScale(hex, toneScale);
-  const bellCurve = getChromaBellCurve(h, isDarkMode);
+  // Bell curve is keyed off the user's primary hue (not the per-tone hue)
+  const bellCurve = getChromaBellCurve(userH, isDarkMode);
+
+  // Determine which Color-N the user's color sits at (within the active tone scale)
+  let userColorN = 6;
+  let bestDiff = Infinity;
+  for (let i = 0; i < toneScale.length; i++) {
+    const diff = Math.abs(toneScale[i] - userL);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      userColorN = i + 1;
+    }
+  }
+
+  // Compute per-tone hue scale with easing
+  const hueScale = computeHueScale(userH, userColorN, hueEasing);
 
   // Generate all tones normally first
   const tones: ToneStep[] = steps.map((step, index) => {
+    const toneHue = hueScale[index];
     const desiredC = Math.min(maxChroma * bellCurve[index], step.chroma);
 
     let result: string;
     try {
-      const generated = chroma.lch(step.tone, desiredC, h);
+      const generated = chroma.lch(step.tone, desiredC, toneHue);
       const [, , gh] = generated.lch();
-      if (!isNaN(h) && !isNaN(gh) && Math.abs(gh - h) > 10 && desiredC > 0.5) {
-        result = chroma.lch(step.tone, desiredC * 0.9, h).hex();
+      if (!isNaN(toneHue) && !isNaN(gh) && Math.abs(gh - toneHue) > 10 && desiredC > 0.5) {
+        result = chroma.lch(step.tone, desiredC * 0.9, toneHue).hex();
       } else {
         result = generated.hex();
       }
     } catch {
-      result = chroma.lch(step.tone, 0, h).hex();
+      result = chroma.lch(step.tone, 0, toneHue).hex();
     }
 
     return {
@@ -182,7 +279,12 @@ function generateScaledTones(hex: string, maxChroma: number, toneScale: readonly
  * maxChroma is the desired peak chroma across all tones.
  * Default: uses the natural peak chroma of the color.
  */
-export function generateSemanticLightModeScale(hex: string, maxChroma?: number, lockedHex?: string): ToneStep[] {
+export function generateSemanticLightModeScale(
+  hex: string,
+  maxChroma?: number,
+  lockedHex?: string,
+  hueEasing?: HueEasing
+): ToneStep[] {
   // Always derive peak from the extracted color's position on the bell curve
   const [l, c, h] = chroma(hex).lch();
   const colorNumber = toneToColorNumber(l);
@@ -194,14 +296,18 @@ export function generateSemanticLightModeScale(hex: string, maxChroma?: number, 
   const cap = maxChroma !== undefined ? maxChroma : 64;
   const peakChroma = Math.min(derivedPeak, cap);
 
-  return generateScaledTones(hex, peakChroma, undefined, false, lockedHex);
+  return generateScaledTones(hex, peakChroma, undefined, false, lockedHex, hueEasing);
 }
 
 /**
  * Generate a 12-tone dark mode scale from a hex color.
  * Peak derived from extracted color, capped at maxChroma (default 42).
  */
-export function generateSemanticDarkModeScale(hex: string, maxChroma?: number): ToneStep[] {
+export function generateSemanticDarkModeScale(
+  hex: string,
+  maxChroma?: number,
+  hueEasing?: HueEasing
+): ToneStep[] {
   const [l, c, h] = chroma(hex).lch();
   const colorNumber = toneToColorNumber(l);
   const bellCurve = getChromaBellCurve(h);
@@ -211,7 +317,7 @@ export function generateSemanticDarkModeScale(hex: string, maxChroma?: number): 
   const cap = maxChroma !== undefined ? maxChroma : 42;
   const peakChroma = Math.min(derivedPeak, cap);
 
-  return generateScaledTones(hex, peakChroma, DARK_TONE_SCALE, true);
+  return generateScaledTones(hex, peakChroma, DARK_TONE_SCALE, true, undefined, hueEasing);
 }
 
 /**
@@ -256,7 +362,7 @@ export function getVibrantColorNumber(mode: 'light' | 'dark'): number {
  */
 export function calculateOB(primaryTone: number): number {
   const PC = toneToColorNumber(primaryTone);
-  return PC >= 9 ? 8 : 6;
+  return PC >= 9 ? 6 : 5;
 }
 
 /**

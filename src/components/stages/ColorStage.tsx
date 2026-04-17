@@ -1,6 +1,6 @@
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card,
-  CircularProgress, Checkbox, Link, Radio, Modal, TextField, Alert, Slider,
+  CircularProgress, Checkbox, Link, Radio, Modal, TextField, Alert, SliderInput,
 } from '@dynodesign/components';
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
@@ -9,10 +9,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
 import { generateColorSchemes } from '../../utils/colorSchemes';
-import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma } from '../../utils/colorScale';
+import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma, findClosestColorN } from '../../utils/colorScale';
 import { getColorDescription } from '../../utils/colorNaming';
 import type { StageProps, ColorScheme } from '../../types';
 import type { ExtractedColorData, ExtractedColor } from '../../utils/imageAnalysis';
+import '../../styles/color-stage.css';
 
 type ColorStep = 'extraction' | 'theme';
 
@@ -46,13 +47,16 @@ export default function ColorStage({
   const [step, setStep] = useState<ColorStep>(selectedScheme ? 'theme' : 'extraction');
   const [colorData, setColorData] = useState<ExtractedColorData | null>(null);
   const [topColors, setTopColors] = useState<ExtractedColor[]>(savedTopColors || []);
+  // Anchor colors = the original extracted hexes used for palette generation.
+  // topColors[i].hex may shift when the user clicks a different tone, but
+  // anchorColors[i] stays put so the generated palette remains stable.
+  const [anchorColors, setAnchorColors] = useState<ExtractedColor[]>(savedTopColors || []);
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [primaryIndex, setPrimaryIndex] = useState(0);
   const [schemes, setSchemes] = useState<ColorScheme[]>(savedSchemes || []);
   const [showChromaSettings, setShowChromaSettings] = useState(false);
   const [chromaPerColor, setChromaPerColor] = useState<number[]>([62, 62, 62, 62, 62, 62]);
   const [darkChromaPerColor, setDarkChromaPerColor] = useState<number[]>([36, 36, 36, 36, 36, 36]);
-  const [chromaEditIndex, setChromaEditIndex] = useState<number | null>(null);
   const [customEditing, setCustomEditing] = useState(false);
   const [toneMode, setToneMode] = useState<'light' | 'dark'>('light');
   const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +73,27 @@ export default function ColorStage({
   const [hexEditSource, setHexEditSource] = useState<'top' | 'additional'>('top');
   const [hexLocked, setHexLocked] = useState(false);
   const [hexError, setHexError] = useState<string | null>(null);
+
+  // Hue easing overrides per topColors index (separate light/dark mode)
+  // hueOverridesByTop[colorIdx] = { light: { darkHue?, lightHue? }, dark: { ... } }
+  const [hueOverridesByTop, setHueOverridesByTop] = useState<Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>>({});
+
+  // Track narrow viewport for responsive swatch sizing
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Edit modal state — adjusts max chroma + dark hue + light hue for one color
+  const [hueEditTopIdx, setHueEditTopIdx] = useState<number | null>(null);
+  const [hueEditDarkHue, setHueEditDarkHue] = useState<number>(0);
+  const [hueEditLightHue, setHueEditLightHue] = useState<number>(0);
+  // Which endpoint is currently being edited (focused), for highlighting in preview
+  const [hueEditFocus, setHueEditFocus] = useState<'dark' | 'light' | null>(null);
+  // Local slider value during drag — committed to chromaPerColor on release for smooth dragging
+  const [chromaDragValue, setChromaDragValue] = useState<number | null>(null);
 
   const openHexEditor = (hex: string, index: number, source: 'top' | 'additional') => {
     setHexEditValue(hex);
@@ -112,6 +137,12 @@ export default function ColorStage({
         next[hexEditIndex] = { ...next[hexEditIndex], hex: hexEditValue };
         return next;
       });
+      // Editing the hex explicitly = setting a new anchor for palette generation
+      setAnchorColors(prev => {
+        const next = [...prev];
+        next[hexEditIndex] = { ...next[hexEditIndex], hex: hexEditValue };
+        return next;
+      });
       // Track lock state
       if (hexLocked) {
         setLockedColorMap(prev => ({ ...prev, [hexEditIndex]: hexEditValue }));
@@ -138,6 +169,7 @@ export default function ColorStage({
         if (cancelled) return;
         setColorData(data);
         setTopColors([...data.topColors]);
+        setAnchorColors([...data.topColors]);
         onTopColorsExtracted?.([...data.topColors]);
         // Initialize chroma per color from natural peak chroma across all tones
         const peakChromas = data.topColors.map(c => getNaturalPeakChroma(c.hex));
@@ -185,7 +217,16 @@ export default function ColorStage({
         return lockedColorMap[origIdx];
       }),
     ];
-    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked);
+    // Translate hueOverridesByTop (keyed by topColors index) to reordered scheme indices
+    // Reordered: [primary=tops[pIdx], ...tops without pIdx] → indices 0/1/2 in scheme
+    const orderedTopIndices = [pIdx, ...tops.map((_, i) => i).filter(i => i !== pIdx)];
+    const hueOverridesForScheme: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }> = {};
+    orderedTopIndices.forEach((origIdx, schemeIdx) => {
+      if (hueOverridesByTop[origIdx]) {
+        hueOverridesForScheme[schemeIdx] = hueOverridesByTop[origIdx];
+      }
+    });
+    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
     setSchemes(generated);
     onSchemesGenerated?.(generated);
     if (selectedScheme) {
@@ -194,7 +235,7 @@ export default function ColorStage({
     } else {
       onSchemeSelected(generated[0]);
     }
-  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, lockedColorMap]);
+  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, lockedColorMap, hueOverridesByTop]);
 
   const handleGenerateThemes = useCallback(() => {
     regenerateSchemes(topColors, primaryIndex);
@@ -245,6 +286,352 @@ export default function ColorStage({
     );
   }
 
+  // Renders the unified Edit modal — used by both extraction and theme steps
+  const renderEditModal = () => (
+    <Modal
+      open={hueEditTopIdx !== null}
+      onClose={() => setHueEditTopIdx(null)}
+      title={
+        hueEditTopIdx !== null && anchorColors[hueEditTopIdx]
+          ? `Edit ${
+              hueEditTopIdx === primaryIndex
+                ? `Primary – ${getColorDescription(anchorColors[hueEditTopIdx].hex)}`
+                : getColorDescription(anchorColors[hueEditTopIdx].hex)
+            }`
+          : 'Edit Color'
+      }
+    >
+      {hueEditTopIdx !== null && (() => {
+        const idx = hueEditTopIdx;
+        // Use the stable anchor color, NOT the user's currently chosen tone
+        const baseColor = anchorColors[idx] || topColors[idx];
+        if (!baseColor) return null;
+        const naturalChroma = getNaturalPeakChroma(baseColor.hex);
+        // Default to natural peak (capped at the mode's hard ceiling) when no override is set
+        const lightDefault = Math.min(naturalChroma, 70);
+        const darkDefault = Math.min(naturalChroma, 42);
+        const storedLight = chromaPerColor[idx];
+        const storedDark = darkChromaPerColor[idx];
+        const currentChroma = toneMode === 'light'
+          ? (storedLight !== undefined ? storedLight : lightDefault)
+          : (storedDark !== undefined ? storedDark : darkDefault);
+        const baseHue = (() => {
+          const h = chroma(baseColor.hex).get('lch.h');
+          return isNaN(h) ? 0 : Math.round(h);
+        })();
+
+        const previewEasing = { darkHue: hueEditDarkHue, lightHue: hueEditLightHue };
+        const previewPalette = toneMode === 'light'
+          ? generateSemanticLightModeScale(baseColor.hex, currentChroma, lockedColorMap[idx], previewEasing)
+          : generateSemanticDarkModeScale(baseColor.hex, currentChroma, previewEasing);
+
+        // Effective peak chroma = the highest LCH chroma actually present in the rendered palette
+        const effectivePeak = Math.round(Math.max(
+          ...previewPalette.map((p) => {
+            const c = chroma(p.hex).get('lch.c');
+            return isNaN(c) ? 0 : c;
+          })
+        ));
+
+        // Natural ceiling = the highest peak this color CAN reach (ignoring current input).
+        // Generated once with a very high input to find the gamut limit.
+        const naturalCeilingPalette = toneMode === 'light'
+          ? generateSemanticLightModeScale(baseColor.hex, 200, lockedColorMap[idx], previewEasing)
+          : generateSemanticDarkModeScale(baseColor.hex, 200, previewEasing);
+        const naturalCeiling = Math.round(Math.max(
+          ...naturalCeilingPalette.map((p) => {
+            const c = chroma(p.hex).get('lch.c');
+            return isNaN(c) ? 0 : c;
+          })
+        ));
+
+        // Find which Color-N the user's exact color sits at (by lightness match)
+        const baseLightness = chroma(baseColor.hex).get('lch.l');
+        let lockedColorN = 1;
+        let lockedDist = Infinity;
+        previewPalette.forEach((step) => {
+          const d = Math.abs(step.tone - baseLightness);
+          if (d < lockedDist) { lockedDist = d; lockedColorN = step.colorNumber; }
+        });
+
+        const hasOverrides = hueOverridesByTop[idx]?.[toneMode] !== undefined;
+
+        const applyEdit = () => {
+          setHueOverridesByTop(prev => {
+            const next = { ...prev };
+            const colorEntry = { ...(next[idx] || {}) };
+            colorEntry[toneMode] = { darkHue: hueEditDarkHue, lightHue: hueEditLightHue };
+            next[idx] = colorEntry;
+            return next;
+          });
+          setHueEditTopIdx(null);
+          setTimeout(() => regenerateSchemes(topColors, primaryIndex), 0);
+        };
+
+        const resetEdit = () => {
+          setHueOverridesByTop(prev => {
+            const next = { ...prev };
+            if (!next[idx]) return prev;
+            const colorEntry = { ...next[idx] };
+            delete colorEntry[toneMode];
+            if (Object.keys(colorEntry).length === 0) delete next[idx];
+            else next[idx] = colorEntry;
+            return next;
+          });
+          setHueEditTopIdx(null);
+          setTimeout(() => regenerateSchemes(topColors, primaryIndex), 0);
+        };
+
+        const onChromaChange = (v: number) => {
+          if (toneMode === 'light') {
+            const updated = [...chromaPerColor];
+            updated[idx] = v;
+            setChromaPerColor(updated);
+            regenerateSchemes(topColors, primaryIndex, updated, undefined);
+          } else {
+            const updated = [...darkChromaPerColor];
+            updated[idx] = v;
+            setDarkChromaPerColor(updated);
+            regenerateSchemes(topColors, primaryIndex, undefined, updated);
+          }
+        };
+
+        return (
+          <VStack spacing={3} style={{ minWidth: 380, maxWidth: 480 }}>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Adjust the lightest and darkest hues to correct perceived color shifts
+              (yellows turning green when dark, navy turning purple when light).
+              The user&apos;s exact color stays fixed; hues interpolate from the endpoints toward it.
+            </BodySmall>
+
+            <BodySmall style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>
+              Editing <strong>{toneMode}</strong> mode (switch above to edit the other mode)
+            </BodySmall>
+
+            <VStack spacing={1}>
+              <BodySmall style={{ fontWeight: 600 }}>Preview</BodySmall>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {previewPalette.map((step) => {
+                  const isExtracted = step.colorNumber === lockedColorN;
+                  const isHexLocked = isExtracted && !!lockedColorMap[idx];
+                  const isDarkEnd = step.colorNumber === 1;
+                  const isLightEnd = step.colorNumber === previewPalette.length;
+                  const isFocusedEndpoint =
+                    (isDarkEnd && hueEditFocus === 'dark') ||
+                    (isLightEnd && hueEditFocus === 'light');
+                  let outline: string = 'none';
+                  if (isFocusedEndpoint) outline = '2px solid var(--Focus-Visible)';
+                  else if (isExtracted) outline = '2px dashed var(--Quiet)';
+                  // Choose contrasting icon color based on swatch luminance
+                  const iconColor = (() => {
+                    try { return chroma(step.hex).luminance() > 0.5 ? '#000' : '#fff'; }
+                    catch { return '#fff'; }
+                  })();
+                  return (
+                    <div
+                      key={step.colorNumber}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 2,
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: '100%',
+                          height: 28,
+                          background: step.hex,
+                          borderRadius: 4,
+                          outline,
+                          outlineOffset: 1,
+                          cursor: (isDarkEnd || isLightEnd) ? 'pointer' : 'default',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        title={`Color-${step.colorNumber}: ${step.hex}${isExtracted ? ' (extracted)' : ''}${isHexLocked ? ' — locked' : ''}`}
+                        onClick={() => {
+                          if (isDarkEnd) setHueEditFocus('dark');
+                          else if (isLightEnd) setHueEditFocus('light');
+                        }}
+                      >
+                        {isHexLocked && (
+                          <LockIcon style={{ fontSize: 14, color: iconColor }} />
+                        )}
+                      </div>
+                      {isExtracted && (
+                        <span style={{ fontSize: '0.55rem', color: 'var(--Quiet)', whiteSpace: 'nowrap' }}>
+                          Color-{step.colorNumber}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <BodySmall style={{ fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+                Dashed = your extracted color
+              </BodySmall>
+            </VStack>
+
+            {(() => {
+              const isLocked = !!lockedColorMap[idx];
+              const sliderMin = 0;
+              // Slider max = the actual achievable peak (gamut-limited), capped at hard 70
+              const sliderMax = Math.min(70, naturalCeiling);
+              // Bell-curve peak multiplier: yellow hues peak at 1.0, others at 0.90.
+              const isYellow = baseHue >= 60 && baseHue <= 100;
+              const bellMax = isYellow ? 1.00 : 0.90;
+              // Resting slider value = the effective peak in the rendered palette
+              const resting = Math.max(sliderMin, Math.min(sliderMax, effectivePeak));
+              const sliderValue = chromaDragValue !== null ? chromaDragValue : resting;
+              const colorName = getColorDescription(baseColor.hex);
+              return (
+                <VStack spacing={1}>
+                  <BodySmall style={{ fontWeight: 600 }}>
+                    {colorName} Max Chroma: {sliderValue}
+                  </BodySmall>
+                  <SliderInput
+                    variant="primary"
+                    min={sliderMin}
+                    max={sliderMax}
+                    value={sliderValue}
+                    onChange={(_: any, val: number | number[]) => setChromaDragValue(val as number)}
+                    onChangeCommitted={(_: any, val: number | number[]) => {
+                      // Scale slider value → chromaPerColor input so the highest-chroma
+                      // tone reaches (but doesn't exceed) the slider value.
+                      const target = Math.min(sliderMax, val as number);
+                      const scaledInput = Math.floor(target / bellMax);
+                      onChromaChange(scaledInput);
+                      setChromaDragValue(null);
+                    }}
+                    size="small"
+                    disabled={isLocked}
+                    marks={[
+                      { value: sliderMin, label: String(sliderMin) },
+                      { value: sliderMax, label: String(sliderMax) },
+                    ]}
+                  />
+                  {isLocked && (
+                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+                      Chroma is locked because this color is locked to its exact hex.
+                    </BodySmall>
+                  )}
+                </VStack>
+              );
+            })()}
+
+            {(() => {
+              const hueGradient = 'linear-gradient(to right, hsl(0,80%,50%), hsl(60,80%,50%), hsl(120,80%,50%), hsl(180,80%,50%), hsl(240,80%,50%), hsl(300,80%,50%), hsl(360,80%,50%))';
+              const hueSliderSx = {
+                '& .MuiSlider-rail': {
+                  background: hueGradient,
+                  opacity: 1,
+                  border: 'none',
+                },
+                '& .MuiSlider-track': {
+                  background: 'transparent',
+                  border: 'none',
+                },
+                '& .MuiSlider-thumb': {
+                  border: '2px solid var(--Background)',
+                  boxShadow: '0 0 0 1px var(--Border), var(--Effect-Level-2)',
+                },
+              };
+              return (
+                <VStack spacing={2}>
+                  <Card padding="small" style={{ width: '100%' }}>
+                    <div onMouseEnter={() => setHueEditFocus('dark')} onClick={() => setHueEditFocus('dark')}>
+                      <VStack spacing={1}>
+                        <BodySmall style={{ fontWeight: 600 }}>
+                          Darkest Hue: {Math.round(hueEditDarkHue)}°
+                        </BodySmall>
+                        <SliderInput
+                          variant="primary"
+                          min={0}
+                          max={360}
+                          step={1}
+                          value={hueEditDarkHue}
+                          onChange={(_: any, v: number | number[]) => {
+                            setHueEditDarkHue(v as number);
+                            setHueEditFocus('dark');
+                          }}
+                          size="small"
+                          sx={hueSliderSx}
+                        />
+                        {Math.round(hueEditDarkHue) !== baseHue && (
+                          <Link
+                            style={{ fontSize: '0.7rem', cursor: 'pointer' }}
+                            onClick={(e: React.MouseEvent) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setHueEditDarkHue(baseHue);
+                              setHueEditFocus('dark');
+                            }}
+                          >
+                            Reset to {baseHue}°
+                          </Link>
+                        )}
+                      </VStack>
+                    </div>
+                  </Card>
+
+                  <Card padding="small" style={{ width: '100%' }}>
+                    <div onMouseEnter={() => setHueEditFocus('light')} onClick={() => setHueEditFocus('light')}>
+                      <VStack spacing={1}>
+                        <BodySmall style={{ fontWeight: 600 }}>
+                          Lightest Hue: {Math.round(hueEditLightHue)}°
+                        </BodySmall>
+                        <SliderInput
+                          variant="primary"
+                          min={0}
+                          max={360}
+                          step={1}
+                          value={hueEditLightHue}
+                          onChange={(_: any, v: number | number[]) => {
+                            setHueEditLightHue(v as number);
+                            setHueEditFocus('light');
+                          }}
+                          size="small"
+                          sx={hueSliderSx}
+                        />
+                        {Math.round(hueEditLightHue) !== baseHue && (
+                          <Link
+                            style={{ fontSize: '0.7rem', cursor: 'pointer' }}
+                            onClick={(e: React.MouseEvent) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setHueEditLightHue(baseHue);
+                              setHueEditFocus('light');
+                            }}
+                          >
+                            Reset to {baseHue}°
+                          </Link>
+                        )}
+                      </VStack>
+                    </div>
+                  </Card>
+                </VStack>
+              );
+            })()}
+
+            <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+              {hasOverrides && (
+                <Button variant="outline" size="small" onClick={resetEdit}>
+                  Reset Hues
+                </Button>
+              )}
+              <Button variant="outline" size="small" onClick={() => setHueEditTopIdx(null)}>Cancel</Button>
+              <Button variant="default" size="small" onClick={applyEdit}>Apply</Button>
+            </HStack>
+          </VStack>
+        );
+      })()}
+    </Modal>
+  );
+
   // ─── Step 1: Color Extraction ───
   if (step === 'extraction') {
     return (
@@ -288,21 +675,24 @@ export default function ColorStage({
                   <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
                     <Button
                       swatch
-                      swatchColor={color.hex}
                       size="large"
                       onClick={() => {
                         if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
-                        clickTimer.current = setTimeout(() => { clickTimer.current = null; openHexEditor(color.hex, i, 'top'); }, 250);
+                        clickTimer.current = setTimeout(() => { clickTimer.current = null; openHexEditor(color.hex, i, 'top'); }, 350);
                       }}
                       onDoubleClick={() => {
                         if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
                         setSwapIndex(isSwapActive ? null : i);
                       }}
                       sx={{
+                        backgroundColor: color.hex,
+                        '&:hover': { backgroundColor: color.hex },
+                        borderRadius: 'var(--Style-Border-Radius, 6px)',
                         width: '100%',
                         aspectRatio: '1',
                         height: 'auto',
-                        ...(isSwapActive ? { border: '2px solid var(--Buttons-Default-Border)' } : {}),
+                        outline: isSwapActive ? '3px solid var(--Focus-Visible)' : 'none',
+                        outlineOffset: isSwapActive ? 2 : 0,
                       }}
                       title={`${color.hex} — click to edit · double-click to swap`}
                     />
@@ -344,20 +734,29 @@ export default function ColorStage({
               </BodySmall>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(48px, 1fr))',
-                gap: 8,
+                gridTemplateColumns: 'repeat(auto-fill, 42px)',
+                gap: 6,
+                justifyContent: 'start',
               }}>
                 {colorData.additionalColors.map((color, i) => (
                   <VStack key={i} spacing={0} alignItems="center">
                     <Button
                       swatch
-                      swatchColor={color.hex}
                       size="large"
                       onClick={() => {
                         if (swapIndex !== null) handleSwap(color);
                         else openHexEditor(color.hex, i, 'additional');
                       }}
                       title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : `${color.hex} — click to view`}
+                      sx={{
+                        backgroundColor: color.hex,
+                        '&:hover': { backgroundColor: color.hex },
+                        borderRadius: 'var(--Style-Border-Radius, 6px)',
+                        width: 42,
+                        height: 42,
+                        minWidth: 42,
+                        minHeight: 42,
+                      }}
                     />
                     {color.isSwatch && (
                       <StarIcon style={{ fontSize: 10, color: 'var(--Text-Primary)' }} />
@@ -471,15 +870,17 @@ export default function ColorStage({
             </HStack>
           </VStack>
         </Modal>
+        {renderEditModal()}
       </VStack>
     );
   }
+
 
   // ─── Step 2: Theme Selection ───
   const selectedName = selectedScheme?.name;
 
   return (
-    <VStack spacing={4} style={{ padding: '40px 24px', maxWidth: 500, margin: '0 auto' }}>
+    <div className="color-theme-stage">
       <VStack spacing={1} alignItems="center">
         <H2 style={{ textAlign: 'center' }}>Theme</H2>
         <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
@@ -488,7 +889,7 @@ export default function ColorStage({
       </VStack>
 
       {/* Core Colors + Settings */}
-      <Card padding="medium" style={{ width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
+      <Card padding="medium" className="color-theme-core-card" style={{ width: '100%', borderRadius: 'var(--Card-Radius, 14px)' }}>
         <VStack spacing={3}>
           <VStack spacing={1}>
             <BodySmall style={{ fontWeight: 600 }}>Core Colors</BodySmall>
@@ -503,13 +904,12 @@ export default function ColorStage({
                 <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
                   <Button
                     swatch
-                    swatchColor={color.hex}
-                    size="large"
+                    size={isNarrow ? 'small' : 'large'}
                     onClick={() => {
                       setPrimaryIndex(i);
                       regenerateSchemes(topColors, i);
                     }}
-                    sx={isPrimary ? { border: '2px solid var(--Buttons-Default-Border)' } : {}}
+                    sx={{ backgroundColor: color.hex, '&:hover': { backgroundColor: color.hex }, ...(isPrimary ? { border: '2px solid var(--Buttons-Default-Border)' } : {}) }}
                   />
                   <Radio
                     variant="default-outline"
@@ -547,16 +947,16 @@ export default function ColorStage({
           {/* Expanded: per-color tones + chroma */}
           {showChromaSettings && (
             <VStack spacing={3}>
-              <ButtonGroup size="small" variant="primary-outline">
+              <ButtonGroup size="small">
                 <Button
-                  variant={toneMode === 'light' ? 'primary' : 'primary-outline'}
+                  variant={toneMode === 'light' ? 'default' : 'outline'}
                   size="small"
                   onClick={() => setToneMode('light')}
                 >
                   Light Mode
                 </Button>
                 <Button
-                  variant={toneMode === 'dark' ? 'primary' : 'primary-outline'}
+                  variant={toneMode === 'dark' ? 'default' : 'outline'}
                   size="small"
                   onClick={() => setToneMode('dark')}
                 >
@@ -570,18 +970,20 @@ export default function ColorStage({
               </BodySmall>
 
               {topColors.map((color, colorIdx) => {
+                const anchor = anchorColors[colorIdx] || color;
                 const lc = chromaPerColor[colorIdx] || 62;
                 const dc = darkChromaPerColor[colorIdx] || 36;
+                const easing = hueOverridesByTop[colorIdx]?.[toneMode];
+                // Generate palette from the STABLE anchor color, not the user's current pick
                 const palette = toneMode === 'light'
-                  ? generateSemanticLightModeScale(color.hex, lc)
-                  : generateSemanticDarkModeScale(color.hex, dc);
-                const currentTone = Math.round(getLightness(color.hex));
-                const currentColorN = toneToColorNumber(currentTone);
-                const naturalChroma = getNaturalPeakChroma(color.hex);
+                  ? generateSemanticLightModeScale(anchor.hex, lc, lockedColorMap[colorIdx], easing)
+                  : generateSemanticDarkModeScale(anchor.hex, dc, easing);
+                // Find which Color-N matches the user's currently chosen hex (closest by deltaE)
+                const currentColorN = findClosestColorN(color.hex, palette);
+                const isHexLocked = !!lockedColorMap[colorIdx];
                 const colorName = colorIdx === primaryIndex
-                  ? `Primary – ${getColorDescription(color.hex)}`
-                  : getColorDescription(color.hex);
-                const isChromaOpen = chromaEditIndex === colorIdx;
+                  ? `Primary – ${getColorDescription(anchor.hex)}`
+                  : getColorDescription(anchor.hex);
 
                 return (
                   <VStack key={colorIdx} spacing={1}>
@@ -592,21 +994,36 @@ export default function ColorStage({
                       <Link
                         onClick={(e: React.MouseEvent) => {
                           e.preventDefault();
-                          setChromaEditIndex(isChromaOpen ? null : colorIdx);
+                          const baseHue = (() => {
+                            const h = chroma(anchor.hex).get('lch.h');
+                            return isNaN(h) ? 0 : Math.round(h);
+                          })();
+                          const existingDark = hueOverridesByTop[colorIdx]?.[toneMode]?.darkHue;
+                          const existingLight = hueOverridesByTop[colorIdx]?.[toneMode]?.lightHue;
+                          setHueEditDarkHue(existingDark !== undefined ? existingDark : baseHue);
+                          setHueEditLightHue(existingLight !== undefined ? existingLight : baseHue);
+                          setHueEditFocus(null);
+                          setChromaDragValue(null);
+                          setHueEditTopIdx(colorIdx);
                         }}
                         style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}
                       >
-                        {isChromaOpen ? 'Close' : 'Adjust Chroma'}
+                        Edit
                       </Link>
                     </div>
 
                     {/* Tone palette */}
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {palette.map((step, i) => {
+                      {palette.map((step) => {
                         const isCurrentTone = step.colorNumber === currentColorN;
+                        const showLock = isCurrentTone && isHexLocked;
+                        const iconColor = (() => {
+                          try { return chroma(step.hex).luminance() > 0.5 ? '#000' : '#fff'; }
+                          catch { return '#fff'; }
+                        })();
                         return (
                           <div
-                            key={i}
+                            key={step.colorNumber}
                             style={{
                               flex: 1,
                               display: 'flex',
@@ -617,107 +1034,39 @@ export default function ColorStage({
                           >
                             <div
                               style={{
+                                position: 'relative',
                                 width: '100%',
                                 height: 24,
                                 background: step.hex,
-                                cursor: toneMode === 'light' ? 'pointer' : 'default',
+                                cursor: (toneMode === 'light' && !isHexLocked) ? 'pointer' : 'default',
                                 borderRadius: 4,
                                 outline: isCurrentTone ? '2px solid var(--Focus-Visible)' : 'none',
                                 outlineOffset: isCurrentTone ? 1 : 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                               }}
-                              title={`Color-${step.colorNumber}: ${step.hex}`}
+                              title={`Color-${step.colorNumber}: ${step.hex}${isHexLocked && isCurrentTone ? ' — locked' : ''}`}
                               onClick={() => {
                                 if (toneMode === 'dark') return;
+                                if (isHexLocked) return; // can't change selected tone when color is hex-locked
+                                // Only update topColors[colorIdx].hex; the palette is anchored
+                                // and won't regenerate from this click.
                                 const updated = [...topColors];
                                 updated[colorIdx] = { ...updated[colorIdx], hex: step.hex };
                                 setTopColors(updated);
                                 regenerateSchemes(updated, primaryIndex);
                               }}
-                            />
-                            {isCurrentTone && (
-                              <span style={{ fontSize: '0.55rem', color: 'var(--Quiet)', whiteSpace: 'nowrap' }}>
-                                {colorIdx === primaryIndex ? 'Primary' : ['Secondary', 'Tertiary'][colorIdx - (primaryIndex < colorIdx ? 1 : 0)] || `Color ${colorIdx + 1}`}
-                              </span>
-                            )}
+                            >
+                              {showLock && (
+                                <LockIcon style={{ fontSize: 12, color: iconColor }} />
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* Per-color chroma editor */}
-                    {isChromaOpen && (
-                      <VStack spacing={2} style={{
-                        padding: 12,
-                        border: '1px solid var(--Border)',
-                        borderRadius: 'var(--Style-Border-Radius)',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        overflow: 'hidden',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <BodySmall style={{ fontWeight: 600 }}>
-                            Max Chroma ({toneMode === 'light' ? 'Light' : 'Dark'}) ({toneMode === 'light' ? lc : dc})
-                          </BodySmall>
-                          <span style={{ color: 'var(--Icons-Info)', fontSize: '0.85rem', cursor: 'help', flexShrink: 0 }} title="Chroma controls color saturation. This color's natural chroma is the maximum it can reach.">ⓘ</span>
-                          <Link onClick={(e: React.MouseEvent) => e.preventDefault()} style={{ fontSize: '0.7rem' }}>
-                            What is Chroma?
-                          </Link>
-                        </div>
-                        <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
-                          Natural chroma: {naturalChroma}. Colors above the max will be desaturated.
-                        </BodySmall>
-                        <Slider
-                          min={20}
-                          max={toneMode === 'light' ? 70 : 42}
-                          value={toneMode === 'light' ? lc : dc}
-                          onChange={(_: any, val: number | number[]) => {
-                            const v = val as number;
-                            if (toneMode === 'light') {
-                              const updatedChroma = [...chromaPerColor];
-                              updatedChroma[colorIdx] = v;
-                              setChromaPerColor(updatedChroma);
-                              regenerateSchemes(topColors, primaryIndex, updatedChroma, undefined);
-                            } else {
-                              const updatedChroma = [...darkChromaPerColor];
-                              updatedChroma[colorIdx] = v;
-                              setDarkChromaPerColor(updatedChroma);
-                              regenerateSchemes(topColors, primaryIndex, undefined, updatedChroma);
-                            }
-                          }}
-                          size="small"
-                          valueLabelDisplay="auto"
-                        />
-                        <HStack justifyContent="space-between">
-                          <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>20</BodySmall>
-                          <BodySmall style={{ color: 'var(--Buttons-Default-Button)', fontSize: '0.65rem' }}>
-                            {naturalChroma} (natural)
-                          </BodySmall>
-                          <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
-                            {toneMode === 'light' ? '70' : '42'}
-                          </BodySmall>
-                        </HStack>
-                        <Button
-                          variant="primary-outline"
-                          color="default"
-                          size="small"
-                          onClick={() => {
-                            if (toneMode === 'light') {
-                              const updatedChroma = [...chromaPerColor];
-                              updatedChroma[colorIdx] = Math.min(naturalChroma, 70);
-                              setChromaPerColor(updatedChroma);
-                              regenerateSchemes(topColors, primaryIndex, updatedChroma, undefined);
-                            } else {
-                              const updatedChroma = [...darkChromaPerColor];
-                              updatedChroma[colorIdx] = Math.min(naturalChroma, 42);
-                              setDarkChromaPerColor(updatedChroma);
-                              regenerateSchemes(topColors, primaryIndex, undefined, updatedChroma);
-                            }
-                          }}
-                        >
-                          Reset to Natural
-                        </Button>
-                      </VStack>
-                    )}
                   </VStack>
                 );
               })}
@@ -726,8 +1075,8 @@ export default function ColorStage({
         </VStack>
       </Card>
 
-      {/* Scheme cards */}
-      <VStack spacing={2} style={{ width: '100%' }}>
+      {/* Scheme cards — 3 col grid on wide screens, stacked on narrow */}
+      <div className="color-theme-scheme-grid">
         {schemes.map((scheme) => {
           const isSelected = selectedName === scheme.name;
           const isCustom = scheme.name === 'Custom';
@@ -767,15 +1116,14 @@ export default function ColorStage({
                       <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
                         <Button
                           swatch
-                          swatchColor={displayColor}
                           size="large"
-                          sx={{ width: '100%', height: 56 }}
+                          sx={{ backgroundColor: displayColor, '&:hover': { backgroundColor: displayColor }, width: '100%', height: 56 }}
                           onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             if (isCustom) setCustomEditing(true);
                           }}
                         />
-                        <BodySmall style={{ fontWeight: 600, fontSize: '0.7rem' }}>{label}</BodySmall>
+                        <BodySmall style={{ fontWeight: 600, fontSize: '0.7rem', textAlign: 'center', width: '100%' }}>{label}</BodySmall>
                       </VStack>
                     );
                   })}
@@ -859,9 +1207,11 @@ export default function ColorStage({
             </Card>
           );
         })}
-      </VStack>
+      </div>
+
+      {renderEditModal()}
 
       {/* Navigation handled by CreationTopBar — Back goes to extraction step first */}
-    </VStack>
+    </div>
   );
 }

@@ -2923,7 +2923,7 @@ function generateModesThemes(
   const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
   const TC = (rawTC === 11 || rawTC <= 5) ? (PC >= 9 ? 9 : 8) : rawTC;
   const NC = 9; // Neutral is always fixed
-  const OB = PC >= 9 ? 9 : 8; // Other buttons (OB = 8 if PC >= 9, else 6)
+  const OB = PC >= 9 ? 6 : 5; // Other buttons (OB = 8 if PC >= 9, else 6)
   
   // {X} values per Background (from theme-definitions-3.md)
   const getXValue = (backgroundN: number): number => {
@@ -4397,7 +4397,7 @@ export function exportColorSystemToJSON(
   
   // Calculate OB (Other Buttons) value based on Primary Color position
   const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
-  const OB = PC >= 9 ? 9 : 8; // Other buttons (OB = 8 if PC >= 9, else 6)
+  const OB = PC >= 9 ? 6 : 5; // Other buttons (OB = 8 if PC >= 9, else 6)
   console.log(`🎯 [JSON Export] OB calculated: ${OB} (PC = ${PC})`);
   
   const colorSystem: ColorSystemExport = {
@@ -6137,7 +6137,7 @@ export function exportColorSystemToJSON(
       const rawTC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11;
   const TC = (rawTC === 11 || rawTC <= 5) ? (PC >= 9 ? 9 : 8) : rawTC;
       const NC = 9;
-      const OB = PC >= 9 ? 9 : 8;
+      const OB = PC >= 9 ? 6 : 5;
 
       const buttonThemes = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
       const btnColorNMap: Record<string, number> = {

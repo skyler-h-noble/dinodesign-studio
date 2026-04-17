@@ -32,6 +32,21 @@ export interface TypographyStyle {
   allCaps: boolean;
 }
 
+/** Hue overrides for the endpoints (Color-1 / Color-12) of a tone scale */
+export interface HueEasing {
+  darkHue?: number;  // 0-360, hue at Color-1 (darkest)
+  lightHue?: number; // 0-360, hue at Color-12 (lightest)
+}
+
+/** Per-palette hue overrides, separated by light/dark mode */
+export interface PaletteHueOverrides {
+  light?: HueEasing;
+  dark?: HueEasing;
+}
+
+/** Hue overrides keyed by palette index (0=primary, 1=secondary, 2=tertiary) */
+export type HueOverridesMap = Record<number, PaletteHueOverrides>;
+
 /** Color scheme extracted from mood board */
 export interface ColorScheme {
   name: string;
@@ -45,6 +60,8 @@ export interface ColorScheme {
   tonePalettes: Record<string, Array<{ tone: number; lightness: number; hex: string; colorNumber: number }>>;
   darkModeTonePalettes: Record<string, Array<{ tone: number; lightness: number; hex: string; colorNumber: number }>>;
   userSelections?: UserSelections;
+  /** Per-palette hue easing overrides for Color-1 and Color-12 endpoints */
+  hueOverrides?: HueOverridesMap;
 }
 
 /** User design choices made during the workflow */

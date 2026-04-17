@@ -1,5 +1,7 @@
 import { Button, H5 } from '@dynodesign/components';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TopBarProps {
   designSystemName: string;
@@ -8,6 +10,7 @@ interface TopBarProps {
 }
 
 export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps) {
+  const { user } = useAuth();
   return (
     <div
       data-theme={themed ? 'Brand-App-Bar' : 'App-Bar'}
@@ -33,7 +36,18 @@ export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps
         Back
       </Button>
       <H5 style={{ flex: 1, textAlign: 'center', margin: 0 }}>{designSystemName}</H5>
-      <div style={{ width: 70 }} />
+      {user ? (
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => window.location.href = '/account'}
+          startIcon={<AccountCircleIcon style={{ fontSize: 18 }} />}
+        >
+          Account
+        </Button>
+      ) : (
+        <div style={{ width: 70 }} />
+      )}
     </div>
   );
 }

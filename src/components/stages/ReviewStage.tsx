@@ -53,14 +53,14 @@ export default function ReviewStage({
           {/* ─── Left: Phone Preview ─── */}
           <div className="review-preview-col">
             <VStack spacing={2} alignItems="center">
-              <ButtonGroup size="small" variant="primary-outline">
+              <ButtonGroup size="small">
                 <Button
-                  variant={previewMode === 'light' ? 'primary' : 'primary-outline'}
+                  variant={previewMode === 'light' ? 'default' : 'outline'}
                   size="small"
                   onClick={() => setPreviewMode('light')}
                 >Light</Button>
                 <Button
-                  variant={previewMode === 'dark' ? 'primary' : 'primary-outline'}
+                  variant={previewMode === 'dark' ? 'default' : 'outline'}
                   size="small"
                   onClick={() => setPreviewMode('dark')}
                 >Dark</Button>
@@ -136,7 +136,7 @@ export default function ReviewStage({
                 <BodySmall style={{ fontWeight: 600 }}>Coloring</BodySmall>
                 <HStack spacing={1}>
                   {colors.slice(0, 3).map((c, i) => (
-                    <Button key={i} swatch swatchColor={c} size="medium" />
+                    <Button key={i} swatch size="medium" sx={{ backgroundColor: c, '&:hover': { backgroundColor: c } }} />
                   ))}
                 </HStack>
                 <BodySmall style={{ color: 'var(--Quiet)' }}>Theme: {colorScheme?.name || 'Custom'}</BodySmall>

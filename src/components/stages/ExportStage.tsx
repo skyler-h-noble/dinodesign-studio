@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, IconBadge, Icon,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card,
 } from '@dynodesign/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
@@ -9,6 +9,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../../types';
 import { generateAndUploadDesignSystem } from '../../utils/generateDesignSystem';
+import { getPublicFileUrl } from '../../utils/firebase/storage';
 import '../../styles/export.css';
 
 interface Props extends StageProps {
@@ -143,9 +144,9 @@ export default function ExportStage({
           {/* Row 1: Hosted + Figma (50/50) */}
           <Card padding="medium">
             <VStack spacing={3}>
-              <IconBadge color="primary">
+              <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Primary-Button)', color: 'var(--Buttons-Primary-Text)' }}>
                 <ComputerIcon />
-              </IconBadge>
+              </div>
               <H3 style={{ fontSize: '1.1rem' }}>Hosted Design System</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 View your complete design system with all 49 components rendered with your brand tokens. Share the playground link with your team.
@@ -158,7 +159,7 @@ export default function ExportStage({
 
           <Card padding="medium">
             <VStack spacing={3}>
-              <IconBadge color="black">
+              <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a', color: '#fff' }}>
                 <svg width="20" height="20" viewBox="0 0 38 57" fill="none">
                   <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" fill="#1ABCFE"/>
                   <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" fill="#0ACF83"/>
@@ -166,7 +167,7 @@ export default function ExportStage({
                   <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" fill="#F24E1E"/>
                   <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" fill="#A259FF"/>
                 </svg>
-              </IconBadge>
+              </div>
               <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Get a full Figma design system with your brand tokens applied to every component, style, and variable.
@@ -180,9 +181,9 @@ export default function ExportStage({
           {/* Row 2: Code Project + Storybook (50/50) */}
           <Card padding="medium">
             <VStack spacing={3}>
-              <IconBadge color="tertiary">
+              <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Tertiary-Button)', color: 'var(--Buttons-Tertiary-Text)' }}>
                 <CodeIcon />
-              </IconBadge>
+              </div>
               <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Install the DinoDesign component library and connect your design system to your React project.
@@ -201,11 +202,11 @@ export default function ExportStage({
 
           <Card padding="medium">
             <VStack spacing={3}>
-              <IconBadge color="error">
+              <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Error-Button)', color: 'var(--Buttons-Error-Text)' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M16.34.24l-.12 2.71a.18.18 0 0 0 .29.15l1.06-.8.9.7a.18.18 0 0 0 .28-.14L18.65.1l1.33-.1a1.2 1.2 0 0 1 1.28 1.2v21.6A1.2 1.2 0 0 1 20 24l-16.1-.72a1.2 1.2 0 0 1-1.15-1.16L2 2.32a1.2 1.2 0 0 1 1.13-1.27l13.2-.83.01.02zM13.27 9.3c0 .47 3.16.24 3.59-.08 0-3.2-1.72-4.89-4.86-4.89-3.15 0-4.9 1.72-4.9 4.29 0 4.45 6 4.53 6 6.96 0 .7-.32 1.1-1.05 1.1-.96 0-1.35-.49-1.3-2.16 0-.36-3.65-.48-3.77 0-.27 4.03 2.23 5.2 5.1 5.2 2.79 0 4.97-1.49 4.97-4.18 0-4.77-6.1-4.64-6.1-7 0-.97.72-1.1 1.13-1.1.45 0 1.25.07 1.19 1.87z"/>
                 </svg>
-              </IconBadge>
+              </div>
               <H3 style={{ fontSize: '1.1rem' }}>Storybook</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Browse interactive component documentation with usage examples, prop tables, and live previews for all 49 components.
@@ -219,9 +220,9 @@ export default function ExportStage({
           {/* Row 3: AI + Accessibility Report (50/50) */}
           <Card padding="medium">
             <VStack spacing={3}>
-              <IconBadge color="secondary">
+              <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Secondary-Button)', color: 'var(--Buttons-Secondary-Text)' }}>
                 <GridViewIcon />
-              </IconBadge>
+              </div>
               <H3 style={{ fontSize: '1.1rem' }}>Start Using in AI</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Connect your design system to Cursor, Claude Code, or any AI coding assistant.
@@ -240,9 +241,9 @@ export default function ExportStage({
 
           <Card padding="medium">
             <VStack spacing={3}>
-              <IconBadge color="success">
+              <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Success-Button)', color: 'var(--Buttons-Success-Text)' }}>
                 <CheckCircleOutlineIcon />
-              </IconBadge>
+              </div>
               <H3 style={{ fontSize: '1.1rem' }}>Accessibility Report</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
@@ -264,11 +265,10 @@ export default function ExportStage({
                 style={{ width: '100%' }}
                 onClick={async () => {
                   const zip = new JSZip();
-                  const base = `https://aqpmdqlhffjakkznxudv.supabase.co/storage/v1/object/public/design-system/${dinoId}`;
                   const files = ['foundation.css', 'core.css', 'typography-tokens.css', 'Light-Mode.css', 'Dark-Mode.css', 'base.css', 'styles.css', 'tokens.json', 'figma.json', 'DINO-TOKENS.md', 'theme.json'];
                   for (const f of files) {
                     try {
-                      const res = await fetch(`${base}/${f}`);
+                      const res = await fetch(getPublicFileUrl(dinoId!, f));
                       if (res.ok) zip.file(f, await res.text());
                     } catch { /* skip */ }
                   }
