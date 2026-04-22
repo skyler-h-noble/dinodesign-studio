@@ -276,8 +276,9 @@ function generateScaledTones(
 
 /**
  * Generate a 12-tone light mode scale from a hex color.
- * maxChroma is the desired peak chroma across all tones.
- * Default: uses the natural peak chroma of the color.
+ * When maxChroma is provided, it is used directly as the peak.
+ * When undefined, peak is derived from the extracted color's position on the bell curve.
+ * Per-tone chroma is always gamut-clipped by step.chroma in generateScaledTones.
  */
 export function generateSemanticLightModeScale(
   hex: string,
@@ -285,37 +286,40 @@ export function generateSemanticLightModeScale(
   lockedHex?: string,
   hueEasing?: HueEasing
 ): ToneStep[] {
-  // Always derive peak from the extracted color's position on the bell curve
-  const [l, c, h] = chroma(hex).lch();
-  const colorNumber = toneToColorNumber(l);
-  const bellCurve = getChromaBellCurve(h);
-  const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
-  const derivedPeak = multiplierAtTone > 0 ? c / multiplierAtTone : c;
-
-  // Cap: use maxChroma as a ceiling if provided, default 64
-  const cap = maxChroma !== undefined ? maxChroma : 64;
-  const peakChroma = Math.min(derivedPeak, cap);
+  let peakChroma: number;
+  if (maxChroma !== undefined) {
+    peakChroma = maxChroma;
+  } else {
+    const [l, c, h] = chroma(hex).lch();
+    const colorNumber = toneToColorNumber(l);
+    const bellCurve = getChromaBellCurve(h);
+    const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
+    peakChroma = multiplierAtTone > 0 ? c / multiplierAtTone : c;
+  }
 
   return generateScaledTones(hex, peakChroma, undefined, false, lockedHex, hueEasing);
 }
 
 /**
  * Generate a 12-tone dark mode scale from a hex color.
- * Peak derived from extracted color, capped at maxChroma (default 42).
+ * When maxChroma is provided, it is used directly as the peak.
+ * When undefined, peak is derived from the extracted color's position on the bell curve.
  */
 export function generateSemanticDarkModeScale(
   hex: string,
   maxChroma?: number,
   hueEasing?: HueEasing
 ): ToneStep[] {
-  const [l, c, h] = chroma(hex).lch();
-  const colorNumber = toneToColorNumber(l);
-  const bellCurve = getChromaBellCurve(h);
-  const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
-  const derivedPeak = multiplierAtTone > 0 ? c / multiplierAtTone : c;
-
-  const cap = maxChroma !== undefined ? maxChroma : 42;
-  const peakChroma = Math.min(derivedPeak, cap);
+  let peakChroma: number;
+  if (maxChroma !== undefined) {
+    peakChroma = maxChroma;
+  } else {
+    const [l, c, h] = chroma(hex).lch();
+    const colorNumber = toneToColorNumber(l);
+    const bellCurve = getChromaBellCurve(h, true);
+    const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
+    peakChroma = multiplierAtTone > 0 ? c / multiplierAtTone : c;
+  }
 
   return generateScaledTones(hex, peakChroma, DARK_TONE_SCALE, true, undefined, hueEasing);
 }
@@ -326,6 +330,30 @@ export function generateSemanticDarkModeScale(
 export function getNaturalPeakChroma(hex: string): number {
   const { peakChroma } = generateNaturalScale(hex);
   return Math.round(peakChroma);
+}
+
+/**
+ * Get the peak chroma that makes the extracted color sit naturally in its
+ * own palette — i.e. the peak such that, after the bell-curve multiplier at
+ * the extracted color's tone position, the rendered chroma equals the
+ * extracted chroma. This is the default "matching" peak used when the user
+ * hasn't explicitly boosted chroma via the slider.
+ */
+export function getMatchingPeakChroma(hex: string, isDarkMode: boolean = false): number {
+  const [l, c, h] = chroma(hex).lch();
+  const toneScale = isDarkMode ? DARK_TONE_SCALE : TONE_SCALE;
+  let colorNumber = 1;
+  let minDiff = Infinity;
+  for (let i = 0; i < toneScale.length; i++) {
+    const diff = Math.abs(toneScale[i] - l);
+    if (diff < minDiff) {
+      minDiff = diff;
+      colorNumber = i + 1;
+    }
+  }
+  const bellCurve = getChromaBellCurve(h, isDarkMode);
+  const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
+  return multiplierAtTone > 0 ? c / multiplierAtTone : c;
 }
 
 /**

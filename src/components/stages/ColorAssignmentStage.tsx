@@ -222,7 +222,7 @@ export default function ColorAssignmentStage({
               >
                 <HStack spacing={1} alignItems="center">
                   <BodySmall style={{ color: 'var(--Quiet)', cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
-                  <Button swatch size="medium" sx={{ backgroundColor: colors[i] || '#ccc', '&:hover': { backgroundColor: colors[i] || '#ccc' } }} />
+                  <Button swatch size="medium" className="dino-swatch" sx={{ backgroundColor: colors[i] || '#ccc', '&:hover': { backgroundColor: colors[i] || '#ccc' } }} />
                   <BodySmall style={{ fontWeight: 600 }}>{label}</BodySmall>
                 </HStack>
               </Card>

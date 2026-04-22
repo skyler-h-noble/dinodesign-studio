@@ -31,10 +31,10 @@ export interface StyleCustomizations {
 }
 
 const STYLE_DEFAULTS: Record<ComponentStyle, { label: string; description: string } & StyleCustomizations> = {
-  professional: { label: 'Pro', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2 },
-  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
-  bold: { label: 'Bold', description: 'Strong elements, generous rounding', radius: 16, buttonRadius: 8, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 8 },
-  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', radius: 24, buttonRadius: 64, bevel: 10, bevelOpacity: 80, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 64 },
+  professional: { label: 'Pro', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2 },
+  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
+  bold: { label: 'Bold', description: 'Strong elements, generous rounding', radius: 16, buttonRadius: 8, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 8 },
+  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', radius: 24, buttonRadius: 64, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 64 },
 };
 
 const STYLE_KEYS: ComponentStyle[] = ['professional', 'modern', 'bold', 'playful'];
@@ -92,14 +92,6 @@ export default function ComponentStyleStage({
     onStyleSelected(selected, customizations[selected]);
   }, [selected, customizations]);
 
-  // Bevel is a % of button height — compute px for each size
-  const bevelPx = (height: number) => Math.round(height * custom.bevel / 100);
-  const bevelStyleFor = (height: number) => {
-    const px = bevelPx(height);
-    if (px <= 0 || custom.bevel <= 0) return 'none';
-    return `inset -${px}px -${px}px ${px}px color-mix(in srgb, var(--Buttons-Default-Highlight, #ffffff) ${custom.bevelOpacity}%, transparent), inset ${px}px ${px}px ${px}px color-mix(in srgb, var(--Buttons-Default-Lowlight, #000000) ${custom.bevelOpacity}%, transparent)`;
-  };
-  const bevelStyle = bevelStyleFor(custom.buttonHeight);
 
   return (
     <div className="comp-style-page" style={{ display: 'flex', minHeight: '100vh' }}>
@@ -209,7 +201,7 @@ export default function ComponentStyleStage({
               '--Card-Radius': `${custom.radius}px`,
               '--Icon-Button-Radius': `${custom.iconButtonRadius}px`,
               '--Button-Height': `${custom.buttonHeight}px`,
-              '--Button-Min-Width': `${custom.minButtonWidth}px`,
+              '--Min-Button-Width': `${custom.minButtonWidth}px`,
             } as React.CSSProperties}
           >
             <Card
@@ -227,14 +219,17 @@ export default function ComponentStyleStage({
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Style</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
                       <Button variant="primary" size="medium"
+                        sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Solid
                       </Button>
                       <Button variant="primary-outline" size="medium"
+                        sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Outline
                       </Button>
                       <Button variant="ghost" size="medium"
+                        sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Ghost
                       </Button>
@@ -246,14 +241,17 @@ export default function ComponentStyleStage({
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Size</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
                       <Button variant="primary" size="small"
+                        sx={{ minHeight: `${custom.smallButtonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Small
                       </Button>
                       <Button variant="primary" size="medium"
+                        sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Medium
                       </Button>
                       <Button variant="primary" size="large"
+                        sx={{ minHeight: `${custom.largeButtonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Large
                       </Button>
@@ -265,16 +263,32 @@ export default function ComponentStyleStage({
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Icon Buttons</Label>
                     <HStack spacing={2}>
                       <Button variant="primary" size="medium" iconOnly
+                        sx={{
+                          minHeight: `${custom.buttonHeight}px`,
+                          minWidth: `${custom.buttonHeight}px`,
+                          maxWidth: `${custom.buttonHeight}px`,
+                          borderRadius: `${custom.iconButtonRadius}px`,
+                        }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>
                       <Button variant="primary-outline" size="medium" iconOnly
-                        style={{ height: custom.buttonHeight, width: custom.buttonHeight, borderRadius: custom.iconButtonRadius }}
+                        sx={{
+                          minHeight: `${custom.buttonHeight}px`,
+                          minWidth: `${custom.buttonHeight}px`,
+                          maxWidth: `${custom.buttonHeight}px`,
+                          borderRadius: `${custom.iconButtonRadius}px`,
+                        }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>
                       <Button variant="ghost" size="medium" iconOnly
-                        style={{ height: custom.buttonHeight, width: custom.buttonHeight, borderRadius: custom.iconButtonRadius }}
+                        sx={{
+                          minHeight: `${custom.buttonHeight}px`,
+                          minWidth: `${custom.buttonHeight}px`,
+                          maxWidth: `${custom.buttonHeight}px`,
+                          borderRadius: `${custom.iconButtonRadius}px`,
+                        }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>

@@ -803,7 +803,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const buttonRadius = sc?.buttonRadius ?? BORDER_RADII[input.componentStyle].medium;
   const cardRadius = sc?.radius ?? Math.round(buttonRadius * 1.33);
   const cardPadding = cardRadius >= 16 ? 20 : 16;
-  const buttonHeight = sc?.buttonHeight ?? 36;
+  const buttonHeight = sc?.buttonHeight ?? 32;
   const smallButtonHeight = sc?.smallButtonHeight ?? 24;
   const largeButtonHeight = sc?.largeButtonHeight ?? 56;
   const minButtonWidth = sc?.minButtonWidth ?? 60;
@@ -824,7 +824,6 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Bevel: ${bevelPercent};
   --Button-Bevel-Px: ${bevelPx}px;
   --Button-Bevel-Opacity: ${bevelOpacity / 100};
-  --Button-Bevel-Shadow: ${bevelPx > 0 ? `inset -${bevelPx}px -${bevelPx}px ${bevelPx}px color-mix(in srgb, var(--Buttons-Default-Highlight, #ffffff) ${bevelOpacity}%, transparent), inset ${bevelPx}px ${bevelPx}px ${bevelPx}px color-mix(in srgb, var(--Buttons-Default-Lowlight, #000000) ${bevelOpacity}%, transparent)` : 'none'};
   --Style-Border-Radius: var(--Button-Radius);
 
   /* Card */
@@ -1145,6 +1144,10 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 }
 `;
 
+  // Button bevel is implemented entirely inside the consumer's Button
+  // component (reads --Button-Bevel, per-variant Highlight/Lowlight, and
+  // the size-specific height token), so styles.css stays empty of button
+  // overrides — adding any would win on specificity and break Button.js.
   const stylesCSS = `/* Overrides */\n`;
 
   // 6. Import typography-tokens.css

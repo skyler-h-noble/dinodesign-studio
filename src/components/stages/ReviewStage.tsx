@@ -25,7 +25,7 @@ const STYLE_LABELS: Record<ComponentStyle, string> = {
 };
 
 export default function ReviewStage({
-  onNext, onBack, designSystemName, colorScheme, userSelections,
+  onNext, designSystemName, colorScheme, userSelections,
   typographyStyles, componentStyle, moodBoardUrl,
 }: Props) {
   const colors = colorScheme?.colors || [];
@@ -120,10 +120,6 @@ export default function ReviewStage({
                 </Button>
               </VStack>
             </Card>
-
-            <Button variant="primary-outline" onClick={onBack} style={{ width: '100%' }}>
-              Back
-            </Button>
           </div>
         </div>
 
@@ -136,7 +132,7 @@ export default function ReviewStage({
                 <BodySmall style={{ fontWeight: 600 }}>Coloring</BodySmall>
                 <HStack spacing={1}>
                   {colors.slice(0, 3).map((c, i) => (
-                    <Button key={i} swatch size="medium" sx={{ backgroundColor: c, '&:hover': { backgroundColor: c } }} />
+                    <Button key={i} swatch size="medium" className="dino-swatch" sx={{ backgroundColor: c, '&:hover': { backgroundColor: c } }} />
                   ))}
                 </HStack>
                 <BodySmall style={{ color: 'var(--Quiet)' }}>Theme: {colorScheme?.name || 'Custom'}</BodySmall>

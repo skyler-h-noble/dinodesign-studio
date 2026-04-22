@@ -71,7 +71,7 @@ function MainApp() {
   const [savedFontSamples, setSavedFontSamples] = useState<any[]>([]);
   const [savedSelectedSample, setSavedSelectedSample] = useState<number | null>(null);
   const [savedStyleCustomizations, setSavedStyleCustomizations] = useState<any>({
-    modern: { radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 36, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
+    modern: { radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
   });
 
   const goNext = useCallback(() => {
@@ -121,6 +121,13 @@ function MainApp() {
   const [customNextLabel, setCustomNextLabel] = useState<string | null>(null);
 
   const goBack = useCallback(() => {
+    // If the pricing modal is open, Back just closes it (returns to the stage
+    // beneath) instead of navigating stages.
+    if (showPricingModal) {
+      setShowPricingModal(false);
+      window.scrollTo(0, 0);
+      return;
+    }
     if (customBackRef.current) {
       customBackRef.current();
       return;
@@ -130,7 +137,7 @@ function MainApp() {
       setStage(STAGE_ORDER[currentIndex - 1]);
       window.scrollTo(0, 0);
     }
-  }, [stage]);
+  }, [stage, showPricingModal]);
 
   const handleNameSubmit = (name: string, date: string) => {
     setDesignSystemName(name);
@@ -341,11 +348,13 @@ function MainApp() {
 
   const bevel = savedStyleCustomizations?.[componentStyle]?.bevel ?? 0;
   const bevelOpacity = savedStyleCustomizations?.[componentStyle]?.bevelOpacity ?? 50;
-  const buttonHeight = savedStyleCustomizations?.[componentStyle]?.buttonHeight ?? 36;
+  const buttonHeight = savedStyleCustomizations?.[componentStyle]?.buttonHeight ?? 32;
   const smallButtonHeight = savedStyleCustomizations?.[componentStyle]?.smallButtonHeight ?? 24;
   const largeButtonHeight = savedStyleCustomizations?.[componentStyle]?.largeButtonHeight ?? 56;
   const minButtonWidth = savedStyleCustomizations?.[componentStyle]?.minButtonWidth ?? 60;
   const iconButtonRadius = savedStyleCustomizations?.[componentStyle]?.iconButtonRadius ?? buttonRadius;
+
+  const bevelPx = Math.round(buttonHeight * bevel / 100);
 
   const styleVars = {
     '--Style-Border-Radius': `${buttonRadius}px`,
@@ -353,6 +362,7 @@ function MainApp() {
     '--Button-Icon-Radius': `${iconButtonRadius}px`,
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
+    '--Button-Bevel-Px': `${bevelPx}px`,
     '--Button-Height': `${buttonHeight}px`,
     '--Small-Button-Height': `${smallButtonHeight}px`,
     '--Large-Button-Height': `${largeButtonHeight}px`,
@@ -427,6 +437,81 @@ function MainApp() {
           --Effect-Level-3: 0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22);
           --Effect-Level-4: 0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17);
           --Effect-Level-5: 0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13);
+        }
+      `}} />
+      {/* `@dynodesign/components`'s Button has no "default" in its color list,
+          so variant="default" silently falls through to the Primary styles and
+          reads --Buttons-Primary-*. Redirect those reads to --Buttons-Default-*
+          on any .btn-default so the button actually renders with the Default
+          palette (which tracks the user's button-mode choice). */}
+      <style id="dino-btn-default-redirect" dangerouslySetInnerHTML={{ __html: `
+        .btn-default {
+          --Buttons-Primary-Button: var(--Buttons-Default-Button);
+          --Buttons-Primary-Text: var(--Buttons-Default-Text);
+          --Buttons-Primary-Border: var(--Buttons-Default-Border);
+          --Buttons-Primary-Hover: var(--Buttons-Default-Hover);
+          --Buttons-Primary-Active: var(--Buttons-Default-Active);
+        }
+      `}} />
+      {/* Per-variant bevel shadow. Each variant exposes its palette's
+          Highlight/Lowlight RGB triples via --Current-Bevel-*; one rule
+          applies the shadow, skipping ghost/text (flat by design). */}
+      <style id="dino-button-bevel" dangerouslySetInnerHTML={{ __html: `
+        .btn-primary, .btn-primary-outline, .btn-primary-light, .btn-outline {
+          --Current-Bevel-Highlight: var(--Buttons-Primary-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Primary-Lowlight, 0, 0, 0);
+        }
+        .btn-default {
+          --Current-Bevel-Highlight: var(--Buttons-Default-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Default-Lowlight, 0, 0, 0);
+        }
+        .btn-secondary, .btn-secondary-outline, .btn-secondary-light {
+          --Current-Bevel-Highlight: var(--Buttons-Secondary-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Secondary-Lowlight, 0, 0, 0);
+        }
+        .btn-tertiary, .btn-tertiary-outline, .btn-tertiary-light {
+          --Current-Bevel-Highlight: var(--Buttons-Tertiary-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Tertiary-Lowlight, 0, 0, 0);
+        }
+        .btn-neutral, .btn-neutral-outline, .btn-neutral-light {
+          --Current-Bevel-Highlight: var(--Buttons-Neutral-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Neutral-Lowlight, 0, 0, 0);
+        }
+        .btn-info, .btn-info-outline, .btn-info-light {
+          --Current-Bevel-Highlight: var(--Buttons-Info-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Info-Lowlight, 0, 0, 0);
+        }
+        .btn-success, .btn-success-outline, .btn-success-light {
+          --Current-Bevel-Highlight: var(--Buttons-Success-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Success-Lowlight, 0, 0, 0);
+        }
+        .btn-warning, .btn-warning-outline, .btn-warning-light {
+          --Current-Bevel-Highlight: var(--Buttons-Warning-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Warning-Lowlight, 0, 0, 0);
+        }
+        .btn-error, .btn-error-outline, .btn-error-light, .btn-danger {
+          --Current-Bevel-Highlight: var(--Buttons-Error-Highlight, 255, 255, 255);
+          --Current-Bevel-Lowlight: var(--Buttons-Error-Lowlight, 0, 0, 0);
+        }
+        /* Size-scaled bevel: --_bevel is derived from the bevel % × the
+           button's own height token, matching DinoDesign Button.js. MUI adds
+           .MuiButton-size{Small,Medium,Large} based on the size prop. */
+        body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch) {
+          --_bevel: calc(var(--Button-Bevel, 0) * var(--Button-Height, 0px) / 100);
+        }
+        body .MuiButton-root[class*="btn-"].MuiButton-sizeSmall:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch) {
+          --_bevel: calc(var(--Button-Bevel, 0) * var(--Small-Button-Height, 0px) / 100);
+        }
+        body .MuiButton-root[class*="btn-"].MuiButton-sizeLarge:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch) {
+          --_bevel: calc(var(--Button-Bevel, 0) * var(--Large-Button-Height, 0px) / 100);
+        }
+        body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch),
+        body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch):hover,
+        body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch):active,
+        body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch).Mui-focusVisible {
+          box-shadow:
+            inset var(--_bevel, 0px) var(--_bevel, 0px) var(--_bevel, 0px) rgba(var(--Current-Bevel-Highlight, 255, 255, 255), var(--Button-Bevel-Opacity, 0.5)),
+            inset calc(0px - var(--_bevel, 0px)) calc(0px - var(--_bevel, 0px)) var(--_bevel, 0px) rgba(var(--Current-Bevel-Lowlight, 0, 0, 0), var(--Button-Bevel-Opacity, 0.5));
         }
       `}} />
       {/* Inject brand CSS — same tokens as the phone preview */}

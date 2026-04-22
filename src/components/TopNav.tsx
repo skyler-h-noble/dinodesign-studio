@@ -6,7 +6,7 @@ interface TopNavProps {
 
 export default function TopNav({ designSystemName }: TopNavProps) {
   return (
-    <ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
+    <ThemedZone theme="Brand-App-Bar" surface="Surface" as="header">
       <AppBar
         mode="desktop"
         barColor="default"

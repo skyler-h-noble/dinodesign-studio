@@ -48,6 +48,15 @@ const WEIGHT_OPTIONS = [
   { value: '700', label: 'Bold (700)' },
 ];
 
+// Detected/arbitrary numeric weights may not land on one of WEIGHT_OPTIONS.
+// Snap to the closest supported value so the dropdown always has a selection.
+function snapWeight(weight: number | string | null | undefined): string {
+  const allowed = WEIGHT_OPTIONS.map(o => Number(o.value));
+  const n = Number(weight);
+  if (!Number.isFinite(n)) return '400';
+  return String(allowed.reduce((best, w) => Math.abs(w - n) < Math.abs(best - n) ? w : best, allowed[0]));
+}
+
 const SPACING_OPTIONS = [
   { value: '-0.02em', label: 'Tight' },
   { value: '0em', label: 'Normal' },
@@ -125,7 +134,7 @@ export default function TypographyStage({
 
   const roleLabels: Record<string, string> = {
     header: 'Decorative Header',
-    decorative: 'Decorative Overline',
+    decorative: 'Decorative Subtitle',
     body: 'Body',
   };
 
@@ -159,9 +168,9 @@ export default function TypographyStage({
 
           if (detected) {
             setEditedTypography([
-              { type: 'header', family: detected.headerStyle, weight: String(detected.headerWeight), letterSpacing: `${detected.headerLetterSpacing}em`, allCaps: detected.headerIsAllCaps },
-              { type: 'decorative', family: detected.decorativeStyle || detected.headerStyle, weight: String(detected.decorativeWeight), letterSpacing: `${detected.decorativeLetterSpacing}em`, allCaps: detected.decorativeIsAllCaps },
-              { type: 'body', family: detected.bodyStyle, weight: String(detected.bodyWeight), letterSpacing: `${detected.bodyLetterSpacing}em`, allCaps: false },
+              { type: 'header', family: detected.headerStyle, weight: snapWeight(detected.headerWeight), letterSpacing: `${detected.headerLetterSpacing}em`, allCaps: detected.headerIsAllCaps },
+              { type: 'decorative', family: detected.decorativeStyle || detected.headerStyle, weight: snapWeight(detected.decorativeWeight), letterSpacing: `${detected.decorativeLetterSpacing}em`, allCaps: detected.decorativeIsAllCaps },
+              { type: 'body', family: detected.bodyStyle, weight: snapWeight(detected.bodyWeight), letterSpacing: `${detected.bodyLetterSpacing}em`, allCaps: false },
             ]);
             setUseMoodBased(false);
             setStep('review');
@@ -317,6 +326,9 @@ export default function TypographyStage({
   const renderRoleSection = (key: 'header' | 'decorative' | 'body', i: number) => {
     const t = editedTypography[i];
     const isOpen = openSections[key];
+    const roleCategoryOptions = (key === 'body' && !useMoodBased)
+      ? categoryOptions.filter(c => c.startsWith('Sans Serif'))
+      : categoryOptions;
     return (
       <div key={key} className="typo-section">
         <div className="typo-section-header" onClick={() => toggleSection(key)}>
@@ -333,7 +345,7 @@ export default function TypographyStage({
                 fullWidth
                 value={t.family}
                 onChange={(val: string) => handleEdit(i, 'family', val)}
-                options={categoryOptions.map(cat => ({ value: cat, label: cat }))}
+                options={roleCategoryOptions.map(cat => ({ value: cat, label: cat }))}
               />
               <Select
                 label="Weight"

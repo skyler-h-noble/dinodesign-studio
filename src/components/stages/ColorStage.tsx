@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
 import { generateColorSchemes } from '../../utils/colorSchemes';
-import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma, findClosestColorN } from '../../utils/colorScale';
+import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma, getMatchingPeakChroma, findClosestColorN } from '../../utils/colorScale';
 import { getColorDescription } from '../../utils/colorNaming';
 import type { StageProps, ColorScheme } from '../../types';
 import type { ExtractedColorData, ExtractedColor } from '../../utils/imageAnalysis';
@@ -171,10 +171,12 @@ export default function ColorStage({
         setTopColors([...data.topColors]);
         setAnchorColors([...data.topColors]);
         onTopColorsExtracted?.([...data.topColors]);
-        // Initialize chroma per color from natural peak chroma across all tones
-        const peakChromas = data.topColors.map(c => getNaturalPeakChroma(c.hex));
-        setChromaPerColor(peakChromas.map(c => Math.min(c, 70)));
-        setDarkChromaPerColor(peakChromas.map(c => Math.min(c, 42)));
+        // Initialize chroma per color so the extracted color sits at its natural
+        // chroma in its own palette. User can boost via the edit modal slider.
+        const lightPeaks = data.topColors.map(c => getMatchingPeakChroma(c.hex, false));
+        const darkPeaks = data.topColors.map(c => getMatchingPeakChroma(c.hex, true));
+        setChromaPerColor(lightPeaks.map(c => Math.min(Math.round(c), 70)));
+        setDarkChromaPerColor(darkPeaks.map(c => Math.min(Math.round(c), 42)));
       } catch (err) {
         if (!cancelled) {
           setError('Failed to extract colors. Try a different image.');
@@ -306,10 +308,9 @@ export default function ColorStage({
         // Use the stable anchor color, NOT the user's currently chosen tone
         const baseColor = anchorColors[idx] || topColors[idx];
         if (!baseColor) return null;
-        const naturalChroma = getNaturalPeakChroma(baseColor.hex);
-        // Default to natural peak (capped at the mode's hard ceiling) when no override is set
-        const lightDefault = Math.min(naturalChroma, 70);
-        const darkDefault = Math.min(naturalChroma, 42);
+        // Default peak = the one that preserves extracted chroma at its own tone
+        const lightDefault = Math.min(Math.round(getMatchingPeakChroma(baseColor.hex, false)), 70);
+        const darkDefault = Math.min(Math.round(getMatchingPeakChroma(baseColor.hex, true)), 42);
         const storedLight = chromaPerColor[idx];
         const storedDark = darkChromaPerColor[idx];
         const currentChroma = toneMode === 'light'
@@ -404,7 +405,7 @@ export default function ColorStage({
               The user&apos;s exact color stays fixed; hues interpolate from the endpoints toward it.
             </BodySmall>
 
-            <BodySmall style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
               Editing <strong>{toneMode}</strong> mode (switch above to edit the other mode)
             </BodySmall>
 
@@ -463,7 +464,7 @@ export default function ColorStage({
                         )}
                       </div>
                       {isExtracted && (
-                        <span style={{ fontSize: '0.55rem', color: 'var(--Quiet)', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--Quiet)', whiteSpace: 'nowrap' }}>
                           Color-{step.colorNumber}
                         </span>
                       )}
@@ -471,7 +472,7 @@ export default function ColorStage({
                   );
                 })}
               </div>
-              <BodySmall style={{ fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Dashed = your extracted color
               </BodySmall>
             </VStack>
@@ -479,8 +480,7 @@ export default function ColorStage({
             {(() => {
               const isLocked = !!lockedColorMap[idx];
               const sliderMin = 0;
-              // Slider max = the actual achievable peak (gamut-limited), capped at hard 70
-              const sliderMax = Math.min(70, naturalCeiling);
+              const sliderMax = Math.min(70, Math.max(1, naturalCeiling));
               // Bell-curve peak multiplier: yellow hues peak at 1.0, others at 0.90.
               const isYellow = baseHue >= 60 && baseHue <= 100;
               const bellMax = isYellow ? 1.00 : 0.90;
@@ -498,13 +498,14 @@ export default function ColorStage({
                     min={sliderMin}
                     max={sliderMax}
                     value={sliderValue}
-                    onChange={(_: any, val: number | number[]) => setChromaDragValue(val as number)}
-                    onChangeCommitted={(_: any, val: number | number[]) => {
-                      // Scale slider value → chromaPerColor input so the highest-chroma
-                      // tone reaches (but doesn't exceed) the slider value.
+                    onChange={(_: any, val: number | number[]) => {
+                      setChromaDragValue(val as number);
+                      // Update chromaPerColor during drag so the preview updates live
                       const target = Math.min(sliderMax, val as number);
                       const scaledInput = Math.floor(target / bellMax);
                       onChromaChange(scaledInput);
+                    }}
+                    onChangeCommitted={() => {
                       setChromaDragValue(null);
                     }}
                     size="small"
@@ -514,11 +515,24 @@ export default function ColorStage({
                       { value: sliderMax, label: String(sliderMax) },
                     ]}
                   />
-                  {isLocked && (
-                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+                  {isLocked ? (
+                    <BodySmall style={{ color: 'var(--Quiet)' }}>
                       Chroma is locked because this color is locked to its exact hex.
                     </BodySmall>
-                  )}
+                  ) : sliderMax < 70 ? (
+                    <BodySmall style={{ color: 'var(--Quiet)' }}>
+                      This color's gamut peaks at {sliderMax}.{' '}
+                      <Link
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e: React.MouseEvent) => {
+                          e.preventDefault();
+                          window.open('/faq#chroma-limit', '_blank');
+                        }}
+                      >
+                        Why can't I increase the chroma?
+                      </Link>
+                    </BodySmall>
+                  ) : null}
                 </VStack>
               );
             })()}
@@ -623,8 +637,20 @@ export default function ColorStage({
                   Reset Hues
                 </Button>
               )}
-              <Button variant="outline" size="small" onClick={() => setHueEditTopIdx(null)}>Cancel</Button>
-              <Button variant="default" size="small" onClick={applyEdit}>Apply</Button>
+              <Button variant="primary-outline" size="small" onClick={() => setHueEditTopIdx(null)}>Cancel</Button>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={applyEdit}
+                sx={{
+                  backgroundColor: 'var(--Text)',
+                  color: 'var(--Background)',
+                  borderColor: 'var(--Text)',
+                  '&:hover': { backgroundColor: 'var(--Text)', opacity: 0.85, borderColor: 'var(--Text)' },
+                }}
+              >
+                Apply
+              </Button>
             </HStack>
           </VStack>
         );
@@ -676,6 +702,7 @@ export default function ColorStage({
                     <Button
                       swatch
                       size="large"
+                      className="dino-swatch"
                       onClick={() => {
                         if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
                         clickTimer.current = setTimeout(() => { clickTimer.current = null; openHexEditor(color.hex, i, 'top'); }, 350);
@@ -743,6 +770,7 @@ export default function ColorStage({
                     <Button
                       swatch
                       size="large"
+                      className="dino-swatch"
                       onClick={() => {
                         if (swapIndex !== null) handleSwap(color);
                         else openHexEditor(color.hex, i, 'additional');
@@ -864,7 +892,17 @@ export default function ColorStage({
             {/* Actions */}
             <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
               <Button variant="primary-outline" size="small" onClick={() => setHexEditIndex(null)}>Cancel</Button>
-              <Button variant="primary" size="small" onClick={applyHexEdit}>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={applyHexEdit}
+                sx={{
+                  backgroundColor: 'var(--Text)',
+                  color: 'var(--Background)',
+                  borderColor: 'var(--Text)',
+                  '&:hover': { backgroundColor: 'var(--Text)', opacity: 0.85, borderColor: 'var(--Text)' },
+                }}
+              >
                 {hexEditSource === 'top' ? 'Apply' : 'Close'}
               </Button>
             </HStack>
@@ -905,6 +943,7 @@ export default function ColorStage({
                   <Button
                     swatch
                     size={isNarrow ? 'small' : 'large'}
+                    className="dino-swatch"
                     onClick={() => {
                       setPrimaryIndex(i);
                       regenerateSchemes(topColors, i);
@@ -947,11 +986,12 @@ export default function ColorStage({
           {/* Expanded: per-color tones + chroma */}
           {showChromaSettings && (
             <VStack spacing={3}>
-              <ButtonGroup size="small">
+              <HStack spacing={0}>
                 <Button
                   variant={toneMode === 'light' ? 'default' : 'outline'}
                   size="small"
                   onClick={() => setToneMode('light')}
+                  sx={{ borderRadius: 'var(--Style-Border-Radius) 0 0 var(--Style-Border-Radius)', marginRight: '-1px', position: 'relative', zIndex: toneMode === 'light' ? 1 : 0 }}
                 >
                   Light Mode
                 </Button>
@@ -959,10 +999,11 @@ export default function ColorStage({
                   variant={toneMode === 'dark' ? 'default' : 'outline'}
                   size="small"
                   onClick={() => setToneMode('dark')}
+                  sx={{ borderRadius: '0 var(--Style-Border-Radius) var(--Style-Border-Radius) 0' }}
                 >
                   Dark Mode
                 </Button>
-              </ButtonGroup>
+              </HStack>
 
               <BodySmall style={{ fontSize: '0.75rem' }}>
                 <strong>Click any tone</strong> to update which tone represents each color.
@@ -1117,6 +1158,7 @@ export default function ColorStage({
                         <Button
                           swatch
                           size="large"
+                          className="dino-swatch"
                           sx={{ backgroundColor: displayColor, '&:hover': { backgroundColor: displayColor }, width: '100%', height: 56 }}
                           onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
