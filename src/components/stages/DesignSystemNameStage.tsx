@@ -56,7 +56,18 @@ export default function DesignSystemNameStage({ onNext, onBack, onSubmit }: Prop
         <Button variant="primary-outline" size="medium" onClick={onBack}>
           Cancel
         </Button>
-        <Button variant="primary" size="medium" onClick={handleNext} disabled={!name.trim()}>
+        <Button
+          variant="primary"
+          size="medium"
+          onClick={handleNext}
+          disabled={!name.trim()}
+          sx={{
+            backgroundColor: 'var(--Text)',
+            color: 'var(--Background)',
+            borderColor: 'var(--Text)',
+            '&:hover': { backgroundColor: 'var(--Text)', opacity: 0.85, borderColor: 'var(--Text)' },
+          }}
+        >
           Next
         </Button>
       </HStack>

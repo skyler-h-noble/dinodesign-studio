@@ -248,8 +248,13 @@ export default function ExportStage({
               <BodySmall style={{ color: 'var(--Quiet)' }}>
                 Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
               </BodySmall>
-              <Button variant="primary" style={{ width: '100%' }} disabled>
-                Download Report (Coming Soon)
+              <Button
+                variant="primary"
+                style={{ width: '100%' }}
+                disabled={!hasId}
+                onClick={() => window.open(`/accessibility-report?id=${dinoId}`, '_blank', 'noopener')}
+              >
+                Open Accessibility Report
               </Button>
             </VStack>
           </Card>

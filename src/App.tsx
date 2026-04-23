@@ -36,6 +36,7 @@ import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
 import ToneTuner from './components/ToneTuner';
 import AccountPage from './components/AccountPage';
 import LandingPage from './components/LandingPage';
+import AccessibilityReport from './components/AccessibilityReport';
 
 function MainApp() {
   const { user } = useAuth();
@@ -588,6 +589,7 @@ function App() {
         <Route path="/tune" element={<ToneTuner />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccess />} />
+        <Route path="/accessibility-report" element={<AccessibilityReport />} />
       </Routes>
     </BrowserRouter>
   );

@@ -542,8 +542,16 @@ ${(() => {
   const abOldHoverHex = p(abPalArr, abOldHover);
   const abHoverHex = mixHex(btnBg, abOldHoverHex);
 
+  // Library components like AppBar set their own data-theme="App-Bar" on their
+  // root element, which would otherwise override these vars. The nested
+  // descendant selector lets that inner element still inherit the branded
+  // tokens. Keep this narrow — matching [data-theme="Brand"] descendants would
+  // also catch sibling content inside shared-wrapper layouts (e.g. PhonePreview
+  // wraps App-Bar and Brand-main under one Brand-Nav-Bar frame).
   return `[data-theme="Brand-App-Bar"],
-  [data-theme="Brand-App-Bar"][data-surface="Surface"] {
+  [data-theme="Brand-App-Bar"][data-surface="Surface"],
+  [data-theme="Brand-App-Bar"] [data-theme="App-Bar"],
+  [data-theme="Brand-App-Bar"] [data-theme="App-Bar"][data-surface="Surface-Bright"] {
   --Background: ${appBarBg};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(appBarBg))};
   --Text: var(--${ac.palette}-Color-${tones.text});
@@ -736,7 +744,9 @@ ${(() => {
   const navBorderN = tones.border;
 
   return `[data-theme="Brand-Nav-Bar"],
-  [data-theme="Brand-Nav-Bar"][data-surface="Surface"] {
+  [data-theme="Brand-Nav-Bar"][data-surface="Surface"],
+  [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"],
+  [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"][data-surface="Surface-Bright"] {
   --Background: ${navBarBg};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(navBarBg))};
   --Text: ${p(primaryLight, tones.text)};
