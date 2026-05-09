@@ -32,6 +32,9 @@ interface GenerateInput {
   surfaceStyle?: SurfaceStyle;
   moodBoardUrl?: string | null;
   moodBoardFile?: File | null;
+  /** Monotonic export version. Plugins compare this against their last-imported
+   *  value to decide whether the design system has new changes. Defaults to 1. */
+  version?: number;
 }
 
 // ─── Map our button mode names to the pipeline's button style names ───
@@ -1161,7 +1164,23 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     { name: 'styles.css', content: stylesCSS, type: 'text/css' },
     { name: 'theme.json', content: themeJson, type: 'application/json' },
     { name: 'tokens.json', content: JSON.stringify(designSystemJSON, null, 2), type: 'application/json' },
-    { name: 'figma.json', content: (() => { try { if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations; designSystemJSON._userSelections = input.userSelections; return JSON.stringify(generateFigmaJSON(designSystemJSON), null, 2); } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; } })(), type: 'application/json' },
+    { name: 'figma.json', content: (() => {
+      try {
+        if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations;
+        designSystemJSON._userSelections = input.userSelections;
+        const figmaPayload = generateFigmaJSON(designSystemJSON);
+        // Metadata that the Figma plugin reads to detect updates since its
+        // last import. version is monotonic; lastModified is ISO 8601.
+        figmaPayload.Metadata = {
+          ...(figmaPayload.Metadata || {}),
+          dinoId: uuid,
+          version: input.version ?? 1,
+          lastModified: new Date().toISOString(),
+          name: input.designSystemName,
+        };
+        return JSON.stringify(figmaPayload, null, 2);
+      } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; }
+    })(), type: 'application/json' },
     { name: 'DINO-TOKENS.md', content: buildDinoTokensMd(uuid, input), type: 'text/markdown' },
   ];
 

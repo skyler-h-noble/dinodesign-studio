@@ -686,7 +686,19 @@ ${(() => {
 }
 
 /* ══ Container Surface ══ */
-[data-theme="Brand"][data-surface="Container"],
+${(() => {
+  // The button border must follow the chosen button-mode palette (so it
+  // matches Button / Text), not the container surface's palette. Mirrors the
+  // logic in the --Container-Buttons-Default-Border block above.
+  let buttonModePaletteName: 'Primary' | 'Secondary' | 'Tertiary' | 'Neutral' = 'Primary';
+  let buttonModePalette: typeof vPrimary = vPrimary;
+  switch (effectiveButton) {
+    case 'secondary': case 'laddered': buttonModePaletteName = 'Secondary'; buttonModePalette = vSecondary; break;
+    case 'black-white': buttonModePaletteName = 'Neutral'; buttonModePalette = NEUTRAL.map(h => ({ hex: h })) as any; break;
+    default: buttonModePaletteName = 'Primary'; buttonModePalette = vPrimary; break;
+  }
+  const buttonModeBorderN = getAccessibleTones(containerBg, containerN, buttonModePalette).border;
+  return `[data-theme="Brand"][data-surface="Container"],
 [data-theme="Brand"] [data-surface="Container"],
 [data-surface] [data-surface="Container"] {
   --Background: var(--${containerPaletteName}-Color-${containerN});
@@ -700,17 +712,18 @@ ${(() => {
   --Active: var(--${containerPaletteName}-Color-${hoverMap[containerN - 1] || containerN});
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: var(--${containerPaletteName}-Color-${containerTones.border});
+  --Buttons-Primary-Border: var(--${buttonModePaletteName}-Color-${buttonModeBorderN});
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Border: var(--${containerPaletteName}-Color-${containerTones.border});
+  --Buttons-Default-Border: var(--${buttonModePaletteName}-Color-${buttonModeBorderN});
   --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
   --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Buttons-Default-Hover: ${mixHex(btnBg, p(primaryLight, hoverMap[containerN - 1] || containerN))};
   --Buttons-Default-Active: ${p(primaryLight, hoverMap[containerN - 1] || containerN)};
   --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
   --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
-}
+}`;
+})()}
 
 /* ══ Tertiary Theme ══ */
 [data-theme="Tertiary"] {

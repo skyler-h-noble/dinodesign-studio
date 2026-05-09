@@ -7,9 +7,12 @@ import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../../types';
 import { generateAndUploadDesignSystem } from '../../utils/generateDesignSystem';
 import { getPublicFileUrl } from '../../utils/firebase/storage';
+import { db } from '../../utils/firebase/client';
+import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/export.css';
 
 interface Props extends StageProps {
@@ -30,12 +33,14 @@ export default function ExportStage({
   onBack, designSystemName, colorScheme, userSelections,
   typographyStyles, componentStyle, dinoId, onDinoIdGenerated, moodBoardUrl, moodBoardFile, surfaceStyle, styleCustomizations,
 }: Props) {
+  const { user } = useAuth();
   const [copiedId, setCopiedId] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedClaude, setCopiedClaude] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
+  const headerFont = typographyStyles.find(t => t.type === 'header');
 
   // Generate on mount if no ID yet
   useEffect(() => {
@@ -56,8 +61,30 @@ export default function ExportStage({
       moodBoardFile,
       styleCustomizations,
     })
-      .then(id => {
+      .then(async id => {
         if (!mounted) return;
+        // Persist a Firestore record so this design system shows up in the
+        // user's account list. Storage upload already happened above; this
+        // is just the user-association metadata. Best-effort — failure here
+        // doesn't block the user from proceeding.
+        if (user) {
+          try {
+            await setDoc(doc(db, 'designSystems', id), {
+              userId: user.uid,
+              name: designSystemName,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              version: 1,
+              lastPushedAt: null,
+              lastPushedVersion: 0,
+              colors: colors.slice(0, 3),
+              componentStyle,
+              headerFontFamily: headerFont?.family || null,
+            }, { merge: true });
+          } catch (err) {
+            console.error('Failed to write design system record:', err);
+          }
+        }
         onDinoIdGenerated(id);
         setIsGenerating(false);
       })

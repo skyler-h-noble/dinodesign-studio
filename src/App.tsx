@@ -37,6 +37,7 @@ import ToneTuner from './components/ToneTuner';
 import AccountPage from './components/AccountPage';
 import LandingPage from './components/LandingPage';
 import AccessibilityReport from './components/AccessibilityReport';
+import DesignSystemDetail from './components/DesignSystemDetail';
 
 function MainApp() {
   const { user } = useAuth();
@@ -590,6 +591,7 @@ function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccess />} />
         <Route path="/accessibility-report" element={<AccessibilityReport />} />
+        <Route path="/my-designs/:id" element={<DesignSystemDetail />} />
       </Routes>
     </BrowserRouter>
   );
