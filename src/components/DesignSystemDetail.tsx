@@ -5,7 +5,7 @@ import JSZip from 'jszip';
 import {
   Button, H2, H3, H4, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, TextField,
   Breadcrumbs, BreadcrumbItem, Accordion, AccordionGroup, AccordionSummary, AccordionDetails,
-  Modal,
+  Modal, Chip,
 } from '@dynodesign/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
@@ -20,9 +20,10 @@ import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
+import { generateAndUploadDesignSystem } from '../utils/generateDesignSystem';
 import AppHeader from './AppHeader';
 import {
-  RenameDesignSystemModal, DeleteDesignSystemModal, MenuButton,
+  RenameDesignSystemModal, DeleteDesignSystemModal, RegenerateDesignSystemModal, MenuButton,
 } from './designSystemDialogs';
 import '../styles/export.css';
 
@@ -92,6 +93,17 @@ interface EventRecord {
   summary?: string;
 }
 
+interface VersionRecord {
+  id: string;
+  version: number;
+  createdAt: Date | null;
+  name: string;
+  componentStyle: string;
+  colors: string[];
+  headerFontFamily: string | null;
+  snapshot: any;
+}
+
 type Status = 'loading' | 'ready' | 'not-found';
 type Inner = 'use' | 'settings' | 'history';
 
@@ -102,10 +114,14 @@ export default function DesignSystemDetail() {
   const [record, setRecord] = useState<Record | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [events, setEvents] = useState<EventRecord[]>([]);
+  const [versions, setVersions] = useState<VersionRecord[]>([]);
   const [tab, setTab] = useState<Inner>('use');
   const [showFigmaUpdateModal, setShowFigmaUpdateModal] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<VersionRecord | null>(null);
+  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -116,6 +132,32 @@ export default function DesignSystemDetail() {
       window.history.replaceState(null, '', next);
     }
   }, []);
+
+  async function loadVersions(designId: string) {
+    try {
+      const vSnap = await getDocs(query(
+        collection(db, 'designSystems', designId, 'versions'),
+        orderBy('version', 'desc'),
+      ));
+      const list: VersionRecord[] = [];
+      vSnap.forEach(d => {
+        const data = d.data() as any;
+        list.push({
+          id: d.id,
+          version: Number(data.version || 0),
+          createdAt: data.createdAt?.toDate?.() || null,
+          name: data.name || '',
+          componentStyle: data.componentStyle || 'modern',
+          colors: Array.isArray(data.colors) ? data.colors : [],
+          headerFontFamily: data.headerFontFamily || null,
+          snapshot: data.snapshot,
+        });
+      });
+      setVersions(list);
+    } catch (err) {
+      console.error('Failed to load versions:', err);
+    }
+  }
 
   async function loadEvents(designId: string) {
     try {
@@ -200,6 +242,7 @@ export default function DesignSystemDetail() {
           if (!cancelled) setPayments(pays);
         }
         if (!cancelled) await loadEvents(id);
+        if (!cancelled) await loadVersions(id);
       } catch (err) {
         console.error('Failed to load design system:', err);
         if (!cancelled) setStatus('not-found');
@@ -255,6 +298,7 @@ export default function DesignSystemDetail() {
           colors={colors}
           onRequestRename={() => setRenameOpen(true)}
           onRequestDelete={() => setDeleteOpen(true)}
+          onRequestRegenerate={() => setRegenerateOpen(true)}
           onMarkPushed={async () => {
             try {
               await setDoc(doc(db, 'designSystems', id), {
@@ -289,7 +333,14 @@ export default function DesignSystemDetail() {
 
         {tab === 'use' && <UseMyDesignTab id={id} record={record} />}
         {tab === 'settings' && <SettingsTab id={id} record={record} payments={payments} />}
-        {tab === 'history' && <HistoryTab record={record} events={events} />}
+        {tab === 'history' && (
+          <VersionsTab
+            record={record}
+            versions={versions}
+            restoringVersionId={restoringVersionId}
+            onRequestRestore={setRestoreTarget}
+          />
+        )}
       </VStack>
       </main>
 
@@ -308,6 +359,89 @@ export default function DesignSystemDetail() {
         target={deleteOpen ? { id, name: record.name } : null}
         onClose={() => setDeleteOpen(false)}
         onDeleted={() => { window.location.href = '/my-designs'; }}
+      />
+      <RegenerateDesignSystemModal
+        target={regenerateOpen ? { id, name: record.name } : null}
+        onClose={() => setRegenerateOpen(false)}
+        onRegenerated={(_, newVersion) => {
+          setRecord({ ...record, version: newVersion, updatedAt: new Date() });
+          loadVersions(id);
+          loadEvents(id);
+        }}
+      />
+
+      <RestoreVersionModal
+        target={restoreTarget}
+        currentVersion={record.version}
+        restoring={restoringVersionId === restoreTarget?.id}
+        onClose={() => { if (!restoringVersionId) setRestoreTarget(null); }}
+        onConfirm={async () => {
+          if (!restoreTarget) return;
+          setRestoringVersionId(restoreTarget.id);
+          try {
+            const docSnap = await getDoc(doc(db, 'designSystems', id));
+            const data = docSnap.exists() ? docSnap.data() as any : {};
+            const prevVersion = Number(data.version || 0);
+            const nextVersion = prevVersion + 1;
+
+            // Re-run the generator using the historical snapshot. The
+            // generator overwrites the canonical CSS/JSON files in
+            // Firebase Storage at design-systems/{id}/...
+            await generateAndUploadDesignSystem({
+              ...restoreTarget.snapshot,
+              uuid: id,
+              version: nextVersion,
+            });
+
+            // Update the parent doc + create a fresh versions/{N} entry so
+            // the restore is itself a version (auditable + restorable again).
+            await setDoc(doc(db, 'designSystems', id), {
+              updatedAt: serverTimestamp(),
+              version: nextVersion,
+              colors: restoreTarget.colors,
+              componentStyle: restoreTarget.componentStyle,
+              headerFontFamily: restoreTarget.headerFontFamily,
+              name: restoreTarget.name,
+              snapshot: restoreTarget.snapshot,
+            }, { merge: true });
+
+            await setDoc(doc(db, 'designSystems', id, 'versions', String(nextVersion)), {
+              version: nextVersion,
+              createdAt: serverTimestamp(),
+              name: restoreTarget.name,
+              componentStyle: restoreTarget.componentStyle,
+              colors: restoreTarget.colors,
+              headerFontFamily: restoreTarget.headerFontFamily,
+              snapshot: restoreTarget.snapshot,
+            });
+
+            await addDoc(collection(db, 'designSystems', id, 'events'), {
+              kind: 'restored',
+              version: nextVersion,
+              at: serverTimestamp(),
+              summary: `Restored v${restoreTarget.version} as v${nextVersion}`,
+            });
+
+            setRecord({
+              ...record,
+              version: nextVersion,
+              updatedAt: new Date(),
+              colors: restoreTarget.colors,
+              componentStyle: restoreTarget.componentStyle,
+              headerFontFamily: restoreTarget.headerFontFamily,
+              name: restoreTarget.name,
+              snapshot: restoreTarget.snapshot,
+            });
+            await loadVersions(id);
+            await loadEvents(id);
+            setRestoreTarget(null);
+          } catch (err) {
+            console.error('Restore failed:', err);
+            alert('Restore failed. Check the console for details.');
+          } finally {
+            setRestoringVersionId(null);
+          }
+        }}
       />
     </>
   );
@@ -403,7 +537,7 @@ function Step({ n, body }: { n: number; body: string }) {
   );
 }
 
-function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequestRename, onRequestDelete }: { record: Record; id: string; headerStyle: React.CSSProperties; colors: string[]; onMarkPushed: () => Promise<void>; onRequestRename: () => void; onRequestDelete: () => void }) {
+function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequestRename, onRequestDelete, onRequestRegenerate }: { record: Record; id: string; headerStyle: React.CSSProperties; colors: string[]; onMarkPushed: () => Promise<void>; onRequestRename: () => void; onRequestDelete: () => void; onRequestRegenerate: () => void }) {
   const [copied, setCopied] = useState(false);
   const [marking, setMarking] = useState(false);
   // Portal-anchored ellipsis menu — the lib's Menu silent-fails without a
@@ -505,6 +639,9 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
                   color: 'var(--Text)',
                 }}
               >
+                <MenuButton onClick={() => { setMenuOpen(false); onRequestRegenerate(); }}>
+                  Regenerate
+                </MenuButton>
                 <MenuButton onClick={() => { setMenuOpen(false); onRequestRename(); }}>
                   Rename
                 </MenuButton>
@@ -1091,63 +1228,129 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
   );
 }
 
-function HistoryTab({ record, events }: { record: Record; events: EventRecord[] }) {
-  const KIND_LABEL: Record<string, string> = {
-    created: 'Created',
-    updated: 'Updated',
-    pushed: 'Pushed to Figma',
-  };
-
-  // Prefer the events subcollection. Fall back to doc-level timestamps so
-  // older designs (pre event-log) still show something meaningful.
-  let rows: Array<{ when: Date | null; label: string; detail?: string; summary?: string }>;
-  if (events.length > 0) {
-    rows = events.map(e => ({
-      when: e.at,
-      label: KIND_LABEL[e.kind] || e.kind.charAt(0).toUpperCase() + e.kind.slice(1),
-      detail: e.version > 0 ? `v${e.version}` : undefined,
-      summary: e.summary,
-    }));
-  } else {
-    rows = [];
-    if (record.createdAt) rows.push({ when: record.createdAt, label: 'Created', detail: `v1` });
-    if (record.updatedAt && record.updatedAt.getTime() !== record.createdAt?.getTime()) {
-      rows.push({ when: record.updatedAt, label: 'Last updated', detail: `v${record.version}` });
-    }
-    if (record.lastPushedAt) {
-      rows.push({ when: record.lastPushedAt, label: 'Pushed to Figma', detail: `v${record.lastPushedVersion}` });
-    }
-    rows.sort((a, b) => (b.when?.getTime() || 0) - (a.when?.getTime() || 0));
+function VersionsTab({
+  record, versions, restoringVersionId, onRequestRestore,
+}: {
+  record: Record;
+  versions: VersionRecord[];
+  restoringVersionId: string | null;
+  onRequestRestore: (v: VersionRecord) => void;
+}) {
+  if (versions.length === 0) {
+    return (
+      <Card padding="medium">
+        <VStack spacing={2}>
+          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+            Versions
+          </BodySmall>
+          <BodySmall style={{ color: 'var(--Quiet)' }}>
+            No version snapshots yet. Every time you reprocess this design
+            system, a new version snapshot gets stored here so you can
+            restore it later.
+          </BodySmall>
+        </VStack>
+      </Card>
+    );
   }
 
   return (
     <Card padding="medium">
       <VStack spacing={2}>
         <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
-          Activity
+          Versions
         </BodySmall>
-        {rows.length === 0 ? (
-          <BodySmall style={{ color: 'var(--Quiet)' }}>No history yet.</BodySmall>
-        ) : (
-          <VStack spacing={0}>
-            {rows.map((e, i) => (
-              <HStack key={i} spacing={2} style={{ padding: '10px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--Border)' : 'none', alignItems: 'flex-start' }}>
-                <BodySmall style={{ width: 130, color: 'var(--Quiet)', flexShrink: 0 }}>
-                  {e.when ? `${e.when.toLocaleDateString()} ${e.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '—'}
-                </BodySmall>
-                <VStack spacing={0} style={{ flex: 1 }}>
-                  <HStack spacing={1}>
-                    <BodySmall style={{ fontWeight: 600 }}>{e.label}</BodySmall>
-                    {e.detail && <BodySmall style={{ color: 'var(--Quiet)' }}>· {e.detail}</BodySmall>}
+        <VStack spacing={0}>
+          {versions.map((v, i) => {
+            const isCurrent = v.version === record.version;
+            const isRestoring = restoringVersionId === v.id;
+            const swatches = (v.colors.length ? v.colors : ['#666', '#999', '#ccc']).slice(0, 3);
+            return (
+              <HStack
+                key={v.id}
+                spacing={3}
+                style={{
+                  padding: '14px 0',
+                  borderBottom: i < versions.length - 1 ? '1px solid var(--Border)' : 'none',
+                  alignItems: 'center',
+                }}
+              >
+                <HStack spacing={1} style={{ flexShrink: 0 }}>
+                  {swatches.map((c, j) => (
+                    <div
+                      key={j}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 6,
+                        background: c,
+                        border: '1px solid var(--Border)',
+                      }}
+                    />
+                  ))}
+                </HStack>
+                <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
+                  <HStack spacing={1} style={{ alignItems: 'center' }}>
+                    <BodySmall style={{ fontWeight: 700 }}>v{v.version}</BodySmall>
+                    {isCurrent && (
+                      <Chip variant="success-light" size="small" label="Current" />
+                    )}
                   </HStack>
-                  {e.summary && <BodySmall style={{ color: 'var(--Quiet)' }}>{e.summary}</BodySmall>}
+                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+                    {v.componentStyle}
+                    {' · '}
+                    {v.createdAt
+                      ? `${v.createdAt.toLocaleDateString()} ${v.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : 'unknown date'}
+                  </BodySmall>
                 </VStack>
+                {!isCurrent && (
+                  <Button
+                    variant="primary-outline"
+                    size="small"
+                    disabled={isRestoring || restoringVersionId !== null}
+                    onClick={() => onRequestRestore(v)}
+                  >
+                    {isRestoring ? 'Restoring…' : 'Restore this version'}
+                  </Button>
+                )}
               </HStack>
-            ))}
-          </VStack>
-        )}
+            );
+          })}
+        </VStack>
       </VStack>
     </Card>
+  );
+}
+
+function RestoreVersionModal({
+  target, currentVersion, restoring, onClose, onConfirm,
+}: {
+  target: VersionRecord | null;
+  currentVersion: number;
+  restoring: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!target) return null;
+  return (
+    <Modal open onClose={onClose} title={`Restore v${target.version}?`} size="medium">
+      <VStack spacing={3}>
+        <Body>
+          This rebuilds your hosted CSS and JSON files using the v{target.version}
+          snapshot and bumps the version number to v{currentVersion + 1}. Nothing is
+          lost — your current v{currentVersion} stays in the history and you can
+          restore it back any time.
+        </Body>
+        <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+          <Button variant="primary-outline" size="small" onClick={onClose} disabled={restoring}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="small" onClick={onConfirm} disabled={restoring}>
+            {restoring ? 'Restoring…' : `Restore v${target.version}`}
+          </Button>
+        </HStack>
+      </VStack>
+    </Modal>
   );
 }
 

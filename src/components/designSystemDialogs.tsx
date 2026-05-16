@@ -5,10 +5,12 @@ import {
 } from '@dynodesign/components';
 import {
   collection, doc, deleteDoc, updateDoc, getDocs, writeBatch,
+  getDoc, setDoc, addDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { deleteDesignSystemFiles } from '../utils/firebase/storage';
 import { isDesignNameTaken } from '../utils/designSystemNames';
+import { generateAndUploadDesignSystem } from '../utils/generateDesignSystem';
 import { useAuth } from '../contexts/AuthContext';
 
 /** Shared rename + delete dialogs for design systems. Used from the My Designs
@@ -177,6 +179,108 @@ export function DeleteDesignSystemModal({
             disabled={!matches || deleting}
           >
             {deleting ? 'Deleting…' : 'Delete this design system'}
+          </Button>
+        </HStack>
+      </VStack>
+    </Modal>
+  );
+}
+
+export function RegenerateDesignSystemModal({
+  target, onClose, onRegenerated,
+}: {
+  target: DesignSystemTarget | null;
+  onClose: () => void;
+  onRegenerated: (id: string, newVersion: number) => void;
+}) {
+  const [regenerating, setRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (target) { setError(null); setRegenerating(false); }
+  }, [target]);
+
+  if (!target) return null;
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    setError(null);
+    try {
+      const snap = await getDoc(doc(db, 'designSystems', target.id));
+      if (!snap.exists()) throw new Error('Design system not found.');
+      const data = snap.data() as any;
+      const snapshot = data.snapshot;
+      if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) {
+        throw new Error('No rehydration snapshot stored for this design — re-export from the editor once to populate it.');
+      }
+      const prevVersion = Number(data.version || 0);
+      const nextVersion = prevVersion + 1;
+
+      // Re-run the generator with the saved snapshot. Output overwrites the
+      // canonical files in design-systems/{id}/... — same paths the
+      // hosted playground reads from.
+      await generateAndUploadDesignSystem({
+        ...snapshot,
+        uuid: target.id,
+        version: nextVersion,
+      });
+
+      // Update the parent doc + write a new versions/{N} so this
+      // regenerate is itself an auditable history entry.
+      await setDoc(doc(db, 'designSystems', target.id), {
+        updatedAt: serverTimestamp(),
+        version: nextVersion,
+      }, { merge: true });
+
+      await setDoc(doc(db, 'designSystems', target.id, 'versions', String(nextVersion)), {
+        version: nextVersion,
+        createdAt: serverTimestamp(),
+        name: data.name || target.name,
+        componentStyle: data.componentStyle || 'modern',
+        colors: Array.isArray(data.colors) ? data.colors : [],
+        headerFontFamily: data.headerFontFamily || null,
+        snapshot,
+      });
+
+      await addDoc(collection(db, 'designSystems', target.id, 'events'), {
+        kind: 'regenerated',
+        version: nextVersion,
+        at: serverTimestamp(),
+        summary: `Regenerated as v${nextVersion} (no setting changes)`,
+      });
+
+      onRegenerated(target.id, nextVersion);
+      onClose();
+    } catch (err: any) {
+      console.error('Regenerate failed:', err);
+      setError(err?.message || 'Could not regenerate. Try again.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  return (
+    <Modal open={!!target} onClose={regenerating ? () => {} : onClose} title="Regenerate design system?">
+      <VStack spacing={3} style={{ minWidth: 380, maxWidth: 460 }}>
+        <Body>
+          This rebuilds <strong>{target.name}</strong>'s hosted CSS, tokens,
+          and Figma files using the current snapshot. Settings stay the same —
+          this is for picking up generator improvements (new tokens, fixes,
+          etc.) without walking through the edit flow.
+        </Body>
+        <BodySmall style={{ color: 'var(--Quiet)' }}>
+          The version number bumps by 1 and a new history entry is added. The
+          previous files are overwritten in place.
+        </BodySmall>
+        {error && (
+          <Alert variant="light" color="error" size="small">{error}</Alert>
+        )}
+        <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+          <Button variant="primary-outline" size="small" onClick={onClose} disabled={regenerating}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="small" onClick={handleRegenerate} disabled={regenerating}>
+            {regenerating ? 'Regenerating…' : 'Regenerate'}
           </Button>
         </HStack>
       </VStack>

@@ -12,7 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import AppHeader from './AppHeader';
 import {
-  RenameDesignSystemModal, DeleteDesignSystemModal, MenuButton,
+  RenameDesignSystemModal, DeleteDesignSystemModal, RegenerateDesignSystemModal, MenuButton,
 } from './designSystemDialogs';
 
 interface LinkedFigmaFile {
@@ -74,6 +74,7 @@ export default function MyDesignsPage() {
   const [loading, setLoading] = useState(true);
   const [renameTarget, setRenameTarget] = useState<DesignSystem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DesignSystem | null>(null);
+  const [regenerateTarget, setRegenerateTarget] = useState<DesignSystem | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>('recent');
 
   const sortedDesigns = useMemo(() => {
@@ -239,6 +240,7 @@ export default function MyDesignsPage() {
                 ds={ds}
                 onRename={() => setRenameTarget(ds)}
                 onDelete={() => setDeleteTarget(ds)}
+                onRegenerate={() => setRegenerateTarget(ds)}
               />
             ))}
           </div>
@@ -255,13 +257,23 @@ export default function MyDesignsPage() {
         onClose={() => setDeleteTarget(null)}
         onDeleted={handleDeleted}
       />
+      <RegenerateDesignSystemModal
+        target={regenerateTarget}
+        onClose={() => setRegenerateTarget(null)}
+        onRegenerated={() => {
+          // Refresh nothing critical at the list level — the card already
+          // shows v + pending-changes derived from the doc, which updates
+          // on next visit. Keep this lightweight to avoid a full reload.
+          setRegenerateTarget(null);
+        }}
+      />
     </>
   );
 }
 
 function DesignSystemCard({
-  ds, onRename, onDelete,
-}: { ds: DesignSystem; onRename: () => void; onDelete: () => void }) {
+  ds, onRename, onDelete, onRegenerate,
+}: { ds: DesignSystem; onRename: () => void; onDelete: () => void; onRegenerate: () => void }) {
   const [moodBoardOk, setMoodBoardOk] = useState(true);
   // The lib's Menu component reads its open state from a Dropdown context, so
   // the `open` / `anchorEl` props we'd pass are ignored and the menu never
@@ -394,6 +406,11 @@ function DesignSystemCard({
                 color: 'var(--Text)',
               }}
             >
+              <MenuButton
+                onClick={() => { setMenuOpen(false); onRegenerate(); }}
+              >
+                Regenerate
+              </MenuButton>
               <MenuButton
                 onClick={() => { setMenuOpen(false); onRename(); }}
               >
