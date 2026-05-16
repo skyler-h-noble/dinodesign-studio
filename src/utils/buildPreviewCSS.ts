@@ -767,6 +767,32 @@ ${(() => {
   --Buttons-Default-Active: ${contBtnActive};
   --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
   --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  /* Light-Mode.css's [data-theme="Default"] [data-surface^="Container"]
+     rule writes --Buttons-Primary-Hover / -Active straight onto every Card
+     in the studio (because the outer App <main> still has
+     data-theme="Default"), which beats the value inherited from this
+     scope. Re-set them here so primary buttons inside branded Cards keep
+     their primary-tinted hover/active. */
+  --Buttons-Primary-Hover: ${contBtnHover};
+  --Buttons-Primary-Active: ${contBtnActive};
+  /* Per-palette Highlight / Lowlight overrides inside container scope.
+     Lib's Light-Mode.css writes hardcoded teal triples onto every Card via
+     [data-theme="Default"] [data-surface^="Container"] for Secondary,
+     Tertiary, Neutral. That rule's specificity (0,2,0) beats the brand's
+     (0,1,0) at the <main> level, so without these explicit re-overrides
+     at matching specificity the bevels stay teal regardless of brand. */
+${(() => {
+    const perPalette = [
+      { name: 'Secondary', pal: vSecondary, n: SC },
+      { name: 'Tertiary',  pal: vTertiary,  n: TC },
+      { name: 'Neutral',   pal: NEUTRAL.map(h => ({ hex: h })) as any, n: 8 },
+    ];
+    return perPalette.map(({ name, pal, n }) => {
+      const bg = p(pal, n);
+      return `  --Buttons-${name}-Highlight: ${hexToRgb(highlightFor(bg))};
+  --Buttons-${name}-Lowlight: ${hexToRgb(lowlightFor(bg))};`;
+    }).join('\n');
+  })()}
 }`;
 })()}
 
@@ -930,23 +956,32 @@ ${(() => {
 }`;
 })()}
 
-${isDark ? `/* ══ Dark mode image + text treatment ══
- * Every <img> gets a 30% black overlay (via brightness, which is
- * mathematically equivalent on opaque pixels and works on replaced
- * elements without a wrapper). Text/Header tokens are softened from
- * pure white to 70% white for visual comfort against dark surfaces. */
-[data-theme="Brand"] img,
-[data-theme^="Brand-"] img,
-[data-theme="Brand"] [data-theme] img {
-  filter: brightness(0.7);
-}
+/* ══ Adaptive white token ══
+ * --White is opaque #ffffff in light mode and 70% white in dark mode.
+ * Anywhere the brand needs "white" (e.g. text on a chromatic surface,
+ * a 100%-coverage container) should use var(--White) instead of a
+ * literal #ffffff so it dims correctly for visual comfort under dark
+ * surfaces. */
 [data-theme="Brand"],
 [data-theme^="Brand-"],
 [data-theme="Brand"] [data-surface],
 [data-theme^="Brand-"] [data-surface] {
-  --Text: rgba(255, 255, 255, 0.7);
-  --Header: rgba(255, 255, 255, 0.7);
-  --Quiet: rgba(255, 255, 255, 0.42);
+  --White: ${isDark ? 'rgba(255, 255, 255, 0.7)' : '#ffffff'};
+}
+
+${isDark ? `/* ══ Dark mode image treatment ══
+ * Every <img> gets a 30% black overlay (via brightness, which is
+ * mathematically equivalent on opaque pixels and works on replaced
+ * elements without a wrapper).
+ *
+ * Text/Header are NOT overridden here — the brand CSS above already
+ * sets them to the design system's dark-mode palette tones (e.g.
+ * var(--Neutral-Color-9)), which the export pipeline contrast-verifies
+ * against each surface. */
+[data-theme="Brand"] img,
+[data-theme^="Brand-"] img,
+[data-theme="Brand"] [data-theme] img {
+  filter: brightness(0.7);
 }
 ` : ''}`;
 }

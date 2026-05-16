@@ -439,8 +439,13 @@ function MainApp() {
   const cardRadius = savedStyleCustomizations?.[componentStyle]?.radius ?? { professional: 4, modern: 8, bold: 16, playful: 24 }[componentStyle];
   const buttonRadius = savedStyleCustomizations?.[componentStyle]?.buttonRadius ?? { professional: 2, modern: 4, bold: 8, playful: 64 }[componentStyle];
 
-  // Apply brand tokens after color-assignment stage
-  const applyBrand = ['color-assignment', 'typography', 'component-style', 'review', 'export'].includes(stage);
+  // Apply brand tokens after color-assignment stage. When the user is
+  // editing an existing design system (pendingReExport === true), the
+  // colors/typography/component style are already known and rehydrated
+  // from Firestore at mount, so the brand chrome can show from the very
+  // first stage instead of switching on mid-flow.
+  const applyBrand = pendingReExport
+    || ['color-assignment', 'typography', 'component-style', 'review', 'export'].includes(stage);
 
   // Build full brand CSS from the same logic as the phone preview
   // Post-process to add !important so it overrides DynoDesignProvider's theme
