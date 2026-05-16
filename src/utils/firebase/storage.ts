@@ -40,6 +40,19 @@ export function getPublicBaseUrl(uuid: string): string {
 
 /**
  * Upload a file (string or Blob) to design-systems/{uuid}/{filename}.
+ *
+ * Sets `Cache-Control: no-cache` on every upload so that the moment the
+ * studio rewrites a design system's CSS / theme.json / Figma files
+ * (regenerate, re-export, restore), the hosted playground picks up the
+ * new content on the next request instead of serving Firebase Storage's
+ * default 1-hour cached copy. With `no-cache` the browser still uses HTTP
+ * validators (ETag / Last-Modified) so unchanged files come back as 304
+ * — no extra bandwidth, just guaranteed freshness on rewrite.
+ *
+ * Mood board images and other one-shot binaries are uploaded through
+ * this same path, which means they also revalidate every load. That's
+ * the same trade-off (small revalidation request) and worth it for the
+ * version-correctness guarantee.
  */
 export async function uploadDesignSystemFile(
   uuid: string,
@@ -54,7 +67,10 @@ export async function uploadDesignSystemFile(
   } else {
     data = content;
   }
-  const metadata = contentType ? { contentType } : undefined;
+  const metadata = {
+    cacheControl: 'no-cache, max-age=0, must-revalidate',
+    ...(contentType ? { contentType } : {}),
+  };
   await uploadBytes(fileRef, data, metadata);
 }
 

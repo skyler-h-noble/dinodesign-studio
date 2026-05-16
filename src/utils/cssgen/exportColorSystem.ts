@@ -6172,8 +6172,23 @@ export function exportColorSystemToJSON(
                   if (resolved) return resolved;
                 }
               }
-              // Fallback: use Secondary palette (Default button usually maps to Secondary)
-              return colors?.Secondary?.['Color-' + colorN]?.value;
+              // Fallback driven by the user's chosen button mode. The Default
+              // button takes its fill from whichever palette the button mode
+              // maps to — Primary for primary mode, Secondary for secondary /
+              // tonal / laddered, Neutral for black-white. Hardcoding
+              // Secondary here would leave Highlight/Lowlight derived from
+              // the wrong palette (visible as bevels in the wrong hue, e.g.
+              // pink-tinted bevels on a blue-gray button).
+              const btnMode = userSelections?.button;
+              const fbPalette = (btnMode === 'secondary' || btnMode === 'tonal' || btnMode === 'laddered')
+                ? 'Secondary'
+                : btnMode === 'black-white'
+                  ? 'Neutral'
+                  : 'Primary';
+              const fbN = fbPalette === 'Primary' ? PC
+                        : fbPalette === 'Secondary' ? SC
+                        : colorN;
+              return colors?.[fbPalette]?.['Color-' + fbN]?.value;
             })()
           : colors?.[btnTheme]?.['Color-' + colorN]?.value;
 
@@ -6216,6 +6231,71 @@ export function exportColorSystemToJSON(
         });
       });
     }
+
+    // ── Tag.Default per theme ────────────────────────────────────────────
+    // Chromatic themes get their Tag.Default from a complementary palette
+    // (Primary↔Secondary↔Tertiary triangle). Semantic themes pick the
+    // higher-contrast of black/var(--White) for the chip background, with
+    // the opposite as text. App-Bar/Nav-Bar/Status alias their source
+    // theme so the mapping flows through.
+    const tagDefaultPaletteMap: Record<string, 'Primary' | 'Secondary' | 'Tertiary' | 'bw'> = {
+      'Default':         'Secondary',
+      'Primary':         'Secondary',
+      'Primary-Light':   'Secondary',
+      'Black':           'Secondary',
+      'White':           'Secondary',
+      'Light-Gray':      'Secondary',
+      'Secondary':       'Tertiary',
+      'Secondary-Light': 'Tertiary',
+      'Tertiary':        'Primary',
+      'Tertiary-Light':  'Primary',
+      'Info':            'bw',
+      'Info-Light':      'bw',
+      'Success':         'bw',
+      'Success-Light':   'bw',
+      'Warning':         'bw',
+      'Warning-Light':   'bw',
+      'Error':           'bw',
+      'Error-Light':     'bw',
+      // Nav themes alias their source — fall through to Secondary as a
+      // safe default since they typically render on Primary/Primary-Light.
+      'App-Bar':         'Secondary',
+      'Nav-Bar':         'Secondary',
+      'Status':          'Secondary',
+    };
+    Object.keys(themes).forEach(themeName => {
+      const theme = themes[themeName];
+      const target = tagDefaultPaletteMap[themeName];
+      if (!target) return;
+      ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'].forEach(section => {
+        const sectionData = theme[section];
+        if (!sectionData) return;
+        if (!sectionData.Tag) sectionData.Tag = {};
+
+        if (target === 'bw') {
+          // Semantic theme — resolve the section's Background to hex and
+          // pick whichever of black/white has higher contrast against it.
+          const bgRef = sectionData.Background?.value;
+          const bgHex = bgRef ? resolveColorToken(bgRef, colors, backgrounds) : null;
+          if (!bgHex) return;
+          const ratioBlack = getContrastRatio(bgHex, '#000000');
+          const ratioWhite = getContrastRatio(bgHex, '#ffffff');
+          const blackWins = ratioBlack >= ratioWhite;
+          sectionData.Tag.Default = {
+            BG:   { value: blackWins ? '#000000' : 'var(--White)', type: 'color' },
+            Text: { value: blackWins ? 'var(--White)' : '#000000', type: 'color' },
+          };
+        } else if (sectionData.Tag[target]) {
+          // Chromatic theme — alias the target palette's Tag entry. Clone
+          // so future mutations to Tag.Secondary etc don't accidentally
+          // mutate Tag.Default through reference sharing.
+          sectionData.Tag.Default = {
+            BG:   { ...sectionData.Tag[target].BG },
+            Text: { ...sectionData.Tag[target].Text },
+          };
+        }
+      });
+    });
 
     console.log(`  ✓ Added Dropshadow-Color, Highlight, Lowlight to ${mode} themes`);
   });

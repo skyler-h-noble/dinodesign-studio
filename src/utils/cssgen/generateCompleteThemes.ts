@@ -783,9 +783,15 @@ export function generateAllThemesWithSurfacesAndContainers(
     }
   }
 
-  const appBarSource = navSelectionToThemeName(defaultSettings.appBar);
-  const navBarSource = navSelectionToThemeName(defaultSettings.navBar);
-  const statusSource = navSelectionToThemeName(defaultSettings.status);
+  // SimplifiedDefaultConfig stores nav selections as separate `<x>Theme` +
+  // `<x>N` fields, NOT as a single string. Reading `.appBar` here always
+  // returned `undefined`, which made the default branch ('Primary-Light')
+  // win — so the AppBar was tinted Primary-Light regardless of what the
+  // user picked in Assign Colors. Pull the raw selection from
+  // userSelections.* instead, which is where the studio writes it.
+  const appBarSource = navSelectionToThemeName(userSelections?.appBar as string);
+  const navBarSource = navSelectionToThemeName(userSelections?.navBar as string);
+  const statusSource = navSelectionToThemeName(userSelections?.status as string);
 
   // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC converted to Color-N)
   // PC/SC/TC = closest Color-N to the original extracted color's lightness
@@ -795,7 +801,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
   const OB = PC >= 9 ? 6 : 5;
 
-  console.log(`  Nav themes: App-Bar→${appBarSource} (from "${defaultSettings.appBar}"), Nav-Bar→${navBarSource} (from "${defaultSettings.navBar}"), Status→${statusSource} (from "${defaultSettings.status}")`);
+  console.log(`  Nav themes: App-Bar→${appBarSource} (from "${userSelections?.appBar}"), Nav-Bar→${navBarSource} (from "${userSelections?.navBar}"), Status→${statusSource} (from "${userSelections?.status}")`);
   console.log(`  PC=${PC}, SC=${SC}, TC=${TC}, OB=${OB}`);
 
   // Helper to build common theme config

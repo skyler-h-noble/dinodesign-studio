@@ -1200,9 +1200,14 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     uploadFiles.push({ name: 'base.css', content: baseCSS, type: 'text/css' });
   }
 
-  // Add any other generated CSS files
+  // Add any other generated CSS files — excluding the three the dedicated
+  // branches above already pushed. Without `base.css` in this skip-list it
+  // would land in the upload list twice (once from line 1199, once here),
+  // which both wastes a network round-trip and leaves a confusing
+  // "base.css, base.css" trail in the upload log.
+  const alreadyPushed = new Set(['Light-Mode.css', 'Dark-Mode.css', 'base.css']);
   for (const [name, content] of Object.entries(cssFiles)) {
-    if (name !== 'Light-Mode.css' && name !== 'Dark-Mode.css') {
+    if (!alreadyPushed.has(name)) {
       uploadFiles.push({ name, content, type: 'text/css' });
     }
   }
