@@ -205,16 +205,21 @@ export function RegenerateDesignSystemModal({
   const handleRegenerate = async () => {
     setRegenerating(true);
     setError(null);
+    const t0 = performance.now();
+    console.log(`🔄 [Regenerate] Starting for ${target.id} (${target.name})`);
     try {
       const snap = await getDoc(doc(db, 'designSystems', target.id));
       if (!snap.exists()) throw new Error('Design system not found.');
       const data = snap.data() as any;
       const snapshot = data.snapshot;
+      console.log(`🔄 [Regenerate] Snapshot loaded; keys:`, snapshot ? Object.keys(snapshot) : 'NONE');
       if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) {
         throw new Error('No rehydration snapshot stored for this design — re-export from the editor once to populate it.');
       }
       const prevVersion = Number(data.version || 0);
       const nextVersion = prevVersion + 1;
+      console.log(`🔄 [Regenerate] Bumping v${prevVersion} → v${nextVersion}`);
+      console.log(`🔄 [Regenerate] userSelections:`, snapshot.userSelections);
 
       // Re-run the generator with the saved snapshot. Output overwrites the
       // canonical files in design-systems/{id}/... — same paths the
@@ -224,6 +229,7 @@ export function RegenerateDesignSystemModal({
         uuid: target.id,
         version: nextVersion,
       });
+      console.log(`🔄 [Regenerate] Generator finished in ${Math.round(performance.now() - t0)}ms`);
 
       // Update the parent doc + write a new versions/{N} so this
       // regenerate is itself an auditable history entry.
@@ -249,6 +255,8 @@ export function RegenerateDesignSystemModal({
         summary: `Regenerated as v${nextVersion} (no setting changes)`,
       });
 
+      console.log(`✅ [Regenerate] Complete in ${Math.round(performance.now() - t0)}ms; now at v${nextVersion}`);
+      console.log(`   Verify in playground: Network tab → Light-Mode.css → Response Headers → cache-control should say "no-cache, max-age=0, must-revalidate"`);
       onRegenerated(target.id, nextVersion);
       onClose();
     } catch (err: any) {

@@ -72,6 +72,11 @@ export async function uploadDesignSystemFile(
     ...(contentType ? { contentType } : {}),
   };
   await uploadBytes(fileRef, data, metadata);
+  // Per-file confirmation so the console shows which uploads landed on
+  // which paths with which cache headers. Helps diagnose stale-CSS
+  // problems where the playground keeps showing old content after a
+  // regenerate.
+  console.log(`📤 [Storage] uploaded ${ROOT}/${uuid}/${filename} (cache-control: ${metadata.cacheControl})`);
 }
 
 /**

@@ -6275,8 +6275,23 @@ export function exportColorSystemToJSON(
         if (target === 'bw') {
           // Semantic theme — resolve the section's Background to hex and
           // pick whichever of black/white has higher contrast against it.
+          // The Background can reference {Backgrounds.X.Background-N}
+          // which itself wraps another { ref }, so a single
+          // resolveColorToken call may not produce a hex. Walk through one
+          // extra level if needed, then bail (skip Tag.Default for this
+          // section) if we still don't have a hex — better to omit the
+          // token than crash the whole export.
           const bgRef = sectionData.Background?.value;
-          const bgHex = bgRef ? resolveColorToken(bgRef, colors, backgrounds) : null;
+          let bgHex: string | null = null;
+          if (bgRef) {
+            const r1 = resolveColorToken(bgRef, colors, backgrounds);
+            if (typeof r1 === 'string' && r1.startsWith('#')) {
+              bgHex = r1;
+            } else if (typeof r1 === 'string') {
+              const r2 = resolveColorToken(r1, colors, backgrounds);
+              if (typeof r2 === 'string' && r2.startsWith('#')) bgHex = r2;
+            }
+          }
           if (!bgHex) return;
           const ratioBlack = getContrastRatio(bgHex, '#000000');
           const ratioWhite = getContrastRatio(bgHex, '#ffffff');
