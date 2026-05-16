@@ -1,6 +1,5 @@
 /** Workflow stages in order */
 export type Stage =
-  | 'welcome'
   | 'name'
   | 'upload'
   | 'color'
@@ -12,7 +11,6 @@ export type Stage =
 
 /** All stages in order for navigation */
 export const STAGE_ORDER: Stage[] = [
-  'welcome',
   'name',
   'upload',
   'color',

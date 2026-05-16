@@ -7,11 +7,13 @@ import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../../types';
 import { generateAndUploadDesignSystem } from '../../utils/generateDesignSystem';
+import { LIB_DYNAMIC_CSS_FILES } from '../../utils/cssgen/exportToCSS';
 import { getPublicFileUrl } from '../../utils/firebase/storage';
 import { db } from '../../utils/firebase/client';
+import { isDesignNameTaken } from '../../utils/designSystemNames';
 import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/export.css';
 
@@ -27,11 +29,33 @@ interface Props extends StageProps {
   moodBoardFile?: File | null;
   styleCustomizations?: any;
   surfaceStyle?: SurfaceStyle;
+  /** Full list of swatches extracted from the mood board (the "Core Colors"
+   *  the user sees in ColorStage's extraction step). Persisted in the
+   *  rehydration snapshot so editing brings back the original 6+ choices,
+   *  not just the 3 currently selected as primary/secondary/tertiary. */
+  topColors?: Array<{ hex: string; isSwatch?: boolean }>;
+  /** Per-Core-Color tweaks (chroma sliders, hex locks) — also persisted in
+   *  the snapshot so editing restores the user's saturation and lock state. */
+  colorEdits?: {
+    chromaPerColor?: number[];
+    darkChromaPerColor?: number[];
+    lockedColorMap?: Record<number, string>;
+  };
+  /** Sidebar typography settings (style category / weight / spacing / caps
+   *  per role). Persisted alongside the chosen Google Font trio so the
+   *  Typography stage's left panel comes back the same on edit. */
+  typographySettings?: TypographyStyle[] | null;
+  /** True when MainApp loaded an existing design system from Firestore and the
+   *  user has clicked through to the export stage. Triggers a re-export to the
+   *  same UUID with version + 1 and writes an 'updated' event. */
+  pendingReExport?: boolean;
+  onReExportComplete?: () => void;
 }
 
 export default function ExportStage({
   onBack, designSystemName, colorScheme, userSelections,
   typographyStyles, componentStyle, dinoId, onDinoIdGenerated, moodBoardUrl, moodBoardFile, surfaceStyle, styleCustomizations,
+  topColors, colorEdits, typographySettings, pendingReExport, onReExportComplete,
 }: Props) {
   const { user } = useAuth();
   const [copiedId, setCopiedId] = useState(false);
@@ -39,36 +63,86 @@ export default function ExportStage({
   const [copiedClaude, setCopiedClaude] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  // Tracks which dinoId we've already started a re-export for. React 18 dev
+  // StrictMode invokes effects twice; without this ref the second invocation
+  // would race against the first and the post-upload state updates
+  // (setIsGenerating(false) + onReExportComplete) would never fire.
+  const reExportStartedFor = useRef<string | null>(null);
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
   const headerFont = typographyStyles.find(t => t.type === 'header');
 
-  // Generate on mount if no ID yet
-  useEffect(() => {
-    if (dinoId || isGenerating || !colorScheme) return;
-    let mounted = true;
+  // Build the rehydration snapshot once per render — same shape used on both
+  // first export and re-export so the next /create?id= can restore state.
+  // Persists the Firebase Storage URL (not the local blob URL), so the
+  // mood board survives a page refresh and is visible to anyone who can
+  // read the design system.
+  const buildSnapshot = (id: string | null) => ({
+    designSystemName,
+    colorScheme,
+    userSelections,
+    typographyStyles,
+    componentStyle,
+    styleCustomizations: styleCustomizations || null,
+    surfaceStyle: surfaceStyle || null,
+    moodBoardUrl: id ? getPublicFileUrl(id, 'moodboard.png') : null,
+    // Persist the full Core Colors set so the next /create?id=<uuid> can
+    // restore the same swatches the user saw when they first extracted —
+    // not just the 3 (primary/secondary/tertiary) inside `colorScheme`.
+    topColors: topColors || null,
+    // Per-color customisations (chroma sliders, hex locks) that the palette
+    // generator can't reconstruct from the extracted hexes alone.
+    colorEdits: colorEdits || null,
+    // Sidebar typography state (style categories per role). Lets the
+    // Typography stage restore the left panel exactly as the user left it,
+    // separate from `typographyStyles` which carries the chosen Google
+    // Font names.
+    typographySettings: typographySettings || null,
+  });
 
+  // First export: no dinoId yet. Generate fresh UUID, write Firestore +
+  // 'created' event.
+  useEffect(() => {
+    if (dinoId || isGenerating || !colorScheme || pendingReExport) return;
+    let mounted = true;
     setIsGenerating(true);
     setGenError(null);
 
-    generateAndUploadDesignSystem({
-      designSystemName,
-      colorScheme,
-      userSelections,
-      typographyStyles,
-      componentStyle,
-      surfaceStyle,
-      moodBoardUrl,
-      moodBoardFile,
-      styleCustomizations,
-    })
+    (async () => {
+      // Backstop uniqueness check — the name stage caught duplicates for users
+      // who were signed in at naming time, but anonymous users sign in later
+      // in the review→pricing flow and may now collide with an older design.
+      if (user) {
+        try {
+          const taken = await isDesignNameTaken(user.uid, designSystemName);
+          if (taken) {
+            if (!mounted) return;
+            setGenError(`You already have a design system named "${designSystemName}". Go back and rename it before exporting.`);
+            setIsGenerating(false);
+            return;
+          }
+        } catch {
+          // Non-fatal: if the check itself errors we don't want to block
+          // export. Continue and let Firestore enforce constraints at write.
+        }
+      }
+
+      generateAndUploadDesignSystem({
+        designSystemName,
+        colorScheme,
+        userSelections,
+        typographyStyles,
+        componentStyle,
+        surfaceStyle,
+        moodBoardUrl,
+        moodBoardFile,
+        styleCustomizations,
+        version: 1,
+      })
       .then(async id => {
         if (!mounted) return;
-        // Persist a Firestore record so this design system shows up in the
-        // user's account list. Storage upload already happened above; this
-        // is just the user-association metadata. Best-effort — failure here
-        // doesn't block the user from proceeding.
         if (user) {
           try {
+            const snapshot = buildSnapshot(id);
             await setDoc(doc(db, 'designSystems', id), {
               userId: user.uid,
               name: designSystemName,
@@ -80,7 +154,28 @@ export default function ExportStage({
               colors: colors.slice(0, 3),
               componentStyle,
               headerFontFamily: headerFont?.family || null,
+              moodBoardUrl: getPublicFileUrl(id, 'moodboard.png'),
+              // Rehydration snapshot — read on /create?id=<uuid>
+              snapshot,
             }, { merge: true });
+            // Phase 1 of versioning: append the snapshot to a versions
+            // subcollection keyed by version number. Future Cloud Function
+            // can regenerate any historical CSS/tokens from this doc.
+            await setDoc(doc(db, 'designSystems', id, 'versions', '1'), {
+              version: 1,
+              createdAt: serverTimestamp(),
+              name: designSystemName,
+              componentStyle,
+              colors: colors.slice(0, 3),
+              headerFontFamily: headerFont?.family || null,
+              snapshot,
+            });
+            await addDoc(collection(db, 'designSystems', id, 'events'), {
+              kind: 'created',
+              version: 1,
+              at: serverTimestamp(),
+              summary: `Created — ${componentStyle} style, ${colors.length} core colors`,
+            });
           } catch (err) {
             console.error('Failed to write design system record:', err);
           }
@@ -94,9 +189,90 @@ export default function ExportStage({
         setGenError(err.message);
         setIsGenerating(false);
       });
+    })();
 
     return () => { mounted = false; };
   }, []);
+
+  // Re-export: existing dinoId loaded from Firestore. Bump version, upload
+  // to the same UUID, and append an 'updated' event.
+  useEffect(() => {
+    if (!pendingReExport || !dinoId || !colorScheme || !user) return;
+    // Guard against React 18 StrictMode double-invocation: only one
+    // re-export per dinoId per component lifetime. Tying this to a ref
+    // (not a closure-scoped `mounted` flag) keeps the in-flight async
+    // work alive when StrictMode reruns the effect.
+    if (reExportStartedFor.current === dinoId) return;
+    reExportStartedFor.current = dinoId;
+
+    (async () => {
+      setIsGenerating(true);
+      setGenError(null);
+      try {
+        // Read current version so we can bump it monotonically.
+        const snap = await getDoc(doc(db, 'designSystems', dinoId));
+        const data = snap.exists() ? snap.data() as any : {};
+        const prevVersion = Number(data.version || 0);
+        const nextVersion = prevVersion + 1;
+
+        await generateAndUploadDesignSystem({
+          designSystemName,
+          colorScheme,
+          userSelections,
+          typographyStyles,
+          componentStyle,
+          surfaceStyle,
+          moodBoardUrl,
+          moodBoardFile,
+          styleCustomizations,
+          uuid: dinoId,
+          version: nextVersion,
+        });
+
+        const snapshot = buildSnapshot(dinoId);
+        await setDoc(doc(db, 'designSystems', dinoId), {
+          updatedAt: serverTimestamp(),
+          version: nextVersion,
+          colors: colors.slice(0, 3),
+          componentStyle,
+          headerFontFamily: headerFont?.family || null,
+          name: designSystemName,
+          moodBoardUrl: getPublicFileUrl(dinoId, 'moodboard.png'),
+          snapshot,
+        }, { merge: true });
+        // Phase 1 of versioning: store this re-export's snapshot under
+        // versions/{N}. Old versions stay reachable for regeneration.
+        await setDoc(doc(db, 'designSystems', dinoId, 'versions', String(nextVersion)), {
+          version: nextVersion,
+          createdAt: serverTimestamp(),
+          name: designSystemName,
+          componentStyle,
+          colors: colors.slice(0, 3),
+          headerFontFamily: headerFont?.family || null,
+          snapshot,
+        });
+        await addDoc(collection(db, 'designSystems', dinoId, 'events'), {
+          kind: 'updated',
+          version: nextVersion,
+          at: serverTimestamp(),
+          summary: `Updated — ${componentStyle} style`,
+        });
+
+        setIsGenerating(false);
+        onReExportComplete?.();
+      } catch (err: any) {
+        console.error('Re-export failed:', err);
+        setGenError(err?.message || String(err));
+        setIsGenerating(false);
+        // Allow a retry after failure (e.g. transient Firestore error).
+        reExportStartedFor.current = null;
+      }
+    })();
+    // No cleanup needed — the ref guard prevents double-firing and we
+    // deliberately want the async work to run to completion even if the
+    // effect is torn down by StrictMode's double-invocation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReExport, dinoId, colorScheme, user]);
 
   const uniqueId = dinoId || 'generating...';
   const showcaseBase = 'https://designology.netlify.app';
@@ -322,6 +498,106 @@ export default function ExportStage({
                 }}
               >
                 Download All (.zip)
+              </Button>
+            </VStack>
+          </Card>
+        )}
+
+        {/* Export directly to DinoDesign lib (dev workflow) */}
+        {hasId && (
+          <Card padding="medium" sx={{ width: '100%' }}>
+            <VStack spacing={2}>
+              <BodySmall style={{ fontWeight: 600 }}>Export to DinoDesign</BodySmall>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
+                Writes the 3 dynamic CSS files (<code>base.css</code>, <code>Light-Mode.css</code>, <code>Dark-Mode.css</code>) to your DinoDesign folder. First time you'll pick the folder; after that the studio remembers it and writes directly. Static lib files are left alone. Chrome/Edge only.
+              </BodySmall>
+              <Button
+                variant="primary-outline"
+                style={{ width: '100%' }}
+                onClick={async () => {
+                  type DirHandle = FileSystemDirectoryHandle & {
+                    queryPermission?: (d: { mode: 'readwrite' }) => Promise<'granted' | 'denied' | 'prompt'>;
+                    requestPermission?: (d: { mode: 'readwrite' }) => Promise<'granted' | 'denied' | 'prompt'>;
+                  };
+                  type WritableFile = { createWritable: () => Promise<{ write: (c: string) => Promise<void>; close: () => Promise<void> }> };
+                  const w = window as unknown as { showDirectoryPicker?: (opts?: unknown) => Promise<DirHandle> };
+                  if (!w.showDirectoryPicker) {
+                    alert('Your browser doesn’t support direct folder writes. Use Chrome or Edge for this button.');
+                    return;
+                  }
+
+                  // Tiny IndexedDB helper to persist the directory handle across sessions.
+                  const DB_NAME = 'dynodesign-studio';
+                  const STORE = 'handles';
+                  const KEY = 'dinodesign-public-styles';
+                  const openDB = () => new Promise<IDBDatabase>((resolve, reject) => {
+                    const req = indexedDB.open(DB_NAME, 1);
+                    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                  });
+                  const idbGet = async (): Promise<DirHandle | null> => {
+                    const db = await openDB();
+                    return new Promise(resolve => {
+                      const tx = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
+                      tx.onsuccess = () => resolve((tx.result as DirHandle) ?? null);
+                      tx.onerror = () => resolve(null);
+                    });
+                  };
+                  const idbSet = async (h: DirHandle) => {
+                    const db = await openDB();
+                    return new Promise<void>(resolve => {
+                      const tx = db.transaction(STORE, 'readwrite').objectStore(STORE).put(h, KEY);
+                      tx.onsuccess = () => resolve();
+                      tx.onerror = () => resolve();
+                    });
+                  };
+
+                  try {
+                    let dirHandle = await idbGet();
+                    if (dirHandle) {
+                      // Re-check or re-request permission.
+                      const perm = (await dirHandle.queryPermission?.({ mode: 'readwrite' })) ?? 'prompt';
+                      if (perm !== 'granted') {
+                        const requested = await dirHandle.requestPermission?.({ mode: 'readwrite' });
+                        if (requested !== 'granted') dirHandle = null;
+                      }
+                    }
+                    if (!dirHandle) {
+                      dirHandle = await w.showDirectoryPicker({
+                        id: 'dinodesign-public-styles',
+                        mode: 'readwrite',
+                        startIn: 'documents',
+                      });
+                      await idbSet(dirHandle);
+                    }
+
+                    let written = 0;
+                    for (const f of LIB_DYNAMIC_CSS_FILES) {
+                      try {
+                        const res = await fetch(getPublicFileUrl(dinoId!, f));
+                        if (!res.ok) continue;
+                        const content = await res.text();
+                        const fileHandle = await dirHandle.getFileHandle(f, { create: true });
+                        const writable = await (fileHandle as unknown as WritableFile).createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        written += 1;
+                      } catch (e) {
+                        console.error(`Failed to write ${f}:`, e);
+                      }
+                    }
+                    alert(`Exported ${written} of ${LIB_DYNAMIC_CSS_FILES.length} dynamic CSS files to DinoDesign.`);
+                  } catch (err) {
+                    // AbortError = user cancelled the picker; ignore silently.
+                    if ((err as { name?: string })?.name !== 'AbortError') {
+                      console.error('Export to DinoDesign failed:', err);
+                      alert('Export failed. See console for details.');
+                    }
+                  }
+                }}
+              >
+                Export to DinoDesign
               </Button>
             </VStack>
           </Card>

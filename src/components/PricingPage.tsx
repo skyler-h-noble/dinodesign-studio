@@ -123,21 +123,13 @@ export default function PricingPage({ onCheckout }: Props) {
 
       {/* Billing period toggle */}
       <VStack spacing={2} alignItems="center">
-        <ButtonGroup size="small">
-          <Button
-            variant={billingPeriod === 'monthly' ? 'default' : 'outline'}
-            size="small"
-            onClick={() => setBillingPeriod('monthly')}
-          >
-            Monthly
-          </Button>
-          <Button
-            variant={billingPeriod === 'annual' ? 'default' : 'outline'}
-            size="small"
-            onClick={() => setBillingPeriod('annual')}
-          >
-            Annual (save 21%)
-          </Button>
+        <ButtonGroup
+          size="small"
+          value={billingPeriod}
+          onChange={(val: 'monthly' | 'annual') => setBillingPeriod(val)}
+        >
+          <Button value="monthly" size="small">Monthly</Button>
+          <Button value="annual" size="small">Annual (save 21%)</Button>
         </ButtonGroup>
       </VStack>
 

@@ -1,12 +1,14 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { DynoDesignProvider } from '@dynodesign/components';
+import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
 import PricingPage, { type PurchaseSelection } from './components/PricingPage';
 import CheckoutSuccess from './components/CheckoutSuccess';
 import { redirectToCheckout } from './utils/stripe/checkout';
 import { db } from './utils/firebase/client';
+import { getPublicFileUrl } from './utils/firebase/storage';
 import type { Stage, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from './types';
 import { STAGE_ORDER } from './types';
 import {
@@ -20,9 +22,8 @@ import { autoAssignColors } from './utils/autoAssignColors';
 import { suggestComponentStyle } from './utils/autoSuggestStyle';
 import { buildPreviewCSS } from './utils/buildPreviewCSS';
 
-import TopNav from './components/TopNav';
+import AppHeader from './components/AppHeader';
 import { CreationTopBar, CreationBottomBar } from './components/CreationNav';
-import WelcomeStage from './components/stages/WelcomeStage';
 import DesignSystemNameStage from './components/stages/DesignSystemNameStage';
 import UploadStage from './components/stages/UploadStage';
 import ColorStage from './components/stages/ColorStage';
@@ -36,15 +37,18 @@ import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
 import ToneTuner from './components/ToneTuner';
 import AccountPage from './components/AccountPage';
 import LandingPage from './components/LandingPage';
+import AddOnCatalogPage from './components/AddOnCatalogPage';
 import AccessibilityReport from './components/AccessibilityReport';
 import DesignSystemDetail from './components/DesignSystemDetail';
+import MyDesignsPage from './components/MyDesignsPage';
+import AdminProposals from './components/AdminProposals';
 
 function MainApp() {
   const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
 
-  const [stage, setStage] = useState<Stage>('welcome');
+  const [stage, setStage] = useState<Stage>('name');
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
   const [moodBoardUrl, setMoodBoardUrl] = useState<string | null>(null);
@@ -70,11 +74,93 @@ function MainApp() {
   const [autoAssigned, setAutoAssigned] = useState(false);
   const [savedSchemes, setSavedSchemes] = useState<ColorScheme[]>([]);
   const [savedTopColors, setSavedTopColors] = useState<any[]>([]);
+  // Per-color customisations the user made in ColorStage that the palette
+  // generator can't recreate from extracted hexes alone: chroma slider
+  // positions per Core Color, and any hexes the user explicitly locked.
+  // These get persisted into the design system's snapshot on export.
+  const [savedColorEdits, setSavedColorEdits] = useState<{
+    chromaPerColor?: number[];
+    darkChromaPerColor?: number[];
+    lockedColorMap?: Record<number, string>;
+  }>({});
   const [savedFontSamples, setSavedFontSamples] = useState<any[]>([]);
   const [savedSelectedSample, setSavedSelectedSample] = useState<number | null>(null);
+  // The Typography Settings sidebar (font category / weight / letter-spacing /
+  // all-caps) — persists across stage navigation so customizations survive
+  // when the user clicks back into the Typography stage.
+  const [savedTypographySettings, setSavedTypographySettings] = useState<TypographyStyle[] | null>(null);
   const [savedStyleCustomizations, setSavedStyleCustomizations] = useState<any>({
     modern: { radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
   });
+  const [pendingReExport, setPendingReExport] = useState(false);
+  const [originalSnapshot, setOriginalSnapshot] = useState<any>(null);
+
+  // Rehydrate from /create?id=<uuid>: load the snapshot we stored at the
+  // last export and jump the user straight to the review stage so they can
+  // make tweaks and re-export to the same UUID. Bumps version on re-export.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('id');
+    if (!editId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'designSystems', editId));
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        const s = data.snapshot;
+        if (!s) {
+          console.warn('Design system has no rehydration snapshot — likely created before edit support; cannot edit.');
+          return;
+        }
+        if (cancelled) return;
+        if (s.designSystemName) setDesignSystemName(s.designSystemName);
+        if (s.colorScheme) setSelectedColorScheme(s.colorScheme);
+        if (s.userSelections) setUserSelections(s.userSelections);
+        if (Array.isArray(s.typographyStyles)) setTypographyStyles(s.typographyStyles);
+        if (s.componentStyle) setComponentStyle(s.componentStyle);
+        if (s.surfaceStyle) setSurfaceStyle(s.surfaceStyle);
+        // Restore the Core Colors swatches from the snapshot so editing
+        // shows the same 6 colors the user originally extracted.
+        if (Array.isArray(s.topColors) && s.topColors.length) {
+          setSavedTopColors(s.topColors);
+        }
+        // Restore per-color edits (chroma sliders, hex locks). Hex edits to
+        // the swatches themselves live in s.topColors above.
+        if (s.colorEdits && typeof s.colorEdits === 'object') {
+          setSavedColorEdits(s.colorEdits);
+        }
+        // Restore the Typography sidebar settings (style category / weight /
+        // spacing / caps per role). The chosen Google Font trio is in
+        // s.typographyStyles above; this controls the left panel + alt deck.
+        if (Array.isArray(s.typographySettings) && s.typographySettings.length === 3) {
+          setSavedTypographySettings(s.typographySettings);
+        }
+        if (s.styleCustomizations) {
+          setSavedStyleCustomizations((prev: any) => ({
+            ...prev,
+            [s.componentStyle || 'modern']: s.styleCustomizations,
+          }));
+        }
+        // Always use the deterministic Storage URL on rehydration. Older
+        // design systems persisted a transient blob URL into the snapshot;
+        // the file itself is always at design-systems/{id}/moodboard.png.
+        setMoodBoardUrl(getPublicFileUrl(editId, 'moodboard.png'));
+        setDinoId(editId);
+        setOriginalSnapshot(s);
+        setAutoAssigned(true); // skip auto-assign overrides
+        // Land on the Color stage's Theme sub-step so the user can pick a
+        // different theme variant. ColorStage starts on 'theme' whenever
+        // `selectedScheme` is set, and `pendingReExport` blocks it from
+        // re-running color extraction on the mood board.
+        setStage('color');
+        setPendingReExport(true);
+      } catch (err) {
+        console.error('Failed to rehydrate design system:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const goNext = useCallback(() => {
     // Block leaving the upload stage without a mood board
@@ -85,6 +171,14 @@ function MainApp() {
     if (stage === 'review') {
       if (!user) {
         setShowAuthModal(true);
+        return;
+      }
+      // Edit flow: user already paid for this design system. Skip the pricing
+      // gate and reprocess straight to the export stage so tokens get
+      // republished with the new selections.
+      if (pendingReExport) {
+        setStage('export');
+        window.scrollTo(0, 0);
         return;
       }
       // User is logged in — show pricing page
@@ -116,7 +210,7 @@ function MainApp() {
       setStage(nextStage);
       window.scrollTo(0, 0);
     }
-  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle, moodBoardUrl, user]);
+  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle, moodBoardUrl, user, pendingReExport]);
 
   const customBackRef = useRef<(() => void) | null>(null);
   const customNextRef = useRef<(() => void) | null>(null);
@@ -134,12 +228,20 @@ function MainApp() {
       customBackRef.current();
       return;
     }
+    // Edit flow: stages before color (upload, name) would let the
+    // user re-extract or rename, breaking the re-export contract. From the
+    // landing stage (color), Back returns to the design system detail page
+    // instead of stepping into earlier flow.
+    if (pendingReExport && stage === 'color' && dinoId) {
+      window.location.href = `/my-designs/${dinoId}`;
+      return;
+    }
     const currentIndex = STAGE_ORDER.indexOf(stage);
     if (currentIndex > 0) {
       setStage(STAGE_ORDER[currentIndex - 1]);
       window.scrollTo(0, 0);
     }
-  }, [stage, showPricingModal]);
+  }, [stage, showPricingModal, pendingReExport, dinoId]);
 
   const handleNameSubmit = (name: string, date: string) => {
     setDesignSystemName(name);
@@ -148,8 +250,6 @@ function MainApp() {
 
   const renderStage = () => {
     switch (stage) {
-      case 'welcome':
-        return <WelcomeStage onNext={goNext} onBack={goBack} />;
       case 'name':
         return (
           <DesignSystemNameStage
@@ -193,9 +293,12 @@ function MainApp() {
             onSchemesGenerated={setSavedSchemes}
             savedTopColors={savedTopColors}
             onTopColorsExtracted={setSavedTopColors}
+            savedColorEdits={savedColorEdits}
+            onColorEditsChange={setSavedColorEdits}
             onCustomBackChange={(handler) => { customBackRef.current = handler; }}
             onCustomNextChange={(handler) => { customNextRef.current = handler; }}
             onNextLabelChange={setCustomNextLabel}
+            editMode={pendingReExport}
           />
         );
       case 'color-assignment':
@@ -247,6 +350,9 @@ function MainApp() {
               setSavedFontSamples(samples);
               setSavedSelectedSample(selected);
             }}
+            savedTypographySettings={savedTypographySettings}
+            onTypographySettingsChange={setSavedTypographySettings}
+            savedFirstTrio={pendingReExport ? typographyStyles : undefined}
             decorativeMode={userSelections.decorativeMode}
             onDecorativeModeChange={(mode) => setUserSelections({ ...userSelections, decorativeMode: mode })}
           />
@@ -278,6 +384,8 @@ function MainApp() {
             typographyStyles={typographyStyles}
             componentStyle={componentStyle}
             moodBoardUrl={moodBoardUrl}
+            pendingReExport={pendingReExport}
+            originalSnapshot={originalSnapshot}
           />
         );
       case 'export':
@@ -296,20 +404,30 @@ function MainApp() {
             moodBoardFile={moodBoardFile}
             surfaceStyle={surfaceStyle}
             styleCustomizations={savedStyleCustomizations?.[componentStyle]}
+            topColors={savedTopColors}
+            colorEdits={savedColorEdits}
+            typographySettings={savedTypographySettings}
+            pendingReExport={pendingReExport}
+            onReExportComplete={() => {
+              setPendingReExport(false);
+              if (dinoId) {
+                window.location.href = `/my-designs/${dinoId}?reprocessed=1`;
+              }
+            }}
           />
         );
       default:
-        return <WelcomeStage onNext={goNext} onBack={goBack} />;
+        return null;
     }
   };
 
   const isExport = stage === 'export';
-  const showTopBar = designSystemName && stage !== 'welcome' && stage !== 'name' && !isExport;
-  const showBottomBar = !isExport && stage !== 'name' && stage !== 'welcome'; // export/name/welcome have own nav
-  const isFirstStage = stage === 'welcome';
+  const showTopBar = designSystemName && stage !== 'name' && !isExport;
+  const showBottomBar = !isExport && stage !== 'name'; // export/name have own nav
+  const isFirstStage = stage === 'name';
 
   // Bottom bar label
-  const nextLabel = customNextLabel || (stage === 'review' ? 'Get Your Design System' : 'Continue');
+  const nextLabel = customNextLabel || (stage === 'review' ? (pendingReExport ? 'Reprocess Design System' : 'Get Your Design System') : 'Continue');
 
   // Bottom bar disabled state — block stage progression when prerequisites aren't met
   const canProceed = (() => {
@@ -397,11 +515,7 @@ function MainApp() {
   } as React.CSSProperties;
 
   return (
-    <DynoDesignProvider
-      defaultTheme="Default"
-      defaultStyle="Modern"
-      defaultSurface="Surface"
-    >
+    <>
       {/* Default theme overrides — fix dark containers from library CSS + add effects */}
       <style id="dino-default-effects" dangerouslySetInnerHTML={{ __html: `
         [data-theme="Default"],
@@ -453,6 +567,38 @@ function MainApp() {
           --Buttons-Primary-Border: var(--Buttons-Default-Border);
           --Buttons-Primary-Hover: var(--Buttons-Default-Hover);
           --Buttons-Primary-Active: var(--Buttons-Default-Active);
+        }
+      `}} />
+      {/* Canonical @dynodesign/components 0.1.8 doesn't render the swatch
+          fill (the `swatch`/`swatchColor` props pass through as DOM
+          attributes). Studio-side workaround: the consumer sets
+          `--swatch-color` inline on each swatch Button and these rules paint
+          the fill. Wins over `.btn-primary` because of `!important`.
+          MISSING-LIB-COMPONENT: Button swatch variant — re-add to canonical lib. */}
+      <style id="dino-swatch-fill" dangerouslySetInnerHTML={{ __html: `
+        .dino-swatch[style*="--swatch-color"] {
+          background-color: var(--swatch-color) !important;
+          background-image: none !important;
+          border-color: var(--swatch-color) !important;
+          color: transparent !important;
+        }
+        .dino-swatch[style*="--swatch-color"]:hover,
+        .dino-swatch[style*="--swatch-color"]:active,
+        .dino-swatch[style*="--swatch-color"].Mui-focusVisible {
+          background-color: var(--swatch-color) !important;
+          background-image: none !important;
+          border-color: var(--swatch-color) !important;
+          opacity: 0.9;
+        }
+        /* Canonical lib 0.1.8 Select with mode=color paints the trigger
+           swatch using the option's value (e.g. primary-light) instead of
+           its color field, producing an empty/invalid background. Consumer
+           sets --select-trigger-color and this rule paints the first child
+           of the combobox flex:1 box (i.e. the broken swatch).
+           MISSING-LIB-COMPONENT: Select wrapper — port color-trigger fix. */
+        .dino-color-select[style*="--select-trigger-color"] [role="combobox"] > div:first-child > div > div:first-child {
+          background-color: var(--select-trigger-color) !important;
+          background-image: none !important;
         }
       `}} />
       {/* Per-variant bevel shadow. Each variant exposes its palette's
@@ -511,15 +657,20 @@ function MainApp() {
         body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch):hover,
         body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch):active,
         body .MuiButton-root[class*="btn-"]:not(.btn-ghost):not(.btn-text):not([class*="-outline"]):not(.dino-swatch).Mui-focusVisible {
+          /* Negative spread of -_bevel pulls the inset shadow inward so it
+             stays at the corners instead of fanning into the button center.
+             Net coverage: offset(b) + blur(b) - spread(b) = b pixels from the
+             edge — i.e., the bevel reads as the chosen % of button height and
+             leaves the bg under the text untouched. */
           box-shadow:
-            inset var(--_bevel, 0px) var(--_bevel, 0px) var(--_bevel, 0px) rgba(var(--Current-Bevel-Highlight, 255, 255, 255), var(--Button-Bevel-Opacity, 0.5)),
-            inset calc(0px - var(--_bevel, 0px)) calc(0px - var(--_bevel, 0px)) var(--_bevel, 0px) rgba(var(--Current-Bevel-Lowlight, 0, 0, 0), var(--Button-Bevel-Opacity, 0.5));
+            inset var(--_bevel, 0px) var(--_bevel, 0px) var(--_bevel, 0px) calc(0px - var(--_bevel, 0px)) rgba(var(--Current-Bevel-Highlight, 255, 255, 255), var(--Button-Bevel-Opacity, 0.5)),
+            inset calc(0px - var(--_bevel, 0px)) calc(0px - var(--_bevel, 0px)) var(--_bevel, 0px) calc(0px - var(--_bevel, 0px)) rgba(var(--Current-Bevel-Lowlight, 0, 0, 0), var(--Button-Bevel-Opacity, 0.5));
         }
       `}} />
       {/* Inject brand CSS — same tokens as the phone preview */}
       {brandCSS && <style id="dino-brand-css" dangerouslySetInnerHTML={{ __html: brandCSS }} />}
       <div style={styleVars as React.CSSProperties}>
-        {isExport && <TopNav designSystemName={designSystemName} />}
+        {isExport && <AppHeader />}
         {showTopBar && (
           <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
         )}
@@ -574,15 +725,21 @@ function MainApp() {
         />
 
       </div>
-    </DynoDesignProvider>
+    </>
   );
 }
 
 function App() {
   return (
+    <DynoDesignProvider
+      defaultTheme="Default"
+      defaultStyle="Modern"
+      defaultSurface="Surface"
+    >
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/add-ons" element={<AddOnCatalogPage />} />
         <Route path="/create" element={<MainApp />} />
         <Route path="/playground" element={<Playground />} />
         <Route path="/api/tokens/:uuid" element={<ApiTokensJson />} />
@@ -591,9 +748,12 @@ function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccess />} />
         <Route path="/accessibility-report" element={<AccessibilityReport />} />
+        <Route path="/my-designs" element={<MyDesignsPage />} />
         <Route path="/my-designs/:id" element={<DesignSystemDetail />} />
+        <Route path="/admin/proposals" element={<AdminProposals />} />
       </Routes>
     </BrowserRouter>
+    </DynoDesignProvider>
   );
 }
 

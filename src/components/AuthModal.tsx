@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Modal, Button, H3, Body, BodySmall, VStack, HStack, TextField, Alert,
+  Modal, Button, H3, Body, BodySmall, VStack, HStack, TextField, Alert, Divider, Link,
 } from '@dynodesign/components';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../contexts/AuthContext';
@@ -85,11 +85,11 @@ export default function AuthModal({ open, onClose, onSuccess }: Props) {
           Continue with Google
         </Button>
 
-        {/* Divider */}
+        {/* "or" separator — lib Divider with inline label */}
         <HStack spacing={2} style={{ alignItems: 'center', width: '100%' }}>
-          <div style={{ flex: 1, height: 1, background: 'var(--Border)' }} />
+          <Divider style={{ flex: 1 }} />
           <BodySmall style={{ color: 'var(--Quiet)', flexShrink: 0 }}>or</BodySmall>
-          <div style={{ flex: 1, height: 1, background: 'var(--Border)' }} />
+          <Divider style={{ flex: 1 }} />
         </HStack>
 
         {/* Email/password */}
@@ -130,21 +130,27 @@ export default function AuthModal({ open, onClose, onSuccess }: Props) {
         <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
           {mode === 'signin' ? (
             <>Don't have an account?{' '}
-              <span
-                style={{ color: 'var(--Hotlink)', cursor: 'pointer' }}
-                onClick={() => { setMode('signup'); setError(null); }}
+              <Link
+                onClick={(e: React.MouseEvent) => {
+                  e.preventDefault();
+                  setMode('signup');
+                  setError(null);
+                }}
               >
                 Sign up
-              </span>
+              </Link>
             </>
           ) : (
             <>Already have an account?{' '}
-              <span
-                style={{ color: 'var(--Hotlink)', cursor: 'pointer' }}
-                onClick={() => { setMode('signin'); setError(null); }}
+              <Link
+                onClick={(e: React.MouseEvent) => {
+                  e.preventDefault();
+                  setMode('signin');
+                  setError(null);
+                }}
               >
                 Sign in
-              </span>
+              </Link>
             </>
           )}
         </BodySmall>

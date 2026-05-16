@@ -1,6 +1,6 @@
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card,
-  CircularProgress, Checkbox, Link, Radio, Modal, TextField, Alert, SliderInput,
+  CircularProgress, Checkbox, Divider, Link, Radio, Modal, TextField, Alert, SliderInput,
 } from '@dynodesign/components';
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
@@ -17,6 +17,17 @@ import '../../styles/color-stage.css';
 
 type ColorStep = 'extraction' | 'theme';
 
+/** Bundle of per-color customisations that should survive an edit cycle.
+ *  Lives outside `colorScheme` because chroma/locks are per-topColor-index
+ *  (not per palette role), and the scheme can be regenerated from any of
+ *  these without losing the user's tweaks. */
+export interface ColorEdits {
+  chromaPerColor?: number[];
+  darkChromaPerColor?: number[];
+  /** Map of topColors index → exact hex the user locked. */
+  lockedColorMap?: Record<number, string>;
+}
+
 interface Props extends StageProps {
   moodBoardUrl: string | null;
   onSchemeSelected: (scheme: ColorScheme) => void;
@@ -25,9 +36,16 @@ interface Props extends StageProps {
   onSchemesGenerated?: (schemes: ColorScheme[]) => void;
   savedTopColors?: ExtractedColor[];
   onTopColorsExtracted?: (colors: ExtractedColor[]) => void;
+  /** Restored on /create?id=<uuid> so chroma sliders, locked hexes, and
+   *  edited Core Color hexes (already in savedTopColors) survive editing. */
+  savedColorEdits?: ColorEdits;
+  onColorEditsChange?: (edits: ColorEdits) => void;
   onCustomBackChange?: (handler: (() => void) | null) => void;
   onCustomNextChange?: (handler: (() => void) | null) => void;
   onNextLabelChange?: (label: string | null) => void;
+  /** Re-export edit flow: skip image re-analysis, pin to theme step,
+   *  and keep the user out of the extraction sub-step. */
+  editMode?: boolean;
 }
 
 export default function ColorStage({
@@ -40,23 +58,48 @@ export default function ColorStage({
   onSchemesGenerated,
   savedTopColors,
   onTopColorsExtracted,
+  savedColorEdits,
+  onColorEditsChange,
   onCustomBackChange,
   onCustomNextChange,
   onNextLabelChange,
+  editMode = false,
 }: Props) {
-  const [step, setStep] = useState<ColorStep>(selectedScheme ? 'theme' : 'extraction');
+  // Edit flow always lands on the theme step. Otherwise honor the existing
+  // rule: theme if a scheme has already been selected, extraction otherwise.
+  const [step, setStep] = useState<ColorStep>(
+    editMode || selectedScheme ? 'theme' : 'extraction',
+  );
   const [colorData, setColorData] = useState<ExtractedColorData | null>(null);
-  const [topColors, setTopColors] = useState<ExtractedColor[]>(savedTopColors || []);
+  // Edit flow seeds topColors/anchorColors from the saved scheme's
+  // originalColors so the theme step has swatches to render without
+  // re-running image analysis.
+  const seededFromScheme = (): ExtractedColor[] => {
+    if (savedTopColors && savedTopColors.length) return savedTopColors;
+    if (editMode && selectedScheme?.originalColors?.length) {
+      return selectedScheme.originalColors.map(hex => ({ hex, isSwatch: false }));
+    }
+    return [];
+  };
+  const [topColors, setTopColors] = useState<ExtractedColor[]>(seededFromScheme);
   // Anchor colors = the original extracted hexes used for palette generation.
   // topColors[i].hex may shift when the user clicks a different tone, but
   // anchorColors[i] stays put so the generated palette remains stable.
-  const [anchorColors, setAnchorColors] = useState<ExtractedColor[]>(savedTopColors || []);
+  const [anchorColors, setAnchorColors] = useState<ExtractedColor[]>(seededFromScheme);
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [primaryIndex, setPrimaryIndex] = useState(0);
   const [schemes, setSchemes] = useState<ColorScheme[]>(savedSchemes || []);
   const [showChromaSettings, setShowChromaSettings] = useState(false);
-  const [chromaPerColor, setChromaPerColor] = useState<number[]>([62, 62, 62, 62, 62, 62]);
-  const [darkChromaPerColor, setDarkChromaPerColor] = useState<number[]>([36, 36, 36, 36, 36, 36]);
+  const [chromaPerColor, setChromaPerColor] = useState<number[]>(
+    savedColorEdits?.chromaPerColor && savedColorEdits.chromaPerColor.length
+      ? savedColorEdits.chromaPerColor
+      : [62, 62, 62, 62, 62, 62],
+  );
+  const [darkChromaPerColor, setDarkChromaPerColor] = useState<number[]>(
+    savedColorEdits?.darkChromaPerColor && savedColorEdits.darkChromaPerColor.length
+      ? savedColorEdits.darkChromaPerColor
+      : [36, 36, 36, 36, 36, 36],
+  );
   const [customEditing, setCustomEditing] = useState(false);
   const [toneMode, setToneMode] = useState<'light' | 'dark'>('light');
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +110,9 @@ export default function ColorStage({
     return () => { if (clickTimer.current) clearTimeout(clickTimer.current); };
   }, []);
   // Track which top colors are locked (index → exact hex)
-  const [lockedColorMap, setLockedColorMap] = useState<Record<number, string>>({});
+  const [lockedColorMap, setLockedColorMap] = useState<Record<number, string>>(
+    savedColorEdits?.lockedColorMap || {},
+  );
   const [hexEditIndex, setHexEditIndex] = useState<number | null>(null);
   const [hexEditValue, setHexEditValue] = useState('');
   const [hexEditSource, setHexEditSource] = useState<'top' | 'additional'>('top');
@@ -153,8 +198,73 @@ export default function ColorStage({
     setHexEditIndex(null);
   };
 
+  // Edit flow bootstrap: skip image analysis, populate the scheme list
+  // from the seeded topColors so the user has theme variants to choose
+  // between immediately. If a previous edit cycle persisted per-color
+  // chroma values in savedColorEdits, use those; otherwise re-derive from
+  // each color's natural peak so the initial scheme matches what the
+  // Settings preview shows.
+  useEffect(() => {
+    if (!editMode) return;
+    setIsLoading(false);
+    if (topColors.length === 0) return;
+    const hasSavedLight = !!(savedColorEdits?.chromaPerColor && savedColorEdits.chromaPerColor.length === topColors.length);
+    const hasSavedDark = !!(savedColorEdits?.darkChromaPerColor && savedColorEdits.darkChromaPerColor.length === topColors.length);
+    const lightValues = hasSavedLight
+      ? savedColorEdits!.chromaPerColor!
+      : topColors.map(c => Math.min(Math.round(getMatchingPeakChroma(c.hex, false)), 70));
+    const darkValues = hasSavedDark
+      ? savedColorEdits!.darkChromaPerColor!
+      : topColors.map(c => Math.min(Math.round(getMatchingPeakChroma(c.hex, true)), 42));
+    if (!hasSavedLight) setChromaPerColor(lightValues);
+    if (!hasSavedDark) setDarkChromaPerColor(darkValues);
+    // Restore primaryIndex from the saved scheme's primary hex. Without
+    // this, regeneration uses topColors[0] as primary and the user's "I
+    // picked the brown one" intent gets clobbered on every edit cycle.
+    const primaryHex = selectedScheme?.colors?.[0]?.toLowerCase();
+    let restoredPrimaryIndex = primaryIndex;
+    if (primaryHex) {
+      const idx = topColors.findIndex(c => c.hex?.toLowerCase() === primaryHex);
+      if (idx >= 0 && idx !== primaryIndex) {
+        restoredPrimaryIndex = idx;
+        setPrimaryIndex(idx);
+      }
+    }
+    if (schemes.length === 0) {
+      regenerateSchemes(topColors, restoredPrimaryIndex, lightValues, darkValues);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Push customisation state up so App.tsx can persist it in the next
+  // export snapshot (chroma sliders, hex locks). Hex edits to Core Colors
+  // are propagated separately via onTopColorsExtracted below.
+  useEffect(() => {
+    onColorEditsChange?.({
+      chromaPerColor,
+      darkChromaPerColor,
+      lockedColorMap,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chromaPerColor, darkChromaPerColor, lockedColorMap]);
+
+  // Fire onTopColorsExtracted whenever topColors changes — covers both the
+  // initial image extraction AND inline hex edits via the modal — so the
+  // edited swatch list is what gets persisted to the snapshot.
+  useEffect(() => {
+    if (topColors.length === 0) return;
+    onTopColorsExtracted?.([...topColors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topColors]);
+
   // Extract colors on mount
   useEffect(() => {
+    // Edit flow: skip image re-analysis. Colors are seeded from the saved
+    // scheme's originalColors and the user is locked to the theme step.
+    if (editMode) {
+      setIsLoading(false);
+      return;
+    }
     if (!moodBoardUrl) {
       setError('No mood board uploaded');
       setIsLoading(false);
@@ -170,7 +280,8 @@ export default function ColorStage({
         setColorData(data);
         setTopColors([...data.topColors]);
         setAnchorColors([...data.topColors]);
-        onTopColorsExtracted?.([...data.topColors]);
+        // onTopColorsExtracted is fired by the [topColors] effect above
+        // whenever topColors changes — no need to call it inline here.
         // Initialize chroma per color so the extracted color sits at its natural
         // chroma in its own palette. User can boost via the edit modal slider.
         const lightPeaks = data.topColors.map(c => getMatchingPeakChroma(c.hex, false));
@@ -205,9 +316,11 @@ export default function ColorStage({
     pIdx: number,
     lChroma?: number[],
     dChroma?: number[],
+    anchors?: ExtractedColor[],
   ) => {
     const lc = lChroma || chromaPerColor;
     const dc = dChroma || darkChromaPerColor;
+    const anchorsArr = anchors || anchorColors;
     const primary = tops[pIdx].hex;
     const others = tops.filter((_, i) => i !== pIdx).map(c => c.hex);
     const reordered = [primary, ...others];
@@ -229,30 +342,69 @@ export default function ColorStage({
       }
     });
     const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
-    setSchemes(generated);
-    onSchemesGenerated?.(generated);
+
+    // Post-process: regenerate each scheme's tonePalettes/darkModeTonePalettes
+    // from anchorColors[topIdx] + chromaPerColor[topIdx] + per-color hue easing —
+    // exactly the inputs the Settings panel uses to render its tone palettes.
+    // Otherwise the same maxChroma (primary's) gets applied to all 3 roles, and
+    // the picked-tone hex (which may have shifted away from anchor) drives
+    // hue/chroma toward saturated palettes that don't match the visible tones.
+    const refined = generated.map(scheme => {
+      const roles = scheme.colors.map(colorHex => {
+        const topIdx = tops.findIndex(t => t.hex === colorHex);
+        if (topIdx < 0) return null;
+        const anchorHex = anchorsArr[topIdx]?.hex || colorHex;
+        const lightC = lc[topIdx] ?? 62;
+        const darkC = dc[topIdx] ?? 36;
+        const lockedHex = lockedColorMap[topIdx];
+        const easing = hueOverridesByTop[topIdx];
+        return {
+          light: generateSemanticLightModeScale(anchorHex, lightC, lockedHex, easing?.light),
+          dark: generateSemanticDarkModeScale(anchorHex, darkC, easing?.dark),
+        };
+      });
+      if (!roles[0] || !roles[1] || !roles[2]) return scheme;
+      return {
+        ...scheme,
+        tonePalettes: {
+          primary: roles[0].light,
+          secondary: roles[1].light,
+          tertiary: roles[2].light,
+        },
+        darkModeTonePalettes: {
+          primary: roles[0].dark,
+          secondary: roles[1].dark,
+          tertiary: roles[2].dark,
+        },
+      };
+    });
+
+    setSchemes(refined);
+    onSchemesGenerated?.(refined);
     if (selectedScheme) {
-      const updated = generated.find(s => s.name === selectedScheme.name);
-      onSchemeSelected(updated || generated[0]);
+      const updated = refined.find(s => s.name === selectedScheme.name);
+      onSchemeSelected(updated || refined[0]);
     } else {
-      onSchemeSelected(generated[0]);
+      onSchemeSelected(refined[0]);
     }
-  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, lockedColorMap, hueOverridesByTop]);
+  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, anchorColors, lockedColorMap, hueOverridesByTop]);
 
   const handleGenerateThemes = useCallback(() => {
     regenerateSchemes(topColors, primaryIndex);
     setStep('theme');
   }, [topColors, primaryIndex, regenerateSchemes]);
 
-  // Register custom back handler: theme step → extraction, extraction → previous stage
+  // Register custom back handler: theme step → extraction, extraction → previous stage.
+  // In edit mode the extraction sub-step is unreachable, so leave the back
+  // handler unset and let App.tsx route Back to /my-designs/{dinoId}.
   useEffect(() => {
-    if (step === 'theme') {
+    if (step === 'theme' && !editMode) {
       onCustomBackChange?.(() => setStep('extraction'));
     } else {
       onCustomBackChange?.(null);
     }
     return () => onCustomBackChange?.(null);
-  }, [step, onCustomBackChange]);
+  }, [step, editMode, onCustomBackChange]);
 
   // Register custom next handler: extraction → generate themes, theme → next stage
   useEffect(() => {
@@ -278,7 +430,10 @@ export default function ColorStage({
     );
   }
 
-  if (error || !colorData) {
+  // Bail with "No data" only when the extraction step actually needs
+  // colorData. The theme step is reachable in edit mode from a saved snapshot
+  // that has topColors/anchorColors/scheme but no colorData, so don't block it.
+  if (error || (!colorData && step === 'extraction')) {
     return (
       <VStack spacing={4} alignItems="center" style={{ padding: '80px 24px' }}>
         <H2 style={{ textAlign: 'center' }}>Color Extraction</H2>
@@ -701,8 +856,10 @@ export default function ColorStage({
                   <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
                     <Button
                       swatch
+                      swatchColor={color.hex}
                       size="large"
                       className="dino-swatch"
+                      style={{ ['--swatch-color' as any]: color.hex }}
                       onClick={() => {
                         if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
                         clickTimer.current = setTimeout(() => { clickTimer.current = null; openHexEditor(color.hex, i, 'top'); }, 350);
@@ -712,8 +869,6 @@ export default function ColorStage({
                         setSwapIndex(isSwapActive ? null : i);
                       }}
                       sx={{
-                        backgroundColor: color.hex,
-                        '&:hover': { backgroundColor: color.hex },
                         borderRadius: 'var(--Style-Border-Radius, 6px)',
                         width: '100%',
                         aspectRatio: '1',
@@ -769,16 +924,16 @@ export default function ColorStage({
                   <VStack key={i} spacing={0} alignItems="center">
                     <Button
                       swatch
+                      swatchColor={color.hex}
                       size="large"
                       className="dino-swatch"
+                      style={{ ['--swatch-color' as any]: color.hex }}
                       onClick={() => {
                         if (swapIndex !== null) handleSwap(color);
                         else openHexEditor(color.hex, i, 'additional');
                       }}
                       title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : `${color.hex} — click to view`}
                       sx={{
-                        backgroundColor: color.hex,
-                        '&:hover': { backgroundColor: color.hex },
                         borderRadius: 'var(--Style-Border-Radius, 6px)',
                         width: 42,
                         height: 42,
@@ -934,21 +1089,35 @@ export default function ColorStage({
             <BodySmall style={{ color: 'var(--Quiet)' }}>Click to change</BodySmall>
           </VStack>
 
-          {/* Primary color swatches with radio buttons */}
+          {/* Primary color swatches with radio buttons. We use a plain
+              <button> here instead of the lib's <Button swatch> because the
+              lib variant hardcodes its corner radius — when the brand sets
+              a large --Button-Radius the swatches stayed square. */}
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             {topColors.map((color, i) => {
               const isPrimary = i === primaryIndex;
+              const swatchSize = isNarrow ? 40 : 56;
               return (
                 <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
-                  <Button
-                    swatch
-                    size={isNarrow ? 'small' : 'large'}
-                    className="dino-swatch"
+                  <button
+                    type="button"
+                    aria-label={`Set Core Color ${i + 1} as Primary`}
                     onClick={() => {
                       setPrimaryIndex(i);
                       regenerateSchemes(topColors, i);
                     }}
-                    sx={{ backgroundColor: color.hex, '&:hover': { backgroundColor: color.hex }, ...(isPrimary ? { border: '2px solid var(--Buttons-Default-Border)' } : {}) }}
+                    style={{
+                      width: swatchSize,
+                      height: swatchSize,
+                      borderRadius: 'var(--Button-Radius, 6px)',
+                      background: color.hex,
+                      border: isPrimary
+                        ? '2px solid var(--Buttons-Default-Border, var(--Border))'
+                        : '1px solid var(--Border, rgba(0,0,0,0.1))',
+                      cursor: 'pointer',
+                      padding: 0,
+                      flexShrink: 0,
+                    }}
                   />
                   <Radio
                     variant="default-outline"
@@ -971,16 +1140,15 @@ export default function ColorStage({
           </div>
 
           {/* Divider + Show/Hide Settings toggle */}
-          <div style={{ borderTop: '1px solid var(--Border)', width: '100%', paddingTop: 12 }}>
-            <div
-              onClick={() => setShowChromaSettings(!showChromaSettings)}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-            >
-              <span style={{ color: 'var(--Hotlink)', fontSize: '0.8rem', transform: showChromaSettings ? 'rotate(0)' : 'rotate(180deg)', transition: 'transform 0.2s', display: 'inline-block' }}>⌃</span>
-              <Link onClick={(e: React.MouseEvent) => e.preventDefault()} style={{ fontSize: '0.875rem' }}>
-                {showChromaSettings ? 'Hide Settings' : 'Show Settings'}
-              </Link>
-            </div>
+          <Divider />
+          <div
+            onClick={() => setShowChromaSettings(!showChromaSettings)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+          >
+            <span style={{ color: 'var(--Hotlink)', fontSize: '0.8rem', transform: showChromaSettings ? 'rotate(0)' : 'rotate(180deg)', transition: 'transform 0.2s', display: 'inline-block' }}>⌃</span>
+            <Link onClick={(e: React.MouseEvent) => e.preventDefault()} style={{ fontSize: '0.875rem' }}>
+              {showChromaSettings ? 'Hide Settings' : 'Show Settings'}
+            </Link>
           </div>
 
           {/* Expanded: per-color tones + chroma */}
@@ -1148,21 +1316,26 @@ export default function ColorStage({
                   <Body style={{ fontWeight: 600 }}>{scheme.name}</Body>
                 </HStack>
 
-                {/* 3 color swatches */}
+                {/* 3 color swatches — non-interactive. The whole card
+                    handles selection; clicking a swatch directly did
+                    nothing here, so the lib's Button variant was misleading.
+                    For the Custom card the user still picks colors via the
+                    "Edit Colors" link below. */}
                 <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                   {(['primary', 'secondary', 'tertiary'] as const).map((role, i) => {
                     const displayColor = scheme.colors[i];
                     const label = ['Primary', 'Secondary', 'Tertiary'][i];
                     return (
                       <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
-                        <Button
-                          swatch
-                          size="large"
-                          className="dino-swatch"
-                          sx={{ backgroundColor: displayColor, '&:hover': { backgroundColor: displayColor }, width: '100%', height: 56 }}
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
-                            if (isCustom) setCustomEditing(true);
+                        <div
+                          aria-hidden="true"
+                          style={{
+                            width: '100%',
+                            height: 56,
+                            background: displayColor,
+                            borderRadius: 'var(--Button-Radius, 6px)',
+                            border: '1px solid var(--Border, rgba(0,0,0,0.1))',
+                            boxSizing: 'border-box',
                           }}
                         />
                         <BodySmall style={{ fontWeight: 600, fontSize: '0.7rem', textAlign: 'center', width: '100%' }}>{label}</BodySmall>

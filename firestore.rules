@@ -1,0 +1,122 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DinoDesign Firestore security rules
+//
+// Authorization model
+//   • A "user" is a Firebase Auth uid. Studio (web) signs the user in
+//     directly; the Figma plugin signs in via a one-time custom token
+//     produced by the device-pairing flow (see functions/pluginPairing.js).
+//     After pairing, the plugin holds a regular Firebase Auth session bound
+//     to the same uid as the studio session that approved the pairing.
+//   • A document in `designSystems` is owned by the uid stored in its
+//     `userId` field. Owners may read and write that document; nobody else
+//     can touch it.
+//   • `pairingCodes` are created and consumed exclusively via cloud
+//     functions running with the Admin SDK (which bypasses these rules).
+//     Clients never read or write that collection directly.
+//   • `payments` are written by the Stripe webhook (Admin SDK) and read by
+//     the owning user only.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // designSystems/{id}
+    //   userId field is the owner's uid. We verify owner-ness on every op
+    //   and prevent userId from being rewritten on update (otherwise an
+    //   owner could silently transfer their record to someone else).
+    match /designSystems/{id} {
+      allow read:   if isOwner(resource.data.userId);
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId)
+                    && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+
+      // Tamper-resistant event log: owner can read, create, and delete
+      // entries (deletion is needed so deleting a design system can also
+      // clear its audit trail — orphaned events otherwise sit forever and
+      // leak user data). Updates are still blocked so individual events
+      // can't be rewritten after the fact.
+      match /events/{eid} {
+        allow read, create, delete: if isOwner(
+          get(/databases/$(database)/documents/designSystems/$(id)).data.userId
+        );
+        allow update: if false;
+      }
+
+      // Version snapshots — owner-only read/write/delete. Each doc is the
+      // full snapshot needed to regenerate this version's CSS/tokens on
+      // demand (Phase 2 will add a Cloud Function that materializes them).
+      // Updates are blocked: a "version" is immutable by definition; re-
+      // exports always write a new doc, never modify an existing one.
+      match /versions/{vid} {
+        allow read, create, delete: if isOwner(
+          get(/databases/$(database)/documents/designSystems/$(id)).data.userId
+        );
+        allow update: if false;
+      }
+    }
+
+    // payments/{id}
+    //   Owner-readable; written exclusively by the Stripe webhook function.
+    match /payments/{pid} {
+      allow read:  if isOwner(resource.data.userId);
+      allow write: if false;
+    }
+
+    // users/{uid}
+    //   Owner-readable; written by webhook (credit increments) only.
+    match /users/{uid} {
+      allow read:  if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // pairingCodes/{code}
+    //   Strictly cloud-function-only. The plugin and studio talk to the
+    //   functions; nobody touches Firestore directly here.
+    match /pairingCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // componentProposals/{id}
+    //   Submitted by lib consumers via the submitComponentProposal cloud
+    //   function (Admin SDK, bypasses rules). Admin users read + update
+    //   status from the /admin/proposals dashboard. Nobody can write
+    //   directly; that would let anyone bypass rate limiting and validation.
+    //
+    //   Admin status is tracked on users/{uid}.isAdmin. Flip that field to
+    //   true on your own user doc via the Firebase console to grant access.
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    match /componentProposals/{pid} {
+      allow read:   if isAdmin();
+      // Admin can change status / add review notes, but the original
+      // submitted fields must stay intact — we only check that the fields
+      // an admin should be touching are the ones being touched.
+      allow update: if isAdmin()
+                    && request.resource.data.componentName == resource.data.componentName
+                    && request.resource.data.implementation == resource.data.implementation
+                    && request.resource.data.proposedApi == resource.data.proposedApi;
+      allow create, delete: if false;
+    }
+
+    // rateLimits/{key}
+    //   Cloud-function-only counter docs (one per IP per protected endpoint).
+    match /rateLimits/{key} {
+      allow read, write: if false;
+    }
+  }
+}

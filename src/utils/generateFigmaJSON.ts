@@ -810,6 +810,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     const bevelMed = Math.round(cs.buttonHeight * cs.bevel / 100);
     const bevelSm = Math.round(cs.smallButtonHeight * cs.bevel / 100);
     const bevelLg = Math.round(cs.largeButtonHeight * cs.bevel / 100);
+    // Padding tokens derived from buttonRadius per spec.
+    const buttonPadding = cs.buttonRadius > 8 ? cs.buttonRadius / 2 : 4;
+    const smButtonPadding = cs.buttonRadius >= 8 ? 8 : cs.buttonRadius;
+    const largeButtonPadding = cs.buttonRadius > 32 ? Math.round((cs.buttonRadius * 2) / 3) : 16;
     figma.Components = {
       Button: {
         'Button-Radius': cs.buttonRadius,
@@ -822,6 +826,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         'Small-Button-Height': cs.smallButtonHeight - 2,
         'Large-Button-Height': cs.largeButtonHeight - 2,
         'Button-Min-Width': cs.minButtonWidth,
+        'Button-Border-Width': 2,
+        'Button-Padding': buttonPadding,
+        'Sm-Button-Padding': smButtonPadding,
+        'Large-Button-Padding': largeButtonPadding,
         // Medium (default) — top-left highlight, bottom-right lowlight
         'Button-Highlight-Offset-x': -bevelMed,
         'Button-Highlight-Offset-y': -bevelMed,
@@ -851,6 +859,11 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         'Card-Inner-Border-Radius': Math.max(cs.radius - 1, 0),
         'Card-Focus-Border-Radius': cs.radius + 3,
         'Card-Padding': cardPadding,
+      },
+      Input: {
+        // User-overridable via sliders; fall back to formulas keyed on buttonRadius.
+        'Input-Radius': cs.inputRadius ?? Math.min(cs.buttonRadius, 8),
+        'Input-Padding': cs.inputPadding ?? (cs.buttonRadius >= 8 ? 4 : 2),
       },
     };
   }

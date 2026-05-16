@@ -5,13 +5,13 @@
 import { toneToColorNumber } from '../colorScale';
 
 /**
- * Map 12-tone Color-N to 14-tone Background-N.
- * The Backgrounds system still uses the old 14-tone numbering.
- * 12-tone: 1-5 map 1:1, 6-12 shift by +2 (dead zone tones 6,7 removed in 12-tone).
+ * Map 12-tone Color-N to Background-N. Backgrounds are now 1:1 with Color-N
+ * in the 12-tone system (Color-1..12 → Background-1..12). The +2 shift this
+ * function used to apply was for the legacy 14-tone Background numbering and
+ * is no longer correct.
  */
 function colorNToBackgroundN(n: number): number {
-  if (n <= 5) return n;
-  return n + 2; // Color-6→BG-8, Color-7→BG-9, ... Color-12→BG-14
+  return n;
 }
 
 export interface DefaultThemeSettings {

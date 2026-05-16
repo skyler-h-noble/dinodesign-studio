@@ -41,7 +41,6 @@ export function generateSimplifiedLightModeBackgrounds(
   let surfaceWhite = 0.0;
   let surfaceBrightWhite = 0.04;
   let surfaceBaseTone = 0;
-  
   let useColor10ForContainers = false;
   let containerLowestBlend = 0.12;
   let containerLowBlend = 0.15;
@@ -49,50 +48,23 @@ export function generateSimplifiedLightModeBackgrounds(
   let containerHighBlend = 0.20;
   let containerHighestBlend = 0.22;
 
-  // Map tones to colors using SIMPLIFIED 1:1 mapping
-  if (tone === 1) { // Background-1 → Color-1
-    surfaceBaseTone = 0;
-    useColor10ForContainers = true;
-  } else if (tone === 10) { // Background-2 → Color-2
-    surfaceBaseTone = 1;
-    useColor10ForContainers = true;
-  } else if (tone === 19) { // Background-3 → Color-3
-    surfaceBaseTone = 2;
-    useColor10ForContainers = true;
-  } else if (tone === 28) { // Background-4 → Color-4
-    surfaceBaseTone = 3;
-    useColor10ForContainers = true;
-  } else if (tone === 37) { // Background-5 → Color-5
-    surfaceBaseTone = 4;
-    useColor10ForContainers = true;
-  } else if (tone === 46.6) { // Background-6 → Color-6
-    surfaceBaseTone = 5;
-    useColor10ForContainers = true;
-  } else if (tone === 53) { // Background-7 → Color-7
-    surfaceBaseTone = 6;
-    useColor10ForContainers = true;
-  } else if (tone === 62) { // Background-8 → Color-8
-    surfaceBaseTone = 7;
-    useColor10ForContainers = false; // Use Color-12
-  } else if (tone === 71) { // Background-9 → Color-9
-    surfaceBaseTone = 8;
-    useColor10ForContainers = false; // Use Color-12
-  } else if (tone === 81) { // Background-10 → Color-10
-    surfaceBaseTone = 9;
-    useColor10ForContainers = false; // Use Color-12
-  } else if (tone === 90) { // Background-11 → Color-11
-    surfaceBaseTone = 10;
-    useColor10ForContainers = false; // Use Color-12
-  } else if (tone === 95) { // Background-12 → Color-12
-    surfaceBaseTone = 11;
-    useColor10ForContainers = false; // Use Color-12
-  } else if (tone === 98) { // Background-11 (tone 98) → Color-12 (capped)
-    surfaceBaseTone = 11;
-    useColor10ForContainers = false; // Use Color-12
-  } else if (tone === 99) { // Background-12 (tone 99) → Color-12 (capped)
-    surfaceBaseTone = 11;
-    useColor10ForContainers = false; // Use Color-12
+  // SIMPLIFIED 1:1 mapping — Background-N uses Color-N regardless of tone-scale
+  // values. Find the palette entry whose tone is closest to `tone` and use its
+  // index. (Previously a hard-coded if/else ladder that only recognised the
+  // old 14-tone scale; tones 58+ from the current 12-tone scale fell through
+  // to the default surfaceBaseTone=0 → Color-1 → near-black, which is why
+  // Background-6..12 imported as black.)
+  let bestIdx = 0;
+  let bestDiff = Math.abs((palette[0]?.tone ?? 0) - tone);
+  for (let i = 1; i < palette.length; i++) {
+    const d = Math.abs((palette[i]?.tone ?? 0) - tone);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
   }
+  surfaceBaseTone = Math.min(bestIdx, 11);
+  // Container tone: lighter-half backgrounds (Color-1..7) use a saturated
+  // container tone (Color-10); darker-half backgrounds (Color-8..12) need a
+  // lighter container so text stays legible — use Color-12 capped.
+  useColor10ForContainers = surfaceBaseTone <= 6;
 
   const surfaceColor = palette[surfaceBaseTone]?.color || baseColor;
   const surfaceDimColor = blendColors('#000000', surfaceColor, surfaceDimBlack);
@@ -377,54 +349,22 @@ export function generateSimplifiedDarkModeBackgrounds(
   let surfaceDimBlack = 0.02;
   let surfaceBrightWhite = 0.08;
   let surfaceBaseTone = 0;
-
   let useColor5ForContainers = false;
 
-  // DARK_MODE_TONES = [1, 5, 12, 18, 24, 30, 36, 58, 64, 70, 76, 82, 85, 89]
-  // Background-N → Color-N mapping (1:1)
-  if (tone === 1) {
-    surfaceBaseTone = 0;  // Background-1 → Color-1
-    useColor5ForContainers = true;
-  } else if (tone === 5) {
-    surfaceBaseTone = 1;  // Background-2 → Color-2
-    useColor5ForContainers = true;
-  } else if (tone === 12) {
-    surfaceBaseTone = 2;  // Background-3 → Color-3
-    useColor5ForContainers = true;
-  } else if (tone === 18) {
-    surfaceBaseTone = 3;  // Background-4 → Color-4
-    useColor5ForContainers = true;
-  } else if (tone === 24) {
-    surfaceBaseTone = 4;  // Background-5 → Color-5
-    useColor5ForContainers = true;
-  } else if (tone === 30) {
-    surfaceBaseTone = 5;  // Background-6 → Color-6
-    useColor5ForContainers = true;
-  } else if (tone === 36) {
-    surfaceBaseTone = 6;  // Background-7 → Color-7
-    useColor5ForContainers = true;
-  } else if (tone === 58) {
-    surfaceBaseTone = 7;  // Background-8 → Color-8
-    useColor5ForContainers = false; // Use Color-4
-  } else if (tone === 64) {
-    surfaceBaseTone = 8;  // Background-9 → Color-9
-    useColor5ForContainers = false;
-  } else if (tone === 70) {
-    surfaceBaseTone = 9;  // Background-10 → Color-10
-    useColor5ForContainers = false;
-  } else if (tone === 76) {
-    surfaceBaseTone = 10;  // Background-11 → Color-11
-    useColor5ForContainers = false;
-  } else if (tone === 82) {
-    surfaceBaseTone = 11;  // Background-12 → Color-12
-    useColor5ForContainers = false;
-  } else if (tone === 85) {
-    surfaceBaseTone = 11;  // Capped at Color-12
-    useColor5ForContainers = false;
-  } else if (tone === 89) {
-    surfaceBaseTone = 11;  // Capped at Color-12
-    useColor5ForContainers = false;
+  // SIMPLIFIED 1:1 mapping — Background-N uses Color-N. Match the input tone
+  // to the closest palette entry instead of an if/else ladder, so future
+  // tone-scale changes don't drop Background-N into the default Color-1.
+  let bestIdx = 0;
+  let bestDiff = Math.abs((palette[0]?.tone ?? 0) - tone);
+  for (let i = 1; i < palette.length; i++) {
+    const d = Math.abs((palette[i]?.tone ?? 0) - tone);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
   }
+  surfaceBaseTone = Math.min(bestIdx, 11);
+  // Container tone in dark mode: lighter-half backgrounds (Color-1..7) use
+  // a slightly lighter container (Color-5); darker-half backgrounds use the
+  // even darker Color-4 so the container stays distinct from the surface.
+  useColor5ForContainers = surfaceBaseTone <= 6;
 
   const surfaceColor = palette[surfaceBaseTone]?.color || baseColor;
   const surfaceDimColor = blendColors('#000000', surfaceColor, surfaceDimBlack);

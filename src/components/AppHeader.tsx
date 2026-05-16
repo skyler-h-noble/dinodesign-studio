@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Button, H3, HStack } from '@dynodesign/components';
+import { AppBar, Button, HStack } from '@dynodesign/components';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { useAuth } from '../contexts/AuthContext';
+import AvatarDropdown from './AvatarDropdown';
+import CartIcon from './CartIcon';
 
 /**
- * Shared signed-in app bar. Same shape as LandingPage's top nav (brand left,
- * right-side buttons), with a notification bell that surfaces the count of
- * design systems the user has unpushed changes on (version > lastPushedVersion).
+ * Signed-in app shell header.
+ *
+ *   [Brand]                                  [New Design] [Bell] [Avatar▾]
+ *
+ * AppBar provides the shell (theming, sticky positioning, slot layout).
+ * The avatar dropdown and the bell are both inlined here because the lib
+ * doesn't ship working primitives for them (see MISSING-LIB-COMPONENT tags).
  */
 export default function AppHeader() {
   const { user, signOut } = useAuth();
@@ -19,7 +25,10 @@ export default function AppHeader() {
     let cancelled = false;
     (async () => {
       try {
-        const snap = await getDocs(query(collection(db, 'designSystems'), where('userId', '==', user.uid)));
+        const snap = await getDocs(query(
+          collection(db, 'designSystems'),
+          where('userId', '==', user.uid),
+        ));
         let count = 0;
         snap.forEach(d => {
           const data = d.data() as any;
@@ -36,87 +45,50 @@ export default function AppHeader() {
   }, [user]);
 
   return (
-    <nav
-      data-theme="App-Bar"
-      data-surface="Surface-Bright"
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'center',
-        height: 64,
-        padding: '0 24px',
-        background: 'var(--Background)',
-        borderBottom: '1px solid var(--Border)',
-      }}
-    >
-      <H3
-        style={{ margin: 0, flexShrink: 0, cursor: 'pointer' }}
-        onClick={() => window.location.href = '/'}
-      >
-        DinoDesign
-      </H3>
-
-      <div style={{ flex: 1 }} />
-
-      <HStack spacing={1} style={{ flexShrink: 0, alignItems: 'center' }}>
-        {user && (
-          <button
-            type="button"
-            aria-label={pendingChanges > 0 ? `${pendingChanges} pending changes` : 'Notifications'}
-            onClick={() => window.location.href = '/account#my-designs'}
-            style={{
-              position: 'relative',
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              padding: 8,
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--Text)',
-            }}
+    <AppBar
+      brand="DinoDesign"
+      onBrandClick={() => { window.location.href = '/'; }}
+      endSlot={
+        <HStack spacing={1} style={{ alignItems: 'center', gap: 8 }}>
+          <Button
+            variant="default"
+            size="small"
+            onClick={() => { window.location.href = '/create'; }}
           >
-            <NotificationsNoneIcon style={{ fontSize: 22 }} />
-            {pendingChanges > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: 4, right: 4,
-                minWidth: 16, height: 16, padding: '0 4px',
-                borderRadius: 8,
-                background: 'var(--Buttons-Error-Button, #c0392b)',
-                color: 'var(--Buttons-Error-Text, #fff)',
-                fontSize: 10, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1,
-              }}>
-                {pendingChanges}
-              </span>
-            )}
-          </button>
-        )}
-        {user ? (
-          <>
-            <Button variant="ghost" size="small" onClick={() => window.location.href = '/account'}>
-              Account
-            </Button>
-            <Button variant="ghost" size="small" onClick={() => signOut()}>
-              Sign Out
-            </Button>
-          </>
-        ) : (
-          <Button variant="ghost" size="small" onClick={() => window.location.href = '/?login=true'}>
-            Login
+            New Design
           </Button>
-        )}
-        <Button
-          variant="default"
-          size="small"
-          onClick={() => window.location.href = '/create'}
-        >
-          New Design
-        </Button>
-      </HStack>
-    </nav>
+
+          {user && <NotificationBell count={pendingChanges} />}
+          {user && <CartIcon />}
+
+          {user ? (
+            <AvatarDropdown
+              user={user}
+              onSignOut={async () => { await signOut(); window.location.href = '/'; }}
+            />
+          ) : (
+            <Button variant="outline" color="default" size="small" onClick={() => { window.location.href = '/?login=true'; }}>
+              Login
+            </Button>
+          )}
+        </HStack>
+      }
+    />
+  );
+}
+
+function NotificationBell({ count }: { count: number }) {
+  return (
+    <Button
+      iconOnly
+      variant="ghost"
+      size="small"
+      badge={count > 0}
+      badgeContent={count}
+      aria-label={count > 0 ? `${count} pending changes` : 'Notifications'}
+      onClick={() => { window.location.href = '/my-designs'; }}
+    >
+      <NotificationsNoneIcon style={{ fontSize: 22 }} />
+    </Button>
   );
 }

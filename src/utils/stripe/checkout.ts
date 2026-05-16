@@ -29,9 +29,12 @@ export interface CheckoutRequest {
  */
 export async function redirectToCheckout(request: CheckoutRequest): Promise<'dev_complete' | void> {
   if (DEV_MODE) {
-    console.log(`[DEV MODE] Simulating payment for user ${request.userId}`);
-    const userRef = doc(db, 'users', request.userId);
-    await setDoc(userRef, { paid: true }, { merge: true });
+    console.log(`[DEV MODE] Simulating payment for user ${request.userId} (Firestore write skipped — temp bypass for CSS-dump flow)`);
+    // Temporarily skipped: setDoc on /users/{uid} was failing with
+    // "Missing or insufficient permissions" while we needed to reach Export
+    // to dump CSS. Restore the write once Firestore rules allow it.
+    // const userRef = doc(db, 'users', request.userId);
+    // await setDoc(userRef, { paid: true }, { merge: true });
     return 'dev_complete';
   }
 

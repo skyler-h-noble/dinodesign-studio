@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { DynoDesignProvider, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Button, TextField, Alert, Badge, Divider } from '@dynodesign/components';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import EmailIcon from '@mui/icons-material/Email';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { getPublicFileUrl } from '../utils/firebase/storage';
 
 export default function Playground() {
@@ -121,11 +126,74 @@ export default function Playground() {
           <Divider />
 
           {/* Inputs */}
-          <VStack spacing={2}>
+          <VStack spacing={3}>
             <H2>Inputs</H2>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              Plain inputs:
+            </BodySmall>
             <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
               <TextField label="Email" style={{ flex: 1, minWidth: 200 }} />
               <TextField label="Password" style={{ flex: 1, minWidth: 200 }} />
+            </HStack>
+
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              With <code>startAdornment</code> / <code>endAdornment</code> — drop in any icon or icon-button to mark the field's purpose or attach an action:
+            </BodySmall>
+            <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
+              <TextField
+                label="Search"
+                placeholder="Search..."
+                style={{ flex: 1, minWidth: 200 }}
+                startAdornment={<SearchIcon style={{ fontSize: 18, color: 'var(--Quiet)' }} />}
+              />
+              <TextField
+                label="Amount"
+                placeholder="0.00"
+                style={{ flex: 1, minWidth: 200 }}
+                startAdornment={<AttachMoneyIcon style={{ fontSize: 18, color: 'var(--Quiet)' }} />}
+              />
+              <TextField
+                label="Email"
+                placeholder="you@example.com"
+                style={{ flex: 1, minWidth: 200 }}
+                startAdornment={<EmailIcon style={{ fontSize: 18, color: 'var(--Quiet)' }} />}
+              />
+            </HStack>
+
+            <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
+              <TextField
+                label="Search"
+                placeholder="With clear button"
+                style={{ flex: 1, minWidth: 200 }}
+                startAdornment={<SearchIcon style={{ fontSize: 18, color: 'var(--Quiet)' }} />}
+                endAdornment={
+                  <Button variant="ghost" size="small" sx={{ minWidth: 0, padding: '2px 6px' }}>
+                    <ClearIcon style={{ fontSize: 16 }} />
+                  </Button>
+                }
+              />
+              <TextField
+                label="Password"
+                type="password"
+                placeholder="••••••••"
+                style={{ flex: 1, minWidth: 200 }}
+                endAdornment={
+                  <Button variant="ghost" size="small" sx={{ minWidth: 0, padding: '2px 6px' }}>
+                    <VisibilityIcon style={{ fontSize: 16 }} />
+                  </Button>
+                }
+              />
+              <TextField
+                label="Design system ID"
+                value="efa30f2c-fafc-4f1d-ad8e-d9d67c9c397d"
+                style={{ flex: 1, minWidth: 200 }}
+                InputProps={{ readOnly: true }}
+                endAdornment={
+                  <Button variant="ghost" size="small" sx={{ minWidth: 0, padding: '2px 8px' }}>
+                    Copy
+                  </Button>
+                }
+              />
             </HStack>
           </VStack>
 

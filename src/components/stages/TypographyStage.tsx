@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Link, Modal, RadioGroup, Select, TextField,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Checkbox, Divider, Link, Modal, RadioGroup, Select, TextField,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
 import type { StageProps, TypographyStyle, ColorScheme } from '../../types';
@@ -18,8 +18,18 @@ interface Props extends StageProps {
   savedFontSamples?: FontPair[];
   savedSelectedSample?: number | null;
   onFontSamplesGenerated?: (samples: FontPair[], selected: number | null) => void;
+  /** On the edit flow, the user's chosen trio from the previous session. When
+   *  set, TypographyStage skips the OCR step, uses savedTypographySettings to
+   *  drive the sidebar, and pins this trio as Card #1 of the freshly generated
+   *  20-card deck so the user sees their pick first. */
+  savedFirstTrio?: TypographyStyle[];
   decorativeMode?: 'surface-components' | 'only-selected';
   onDecorativeModeChange?: (mode: 'surface-components' | 'only-selected') => void;
+  /** Persisted left-sidebar settings (font category, weight, letter-spacing,
+   *  all-caps for each role). When set, restores on remount instead of
+   *  resetting to the hardcoded defaults. */
+  savedTypographySettings?: TypographyStyle[] | null;
+  onTypographySettingsChange?: (settings: TypographyStyle[]) => void;
 }
 
 export interface FontPair {
@@ -95,14 +105,29 @@ export default function TypographyStage({
   onNext, onBack, colorScheme, moodBoardUrl, onTypographyComplete, designSystemName,
   savedFontSamples, savedSelectedSample, onFontSamplesGenerated,
   decorativeMode: decorativeModeProp, onDecorativeModeChange,
+  savedTypographySettings, onTypographySettingsChange,
+  savedFirstTrio,
 }: Props) {
   const hasSaved = savedFontSamples && savedFontSamples.length > 0;
-  const [step, setStep] = useState<'detecting' | 'review' | 'samples'>(hasSaved ? 'samples' : 'detecting');
-  const [editedTypography, setEditedTypography] = useState<TypographyStyle[]>([
-    { type: 'header', family: 'Sans Serif, Geometric', weight: '700', letterSpacing: '-0.02em', allCaps: false },
-    { type: 'decorative', family: 'Sans Serif, Humanist', weight: '600', letterSpacing: '0.05em', allCaps: true },
-    { type: 'body', family: 'Sans Serif, Neo Grotesque', weight: '400', letterSpacing: '0em', allCaps: false },
-  ]);
+  // Edit-flow shortcut: if we have the user's previous trio, skip the OCR
+  // detection step — we'll generate fresh alternatives from the saved
+  // sidebar settings and pin the previous trio as Card #0.
+  const isEditFlow = !hasSaved && savedFirstTrio && savedFirstTrio.length === 3;
+  const [step, setStep] = useState<'detecting' | 'review' | 'samples'>(
+    hasSaved ? 'samples' : (isEditFlow ? 'review' : 'detecting'),
+  );
+  // Restore prior sidebar settings on remount; fall back to defaults the
+  // first time the user lands here. Persisted via onTypographySettingsChange
+  // so they survive navigation between stages.
+  const [editedTypography, setEditedTypography] = useState<TypographyStyle[]>(() =>
+    savedTypographySettings && savedTypographySettings.length === 3
+      ? savedTypographySettings
+      : [
+        { type: 'header', family: 'Sans Serif, Geometric', weight: '700', letterSpacing: '-0.02em', allCaps: false },
+        { type: 'decorative', family: 'Sans Serif, Humanist', weight: '600', letterSpacing: '0.05em', allCaps: true },
+        { type: 'body', family: 'Sans Serif, Neo Grotesque', weight: '400', letterSpacing: '0em', allCaps: false },
+      ]
+  );
   const [fontSamples, setFontSamples] = useState<FontPair[]>(savedFontSamples || []);
   const [selectedSample, setSelectedSample] = useState<number | null>(savedSelectedSample ?? null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -205,7 +230,11 @@ export default function TypographyStage({
   }, []);
 
   // ─── Generate font options ───
-  const handleGenerateOptions = useCallback(async () => {
+  // `pinTrio` (used only on the first edit-flow render) inserts the user's
+  // previously chosen Header / Decorative / Body fonts as Card #0, with
+  // 19 fresh alternatives following. Subsequent calls (e.g. when the user
+  // tweaks the sidebar) pass undefined and the deck is fully refreshed.
+  const handleGenerateOptions = useCallback(async (pinTrio?: TypographyStyle[]) => {
     setIsGenerating(true);
     try {
       const headerFonts = await getFontsForStyleCategory(editedTypography[0].family, 20, useMoodBased);
@@ -213,23 +242,39 @@ export default function TypographyStage({
       const bodyFonts = await getFontsForStyleCategory('Sans Serif, Neo Grotesque', 20, useMoodBased);
 
       const pairs: FontPair[] = [];
-      for (let i = 0; i < 20; i++) {
+      const validPin = pinTrio && pinTrio.length === 3
+        && pinTrio.every(t => typeof t.family === 'string' && t.family.length > 0);
+      if (validPin) {
+        const h = pinTrio![0];
+        const d = pinTrio![1];
+        const b = pinTrio![2];
+        pairs.push({
+          id: 0,
+          header: { family: h.family, weight: h.weight, letterSpacing: h.letterSpacing, allCaps: h.allCaps },
+          decorative: { family: d.family, weight: d.weight, letterSpacing: d.letterSpacing, allCaps: d.allCaps },
+          body: { family: b.family, weight: b.weight, letterSpacing: b.letterSpacing },
+        });
+      }
+      const startIndex = pairs.length;
+      const targetTotal = 20;
+      for (let i = startIndex; i < targetTotal; i++) {
+        const offset = validPin ? i : i; // keep deterministic ordering
         pairs.push({
           id: i,
           header: {
-            family: headerFonts[i % headerFonts.length].family,
+            family: headerFonts[offset % headerFonts.length].family,
             weight: editedTypography[0].weight,
             letterSpacing: editedTypography[0].letterSpacing,
             allCaps: editedTypography[0].allCaps,
           },
           decorative: {
-            family: decorativeFonts[i % decorativeFonts.length].family,
+            family: decorativeFonts[offset % decorativeFonts.length].family,
             weight: editedTypography[1].weight,
             letterSpacing: editedTypography[1].letterSpacing,
             allCaps: editedTypography[1].allCaps,
           },
           body: {
-            family: bodyFonts[i % bodyFonts.length].family,
+            family: bodyFonts[offset % bodyFonts.length].family,
             weight: editedTypography[2].weight,
             letterSpacing: editedTypography[2].letterSpacing,
           },
@@ -251,11 +296,14 @@ export default function TypographyStage({
     }
   }, [editedTypography, useMoodBased]);
 
-  // Auto-generate when detection completes
+  // Auto-generate when detection completes. On the edit flow's first run,
+  // pin the saved trio as Card #0 so the user immediately sees their
+  // previous pick; later regenerations skip the pin.
   useEffect(() => {
     if (step === 'review') {
-      handleGenerateOptions();
+      handleGenerateOptions(isEditFlow ? savedFirstTrio : undefined);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step === 'review']);
 
   // Auto-regenerate (debounced) when typography settings change after initial samples exist
@@ -272,6 +320,7 @@ export default function TypographyStage({
     const updated = [...editedTypography];
     updated[index] = { ...updated[index], [field]: value };
     setEditedTypography(updated);
+    onTypographySettingsChange?.(updated);
   };
 
   const handleSampleEdit = (sampleId: number, role: 'header' | 'decorative' | 'body', field: string, value: string | boolean) => {
@@ -385,12 +434,13 @@ export default function TypographyStage({
     <div className="typo-page" style={{ display: 'flex', minHeight: '100vh' }}>
 
       {/* ─── Left: persistent sidebar ─── */}
-      <div style={{
+      <div data-surface="Surface-Dim" style={{
         width: settingsOpen ? 280 : 0,
         flexShrink: 0,
         overflow: 'hidden',
         transition: 'width 0.2s ease',
         borderRight: settingsOpen ? '1px solid var(--Border)' : 'none',
+        background: 'var(--Background)',
       }}>
         <div style={{ width: 280, padding: '8px 16px', boxSizing: 'border-box' }}>
           <VStack spacing={2}>
@@ -430,7 +480,7 @@ export default function TypographyStage({
 
       {/* ─── Right: main content ─── */}
       <div style={{ flex: 1, minWidth: 0, transition: 'margin 0.2s ease' }}>
-        <VStack spacing={3} style={{ maxWidth: 1000, margin: '0 auto', width: '100%', padding: '40px 24px' }}>
+        <VStack spacing={3} style={{ maxWidth: 1000, margin: '0 auto', width: '100%', padding: '40px 32px', boxSizing: 'border-box' }}>
 
           {!settingsOpen && (
             <HStack spacing={2} style={{ justifyContent: 'center' }}>
@@ -539,7 +589,9 @@ export default function TypographyStage({
                     </Button>
 
                     {isExpanded && (
-                      <VStack spacing={3} onClick={e => e.stopPropagation()} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--Border)', width: '100%' }}>
+                      <>
+                      <Divider style={{ marginTop: 12, width: '100%' }} />
+                      <VStack spacing={3} onClick={e => e.stopPropagation()} style={{ paddingTop: 12, width: '100%' }}>
                         {/* Role headers */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                           {(['header', 'decorative', 'body'] as const).map(role => (
@@ -593,6 +645,7 @@ export default function TypographyStage({
                           ))}
                         </div>
                       </VStack>
+                      </>
                     )}
                   </Card>
                 );

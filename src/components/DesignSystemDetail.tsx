@@ -1,19 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router';
+import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, Tab,
+  Button, H2, H3, H4, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, TextField,
+  Breadcrumbs, BreadcrumbItem, Accordion, AccordionGroup, AccordionSummary, AccordionDetails,
+  Modal,
 } from '@dynodesign/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { doc, getDoc, collection, query, where, getDocs, setDoc, addDoc, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { getPublicFileUrl } from '../utils/firebase/storage';
+import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
+import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import AppHeader from './AppHeader';
+import {
+  RenameDesignSystemModal, DeleteDesignSystemModal, MenuButton,
+} from './designSystemDialogs';
 import '../styles/export.css';
 
 /**
@@ -21,6 +31,13 @@ import '../styles/export.css';
  * tabs: Use My Design (export-stage hub), Settings (subscription/payment),
  * History (creation date + future events).
  */
+
+interface LinkedFigmaFile {
+  fileKey: string;
+  fileName: string;
+  fileUrl: string | null;
+  lastSeenAt: Date | null;
+}
 
 interface Record {
   name: string;
@@ -34,6 +51,29 @@ interface Record {
   lastPushedAt: Date | null;
   monthlyAddOns?: { playground?: boolean; storybook?: boolean; designerPortal?: boolean };
   plan?: string;
+  linkedFigmaFiles: LinkedFigmaFile[];
+  /** Full rehydration snapshot from the design system doc — used here to
+   *  drive brand-themed rendering of the detail page itself, so the app
+   *  chrome adopts the user's design system once they've created one. */
+  snapshot: any | null;
+}
+
+function figmaFileUrl(file: LinkedFigmaFile): string {
+  if (file.fileUrl) return file.fileUrl;
+  const slug = (file.fileName || 'design').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'design';
+  return `https://www.figma.com/design/${encodeURIComponent(file.fileKey)}/${encodeURIComponent(slug)}`;
+}
+
+function FigmaGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={Math.round(size * 1.5)} viewBox="0 0 38 57" fill="none" aria-hidden="true">
+      <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" fill="#1ABCFE"/>
+      <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" fill="#0ACF83"/>
+      <path d="M19 0V19H28.5C33.7467 19 38 14.7467 38 9.5C38 4.25329 33.7467 0 28.5 0H19Z" fill="#FF7262"/>
+      <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" fill="#F24E1E"/>
+      <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" fill="#A259FF"/>
+    </svg>
+  );
 }
 
 interface PaymentRecord {
@@ -42,6 +82,14 @@ interface PaymentRecord {
   description: string;
   amount: number;
   status: string;
+}
+
+interface EventRecord {
+  id: string;
+  kind: 'created' | 'updated' | 'pushed' | string;
+  version: number;
+  at: Date | null;
+  summary?: string;
 }
 
 type Status = 'loading' | 'ready' | 'not-found';
@@ -53,7 +101,45 @@ export default function DesignSystemDetail() {
   const [status, setStatus] = useState<Status>('loading');
   const [record, setRecord] = useState<Record | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [events, setEvents] = useState<EventRecord[]>([]);
   const [tab, setTab] = useState<Inner>('use');
+  const [showFigmaUpdateModal, setShowFigmaUpdateModal] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reprocessed') === '1') {
+      setShowFigmaUpdateModal(true);
+      params.delete('reprocessed');
+      const next = window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash;
+      window.history.replaceState(null, '', next);
+    }
+  }, []);
+
+  async function loadEvents(designId: string) {
+    try {
+      const evSnap = await getDocs(query(
+        collection(db, 'designSystems', designId, 'events'),
+        orderBy('at', 'desc'),
+        limit(50),
+      ));
+      const list: EventRecord[] = [];
+      evSnap.forEach(d => {
+        const data = d.data() as any;
+        list.push({
+          id: d.id,
+          kind: data.kind || 'updated',
+          version: Number(data.version || 0),
+          at: data.at?.toDate?.() || null,
+          summary: data.summary || undefined,
+        });
+      });
+      setEvents(list);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+    }
+  }
 
   useEffect(() => {
     if (!id) { setStatus('not-found'); return; }
@@ -66,6 +152,16 @@ export default function DesignSystemDetail() {
           return;
         }
         const data = snap.data() as any;
+        const linkedRaw: any[] = Array.isArray(data.linkedFigmaFiles) ? data.linkedFigmaFiles : [];
+        const linked: LinkedFigmaFile[] = linkedRaw
+          .map(f => ({
+            fileKey: String(f.fileKey || ''),
+            fileName: String(f.fileName || ''),
+            fileUrl: f.fileUrl ? String(f.fileUrl) : null,
+            lastSeenAt: f.lastSeenAt?.toDate?.() || (f.lastSeenAt ? new Date(f.lastSeenAt) : null),
+          }))
+          .filter(f => f.fileKey)
+          .sort((a, b) => (b.lastSeenAt?.getTime() || 0) - (a.lastSeenAt?.getTime() || 0));
         const r: Record = {
           name: data.name || 'Untitled',
           colors: Array.isArray(data.colors) ? data.colors.slice(0, 3) : [],
@@ -78,6 +174,8 @@ export default function DesignSystemDetail() {
           lastPushedAt: data.lastPushedAt?.toDate?.() || null,
           monthlyAddOns: data.monthlyAddOns,
           plan: data.plan,
+          linkedFigmaFiles: linked,
+          snapshot: data.snapshot || null,
         };
         if (cancelled) return;
         setRecord(r);
@@ -101,6 +199,7 @@ export default function DesignSystemDetail() {
           });
           if (!cancelled) setPayments(pays);
         }
+        if (!cancelled) await loadEvents(id);
       } catch (err) {
         console.error('Failed to load design system:', err);
         if (!cancelled) setStatus('not-found');
@@ -140,30 +239,197 @@ export default function DesignSystemDetail() {
 
   return (
     <>
+      <BrandCSSInjector snapshot={record.snapshot} />
+      <main data-theme="Brand" data-surface="Surface" style={{ minHeight: '100vh', background: 'var(--Background)' }}>
       <AppHeader />
       <VStack spacing={4} style={{ padding: '32px 24px', maxWidth: 1100, margin: '0 auto' }}>
+        <Breadcrumbs size="small">
+          <BreadcrumbItem href="/my-designs">My Designs</BreadcrumbItem>
+          <BreadcrumbItem>{record.name || 'Untitled'}</BreadcrumbItem>
+        </Breadcrumbs>
         {/* Header strip — name in user's font, swatches, ID with copy */}
-        <DetailHeader record={record} id={id} headerStyle={headerStyle} colors={colors} />
+        <DetailHeader
+          record={record}
+          id={id}
+          headerStyle={headerStyle}
+          colors={colors}
+          onRequestRename={() => setRenameOpen(true)}
+          onRequestDelete={() => setDeleteOpen(true)}
+          onMarkPushed={async () => {
+            try {
+              await setDoc(doc(db, 'designSystems', id), {
+                lastPushedAt: serverTimestamp(),
+                lastPushedVersion: record.version,
+              }, { merge: true });
+              await addDoc(collection(db, 'designSystems', id, 'events'), {
+                kind: 'pushed',
+                version: record.version,
+                at: serverTimestamp(),
+                summary: `Marked v${record.version} as pushed to Figma`,
+              });
+              setRecord({
+                ...record,
+                lastPushedAt: new Date(),
+                lastPushedVersion: record.version,
+              });
+              loadEvents(id);
+            } catch (err) {
+              console.error('Failed to mark as pushed:', err);
+            }
+          }}
+        />
 
-        <Tabs
-          value={['use', 'settings', 'history'].indexOf(tab)}
-          onChange={(_: any, v: number) => setTab(['use', 'settings', 'history'][v] as Inner)}
-        >
-          <Tab label="Use My Design" />
-          <Tab label="Settings" />
-          <Tab label="History" />
+        <Tabs value={tab} onChange={(v: Inner) => setTab(v)}>
+          <TabList aria-label="Design system sections">
+            <Tab value="use">Use My Design</Tab>
+            <Tab value="settings">Settings</Tab>
+            <Tab value="history">History</Tab>
+          </TabList>
         </Tabs>
 
         {tab === 'use' && <UseMyDesignTab id={id} record={record} />}
-        {tab === 'settings' && <SettingsTab record={record} payments={payments} />}
-        {tab === 'history' && <HistoryTab record={record} />}
+        {tab === 'settings' && <SettingsTab id={id} record={record} payments={payments} />}
+        {tab === 'history' && <HistoryTab record={record} events={events} />}
       </VStack>
+      </main>
+
+      <FigmaUpdateModal
+        open={showFigmaUpdateModal}
+        onClose={() => setShowFigmaUpdateModal(false)}
+        hasLinkedFile={record.linkedFigmaFiles.length > 0}
+      />
+
+      <RenameDesignSystemModal
+        target={renameOpen ? { id, name: record.name } : null}
+        onClose={() => setRenameOpen(false)}
+        onRenamed={(_, newName) => setRecord({ ...record, name: newName })}
+      />
+      <DeleteDesignSystemModal
+        target={deleteOpen ? { id, name: record.name } : null}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={() => { window.location.href = '/my-designs'; }}
+      />
     </>
   );
 }
 
-function DetailHeader({ record, id, headerStyle, colors }: { record: Record; id: string; headerStyle: React.CSSProperties; colors: string[] }) {
+/**
+ * Builds the design system's brand CSS from its snapshot (the same shape
+ * the create flow stores in Firestore) and injects it into the document
+ * head. Pair with `data-theme="Brand"` on a container so the page chrome
+ * adopts the user's tokens instead of DinoDesign's defaults.
+ */
+function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
+  const css = useMemo(() => {
+    if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) return '';
+    try {
+      return buildPreviewCSS({
+        colorScheme: snapshot.colorScheme,
+        userSelections: snapshot.userSelections,
+        componentStyle: snapshot.componentStyle || 'modern',
+        mode: 'light',
+        typographyStyles: snapshot.typographyStyles,
+      });
+    } catch (err) {
+      console.error('Failed to build brand CSS for detail page:', err);
+      return '';
+    }
+  }, [snapshot]);
+
+  useEffect(() => {
+    if (!snapshot?.typographyStyles?.length) return;
+    const families = snapshot.typographyStyles
+      .map((t: any) => t?.family)
+      .filter((f: any): f is string => typeof f === 'string' && f.length > 0);
+    if (families.length) loadGoogleFonts(families).catch(() => {});
+  }, [snapshot]);
+
+  if (!css) return null;
+  return <style id="dino-detail-brand-css" dangerouslySetInnerHTML={{ __html: css }} />;
+}
+
+function FigmaUpdateModal({ open, onClose, hasLinkedFile }: { open: boolean; onClose: () => void; hasLinkedFile: boolean }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Update your Figma file" size="medium">
+      <VStack spacing={3}>
+        <Body>
+          Your design system has been reprocessed and republished. To pull the
+          latest tokens into Figma, open the DinoDesign plugin and run an
+          update.
+        </Body>
+        <Card padding="medium">
+          <VStack spacing={2}>
+            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+              In Figma
+            </BodySmall>
+            <Step n={1} body="Open your linked Figma file." />
+            <Step n={2} body="Open the DinoDesign plugin from Plugins → Development." />
+            <Step n={3} body="Click Update Design System. The plugin already has your ID — no need to re-enter it." />
+            <Step n={4} body="Wait for the run to finish. Your styles, variables, and components will refresh in place." />
+          </VStack>
+        </Card>
+        {!hasLinkedFile && (
+          <BodySmall style={{ color: 'var(--Quiet)' }}>
+            Once the plugin finishes the import, your Figma file will appear in
+            the Settings tab under "Linked Figma files."
+          </BodySmall>
+        )}
+        <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+          <Button variant="primary" onClick={onClose}>Got it</Button>
+        </HStack>
+      </VStack>
+    </Modal>
+  );
+}
+
+function Step({ n, body }: { n: number; body: string }) {
+  return (
+    <HStack spacing={2} style={{ alignItems: 'flex-start' }}>
+      <div style={{
+        flexShrink: 0,
+        width: 24,
+        height: 24,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--Buttons-Primary-Button)',
+        color: 'var(--Buttons-Primary-Text)',
+        fontSize: '0.75rem',
+        fontWeight: 700,
+      }}>{n}</div>
+      <BodySmall style={{ flex: 1, paddingTop: 2 }}>{body}</BodySmall>
+    </HStack>
+  );
+}
+
+function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequestRename, onRequestDelete }: { record: Record; id: string; headerStyle: React.CSSProperties; colors: string[]; onMarkPushed: () => Promise<void>; onRequestRename: () => void; onRequestDelete: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [marking, setMarking] = useState(false);
+  // Portal-anchored ellipsis menu — the lib's Menu silent-fails without a
+  // Dropdown ancestor (see CLAUDE.md), so this mirrors the MyDesignsPage card
+  // pattern: anchor to the trigger via getBoundingClientRect, portal to body,
+  // close on outside-click + Escape.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutside = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t)) return;
+      if (menuButtonRef.current?.contains(t)) return;
+      setMenuOpen(false);
+    };
+    const closeOnEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [menuOpen]);
   const handleCopy = () => {
     navigator.clipboard.writeText(id);
     setCopied(true);
@@ -185,28 +451,117 @@ function DetailHeader({ record, id, headerStyle, colors }: { record: Record; id:
               {record.componentStyle} · v{record.version} · created {record.createdAt?.toLocaleDateString() || 'unknown'}
             </BodySmall>
           </VStack>
+          <HStack spacing={1} style={{ flexShrink: 0, alignItems: 'center' }}>
+            <Button
+              variant="primary-outline"
+              size="small"
+              onClick={() => window.location.href = `/create?id=${id}`}
+            >
+              Edit
+            </Button>
+            <button
+              ref={menuButtonRef}
+              type="button"
+              aria-label="More options"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMenuPos({
+                  top: rect.bottom + window.scrollY + 4,
+                  right: window.innerWidth - rect.right - window.scrollX,
+                });
+                setMenuOpen(prev => !prev);
+              }}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                padding: 6,
+                borderRadius: 4,
+                color: 'var(--Quiet)',
+                display: 'flex',
+              }}
+            >
+              <MoreVertIcon style={{ fontSize: 20 }} />
+            </button>
+            {menuOpen && menuPos && createPortal(
+              <div
+                ref={menuRef}
+                role="menu"
+                style={{
+                  position: 'absolute',
+                  top: menuPos.top,
+                  right: menuPos.right,
+                  minWidth: 160,
+                  background: 'var(--Container, #fff)',
+                  border: '1px solid var(--Border, #d4d4d4)',
+                  borderRadius: 'var(--Style-Border-Radius, 6px)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
+                  padding: '4px 0',
+                  zIndex: 1300,
+                  color: 'var(--Text)',
+                }}
+              >
+                <MenuButton onClick={() => { setMenuOpen(false); onRequestRename(); }}>
+                  Rename
+                </MenuButton>
+                <MenuButton onClick={() => { setMenuOpen(false); onRequestDelete(); }}>
+                  Delete
+                </MenuButton>
+              </div>,
+              document.body,
+            )}
+          </HStack>
         </HStack>
         {pending > 0 && (
-          <div style={{
+          <HStack spacing={2} style={{
             padding: '8px 12px', borderRadius: 6,
             background: 'var(--Warning-Color-11, #fff8e1)',
             border: '1px solid var(--Buttons-Warning-Border, #ffd54f)',
             fontSize: 12,
+            alignItems: 'center',
           }}>
-            <strong>{pending} {pending === 1 ? 'change' : 'changes'}</strong> not yet pushed to Figma. Re-import in the plugin to sync.
-          </div>
+            <BodySmall style={{ flex: 1 }}>
+              <strong>{pending} {pending === 1 ? 'change' : 'changes'}</strong> not yet pushed to Figma. Re-import in the plugin to sync.
+            </BodySmall>
+            <Button
+              variant="primary-outline"
+              size="small"
+              disabled={marking}
+              onClick={async () => {
+                setMarking(true);
+                try { await onMarkPushed(); } finally { setMarking(false); }
+              }}
+            >
+              {marking ? 'Marking…' : 'Mark as pushed'}
+            </Button>
+          </HStack>
         )}
-        <HStack spacing={1} style={{ alignItems: 'center', fontSize: 12 }}>
-          <BodySmall style={{ color: 'var(--Quiet)', flexShrink: 0 }}>ID:</BodySmall>
-          <code style={{
-            fontSize: 11, fontFamily: 'SF Mono, Monaco, Consolas, monospace',
-            background: 'var(--Container-Lowest, #f5f5f5)',
-            padding: '2px 8px', borderRadius: 4, flex: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{id}</code>
-          <Button variant="primary-outline" size="small" onClick={handleCopy}>
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
+        <HStack spacing={1} style={{ alignItems: 'center' }}>
+          <BodySmall style={{ color: 'var(--Quiet)', flexShrink: 0, width: 24 }}>ID:</BodySmall>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <TextField
+              value={id || ''}
+              size="small"
+              fullWidth
+              InputProps={{ readOnly: true }}
+              onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
+              endAdornment={
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={handleCopy}
+                  startIcon={<ContentCopyIcon style={{ fontSize: 16 }} />}
+                  sx={{ minWidth: 0, padding: '2px 8px' }}
+                >
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+              }
+            />
+          </div>
         </HStack>
       </VStack>
     </Card>
@@ -232,6 +587,7 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
   const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${id}`;
 
   return (
+    <VStack spacing={5}>
     <div className="export-cards-grid">
       <Card padding="medium">
         <VStack spacing={3}>
@@ -260,12 +616,43 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
             </svg>
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
-            Get a full Figma design system with your brand tokens applied to every component, style, and variable.
-          </BodySmall>
-          <Button variant="primary" style={{ width: '100%' }} disabled>
-            Open Figma Template (Coming Soon)
-          </Button>
+          {record.lastPushedAt ? (
+            <>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
+                Get a full Figma design system with your brand tokens applied to every component, style, and variable.
+              </BodySmall>
+              {record.linkedFigmaFiles.length > 0 ? (
+                <Button
+                  variant="primary"
+                  style={{ width: '100%' }}
+                  onClick={() => window.open(figmaFileUrl(record.linkedFigmaFiles[0]), '_blank', 'noopener')}
+                >
+                  Open Figma file
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  style={{ width: '100%' }}
+                  onClick={() => document.getElementById('figma-import-guide')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  View Figma import guide
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
+                You have not yet pushed your design to Figma.
+              </BodySmall>
+              <Button
+                variant="primary"
+                style={{ width: '100%' }}
+                onClick={() => document.getElementById('figma-import-guide')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                Get your design into Figma
+              </Button>
+            </>
+          )}
         </VStack>
       </Card>
 
@@ -379,13 +766,204 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
           >
             Download All (.zip)
           </Button>
+          <Button
+            variant="primary-outline"
+            style={{ width: '100%' }}
+            onClick={async () => {
+              type DirHandle = FileSystemDirectoryHandle & {
+                queryPermission?: (d: { mode: 'readwrite' }) => Promise<'granted' | 'denied' | 'prompt'>;
+                requestPermission?: (d: { mode: 'readwrite' }) => Promise<'granted' | 'denied' | 'prompt'>;
+              };
+              type WritableFile = { createWritable: () => Promise<{ write: (c: string) => Promise<void>; close: () => Promise<void> }> };
+              const w = window as unknown as { showDirectoryPicker?: (opts?: unknown) => Promise<DirHandle> };
+              if (!w.showDirectoryPicker) {
+                alert('Your browser doesn’t support direct folder writes. Use Chrome or Edge for this.');
+                return;
+              }
+
+              // IndexedDB persistence so the folder is remembered between sessions.
+              const DB_NAME = 'dynodesign-studio';
+              const STORE = 'handles';
+              const KEY = 'dinodesign-public-styles';
+              const openDB = () => new Promise<IDBDatabase>((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+              });
+              const idbGet = async (): Promise<DirHandle | null> => {
+                const db = await openDB();
+                return new Promise(resolve => {
+                  const tx = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
+                  tx.onsuccess = () => resolve((tx.result as DirHandle) ?? null);
+                  tx.onerror = () => resolve(null);
+                });
+              };
+              const idbSet = async (h: DirHandle) => {
+                const db = await openDB();
+                return new Promise<void>(resolve => {
+                  const tx = db.transaction(STORE, 'readwrite').objectStore(STORE).put(h, KEY);
+                  tx.onsuccess = () => resolve();
+                  tx.onerror = () => resolve();
+                });
+              };
+
+              try {
+                let dirHandle = await idbGet();
+                if (dirHandle) {
+                  const perm = (await dirHandle.queryPermission?.({ mode: 'readwrite' })) ?? 'prompt';
+                  if (perm !== 'granted') {
+                    const requested = await dirHandle.requestPermission?.({ mode: 'readwrite' });
+                    if (requested !== 'granted') dirHandle = null;
+                  }
+                }
+                if (!dirHandle) {
+                  dirHandle = await w.showDirectoryPicker({
+                    id: 'dinodesign-public-styles',
+                    mode: 'readwrite',
+                    startIn: 'documents',
+                  });
+                  await idbSet(dirHandle);
+                }
+
+                let written = 0;
+                for (const f of LIB_DYNAMIC_CSS_FILES) {
+                  try {
+                    const res = await fetch(getPublicFileUrl(id, f));
+                    if (!res.ok) continue;
+                    const content = await res.text();
+                    const fh = await dirHandle.getFileHandle(f, { create: true });
+                    const writable = await (fh as unknown as WritableFile).createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                    written += 1;
+                  } catch (e) {
+                    console.error(`Failed to write ${f}:`, e);
+                  }
+                }
+                alert(`Pushed ${written} of ${LIB_DYNAMIC_CSS_FILES.length} dynamic CSS files to DinoDesign.`);
+              } catch (err) {
+                if ((err as { name?: string })?.name !== 'AbortError') {
+                  console.error('Push to local DinoDesign failed:', err);
+                  alert('Push failed. See console for details.');
+                }
+              }
+            }}
+          >
+            Push to local DinoDesign
+          </Button>
+          <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            Writes the 3 dynamic CSS files (base / Light-Mode / Dark-Mode) into your DinoDesign repo folder. Chrome/Edge only. First click prompts you to pick the folder; after that it remembers.
+          </BodySmall>
         </VStack>
       </Card>
     </div>
+
+    <ResourcesSection id={id} />
+    </VStack>
   );
 }
 
-function SettingsTab({ record, payments }: { record: Record; payments: PaymentRecord[] }) {
+function ResourcesSection({ id }: { id: string }) {
+  return (
+    <VStack spacing={3}>
+      <H3>Resources</H3>
+
+      <Card padding="medium">
+        <VStack spacing={2}>
+          <HStack spacing={2} style={{ alignItems: 'center' }}>
+            <FigmaGlyph size={16} />
+            <H4 style={{ margin: 0, fontSize: '1rem' }}>Figma</H4>
+          </HStack>
+          <AccordionGroup>
+            <Accordion id="figma-import-guide">
+              <AccordionSummary>
+                <BodySmall style={{ fontWeight: 600 }}>
+                  Build your Design System in Figma
+                </BodySmall>
+              </AccordionSummary>
+              <AccordionDetails>
+                <VStack spacing={3} style={{ paddingTop: 8 }}>
+                  <FigmaStep
+                    n={1}
+                    title="Download your Figma file"
+                    body="Download the attached .fig file from your DinoDesign dashboard."
+                  />
+                  <FigmaStep
+                    n={2}
+                    title="Import into Figma"
+                    body="Open Figma and import your file by dragging and dropping the .fig file into the Figma home screen, or click Import and select the downloaded file."
+                  />
+                  <FigmaStep
+                    n={3}
+                    title="Open the file"
+                    body="Once imported, open the file. You'll land on the Almost There page, which walks you through connecting your branded design system."
+                  />
+                  <FigmaStep
+                    n={4}
+                    title="Install the DinoDesign Plugin"
+                    body="From the Almost There page, install the DinoDesign Plugin directly in Figma."
+                  />
+                  <FigmaStep n={5} title="Enter your DinoDesign ID">
+                    <BodySmall>
+                      In the plugin, paste in your unique DinoDesign ID:{' '}
+                      <code style={{
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                        fontSize: '0.85em',
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: 'var(--Container)',
+                        border: '1px solid var(--Border)',
+                        wordBreak: 'break-all',
+                      }}>{id}</code>
+                    </BodySmall>
+                  </FigmaStep>
+                  <FigmaStep
+                    n={6}
+                    title="Import your design system"
+                    body="Press ⌘L to open the URL input field, paste in your Figma file URL, then click Import Design System. Let it run — this is where the magic happens."
+                  />
+                  <FigmaStep
+                    n={7}
+                    title="Explore"
+                    body="Once complete, head to the Using Your DinoDesign System page for tips and tricks on getting the most out of your branded design system."
+                  />
+                </VStack>
+              </AccordionDetails>
+            </Accordion>
+          </AccordionGroup>
+        </VStack>
+      </Card>
+    </VStack>
+  );
+}
+
+function FigmaStep({ n, title, body, children }: { n: number; title: string; body?: string; children?: React.ReactNode }) {
+  return (
+    <HStack spacing={2} style={{ alignItems: 'flex-start' }}>
+      <div style={{
+        flexShrink: 0,
+        width: 28,
+        height: 28,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--Buttons-Primary-Button)',
+        color: 'var(--Buttons-Primary-Text)',
+        fontSize: '0.8rem',
+        fontWeight: 700,
+      }}>{n}</div>
+      <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
+        <BodySmall style={{ fontWeight: 600 }}>Step {n} — {title}</BodySmall>
+        {body && <BodySmall style={{ color: 'var(--Quiet)' }}>{body}</BodySmall>}
+        {children}
+      </VStack>
+    </HStack>
+  );
+}
+
+function SettingsTab({ id, record, payments }: { id: string; record: Record; payments: PaymentRecord[] }) {
   const addOns = useMemo(() => {
     const list: string[] = [];
     if (record.monthlyAddOns?.playground) list.push('Playground');
@@ -412,7 +990,67 @@ function SettingsTab({ record, payments }: { record: Record; payments: PaymentRe
             Hosting
           </BodySmall>
           <KV k="Tokens" v="Firebase Storage · public read" />
-          <KV k="Playground URL" v={`https://designology.netlify.app/?user=${record ? '(this id)' : ''}`} />
+          <HStack spacing={2} style={{ padding: '6px 0', alignItems: 'baseline' }}>
+            <BodySmall style={{ color: 'var(--Quiet)', width: 130, flexShrink: 0 }}>Playground URL</BodySmall>
+            <a
+              href={`https://designology.netlify.app/?user=${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: 'var(--Hotlink)',
+                textDecoration: 'underline',
+                wordBreak: 'break-all',
+                fontSize: '0.875rem',
+                fontFamily: 'inherit',
+              }}
+            >
+              {`https://designology.netlify.app/?user=${id}`}
+            </a>
+          </HStack>
+        </VStack>
+      </Card>
+
+      <Card padding="medium">
+        <VStack spacing={2}>
+          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+            Linked Figma files
+          </BodySmall>
+          {record.linkedFigmaFiles.length === 0 ? (
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              No Figma files linked yet. Pair the DinoDesign plugin from your Account
+              page, then run an import — the file you imported into will show up here.
+            </BodySmall>
+          ) : (
+            <VStack spacing={0}>
+              {record.linkedFigmaFiles.map(f => (
+                <HStack key={f.fileKey} spacing={2} style={{
+                  padding: '10px 0',
+                  borderBottom: '1px solid var(--Border)',
+                  alignItems: 'center',
+                }}>
+                  <FigmaGlyph size={14} />
+                  <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
+                    <BodySmall style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {f.fileName || 'Untitled file'}
+                    </BodySmall>
+                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+                      Last imported{' '}
+                      {f.lastSeenAt
+                        ? f.lastSeenAt.toLocaleDateString() + ' ' + f.lastSeenAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : 'unknown'}
+                    </BodySmall>
+                  </VStack>
+                  <Button
+                    variant="primary-outline"
+                    size="small"
+                    onClick={() => window.open(figmaFileUrl(f), '_blank', 'noopener')}
+                  >
+                    Open in Figma
+                  </Button>
+                </HStack>
+              ))}
+            </VStack>
+          )}
         </VStack>
       </Card>
 
@@ -453,16 +1091,34 @@ function SettingsTab({ record, payments }: { record: Record; payments: PaymentRe
   );
 }
 
-function HistoryTab({ record }: { record: Record }) {
-  const events: Array<{ when: Date | null; label: string; detail?: string }> = [];
-  if (record.createdAt) events.push({ when: record.createdAt, label: 'Created', detail: `v1` });
-  if (record.updatedAt && record.updatedAt.getTime() !== record.createdAt?.getTime()) {
-    events.push({ when: record.updatedAt, label: 'Last updated', detail: `v${record.version}` });
+function HistoryTab({ record, events }: { record: Record; events: EventRecord[] }) {
+  const KIND_LABEL: Record<string, string> = {
+    created: 'Created',
+    updated: 'Updated',
+    pushed: 'Pushed to Figma',
+  };
+
+  // Prefer the events subcollection. Fall back to doc-level timestamps so
+  // older designs (pre event-log) still show something meaningful.
+  let rows: Array<{ when: Date | null; label: string; detail?: string; summary?: string }>;
+  if (events.length > 0) {
+    rows = events.map(e => ({
+      when: e.at,
+      label: KIND_LABEL[e.kind] || e.kind.charAt(0).toUpperCase() + e.kind.slice(1),
+      detail: e.version > 0 ? `v${e.version}` : undefined,
+      summary: e.summary,
+    }));
+  } else {
+    rows = [];
+    if (record.createdAt) rows.push({ when: record.createdAt, label: 'Created', detail: `v1` });
+    if (record.updatedAt && record.updatedAt.getTime() !== record.createdAt?.getTime()) {
+      rows.push({ when: record.updatedAt, label: 'Last updated', detail: `v${record.version}` });
+    }
+    if (record.lastPushedAt) {
+      rows.push({ when: record.lastPushedAt, label: 'Pushed to Figma', detail: `v${record.lastPushedVersion}` });
+    }
+    rows.sort((a, b) => (b.when?.getTime() || 0) - (a.when?.getTime() || 0));
   }
-  if (record.lastPushedAt) {
-    events.push({ when: record.lastPushedAt, label: 'Pushed to Figma', detail: `v${record.lastPushedVersion}` });
-  }
-  events.sort((a, b) => (b.when?.getTime() || 0) - (a.when?.getTime() || 0));
 
   return (
     <Card padding="medium">
@@ -470,17 +1126,22 @@ function HistoryTab({ record }: { record: Record }) {
         <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
           Activity
         </BodySmall>
-        {events.length === 0 ? (
+        {rows.length === 0 ? (
           <BodySmall style={{ color: 'var(--Quiet)' }}>No history yet.</BodySmall>
         ) : (
           <VStack spacing={0}>
-            {events.map((e, i) => (
-              <HStack key={i} spacing={2} style={{ padding: '8px 0', borderBottom: i < events.length - 1 ? '1px solid var(--Border)' : 'none' }}>
-                <BodySmall style={{ width: 110, color: 'var(--Quiet)', flexShrink: 0 }}>
-                  {e.when?.toLocaleDateString() || '—'}
+            {rows.map((e, i) => (
+              <HStack key={i} spacing={2} style={{ padding: '10px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--Border)' : 'none', alignItems: 'flex-start' }}>
+                <BodySmall style={{ width: 130, color: 'var(--Quiet)', flexShrink: 0 }}>
+                  {e.when ? `${e.when.toLocaleDateString()} ${e.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '—'}
                 </BodySmall>
-                <BodySmall style={{ fontWeight: 600 }}>{e.label}</BodySmall>
-                {e.detail && <BodySmall style={{ color: 'var(--Quiet)' }}>· {e.detail}</BodySmall>}
+                <VStack spacing={0} style={{ flex: 1 }}>
+                  <HStack spacing={1}>
+                    <BodySmall style={{ fontWeight: 600 }}>{e.label}</BodySmall>
+                    {e.detail && <BodySmall style={{ color: 'var(--Quiet)' }}>· {e.detail}</BodySmall>}
+                  </HStack>
+                  {e.summary && <BodySmall style={{ color: 'var(--Quiet)' }}>{e.summary}</BodySmall>}
+                </VStack>
               </HStack>
             ))}
           </VStack>
@@ -498,3 +1159,4 @@ function KV({ k, v }: { k: string; v: string }) {
     </HStack>
   );
 }
+

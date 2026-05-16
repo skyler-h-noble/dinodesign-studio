@@ -147,9 +147,11 @@ declare module '@dynodesign/components' {
   // Data Display
   export const Avatar: FC<any>;
   export const AvatarGroup: FC<any>;
+  export const AvatarMenu: FC<any>;
   export const Badge: FC<any>;
   export const Divider: FC<any>;
   export const List: FC<any>;
+  export const Slider: FC<any>;
   export const Table: FC<any>;
   export const Tooltip: FC<any>;
 

@@ -5453,13 +5453,19 @@ export function exportColorSystemToJSON(
     type: 'color'
   };
   
-  // Dark Mode utility colors
+  // Dark Mode utility colors — white at 70% opacity. Used as the canonical
+  // "white" reference for text and any UI that needs a softened white
+  // against dark backgrounds (full #ffffff against #0d0d0d reads as harsh).
+  // 0xB3 / 255 ≈ 0.702.
   colorSystem.Modes['Dark-Mode'].Colors['White'] = {
-    value: '#ffffffba',  // White with transparency in dark mode for glass effect
+    value: '#ffffffb3',
     type: 'color'
   };
+  // 30% black overlay for images in dark mode (#0000004D = 0x4D / 255 ≈ 0.30).
+  // Light mode stays fully transparent — overlay is only applied when the
+  // image needs to be visually muted against a darker UI.
   colorSystem.Modes['Dark-Mode'].Colors['Image-Overlay'] = {
-    value: '#00000066',
+    value: '#0000004D',
     type: 'color'
   };
   colorSystem.Modes['Dark-Mode'].Colors['Transparent'] = {

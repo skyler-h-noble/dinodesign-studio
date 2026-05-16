@@ -1,6 +1,9 @@
 .review-page {
-  padding: 40px 24px;
+  padding: 40px 32px;
   width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .review-layout {

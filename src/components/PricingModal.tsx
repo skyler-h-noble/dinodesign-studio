@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Modal, Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Checkbox,
+  Modal, Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Checkbox, Divider,
 } from '@dynodesign/components';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -294,12 +294,11 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
                 <BodySmall>$39/mo</BodySmall>
               </HStack>
             )}
-            <div style={{ borderTop: '1px solid var(--Border)', paddingTop: 8, marginTop: 4, width: '100%' }}>
-              <HStack spacing={2} style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Body style={{ fontWeight: 700 }}>Monthly subscription</Body>
-                <Body style={{ fontWeight: 700, color: '#3b82f6' }}>${monthlyTotal}/mo</Body>
-              </HStack>
-            </div>
+            <Divider style={{ marginTop: 4 }} />
+            <HStack spacing={2} style={{ justifyContent: 'space-between', width: '100%', paddingTop: 4 }}>
+              <Body style={{ fontWeight: 700 }}>Monthly subscription</Body>
+              <Body style={{ fontWeight: 700, color: '#3b82f6' }}>${monthlyTotal}/mo</Body>
+            </HStack>
           </VStack>
         </Card>
 

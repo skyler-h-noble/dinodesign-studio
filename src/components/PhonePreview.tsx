@@ -143,7 +143,13 @@ export default function PhonePreview({
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <H3 style={{ fontSize: 16 }}>Next Steps</H3>
-                    <BodySmall style={{ fontWeight: 700, fontSize: 12 }}>Explore</BodySmall>
+                    <span style={{
+                      fontFamily: 'var(--Set-Font-Family-Decorative, "Allura", cursive)',
+                      fontWeight: 'var(--Set-Font-Family-Decorative-Weight, 400)' as any,
+                      letterSpacing: 'var(--Set-Font-Family-Decorative-Letter-Spacing, 0em)',
+                      textTransform: 'var(--Set-Font-Family-Decorative-Text-Transform, none)' as any,
+                      fontSize: 12, color: 'var(--Quiet)',
+                    }}>Explore</span>
                   </div>
                   <Button variant="secondary" size="small" style={{
                     width: 36, height: 36, minWidth: 'auto', borderRadius: 36, padding: 0, flexShrink: 0,
@@ -165,8 +171,8 @@ export default function PhonePreview({
             <Card padding="medium" color="tertiary" style={{ minWidth: 0 }}>
               <VStack spacing={2}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <H3 style={{ fontSize: 16 }}>Have fun!</H3>
                   <Chip label="NEW" size="small" variant="tertiary" sx={{ borderRadius: '2px', alignSelf: 'flex-start' }} />
-                  <BodySmall style={{ fontWeight: 700, fontSize: 12 }}>Have fun!</BodySmall>
                 </div>
                 {moodBoardUrl && (
                   <div style={{ width: '100%', height: 56, borderRadius: 8, overflow: 'hidden' }}>

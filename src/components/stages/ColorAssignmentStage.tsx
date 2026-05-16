@@ -156,17 +156,13 @@ export default function ColorAssignmentStage({
         {/* ─── Left: Preview ─── */}
         <div className={`assign-colors-preview ${activeTab !== 'preview' ? 'hidden' : ''}`}>
           <div className="assign-preview-toggle">
-            <ButtonGroup size="small">
-              <Button
-                variant={previewMode === 'light' ? 'default' : 'outline'}
-                size="small"
-                onClick={() => setPreviewMode('light')}
-              >Light</Button>
-              <Button
-                variant={previewMode === 'dark' ? 'default' : 'outline'}
-                size="small"
-                onClick={() => setPreviewMode('dark')}
-              >Dark</Button>
+            <ButtonGroup
+              size="small"
+              value={previewMode}
+              onChange={(val: 'light' | 'dark') => setPreviewMode(val)}
+            >
+              <Button value="light" size="small">Light</Button>
+              <Button value="dark" size="small">Dark</Button>
             </ButtonGroup>
           </div>
 
@@ -222,7 +218,17 @@ export default function ColorAssignmentStage({
               >
                 <HStack spacing={1} alignItems="center">
                   <BodySmall style={{ color: 'var(--Quiet)', cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
-                  <Button swatch size="medium" className="dino-swatch" sx={{ backgroundColor: colors[i] || '#ccc', '&:hover': { backgroundColor: colors[i] || '#ccc' } }} />
+                  <div
+                    aria-hidden
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 'var(--Style-Border-Radius, 4px)',
+                      background: colors[i] || '#ccc',
+                      border: '1px solid var(--Border, #d4d4d4)',
+                      flexShrink: 0,
+                    }}
+                  />
                   <BodySmall style={{ fontWeight: 600 }}>{label}</BodySmall>
                 </HStack>
               </Card>
@@ -236,27 +242,32 @@ export default function ColorAssignmentStage({
         <VStack spacing={3}>
           <H3 style={{ fontSize: '1rem' }}>Navigational Elements</H3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, width: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, width: '100%' }}>
             {([
               { key: 'status' as const, label: 'Status Bar', options: NAV_OPTIONS },
               { key: 'appBar' as const, label: 'App Bar', options: NAV_OPTIONS },
               { key: 'navBar' as const, label: 'Navigation Bar', options: NAV_OPTIONS },
             ]).map(nav => (
-              <Select
-                key={nav.key}
-                mode="color"
-                label={nav.label}
-                labelPosition="top"
-                size="small"
-                fullWidth
-                value={userSelections[nav.key]}
-                onChange={(val: string) => update({ [nav.key]: val as NavOption })}
-                options={nav.options.map(opt => ({
-                  value: opt.value,
-                  label: opt.label,
-                  color: getNavColor(opt.value),
-                }))}
-              />
+              <VStack key={nav.key} spacing={1} alignItems="flex-start" style={{ width: '100%' }}>
+                <BodySmall style={{ color: 'var(--Text)', fontWeight: 600 }}>
+                  {nav.label}
+                </BodySmall>
+                <Select
+                  mode="color"
+                  color="default"
+                  size="small"
+                  fullWidth
+                  className="dino-color-select"
+                  style={{ ['--select-trigger-color' as any]: getNavColor(userSelections[nav.key]) }}
+                  value={userSelections[nav.key]}
+                  onChange={(val: string) => update({ [nav.key]: val as NavOption })}
+                  options={nav.options.map(opt => ({
+                    value: opt.value,
+                    label: opt.label,
+                    color: getNavColor(opt.value),
+                  }))}
+                />
+              </VStack>
             ))}
           </div>
         </VStack>
@@ -334,14 +345,14 @@ export default function ColorAssignmentStage({
             <H3 style={{ fontSize: '1rem' }}>Default Buttons</H3>
             <Link style={{ fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setShowButtonInfo(true)}>Learn more</Link>
           </div>
-          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, width: '100%' }}>
             {BUTTON_MODES.map(mode => (
               <Button
                 key={mode.value}
                 variant={userSelections.button === mode.value ? 'default' : 'outline'}
                 size="small"
                 onClick={() => update({ button: mode.value })}
-                style={{ flex: 1 }}
+                style={{ flex: '1 1 100px', minWidth: 0 }}
               >
                 {mode.label}
               </Button>

@@ -1,4 +1,7 @@
-import { ref, uploadBytes, getDownloadURL, getBytes } from 'firebase/storage';
+import {
+  ref, uploadBytes, getDownloadURL, getBytes, listAll, deleteObject,
+  type StorageReference,
+} from 'firebase/storage';
 import { storage, STORAGE_BUCKET } from './client';
 
 /**
@@ -71,6 +74,30 @@ export async function fetchDesignSystemFileText(uuid: string, filename: string):
   const fileRef = ref(storage, `${ROOT}/${uuid}/${filename}`);
   const bytes = await getBytes(fileRef);
   return new TextDecoder().decode(bytes);
+}
+
+/**
+ * Recursively delete every file under design-systems/{uuid}/. Storage has
+ * no native "delete folder" — we list, fan out deletes, and recurse into
+ * any nested prefixes (e.g. per-mode subfolders if the export ever adds
+ * them). Failures on individual files are swallowed so a single permission
+ * blip doesn't leave the caller half-done; the orphaned files would just
+ * be unreachable from the studio UI.
+ */
+async function deleteFolderRecursive(folderRef: StorageReference): Promise<void> {
+  const result = await listAll(folderRef);
+  await Promise.all([
+    ...result.items.map(item => deleteObject(item).catch(err => {
+      console.warn('deleteObject failed:', item.fullPath, err);
+    })),
+    ...result.prefixes.map(prefix => deleteFolderRecursive(prefix)),
+  ]);
+}
+
+/** Delete every file under design-systems/{uuid}/. Safe to call when empty. */
+export async function deleteDesignSystemFiles(uuid: string): Promise<void> {
+  const folderRef = ref(storage, `${ROOT}/${uuid}`);
+  await deleteFolderRecursive(folderRef);
 }
 
 /**

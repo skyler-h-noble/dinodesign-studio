@@ -20,6 +20,17 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+// Figma plugin device-pairing endpoints.
+// Imported after admin.initializeApp() so they share the same app instance.
+const pluginPairing = require('./pluginPairing');
+exports.createPluginPairingCode = pluginPairing.createPluginPairingCode;
+exports.claimPluginPairingCode = pluginPairing.claimPluginPairingCode;
+exports.pollPluginPairingCode = pluginPairing.pollPluginPairingCode;
+
+// Component proposal submissions from @dynodesign/components consumers.
+const componentProposals = require('./componentProposals');
+exports.submitComponentProposal = componentProposals.submitComponentProposal;
+
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
 

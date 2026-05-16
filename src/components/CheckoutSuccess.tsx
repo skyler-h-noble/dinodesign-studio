@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
-import { H2, Body, BodySmall, VStack } from '@dynodesign/components';
+import { H2, Body, BodySmall, VStack, Link } from '@dynodesign/components';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
@@ -80,9 +80,14 @@ export default function CheckoutSuccess() {
             Session: {sessionId}
           </BodySmall>
           <Body>
-            <span style={{ color: 'var(--Hotlink)', cursor: 'pointer' }} onClick={() => navigate('/create', { replace: true })}>
+            <Link
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                navigate('/create', { replace: true });
+              }}
+            >
               Go to studio anyway →
-            </span>
+            </Link>
           </Body>
         </>
       )}

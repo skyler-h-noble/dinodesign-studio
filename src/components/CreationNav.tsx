@@ -1,7 +1,6 @@
 import { Button, H3 } from '@dynodesign/components';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import { useAuth } from '../contexts/AuthContext';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface TopBarProps {
   designSystemName: string;
@@ -10,7 +9,10 @@ interface TopBarProps {
 }
 
 export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps) {
-  const { user } = useAuth();
+  const handleCancel = () => {
+    const ok = window.confirm('Cancel and leave this design? Unsaved changes will be lost.');
+    if (ok) window.location.href = '/';
+  };
   return (
     <div
       data-theme={themed ? 'Brand-App-Bar' : 'App-Bar'}
@@ -32,22 +34,20 @@ export function CreationTopBar({ designSystemName, onBack, themed }: TopBarProps
         size="small"
         onClick={onBack}
         startIcon={<ArrowBackIcon style={{ fontSize: 16 }} />}
+        sx={{ color: 'var(--Text)', textDecoration: 'none' }}
       >
         Back
       </Button>
       <H3 style={{ flex: 1, textAlign: 'center', margin: 0 }}>{designSystemName}</H3>
-      {user ? (
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={() => window.location.href = '/account'}
-          startIcon={<AccountCircleIcon style={{ fontSize: 18 }} />}
-        >
-          Account
-        </Button>
-      ) : (
-        <div style={{ width: 70 }} />
-      )}
+      <Button
+        variant="ghost"
+        size="small"
+        onClick={handleCancel}
+        startIcon={<CloseIcon style={{ fontSize: 18 }} />}
+        sx={{ color: 'var(--Text)', textDecoration: 'none' }}
+      >
+        Cancel
+      </Button>
     </div>
   );
 }

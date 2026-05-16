@@ -1414,7 +1414,19 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
           const bgToken = variantData.Surface?.value || variantData.Background?.value;
           if (bgToken) {
             const bgResolved = resolveTokenForCSS(bgToken, '--Background');
-            const bgHex = bgResolved.startsWith('#') ? bgResolved : null;
+            let bgHex: string | null = bgResolved.startsWith('#') ? bgResolved : null;
+            // If resolution returned a var(--Palette-Color-N) reference (the
+            // default-Surface case), look up the underlying hex from
+            // modeData.Colors so we can still derive a Dropshadow-Color.
+            if (!bgHex && modeData?.Colors) {
+              const varMatch = bgResolved.match(/^var\(--([\w-]+)-(Color-\d+)\)$/);
+              if (varMatch) {
+                const paletteHex = modeData.Colors?.[varMatch[1]]?.[varMatch[2]]?.value;
+                if (paletteHex && typeof paletteHex === 'string' && paletteHex.startsWith('#')) {
+                  bgHex = paletteHex;
+                }
+              }
+            }
             if (bgHex) {
               const rgb = deriveShadowRGB(bgHex);
               if (rgb) surfaceLines.push(`  --Dropshadow-Color: ${rgb};`);
@@ -1457,7 +1469,17 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
         const contToken = theme.Containers.Container?.value;
         if (contToken) {
           const contResolved = resolveTokenForCSS(contToken, '--Container');
-          const contHex = contResolved.startsWith('#') ? contResolved : null;
+          let contHex: string | null = contResolved.startsWith('#') ? contResolved : null;
+          // Same var(--Palette-Color-N) fallback as the Surfaces case above.
+          if (!contHex && modeData?.Colors) {
+            const varMatch = contResolved.match(/^var\(--([\w-]+)-(Color-\d+)\)$/);
+            if (varMatch) {
+              const paletteHex = modeData.Colors?.[varMatch[1]]?.[varMatch[2]]?.value;
+              if (paletteHex && typeof paletteHex === 'string' && paletteHex.startsWith('#')) {
+                contHex = paletteHex;
+              }
+            }
+          }
           if (contHex) {
             const rgb = deriveShadowRGB(contHex);
             if (rgb) containerLines.push(`  --Dropshadow-Color: ${rgb};`);
@@ -1877,28 +1899,21 @@ function generateThemeFromTopLevel(fullJsonData: any): string {
  * Helper function to convert tone value (e.g., 71) to color number (e.g., 11)
  */
 function toneToColorNumber(tone: number): number {
-  // NEW 14-TONE SYSTEM: [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99]
-  //                      1   2   3   4   5    6    7   8   9  10  11  12  13  14
-  const toneScale = [1, 10, 19, 28, 37, 46.6, 53, 62, 71, 81, 90, 95, 98, 99];
-  
-  // Find exact match
+  // 12-TONE SYSTEM (must mirror TONE_SCALE in src/utils/colorScale.ts):
+  //   [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
+  //    1   2   3   4   5   6   7   8   9  10  11  12
+  const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
+
   const exactIndex = toneScale.findIndex(t => Math.abs(t - tone) < 0.1);
-  if (exactIndex !== -1) {
-    return exactIndex + 1; // Color-1 through Color-14
-  }
-  
-  // Find closest tone
+  if (exactIndex !== -1) return exactIndex + 1;
+
   let closestIndex = 0;
   let minDiff = Math.abs(toneScale[0] - tone);
   for (let i = 1; i < toneScale.length; i++) {
     const diff = Math.abs(toneScale[i] - tone);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closestIndex = i;
-    }
+    if (diff < minDiff) { minDiff = diff; closestIndex = i; }
   }
-  
-  return closestIndex + 1; // Color-N (1-14)
+  return closestIndex + 1;
 }
 
 /**
@@ -2785,7 +2800,23 @@ export function generateCSSFiles(jsonData: any): { [filename: string]: string } 
         
         const css = generateModeCSSFromSingleMode(mergedData, mode, jsonData);
         // Validate and clean CSS before adding to output
-        const validatedCSS = css.split('\n').map(line => validateCSSLine(line)).join('\n');
+        let validatedCSS = css.split('\n').map(line => validateCSSLine(line)).join('\n');
+        // Dark mode: apply a 30% black overlay to every <img>. brightness(0.7)
+        // is mathematically equivalent to compositing a #0000004D layer on top
+        // of fully-opaque pixels (each channel multiplied by 0.7), and unlike
+        // a literal ::after overlay it works on replaced elements directly.
+        // The token --Image-Overlay-Color-1 still ships #0000004D for consumers
+        // who'd rather use a literal overlay layer themselves.
+        if (mode === 'Dark-Mode') {
+          validatedCSS += `
+
+/* Dark-mode image treatment — 30% black overlay applied via filter so it
+   works on plain <img> tags without requiring a wrapper element. */
+img {
+  filter: brightness(0.7);
+}
+`;
+        }
         cssFiles[`${mode}.css`] = validatedCSS;
         console.log(`✅ Generated ${mode}.css (${css.split('\n').length} lines)`);
       } else {
@@ -3007,15 +3038,52 @@ export function downloadCSSFile(filename: string, content: string): void {
  */
 export function downloadAllCSSFiles(jsonData: DesignSystem): void {
   const cssFiles = generateCSSFiles(jsonData);
-  
+
   Object.entries(cssFiles).forEach(([filename, content]) => {
     // Small delay between downloads to avoid browser blocking
     setTimeout(() => {
       downloadCSSFile(filename, content);
     }, 100);
   });
-  
+
   console.log(`�� Downloaded ${Object.keys(cssFiles).length} CSS files`);
+}
+
+/**
+ * CSS files that contain per-design-system values (brand colors, fonts).
+ * Regenerated on every export. Everything else in the lib's public/styles/
+ * (core.css, foundation.css, foundations.css, styles.css, typography-tokens.css)
+ * is lib-owned STATIC content that must not be overwritten.
+ * See `DinoDesign/public/styles/README.md` for details.
+ */
+export const LIB_DYNAMIC_CSS_FILES = ['base.css', 'Light-Mode.css', 'Dark-Mode.css'] as const;
+
+/**
+ * Generate ONLY the dynamic CSS files — for syncing into the lib repo.
+ * Use this when updating @dynodesign/components/public/styles/ to avoid
+ * clobbering the static lib-owned files.
+ */
+export function generateLibSyncCSSFiles(jsonData: DesignSystem): { [filename: string]: string } {
+  const all = generateCSSFiles(jsonData);
+  const sync: { [filename: string]: string } = {};
+  for (const name of LIB_DYNAMIC_CSS_FILES) {
+    if (all[name]) sync[name] = all[name];
+  }
+  return sync;
+}
+
+/**
+ * Download only the dynamic CSS files (base.css, Light-Mode.css, Dark-Mode.css).
+ * Use this when you want to drop fresh CSS into the lib without overwriting
+ * the static lib-owned files (core, foundation, foundations, styles,
+ * typography-tokens).
+ */
+export function downloadLibSyncCSSFiles(jsonData: DesignSystem): void {
+  const sync = generateLibSyncCSSFiles(jsonData);
+  Object.entries(sync).forEach(([filename, content], i) => {
+    setTimeout(() => downloadCSSFile(filename, content), i * 100);
+  });
+  console.log(`📦 Downloaded ${Object.keys(sync).length} lib-sync CSS files (dynamic only)`);
 }
 
 /**
@@ -3117,6 +3185,13 @@ function generateStyleCSS(jsonData: any): string {
       props.push(`${indent}--Style-Border-Radius: var(--Button-Radius);`);
       props.push(`${indent}--Card-Radius: ${Math.round(borderRadius * 1.33)}px;`);
       props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
+      // Button & Input tokens derived from --Button-Radius.
+      props.push(`${indent}--Button-Border-Width: 2px;`);
+      props.push(`${indent}--Button-Padding: ${borderRadius > 8 ? borderRadius / 2 : 4}px;`);
+      props.push(`${indent}--Sm-Button-Padding: ${borderRadius >= 8 ? 8 : borderRadius}px;`);
+      props.push(`${indent}--Large-Button-Padding: ${borderRadius > 32 ? Math.round((borderRadius * 2) / 3) : 16}px;`);
+      props.push(`${indent}--Input-Radius: ${Math.min(borderRadius, 8)}px;`);
+      props.push(`${indent}--Input-Padding: ${borderRadius >= 8 ? 4 : 2}px;`);
     }
     
     // Gradient
@@ -4174,10 +4249,20 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-12);');
   lines.push(`  --Buttons-BlackWhite-Medium-Hover: ${hoverHex('Neutral', 1)};`);
   lines.push(`  --Buttons-BlackWhite-Medium-Active: ${hoverHex('Neutral', 1)};`);
-  // Default button
+  // Default button — border matches the user's button mode palette.
+  // Mode → palette: primary→Primary, secondary→Secondary, others fall through.
+  const buttonMode = jsonData?.Metadata?.['Button-Config']?.DefaultButtonType?.value;
+  const defaultBorderPalette =
+    buttonMode === 'primary' ? 'Primary' :
+    buttonMode === 'secondary' ? 'Secondary' :
+    buttonMode === 'black-white' ? 'Neutral' :
+    null; // tonal / laddered → let Light-Mode.css fallback win
   lines.push('  --Buttons-Default-Button: var(--Default-Button-Default-Medium-Button);');
   lines.push('  --Buttons-Default-Text: var(--Default-Button-Default-Medium-Text);');
-  lines.push('  --Buttons-Default-Border: var(--Default-Button-Border-Surfaces-Default-Color-' + primaryTone + ');');
+  if (defaultBorderPalette) {
+    lines.push(`  --Buttons-Default-Border: var(--Buttons-${defaultBorderPalette}-Border);`);
+  }
+  // else: omit the line so Light-Mode.css's `--Buttons-Default-Border: var(--Neutral-Color-5)` survives the cascade.
   // Resolve Default hover/active through the Buttons chain
   const defaultBtnData = jsonData?.Modes?.['Light-Mode']?.['Default-Button'] || jsonData?.['Default-Button'];
   const buttonsJsonData = jsonData?.Modes?.['Light-Mode']?.Buttons || jsonData?.Buttons;
@@ -4257,7 +4342,7 @@ export function generateBaseCSS(jsonData: any): string {
   if (effectCSS) {
     lines.push(effectCSS);
   }
-  
+
   // Typography/Font variables (inside same :root)
   lines.push('');
   const typographyVars = generateTypographyVariablesOnly(jsonData);
@@ -4321,6 +4406,13 @@ export function generateBaseCSS(jsonData: any): string {
       lines.push(`  --Button-Radius: ${borderRadius}px;`);
       lines.push(`  --Card-Radius: ${Math.round(borderRadius * 1.33)}px;`);
       lines.push(`  --Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
+      // Button & Input tokens derived from --Button-Radius.
+      lines.push(`  --Button-Border-Width: 2px;`);
+      lines.push(`  --Button-Padding: ${borderRadius > 8 ? borderRadius / 2 : 4}px;`);
+      lines.push(`  --Sm-Button-Padding: ${borderRadius >= 8 ? 8 : borderRadius}px;`);
+      lines.push(`  --Large-Button-Padding: ${borderRadius > 32 ? Math.round((borderRadius * 2) / 3) : 16}px;`);
+      lines.push(`  --Input-Radius: ${Math.min(borderRadius, 8)}px;`);
+      lines.push(`  --Input-Padding: ${borderRadius >= 8 ? 4 : 2}px;`);
       lines.push('}');
       lines.push('');
     }

@@ -1,6 +1,6 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
-  Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, Tab,
+  AppBar, Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab,
 } from '@dynodesign/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -12,21 +12,46 @@ import CodeIcon from '@mui/icons-material/Code';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
+import AvatarDropdown from './AvatarDropdown';
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 }
 
 export default function LandingPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const NAV_LINKS = [
+  // Open the auth modal automatically when arriving via `/?login=true`,
+  // then clean the URL so a refresh doesn't re-open it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('login') === 'true') {
+      setShowAuthModal(true);
+      params.delete('login');
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
+  const NAV_LINKS: Array<{ label: string; id: string; href?: string }> = [
     { label: 'How it Works', id: 'how-it-works' },
     { label: 'Gallery', id: 'gallery' },
     { label: 'Resources', id: 'resources' },
-    { label: 'Add-Ons', id: 'addons' },
+    { label: 'Add-Ons', id: 'addons', href: '/add-ons' },
     { label: 'Pricing', id: 'pricing' },
   ];
+
+  const handleNavClick = (id: string) => {
+    const link = NAV_LINKS.find(l => l.id === id);
+    if (link?.href) {
+      window.location.href = link.href;
+    } else {
+      scrollTo(id);
+    }
+  };
 
   const FEATURES = [
     { icon: <PaletteIcon />, title: '12-Tone LCH Palettes', description: 'Perceptually uniform color scales with bell-curve chroma distribution across light and dark modes.' },
@@ -50,60 +75,38 @@ export default function LandingPage() {
   ];
 
   return (
-    <div data-theme="Default" data-surface="Surface" style={{ background: 'var(--Background)', color: 'var(--Text)', overflowX: 'hidden' }}>
+    <div data-theme="Default" data-surface="Surface" style={{ background: 'var(--Background)', color: 'var(--Text)', overflowX: 'clip' }}>
       {/* ─── Top Nav ─── */}
-      <nav
-        data-theme="App-Bar"
-        data-surface="Surface-Bright"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          height: 64,
-          padding: '0 24px',
-          background: 'var(--Background)',
-          borderBottom: '1px solid var(--Border)',
-        }}
-      >
-        {/* Brand */}
-        <H3
-          style={{ margin: 0, flexShrink: 0, cursor: 'pointer' }}
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        >
-          DinoDesign
-        </H3>
-
-        {/* Nav tabs */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-          <Tabs value={false} onChange={(_: any, val: number) => scrollTo(NAV_LINKS[val].id)}>
-            {NAV_LINKS.map(link => (
-              <Tab key={link.id} label={link.label} />
-            ))}
+      <AppBar
+        brand="DinoDesign"
+        onBrandClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        centerSlot={
+          <Tabs onChange={(val: string) => handleNavClick(val)}>
+            <TabList aria-label="Page sections">
+              {NAV_LINKS.map(link => (
+                <Tab key={link.id} value={link.id}>{link.label}</Tab>
+              ))}
+            </TabList>
           </Tabs>
-        </div>
-
-        {/* Right buttons */}
-        <HStack spacing={1} style={{ flexShrink: 0 }}>
-          {user ? (
-            <Button variant="ghost" size="small" onClick={() => window.location.href = '/account'}>
-              Account
+        }
+        endSlot={
+          <HStack spacing={1} style={{ alignItems: 'center' }}>
+            <Button variant="default" size="small" onClick={() => window.location.href = '/create'}>
+              Get Started
             </Button>
-          ) : (
-            <Button variant="ghost" size="small" onClick={() => window.location.href = '/?login=true'}>
-              Login
-            </Button>
-          )}
-          <Button
-            variant="default"
-            size="small"
-            onClick={() => window.location.href = '/create'}
-          >
-            Get Started
-          </Button>
-        </HStack>
-      </nav>
+            {user ? (
+              <AvatarDropdown
+                user={user}
+                onSignOut={async () => { await signOut(); window.location.href = '/'; }}
+              />
+            ) : (
+              <Button variant="outline" color="default" size="small" onClick={() => setShowAuthModal(true)}>
+                Login
+              </Button>
+            )}
+          </HStack>
+        }
+      />
 
       {/* ─── Hero ─── */}
       <section data-theme="Neutral-Dark" data-surface="Surface" style={{ padding: '80px 24px 60px', background: 'var(--Background)', color: 'var(--Text)' }}>
@@ -378,6 +381,12 @@ export default function LandingPage() {
           © {new Date().getFullYear()} DinoDesign. All rights reserved.
         </BodySmall>
       </footer>
+
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => setShowAuthModal(false)}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
+  TextField, SearchField, Select,
 } from '@dynodesign/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -28,13 +29,20 @@ export interface StyleCustomizations {
   largeButtonHeight: number;
   minButtonWidth: number;
   iconButtonRadius: number;
+  inputRadius: number;
+  inputPadding: number;
 }
 
+// Derive initial Input defaults from the Button radius.
+// These are initial-only — users can override via the Input sliders.
+const initialInputRadius = (buttonRadius: number) => Math.min(buttonRadius, 8);
+const initialInputPadding = (buttonRadius: number) => (buttonRadius >= 8 ? 4 : 2);
+
 const STYLE_DEFAULTS: Record<ComponentStyle, { label: string; description: string } & StyleCustomizations> = {
-  professional: { label: 'Pro', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2 },
-  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
-  bold: { label: 'Bold', description: 'Strong elements, generous rounding', radius: 16, buttonRadius: 8, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 8 },
-  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', radius: 24, buttonRadius: 64, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 64 },
+  professional: { label: 'Pro', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2, inputRadius: initialInputRadius(2), inputPadding: initialInputPadding(2) },
+  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4, inputRadius: initialInputRadius(4), inputPadding: initialInputPadding(4) },
+  bold: { label: 'Bold', description: 'Strong elements, generous rounding', radius: 16, buttonRadius: 8, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 8, inputRadius: initialInputRadius(8), inputPadding: initialInputPadding(8) },
+  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', radius: 24, buttonRadius: 64, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 64, inputRadius: initialInputRadius(64), inputPadding: initialInputPadding(64) },
 };
 
 const STYLE_KEYS: ComponentStyle[] = ['professional', 'modern', 'bold', 'playful'];
@@ -44,11 +52,14 @@ const DEFAULT_CUSTOMIZATIONS: Record<ComponentStyle, StyleCustomizations> = Obje
     radius: STYLE_DEFAULTS[k].radius,
     buttonRadius: STYLE_DEFAULTS[k].buttonRadius,
     bevel: STYLE_DEFAULTS[k].bevel,
+    bevelOpacity: STYLE_DEFAULTS[k].bevelOpacity,
     buttonHeight: STYLE_DEFAULTS[k].buttonHeight,
     smallButtonHeight: STYLE_DEFAULTS[k].smallButtonHeight,
     largeButtonHeight: STYLE_DEFAULTS[k].largeButtonHeight,
     minButtonWidth: STYLE_DEFAULTS[k].minButtonWidth,
     iconButtonRadius: STYLE_DEFAULTS[k].iconButtonRadius,
+    inputRadius: STYLE_DEFAULTS[k].inputRadius,
+    inputPadding: STYLE_DEFAULTS[k].inputPadding,
   }])
 ) as Record<ComponentStyle, StyleCustomizations>;
 
@@ -92,17 +103,26 @@ export default function ComponentStyleStage({
     onStyleSelected(selected, customizations[selected]);
   }, [selected, customizations]);
 
+  // Keep button border radius from exceeding the large button height.
+  useEffect(() => {
+    const custom = customizations[selected];
+    if (custom.buttonRadius > custom.largeButtonHeight) {
+      updateCustom('buttonRadius', custom.largeButtonHeight);
+    }
+  }, [customizations[selected].largeButtonHeight]);
+
 
   return (
     <div className="comp-style-page" style={{ display: 'flex', minHeight: '100vh' }}>
 
       {/* ─── Left: persistent sidebar ─── */}
-      <div style={{
+      <div data-surface="Surface-Dim" style={{
         width: settingsOpen ? 280 : 0,
         flexShrink: 0,
         overflow: 'hidden',
         transition: 'width 0.2s ease',
         borderRight: settingsOpen ? '1px solid var(--Border)' : 'none',
+        background: 'var(--Background)',
       }}>
         <div style={{ width: 280, padding: '8px 16px', boxSizing: 'border-box' }}>
           <VStack spacing={2}>
@@ -112,23 +132,21 @@ export default function ComponentStyleStage({
             <VStack spacing={1}>
               <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>Presets</BodySmall>
               <BodySmall style={{ color: 'var(--Quiet)' }}>Choose a base style then fine-tune the details.</BodySmall>
-              <ButtonGroup size="small">
+              <ButtonGroup
+                size="small"
+                value={selected}
+                onChange={(val: typeof selected) => {
+                  setSelected(val);
+                  setCustomizations(prev => ({
+                    ...prev,
+                    [val]: DEFAULT_CUSTOMIZATIONS[val],
+                  }));
+                }}
+              >
                 {STYLE_KEYS.map(styleKey => {
                   const style = STYLE_DEFAULTS[styleKey];
-                  const isSelected = selected === styleKey;
                   return (
-                    <Button
-                      key={styleKey}
-                      variant={isSelected ? 'default' : 'outline'}
-                      size="small"
-                      onClick={() => {
-                        setSelected(styleKey);
-                        setCustomizations(prev => ({
-                          ...prev,
-                          [styleKey]: DEFAULT_CUSTOMIZATIONS[styleKey],
-                        }));
-                      }}
-                    >
+                    <Button key={styleKey} value={styleKey} size="small">
                       {style.label}
                     </Button>
                   );
@@ -144,7 +162,7 @@ export default function ComponentStyleStage({
                   <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
                   <Slider label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Border Radius" min={0} max={64} value={custom.buttonRadius} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Border Radius" min={0} max={custom.largeButtonHeight} value={Math.min(custom.buttonRadius, custom.largeButtonHeight)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
@@ -158,6 +176,12 @@ export default function ComponentStyleStage({
               { key: 'card', label: 'Card', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
                   <Slider label="Border Radius" min={0} max={32} value={custom.radius} onChange={(_: any, v: number | number[]) => updateCustom('radius', v as number)} size="small" valueLabelDisplay="auto" />
+                </VStack>
+              )},
+              { key: 'input', label: 'Input', defaultOpen: false, content: (
+                <VStack spacing={2} style={{ width: '100%' }}>
+                  <Slider label="Border Radius" min={0} max={8} value={custom.inputRadius} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Padding" min={0} max={16} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
             ].map(section => {
@@ -198,10 +222,20 @@ export default function ComponentStyleStage({
           <div
             style={{
               '--Style-Border-Radius': `${custom.buttonRadius}px`,
+              '--Button-Radius': `${custom.buttonRadius}px`,
               '--Card-Radius': `${custom.radius}px`,
               '--Icon-Button-Radius': `${custom.iconButtonRadius}px`,
               '--Button-Height': `${custom.buttonHeight}px`,
+              '--Small-Button-Height': `${custom.smallButtonHeight}px`,
+              '--Large-Button-Height': `${custom.largeButtonHeight}px`,
               '--Min-Button-Width': `${custom.minButtonWidth}px`,
+              '--Input-Radius': `${custom.inputRadius}px`,
+              '--Input-Padding': `${custom.inputPadding}px`,
+              // Button paddings derived live from buttonRadius per spec.
+              '--Button-Padding': `${custom.buttonRadius > 8 ? custom.buttonRadius / 2 : 4}px`,
+              '--Sm-Button-Padding': `${custom.buttonRadius >= 8 ? 8 : custom.buttonRadius}px`,
+              '--Large-Button-Padding': `${custom.buttonRadius > 32 ? Math.round((custom.buttonRadius * 2) / 3) : 16}px`,
+              '--Button-Border-Width': '2px',
             } as React.CSSProperties}
           >
             <Card
@@ -293,6 +327,28 @@ export default function ComponentStyleStage({
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>
                     </HStack>
+                  </VStack>
+
+                  {/* Inputs: text, search, dropdown */}
+                  <VStack spacing={2}>
+                    <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Inputs</Label>
+                    <VStack spacing={2}>
+                      <TextField label="Text" placeholder="Type here..." size="small" fullWidth />
+                      <SearchField placeholder="Search..." size="small" fullWidth />
+                      <Select
+                        label="Dropdown"
+                        labelPosition="top"
+                        size="small"
+                        fullWidth
+                        value=""
+                        onChange={() => {}}
+                        options={[
+                          { value: 'opt1', label: 'Option 1' },
+                          { value: 'opt2', label: 'Option 2' },
+                          { value: 'opt3', label: 'Option 3' },
+                        ]}
+                      />
+                    </VStack>
                   </VStack>
                 </VStack>
               </Card>
