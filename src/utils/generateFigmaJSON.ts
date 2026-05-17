@@ -7,6 +7,8 @@
  * - SurfacesContainers: links to Themes, containers get Background from Modes
  */
 
+import { computeRadii, migrateLegacyRadii } from './componentRadii';
+
 interface ColorToken {
   value: string;
   type: 'color';
@@ -803,33 +805,71 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   }
 
   // ── Component Style (Button, Card) ──
-  const cs = designSystemJSON._componentStyle;
-  if (cs) {
-    const cardPadding = cs.radius >= 16 ? 20 : 16;
+  const csRaw = designSystemJSON._componentStyle;
+  if (csRaw) {
+    // Normalize: existing designs may still carry the legacy pixel-shaped
+    // radii fields. migrateLegacyRadii() promotes them to percent. After
+    // this, computeRadii() returns the canonical pixel tokens.
+    const cs = migrateLegacyRadii({
+      ...csRaw,
+      buttonHeight: csRaw.buttonHeight ?? 32,
+      smallButtonHeight: csRaw.smallButtonHeight ?? 24,
+      largeButtonHeight: csRaw.largeButtonHeight ?? 56,
+    });
+    const r = computeRadii(cs);
     // Bevel is a % of button height — compute px values per size
-    const bevelMed = Math.round(cs.buttonHeight * cs.bevel / 100);
-    const bevelSm = Math.round(cs.smallButtonHeight * cs.bevel / 100);
-    const bevelLg = Math.round(cs.largeButtonHeight * cs.bevel / 100);
-    // Padding tokens derived from buttonRadius per spec.
-    const buttonPadding = cs.buttonRadius > 8 ? cs.buttonRadius / 2 : 4;
-    const smButtonPadding = cs.buttonRadius >= 8 ? 8 : cs.buttonRadius;
-    const largeButtonPadding = cs.buttonRadius > 32 ? Math.round((cs.buttonRadius * 2) / 3) : 16;
+    const bevelMed = Math.round(cs.buttonHeight * (csRaw.bevel ?? 0) / 100);
+    const bevelSm = Math.round(cs.smallButtonHeight * (csRaw.bevel ?? 0) / 100);
+    const bevelLg = Math.round(cs.largeButtonHeight * (csRaw.bevel ?? 0) / 100);
+    // Padding tokens derived from the computed medium button radius.
+    const buttonPadding = r.buttonRadius > 8 ? Math.round(r.buttonRadius / 2) : 4;
+    const smButtonPadding = r.buttonRadius >= 8 ? 8 : r.buttonRadius;
+    const largeButtonPadding = r.buttonRadius > 32 ? Math.round((r.buttonRadius * 2) / 3) : 16;
+    // Single source of truth for border width — referenced by both the
+    // emitted Button-Border-Width token and the height calculations
+    // (inner height = outer - border × 2).
+    const BUTTON_BORDER_WIDTH = 2;
     figma.Components = {
       Button: {
-        'Button-Radius': cs.buttonRadius,
-        'Button-Inner-Radius': Math.max(cs.buttonRadius - 1, 0),
-        'Button-Focus-Radius': cs.buttonRadius + 3,
-        'Button-Icon-Radius': cs.iconButtonRadius,
-        'Button-Icon-Inner-Radius': Math.max(cs.iconButtonRadius - 1, 0),
-        'Button-Icon-Focus-Radius': cs.iconButtonRadius + 3,
-        'Button-Height': cs.buttonHeight - 2,
-        'Small-Button-Height': cs.smallButtonHeight - 2,
-        'Large-Button-Height': cs.largeButtonHeight - 2,
-        'Button-Min-Width': cs.minButtonWidth,
-        'Button-Border-Width': 2,
+        'Button-Radius': r.buttonRadius,
+        'Sm-Button-Radius': r.smButtonRadius,
+        'Lg-Button-Radius': r.lgButtonRadius,
+        'Button-Inner-Radius': r.buttonInnerRadius,
+        'Sm-Button-Inner-Radius': r.smButtonInnerRadius,
+        'Lg-Button-Inner-Radius': r.lgButtonInnerRadius,
+        'Button-Focus-Radius': r.buttonFocusRadius,
+        'Sm-Button-Focus-Radius': r.smButtonFocusRadius,
+        'Lg-Button-Focus-Radius': r.lgButtonFocusRadius,
+        'Button-Icon-Radius': r.iconButtonRadius,
+        'Sm-Button-Icon-Radius': r.smIconButtonRadius,
+        'Lg-Button-Icon-Radius': r.lgIconButtonRadius,
+        'Button-Icon-Inner-Radius': r.iconButtonInnerRadius,
+        'Sm-Button-Icon-Inner-Radius': r.smIconButtonInnerRadius,
+        'Lg-Button-Icon-Inner-Radius': r.lgIconButtonInnerRadius,
+        'Button-Icon-Focus-Radius': r.iconButtonFocusRadius,
+        'Sm-Button-Icon-Focus-Radius': r.smIconButtonFocusRadius,
+        'Lg-Button-Icon-Focus-Radius': r.lgIconButtonFocusRadius,
+        // Figma height tokens are the INNER button height (the colored
+        // fill rect inside the border box). DinoDesign's button has a
+        // border on top AND bottom, so we subtract Button-Border-Width
+        // twice from the user's selected outer height. Was previously
+        // `-2` (single border width), which made every button 2px taller
+        // than intended once the border doubled up in Figma.
+        'Button-Height': cs.buttonHeight - (BUTTON_BORDER_WIDTH * 2),
+        'Sm-Button-Height': cs.smallButtonHeight - (BUTTON_BORDER_WIDTH * 2),
+        'Lg-Button-Height': cs.largeButtonHeight - (BUTTON_BORDER_WIDTH * 2),
+        // Swatch tokens — square swatches inside each button size, 6px
+        // smaller than the inner button height so they leave a 3px gap
+        // on every side of the swatch (a touch tighter than the icon
+        // tokens, matching the Select swatch spec).
+        'Button-Swatch': cs.buttonHeight - (BUTTON_BORDER_WIDTH * 2) - 6,
+        'Sm-Button-Swatch': cs.smallButtonHeight - (BUTTON_BORDER_WIDTH * 2) - 6,
+        'Lg-Button-Swatch': cs.largeButtonHeight - (BUTTON_BORDER_WIDTH * 2) - 6,
+        'Button-Min-Width': csRaw.minButtonWidth ?? 60,
+        'Button-Border-Width': BUTTON_BORDER_WIDTH,
         'Button-Padding': buttonPadding,
         'Sm-Button-Padding': smButtonPadding,
-        'Large-Button-Padding': largeButtonPadding,
+        'Lg-Button-Padding': largeButtonPadding,
         // Medium (default) — top-left highlight, bottom-right lowlight
         'Button-Highlight-Offset-x': -bevelMed,
         'Button-Highlight-Offset-y': -bevelMed,
@@ -840,30 +880,42 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         'Button-Lowlight-Blur-Radius': bevelMed,
         'Button-Lowlight-Spread-Radius': 0,
         // Small
-        'Small-Button-Highlight-Offset-x': -bevelSm,
-        'Small-Button-Highlight-Offset-y': -bevelSm,
-        'Small-Button-Highlight-Blur-Radius': bevelSm,
-        'Small-Button-Lowlight-Offset-x': bevelSm,
-        'Small-Button-Lowlight-Offset-y': bevelSm,
-        'Small-Button-Lowlight-Blur-Radius': bevelSm,
+        'Sm-Button-Highlight-Offset-x': -bevelSm,
+        'Sm-Button-Highlight-Offset-y': -bevelSm,
+        'Sm-Button-Highlight-Blur-Radius': bevelSm,
+        'Sm-Button-Lowlight-Offset-x': bevelSm,
+        'Sm-Button-Lowlight-Offset-y': bevelSm,
+        'Sm-Button-Lowlight-Blur-Radius': bevelSm,
         // Large
-        'Large-Button-Highlight-Offset-x': -bevelLg,
-        'Large-Button-Highlight-Offset-y': -bevelLg,
-        'Large-Button-Highlight-Blur-Radius': bevelLg,
-        'Large-Button-Lowlight-Offset-x': bevelLg,
-        'Large-Button-Lowlight-Offset-y': bevelLg,
-        'Large-Button-Lowlight-Blur-Radius': bevelLg,
+        'Lg-Button-Highlight-Offset-x': -bevelLg,
+        'Lg-Button-Highlight-Offset-y': -bevelLg,
+        'Lg-Button-Highlight-Blur-Radius': bevelLg,
+        'Lg-Button-Lowlight-Offset-x': bevelLg,
+        'Lg-Button-Lowlight-Offset-y': bevelLg,
+        'Lg-Button-Lowlight-Blur-Radius': bevelLg,
       },
       Card: {
-        'Card-Radius': cs.radius,
-        'Card-Inner-Border-Radius': Math.max(cs.radius - 1, 0),
-        'Card-Focus-Border-Radius': cs.radius + 3,
-        'Card-Padding': cardPadding,
+        'Card-Radius': r.cardRadius,
+        'Card-Inner-Border-Radius': r.cardInnerRadius,
+        'Card-Focus-Border-Radius': r.cardFocusRadius,
+        'Card-Padding': r.cardPadding,
+      },
+      Modal: {
+        'Modal-Padding': r.modalPadding,
+        'Modal-Radius': r.modalRadius,
+        'Modal-Inner-Radius': r.modalInnerRadius,
+        'Modal-Focus-Radius': r.modalFocusRadius,
       },
       Input: {
-        // User-overridable via sliders; fall back to formulas keyed on buttonRadius.
-        'Input-Radius': cs.inputRadius ?? Math.min(cs.buttonRadius, 8),
-        'Input-Padding': cs.inputPadding ?? (cs.buttonRadius >= 8 ? 4 : 2),
+        'Input-Radius': r.inputRadius,
+        'Sm-Input-Radius': r.smInputRadius,
+        'Lg-Input-Radius': r.lgInputRadius,
+        'Input-Inner-Radius': r.inputInnerRadius,
+        'Input-Focus-Radius': r.inputFocusRadius,
+        'Input-Swatch-Radius': r.inputSwatchRadius,
+        'Sm-Input-Swatch-Radius': r.smInputSwatchRadius,
+        'Lg-Input-Swatch-Radius': r.lgInputSwatchRadius,
+        'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
       },
     };
   }

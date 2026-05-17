@@ -12,6 +12,7 @@ import chroma from 'chroma-js';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
+import { computeRadii, migrateLegacyRadii } from '../componentRadii';
 import { 
   generateHeaderVariables,
   generateQuietVariables,
@@ -4396,26 +4397,64 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('');
   */
   
-  // Style section — selected style radii in :root
-  if (jsonData?.Style) {
-    const selectedStyle = jsonData.Metadata?.['Component-Style']?.value || 'Modern';
-    const styleData = jsonData.Style[selectedStyle] || jsonData.Style.Modern || Object.values(jsonData.Style)[0];
-    if (styleData?.['Border-Radius']) {
-      const borderRadius = styleData['Border-Radius']['offset-x']?.value || 8;
-      lines.push(':root {');
-      lines.push(`  --Button-Radius: ${borderRadius}px;`);
-      lines.push(`  --Card-Radius: ${Math.round(borderRadius * 1.33)}px;`);
-      lines.push(`  --Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
-      // Button & Input tokens derived from --Button-Radius.
-      lines.push(`  --Button-Border-Width: 2px;`);
-      lines.push(`  --Button-Padding: ${borderRadius > 8 ? borderRadius / 2 : 4}px;`);
-      lines.push(`  --Sm-Button-Padding: ${borderRadius >= 8 ? 8 : borderRadius}px;`);
-      lines.push(`  --Large-Button-Padding: ${borderRadius > 32 ? Math.round((borderRadius * 2) / 3) : 16}px;`);
-      lines.push(`  --Input-Radius: ${Math.min(borderRadius, 8)}px;`);
-      lines.push(`  --Input-Padding: ${borderRadius >= 8 ? 4 : 2}px;`);
-      lines.push('}');
-      lines.push('');
-    }
+  // Radii section — emit the canonical pixel tokens from the customized
+  // _componentStyle (percent fields → px via computeRadii). This replaces an
+  // older Style.Border-Radius path that no longer gets written.
+  if (jsonData?._componentStyle) {
+    const csRaw = jsonData._componentStyle;
+    const cs = migrateLegacyRadii({
+      ...csRaw,
+      buttonHeight: csRaw.buttonHeight ?? 32,
+      smallButtonHeight: csRaw.smallButtonHeight ?? 24,
+      largeButtonHeight: csRaw.largeButtonHeight ?? 56,
+    });
+    const r = computeRadii(cs);
+    const btnR = r.buttonRadius;
+    const buttonPadding = btnR > 8 ? Math.round(btnR / 2) : 4;
+    const smButtonPadding = btnR >= 8 ? 8 : btnR;
+    const largeButtonPadding = btnR > 32 ? Math.round((btnR * 2) / 3) : 16;
+    lines.push(':root {');
+    lines.push(`  --Button-Radius: ${r.buttonRadius}px;`);
+    lines.push(`  --Sm-Button-Radius: ${r.smButtonRadius}px;`);
+    lines.push(`  --Lg-Button-Radius: ${r.lgButtonRadius}px;`);
+    lines.push(`  --Button-Inner-Radius: ${r.buttonInnerRadius}px;`);
+    lines.push(`  --Sm-Button-Inner-Radius: ${r.smButtonInnerRadius}px;`);
+    lines.push(`  --Lg-Button-Inner-Radius: ${r.lgButtonInnerRadius}px;`);
+    lines.push(`  --Button-Focus-Radius: ${r.buttonFocusRadius}px;`);
+    lines.push(`  --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;`);
+    lines.push(`  --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;`);
+    lines.push(`  --Button-Icon-Radius: ${r.iconButtonRadius}px;`);
+    lines.push(`  --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;`);
+    lines.push(`  --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;`);
+    lines.push(`  --Button-Icon-Inner-Radius: ${r.iconButtonInnerRadius}px;`);
+    lines.push(`  --Sm-Button-Icon-Inner-Radius: ${r.smIconButtonInnerRadius}px;`);
+    lines.push(`  --Lg-Button-Icon-Inner-Radius: ${r.lgIconButtonInnerRadius}px;`);
+    lines.push(`  --Button-Icon-Focus-Radius: ${r.iconButtonFocusRadius}px;`);
+    lines.push(`  --Sm-Button-Icon-Focus-Radius: ${r.smIconButtonFocusRadius}px;`);
+    lines.push(`  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;`);
+    lines.push(`  --Card-Radius: ${r.cardRadius}px;`);
+    lines.push(`  --Card-Inner-Radius: ${r.cardInnerRadius}px;`);
+    lines.push(`  --Card-Focus-Radius: ${r.cardFocusRadius}px;`);
+    lines.push(`  --Card-Padding: ${r.cardPadding}px;`);
+    lines.push(`  --Modal-Padding: ${r.modalPadding}px;`);
+    lines.push(`  --Modal-Radius: ${r.modalRadius}px;`);
+    lines.push(`  --Modal-Inner-Radius: ${r.modalInnerRadius}px;`);
+    lines.push(`  --Modal-Focus-Radius: ${r.modalFocusRadius}px;`);
+    lines.push(`  --Input-Radius: ${r.inputRadius}px;`);
+    lines.push(`  --Sm-Input-Radius: ${r.smInputRadius}px;`);
+    lines.push(`  --Lg-Input-Radius: ${r.lgInputRadius}px;`);
+    lines.push(`  --Input-Inner-Radius: ${r.inputInnerRadius}px;`);
+    lines.push(`  --Input-Focus-Radius: ${r.inputFocusRadius}px;`);
+    lines.push(`  --Input-Swatch-Radius: ${r.inputSwatchRadius}px;`);
+    lines.push(`  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;`);
+    lines.push(`  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;`);
+    lines.push(`  --Input-Padding: ${csRaw.inputPadding ?? (btnR >= 8 ? 4 : 2)}px;`);
+    lines.push(`  --Button-Border-Width: 2px;`);
+    lines.push(`  --Button-Padding: ${buttonPadding}px;`);
+    lines.push(`  --Sm-Button-Padding: ${smButtonPadding}px;`);
+    lines.push(`  --Large-Button-Padding: ${largeButtonPadding}px;`);
+    lines.push('}');
+    lines.push('');
   }
   
   // NOTE (2026-03-06): Primary-Buttons and Themes sections REMOVED from base.css

@@ -6,6 +6,7 @@ import { generateFullLightPalettes, generateFullDarkPalettes } from './generateF
 import { exportColorSystemToJSON } from './cssgen/exportColorSystem';
 import { generateCSSFiles, generateBaseCSS } from './cssgen/exportToCSS';
 import { generateFigmaJSON } from './generateFigmaJSON';
+import { computeRadii, migrateLegacyRadii } from './componentRadii';
 
 /**
  * Returns a public download URL for a file in a design system.
@@ -58,7 +59,6 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
   const colors = input.colorScheme.colors;
   const radii = BORDER_RADII[input.componentStyle];
   const showcaseBase = 'https://designology.netlify.app';
-  const storybookUrl = `${showcaseBase}/storybook/?user=${uuid}`;
 
   const styleName = input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1);
 
@@ -71,7 +71,6 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
 | **Dino ID** | \`${uuid}\` |
 | **Playground** | [${showcaseBase}/?user=${uuid}](${showcaseBase}/?user=${uuid}) |
 | **Figma** | Open the Dino Figma plugin and paste your Dino ID |
-| **Storybook** | [${storybookUrl}](${storybookUrl}) |
 
 ### Install in Your Project
 
@@ -94,8 +93,7 @@ This downloads the CSS token files into your project and sets up the provider.
 6. **Use \`<Alert variant="error|success|warning|info">\`** for status messages — never manually color error text.
 7. **Use design system layout components**: \`<Card>\`, \`<TextField>\`, \`<TextArea>\`, \`<Select>\`, \`<VStack>\`, \`<HStack>\`, \`<Tabs>\`, \`<Dialog>\`, \`<Modal>\`.
 8. **All components** are imported from \`'@dynodesign/components'\`.
-9. **Check the Storybook** for component API before building custom UI: [${storybookUrl}](${storybookUrl})
-10. **The design system is the source of truth** — treat it as a requirement, not a suggestion.
+9. **The design system is the source of truth** — treat it as a requirement, not a suggestion.
 
 ---
 
@@ -806,25 +804,44 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const decorativeAllCaps = decorative?.allCaps ? 'uppercase' : 'none';
   const decorativeLetterSpacing = decorative?.letterSpacing || '0em';
   const bodyWeight = body?.weight || '400';
-  // Get customizations from input, fallback to preset defaults
-  const sc = input.styleCustomizations;
-  const buttonRadius = sc?.buttonRadius ?? BORDER_RADII[input.componentStyle].medium;
-  const cardRadius = sc?.radius ?? Math.round(buttonRadius * 1.33);
-  const cardPadding = cardRadius >= 16 ? 20 : 16;
-  const buttonHeight = sc?.buttonHeight ?? 32;
-  const smallButtonHeight = sc?.smallButtonHeight ?? 24;
-  const largeButtonHeight = sc?.largeButtonHeight ?? 56;
-  const minButtonWidth = sc?.minButtonWidth ?? 60;
-  const iconButtonRadius = sc?.iconButtonRadius ?? buttonRadius;
-  const bevelPercent = sc?.bevel ?? 0;
-  const bevelOpacity = sc?.bevelOpacity ?? 50;
+  // Get customizations from input, run legacy-shape migration, then compute
+  // pixel radii once via computeRadii() so every consumer agrees.
+  const sc = migrateLegacyRadii({
+    ...(input.styleCustomizations || {}),
+    buttonHeight: input.styleCustomizations?.buttonHeight ?? 32,
+    smallButtonHeight: input.styleCustomizations?.smallButtonHeight ?? 24,
+    largeButtonHeight: input.styleCustomizations?.largeButtonHeight ?? 56,
+  });
+  const buttonHeight = sc.buttonHeight;
+  const smallButtonHeight = sc.smallButtonHeight;
+  const largeButtonHeight = sc.largeButtonHeight;
+  const minButtonWidth = input.styleCustomizations?.minButtonWidth ?? 60;
+  const bevelPercent = input.styleCustomizations?.bevel ?? 0;
+  const bevelOpacity = input.styleCustomizations?.bevelOpacity ?? 50;
   const bevelPx = Math.round(buttonHeight * bevelPercent / 100);
+  const r = computeRadii(sc);
 
   const foundationCSS = `:root {
 
   /* Button */
-  --Button-Radius: ${buttonRadius}px;
-  --Button-Icon-Radius: ${iconButtonRadius}px;
+  --Button-Radius: ${r.buttonRadius}px;
+  --Sm-Button-Radius: ${r.smButtonRadius}px;
+  --Lg-Button-Radius: ${r.lgButtonRadius}px;
+  --Button-Inner-Radius: ${r.buttonInnerRadius}px;
+  --Sm-Button-Inner-Radius: ${r.smButtonInnerRadius}px;
+  --Lg-Button-Inner-Radius: ${r.lgButtonInnerRadius}px;
+  --Button-Focus-Radius: ${r.buttonFocusRadius}px;
+  --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;
+  --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;
+  --Button-Icon-Radius: ${r.iconButtonRadius}px;
+  --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
+  --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;
+  --Button-Icon-Inner-Radius: ${r.iconButtonInnerRadius}px;
+  --Sm-Button-Icon-Inner-Radius: ${r.smIconButtonInnerRadius}px;
+  --Lg-Button-Icon-Inner-Radius: ${r.lgIconButtonInnerRadius}px;
+  --Button-Icon-Focus-Radius: ${r.iconButtonFocusRadius}px;
+  --Sm-Button-Icon-Focus-Radius: ${r.smIconButtonFocusRadius}px;
+  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;
   --Button-Height: ${buttonHeight}px;
   --Small-Button-Height: ${smallButtonHeight}px;
   --Large-Button-Height: ${largeButtonHeight}px;
@@ -835,9 +852,26 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Style-Border-Radius: var(--Button-Radius);
 
   /* Card */
-  --Card-Radius: ${cardRadius}px;
-  --Card-Focus-Radius: ${cardRadius + 3}px;
-  --Card-Padding: ${cardPadding}px;
+  --Card-Radius: ${r.cardRadius}px;
+  --Card-Inner-Radius: ${r.cardInnerRadius}px;
+  --Card-Focus-Radius: ${r.cardFocusRadius}px;
+  --Card-Padding: ${r.cardPadding}px;
+
+  /* Modal */
+  --Modal-Padding: ${r.modalPadding}px;
+  --Modal-Radius: ${r.modalRadius}px;
+  --Modal-Inner-Radius: ${r.modalInnerRadius}px;
+  --Modal-Focus-Radius: ${r.modalFocusRadius}px;
+
+  /* Input */
+  --Input-Radius: ${r.inputRadius}px;
+  --Sm-Input-Radius: ${r.smInputRadius}px;
+  --Lg-Input-Radius: ${r.lgInputRadius}px;
+  --Input-Inner-Radius: ${r.inputInnerRadius}px;
+  --Input-Focus-Radius: ${r.inputFocusRadius}px;
+  --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
+  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;
+  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;
   --Style-Gradient-Color-1: var(--Buttons-Primary-Button);
   --Style-Gradient-Color-2: var(--Buttons-Primary-Button);
   --Style-Gradient-Angle: 0;

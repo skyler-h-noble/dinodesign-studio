@@ -1,6 +1,7 @@
 import chroma from 'chroma-js';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber } from './colorScale';
+import { computeRadii, migrateLegacyRadii } from './componentRadii';
 
 /**
  * Builds the complete CSS for the phone preview iframe.
@@ -12,6 +13,19 @@ interface BuildInput {
   colorScheme: ColorScheme;
   userSelections: UserSelections;
   componentStyle: ComponentStyle;
+  // User's per-component customizations (sliders). When present, the preview
+  // emits the same pixel tokens that the foundation CSS and Figma JSON do
+  // (via computeRadii). When absent, falls back to preset defaults.
+  styleCustomizations?: Partial<{
+    cardPadding: number;
+    buttonRadius: number;
+    iconButtonRadius: number;
+    inputRadius: number;
+    buttonHeight: number;
+    smallButtonHeight: number;
+    largeButtonHeight: number;
+    radius?: number; // legacy pixel-shaped card radius
+  }>;
   mode: 'light' | 'dark';
   typographyStyles?: import('../types').TypographyStyle[];
 }
@@ -423,12 +437,18 @@ export function buildPreviewCSS(input: BuildInput): string {
     const surfaceBorderTones = getAccessibleTones(surfaceBg, surfaceN, neutralPalette);
     const containerBorderTones = getAccessibleTones(containerBg, containerN, neutralPalette);
 
-    surfaceText = textFor(surfaceBg);
-    surfaceHeader = textFor(surfaceBg);
+    // When textFor would return white on a dark surface, output
+    // var(--White) instead of the literal #ffffff. --White is set to
+    // #ffffff in light mode and rgba(255,255,255,0.7) in dark mode, so
+    // headings and body text on dark surfaces automatically dim for
+    // visual comfort instead of glaring at full white. Black text on
+    // light surfaces stays #1a1a1a — no adaptive equivalent needed.
+    surfaceText = isLight(surfaceBg) ? '#1a1a1a' : 'var(--White)';
+    surfaceHeader = isLight(surfaceBg) ? '#1a1a1a' : 'var(--White)';
     surfaceQuiet = quietFor(surfaceBg);
     surfaceBorder = neutral(surfaceBorderTones.border);
-    containerText = textFor(containerBg);
-    containerHeader = textFor(containerBg);
+    containerText = isLight(containerBg) ? '#1a1a1a' : 'var(--White)';
+    containerHeader = isLight(containerBg) ? '#1a1a1a' : 'var(--White)';
     containerQuiet = quietFor(containerBg);
     containerBorder = neutral(containerBorderTones.border);
   }
@@ -803,10 +823,29 @@ ${(() => {
  * Background selection. Without these, Light-Mode.css's rule for
  * [data-theme="Tertiary"][data-surface="Surface"] hands the element
  * var(--Tertiary-Color-1) (near-black) and tertiary cards look wrong. */
-[data-theme="Tertiary"],
+${(() => {
+  // Accessible Header/Text/Quiet/Border tones for the Tertiary surface at
+  // TC. Without these the tertiary card inherits the brand surface's text
+  // tokens — which are tuned for a different palette, so contrast fails
+  // (e.g. dark neutral header on dark tertiary). Compute against the
+  // tertiary palette at the user's TC tone so the H3 / body / border
+  // resolve to readable tertiary tones.
+  const tertiarySurfaceBg = p(tertiaryLight, TC);
+  const tertiarySurfaceTones = getAccessibleTones(tertiarySurfaceBg, TC, tertiaryLight);
+  return `[data-theme="Tertiary"],
 [data-theme="Tertiary"][data-surface="Surface"] {
   --Background: var(--Tertiary-Color-${TC});
   --Surface: var(--Tertiary-Color-${TC});
+  --Header: var(--Tertiary-Color-${tertiarySurfaceTones.header});
+  --Text: var(--Tertiary-Color-${tertiarySurfaceTones.text});
+  --Quiet: var(--Tertiary-Color-${tertiarySurfaceTones.quiet});
+  --Border: var(--Tertiary-Color-${tertiarySurfaceTones.border});
+  /* Tag.Default on a Tertiary surface = Tag.Primary (per the design
+     system's complementary-palette mapping: Tertiary card → Primary
+     tag). Inherit the brand's already-computed Tag-Primary tokens so
+     the chip stays in sync if the user changes their primary. */
+  --Tag-Default-BG: var(--Tag-Primary-BG);
+  --Tag-Default-Text: var(--Tag-Primary-Text);
   --Container: ${tertiaryContainerBg};
   --Container-Text: ${tertiaryText};
   --Container-Header: ${tertiaryHeader};
@@ -816,7 +855,8 @@ ${(() => {
   --Container-Buttons-Default-Border: var(--Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
   --Tag-Tertiary-BG: ${tagBg};
   --Tag-Tertiary-Text: ${tagText};
-}
+}`;
+})()}
 
 /* ══ Secondary Theme ══
  * Same fix as Tertiary, fixed to SC (the user's secondary color position) so
@@ -948,11 +988,41 @@ ${(() => {
 
 /* ══ Component Style ══ */
 ${(() => {
-  const RADII: Record<string, number> = { professional: 4, modern: 12, bold: 2, playful: 24 };
-  const r = RADII[input.componentStyle] || 12;
+  // Preset fallbacks when no user customizations are present (percent radii).
+  const PRESET_DEFAULTS: Record<string, { cardPadding: number; buttonRadius: number; iconButtonRadius: number; inputRadius: number }> = {
+    professional: { cardPadding: 12, buttonRadius: 6,  iconButtonRadius: 100, inputRadius: 6 },
+    modern:       { cardPadding: 16, buttonRadius: 12, iconButtonRadius: 100, inputRadius: 12 },
+    bold:         { cardPadding: 20, buttonRadius: 25, iconButtonRadius: 100, inputRadius: 25 },
+    playful:      { cardPadding: 24, buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100 },
+  };
+  const preset = PRESET_DEFAULTS[input.componentStyle] || PRESET_DEFAULTS.modern;
+  const sc = migrateLegacyRadii({
+    cardPadding: input.styleCustomizations?.cardPadding ?? preset.cardPadding,
+    buttonRadius: input.styleCustomizations?.buttonRadius ?? preset.buttonRadius,
+    iconButtonRadius: input.styleCustomizations?.iconButtonRadius ?? preset.iconButtonRadius,
+    inputRadius: input.styleCustomizations?.inputRadius ?? preset.inputRadius,
+    buttonHeight: input.styleCustomizations?.buttonHeight ?? 32,
+    smallButtonHeight: input.styleCustomizations?.smallButtonHeight ?? 24,
+    largeButtonHeight: input.styleCustomizations?.largeButtonHeight ?? 56,
+    radius: input.styleCustomizations?.radius,
+  });
+  const r = computeRadii(sc);
   return `:root {
-  --Style-Border-Radius: ${r}px;
-  --Card-Radius: ${Math.round(r * 1.33)}px;
+  --Style-Border-Radius: ${r.buttonRadius}px;
+  --Button-Radius: ${r.buttonRadius}px;
+  --Sm-Button-Radius: ${r.smButtonRadius}px;
+  --Lg-Button-Radius: ${r.lgButtonRadius}px;
+  --Button-Icon-Radius: ${r.iconButtonRadius}px;
+  --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
+  --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;
+  --Card-Radius: ${r.cardRadius}px;
+  --Card-Padding: ${r.cardPadding}px;
+  --Modal-Padding: ${r.modalPadding}px;
+  --Modal-Radius: ${r.modalRadius}px;
+  --Input-Radius: ${r.inputRadius}px;
+  --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
+  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;
+  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;
 }`;
 })()}
 

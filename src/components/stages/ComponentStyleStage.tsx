@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
-  TextField, SearchField, Select,
+  TextInput, SearchField, Select,
 } from '@dynodesign/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
+import { computeRadii, migrateLegacyRadii } from '../../utils/componentRadii';
 import '../../styles/component-style.css';
 
 interface Props extends StageProps {
@@ -20,36 +21,36 @@ interface Props extends StageProps {
 }
 
 export interface StyleCustomizations {
-  radius: number;
+  // Card padding in pixels. Card-Radius derives = Button-Radius + cardPadding.
+  // Modal-Padding = cardPadding × 1.5; Modal-Radius = Button-Radius + Modal-Padding.
+  // (Was named `radius` and held Card radius in pixels — see legacy migration.)
+  cardPadding: number;
+  // Three radii below are stored as PERCENT (0–100) of their respective heights.
+  // Computed-pixel tokens live in utils/componentRadii.ts.
   buttonRadius: number;
+  iconButtonRadius: number;
+  inputRadius: number;
   bevel: number;
   bevelOpacity: number;
   buttonHeight: number;
   smallButtonHeight: number;
   largeButtonHeight: number;
   minButtonWidth: number;
-  iconButtonRadius: number;
-  inputRadius: number;
   inputPadding: number;
 }
 
-// Derive initial Input defaults from the Button radius.
-// These are initial-only — users can override via the Input sliders.
-const initialInputRadius = (buttonRadius: number) => Math.min(buttonRadius, 8);
-const initialInputPadding = (buttonRadius: number) => (buttonRadius >= 8 ? 4 : 2);
-
 const STYLE_DEFAULTS: Record<ComponentStyle, { label: string; description: string } & StyleCustomizations> = {
-  professional: { label: 'Pro', description: 'Clean lines, minimal radius', radius: 4, buttonRadius: 2, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 2, inputRadius: initialInputRadius(2), inputPadding: initialInputPadding(2) },
-  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4, inputRadius: initialInputRadius(4), inputPadding: initialInputPadding(4) },
-  bold: { label: 'Bold', description: 'Strong elements, generous rounding', radius: 16, buttonRadius: 8, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 8, inputRadius: initialInputRadius(8), inputPadding: initialInputPadding(8) },
-  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', radius: 24, buttonRadius: 64, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 64, inputRadius: initialInputRadius(64), inputPadding: initialInputPadding(64) },
+  professional: { label: 'Pro', description: 'Clean lines, minimal radius', cardPadding: 12, buttonRadius: 6, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 6, inputPadding: 2 },
+  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', cardPadding: 16, buttonRadius: 12, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 12, inputPadding: 2 },
+  bold: { label: 'Bold', description: 'Strong elements, generous rounding', cardPadding: 20, buttonRadius: 25, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 25, inputPadding: 4 },
+  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', cardPadding: 24, buttonRadius: 100, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 100, inputPadding: 4 },
 };
 
 const STYLE_KEYS: ComponentStyle[] = ['professional', 'modern', 'bold', 'playful'];
 
 const DEFAULT_CUSTOMIZATIONS: Record<ComponentStyle, StyleCustomizations> = Object.fromEntries(
   STYLE_KEYS.map(k => [k, {
-    radius: STYLE_DEFAULTS[k].radius,
+    cardPadding: STYLE_DEFAULTS[k].cardPadding,
     buttonRadius: STYLE_DEFAULTS[k].buttonRadius,
     bevel: STYLE_DEFAULTS[k].bevel,
     bevelOpacity: STYLE_DEFAULTS[k].bevelOpacity,
@@ -72,11 +73,15 @@ export default function ComponentStyleStage({
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [customizations, setCustomizations] = useState<Record<ComponentStyle, StyleCustomizations>>(() => {
     if (!savedCustomizations) return DEFAULT_CUSTOMIZATIONS;
-    // Merge saved with defaults to fill any missing new fields
+    // Merge saved with defaults to fill any missing new fields, then run the
+    // legacy-radii migration in case the saved record predates the percent model.
     const merged = { ...DEFAULT_CUSTOMIZATIONS };
     for (const key of STYLE_KEYS) {
       if (savedCustomizations[key]) {
-        merged[key] = { ...DEFAULT_CUSTOMIZATIONS[key], ...savedCustomizations[key] };
+        merged[key] = migrateLegacyRadii({
+          ...DEFAULT_CUSTOMIZATIONS[key],
+          ...savedCustomizations[key],
+        }) as StyleCustomizations;
       }
     }
     return merged;
@@ -103,13 +108,8 @@ export default function ComponentStyleStage({
     onStyleSelected(selected, customizations[selected]);
   }, [selected, customizations]);
 
-  // Keep button border radius from exceeding the large button height.
-  useEffect(() => {
-    const custom = customizations[selected];
-    if (custom.buttonRadius > custom.largeButtonHeight) {
-      updateCustom('buttonRadius', custom.largeButtonHeight);
-    }
-  }, [customizations[selected].largeButtonHeight]);
+  // buttonRadius is now percent (0-100), so no clamping needed against
+  // largeButtonHeight — the computed pixel value scales with the height.
 
 
   return (
@@ -158,11 +158,23 @@ export default function ComponentStyleStage({
             {[
               { key: 'button', label: 'Button', defaultOpen: true, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Desktop Button Height" min={28} max={48} value={custom.buttonHeight} onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider
+                    label="Desktop Button Height"
+                    min={24}
+                    max={48}
+                    step={null}
+                    marks={[
+                      { value: 24 }, { value: 32 }, { value: 40 }, { value: 44 }, { value: 48 },
+                    ]}
+                    value={custom.buttonHeight}
+                    onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
                   <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
                   <Slider label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Border Radius" min={0} max={custom.largeButtonHeight} value={Math.min(custom.buttonRadius, custom.largeButtonHeight)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Border Radius (%)" min={0} max={100} value={custom.buttonRadius} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
@@ -170,17 +182,20 @@ export default function ComponentStyleStage({
               )},
               { key: 'icon', label: 'Icon Button', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Border Radius" min={0} max={64} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Border Radius (%)" min={0} max={100} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
               { key: 'card', label: 'Card', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Border Radius" min={0} max={32} value={custom.radius} onChange={(_: any, v: number | number[]) => updateCustom('radius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Padding" min={0} max={48} value={custom.cardPadding} onChange={(_: any, v: number | number[]) => updateCustom('cardPadding', v as number)} size="small" valueLabelDisplay="auto" />
+                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+                    Card radius auto-derives = Button-Radius + Padding. Modal padding = Padding × 1.5.
+                  </BodySmall>
                 </VStack>
               )},
               { key: 'input', label: 'Input', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Border Radius" min={0} max={8} value={custom.inputRadius} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider label="Border Radius (%)" min={0} max={100} value={custom.inputRadius} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider label="Padding" min={0} max={16} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
@@ -219,29 +234,44 @@ export default function ComponentStyleStage({
           )}
 
           {/* Preview */}
-          <div
-            style={{
-              '--Style-Border-Radius': `${custom.buttonRadius}px`,
-              '--Button-Radius': `${custom.buttonRadius}px`,
-              '--Card-Radius': `${custom.radius}px`,
-              '--Icon-Button-Radius': `${custom.iconButtonRadius}px`,
-              '--Button-Height': `${custom.buttonHeight}px`,
-              '--Small-Button-Height': `${custom.smallButtonHeight}px`,
-              '--Large-Button-Height': `${custom.largeButtonHeight}px`,
-              '--Min-Button-Width': `${custom.minButtonWidth}px`,
-              '--Input-Radius': `${custom.inputRadius}px`,
-              '--Input-Padding': `${custom.inputPadding}px`,
-              // Button paddings derived live from buttonRadius per spec.
-              '--Button-Padding': `${custom.buttonRadius > 8 ? custom.buttonRadius / 2 : 4}px`,
-              '--Sm-Button-Padding': `${custom.buttonRadius >= 8 ? 8 : custom.buttonRadius}px`,
-              '--Large-Button-Padding': `${custom.buttonRadius > 32 ? Math.round((custom.buttonRadius * 2) / 3) : 16}px`,
-              '--Button-Border-Width': '2px',
-            } as React.CSSProperties}
-          >
+          {(() => {
+            const radii = computeRadii(custom);
+            // Padding tokens derive from the medium button radius in pixels
+            // (kept consistent with generateFigmaJSON.ts).
+            const btnR = radii.buttonRadius;
+            const buttonPadding = btnR > 8 ? Math.round(btnR / 2) : 4;
+            const smButtonPadding = btnR >= 8 ? 8 : btnR;
+            const lgButtonPadding = btnR > 32 ? Math.round((btnR * 2) / 3) : 16;
+            return (
+            <div
+              style={{
+                '--Style-Border-Radius': `${radii.buttonRadius}px`,
+                '--Button-Radius': `${radii.buttonRadius}px`,
+                '--Sm-Button-Radius': `${radii.smButtonRadius}px`,
+                '--Lg-Button-Radius': `${radii.lgButtonRadius}px`,
+                '--Card-Radius': `${radii.cardRadius}px`,
+                '--Card-Padding': `${radii.cardPadding}px`,
+                '--Icon-Button-Radius': `${radii.iconButtonRadius}px`,
+                '--Sm-Icon-Button-Radius': `${radii.smIconButtonRadius}px`,
+                '--Lg-Icon-Button-Radius': `${radii.lgIconButtonRadius}px`,
+                '--Button-Height': `${custom.buttonHeight}px`,
+                '--Small-Button-Height': `${custom.smallButtonHeight}px`,
+                '--Large-Button-Height': `${custom.largeButtonHeight}px`,
+                '--Min-Button-Width': `${custom.minButtonWidth}px`,
+                '--Input-Radius': `${radii.inputRadius}px`,
+                '--Input-Padding': `${custom.inputPadding}px`,
+                '--Modal-Padding': `${radii.modalPadding}px`,
+                '--Modal-Radius': `${radii.modalRadius}px`,
+                '--Button-Padding': `${buttonPadding}px`,
+                '--Sm-Button-Padding': `${smButtonPadding}px`,
+                '--Large-Button-Padding': `${lgButtonPadding}px`,
+                '--Button-Border-Width': '2px',
+              } as React.CSSProperties}
+            >
             <Card
               padding="medium"
               style={{
-                borderRadius: custom.radius,
+                borderRadius: radii.cardRadius,
                 maxWidth: 400,
                 width: '100%',
                 margin: '0 auto',
@@ -301,7 +331,7 @@ export default function ComponentStyleStage({
                           minHeight: `${custom.buttonHeight}px`,
                           minWidth: `${custom.buttonHeight}px`,
                           maxWidth: `${custom.buttonHeight}px`,
-                          borderRadius: `${custom.iconButtonRadius}px`,
+                          borderRadius: `${radii.iconButtonRadius}px`,
                         }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
@@ -311,7 +341,7 @@ export default function ComponentStyleStage({
                           minHeight: `${custom.buttonHeight}px`,
                           minWidth: `${custom.buttonHeight}px`,
                           maxWidth: `${custom.buttonHeight}px`,
-                          borderRadius: `${custom.iconButtonRadius}px`,
+                          borderRadius: `${radii.iconButtonRadius}px`,
                         }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
@@ -321,7 +351,7 @@ export default function ComponentStyleStage({
                           minHeight: `${custom.buttonHeight}px`,
                           minWidth: `${custom.buttonHeight}px`,
                           maxWidth: `${custom.buttonHeight}px`,
-                          borderRadius: `${custom.iconButtonRadius}px`,
+                          borderRadius: `${radii.iconButtonRadius}px`,
                         }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
@@ -333,7 +363,7 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Inputs</Label>
                     <VStack spacing={2}>
-                      <TextField label="Text" placeholder="Type here..." size="small" fullWidth />
+                      <TextInput label="Text" placeholder="Type here..." size="small" fullWidth />
                       <SearchField placeholder="Search..." size="small" fullWidth />
                       <Select
                         label="Dropdown"
@@ -353,6 +383,8 @@ export default function ComponentStyleStage({
                 </VStack>
               </Card>
           </div>
+            );
+          })()}
         </VStack>
       </div>
     </div>
