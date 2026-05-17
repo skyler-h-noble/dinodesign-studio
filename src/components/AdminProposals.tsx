@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+// MISSING-LIB-COMPONENT: FileInput
+// Needed for: admin upload of the master .fig template
+// Proposed API: <FileInput accept=".fig" onChange={file => ...} />
+// Lib-track: add to @dynodesign/components/src/components/FileInput/
+import { useEffect, useRef, useState } from 'react';
 import {
-  H2, H3, Body, BodySmall, VStack, HStack, Card, Button, Chip, Alert, Divider,
+  H2, H3, H4, Body, BodySmall, VStack, HStack, Card, Button, Chip, Alert, Divider,
 } from '@dynodesign/components';
 import {
   collection, query, where, getDocs, orderBy, doc, getDoc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadFigmaTemplate, FIGMA_TEMPLATE_FILENAME } from '../utils/firebase/storage';
 import AppHeader from './AppHeader';
 
 interface Proposal {
@@ -141,6 +146,8 @@ export default function AdminProposals() {
           </BodySmall>
         </VStack>
 
+        <FigmaTemplateUploader />
+
         {/* Status filter */}
         <HStack spacing={1}>
           {(['pending', 'accepted', 'rejected', 'inLib', 'all'] as const).map(s => {
@@ -264,6 +271,88 @@ function ProposalCard({
           </Button>
           <Button variant="primary-outline" size="small" disabled={busy || proposal.status === 'pending'} onClick={() => setStatus('pending')}>
             Reopen
+          </Button>
+        </HStack>
+      </VStack>
+    </Card>
+  );
+}
+
+function FigmaTemplateUploader() {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [pending, setPending] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const upload = async () => {
+    if (!pending) return;
+    setBusy(true);
+    setErr(null);
+    setSuccess(null);
+    try {
+      await uploadFigmaTemplate(pending);
+      setSuccess(`Uploaded ${pending.name} as ${FIGMA_TEMPLATE_FILENAME}.`);
+      setPending(null);
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (e: any) {
+      setErr(e?.message || 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card padding="medium">
+      <VStack spacing={2}>
+        <H4 style={{ margin: 0 }}>Figma template</H4>
+        <BodySmall style={{ color: 'var(--Quiet)' }}>
+          The master .fig file every user downloads from their dashboard.
+          Overwrites <code>figma-templates/{FIGMA_TEMPLATE_FILENAME}</code> in Storage.
+        </BodySmall>
+
+        {/* Raw <input type="file"> hidden; Button triggers the picker.
+            The lib has no FileInput yet (see MISSING-LIB-COMPONENT tag at top of file). */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".fig"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0] || null;
+            setPending(f);
+            setErr(null);
+            setSuccess(null);
+          }}
+        />
+
+        <HStack spacing={2} style={{ alignItems: 'center' }}>
+          <Button
+            variant="primary-outline"
+            size="small"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+          >
+            Choose .fig file
+          </Button>
+          {pending && (
+            <BodySmall style={{ color: 'var(--Text)' }}>
+              {pending.name} ({Math.round(pending.size / 1024)} KB)
+            </BodySmall>
+          )}
+        </HStack>
+
+        {err && <Alert variant="light" color="error" size="small">{err}</Alert>}
+        {success && <Alert variant="light" color="success" size="small">{success}</Alert>}
+
+        <HStack spacing={2}>
+          <Button
+            variant="primary"
+            size="small"
+            disabled={!pending || busy}
+            onClick={upload}
+          >
+            {busy ? 'Uploading…' : 'Upload template'}
           </Button>
         </HStack>
       </VStack>

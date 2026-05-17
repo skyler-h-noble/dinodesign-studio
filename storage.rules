@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DinoDesign Storage security rules
+//
+// Paths
+//   design-systems/{uuid}/{file}
+//     Per-design-system tokens, CSS, Figma JSON, mood-board images. Public
+//     read (the hosted playground and Figma plugin both fetch by URL),
+//     signed-in write (owners regenerate their own system).
+//
+//   figma-templates/{file}
+//     The master .fig template every user downloads, renamed client-side
+//     to match their design system. Public read so the studio can fetch it
+//     without auth gymnastics; admin-only write to prevent random users
+//     from replacing the template.
+//
+//   add-ons/{addOnId}/{file}
+//     Per-add-on JSON specifications, one file per version (vN.json). NEVER
+//     read directly from object storage — all customer reads go through the
+//     getAddOn cloud function, which uses the admin SDK to bypass these
+//     rules. Public read therefore categorically denied. Writes restricted
+//     to admins so only the published-source-of-truth team can ship specs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    match /design-systems/{uuid}/{file=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /figma-templates/{file=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /add-ons/{addOnId}/{file=**} {
+      allow read: if false;
+      allow write: if isAdmin();
+    }
+  }
+}

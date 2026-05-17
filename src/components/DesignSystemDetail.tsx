@@ -3,8 +3,8 @@ import { useParams } from 'react-router';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import {
-  Button, H2, H3, H4, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, TextField,
-  Breadcrumbs, BreadcrumbItem, Accordion, AccordionGroup, AccordionSummary, AccordionDetails,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, TextField,
+  Breadcrumbs, BreadcrumbItem,
   Modal, Chip,
 } from '@dynodesign/components';
 import ComputerIcon from '@mui/icons-material/Computer';
@@ -15,7 +15,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, addDoc, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
-import { getPublicFileUrl } from '../utils/firebase/storage';
+import { getPublicFileUrl, getFigmaTemplateUrl } from '../utils/firebase/storage';
 import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,7 +50,7 @@ interface Record {
   version: number;
   lastPushedVersion: number;
   lastPushedAt: Date | null;
-  monthlyAddOns?: { playground?: boolean; storybook?: boolean; designerPortal?: boolean };
+  monthlyAddOns?: { playground?: boolean; designerPortal?: boolean };
   plan?: string;
   linkedFigmaFiles: LinkedFigmaFile[];
   /** Full rehydration snapshot from the design system doc — used here to
@@ -117,6 +117,7 @@ export default function DesignSystemDetail() {
   const [versions, setVersions] = useState<VersionRecord[]>([]);
   const [tab, setTab] = useState<Inner>('use');
   const [showFigmaUpdateModal, setShowFigmaUpdateModal] = useState(false);
+  const [showFigmaImportModal, setShowFigmaImportModal] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
@@ -331,7 +332,7 @@ export default function DesignSystemDetail() {
           </TabList>
         </Tabs>
 
-        {tab === 'use' && <UseMyDesignTab id={id} record={record} />}
+        {tab === 'use' && <UseMyDesignTab id={id} record={record} onOpenFigmaImport={() => setShowFigmaImportModal(true)} />}
         {tab === 'settings' && <SettingsTab id={id} record={record} payments={payments} />}
         {tab === 'history' && (
           <VersionsTab
@@ -348,6 +349,13 @@ export default function DesignSystemDetail() {
         open={showFigmaUpdateModal}
         onClose={() => setShowFigmaUpdateModal(false)}
         hasLinkedFile={record.linkedFigmaFiles.length > 0}
+      />
+
+      <FigmaImportModal
+        open={showFigmaImportModal}
+        onClose={() => setShowFigmaImportModal(false)}
+        id={id}
+        name={record.name}
       />
 
       <RenameDesignSystemModal
@@ -705,7 +713,7 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
   );
 }
 
-function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
+function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record: Record; onOpenFigmaImport: () => void }) {
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedClaude, setCopiedClaude] = useState(false);
   const copyTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
@@ -719,7 +727,6 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
 
   const showcaseBase = 'https://designology.netlify.app';
   const playgroundUrl = `${showcaseBase}/?user=${id}`;
-  const storybookUrl = `${showcaseBase}/storybook/?user=${id}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${id}/md`;
   const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${id}`;
 
@@ -753,38 +760,28 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
             </svg>
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
-          {record.lastPushedAt ? (
+          {record.linkedFigmaFiles.length > 0 ? (
             <>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Get a full Figma design system with your brand tokens applied to every component, style, and variable.
-              </BodySmall>
-              {record.linkedFigmaFiles.length > 0 ? (
-                <Button
-                  variant="primary"
-                  style={{ width: '100%' }}
-                  onClick={() => window.open(figmaFileUrl(record.linkedFigmaFiles[0]), '_blank', 'noopener')}
-                >
-                  Open Figma file
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  style={{ width: '100%' }}
-                  onClick={() => document.getElementById('figma-import-guide')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                >
-                  View Figma import guide
-                </Button>
-              )}
-            </>
-          ) : (
-            <>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
-                You have not yet pushed your design to Figma.
+                Your design system is live in Figma. Jump straight to the file.
               </BodySmall>
               <Button
                 variant="primary"
                 style={{ width: '100%' }}
-                onClick={() => document.getElementById('figma-import-guide')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                onClick={() => window.open(figmaFileUrl(record.linkedFigmaFiles[0]), '_blank', 'noopener')}
+              >
+                Jump to your Figma File
+              </Button>
+            </>
+          ) : (
+            <>
+              <BodySmall style={{ color: 'var(--Quiet)' }}>
+                Get a full Figma design system with your brand tokens applied to every component, style, and variable.
+              </BodySmall>
+              <Button
+                variant="primary"
+                style={{ width: '100%' }}
+                onClick={onOpenFigmaImport}
               >
                 Get your design into Figma
               </Button>
@@ -811,23 +808,6 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
               </Button>
             </div>
           </VStack>
-        </VStack>
-      </Card>
-
-      <Card padding="medium">
-        <VStack spacing={3}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Error-Button)', color: 'var(--Buttons-Error-Text)' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M16.34.24l-.12 2.71a.18.18 0 0 0 .29.15l1.06-.8.9.7a.18.18 0 0 0 .28-.14L18.65.1l1.33-.1a1.2 1.2 0 0 1 1.28 1.2v21.6A1.2 1.2 0 0 1 20 24l-16.1-.72a1.2 1.2 0 0 1-1.15-1.16L2 2.32a1.2 1.2 0 0 1 1.13-1.27l13.2-.83.01.02zM13.27 9.3c0 .47 3.16.24 3.59-.08 0-3.2-1.72-4.89-4.86-4.89-3.15 0-4.9 1.72-4.9 4.29 0 4.45 6 4.53 6 6.96 0 .7-.32 1.1-1.05 1.1-.96 0-1.35-.49-1.3-2.16 0-.36-3.65-.48-3.77 0-.27 4.03 2.23 5.2 5.1 5.2 2.79 0 4.97-1.49 4.97-4.18 0-4.77-6.1-4.64-6.1-7 0-.97.72-1.1 1.13-1.1.45 0 1.25.07 1.19 1.87z"/>
-            </svg>
-          </div>
-          <H3 style={{ fontSize: '1.1rem' }}>Storybook</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
-            Browse interactive component documentation with usage examples, prop tables, and live previews.
-          </BodySmall>
-          <Button variant="primary" style={{ width: '100%' }} onClick={() => window.open(storybookUrl, '_blank')}>
-            Open Storybook
-          </Button>
         </VStack>
       </Card>
 
@@ -996,82 +976,94 @@ function UseMyDesignTab({ id, record }: { id: string; record: Record }) {
       </Card>
     </div>
 
-    <ResourcesSection id={id} />
     </VStack>
   );
 }
 
-function ResourcesSection({ id }: { id: string }) {
+function FigmaImportModal({
+  open, onClose, id, name,
+}: { open: boolean; onClose: () => void; id: string; name: string }) {
   return (
-    <VStack spacing={3}>
-      <H3>Resources</H3>
-
-      <Card padding="medium">
-        <VStack spacing={2}>
-          <HStack spacing={2} style={{ alignItems: 'center' }}>
-            <FigmaGlyph size={16} />
-            <H4 style={{ margin: 0, fontSize: '1rem' }}>Figma</H4>
-          </HStack>
-          <AccordionGroup>
-            <Accordion id="figma-import-guide">
-              <AccordionSummary>
-                <BodySmall style={{ fontWeight: 600 }}>
-                  Build your Design System in Figma
-                </BodySmall>
-              </AccordionSummary>
-              <AccordionDetails>
-                <VStack spacing={3} style={{ paddingTop: 8 }}>
-                  <FigmaStep
-                    n={1}
-                    title="Download your Figma file"
-                    body="Download the attached .fig file from your DinoDesign dashboard."
-                  />
-                  <FigmaStep
-                    n={2}
-                    title="Import into Figma"
-                    body="Open Figma and import your file by dragging and dropping the .fig file into the Figma home screen, or click Import and select the downloaded file."
-                  />
-                  <FigmaStep
-                    n={3}
-                    title="Open the file"
-                    body="Once imported, open the file. You'll land on the Almost There page, which walks you through connecting your branded design system."
-                  />
-                  <FigmaStep
-                    n={4}
-                    title="Install the DinoDesign Plugin"
-                    body="From the Almost There page, install the DinoDesign Plugin directly in Figma."
-                  />
-                  <FigmaStep n={5} title="Enter your DinoDesign ID">
-                    <BodySmall>
-                      In the plugin, paste in your unique DinoDesign ID:{' '}
-                      <code style={{
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                        fontSize: '0.85em',
-                        padding: '1px 6px',
-                        borderRadius: 4,
-                        background: 'var(--Container)',
-                        border: '1px solid var(--Border)',
-                        wordBreak: 'break-all',
-                      }}>{id}</code>
-                    </BodySmall>
-                  </FigmaStep>
-                  <FigmaStep
-                    n={6}
-                    title="Import your design system"
-                    body="Press ⌘L to open the URL input field, paste in your Figma file URL, then click Import Design System. Let it run — this is where the magic happens."
-                  />
-                  <FigmaStep
-                    n={7}
-                    title="Explore"
-                    body="Once complete, head to the Using Your DinoDesign System page for tips and tricks on getting the most out of your branded design system."
-                  />
-                </VStack>
-              </AccordionDetails>
-            </Accordion>
-          </AccordionGroup>
-        </VStack>
-      </Card>
-    </VStack>
+    <Modal open={open} onClose={onClose} title="Get your design into Figma" size="medium">
+      <VStack spacing={3} style={{ paddingTop: 8 }}>
+        <FigmaStep n={1} title="Download your Figma file">
+          <VStack spacing={2}>
+            <BodySmall>
+              Download the DinoDesign Figma file. We'll rename it to match your design system so it's easy to find in Figma.
+            </BodySmall>
+            <div>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(getFigmaTemplateUrl(), { cache: 'no-cache' });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const blob = await res.blob();
+                    const safe = (name || 'design-system')
+                      .trim()
+                      .replace(/[\\/:*?"<>|]+/g, '-')
+                      .replace(/\s+/g, ' ')
+                      || 'design-system';
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `${safe}.fig`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                  } catch (err) {
+                    console.error('Figma template download failed:', err);
+                    alert('Could not download the Figma file. Please try again.');
+                  }
+                }}
+              >
+                Download {(name || 'design-system')}.fig
+              </Button>
+            </div>
+          </VStack>
+        </FigmaStep>
+        <FigmaStep
+          n={2}
+          title="Import into Figma"
+          body="Open Figma and import your file by dragging and dropping the .fig file into the Figma home screen, or click Import and select the downloaded file."
+        />
+        <FigmaStep
+          n={3}
+          title="Open the file"
+          body="Once imported, open the file. You'll land on the Almost There page, which walks you through connecting your branded design system."
+        />
+        <FigmaStep
+          n={4}
+          title="Install the DinoDesign Plugin"
+          body="From the Almost There page, install the DinoDesign Plugin directly in Figma."
+        />
+        <FigmaStep n={5} title="Enter your DinoDesign ID">
+          <BodySmall>
+            In the plugin, paste in your unique DinoDesign ID:{' '}
+            <code style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: '0.85em',
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: 'var(--Container)',
+              border: '1px solid var(--Border)',
+              wordBreak: 'break-all',
+            }}>{id}</code>
+          </BodySmall>
+        </FigmaStep>
+        <FigmaStep
+          n={6}
+          title="Import your design system"
+          body="Press ⌘L to open the URL input field, paste in your Figma file URL, then click Import Design System. Let it run — this is where the magic happens."
+        />
+        <FigmaStep
+          n={7}
+          title="Explore"
+          body="Once complete, head to the Using Your DinoDesign System page for tips and tricks on getting the most out of your branded design system."
+        />
+      </VStack>
+    </Modal>
   );
 }
 
@@ -1104,7 +1096,6 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
   const addOns = useMemo(() => {
     const list: string[] = [];
     if (record.monthlyAddOns?.playground) list.push('Playground');
-    if (record.monthlyAddOns?.storybook) list.push('Storybook');
     if (record.monthlyAddOns?.designerPortal) list.push('Designer Portal');
     return list;
   }, [record]);

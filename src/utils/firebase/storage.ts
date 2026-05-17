@@ -121,6 +121,30 @@ export async function deleteDesignSystemFiles(uuid: string): Promise<void> {
   await deleteFolderRecursive(folderRef);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// figma-templates/ — global Figma .fig templates the studio serves to every
+// user (renamed client-side at download time). Separate top-level prefix
+// because the file is global, not per-design-system. Write is admin-gated by
+// the storage.rules `isAdmin()` check; read is public so the download path
+// doesn't need auth on the user side.
+// ─────────────────────────────────────────────────────────────────────────────
+const TEMPLATES_ROOT = 'figma-templates';
+export const FIGMA_TEMPLATE_FILENAME = 'dinodesign-template.fig';
+
+export async function uploadFigmaTemplate(file: Blob): Promise<void> {
+  const fileRef = ref(storage, `${TEMPLATES_ROOT}/${FIGMA_TEMPLATE_FILENAME}`);
+  await uploadBytes(fileRef, file, {
+    cacheControl: 'no-cache, max-age=0, must-revalidate',
+    contentType: 'application/octet-stream',
+  });
+  console.log(`📤 [Storage] uploaded ${TEMPLATES_ROOT}/${FIGMA_TEMPLATE_FILENAME}`);
+}
+
+/** Public URL for the master Figma template. */
+export function getFigmaTemplateUrl(): string {
+  return publicStorageUrl(`${TEMPLATES_ROOT}/${FIGMA_TEMPLATE_FILENAME}`);
+}
+
 /**
  * Check if a design system exists by attempting to read its base CSS file.
  */
