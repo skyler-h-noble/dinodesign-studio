@@ -15,7 +15,6 @@ interface Props {
 
 export interface AddOnSelection {
   playground: boolean; // always true (required)
-  storybook: boolean;
   designerPortal: boolean;
   monthlyTotal: number;
 }
@@ -60,12 +59,6 @@ const HOSTING_PRICE = 19;
 
 const OPTIONAL_ADD_ONS = [
   {
-    key: 'storybook' as const,
-    label: 'Storybook',
-    description: 'Hosted Storybook pre-configured with your token set and component stories. Ready for your dev team.',
-    price: 12,
-  },
-  {
     key: 'designerPortal' as const,
     label: 'Designer portal',
     description: 'Fine-tune tokens, adjust components, and regenerate your system with automatic WCAG re-validation.',
@@ -79,22 +72,21 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
   const [step, setStep] = useState<Step>(credits > 0 ? 'addons' : 'choose');
   const [selectedTier, setSelectedTier] = useState(1);
   const [useExistingCredit, setUseExistingCredit] = useState(credits > 0);
-  const [addOns, setAddOns] = useState({ storybook: false, designerPortal: false });
+  const [addOns, setAddOns] = useState({ designerPortal: false });
 
   // Reset when modal opens
   const handleClose = () => {
     setStep(credits > 0 ? 'addons' : 'choose');
     setUseExistingCredit(credits > 0);
-    setAddOns({ storybook: false, designerPortal: false });
+    setAddOns({ designerPortal: false });
     onClose();
   };
 
   const tier = TIERS[selectedTier];
-  const monthlyTotal = HOSTING_PRICE + (addOns.storybook ? 12 : 0) + (addOns.designerPortal ? 39 : 0);
+  const monthlyTotal = HOSTING_PRICE + (addOns.designerPortal ? 39 : 0);
 
   const addOnSelection: AddOnSelection = {
     playground: true,
-    storybook: addOns.storybook,
     designerPortal: addOns.designerPortal,
     monthlyTotal,
   };
@@ -282,12 +274,6 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
               <BodySmall>Playground hosting</BodySmall>
               <BodySmall>${HOSTING_PRICE}/mo</BodySmall>
             </HStack>
-            {addOns.storybook && (
-              <HStack spacing={2} style={{ justifyContent: 'space-between', width: '100%' }}>
-                <BodySmall>Storybook</BodySmall>
-                <BodySmall>$12/mo</BodySmall>
-              </HStack>
-            )}
             {addOns.designerPortal && (
               <HStack spacing={2} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <BodySmall>Designer portal</BodySmall>

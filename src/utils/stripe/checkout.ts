@@ -12,7 +12,6 @@ export interface CheckoutRequest {
   tierKey: 'single' | 'bundle3' | 'bundle10';
   addOns: {
     playground: boolean;
-    storybook: boolean;
     designerPortal: boolean;
   };
   userId: string;

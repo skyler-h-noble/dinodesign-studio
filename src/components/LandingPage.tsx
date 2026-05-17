@@ -65,7 +65,7 @@ export default function LandingPage() {
   const STEPS = [
     { step: '1', title: 'Upload a mood board', description: 'Drop any image — a brand board, a photo, a screenshot. The system extracts your color palette automatically.' },
     { step: '2', title: 'Customize your system', description: 'Adjust colors, pick typography, set component styles. See changes live in the phone preview.' },
-    { step: '3', title: 'Get your design system', description: 'Receive hosted CSS tokens, Figma library, Storybook, and an AI integration file — all production-ready.' },
+    { step: '3', title: 'Get your design system', description: 'Receive hosted CSS tokens, Figma library, and an AI integration file — all production-ready.' },
   ];
 
   const TESTIMONIALS = [

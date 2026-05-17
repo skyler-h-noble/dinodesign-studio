@@ -689,7 +689,6 @@ function MainApp() {
                     tierKey: selection.tier.key,
                     addOns: {
                       playground: selection.addOns.playground,
-                      storybook: selection.addOns.storybook,
                       designerPortal: selection.addOns.designerPortal,
                     },
                     userId: user.uid,

@@ -28,7 +28,6 @@ const PRICE_MAP = {
   bundle3:        'price_REPLACE_WITH_BUNDLE3_PRICE_ID',      // $799 one-time
   bundle10:       'price_REPLACE_WITH_BUNDLE10_PRICE_ID',     // $2,499 one-time
   playground:     'price_REPLACE_WITH_PLAYGROUND_PRICE_ID',   // $19/mo recurring
-  storybook:      'price_REPLACE_WITH_STORYBOOK_PRICE_ID',    // $12/mo recurring
   designerPortal: 'price_REPLACE_WITH_DESIGNER_PORTAL_ID',    // $39/mo recurring
 };
 
@@ -65,9 +64,6 @@ exports.createCheckoutSession = onCall(
     // Monthly subscriptions
     if (addOns?.playground) {
       lineItems.push({ price: PRICE_MAP.playground, quantity: 1 });
-    }
-    if (addOns?.storybook) {
-      lineItems.push({ price: PRICE_MAP.storybook, quantity: 1 });
     }
     if (addOns?.designerPortal) {
       lineItems.push({ price: PRICE_MAP.designerPortal, quantity: 1 });

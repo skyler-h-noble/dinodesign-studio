@@ -31,6 +31,12 @@ exports.pollPluginPairingCode = pluginPairing.pollPluginPairingCode;
 const componentProposals = require('./componentProposals');
 exports.submitComponentProposal = componentProposals.submitComponentProposal;
 
+// Add-on entitlement endpoints (publish to Storage, list entitled, fetch one).
+const addOns = require('./addOns');
+exports.publishAddOn = addOns.publishAddOn;
+exports.listEntitledAddOns = addOns.listEntitledAddOns;
+exports.getAddOn = addOns.getAddOn;
+
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
 
@@ -44,7 +50,6 @@ const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
  *
  * RECURRING prices (Product → Add price → "Recurring" → Monthly):
  *   - Playground hosting: $19/mo
- *   - Storybook: $12/mo
  *   - Designer portal: $39/mo
  *
  * Replace the placeholder IDs below with your actual Stripe price IDs.
@@ -57,7 +62,6 @@ const PRICES = {
 
   // Monthly recurring subscriptions (TEST MODE)
   playground:     'price_1TLQ7A3oOTDXzvIpjbDssWFf',
-  storybook:      'price_1TLQ7A3oOTDXzvIpjbDssWFf',  // TODO: create separate storybook price
   designerPortal: 'price_1TLQ7A3oOTDXzvIpjbDssWFf',  // TODO: create separate designer portal price
 };
 
@@ -107,9 +111,6 @@ exports.createCheckoutSession = onCall(
     }
 
     // Recurring: optional add-ons
-    if (addOns?.storybook) {
-      lineItems.push({ price: PRICES.storybook, quantity: 1 });
-    }
     if (addOns?.designerPortal) {
       lineItems.push({ price: PRICES.designerPortal, quantity: 1 });
     }

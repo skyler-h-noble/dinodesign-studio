@@ -110,7 +110,6 @@ export default function MyDesignsPage() {
           const data = d.data() as any;
           const addOns: string[] = [];
           if (data.monthlyAddOns?.playground) addOns.push('Playground');
-          if (data.monthlyAddOns?.storybook) addOns.push('Storybook');
           if (data.monthlyAddOns?.designerPortal) addOns.push('Designer Portal');
           const v = Number(data.version || 0);
           const pushed = Number(data.lastPushedVersion || 0);

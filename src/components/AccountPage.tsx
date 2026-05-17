@@ -27,7 +27,6 @@ interface DesignSystemRecord {
   addOns: string[];
   hosting: {
     playground: boolean;
-    storybook: boolean;
     designerPortal: boolean;
   };
 }
@@ -68,7 +67,6 @@ export default function AccountPage() {
             addOns: dsAddOns,
             hosting: {
               playground: !!data.monthlyAddOns?.playground,
-              storybook: !!data.monthlyAddOns?.storybook,
               designerPortal: !!data.monthlyAddOns?.designerPortal,
             },
           });
@@ -289,7 +287,7 @@ function DesignSystemPanel({
   onHostingToggle,
 }: {
   ds: DesignSystemRecord;
-  onHostingToggle: (dsId: string, key: 'playground' | 'storybook' | 'designerPortal', value: boolean) => Promise<void>;
+  onHostingToggle: (dsId: string, key: 'playground' | 'designerPortal', value: boolean) => Promise<void>;
 }) {
   const cart = useCart();
 
@@ -365,12 +363,6 @@ function DesignSystemPanel({
               description="Live, interactive demo of your design system at a public URL."
               checked={ds.hosting.playground}
               onChange={v => onHostingToggle(ds.id, 'playground', v)}
-            />
-            <HostingToggle
-              label="Storybook"
-              description="Hosted Storybook with every component and variant."
-              checked={ds.hosting.storybook}
-              onChange={v => onHostingToggle(ds.id, 'storybook', v)}
             />
             <HostingToggle
               label="Designer Hub"

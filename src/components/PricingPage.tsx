@@ -9,7 +9,6 @@ export type BillingPeriod = 'monthly' | 'annual';
 
 export interface AddOnSelection {
   playground: boolean;
-  storybook: boolean;
   designerPortal: boolean;
   billingPeriod: BillingPeriod;
   monthlyTotal: number;
@@ -31,9 +30,6 @@ const TIER = {
 const HOSTING_MONTHLY = 19;
 const HOSTING_ANNUAL_MONTHLY = 15; // $15/mo billed annually ($180/yr vs $228/yr — save 21%)
 
-const STORYBOOK_MONTHLY = 12;
-const STORYBOOK_ANNUAL_MONTHLY = 10;
-
 const DESIGNER_PORTAL_MONTHLY = 39;
 const DESIGNER_PORTAL_ANNUAL_MONTHLY = 32;
 
@@ -48,12 +44,6 @@ const INCLUDED = [
 
 const OPTIONAL_ADD_ONS = [
   {
-    key: 'storybook' as const,
-    label: 'Storybook',
-    description: 'Hosted Storybook pre-configured with your token set and component stories. Ready for your dev team.',
-    price: 12,
-  },
-  {
     key: 'designerPortal' as const,
     label: 'Designer portal',
     description: 'Fine-tune tokens, adjust components, and regenerate your system with automatic WCAG re-validation.',
@@ -66,19 +56,17 @@ interface Props {
 }
 
 export default function PricingPage({ onCheckout }: Props) {
-  const [addOns, setAddOns] = useState({ storybook: false, designerPortal: false });
+  const [addOns, setAddOns] = useState({ designerPortal: false });
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly');
 
   const isAnnual = billingPeriod === 'annual';
   const hostingPrice = isAnnual ? HOSTING_ANNUAL_MONTHLY : HOSTING_MONTHLY;
-  const storybookPrice = isAnnual ? STORYBOOK_ANNUAL_MONTHLY : STORYBOOK_MONTHLY;
   const designerPortalPrice = isAnnual ? DESIGNER_PORTAL_ANNUAL_MONTHLY : DESIGNER_PORTAL_MONTHLY;
 
-  const monthlyTotal = hostingPrice + (addOns.storybook ? storybookPrice : 0) + (addOns.designerPortal ? designerPortalPrice : 0);
+  const monthlyTotal = hostingPrice + (addOns.designerPortal ? designerPortalPrice : 0);
 
   const addOnSelection: AddOnSelection = {
     playground: true,
-    storybook: addOns.storybook,
     designerPortal: addOns.designerPortal,
     billingPeriod,
     monthlyTotal,
@@ -189,7 +177,7 @@ export default function PricingPage({ onCheckout }: Props) {
                       </BodySmall>
                     )}
                     <BodySmall style={{ fontWeight: 600 }}>
-                      +${addon.key === 'storybook' ? storybookPrice : designerPortalPrice}/mo
+                      +${designerPortalPrice}/mo
                     </BodySmall>
                   </HStack>
                 </VStack>
@@ -210,12 +198,6 @@ export default function PricingPage({ onCheckout }: Props) {
             <BodySmall>Playground hosting</BodySmall>
             <BodySmall>${hostingPrice}/mo</BodySmall>
           </HStack>
-          {addOns.storybook && (
-            <HStack spacing={2} style={{ justifyContent: 'space-between' }}>
-              <BodySmall>Storybook</BodySmall>
-              <BodySmall>${storybookPrice}/mo</BodySmall>
-            </HStack>
-          )}
           {addOns.designerPortal && (
             <HStack spacing={2} style={{ justifyContent: 'space-between' }}>
               <BodySmall>Designer portal</BodySmall>
