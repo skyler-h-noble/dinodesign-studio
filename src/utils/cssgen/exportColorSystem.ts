@@ -3931,17 +3931,23 @@ function generateThemesSection(
       'Focus-Visible': { value: `{Focus-Visible.Surfaces.Color-${backgroundNum}}`, type: 'color' },
       Buttons: {
         Default: {
-          Button: { value: `{Colors.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Border: { value: `{Border.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
+          // All Default tokens follow the user-chosen button-mode palette
+          // (defaultButtonTheme: Primary/Secondary/Tertiary/Neutral) instead
+          // of being hardcoded to Primary. Border + Highlight + Lowlight match
+          // the body color so the bevel + outline stay in-palette.
+          Button: { value: `{Colors.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Text: { value: `{Text.Surfaces.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Border: { value: `{Border.Surfaces.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Hover: { value: `{Hover.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Active: { value: `{Active.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Highlight: { value: `{Button-Highlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Lowlight: { value: `{Button-Lowlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
-          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
+          Button: { value: `{Colors.${defaultButtonTheme}.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Surfaces.${defaultButtonTheme}.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.${defaultButtonTheme}.Color-10}`, type: 'color' },
+          Active: { value: `{Active.${defaultButtonTheme}.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Button}`, type: 'color' },
@@ -4079,17 +4085,21 @@ function generateThemesSection(
       'Focus-Visible': { value: `{Focus-Visible.Containers.Color-${backgroundNum}}`, type: 'color' },
       Buttons: {
         Default: {
-          Button: { value: `{Colors.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Text: { value: `{Text.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
+          // Same fix as the Surfaces block: Default tokens follow the user's
+          // button-mode palette (defaultButtonTheme), not hardcoded Primary.
+          Button: { value: `{Colors.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Text: { value: `{Text.Containers.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Border: { value: `{Border.Containers.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Hover: { value: `{Hover.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Active: { value: `{Active.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Highlight: { value: `{Button-Highlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
+          Lowlight: { value: `{Button-Lowlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
-          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Containers.Primary.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
+          Button: { value: `{Colors.${defaultButtonTheme}.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Containers.${defaultButtonTheme}.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.${defaultButtonTheme}.Color-10}`, type: 'color' },
+          Active: { value: `{Active.${defaultButtonTheme}.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Button}`, type: 'color' },
@@ -5961,11 +5971,17 @@ export function exportColorSystemToJSON(
     }
   };
 
-  // Lowlight: same hue, slightly boosted chroma, darker
-  const computeLowlight = (hex: string): string => computeDropshadow(hex, -15, 1.2);
+  // Lowlight: same hue, slightly *reduced* chroma (so it reads as a shadow,
+  // not a more-saturated glow), and a stronger darkening offset. Saturated
+  // semantic palettes (Info/Success/Warning/Error) had bevels reading as a
+  // bottom-edge glow at the old (-15, 1.2) values — the chroma boost pushed
+  // the lowlight to a vibrant sibling of the body, and only -15 in lightness
+  // wasn't enough contrast to read as a recessed shadow.
+  const computeLowlight = (hex: string): string => computeDropshadow(hex, -30, 0.85);
 
-  // Highlight: same hue, slightly lower chroma, lighter
-  const computeHighlight = (hex: string): string => computeDropshadow(hex, 15, 0.8);
+  // Highlight: same hue, lower chroma, lighter. Keep chroma reduction so the
+  // highlight reads as a washed-out tint, not a saturated overlay.
+  const computeHighlight = (hex: string): string => computeDropshadow(hex, 25, 0.7);
 
   const resolveColorToken = (tokenValue: string, modeColors: any, modeBackgrounds: any): string | null => {
     if (!tokenValue) return null;
@@ -6175,11 +6191,16 @@ export function exportColorSystemToJSON(
               // Fallback driven by the user's chosen button mode. The Default
               // button takes its fill from whichever palette the button mode
               // maps to — Primary for primary mode, Secondary for secondary /
-              // tonal / laddered, Neutral for black-white. Hardcoding
-              // Secondary here would leave Highlight/Lowlight derived from
-              // the wrong palette (visible as bevels in the wrong hue, e.g.
-              // pink-tinted bevels on a blue-gray button).
-              const btnMode = userSelections?.button;
+              // tonal / laddered, Neutral for black-white.
+              //
+              // userSelections.button arrives as a combined string like
+              // 'secondary-adaptive' / 'tonal-fixed' (see the parser at the
+              // top of this file). Strip the '-adaptive' / '-fixed' suffix
+              // before comparing so the equality checks below actually match.
+              const btnModeRaw = userSelections?.button;
+              const btnMode = btnModeRaw === 'black-white'
+                ? 'black-white'
+                : (btnModeRaw?.split('-')[0] || 'primary');
               const fbPalette = (btnMode === 'secondary' || btnMode === 'tonal' || btnMode === 'laddered')
                 ? 'Secondary'
                 : btnMode === 'black-white'

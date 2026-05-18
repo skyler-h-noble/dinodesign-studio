@@ -297,7 +297,9 @@ function deriveShadowRGB(hex: string): string | null {
     }
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     const newS = clamp(s * 100 * 1.5, 0, 100) / 100;
-    const newL = clamp(l * 100 - 25, 8, 92) / 100;
+    // Darkened from -25 → -35 to push the shadow further below the surface,
+    // matching the preview's LCH 0.5 multiplier (was 0.625).
+    const newL = clamp(l * 100 - 35, 8, 92) / 100;
     let sr: number, sg: number, sb: number;
     if (newS === 0) {
       sr = sg = sb = Math.round(newL * 255);
@@ -1968,7 +1970,7 @@ function generateThemeCSS(modeData: any, fullJsonData?: any): string {
   
   // Button types
   const buttonTypes = ['Primary', 'Primary-Light', 'Secondary', 'Secondary-Light', 'Tertiary', 'Tertiary-Light', 'Neutral', 'Neutral-Light', 'Info', 'Info-Light', 'Success', 'Success-Light', 'Warning', 'Warning-Light', 'Error', 'Error-Light'];
-  const buttonProps = ['Button', 'Text', 'Border', 'Hover', 'Active'];
+  const buttonProps = ['Button', 'Text', 'Border', 'Hover', 'Active', 'Highlight', 'Lowlight'];
   
   // Icon types
   const iconTypes = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
@@ -4250,20 +4252,25 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-12);');
   lines.push(`  --Buttons-BlackWhite-Medium-Hover: ${hoverHex('Neutral', 1)};`);
   lines.push(`  --Buttons-BlackWhite-Medium-Active: ${hoverHex('Neutral', 1)};`);
-  // Default button — border matches the user's button mode palette.
-  // Mode → palette: primary→Primary, secondary→Secondary, others fall through.
+  // Default button — border matches the palette that the Default button's
+  // OWN palette/color resolves to for the active theme. Mirrors
+  // getButtonModeBorderMappings(buttonMode).Default in
+  // completeSimplifiedSystem.ts so the CSS matches the Figma JSON cascade.
   const buttonMode = jsonData?.Metadata?.['Button-Config']?.DefaultButtonType?.value;
   const defaultBorderPalette =
     buttonMode === 'primary' ? 'Primary' :
     buttonMode === 'secondary' ? 'Secondary' :
+    buttonMode === 'tonal' ? 'Primary' :    // Default theme's tonal button maps to Primary
+    buttonMode === 'laddered' ? 'Secondary' : // Default theme's laddered button maps to Secondary
     buttonMode === 'black-white' ? 'Neutral' :
-    null; // tonal / laddered → let Light-Mode.css fallback win
+    'Primary'; // safest fallback — was previously null, which let stale Light-Mode.css refs win
   lines.push('  --Buttons-Default-Button: var(--Default-Button-Default-Medium-Button);');
   lines.push('  --Buttons-Default-Text: var(--Default-Button-Default-Medium-Text);');
-  if (defaultBorderPalette) {
-    lines.push(`  --Buttons-Default-Border: var(--Buttons-${defaultBorderPalette}-Border);`);
-  }
-  // else: omit the line so Light-Mode.css's `--Buttons-Default-Border: var(--Neutral-Color-5)` survives the cascade.
+  lines.push(`  --Buttons-Default-Border: var(--Buttons-${defaultBorderPalette}-Border);`);
+  // Bevel inset highlight/lowlight follow the same palette as the border
+  // so the Default button's 3D effect matches its body color.
+  lines.push(`  --Buttons-Default-Highlight: var(--Buttons-${defaultBorderPalette}-Highlight);`);
+  lines.push(`  --Buttons-Default-Lowlight: var(--Buttons-${defaultBorderPalette}-Lowlight);`);
   // Resolve Default hover/active through the Buttons chain
   const defaultBtnData = jsonData?.Modes?.['Light-Mode']?.['Default-Button'] || jsonData?.['Default-Button'];
   const buttonsJsonData = jsonData?.Modes?.['Light-Mode']?.Buttons || jsonData?.Buttons;
@@ -4453,6 +4460,26 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Button-Padding: ${buttonPadding}px;`);
     lines.push(`  --Sm-Button-Padding: ${smButtonPadding}px;`);
     lines.push(`  --Large-Button-Padding: ${largeButtonPadding}px;`);
+    // Bevel tokens — used by the lib Button to render its 3D inset shadow.
+    // Live here (not in foundation.css) so they push to the lib's base.css
+    // via LIB_DYNAMIC_CSS_FILES. --_bevel = Button-Bevel% × height / 100.
+    const bevelPercent = csRaw.bevel ?? 0;
+    const bevelOpacity = csRaw.bevelOpacity ?? 50;
+    const bevelHeight = csRaw.buttonHeight ?? 32;
+    const bevelPx = Math.round(bevelHeight * bevelPercent / 100);
+    lines.push(`  --Button-Bevel: ${bevelPercent};`);
+    lines.push(`  --Button-Bevel-Px: ${bevelPx}px;`);
+    lines.push(`  --Button-Bevel-Opacity: ${bevelOpacity / 100};`);
+    // Effect levels — box-shadow recipes. --Dropshadow-Color is overridden
+    // per-theme in Light-Mode.css / Dark-Mode.css; the nested var() resolves
+    // at the consuming element so themed values still apply even though
+    // these are defined statically here.
+    lines.push(`  --Effect-Level-0: none;`);
+    lines.push(`  --Effect-Level-1: 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);`);
+    lines.push(`  --Effect-Level-2: 0 2px 4px rgba(var(--Dropshadow-Color), 0.22), 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);`);
+    lines.push(`  --Effect-Level-3: 0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22);`);
+    lines.push(`  --Effect-Level-4: 0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17);`);
+    lines.push(`  --Effect-Level-5: 0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13);`);
     lines.push('}');
     lines.push('');
   }
@@ -4542,12 +4569,14 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     cssLines.push(`  --Hotlink-Visited: var(--Surfaces-Hotlink-Visited);`);
     cssLines.push(`  --Effects: var(--${effectsLevel});`);
     
-    // Buttons - all button styles with Hover and Active states
+    // Buttons - all button styles with Hover, Active, Highlight, Lowlight
     cssLines.push(`  --Buttons-Primary-Button: var(--${prefix}-Buttons-Primary-Button);`);
     cssLines.push(`  --Buttons-Primary-Text: var(--${prefix}-Buttons-Primary-Text);`);
     cssLines.push(`  --Buttons-Primary-Border: var(--${prefix}-Buttons-Primary-Border);`);
     cssLines.push(`  --Buttons-Primary-Hover: var(--${prefix}-Buttons-Primary-Hover);`);
     cssLines.push(`  --Buttons-Primary-Active: var(--${prefix}-Buttons-Primary-Active);`);
+    cssLines.push(`  --Buttons-Primary-Highlight: var(--${prefix}-Buttons-Primary-Highlight);`);
+    cssLines.push(`  --Buttons-Primary-Lowlight: var(--${prefix}-Buttons-Primary-Lowlight);`);
     cssLines.push(`  --Buttons-Primary-Outline-Button: var(--${prefix}-Buttons-Primary-Outline-Button);`);
     cssLines.push(`  --Buttons-Primary-Outline-Text: var(--${prefix}-Buttons-Primary-Outline-Text);`);
     cssLines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
@@ -4563,22 +4592,30 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     cssLines.push(`  --Buttons-Secondary-Border: var(--${prefix}-Buttons-Secondary-Border);`);
     cssLines.push(`  --Buttons-Secondary-Hover: var(--${prefix}-Buttons-Secondary-Hover);`);
     cssLines.push(`  --Buttons-Secondary-Active: var(--${prefix}-Buttons-Secondary-Active);`);
+    cssLines.push(`  --Buttons-Secondary-Highlight: var(--${prefix}-Buttons-Secondary-Highlight);`);
+    cssLines.push(`  --Buttons-Secondary-Lowlight: var(--${prefix}-Buttons-Secondary-Lowlight);`);
     cssLines.push(`  --Buttons-Tertiary-Button: var(--${prefix}-Buttons-Tertiary-Button);`);
     cssLines.push(`  --Buttons-Tertiary-Text: var(--${prefix}-Buttons-Tertiary-Text);`);
     cssLines.push(`  --Buttons-Tertiary-Border: var(--${prefix}-Buttons-Tertiary-Border);`);
     cssLines.push(`  --Buttons-Tertiary-Hover: var(--${prefix}-Buttons-Tertiary-Hover);`);
     cssLines.push(`  --Buttons-Tertiary-Active: var(--${prefix}-Buttons-Tertiary-Active);`);
+    cssLines.push(`  --Buttons-Tertiary-Highlight: var(--${prefix}-Buttons-Tertiary-Highlight);`);
+    cssLines.push(`  --Buttons-Tertiary-Lowlight: var(--${prefix}-Buttons-Tertiary-Lowlight);`);
     cssLines.push(`  --Buttons-Neutral-Button: var(--${prefix}-Buttons-Neutral-Button);`);
     cssLines.push(`  --Buttons-Neutral-Text: var(--${prefix}-Buttons-Neutral-Text);`);
     cssLines.push(`  --Buttons-Neutral-Border: var(--${prefix}-Buttons-Neutral-Border);`);
     cssLines.push(`  --Buttons-Neutral-Hover: var(--${prefix}-Buttons-Neutral-Hover);`);
     cssLines.push(`  --Buttons-Neutral-Active: var(--${prefix}-Buttons-Neutral-Active);`);
+    cssLines.push(`  --Buttons-Neutral-Highlight: var(--${prefix}-Buttons-Neutral-Highlight);`);
+    cssLines.push(`  --Buttons-Neutral-Lowlight: var(--${prefix}-Buttons-Neutral-Lowlight);`);
     cssLines.push(`  --Buttons-Info-Button: var(--${prefix}-Buttons-Info-Button);`);
     cssLines.push(`  --Buttons-Info-Text: var(--${prefix}-Buttons-Info-Text);`);
     cssLines.push(`  --Buttons-Info-Border: var(--${prefix}-Buttons-Info-Border);`);
     cssLines.push(`  --Buttons-Info-Hover: var(--${prefix}-Buttons-Info-Hover);`);
     cssLines.push(`  --Buttons-Info-Active: var(--${prefix}-Buttons-Info-Active);`);
-    
+    cssLines.push(`  --Buttons-Info-Highlight: var(--${prefix}-Buttons-Info-Highlight);`);
+    cssLines.push(`  --Buttons-Info-Lowlight: var(--${prefix}-Buttons-Info-Lowlight);`);
+
     // Success button - use "Containers" prefix for button property when type is Surfaces
     const successPrefix = prefix === 'Surfaces' ? 'Containers' : prefix;
     cssLines.push(`  --Buttons-Success-Button: var(--${successPrefix}-Buttons-Success-Button);`);
@@ -4586,17 +4623,23 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     cssLines.push(`  --Buttons-Success-Border: var(--${prefix}-Buttons-Success-Border);`);
     cssLines.push(`  --Buttons-Success-Hover: var(--${prefix}-Buttons-Success-Hover);`);
     cssLines.push(`  --Buttons-Success-Active: var(--${prefix}-Buttons-Success-Active);`);
-    
+    cssLines.push(`  --Buttons-Success-Highlight: var(--${prefix}-Buttons-Success-Highlight);`);
+    cssLines.push(`  --Buttons-Success-Lowlight: var(--${prefix}-Buttons-Success-Lowlight);`);
+
     cssLines.push(`  --Buttons-Warning-Button: var(--${prefix}-Buttons-Warning-Button);`);
     cssLines.push(`  --Buttons-Warning-Text: var(--${prefix}-Buttons-Warning-Text);`);
     cssLines.push(`  --Buttons-Warning-Border: var(--${prefix}-Buttons-Warning-Border);`);
     cssLines.push(`  --Buttons-Warning-Hover: var(--${prefix}-Buttons-Warning-Hover);`);
     cssLines.push(`  --Buttons-Warning-Active: var(--${prefix}-Buttons-Warning-Active);`);
+    cssLines.push(`  --Buttons-Warning-Highlight: var(--${prefix}-Buttons-Warning-Highlight);`);
+    cssLines.push(`  --Buttons-Warning-Lowlight: var(--${prefix}-Buttons-Warning-Lowlight);`);
     cssLines.push(`  --Buttons-Error-Button: var(--${prefix}-Buttons-Error-Button);`);
     cssLines.push(`  --Buttons-Error-Text: var(--${prefix}-Buttons-Error-Text);`);
     cssLines.push(`  --Buttons-Error-Border: var(--${prefix}-Buttons-Error-Border);`);
     cssLines.push(`  --Buttons-Error-Hover: var(--${prefix}-Buttons-Error-Hover);`);
     cssLines.push(`  --Buttons-Error-Active: var(--${prefix}-Buttons-Error-Active);`);
+    cssLines.push(`  --Buttons-Error-Highlight: var(--${prefix}-Buttons-Error-Highlight);`);
+    cssLines.push(`  --Buttons-Error-Lowlight: var(--${prefix}-Buttons-Error-Lowlight);`);
     
     // Icons
     if (surfaceData.Icons) {
@@ -4685,6 +4728,8 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Primary-Border: var(--${prefix}-Buttons-Primary-Border);`);
     lines.push(`  --Buttons-Primary-Hover: var(--${prefix}-Buttons-Primary-Hover);`);
     lines.push(`  --Buttons-Primary-Active: var(--${prefix}-Buttons-Primary-Active);`);
+    lines.push(`  --Buttons-Primary-Highlight: var(--${prefix}-Buttons-Primary-Highlight);`);
+    lines.push(`  --Buttons-Primary-Lowlight: var(--${prefix}-Buttons-Primary-Lowlight);`);
     lines.push(`  --Buttons-Primary-Outline-Button: var(--${prefix}-Buttons-Primary-Outline-Button);`);
     lines.push(`  --Buttons-Primary-Outline-Text: var(--${prefix}-Buttons-Primary-Outline-Text);`);
     lines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
@@ -4700,37 +4745,51 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Secondary-Border: var(--${prefix}-Buttons-Secondary-Border);`);
     lines.push(`  --Buttons-Secondary-Hover: var(--${prefix}-Buttons-Secondary-Hover);`);
     lines.push(`  --Buttons-Secondary-Active: var(--${prefix}-Buttons-Secondary-Active);`);
+    lines.push(`  --Buttons-Secondary-Highlight: var(--${prefix}-Buttons-Secondary-Highlight);`);
+    lines.push(`  --Buttons-Secondary-Lowlight: var(--${prefix}-Buttons-Secondary-Lowlight);`);
     lines.push(`  --Buttons-Tertiary-Button: var(--${prefix}-Buttons-Tertiary-Button);`);
     lines.push(`  --Buttons-Tertiary-Text: var(--${prefix}-Buttons-Tertiary-Text);`);
     lines.push(`  --Buttons-Tertiary-Border: var(--${prefix}-Buttons-Tertiary-Border);`);
     lines.push(`  --Buttons-Tertiary-Hover: var(--${prefix}-Buttons-Tertiary-Hover);`);
     lines.push(`  --Buttons-Tertiary-Active: var(--${prefix}-Buttons-Tertiary-Active);`);
+    lines.push(`  --Buttons-Tertiary-Highlight: var(--${prefix}-Buttons-Tertiary-Highlight);`);
+    lines.push(`  --Buttons-Tertiary-Lowlight: var(--${prefix}-Buttons-Tertiary-Lowlight);`);
     lines.push(`  --Buttons-Neutral-Button: var(--${prefix}-Buttons-Neutral-Button);`);
     lines.push(`  --Buttons-Neutral-Text: var(--${prefix}-Buttons-Neutral-Text);`);
     lines.push(`  --Buttons-Neutral-Border: var(--${prefix}-Buttons-Neutral-Border);`);
     lines.push(`  --Buttons-Neutral-Hover: var(--${prefix}-Buttons-Neutral-Hover);`);
     lines.push(`  --Buttons-Neutral-Active: var(--${prefix}-Buttons-Neutral-Active);`);
+    lines.push(`  --Buttons-Neutral-Highlight: var(--${prefix}-Buttons-Neutral-Highlight);`);
+    lines.push(`  --Buttons-Neutral-Lowlight: var(--${prefix}-Buttons-Neutral-Lowlight);`);
     lines.push(`  --Buttons-Info-Button: var(--${prefix}-Buttons-Info-Button);`);
     lines.push(`  --Buttons-Info-Text: var(--${prefix}-Buttons-Info-Text);`);
     lines.push(`  --Buttons-Info-Border: var(--${prefix}-Buttons-Info-Border);`);
     lines.push(`  --Buttons-Info-Hover: var(--${prefix}-Buttons-Info-Hover);`);
     lines.push(`  --Buttons-Info-Active: var(--${prefix}-Buttons-Info-Active);`);
+    lines.push(`  --Buttons-Info-Highlight: var(--${prefix}-Buttons-Info-Highlight);`);
+    lines.push(`  --Buttons-Info-Lowlight: var(--${prefix}-Buttons-Info-Lowlight);`);
     const successPrefix = prefix.startsWith('Surface') ? 'Containers' : prefix;
     lines.push(`  --Buttons-Success-Button: var(--${successPrefix}-Buttons-Success-Button);`);
     lines.push(`  --Buttons-Success-Text: var(--${prefix}-Buttons-Success-Text);`);
     lines.push(`  --Buttons-Success-Border: var(--${prefix}-Buttons-Success-Border);`);
     lines.push(`  --Buttons-Success-Hover: var(--${prefix}-Buttons-Success-Hover);`);
     lines.push(`  --Buttons-Success-Active: var(--${prefix}-Buttons-Success-Active);`);
+    lines.push(`  --Buttons-Success-Highlight: var(--${prefix}-Buttons-Success-Highlight);`);
+    lines.push(`  --Buttons-Success-Lowlight: var(--${prefix}-Buttons-Success-Lowlight);`);
     lines.push(`  --Buttons-Warning-Button: var(--${prefix}-Buttons-Warning-Button);`);
     lines.push(`  --Buttons-Warning-Text: var(--${prefix}-Buttons-Warning-Text);`);
     lines.push(`  --Buttons-Warning-Border: var(--${prefix}-Buttons-Warning-Border);`);
     lines.push(`  --Buttons-Warning-Hover: var(--${prefix}-Buttons-Warning-Hover);`);
     lines.push(`  --Buttons-Warning-Active: var(--${prefix}-Buttons-Warning-Active);`);
+    lines.push(`  --Buttons-Warning-Highlight: var(--${prefix}-Buttons-Warning-Highlight);`);
+    lines.push(`  --Buttons-Warning-Lowlight: var(--${prefix}-Buttons-Warning-Lowlight);`);
     lines.push(`  --Buttons-Error-Button: var(--${prefix}-Buttons-Error-Button);`);
     lines.push(`  --Buttons-Error-Text: var(--${prefix}-Buttons-Error-Text);`);
     lines.push(`  --Buttons-Error-Border: var(--${prefix}-Buttons-Error-Border);`);
     lines.push(`  --Buttons-Error-Hover: var(--${prefix}-Buttons-Error-Hover);`);
     lines.push(`  --Buttons-Error-Active: var(--${prefix}-Buttons-Error-Active);`);
+    lines.push(`  --Buttons-Error-Highlight: var(--${prefix}-Buttons-Error-Highlight);`);
+    lines.push(`  --Buttons-Error-Lowlight: var(--${prefix}-Buttons-Error-Lowlight);`);
     // Map Default icons to Neutral since Default palette is not generated
     lines.push(`  --Icons-Default: var(--${prefix}-Icons-Neutral);`);
     lines.push(`  --Icons-Default-Variant: var(--${prefix}-Icons-Neutral-Variant);`);

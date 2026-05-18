@@ -750,6 +750,13 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     };
   }
 
+  // Attach _componentStyle BEFORE running any CSS generator so the
+  // generators that depend on it (bevel, radius, modal-padding emission in
+  // generateBaseCSS) actually see the user's component customizations.
+  // Was previously only set later, inside the figma.json IIFE — which meant
+  // base.css regenerated without bevel/radius/modal tokens.
+  if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations;
+
   // 3. Generate CSS files from the JSON
   let cssFiles: Record<string, string> = {};
   console.log('🔍 [CSS Gen] JSON top keys:', Object.keys(designSystemJSON));
@@ -906,6 +913,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
   --Cognitive-Multiplier: 1;
+  --Dropshadow-Color: 20, 20, 20;  /* fallback; overridden per-theme in Light/Dark-Mode.css */
 }
 
 /* Platform Font Overrides */

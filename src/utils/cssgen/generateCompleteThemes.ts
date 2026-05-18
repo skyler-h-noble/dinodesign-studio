@@ -30,6 +30,14 @@ interface ThemeConfig {
   successHeader: string;
   warningHeader: string;
   errorHeader: string;
+  // Palette the Default button's tokens (Border + Highlight + Lowlight) follow.
+  // Derived from the user's button-mode choice via getButtonModeBorderMappings —
+  // 'secondary' button mode → 'Secondary', 'primary' → 'Primary', etc. The
+  // Default button's Button/Text already point at {Default-Button.Default…}
+  // which resolves to the right palette, but Border + bevel were hardcoded to
+  // the current theme's palette, so a Secondary-mode Default button on the
+  // Default theme ended up with a Primary border. This field fixes that.
+  defaultButtonPalette: string;
 }
 
 /**
@@ -190,7 +198,8 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
     // Buttons in Surfaces
     'Buttons': {
       'Default': (() => {
-        // Semantic themes (Info, Success, Warning, Error) use their own palette for Default button
+        // Semantic themes (Info, Success, Warning, Error) use their own palette
+        // for the Default button — Border + bevel follow that semantic palette.
         const semanticThemes = ['Info', 'Success', 'Warning', 'Error'];
         if (semanticThemes.includes(config.theme)) {
           return {
@@ -198,15 +207,21 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
             'Text': { value: `{Buttons.${config.theme}.${shade}.Text}`, type: 'color' },
             'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${shade}.Hover}`, type: 'color' },
-            'Active': { value: `{Buttons.${config.theme}.${shade}.Active}`, type: 'color' }
+            'Active': { value: `{Buttons.${config.theme}.${shade}.Active}`, type: 'color' },
+            'Highlight': { value: `{Button-Highlight.${config.theme}.Color-${n}}`, type: 'color' },
+            'Lowlight': { value: `{Button-Lowlight.${config.theme}.Color-${n}}`, type: 'color' }
           };
         }
+        // Non-semantic themes — Border + Highlight + Lowlight follow the user's
+        // button-mode palette (defaultButtonPalette) so they match the body.
         return {
           'Button': { value: `{Default-Button.Default.${shade}.Button}`, type: 'color' },
           'Text': { value: `{Default-Button.Default.${shade}.Text}`, type: 'color' },
-          'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
+          'Border': { value: `{Border.Surfaces.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
           'Hover': { value: `{Default-Button.Default.${shade}.Hover}`, type: 'color' },
-          'Active': { value: `{Default-Button.Default.${shade}.Active}`, type: 'color' }
+          'Active': { value: `{Default-Button.Default.${shade}.Active}`, type: 'color' },
+          'Highlight': { value: `{Button-Highlight.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
+          'Lowlight': { value: `{Button-Lowlight.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' }
         };
       })(),
       'Primary': {
@@ -508,6 +523,9 @@ function generateSingleTheme(config: ThemeConfig): any {
     // Buttons in Containers
     'Buttons': {
       'Default': (() => {
+        // Mirror of the Surfaces block: semantic themes use their own palette
+        // for the Default button; non-semantic themes use the user's
+        // button-mode palette for Border + Highlight + Lowlight.
         const semanticThemes = ['Info', 'Success', 'Warning', 'Error'];
         if (semanticThemes.includes(config.theme)) {
           return {
@@ -515,15 +533,19 @@ function generateSingleTheme(config: ThemeConfig): any {
             'Text': { value: `{Buttons.${config.theme}.${config.cShade}.Text}`, type: 'color' },
             'Border': { value: `{Border.Containers.${config.theme}.Color-${config.contN}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${config.cShade}.Hover}`, type: 'color' },
-            'Active': { value: `{Buttons.${config.theme}.${config.cShade}.Active}`, type: 'color' }
+            'Active': { value: `{Buttons.${config.theme}.${config.cShade}.Active}`, type: 'color' },
+            'Highlight': { value: `{Button-Highlight.${config.theme}.Color-${config.contN}}`, type: 'color' },
+            'Lowlight': { value: `{Button-Lowlight.${config.theme}.Color-${config.contN}}`, type: 'color' }
           };
         }
         return {
           'Button': { value: `{Default-Button.Default.${config.cShade}.Button}`, type: 'color' },
           'Text': { value: `{Default-Button.Default.${config.cShade}.Text}`, type: 'color' },
-          'Border': { value: `{Border.Containers.${config.contTheme}.Color-${config.contN}}`, type: 'color' },
+          'Border': { value: `{Border.Containers.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
           'Hover': { value: `{Default-Button.Default.${config.cShade}.Hover}`, type: 'color' },
-          'Active': { value: `{Default-Button.Default.${config.cShade}.Active}`, type: 'color' }
+          'Active': { value: `{Default-Button.Default.${config.cShade}.Active}`, type: 'color' },
+          'Highlight': { value: `{Button-Highlight.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
+          'Lowlight': { value: `{Button-Lowlight.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' }
         };
       })(),
       'Primary': {
@@ -687,6 +709,18 @@ export function generateAllThemesWithSurfacesAndContainers(
   };
   
   const textColoring = defaultSettings.textColoring;
+
+  // Resolve the user's button-mode choice to the palette the Default button
+  // uses. Mirrors getButtonModeBorderMappings(buttonMode, mode).Default in
+  // completeSimplifiedSystem.ts so Border + bevel match the body color.
+  const buttonMode = userSelections?.button || 'primary';
+  const defaultButtonPalette: string = (() => {
+    if (buttonMode === 'black-white') return mode === 'Dark-Mode' ? 'Primary' : 'Neutral';
+    if (buttonMode === 'secondary') return 'Secondary';
+    if (buttonMode === 'tonal') return 'Primary';
+    if (buttonMode === 'laddered') return 'Secondary';
+    return 'Primary'; // 'primary' or anything else
+  })();
   
   // Common text palette configurations
   const textPalettes = {
@@ -727,9 +761,10 @@ export function generateAllThemesWithSurfacesAndContainers(
     infoHeader: 'Info',
     successHeader: 'Success',
     warningHeader: 'Warning',
-    errorHeader: 'Error'
+    errorHeader: 'Error',
+    defaultButtonPalette
   });
-  
+
   // Override Default theme's Surface to reference Default-Background (Light/Dark adaptive)
   if (themes.Default?.Surfaces) {
     themes.Default.Surfaces['Background'] = { value: '{Default-Background.Surface}', type: 'color' };
@@ -832,7 +867,8 @@ export function generateAllThemesWithSurfacesAndContainers(
     infoHeader: 'Info',
     successHeader: 'Success',
     warningHeader: 'Warning',
-    errorHeader: 'Error'
+    errorHeader: 'Error',
+    defaultButtonPalette
   });
 
   // Primary, Secondary, Tertiary — N = PC/SC/TC

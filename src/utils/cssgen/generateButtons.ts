@@ -138,14 +138,21 @@ function generateButtonsForMode(
       Button: { value: `{Colors.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Hover: { value: `{Hover.${theme}.Color-${buttonColorN}}`, type: 'color' },
-      Active: { value: `{Active.${theme}.Color-${buttonColorN}}`, type: 'color' }
+      Active: { value: `{Active.${theme}.Color-${buttonColorN}}`, type: 'color' },
+      // Highlight / Lowlight follow the button's own palette so a Secondary
+      // (or Default-as-Secondary, tonal, laddered, etc.) button gets its bevel
+      // tones from its own color, not from Primary.
+      Highlight: { value: `{Button-Highlight.${theme}.Color-${buttonColorN}}`, type: 'color' },
+      Lowlight: { value: `{Button-Lowlight.${theme}.Color-${buttonColorN}}`, type: 'color' }
     };
-    
+
     result.Containers[`Background-${n}`] = {
       Button: { value: `{Colors.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Text: { value: `{Text.Containers.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Hover: { value: `{Hover.${theme}.Color-${buttonColorN}}`, type: 'color' },
-      Active: { value: `{Active.${theme}.Color-${buttonColorN}}`, type: 'color' }
+      Active: { value: `{Active.${theme}.Color-${buttonColorN}}`, type: 'color' },
+      Highlight: { value: `{Button-Highlight.${theme}.Color-${buttonColorN}}`, type: 'color' },
+      Lowlight: { value: `{Button-Lowlight.${theme}.Color-${buttonColorN}}`, type: 'color' }
     };
   }
   
@@ -171,14 +178,18 @@ function generateButtonsForMode(
     Button: { value: `{Colors.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Surfaces.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
-    Active: { value: `{Active.${theme}.Color-${vibrantButtonN}}`, type: 'color' }
+    Active: { value: `{Active.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
+    Highlight: { value: `{Button-Highlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
+    Lowlight: { value: `{Button-Lowlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' }
   };
-  
+
   result.Containers['Background-Vibrant'] = {
     Button: { value: `{Colors.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Containers.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
-    Active: { value: `{Active.${theme}.Color-${vibrantButtonN}}`, type: 'color' }
+    Active: { value: `{Active.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
+    Highlight: { value: `{Button-Highlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
+    Lowlight: { value: `{Button-Lowlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' }
   };
   
   return result;

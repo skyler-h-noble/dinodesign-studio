@@ -189,11 +189,12 @@ function mixHex(hex1: string, hex2: string): string {
   return '#' + [m(r1, r2), m(g1, g2), m(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
-/** Compute dropshadow color: same hue/chroma, L * 0.625 */
+/** Compute dropshadow color: same hue/chroma, L * 0.5 (was 0.625; darkened
+ *  to match the CSS export's HSL -35 offset and give shadows more presence). */
 function dropshadowFor(hex: string): string {
   try {
     const [l, c, h] = chroma(hex).lch();
-    return chroma.lch(l * 0.625, c, h).hex();
+    return chroma.lch(l * 0.5, c, h).hex();
   } catch {
     return 'rgba(0,0,0,0.15)';
   }

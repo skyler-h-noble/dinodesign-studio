@@ -38,7 +38,7 @@ const SURFACE_NAMES = [
 /**
  * Derive shadow RGB from hex (same algorithm as computeDropshadow in exportColorSystem)
  */
-function deriveShadowRGB(hex: string, lightOffset = -25, satMultiplier = 1.5): string {
+function deriveShadowRGB(hex: string, lightOffset = -35, satMultiplier = 1.5): string {
   try {
     const clean = hex.replace('#', '');
     const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
@@ -572,6 +572,31 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                       target[key]['Active'] = { value: `{Button-Active.${palette}.${colorN}}`, type: 'color' };
                       target[key]['Highlight'] = { value: `{Button-Highlight.${palette}.${colorN}}`, type: 'color' };
                       target[key]['Lowlight'] = { value: `{Button-Lowlight.${palette}.${colorN}}`, type: 'color' };
+                      // Border palette should match the button's palette too —
+                      // the upstream JSON hardcodes Border to Primary for the
+                      // Default button (and similar) regardless of the user's
+                      // chosen button style. Rewrite the palette portion of
+                      // the existing Border ref while preserving the surface
+                      // scope (Surfaces vs Containers) and the surface
+                      // background's Color-N.
+                      const existingBorder = target[key]['Border']?.value;
+                      if (typeof existingBorder === 'string') {
+                        // Match any surface scope: Surfaces, Surface-Dim,
+                        // Surface-Dimmest, Surface-Bright, Containers,
+                        // Container-Low(est), Container-High(est). Preserves
+                        // the scope and surface Color-N; rewrites the palette.
+                        const borderMatch = existingBorder.match(
+                          /\{Border\.([\w-]+)\.[\w-]+\.(Color-[\w-]+)\}/
+                        );
+                        if (borderMatch) {
+                          const scope = borderMatch[1];
+                          const surfaceColorN = borderMatch[2];
+                          target[key]['Border'] = {
+                            value: `{Border.${scope}.${palette}.${surfaceColorN}}`,
+                            type: 'color',
+                          };
+                        }
+                      }
                     }
                   }
                 }
@@ -818,9 +843,14 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     });
     const r = computeRadii(cs);
     // Bevel is a % of button height — compute px values per size
-    const bevelMed = Math.round(cs.buttonHeight * (csRaw.bevel ?? 0) / 100);
-    const bevelSm = Math.round(cs.smallButtonHeight * (csRaw.bevel ?? 0) / 100);
-    const bevelLg = Math.round(cs.largeButtonHeight * (csRaw.bevel ?? 0) / 100);
+    // Bevel pixel values per size, capped at 20% of the button's own height
+    // so the inset highlight/lowlight never bleeds into the text band — same
+    // safety cap applied in Button.js's --_bevel calc. Slider max is 20% so
+    // this only kicks in defensively for restored designs or hand-edited input.
+    const bevelPct = csRaw.bevel ?? 0;
+    const bevelMed = Math.round(Math.min(cs.buttonHeight * bevelPct / 100, cs.buttonHeight / 5));
+    const bevelSm = Math.round(Math.min(cs.smallButtonHeight * bevelPct / 100, cs.smallButtonHeight / 5));
+    const bevelLg = Math.round(Math.min(cs.largeButtonHeight * bevelPct / 100, cs.largeButtonHeight / 5));
     // Padding tokens derived from the computed medium button radius.
     const buttonPadding = r.buttonRadius > 8 ? Math.round(r.buttonRadius / 2) : 4;
     const smButtonPadding = r.buttonRadius >= 8 ? 8 : r.buttonRadius;

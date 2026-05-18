@@ -266,6 +266,13 @@ export default function ComponentStyleStage({
                 '--Sm-Button-Padding': `${smButtonPadding}px`,
                 '--Large-Button-Padding': `${lgButtonPadding}px`,
                 '--Button-Border-Width': '2px',
+                // Inject the user's bevel settings so the live preview matches
+                // the exported CSS exactly. Without these, the lib's Button
+                // falls back to its static --Button-Bevel: 11% (foundations.css)
+                // and --Button-Bevel-Opacity: 0.5 — which doesn't reflect what
+                // ships with the design system.
+                '--Button-Bevel': custom.bevel,
+                '--Button-Bevel-Opacity': custom.bevelOpacity / 100,
               } as React.CSSProperties}
             >
             <Card
