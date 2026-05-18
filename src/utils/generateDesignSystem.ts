@@ -745,8 +745,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     designSystemJSON = {
       name: input.designSystemName,
       colors: input.colorScheme.colors,
-      error: (err as Error).message,
-      error: 'Full generation failed, simplified export',
+      error: (err as Error).message ?? 'Full generation failed, simplified export',
     };
   }
 

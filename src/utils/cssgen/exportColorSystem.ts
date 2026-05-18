@@ -3930,24 +3930,25 @@ function generateThemesSection(
       Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' },
       'Focus-Visible': { value: `{Focus-Visible.Surfaces.Color-${backgroundNum}}`, type: 'color' },
       Buttons: {
+        // NOTE: this entire Themes literal is dead in the live pipeline — it
+        // gets overwritten by `generateCompleteSimplifiedSystem` at the
+        // assignment further down in this file (around line 5904). The
+        // *live* Default-button cascade lives in generateCompleteThemes.ts
+        // and uses `config.defaultButtonPalette` to pick the right palette.
+        // Keeping the literal here on Primary just to satisfy TS — nothing
+        // downstream reads these values.
         Default: {
-          // All Default tokens follow the user-chosen button-mode palette
-          // (defaultButtonTheme: Primary/Secondary/Tertiary/Neutral) instead
-          // of being hardcoded to Primary. Border + Highlight + Lowlight match
-          // the body color so the bevel + outline stay in-palette.
-          Button: { value: `{Colors.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Border: { value: `{Border.Surfaces.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Hover: { value: `{Hover.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Highlight: { value: `{Button-Highlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Lowlight: { value: `{Button-Lowlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Text: { value: `{Text.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Border: { value: `{Border.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
-          Button: { value: `{Colors.${defaultButtonTheme}.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.${defaultButtonTheme}.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.${defaultButtonTheme}.Color-10}`, type: 'color' },
-          Active: { value: `{Active.${defaultButtonTheme}.Color-10}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Button}`, type: 'color' },
@@ -4084,22 +4085,20 @@ function generateThemesSection(
       Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' },
       'Focus-Visible': { value: `{Focus-Visible.Containers.Color-${backgroundNum}}`, type: 'color' },
       Buttons: {
+        // Dead literal (overwritten by generateCompleteSimplifiedSystem). See
+        // the matching note in the Surfaces Buttons block above.
         Default: {
-          // Same fix as the Surfaces block: Default tokens follow the user's
-          // button-mode palette (defaultButtonTheme), not hardcoded Primary.
-          Button: { value: `{Colors.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Text: { value: `{Text.Containers.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Border: { value: `{Border.Containers.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Hover: { value: `{Hover.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Highlight: { value: `{Button-Highlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' },
-          Lowlight: { value: `{Button-Lowlight.${defaultButtonTheme}.Color-${backgroundNum}}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Text: { value: `{Text.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
-          Button: { value: `{Colors.${defaultButtonTheme}.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Containers.${defaultButtonTheme}.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.${defaultButtonTheme}.Color-10}`, type: 'color' },
-          Active: { value: `{Active.${defaultButtonTheme}.Color-10}`, type: 'color' }
+          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
+          Text: { value: `{Text.Containers.Primary.Color-10}`, type: 'color' },
+          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
+          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Button}`, type: 'color' },
