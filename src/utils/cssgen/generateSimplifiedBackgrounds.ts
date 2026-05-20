@@ -83,6 +83,12 @@ export function generateSimplifiedLightModeBackgrounds(
   // Convert Color-N index (0-13) to Color-N name (1-14)
   const surfaceColorNumber = Math.min(surfaceBaseTone + 1, 12); // Cap at Color-12 (max in 12-tone scale)
   const containerColorNumber = useColor10ForContainers ? 10 : 12; // Color-10 or Color-12 (capped)
+  // Surface-Dim / Surface-Bright are adjacent palette tones so they stay in the
+  // brand color family (instead of falling out to a desaturated black/white blend).
+  const dimColorNumber = Math.max(surfaceColorNumber - 1, 1);
+  const brightColorNumber = Math.min(surfaceColorNumber + 1, 12);
+  const surfaceDimToken = paletteName ? `{Colors.${paletteName}.Color-${dimColorNumber}}` : surfaceDimColor;
+  const surfaceBrightToken = paletteName ? `{Colors.${paletteName}.Color-${brightColorNumber}}` : surfaceBrightColor;
   
   // DEBUG: Log for Tertiary palette specifically
   if (paletteName === 'Tertiary') {
@@ -101,11 +107,11 @@ export function generateSimplifiedLightModeBackgrounds(
             type: 'color'
           },
           'Surface-Dim': {
-            value: surfaceDimColor,
+            value: surfaceDimToken,
             type: 'color'
           },
           'Surface-Bright': {
-            value: surfaceBrightColor,
+            value: surfaceBrightToken,
             type: 'color'
           }
         },
@@ -133,7 +139,7 @@ export function generateSimplifiedLightModeBackgrounds(
         }
       };
     }
-    
+
     // Professional mode: White cards - all containers link to {White}
     // NOTE: This should only be used when the USER explicitly selects "professional" container style
     if (containerStyle === 'professional') {
@@ -144,11 +150,11 @@ export function generateSimplifiedLightModeBackgrounds(
             type: 'color'
           },
           'Surface-Dim': {
-            value: surfaceDimColor,
+            value: surfaceDimToken,
             type: 'color'
           },
           'Surface-Bright': {
-            value: surfaceBrightColor,
+            value: surfaceBrightToken,
             type: 'color'
           }
         },
@@ -176,7 +182,7 @@ export function generateSimplifiedLightModeBackgrounds(
         }
       };
     }
-    
+
     // Black mode: Black cards - all containers link to {Colors.Neutral.Color-2}
     if (containerStyle === 'black') {
       return {
@@ -186,11 +192,11 @@ export function generateSimplifiedLightModeBackgrounds(
             type: 'color'
           },
           'Surface-Dim': {
-            value: surfaceDimColor,
+            value: surfaceDimToken,
             type: 'color'
           },
           'Surface-Bright': {
-            value: surfaceBrightColor,
+            value: surfaceBrightToken,
             type: 'color'
           }
         },
@@ -242,11 +248,11 @@ export function generateSimplifiedLightModeBackgrounds(
           type: 'color'
         },
         'Surface-Dim': {
-          value: surfaceDimColor,
+          value: surfaceDimToken,
           type: 'color'
         },
         'Surface-Bright': {
-          value: surfaceBrightColor,
+          value: surfaceBrightToken,
           type: 'color'
         }
       },
@@ -380,7 +386,13 @@ export function generateSimplifiedDarkModeBackgrounds(
   // ========================================================================
   
   const surfaceColorNumber = Math.min(surfaceBaseTone + 1, 12); // Cap at Color-12 (max in 12-tone scale)
-  
+  // Surface-Dim / Surface-Bright = adjacent palette tones so they stay in the
+  // brand color family instead of falling out to a desaturated black/white blend.
+  const dimColorNumber = Math.max(surfaceColorNumber - 1, 1);
+  const brightColorNumber = Math.min(surfaceColorNumber + 1, 12);
+  const surfaceDimToken = paletteName ? `{Colors.${paletteName}.Color-${dimColorNumber}}` : surfaceDimColor;
+  const surfaceBrightToken = paletteName ? `{Colors.${paletteName}.Color-${brightColorNumber}}` : surfaceBrightColor;
+
   if (paletteName) {
     return {
       Surfaces: {
@@ -389,11 +401,11 @@ export function generateSimplifiedDarkModeBackgrounds(
           type: 'color'
         },
         'Surface-Dim': {
-          value: surfaceDimColor, // Blended color, keep as hex
+          value: surfaceDimToken,
           type: 'color'
         },
         'Surface-Bright': {
-          value: surfaceBrightColor, // Blended color, keep as hex
+          value: surfaceBrightToken,
           type: 'color'
         }
       },

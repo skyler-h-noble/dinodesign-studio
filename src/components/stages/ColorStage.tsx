@@ -869,7 +869,7 @@ export default function ColorStage({
                         setSwapIndex(isSwapActive ? null : i);
                       }}
                       sx={{
-                        borderRadius: 'var(--Style-Border-Radius, 6px)',
+                        borderRadius: 'var(--Button-Icon-Radius, 50%)',
                         width: '100%',
                         aspectRatio: '1',
                         height: 'auto',
@@ -934,7 +934,7 @@ export default function ColorStage({
                       }}
                       title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : `${color.hex} — click to view`}
                       sx={{
-                        borderRadius: 'var(--Style-Border-Radius, 6px)',
+                        borderRadius: 'var(--Button-Icon-Radius, 50%)',
                         width: 42,
                         height: 42,
                         minWidth: 42,

@@ -117,14 +117,14 @@ export default function ComponentStyleStage({
 
       {/* ─── Left: persistent sidebar ─── */}
       <div data-surface="Surface-Dim" style={{
-        width: settingsOpen ? 280 : 0,
+        width: settingsOpen ? 296 : 0,
         flexShrink: 0,
         overflow: 'hidden',
         transition: 'width 0.2s ease',
         borderRight: settingsOpen ? '1px solid var(--Border)' : 'none',
         background: 'var(--Background)',
       }}>
-        <div style={{ width: 280, padding: '8px 16px', boxSizing: 'border-box' }}>
+        <div style={{ width: 296, padding: '8px 16px', boxSizing: 'border-box' }}>
           <VStack spacing={2}>
             <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style</H3>
 

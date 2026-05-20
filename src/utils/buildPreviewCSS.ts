@@ -542,6 +542,72 @@ export function buildPreviewCSS(input: BuildInput): string {
     tertiaryQuiet = quietFor(tertiaryContainerBg);
   }
 
+  // Builds the surface-N-dependent token block for a given scope (Surface,
+  // Surface-Dim, Surface-Bright, Surface-Dimmest). The main Brand block emits
+  // these for `surfaceN`; the variant scopes re-emit them for their own tone
+  // so descendants don't inherit text/border tuned for the parent surface.
+  // Required because the lib's Light-Mode.css sets Default-theme values for
+  // every variant at matching specificity (0,2,0) — without these overrides
+  // those Default values leak through for everything except --Background.
+  function buildScopeTokens(scopeBg: string, scopeN: number): string {
+    const scopeTones = getAccessibleTones(scopeBg, scopeN, textPalette);
+    const { active: scopeActive, hover: scopeHover } = activeAndHoverFor(surfacePalette, scopeN);
+    const scopeBtnBorderPrimary = p(primaryLight, getAccessibleTones(scopeBg, scopeN, primaryLight).border);
+    const scopeBtnBorderSecondary = p(vSecondary, getAccessibleTones(scopeBg, scopeN, vSecondary).border);
+    const scopeBtnBorderTertiary = p(vTertiary, getAccessibleTones(scopeBg, scopeN, vTertiary).border);
+    let scopeDefaultBtnBorder: string;
+    switch (effectiveButton) {
+      case 'tonal':
+        scopeDefaultBtnBorder = p(primaryLight, getAccessibleTones(scopeBg, scopeN, primaryLight).border); break;
+      case 'secondary': case 'laddered':
+        scopeDefaultBtnBorder = p(vSecondary, getAccessibleTones(scopeBg, scopeN, vSecondary).border); break;
+      case 'black-white':
+        scopeDefaultBtnBorder = btnBg; break;
+      default:
+        scopeDefaultBtnBorder = p(primaryLight, getAccessibleTones(scopeBg, scopeN, primaryLight).border); break;
+    }
+    const neutralPalette = NEUTRAL.map(h => ({ hex: h }));
+    const neutralBorderN = getAccessibleTones(scopeBg, scopeN, neutralPalette).border;
+    const tonal = effectiveTextColoring === 'tonal';
+    const textVal = tonal
+      ? `var(--${surfacePaletteName}-Color-${scopeTones.text})`
+      : (isLight(scopeBg) ? '#1a1a1a' : 'var(--White)');
+    const headerVal = tonal
+      ? `var(--${surfacePaletteName}-Color-${scopeTones.header})`
+      : (isLight(scopeBg) ? '#1a1a1a' : 'var(--White)');
+    const quietVal = tonal
+      ? `var(--${surfacePaletteName}-Color-${scopeTones.quiet})`
+      : quietFor(scopeBg);
+    const borderVal = tonal
+      ? `var(--${surfacePaletteName}-Color-${scopeTones.border})`
+      : neutral(neutralBorderN);
+    const borderVariantVal = tonal
+      ? `${p(surfacePalette, scopeTones.border)}26`
+      : `${neutral(neutralBorderN)}26`;
+    // Hotlink / Link use the SAME tone number as Text (just the Info palette),
+    // so the link tone tracks the text tone exactly. The lib's Link component
+    // reads --Link / --Link-Hover / --Link-Visited (separate from --Hotlink) —
+    // those vars aren't defined in the lib's CSS, so we set both here.
+    const hotlinkColorN = scopeTones.text;
+    return `  --Dropshadow-Color: ${hexToRgb(dropshadowFor(scopeBg))};
+  --Text: ${textVal};
+  --Header: ${headerVal};
+  --Quiet: ${quietVal};
+  --Border: ${borderVal};
+  --Border-Variant: ${borderVariantVal};
+  --Hover: ${scopeHover};
+  --Active: ${scopeActive};
+  --Hotlink: var(--Info-Color-${hotlinkColorN});
+  --Hotlink-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
+  --Link: var(--Info-Color-${hotlinkColorN});
+  --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, hotlinkColorN + (scopeN <= 5 ? -1 : 1)))});
+  --Link-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
+  --Buttons-Primary-Border: ${scopeBtnBorderPrimary};
+  --Buttons-Secondary-Border: ${scopeBtnBorderSecondary};
+  --Buttons-Tertiary-Border: ${scopeBtnBorderTertiary};
+  --Buttons-Default-Border: ${scopeDefaultBtnBorder};`;
+  }
+
   // ── Build CSS ──
   return `
 /* ══ Palette Colors — always light (vibrant) palette ══ */
@@ -629,18 +695,8 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
 
   --Background: var(--${surfacePaletteName}-Color-${surfaceN});
   --Surface: var(--${surfacePaletteName}-Color-${surfaceN});
-  --Surface-Dim: ${(() => {
-    // One step "dimmer": for light surfaces (N≥6) move darker (N-1), for dark
-    // surfaces (N≤5) move lighter (N+1). Endpoints clamp.
-    const dimN = surfaceN >= 6 ? Math.max(surfaceN - 1, 1) : Math.min(surfaceN + 1, 12);
-    return `var(--${surfacePaletteName}-Color-${dimN})`;
-  })()};
-  --Surface-Bright: ${(() => {
-    // One step "brighter": for light surfaces move lighter, for dark surfaces
-    // move darker. Mirrors --Surface-Dim.
-    const brightN = surfaceN >= 6 ? Math.min(surfaceN + 1, 12) : Math.max(surfaceN - 1, 1);
-    return `var(--${surfacePaletteName}-Color-${brightN})`;
-  })()};
+  --Surface-Dim: var(--${surfacePaletteName}-Color-${Math.max(surfaceN - 1, 1)});
+  --Surface-Bright: var(--${surfacePaletteName}-Color-${Math.min(surfaceN + 1, 12)});
   --Container: var(--${containerPaletteName}-Color-${containerN});
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
@@ -650,6 +706,11 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}26` : `${surfaceBorder}26`};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
   --Active: ${activeAndHoverFor(surfacePalette, surfaceN).active};
+  --Hotlink: var(--Info-Color-${surfaceTones.text});
+  --Hotlink-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
+  --Link: var(--Info-Color-${surfaceTones.text});
+  --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, surfaceTones.text + (surfaceN <= 5 ? -1 : 1)))});
+  --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
   --Effect-Level-1: 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
@@ -925,19 +986,38 @@ ${(() => {
 }`;
 })()}
 
-/* Surface variant to Background mapping inside Brand scope.
+/* Surface variants inside Brand scope.
  * Light-Mode.css has rules like [data-theme="Default"] [data-surface="Surface-Dim"]
- * with specificity 0,2,0. To override them for Brand-themed descendants we
- * need at least matching specificity, so each rule below is scoped under
- * [data-theme="Brand"]. */
-[data-theme="Brand"] [data-surface="Surface-Dim"],
-[data-theme="Brand"][data-surface="Surface-Dim"]         { --Background: var(--Surface-Dim); }
+ * that set --Background AND --Text / --Quiet / --Border etc. at specificity
+ * 0,2,0. To fully override them for Brand-themed descendants, each rule below
+ * re-emits the surface-N-dependent token block at its own tone (dimN/brightN).
+ * Without these, only --Background would override and Text/Border would
+ * silently inherit the Default theme's Color-N values. */
+${(() => {
+  const dimN = Math.max(surfaceN - 1, 1);
+  const brightN = Math.min(surfaceN + 1, 12);
+  const dimmestN = Math.max(surfaceN - 2, 1);
+  const dimBg = p(surfacePalette, dimN);
+  const brightBg = p(surfacePalette, brightN);
+  const dimmestBg = p(surfacePalette, dimmestN);
+  return `[data-theme="Brand"] [data-surface="Surface-Dim"],
+[data-theme="Brand"][data-surface="Surface-Dim"] {
+  --Background: var(--Surface-Dim);
+${buildScopeTokens(dimBg, dimN)}
+}
 [data-theme="Brand"] [data-surface="Surface-Dimmest"],
-[data-theme="Brand"][data-surface="Surface-Dimmest"]     { --Background: var(--Surface-Dim); }
+[data-theme="Brand"][data-surface="Surface-Dimmest"] {
+  --Background: var(--${surfacePaletteName}-Color-${dimmestN});
+${buildScopeTokens(dimmestBg, dimmestN)}
+}
 [data-theme="Brand"] [data-surface="Surface-Bright"],
-[data-theme="Brand"][data-surface="Surface-Bright"]      { --Background: var(--Surface-Bright); }
+[data-theme="Brand"][data-surface="Surface-Bright"] {
+  --Background: var(--Surface-Bright);
+${buildScopeTokens(brightBg, brightN)}
+}
 [data-theme="Brand"] [data-surface="Surface"],
-[data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }
+[data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }`;
+})()}
 
 /* ══ Clickable Elements — border inherits 3.1:1 contrast from context ══ */
 .clickable { border-color: var(--Border); }

@@ -14,6 +14,7 @@ import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import AvatarDropdown from './AvatarDropdown';
+import MoodDemo from './MoodDemo';
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -76,7 +77,8 @@ export default function LandingPage() {
 
   return (
     <div data-theme="Default" data-surface="Surface" style={{ background: 'var(--Background)', color: 'var(--Text)', overflowX: 'clip' }}>
-      {/* ─── Top Nav ─── */}
+      {/* ─── Top Nav (sticky) ─── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--Background)' }}>
       <AppBar
         brand="DinoDesign"
         onBrandClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -107,6 +109,7 @@ export default function LandingPage() {
           </HStack>
         }
       />
+      </div>
 
       {/* ─── Hero ─── */}
       <section data-theme="Neutral-Dark" data-surface="Surface" style={{ padding: '80px 24px 60px', background: 'var(--Background)', color: 'var(--Text)' }}>
@@ -139,13 +142,9 @@ export default function LandingPage() {
             </Button>
           </HStack>
 
-          {/* Demo placeholder */}
-          <Card padding="medium" style={{ width: '100%', maxWidth: 800, minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <VStack spacing={2} alignItems="center">
-              <Body style={{ color: 'var(--Quiet)' }}>Interactive demo coming soon</Body>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Upload → Extract → Customize → Export</BodySmall>
-            </VStack>
-          </Card>
+          <div style={{ width: '100%', maxWidth: 1000 }}>
+            <MoodDemo />
+          </div>
         </VStack>
       </section>
 

@@ -90,7 +90,7 @@ function MainApp() {
   // when the user clicks back into the Typography stage.
   const [savedTypographySettings, setSavedTypographySettings] = useState<TypographyStyle[] | null>(null);
   const [savedStyleCustomizations, setSavedStyleCustomizations] = useState<any>({
-    modern: { radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 4 },
+    modern: { radius: 8, buttonRadius: 4, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100 },
   });
   const [pendingReExport, setPendingReExport] = useState(false);
   const [originalSnapshot, setOriginalSnapshot] = useState<any>(null);

@@ -4430,6 +4430,9 @@ export function exportColorSystemToJSON(
           Tertiary: { value: extractedTones.tertiary, type: 'number' }
         }
       }),
+      ...(userSelections?.background && {
+        'Background': { value: userSelections.background, type: 'string' }
+      }),
       'Button-Config': {
         DefaultButtonType: { 
           value: buttonStyle === 'black-white' 
