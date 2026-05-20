@@ -191,13 +191,136 @@ function CustomPopover({ children }) {
 
 Read `node_modules/@dynodesign/components/CLAUDE.md` for the full token list.
 The rule that matters here: never write a hex color or hard-coded radius. Use
-`var(--Text)`, `var(--Container)`, `var(--Border)`, `var(--Style-Border-Radius)`,
-etc. Brand CSS in `src/utils/buildPreviewCSS.ts` defines the user-specific
-values; component code just references the tokens.
+`var(--Text)`, `var(--Border)`, `var(--Style-Border-Radius)`, etc. Brand CSS
+in `src/utils/buildPreviewCSS.ts` defines the user-specific values; component
+code just references the tokens.
 
 The one acceptable exception is the broken-lib workaround panels (portal
 dropdowns), which still use tokens for `background`, `color`, and `border`
 but may inline a `box-shadow` fallback when the lib doesn't expose one.
+
+---
+
+## Changing a background — the only correct way
+
+To paint a page, section, or div, **set `data-theme` + `data-surface` on the
+element**. Do not write `background: var(--Surface)` or
+`background: var(--Container)` anywhere. Those vars exist in the cascade so
+the design system can compute them — components consume them through
+`var(--Background)`, which is what `data-surface` resolves to.
+
+```tsx
+// ✅ Right — declare the theme + surface, let the cascade do the work
+<section data-theme="Primary-Light" data-surface="Surface">
+  <H2>Title</H2>
+  <Body>This text, the border below, the buttons inside — all wired up.</Body>
+</section>
+
+<div data-surface="Container">
+  {/* Card-shaped background without writing a color at all */}
+</div>
+```
+
+```tsx
+// ❌ Wrong — bypasses the cascade, locks the surface to one specific token
+<section style={{ background: 'var(--Surface)' }}>...</section>
+<section style={{ background: 'var(--Container)' }}>...</section>
+<section style={{ background: 'var(--Primary-Color-11)' }}>...</section>
+<section style={{ background: '#f0ebe0' }}>...</section>
+```
+
+Why this matters: setting `data-theme` + `data-surface` exposes the full set
+of paired tokens — `--Background`, `--Text`, `--Quiet`, `--Header`,
+`--Border`, `--Border-Variant`, `--Hover`, `--Active`, `--Hotlink`, the per-
+palette `--Buttons-*-Border/Highlight/Lowlight` overrides — all tuned for
+that surface's tone. Writing `background: var(--Surface)` paints the box but
+leaves text/quiet/border on the parent's tone, so contrast breaks the moment
+the surface flips dark or moves to a different Color-N.
+
+When a component (e.g., Button, Tag, Icon) needs a specific brand token, use
+the named one — `var(--Buttons-Primary-Button)`, `var(--Text-Primary)`,
+`var(--Icons-Secondary)`. Those are also surface-aware (they resolve
+differently inside Surface vs. Container vs. Surface-Dim).
+
+This is the same contract we ship in the lib's CLAUDE.md to end users'
+agentic AI tools. Be exact about it — drift here teaches the wrong pattern.
+
+---
+
+## Don't override component colors
+
+Lib components apply their own colors from the design system. **Never pass
+`style={{ color, background, borderColor }}` to a lib component.** To change
+appearance, change the component's `variant` (or `color`) prop. If the prop
+options don't cover what you need, that's a lib gap — flag it as a
+`MISSING-LIB-COMPONENT` follow-up instead of overriding inline.
+
+```tsx
+// ✅ Right — variant/color drive appearance
+<Button variant="primary-outline" color="default">Cancel</Button>
+<Button variant="success" size="small">Approve</Button>
+<H2>Title</H2>             {/* uses --Header automatically */}
+<Body>Body copy</Body>     {/* uses --Text automatically */}
+<Link>Sign up</Link>       {/* uses --Link automatically */}
+```
+
+```tsx
+// ❌ Wrong — bypasses the component's variant system
+<Button style={{ background: 'var(--Buttons-Primary-Button)', color: '#fff' }}>
+  Cancel
+</Button>
+<H2 style={{ color: 'var(--Primary-Color-3)' }}>Title</H2>
+<Body style={{ color: 'var(--Quiet)' }}>Muted text</Body>
+<Card style={{ background: 'var(--Container-High)' }}>...</Card>
+```
+
+For muted body copy, use the lib's quiet variant (or `<Caption>`) — don't
+recolor `<Body>` by hand. If you find yourself reaching for `style={color}`
+on a typography or button component, the fix is one of: (a) wrong component
+for the job, (b) wrong variant, (c) lib gap — tag it and move on.
+
+### Typography color prop reference
+
+`Body`, `BodySmall`, `BodyLarge`, `H1`–`H6`, `Caption`, `Overline`, `Label`,
+`Subtitle` all accept a `color` prop. Use it instead of `style={{ color }}`:
+
+```tsx
+<Body color="quiet">…</Body>        // var(--Text-Quiet)
+<Body color="primary">…</Body>      // var(--Text-Primary)
+<Body color="secondary">…</Body>    // var(--Text-Secondary)
+<Body color="success">…</Body>      // semantic tokens
+<Body>…</Body>                       // defaults to standard / --Text
+```
+
+For brand-colored icons, wrap MUI icons in the lib's `<Icon>`:
+
+```tsx
+<Icon size="small" color="primary"><CheckCircleIcon /></Icon>
+<Icon size="medium" color="neutral"><FormatQuoteIcon /></Icon>
+```
+
+### Backgrounds — use `<Section>` for any region
+
+For any region that paints a background (page sections, hero, footer, sticky
+nav wrappers, etc.), use `<Section>` from the lib. It sets `data-theme` +
+`data-surface` AND paints `--Background` / `--Text` in one shot:
+
+```tsx
+<Section theme="Primary" surface="Surface" padding="80px 24px">
+  …
+</Section>
+```
+
+For a section that just inherits its parent's surface, omit `theme` (and
+optionally `surface`):
+
+```tsx
+<Section padding="80px 24px">…</Section>
+```
+
+Reserve `<ThemedZone>` for the case where you need the attributes but NOT
+the background paint (e.g., wrapping an `AppBar` whose own root paints
+itself).
 
 ---
 

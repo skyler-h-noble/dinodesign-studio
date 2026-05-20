@@ -44,7 +44,7 @@ const STATIC_CSS = `
   height: 42px;
   border-radius: 50%;
   border: 1px solid var(--Border);
-  background: var(--Container);
+  background: var(--Background);
   color: var(--Text);
   cursor: pointer;
   display: grid;
@@ -64,7 +64,7 @@ const STATIC_CSS = `
   width: 100%;
 }
 .dino-mood-card {
-  background: var(--Container);
+  background: var(--Background);
   border: 1px solid var(--Border);
   border-radius: 8px;
   overflow: hidden;
@@ -266,6 +266,7 @@ export default function MoodDemo() {
       <button
         type="button"
         className="dino-mood-toggle"
+        data-surface="Container"
         onClick={handleToggle}
         aria-label="Toggle light/dark"
       >
@@ -284,7 +285,7 @@ export default function MoodDemo() {
       <div className="dino-mood-grid">
         {records.length === 0
           ? DS_IDS.map(id => (
-              <div key={id} className="dino-mood-card" style={{ opacity: 0.5 }}>
+              <div key={id} className="dino-mood-card" data-surface="Container" style={{ opacity: 0.5 }}>
                 <div className="mood-image" />
                 <div className="card-content">
                   <h3 className="card-title">Loading…</h3>
@@ -298,6 +299,7 @@ export default function MoodDemo() {
                   key={r.id}
                   type="button"
                   className={`dino-mood-card${active ? ' active' : ''}`}
+                  data-surface="Container"
                   onClick={e => handleCard(e, i)}
                 >
                   <div className="mood-image">

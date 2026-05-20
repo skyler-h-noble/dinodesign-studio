@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import {
-  AppBar, Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab,
+  AppBar, Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, Section, Footer, Icon,
 } from '@dynodesign/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -76,9 +76,9 @@ export default function LandingPage() {
   ];
 
   return (
-    <div data-theme="Default" data-surface="Surface" style={{ background: 'var(--Background)', color: 'var(--Text)', overflowX: 'clip' }}>
+    <Section theme="Default" surface="Surface" as="div" style={{ overflowX: 'clip' }}>
       {/* ─── Top Nav (sticky) ─── */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--Background)' }}>
+      <Section as="div" surface="Surface" style={{ position: 'sticky', top: 0, zIndex: 100 }}>
       <AppBar
         brand="DinoDesign"
         onBrandClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -109,19 +109,19 @@ export default function LandingPage() {
           </HStack>
         }
       />
-      </div>
+      </Section>
 
       {/* ─── Hero ─── */}
-      <section data-theme="Neutral-Dark" data-surface="Surface" style={{ padding: '80px 24px 60px', background: 'var(--Background)', color: 'var(--Text)' }}>
+      <Section theme="Neutral-Dark" surface="Surface" padding="80px 24px 60px">
         <VStack spacing={4} alignItems="center" style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={2} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Text-Primary)', fontSize: '0.75rem', textAlign: 'center' }}>
+            <BodySmall color="primary" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.75rem', textAlign: 'center' }}>
               Branded, Scalable and Accessible Design Systems, Automated
             </BodySmall>
             <H1 style={{ textAlign: 'center', maxWidth: 700 }}>
               One image. One complete design system.
             </H1>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center', maxWidth: 560 }}>
+            <Body color="quiet" style={{ textAlign: 'center', maxWidth: 560 }}>
               Upload a mood board and get a fully accessible, coded design system with Figma library,
               49 React components, and hosted playground — live in minutes.
             </Body>
@@ -141,13 +141,13 @@ export default function LandingPage() {
             <MoodDemo />
           </div>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── How it Works ─── */}
-      <section id="how-it-works" style={{ padding: '80px 24px', background: 'var(--Container, #f8f8f8)' }}>
+      <Section surface="Container" id="how-it-works" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 900, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               How it Works
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Three steps. No design skills needed.</H2>
@@ -166,34 +166,34 @@ export default function LandingPage() {
                   {s.step}
                 </div>
                 <H3 style={{ textAlign: 'center' }}>{s.title}</H3>
-                <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>{s.description}</BodySmall>
+                <BodySmall color="quiet" style={{ textAlign: 'center' }}>{s.description}</BodySmall>
               </VStack>
             ))}
           </HStack>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Why it matters ─── */}
-      <section data-theme="Primary" data-surface="Surface" style={{ padding: '80px 24px', background: 'var(--Background)', color: 'var(--Text)' }}>
+      <Section theme="Primary" surface="Surface" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 900, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               Why DinoDesign
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>A design system shouldn't take months</H2>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center', maxWidth: 560 }}>
+            <Body color="quiet" style={{ textAlign: 'center', maxWidth: 560 }}>
               Most teams spend weeks building design tokens, months on component libraries,
               and never quite get accessibility right. DinoDesign does it all from a single image.
             </Body>
           </VStack>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── What you get (Resources) ─── */}
-      <section id="resources" style={{ padding: '80px 24px', background: 'var(--Container, #f8f8f8)' }}>
+      <Section surface="Container" id="resources" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               What You Get
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Everything you need, nothing you don't</H2>
@@ -212,36 +212,36 @@ export default function LandingPage() {
                     {f.icon}
                   </div>
                   <BodySmall style={{ fontWeight: 700 }}>{f.title}</BodySmall>
-                  <BodySmall style={{ color: 'var(--Quiet)' }}>{f.description}</BodySmall>
+                  <BodySmall color="quiet">{f.description}</BodySmall>
                 </VStack>
               </Card>
             ))}
           </div>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Gallery (placeholder) ─── */}
-      <section id="gallery" style={{ padding: '80px 24px' }}>
+      <Section id="gallery" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               Gallery
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Design systems built with DinoDesign</H2>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Coming soon — showcasing real design systems created by our users.</Body>
+            <Body color="quiet" style={{ textAlign: 'center' }}>Coming soon — showcasing real design systems created by our users.</Body>
           </VStack>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Add-Ons ─── */}
-      <section id="addons" style={{ padding: '80px 24px', background: 'var(--Container, #f8f8f8)' }}>
+      <Section surface="Container" id="addons" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               Add-On Components
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Expand your component catalog</H2>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center', maxWidth: 560 }}>
+            <Body color="quiet" style={{ textAlign: 'center', maxWidth: 560 }}>
               Premium components styled with your brand tokens — purchase individually and add to your design system.
             </Body>
           </VStack>
@@ -259,27 +259,27 @@ export default function LandingPage() {
                 <VStack spacing={2}>
                   <HStack spacing={1} style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 700 }}>{addon.title}</BodySmall>
-                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    <BodySmall color="quiet" style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                       {addon.tag}
                     </BodySmall>
                   </HStack>
-                  <BodySmall style={{ color: 'var(--Quiet)' }}>{addon.description}</BodySmall>
+                  <BodySmall color="quiet">{addon.description}</BodySmall>
                 </VStack>
               </Card>
             ))}
           </div>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Pricing ─── */}
-      <section id="pricing" style={{ padding: '80px 24px' }}>
+      <Section id="pricing" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 600, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               Pricing
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Simple, transparent pricing</H2>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+            <Body color="quiet" style={{ textAlign: 'center' }}>
               One design system. Everything included. No hidden fees.
             </Body>
           </VStack>
@@ -290,7 +290,7 @@ export default function LandingPage() {
                 <BodySmall style={{ fontWeight: 700 }}>Design System</BodySmall>
                 <H3 style={{ margin: 0 }}>
                   $299
-                  <BodySmall component="span" style={{ color: 'var(--Quiet)', fontSize: '0.85rem', marginLeft: 4, fontWeight: 400 }}>
+                  <BodySmall component="span" color="quiet" style={{ fontSize: '0.85rem', marginLeft: 4, fontWeight: 400 }}>
                     one-time
                   </BodySmall>
                 </H3>
@@ -298,12 +298,12 @@ export default function LandingPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
                 {['Figma library', 'MUI component library', 'AI integration file', 'Interactive playground', 'WCAG AA accessibility', 'Light + dark mode tokens'].map(f => (
                   <HStack key={f} spacing={1} alignItems="center">
-                    <CheckCircleOutlineIcon style={{ fontSize: 16, color: 'var(--Icon-Secondary, var(--Text-Secondary))' }} />
+                    <Icon size="small" color="secondary"><CheckCircleOutlineIcon /></Icon>
                     <BodySmall>{f}</BodySmall>
                   </HStack>
                 ))}
               </div>
-              <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>+ $19/mo hosted playground (required). Annual billing available.</BodySmall>
+              <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>+ $19/mo hosted playground (required). Annual billing available.</BodySmall>
             </VStack>
           </Card>
 
@@ -318,13 +318,13 @@ export default function LandingPage() {
             Get started with DinoDesign
           </Button>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Testimonials ─── */}
-      <section style={{ padding: '80px 24px', background: 'var(--Container, #f8f8f8)' }}>
+      <Section surface="Container" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               What People Say
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Trusted by designers and developers</H2>
@@ -334,24 +334,26 @@ export default function LandingPage() {
             {TESTIMONIALS.map((t, i) => (
               <Card key={i} padding="medium" style={{ flex: 1 }}>
                 <VStack spacing={2}>
-                  <FormatQuoteIcon style={{ fontSize: 24, color: 'var(--Quiet)', transform: 'scaleX(-1)' }} />
+                  <div style={{ transform: 'scaleX(-1)', width: 24, height: 24 }}>
+                    <Icon size="medium" color="neutral"><FormatQuoteIcon /></Icon>
+                  </div>
                   <BodySmall style={{ fontStyle: 'italic', lineHeight: 1.6 }}>{t.quote}</BodySmall>
                   <VStack spacing={0}>
                     <BodySmall style={{ fontWeight: 700 }}>{t.author}</BodySmall>
-                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>{t.company}</BodySmall>
+                    <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>{t.company}</BodySmall>
                   </VStack>
                 </VStack>
               </Card>
             ))}
           </HStack>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Footer CTA ─── */}
-      <section style={{ padding: '80px 24px' }}>
+      <Section padding="80px 24px">
         <VStack spacing={3} alignItems="center" style={{ maxWidth: 600, margin: '0 auto' }}>
           <H2 style={{ textAlign: 'center' }}>Ready to build your design system?</H2>
-          <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+          <Body color="quiet" style={{ textAlign: 'center' }}>
             Upload a mood board. Get a complete design system. It's that simple.
           </Body>
           <Button
@@ -363,24 +365,45 @@ export default function LandingPage() {
           >
             Get started — free to explore
           </Button>
-          <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+          <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
             No account required until you export. Design your system first, pay when you're ready.
           </BodySmall>
         </VStack>
-      </section>
+      </Section>
 
       {/* ─── Footer ─── */}
-      <footer data-theme="Neutral-Dark" data-surface="Surface" style={{ padding: '24px', background: 'var(--Background)', color: 'var(--Text)', textAlign: 'center' }}>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
-          © {new Date().getFullYear()} DinoDesign. All rights reserved.
-        </BodySmall>
-      </footer>
+      <Footer
+        brand={<H3 style={{ color: 'inherit', margin: 0 }}>DinoDesign</H3>}
+        address={{
+          company: 'DinoDesign',
+          lines: ['Built for designers + AI agents', 'San Francisco, CA'],
+          email: 'hello@dinodesign.dev',
+        }}
+        columns={[
+          {
+            title: 'Product',
+            links: [
+              { label: 'How it Works', onClick: () => scrollTo('how-it-works') },
+              { label: 'Pricing', onClick: () => scrollTo('pricing') },
+              { label: 'Add-Ons', href: '/add-ons' },
+            ],
+          },
+          {
+            title: 'Resources',
+            links: [
+              { label: 'Gallery', onClick: () => scrollTo('gallery') },
+              { label: 'Resources', onClick: () => scrollTo('resources') },
+            ],
+          },
+        ]}
+        copyrightName="DinoDesign"
+      />
 
       <AuthModal
         open={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={() => setShowAuthModal(false)}
       />
-    </div>
+    </Section>
   );
 }
