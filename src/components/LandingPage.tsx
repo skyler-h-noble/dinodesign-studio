@@ -127,20 +127,15 @@ export default function LandingPage() {
             </Body>
           </VStack>
 
-          <HStack spacing={2}>
-            <Button
-              variant="default"
-              size="large"
-              onClick={() => window.location.href = '/create'}
-              endIcon={<ArrowForwardIcon />}
-              style={{ fontWeight: 700 }}
-            >
-              Build your design system
-            </Button>
-            <Button variant="outline" size="large" onClick={() => scrollTo('how-it-works')}>
-              See how it works
-            </Button>
-          </HStack>
+          <Button
+            variant="default"
+            size="large"
+            onClick={() => window.location.href = '/create'}
+            endIcon={<ArrowForwardIcon />}
+            style={{ fontWeight: 700 }}
+          >
+            Build your design system
+          </Button>
 
           <div style={{ width: '100%', maxWidth: 1000 }}>
             <MoodDemo />

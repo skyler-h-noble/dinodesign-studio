@@ -14,6 +14,10 @@ function storageUrl(id: string, path: string): string {
 
 interface ThemeJson {
   name?: string;
+  foundation?: string;
+  core?: string;
+  base?: string;
+  styles?: string;
   lightMode?: string;
   darkMode?: string;
 }
@@ -22,6 +26,10 @@ interface DsRecord {
   id: string;
   name: string;
   moodboardUrl: string;
+  // CSS files shared across modes — set up component rendering, typography,
+  // button shape/padding, radii, font imports.
+  baseCss: string;        // includes foundation + base + core + typography + styles, concatenated
+  // Mode-specific token files (just colors).
   lightCss: string;
   darkCss: string;
 }
@@ -102,22 +110,44 @@ const STATIC_CSS = `
 ::view-transition-old(root) { z-index: 0; }
 `;
 
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+  return res.text();
+}
+
 async function loadDS(id: string): Promise<DsRecord | null> {
   try {
     const themeRes = await fetch(storageUrl(id, 'theme.json'));
     if (!themeRes.ok) return null;
     const theme: ThemeJson = await themeRes.json();
 
+    const foundationUrl = theme.foundation || storageUrl(id, 'foundation.css');
+    const baseUrl = theme.base || storageUrl(id, 'base.css');
+    const coreUrl = theme.core || storageUrl(id, 'core.css');
+    const typographyUrl = storageUrl(id, 'typography-tokens.css');
+    const stylesUrl = theme.styles || storageUrl(id, 'styles.css');
     const lightUrl = theme.lightMode || storageUrl(id, 'Light-Mode.css');
     const darkUrl = theme.darkMode || storageUrl(id, 'Dark-Mode.css');
-    const [lightRes, darkRes] = await Promise.all([fetch(lightUrl), fetch(darkUrl)]);
-    if (!lightRes.ok || !darkRes.ok) return null;
-    const [lightCss, darkCss] = await Promise.all([lightRes.text(), darkRes.text()]);
+
+    const [foundationCss, baseFileCss, coreCss, typographyCss, stylesCss, lightCss, darkCss] = await Promise.all([
+      fetchText(foundationUrl),
+      fetchText(baseUrl),
+      fetchText(coreUrl),
+      fetchText(typographyUrl),
+      fetchText(stylesUrl),
+      fetchText(lightUrl),
+      fetchText(darkUrl),
+    ]);
 
     return {
       id,
       name: theme.name || 'Design System',
       moodboardUrl: storageUrl(id, 'moodboard.png'),
+      // Concatenate the non-mode files in cascade order: foundation (component
+      // sizing/radii) → base (button rendering) → core (token mapping) →
+      // typography (font sizes/weights) → styles (font imports, body reset).
+      baseCss: [foundationCss, baseFileCss, coreCss, typographyCss, stylesCss].join('\n\n'),
       lightCss,
       darkCss,
     };
@@ -156,7 +186,9 @@ export default function MoodDemo() {
     return () => { cancelled = true; };
   }, []);
 
-  // Whenever the active DS or mode changes, swap the injected CSS.
+  // Whenever the active DS or mode changes, swap the injected CSS. The bundle
+  // is: foundation + base + core + typography + styles (shared) + the active
+  // mode file. Appended last so it wins the cascade against the lib's defaults.
   useEffect(() => {
     const active = records[activeIdx];
     if (!active) return;
@@ -164,13 +196,9 @@ export default function MoodDemo() {
     if (!el) {
       el = document.createElement('style');
       el.id = ACTIVE_STYLE_ID;
-      // Append last so it wins the cascade against the lib's Light-Mode.css.
       document.head.appendChild(el);
     }
-    el.textContent = dark ? active.darkCss : active.lightCss;
-    return () => {
-      // Don't remove on every change — only on unmount (handled below).
-    };
+    el.textContent = active.baseCss + '\n\n' + (dark ? active.darkCss : active.lightCss);
   }, [records, activeIdx, dark]);
 
   // Clean up the injected DS CSS when the landing page unmounts.
