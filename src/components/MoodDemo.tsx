@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 const DS_IDS = [
   'ffa9b21d-9ee9-415e-9457-929da502acfd',
   '22387e46-af26-4a3c-bc2e-dedb70b8a166',
-  'c8d26f1e-7d5a-4361-85be-a1799bba6855',
+  '0b3a928c-34cb-4a55-9296-8f4097e53dcf',
 ];
 
 const STORAGE_BASE = 'https://firebasestorage.googleapis.com/v0/b/dino-design.firebasestorage.app/o';
@@ -189,6 +189,10 @@ export default function MoodDemo() {
   // Whenever the active DS or mode changes, swap the injected CSS. The bundle
   // is: foundation + base + core + typography + styles (shared) + the active
   // mode file. Appended last so it wins the cascade against the lib's defaults.
+  //
+  // @import statements must appear before all other rules per CSS spec, but
+  // concatenating multiple files leaves them mid-stylesheet (browser ignores
+  // them — fonts don't load). Extract all @imports to the top of the bundle.
   useEffect(() => {
     const active = records[activeIdx];
     if (!active) return;
@@ -198,7 +202,15 @@ export default function MoodDemo() {
       el.id = ACTIVE_STYLE_ID;
       document.head.appendChild(el);
     }
-    el.textContent = active.baseCss + '\n\n' + (dark ? active.darkCss : active.lightCss);
+    const combined = active.baseCss + '\n\n' + (dark ? active.darkCss : active.lightCss);
+    const imports: string[] = [];
+    const body = combined.replace(/@import[^;]+;/g, (m) => {
+      imports.push(m);
+      return '';
+    });
+    // Deduplicate identical font imports across files.
+    const uniqueImports = Array.from(new Set(imports));
+    el.textContent = uniqueImports.join('\n') + '\n\n' + body;
   }, [records, activeIdx, dark]);
 
   // Clean up the injected DS CSS when the landing page unmounts.
