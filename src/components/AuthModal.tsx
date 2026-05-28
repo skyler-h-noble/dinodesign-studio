@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Modal, Button, H3, Body, BodySmall, VStack, HStack, TextField, Alert, Divider, Link,
+  Modal, Button, H3, Body, BodySmall, VStack, HStack, TextInput, Alert, Divider, Link,
 } from '@dynodesign/components';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,8 +68,8 @@ export default function AuthModal({ open, onClose, onSuccess }: Props) {
       onClose={onClose}
       title={mode === 'signin' ? 'Sign In' : 'Create Account'}
     >
-      <VStack spacing={3} style={{ minWidth: 340, maxWidth: 400 }}>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
+      <VStack spacing={3} alignItems="center" style={{ minWidth: 340, maxWidth: 400, width: '100%', margin: '0 auto' }}>
+        <BodySmall color="quiet" style={{ textAlign: 'center' }}>
           Sign in to generate and save your design system.
         </BodySmall>
 
@@ -88,25 +88,27 @@ export default function AuthModal({ open, onClose, onSuccess }: Props) {
         {/* "or" separator — lib Divider with inline label */}
         <HStack spacing={2} style={{ alignItems: 'center', width: '100%' }}>
           <Divider style={{ flex: 1 }} />
-          <BodySmall style={{ color: 'var(--Quiet)', flexShrink: 0 }}>or</BodySmall>
+          <BodySmall color="quiet" style={{ flexShrink: 0 }}>or</BodySmall>
           <Divider style={{ flex: 1 }} />
         </HStack>
 
         {/* Email/password */}
-        <TextField
+        <TextInput
           label="Email"
           type="email"
           value={email}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-          size="small"
+          size="medium"
+          fullWidth
           disabled={loading}
         />
-        <TextField
+        <TextInput
           label="Password"
           type="password"
           value={password}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-          size="small"
+          size="medium"
+          fullWidth
           disabled={loading}
           onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') handleEmail(); }}
         />

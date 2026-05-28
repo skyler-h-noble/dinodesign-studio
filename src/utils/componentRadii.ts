@@ -102,7 +102,17 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   const smInputSwatchRadius = pct(cs.inputRadius, smInputSwatchSize);
   const lgInputSwatchRadius = pct(cs.inputRadius, lgInputSwatchSize);
 
-  const cardPadding = cs.cardPadding;
+  // Card padding is derived from the resolved button radius:
+  //   radius <  24px  → 16px fixed (small radii get a comfy minimum)
+  //   24px ≤ r < 32px → padding == radius (concentric look, padding scales)
+  //   radius ≥ 32px  → padding == radius / 2 (cap so very rounded cards
+  //                                            don't get pushed to absurd insets)
+  const cardPadding =
+    buttonRadius < 24
+      ? 16
+      : buttonRadius < 32
+        ? buttonRadius
+        : Math.round(buttonRadius / 2);
   const cardRadius = buttonRadius + cardPadding;
 
   const modalPadding = Math.round(cardPadding * 1.5);

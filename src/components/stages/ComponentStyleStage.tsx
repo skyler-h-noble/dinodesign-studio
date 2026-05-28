@@ -185,14 +185,6 @@ export default function ComponentStyleStage({
                   <Slider label="Border Radius (%)" min={0} max={100} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
-              { key: 'card', label: 'Card', defaultOpen: false, content: (
-                <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Padding" min={0} max={48} value={custom.cardPadding} onChange={(_: any, v: number | number[]) => updateCustom('cardPadding', v as number)} size="small" valueLabelDisplay="auto" />
-                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
-                    Card radius auto-derives = Button-Radius + Padding. Modal padding = Padding × 1.5.
-                  </BodySmall>
-                </VStack>
-              )},
               { key: 'input', label: 'Input', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
                   <Slider label="Border Radius (%)" min={0} max={100} value={custom.inputRadius} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', v as number)} size="small" valueLabelDisplay="auto" />
