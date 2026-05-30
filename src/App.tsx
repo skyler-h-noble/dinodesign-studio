@@ -48,6 +48,16 @@ function MainApp() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
 
+  // True while the URL has `?id=...` but we haven't loaded the snapshot yet.
+  // Hides the default 'name' stage from briefly flashing before rehydration
+  // completes — important on the post-Stripe full reload, when Firebase Auth
+  // takes a beat to restore the session before the Firestore read can fire.
+  const [rehydrating, setRehydrating] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return !!params.get('id');
+  });
+
   const [stage, setStage] = useState<Stage>('name');
   const [designSystemName, setDesignSystemName] = useState('');
   const [, setDateCreated] = useState('');
@@ -172,6 +182,8 @@ function MainApp() {
         setPendingReExport(true);
       } catch (err) {
         console.error('Failed to rehydrate design system:', err);
+      } finally {
+        if (!cancelled) setRehydrating(false);
       }
     })();
     return () => { cancelled = true; };
@@ -790,6 +802,19 @@ function MainApp() {
                 }
               }}
             />
+          ) : rehydrating ? (
+            // Brief loading state while we restore an in-progress build from
+            // Firestore (post-Stripe redirect or /my-designs edit). Without
+            // this the default 'name' stage flashes for a beat before the
+            // snapshot loads and we jump to the resumed stage.
+            <div style={{
+              minHeight: '60vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <div className="typo-spinner" />
+            </div>
           ) : (
             renderStage()
           )}

@@ -44,7 +44,9 @@ export default function CheckoutSuccess() {
           const dest = dsId
             ? `/create?id=${dsId}&stage=export`
             : '/create';
-          setTimeout(() => { window.location.href = dest; }, 2000);
+          // Brief enough to feel intentional; short enough to not be a wait.
+          // The /create page has its own loading splash while it rehydrates.
+          setTimeout(() => { window.location.href = dest; }, 600);
           return;
         }
       } catch {
