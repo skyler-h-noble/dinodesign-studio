@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { H2, Body, BodySmall, VStack, Link } from '@dynodesign/components';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -11,7 +11,6 @@ import { db } from '../utils/firebase/client';
  */
 export default function CheckoutSuccess() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [status, setStatus] = useState<'checking' | 'ready' | 'timeout'>('checking');
   const sessionId = searchParams.get('session_id');
@@ -36,10 +35,16 @@ export default function CheckoutSuccess() {
           // Resume where the user left off: if we have a dsId from the
           // pre-checkout draft, hydrate from it and land on Export. Without
           // a dsId we fall back to the start of /create.
+          //
+          // IMPORTANT: use window.location.href (full page load) instead of
+          // react-router navigate(). App.tsx's rehydration effect runs on
+          // mount with `[]` deps reading window.location.search directly —
+          // a SPA navigation wouldn't re-trigger it, so the user would land
+          // on /create with stage stuck at the default 'name'.
           const dest = dsId
             ? `/create?id=${dsId}&stage=export`
             : '/create';
-          setTimeout(() => navigate(dest, { replace: true }), 2000);
+          setTimeout(() => { window.location.href = dest; }, 2000);
           return;
         }
       } catch {
@@ -55,7 +60,7 @@ export default function CheckoutSuccess() {
     };
 
     checkCredits();
-  }, [user, navigate]);
+  }, [user, dsId]);
 
   return (
     <VStack spacing={4} style={{ padding: '80px 24px', alignItems: 'center', maxWidth: 500, margin: '0 auto' }}>
@@ -95,7 +100,8 @@ export default function CheckoutSuccess() {
                 const dest = dsId
                   ? `/create?id=${dsId}&stage=export`
                   : '/create';
-                navigate(dest, { replace: true });
+                // Full page load (see note in the ready-state redirect above).
+                window.location.href = dest;
               }}
             >
               Go to studio anyway →

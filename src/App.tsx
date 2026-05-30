@@ -98,10 +98,16 @@ function MainApp() {
   // Rehydrate from /create?id=<uuid>: load the snapshot we stored at the
   // last export and jump the user straight to the review stage so they can
   // make tweaks and re-export to the same UUID. Bumps version on re-export.
+  //
+  // Depends on `user` so we re-run once Firebase Auth restores the session.
+  // Without this, a full page load (e.g., the post-Stripe redirect) would
+  // run the effect while `user` is still null and Firestore's
+  // `isOwner(resource.data.userId)` rule rejects the read.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('id');
     if (!editId) return;
+    if (!user) return; // wait until auth state hydrates
     let cancelled = false;
     (async () => {
       try {
@@ -169,7 +175,7 @@ function MainApp() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [user]);
 
   const goNext = useCallback(() => {
     // Block leaving the upload stage without a mood board
