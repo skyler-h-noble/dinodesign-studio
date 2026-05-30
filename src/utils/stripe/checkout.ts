@@ -15,6 +15,10 @@ export interface CheckoutRequest {
     designerPortal: boolean;
   };
   userId: string;
+  /** Draft design system ID saved to Firestore before checkout. The
+   *  webhook flips this doc's `status` from 'pending_payment' to 'paid'
+   *  after Stripe confirms payment. */
+  dsId?: string;
   successUrl: string;
   cancelUrl: string;
 }

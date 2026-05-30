@@ -109,16 +109,38 @@ export default function PricingPage({ onCheckout }: Props) {
         </VStack>
       </Card>
 
-      {/* Billing period toggle */}
-      <VStack spacing={2} alignItems="center">
-        <ButtonGroup
-          size="small"
-          value={billingPeriod}
-          onChange={(val: 'monthly' | 'annual') => setBillingPeriod(val)}
-        >
-          <Button value="monthly" size="small">Monthly</Button>
-          <Button value="annual" size="small">Annual (save 21%)</Button>
-        </ButtonGroup>
+      {/* Billing period toggle — "Save 21%" sits as a tag above the Annual
+          button so the segmented control itself stays a clean two-label pair. */}
+      <VStack spacing={1} alignItems="center">
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <span
+            style={{
+              position: 'absolute',
+              top: -10,
+              right: -8,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: 'var(--Buttons-Success-Button)',
+              color: 'var(--Buttons-Success-Text)',
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              zIndex: 1,
+              pointerEvents: 'none',
+            }}
+          >
+            Save 21%
+          </span>
+          <ButtonGroup
+            size="small"
+            value={billingPeriod}
+            onChange={(val: 'monthly' | 'annual') => setBillingPeriod(val)}
+          >
+            <Button value="monthly" size="small">Monthly</Button>
+            <Button value="annual" size="small">Annual</Button>
+          </ButtonGroup>
+        </div>
       </VStack>
 
       {/* Hosting (required) */}

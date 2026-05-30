@@ -15,6 +15,10 @@ export default function CheckoutSuccess() {
   const { user } = useAuth();
   const [status, setStatus] = useState<'checking' | 'ready' | 'timeout'>('checking');
   const sessionId = searchParams.get('session_id');
+  // dsId is the draft design system written to Firestore right before the
+  // Stripe redirect. Carrying it back in the URL lets us rehydrate the user's
+  // in-progress build and drop them into the Export stage to finish.
+  const dsId = searchParams.get('dsId');
 
   useEffect(() => {
     if (!user) return;
@@ -29,8 +33,13 @@ export default function CheckoutSuccess() {
 
         if (credits > 0) {
           setStatus('ready');
-          // Redirect back to the studio after a brief confirmation
-          setTimeout(() => navigate('/create', { replace: true }), 2000);
+          // Resume where the user left off: if we have a dsId from the
+          // pre-checkout draft, hydrate from it and land on Export. Without
+          // a dsId we fall back to the start of /create.
+          const dest = dsId
+            ? `/create?id=${dsId}&stage=export`
+            : '/create';
+          setTimeout(() => navigate(dest, { replace: true }), 2000);
           return;
         }
       } catch {
@@ -83,7 +92,10 @@ export default function CheckoutSuccess() {
             <Link
               onClick={(e: React.MouseEvent) => {
                 e.preventDefault();
-                navigate('/create', { replace: true });
+                const dest = dsId
+                  ? `/create?id=${dsId}&stage=export`
+                  : '/create';
+                navigate(dest, { replace: true });
               }}
             >
               Go to studio anyway →

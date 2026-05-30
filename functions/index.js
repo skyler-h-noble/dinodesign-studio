@@ -89,7 +89,7 @@ const CREDIT_MAP = {
 exports.createCheckoutSession = onCall(
   { secrets: [stripeSecretKey], cors: true },
   async (request) => {
-    const { tierKey, addOns, userId, successUrl, cancelUrl } = request.data;
+    const { tierKey, addOns, userId, dsId, successUrl, cancelUrl } = request.data;
 
     if (!userId || !tierKey) {
       throw new Error('Missing required fields: userId, tierKey');
@@ -126,12 +126,16 @@ exports.createCheckoutSession = onCall(
           userId,
           tierKey,
           credits: String(CREDIT_MAP[tierKey] || 1),
+          ...(dsId ? { dsId } : {}),
         },
       },
       metadata: {
         userId,
         tierKey,
         credits: String(CREDIT_MAP[tierKey] || 1),
+        // dsId rides along so the webhook can flip the draft design system
+        // from `status: 'pending_payment'` to `status: 'paid'`.
+        ...(dsId ? { dsId } : {}),
       },
     });
 
@@ -180,6 +184,7 @@ exports.handleStripeWebhook = onRequest(
         const userId = session.metadata?.userId || session.client_reference_id;
         const credits = parseInt(session.metadata?.credits || '1', 10);
         const tierKey = session.metadata?.tierKey || 'single';
+        const dsId = session.metadata?.dsId || null;
 
         if (userId) {
           // Add credits to user
@@ -199,7 +204,27 @@ exports.handleStripeWebhook = onRequest(
             stripeSessionId: session.id,
             stripeCustomerId: session.customer,
             stripeSubscriptionId: session.subscription,
+            ...(dsId ? { dsId } : {}),
           });
+
+          // Flip the draft design system from pending_payment → paid, so the
+          // /create rehydration flow (and any downstream gating) can tell
+          // that the user has cleared the paywall for THIS design system.
+          if (dsId) {
+            try {
+              await db.collection('designSystems').doc(dsId).set(
+                {
+                  status: 'paid',
+                  paidAt: admin.firestore.Timestamp.now(),
+                  stripeSessionId: session.id,
+                },
+                { merge: true }
+              );
+              console.log(`Marked designSystems/${dsId} as paid`);
+            } catch (err) {
+              console.error(`Failed to mark designSystems/${dsId} paid:`, err);
+            }
+          }
 
           console.log(`Added ${credits} credits to user ${userId}`);
         }

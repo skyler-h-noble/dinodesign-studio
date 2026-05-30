@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { DynoDesignProvider } from '@dynodesign/components';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
 import PricingPage, { type PurchaseSelection } from './components/PricingPage';
@@ -149,11 +149,20 @@ function MainApp() {
         setDinoId(editId);
         setOriginalSnapshot(s);
         setAutoAssigned(true); // skip auto-assign overrides
-        // Land on the Color stage's Theme sub-step so the user can pick a
-        // different theme variant. ColorStage starts on 'theme' whenever
-        // `selectedScheme` is set, and `pendingReExport` blocks it from
-        // re-running color extraction on the mood board.
-        setStage('color');
+        // ?stage=<name> resumes at a specific stage — used by the post-Stripe
+        // success redirect to drop the user straight into Export instead of
+        // back into the Color editing flow. Default behavior (no `stage` in
+        // URL) is the existing re-edit jump to 'color'.
+        const requestedStage = params.get('stage') as Stage | null;
+        if (requestedStage && STAGE_ORDER.includes(requestedStage)) {
+          setStage(requestedStage);
+        } else {
+          // Land on the Color stage's Theme sub-step so the user can pick a
+          // different theme variant. ColorStage starts on 'theme' whenever
+          // `selectedScheme` is set, and `pendingReExport` blocks it from
+          // re-running color extraction on the mood board.
+          setStage('color');
+        }
         setPendingReExport(true);
       } catch (err) {
         console.error('Failed to rehydrate design system:', err);
@@ -215,6 +224,65 @@ function MainApp() {
   const customBackRef = useRef<(() => void) | null>(null);
   const customNextRef = useRef<(() => void) | null>(null);
   const [customNextLabel, setCustomNextLabel] = useState<string | null>(null);
+
+  // Stripe Checkout sends the browser fully off-site, so all in-flight React
+  // state is lost on return. Before the redirect we mint a dsId (if we don't
+  // already have one), snapshot the build, and write
+  // `designSystems/{dsId}` with `status: 'pending_payment'`. The success
+  // page reads dsId from the return URL and bounces us to
+  // `/create?id=<dsId>&stage=export`, where the existing rehydration
+  // effect loads the snapshot back.
+  const saveDraftBeforeCheckout = useCallback(async (): Promise<string | null> => {
+    if (!user) return null;
+    const id = dinoId || crypto.randomUUID();
+    const snapshot = {
+      designSystemName,
+      colorScheme: selectedColorScheme,
+      userSelections,
+      typographyStyles,
+      componentStyle,
+      styleCustomizations: savedStyleCustomizations?.[componentStyle] || null,
+      surfaceStyle,
+      moodBoardUrl: moodBoardUrl || getPublicFileUrl(id, 'moodboard.png'),
+      topColors: savedTopColors || null,
+      colorEdits: savedColorEdits || null,
+      typographySettings: savedTypographySettings || null,
+    };
+    try {
+      await setDoc(
+        doc(db, 'designSystems', id),
+        {
+          userId: user.uid,
+          name: designSystemName,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          status: 'pending_payment',
+          componentStyle,
+          snapshot,
+        },
+        { merge: true },
+      );
+      if (!dinoId) setDinoId(id);
+      return id;
+    } catch (err) {
+      console.error('Failed to save draft before checkout:', err);
+      return null;
+    }
+  }, [
+    user,
+    dinoId,
+    designSystemName,
+    selectedColorScheme,
+    userSelections,
+    typographyStyles,
+    componentStyle,
+    savedStyleCustomizations,
+    surfaceStyle,
+    moodBoardUrl,
+    savedTopColors,
+    savedColorEdits,
+    savedTypographySettings,
+  ]);
 
   const goBack = useCallback(() => {
     // If the pricing modal is open, Back just closes it (returns to the stage
@@ -685,6 +753,11 @@ function MainApp() {
               onCheckout={async (selection: PurchaseSelection) => {
                 if (!user) return;
                 try {
+                  // Save a draft of the in-progress design system to Firestore
+                  // first so we can rehydrate after Stripe sends the browser
+                  // off-site and back. dsId rides along in the success URL.
+                  const draftDsId = await saveDraftBeforeCheckout();
+                  const successUrl = `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}${draftDsId ? `&dsId=${draftDsId}` : ''}`;
                   const result = await redirectToCheckout({
                     tierKey: selection.tier.key,
                     addOns: {
@@ -692,7 +765,8 @@ function MainApp() {
                       designerPortal: selection.addOns.designerPortal,
                     },
                     userId: user.uid,
-                    successUrl: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+                    dsId: draftDsId || undefined,
+                    successUrl,
                     cancelUrl: window.location.href,
                   });
                   // Dev mode: payment handled inline, advance to export
