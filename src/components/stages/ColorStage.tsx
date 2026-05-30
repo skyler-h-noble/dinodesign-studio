@@ -1,6 +1,6 @@
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card,
-  CircularProgress, Checkbox, Divider, Link, Radio, Modal, TextField, Alert, SliderInput,
+  CircularProgress, Checkbox, Divider, Link, Radio, Modal, TextField, Alert, SliderInput, Icon,
 } from '@dynodesign/components';
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
@@ -869,10 +869,13 @@ export default function ColorStage({
                         setSwapIndex(isSwapActive ? null : i);
                       }}
                       sx={{
-                        borderRadius: 'var(--Button-Icon-Radius, 50%)',
+                        // Match the design system's button shape — uses the
+                        // same --Button-Radius token that brand buttons resolve.
+                        borderRadius: 'var(--Button-Radius, 6px)',
                         width: '100%',
                         aspectRatio: '1',
                         height: 'auto',
+                        overflow: 'hidden',
                         outline: isSwapActive ? '3px solid var(--Focus-Visible)' : 'none',
                         outlineOffset: isSwapActive ? 2 : 0,
                       }}
@@ -880,8 +883,8 @@ export default function ColorStage({
                     />
                     {color.isSwatch && (
                       <HStack spacing={0} alignItems="center">
-                        <StarIcon style={{ fontSize: 14, color: 'var(--Text-Primary)' }} />
-                        <BodySmall style={{ color: 'var(--Text-Primary)', fontSize: '0.65rem', fontWeight: 600 }}>
+                        <Icon size="small"><StarIcon style={{ fontSize: 14 }} /></Icon>
+                        <BodySmall style={{ fontSize: '0.65rem', fontWeight: 600 }}>
                           Swatch
                         </BodySmall>
                       </HStack>
@@ -934,15 +937,17 @@ export default function ColorStage({
                       }}
                       title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : `${color.hex} — click to view`}
                       sx={{
-                        borderRadius: 'var(--Button-Icon-Radius, 50%)',
+                        // Same shape as the brand's regular buttons.
+                        borderRadius: 'var(--Button-Radius, 6px)',
                         width: 42,
                         height: 42,
                         minWidth: 42,
                         minHeight: 42,
+                        overflow: 'hidden',
                       }}
                     />
                     {color.isSwatch && (
-                      <StarIcon style={{ fontSize: 10, color: 'var(--Text-Primary)' }} />
+                      <Icon size="small"><StarIcon style={{ fontSize: 10 }} /></Icon>
                     )}
                   </VStack>
                 ))}

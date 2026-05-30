@@ -1039,18 +1039,19 @@ function FigmaImportModal({
           body="From the Almost There page, install the DinoDesign Plugin directly in Figma."
         />
         <FigmaStep n={5} title="Enter your DinoDesign ID">
-          <BodySmall>
-            In the plugin, paste in your unique DinoDesign ID:{' '}
-            <code style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              fontSize: '0.85em',
-              padding: '1px 6px',
-              borderRadius: 4,
-              background: 'var(--Container)',
-              border: '1px solid var(--Border)',
-              wordBreak: 'break-all',
-            }}>{id}</code>
+          <BodySmall style={{ display: 'block', marginBottom: 8 }}>
+            In the plugin, paste in your unique DinoDesign ID:
           </BodySmall>
+          <code style={{
+            display: 'inline-block',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: '0.85em',
+            padding: '4px 10px',
+            borderRadius: 4,
+            background: 'var(--Container)',
+            border: '1px solid var(--Border)',
+            wordBreak: 'break-all',
+          }}>{id}</code>
         </FigmaStep>
         <FigmaStep
           n={6}
