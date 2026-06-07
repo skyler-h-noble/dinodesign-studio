@@ -4533,7 +4533,16 @@ export function exportColorSystemToJSON(
   const createStyleVariant = (
     borderRadius: number,
     bevelColor: string = '#eeeeee'
-  ): StyleVariant => ({
+  ): StyleVariant => {
+    // Cap stored Border-Radius at a 32px reference button height. Buttons
+    // at that height saturate to a perfect pill at radius ≥ 16, so capping
+    // playful's 40 → 32 doesn't visually change the button — but it
+    // prevents cards / modals / image thumbnails from inheriting a
+    // stadium silhouette in downstream consumers of the JSON. Matches the
+    // CSS-side cap in buildPreviewCSS and exportToCSS.
+    const STORED_RADIUS_CAP = 32;
+    const cappedBorderRadius = Math.min(borderRadius, STORED_RADIUS_CAP);
+    return {
     Bevel: {
       'Bevel-1': {
         'Shadow-1': {
@@ -4555,14 +4564,15 @@ export function exportColorSystemToJSON(
       }
     },
     'Border-Radius': {
-      'offset-x': { value: borderRadius, type: 'dimension' }
+      'offset-x': { value: cappedBorderRadius, type: 'dimension' }
     },
     Gradient: {
       'Color-1': { value: '{Buttons.Primary.Button}', type: 'color' },
       'Color-2': { value: '{Buttons.Primary.Button}', type: 'color' },
       Angle: { value: 0, type: 'dimension' }
     }
-  });
+    };
+  };
 
   console.log('🎨 [JSON Export] Generating Style section...');
   

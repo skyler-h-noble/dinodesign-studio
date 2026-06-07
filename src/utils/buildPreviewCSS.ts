@@ -571,6 +571,60 @@ export function buildPreviewCSS(input: BuildInput): string {
   const defaultBtnText = containerText;
   const defaultBtnBorder = borderFor(containerBg);
 
+  // ── Default-button palette per surface theme + button mode ──
+  // The lib's CSS hardcodes --Buttons-Default-Hover etc. under every
+  // [data-theme="Primary"|"Secondary"|"Tertiary"][data-surface="Surface"]
+  // selector (specificity 0,2,0). So a Card with color="tertiary" sets its
+  // inner content to [data-theme="Tertiary"], and the lib's hardcoded pink
+  // hover wins over the brand's main block (different selector, closer
+  // ancestor). We re-emit the Default-button tokens inside each per-palette
+  // surface block below using the same mode logic the main block uses, but
+  // anchored to that surface's palette per the user's cascade rules:
+  //   primary mode   → all surfaces use Primary
+  //   secondary mode → all surfaces use Secondary
+  //   tonal mode     → button palette matches the surface palette
+  //   laddered mode  → Primary surface→Secondary, Secondary→Tertiary, Tertiary→Primary
+  //   black-white    → B/W based on surface lightness
+  type SurfaceTheme = 'Primary' | 'Secondary' | 'Tertiary';
+  const palFor = (name: SurfaceTheme): typeof vPrimary =>
+    name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
+  const nFor = (name: SurfaceTheme): number =>
+    name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
+  const getDefaultBtnPalForSurface = (surfaceTheme: SurfaceTheme): { pal: typeof vPrimary; n: number } => {
+    switch (effectiveButton) {
+      case 'primary': return { pal: vPrimary, n: PC };
+      case 'secondary': return { pal: vSecondary, n: SC };
+      case 'tonal': return { pal: palFor(surfaceTheme), n: nFor(surfaceTheme) };
+      case 'laddered': {
+        const next: SurfaceTheme = surfaceTheme === 'Primary' ? 'Secondary'
+          : surfaceTheme === 'Secondary' ? 'Tertiary' : 'Primary';
+        return { pal: palFor(next), n: nFor(next) };
+      }
+      case 'black-white': {
+        const bg = p(palFor(surfaceTheme), nFor(surfaceTheme));
+        return { pal: NEUTRAL.map(h => ({ hex: h })) as any, n: isLight(bg) ? 1 : 12 };
+      }
+      default: return { pal: vPrimary, n: PC };
+    }
+  };
+  const emitDefaultBtnTokens = (surfaceTheme: SurfaceTheme): string => {
+    const { pal, n } = getDefaultBtnPalForSurface(surfaceTheme);
+    const sbg = p(palFor(surfaceTheme), nFor(surfaceTheme));
+    const sn = nFor(surfaceTheme);
+    const bg = p(pal, n);
+    const tones = getAccessibleTones(bg, n, pal);
+    const txt = p(pal, tones.text);
+    const palBorder = p(pal, getAccessibleTones(sbg, sn, pal).border);
+    const { hover, active } = activeAndHoverFor(pal, n);
+    return `  --Buttons-Default-Button: ${bg};
+  --Buttons-Default-Text: ${txt};
+  --Buttons-Default-Border: ${palBorder};
+  --Buttons-Default-Hover: ${hover};
+  --Buttons-Default-Active: ${active};
+  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(bg))};
+  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(bg))};`;
+  };
+
   // ── Tertiary tag + text — always vibrant (light palette) ──
   const tagN = Math.max(TC - 2, 1);
   const tagBg = `var(--Tertiary-Color-${tagN})`;
@@ -648,9 +702,9 @@ export function buildPreviewCSS(input: BuildInput): string {
   --Border-Variant: ${borderVariantVal};
   --Hover: ${scopeHover};
   --Active: ${scopeActive};
-  --Hotlink: var(--Info-Color-${hotlinkColorN});
+  --Hotlink: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
-  --Link: var(--Info-Color-${hotlinkColorN});
+  --Link: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
   --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, hotlinkColorN + (scopeN <= 5 ? -1 : 1)))});
   --Link-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
   --Buttons-Primary-Border: ${scopeBtnBorderPrimary};
@@ -757,9 +811,12 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}26` : `${surfaceBorder}26`};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
   --Active: ${activeAndHoverFor(surfacePalette, surfaceN).active};
-  --Hotlink: var(--Info-Color-${surfaceTones.text});
+  /* --Hotlink and friends share the contrast-tuned Info text mapping so
+     ghost-variant buttons (which inherit color from --Hotlink) read on
+     any surface tone. Same getFixedTextToken lookup as --Text-Info above. */
+  --Hotlink: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
-  --Link: var(--Info-Color-${surfaceTones.text});
+  --Link: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
   --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, surfaceTones.text + (surfaceN <= 5 ? -1 : 1)))});
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
 ${buildTextPaletteLines(surfaceN, false)}
@@ -811,6 +868,22 @@ ${(() => {
   --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
   --Buttons-Default-Hover: ${defHover};
   --Buttons-Default-Active: ${defActive};`;
+  })()}
+${(() => {
+    // Tag text override. The lib's Dark-Mode.css sets Tag-{Color}-Text to
+    // Color-2 of each palette, assuming dark mode runs an inverted palette
+    // where Color-2 is near-white. The studio uses the LIGHT palette for
+    // tags in both modes (so tags stay vibrant), so Color-2 stays a pale
+    // tint — pale text on a saturated mid-tone bg fails contrast.
+    //
+    // Use the SAME contrast lookup that --Text-Primary/Secondary/Tertiary use
+    // (getFixedTextToken), so a tag's text picks the contrast-verified tone
+    // for its own palette and bg tone. Tag-{Color}-BG always resolves to the
+    // light-palette Color-8 of that name, so we look up text for surfaceN=8.
+    const TAG_BG_N = 8;
+    return ['Primary', 'Secondary', 'Tertiary']
+      .map(name => `  --Tag-${name}-Text: ${tokenRefToVar(getFixedTextToken(TAG_BG_N, false, name as any))};`)
+      .join('\n');
   })()}
 
   --Container: ${containerBg};
@@ -972,6 +1045,7 @@ ${(() => {
   --Container-Buttons-Default-Border: var(--Tertiary-Color-${(() => { const t = getAccessibleTones(tertiaryContainerBg, tertiaryContainerN, tertiaryLight); return t.border; })()});
   --Tag-Tertiary-BG: ${tagBg};
   --Tag-Tertiary-Text: ${tagText};
+${emitDefaultBtnTokens('Tertiary')}
 }`;
 })()}
 
@@ -982,6 +1056,17 @@ ${(() => {
 [data-theme="Secondary"][data-surface="Surface"] {
   --Background: var(--Secondary-Color-${SC});
   --Surface: var(--Secondary-Color-${SC});
+${emitDefaultBtnTokens('Secondary')}
+}
+
+/* ══ Primary Theme ══
+ * Cards with color="primary" (or other elements that set data-theme="Primary")
+ * also need the brand's Default-button tokens — the lib emits hardcoded
+ * Default-Hover/Active under [data-theme="Primary"][data-surface="Surface"]
+ * which would otherwise win over the main Brand block. */
+[data-theme="Primary"],
+[data-theme="Primary"][data-surface="Surface"] {
+${emitDefaultBtnTokens('Primary')}
 }
 
 /* ══ Nav Bar ══ */
@@ -1143,18 +1228,28 @@ ${(() => {
     radius: input.styleCustomizations?.radius,
   });
   const r = computeRadii(sc);
+  // Cap card-shaped radii at the standard button height so larger surfaces
+  // (cards, image thumbnails, modals) don't go stadium-shaped under playful
+  // brand presets where buttonRadius is 100. A 100px radius on a 32px
+  // button still renders as a perfect pill (radius ≥ height/2 saturates),
+  // so clamping below doesn't visually change pill buttons — it only stops
+  // wide rectangular surfaces from inheriting the same pill silhouette.
+  const buttonHeight = sc.buttonHeight ?? 32;
+  const cappedStyleRadius = Math.min(r.buttonRadius, buttonHeight);
+  const cappedCardRadius = Math.min(r.cardRadius, buttonHeight);
+  const cappedModalRadius = Math.min(r.modalRadius, buttonHeight);
   return `:root {
-  --Style-Border-Radius: ${r.buttonRadius}px;
+  --Style-Border-Radius: ${cappedStyleRadius}px;
   --Button-Radius: ${r.buttonRadius}px;
   --Sm-Button-Radius: ${r.smButtonRadius}px;
   --Lg-Button-Radius: ${r.lgButtonRadius}px;
   --Button-Icon-Radius: ${r.iconButtonRadius}px;
   --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
   --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;
-  --Card-Radius: ${r.cardRadius}px;
+  --Card-Radius: ${cappedCardRadius}px;
   --Card-Padding: ${r.cardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
-  --Modal-Radius: ${r.modalRadius}px;
+  --Modal-Radius: ${cappedModalRadius}px;
   --Input-Radius: ${r.inputRadius}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;

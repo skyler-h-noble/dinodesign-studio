@@ -3184,9 +3184,16 @@ function generateStyleCSS(jsonData: any): string {
     // Border-Radius
     if (styleData['Border-Radius']) {
       const borderRadius = styleData['Border-Radius']['offset-x']?.value || 4;
+      // Cap card-shaped radii at a 32px reference button height to keep
+      // surfaces (cards, modal, thumbnails) from going stadium-shaped
+      // under playful presets. Buttons themselves stay at the raw value —
+      // they saturate to pill at height/2 regardless.
+      const REFERENCE_BUTTON_HEIGHT = 32;
+      const cappedStyle = Math.min(borderRadius, REFERENCE_BUTTON_HEIGHT);
+      const cappedCard = Math.min(Math.round(borderRadius * 1.33), REFERENCE_BUTTON_HEIGHT);
       props.push(`${indent}--Button-Radius: ${borderRadius}px;`);
-      props.push(`${indent}--Style-Border-Radius: var(--Button-Radius);`);
-      props.push(`${indent}--Card-Radius: ${Math.round(borderRadius * 1.33)}px;`);
+      props.push(`${indent}--Style-Border-Radius: ${cappedStyle}px;`);
+      props.push(`${indent}--Card-Radius: ${cappedCard}px;`);
       props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
       // Button & Input tokens derived from --Button-Radius.
       props.push(`${indent}--Button-Border-Width: 2px;`);
@@ -4420,7 +4427,21 @@ export function generateBaseCSS(jsonData: any): string {
     const buttonPadding = btnR > 8 ? Math.round(btnR / 2) : 4;
     const smButtonPadding = btnR >= 8 ? 8 : btnR;
     const largeButtonPadding = btnR > 32 ? Math.round((btnR * 2) / 3) : 16;
+    // Cap card-shaped radii at the standard button height so large
+    // surfaces (cards, image thumbnails, modals) don't go stadium-shaped
+    // under playful brand presets where buttonRadius is 100. Mirrors the
+    // cap applied in buildPreviewCSS so exported designs render the same
+    // way as the studio preview. Pill buttons unaffected — they saturate
+    // at height/2 anyway.
+    const buttonHeight = cs.buttonHeight ?? 32;
+    const cappedStyleRadius = Math.min(r.buttonRadius, buttonHeight);
+    const cappedCardRadius = Math.min(r.cardRadius, buttonHeight);
+    const cappedModalRadius = Math.min(r.modalRadius, buttonHeight);
     lines.push(':root {');
+    // --Style-Border-Radius is what the lib's Card component consumes by
+    // default. Emitting it explicitly here (the legacy export path stopped
+    // writing it) ensures exported designs match the preview cap.
+    lines.push(`  --Style-Border-Radius: ${cappedStyleRadius}px;`);
     lines.push(`  --Button-Radius: ${r.buttonRadius}px;`);
     lines.push(`  --Sm-Button-Radius: ${r.smButtonRadius}px;`);
     lines.push(`  --Lg-Button-Radius: ${r.lgButtonRadius}px;`);
@@ -4439,12 +4460,12 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Button-Icon-Focus-Radius: ${r.iconButtonFocusRadius}px;`);
     lines.push(`  --Sm-Button-Icon-Focus-Radius: ${r.smIconButtonFocusRadius}px;`);
     lines.push(`  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;`);
-    lines.push(`  --Card-Radius: ${r.cardRadius}px;`);
+    lines.push(`  --Card-Radius: ${cappedCardRadius}px;`);
     lines.push(`  --Card-Inner-Radius: ${r.cardInnerRadius}px;`);
     lines.push(`  --Card-Focus-Radius: ${r.cardFocusRadius}px;`);
     lines.push(`  --Card-Padding: ${r.cardPadding}px;`);
     lines.push(`  --Modal-Padding: ${r.modalPadding}px;`);
-    lines.push(`  --Modal-Radius: ${r.modalRadius}px;`);
+    lines.push(`  --Modal-Radius: ${cappedModalRadius}px;`);
     lines.push(`  --Modal-Inner-Radius: ${r.modalInnerRadius}px;`);
     lines.push(`  --Modal-Focus-Radius: ${r.modalFocusRadius}px;`);
     lines.push(`  --Input-Radius: ${r.inputRadius}px;`);
