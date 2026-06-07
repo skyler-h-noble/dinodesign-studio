@@ -65,6 +65,17 @@ service cloud.firestore {
         );
         allow update: if false;
       }
+
+      // Add-on entitlements — which add-ons this design system has been
+      // granted access to. Readable by the design system's owner OR an admin.
+      // Writes (grants, revokes, version pins) are admin-only — customers
+      // never grant themselves entitlements; grants come from the studio UI,
+      // Stripe webhooks, or manual admin actions in the Firebase console.
+      match /entitlements/{addOnId} {
+        allow read:  if isAdmin()
+                     || isOwner(get(/databases/$(database)/documents/designSystems/$(id)).data.userId);
+        allow write: if isAdmin();
+      }
     }
 
     // payments/{id}
@@ -111,6 +122,26 @@ service cloud.firestore {
                     && request.resource.data.implementation == resource.data.implementation
                     && request.resource.data.proposedApi == resource.data.proposedApi;
       allow create, delete: if false;
+    }
+
+    // addOns/{addOnId}
+    //   Catalog of available add-ons, written exclusively by admins via the
+    //   publishAddOn cloud function. Any signed-in user can read catalog
+    //   metadata (so the customer plugin can show display names/versions
+    //   without a cloud-function round-trip for trivial data). The actual
+    //   spec JSON lives in Storage, not Firestore — see storage.rules.
+    match /addOns/{addOnId} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+
+      // Version history. Each doc records the storage path, publishedBy,
+      // publishedAt, notes, sizeBytes for a single version. Versions are
+      // immutable in practice; we don't enforce that here because publish
+      // always writes a fresh version doc rather than mutating one.
+      match /versions/{version} {
+        allow read:  if isSignedIn();
+        allow write: if isAdmin();
+      }
     }
 
     // rateLimits/{key}

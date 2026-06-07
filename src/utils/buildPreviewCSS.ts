@@ -2,6 +2,57 @@ import chroma from 'chroma-js';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+// Contrast lookup tables for per-palette Text and Header tokens — the
+// lib's defaults for these resolve to {palette}-Color-9 regardless of the
+// surface tone, which fails WCAG on light surfaces. These helpers return
+// design-token references (e.g. "{Colors.Primary.Color-8}") that we then
+// convert to CSS var() form below.
+import { getFixedTextToken, getFixedHeaderToken } from './cssgen/exportColorSystem';
+
+/** Convert a `{Colors.Palette.Color-N}` token reference (returned by
+ *  getFixedTextToken / getFixedHeaderToken) into a CSS `var(--Palette-Color-N)`
+ *  reference. Hex strings (when the table returns a raw `#fff` etc.) pass
+ *  through unchanged. */
+function tokenRefToVar(ref: string): string {
+  if (ref.startsWith('#')) return ref;
+  const m = ref.match(/^\{Colors\.([^.]+)\.Color-([^}]+)\}$/);
+  if (!m) return ref;
+  return `var(--${m[1]}-Color-${m[2]})`;
+}
+
+/** Build the eight per-palette Text-* token lines for a surface or
+ *  container with the given background tone. */
+function buildTextPaletteLines(backgroundN: number, isContainer: boolean): string {
+  const palettes: Array<['Primary' | 'Secondary' | 'Tertiary' | 'Neutral' | 'Info' | 'Success' | 'Warning' | 'Error', string]> = [
+    ['Primary',   'Text-Primary'],
+    ['Secondary', 'Text-Secondary'],
+    ['Tertiary',  'Text-Tertiary'],
+    ['Neutral',   'Text-Neutral'],
+    ['Info',      'Text-Info'],
+    ['Success',   'Text-Success'],
+    ['Warning',   'Text-Warning'],
+    ['Error',     'Text-Error'],
+  ];
+  return palettes
+    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedTextToken(backgroundN, isContainer, palette))};`)
+    .join('\n');
+}
+
+function buildHeaderPaletteLines(backgroundN: number, isContainer: boolean): string {
+  const palettes: Array<['Primary' | 'Secondary' | 'Tertiary' | 'Neutral' | 'Info' | 'Success' | 'Warning' | 'Error', string]> = [
+    ['Primary',   'Header-Primary'],
+    ['Secondary', 'Header-Secondary'],
+    ['Tertiary',  'Header-Tertiary'],
+    ['Neutral',   'Header-Neutral'],
+    ['Info',      'Header-Info'],
+    ['Success',   'Header-Success'],
+    ['Warning',   'Header-Warning'],
+    ['Error',     'Header-Error'],
+  ];
+  return palettes
+    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedHeaderToken(backgroundN, isContainer, palette))};`)
+    .join('\n');
+}
 
 /**
  * Builds the complete CSS for the phone preview iframe.
@@ -711,6 +762,8 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
   --Link: var(--Info-Color-${surfaceTones.text});
   --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, surfaceTones.text + (surfaceN <= 5 ? -1 : 1)))});
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
+${buildTextPaletteLines(surfaceN, false)}
+${buildHeaderPaletteLines(surfaceN, false)}
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
   --Effect-Level-1: 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
@@ -837,6 +890,8 @@ ${(() => {
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}26` : `${containerBorder}26`};
   --Hover: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).hover};
   --Active: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).active};
+${buildTextPaletteLines(containerN, true)}
+${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${buttonBorderCss};

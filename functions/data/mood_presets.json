@@ -1,0 +1,569 @@
+{
+  "metadata": {
+    "description": "Mood-font presets \u2014 curated pairings for common visual moods. Each preset becomes Option 1 when the mood is detected strongly enough.",
+    "version": "1.0",
+    "detection_notes": "Mood is detected from dominant colors, brightness, saturation, and contrast level of the input image before CLIP runs."
+  },
+  "moods": {
+    "neon_cyberpunk": {
+      "label": "Neon / Cyberpunk",
+      "description": "High contrast neon colors on dark or black background. Electric, futuristic, digital.",
+      "detection": {
+        "brightness": "dark",
+        "saturation": "very_high",
+        "dominant_colors": [
+          "purple",
+          "cyan",
+          "pink",
+          "green",
+          "yellow"
+        ],
+        "background": "very_dark",
+        "contrast": "very_high"
+      },
+      "trio": {
+        "header": "Orbitron",
+        "decorative": "Audiowide",
+        "body": "Share Tech"
+      },
+      "alternates": [
+        {
+          "header": "Michroma",
+          "decorative": "Rajdhani",
+          "body": "Exo 2"
+        },
+        {
+          "header": "Syncopate",
+          "decorative": "Oxanium",
+          "body": "Jost"
+        }
+      ]
+    },
+    "soft_romantic": {
+      "label": "Soft Romantic / Pastel",
+      "description": "Soft pastel palette, airy and light. Blush, lavender, cream. Feminine and gentle.",
+      "detection": {
+        "brightness": "very_light",
+        "saturation": "low",
+        "dominant_colors": [
+          "pink",
+          "lavender",
+          "cream",
+          "blush",
+          "rose"
+        ],
+        "background": "light",
+        "contrast": "low"
+      },
+      "trio": {
+        "header": "Cormorant Garamond",
+        "decorative": "Great Vibes",
+        "body": "Lora"
+      },
+      "alternates": [
+        {
+          "header": "Playfair Display",
+          "decorative": "Sacramento",
+          "body": "Libre Baskerville"
+        },
+        {
+          "header": "Libre Caslon Text",
+          "decorative": "Parisienne",
+          "body": "PT Serif"
+        },
+        {
+          "header": "Cormorant",
+          "decorative": "Cookie",
+          "body": "Crimson Text"
+        },
+        {
+          "header": "Montserrat",
+          "decorative": "Cookie",
+          "body": "Raleway"
+        }
+      ]
+    },
+    "luxury_editorial_black": {
+      "label": "Luxury / Editorial Black",
+      "description": "Black or very dark background with gold, cream, or white accents. High fashion, minimal, powerful.",
+      "detection": {
+        "brightness": "very_dark",
+        "saturation": "low_to_medium",
+        "dominant_colors": [
+          "black",
+          "gold",
+          "cream",
+          "white",
+          "dark_grey"
+        ],
+        "background": "very_dark",
+        "contrast": "very_high"
+      },
+      "trio": {
+        "header": "Playfair Display",
+        "decorative": "Tangerine",
+        "body": "Inter"
+      },
+      "alternates": [
+        {
+          "header": "GFS Didot",
+          "decorative": "Allura",
+          "body": "Montserrat"
+        },
+        {
+          "header": "Bodoni Moda",
+          "decorative": "Pinyon Script",
+          "body": "Raleway"
+        },
+        {
+          "header": "Cormorant Garamond",
+          "decorative": "Great Vibes",
+          "body": "Lato"
+        }
+      ]
+    },
+    "old_money": {
+      "label": "Old Money / Classic Elegance",
+      "description": "Cream or off-white background, high-contrast didone serifs, classic editorial. Understated luxury, heritage, timeless.",
+      "detection": {
+        "brightness": "light",
+        "saturation": "very_low",
+        "dominant_colors": [
+          "cream",
+          "off_white",
+          "ivory",
+          "warm_white",
+          "champagne"
+        ],
+        "background": "warm_light",
+        "contrast": "medium_high"
+      },
+      "trio": {
+        "header": "Playfair Display SC",
+        "decorative": "Libre Baskerville",
+        "body": "Josefin Sans"
+      },
+      "alternates": [
+        {
+          "header": "Cormorant Garamond",
+          "decorative": "Marcellus",
+          "body": "Source Sans 3"
+        },
+        {
+          "header": "Cinzel",
+          "decorative": "Raleway",
+          "body": "Lato"
+        },
+        {
+          "header": "Forum",
+          "decorative": "Poppins",
+          "body": "Cormorant Garamond"
+        },
+        {
+          "header": "Bodoni Moda",
+          "decorative": "Didact Gothic",
+          "body": "Source Sans Pro"
+        }
+      ]
+    },
+    "natural_organic": {
+      "label": "Natural / Organic",
+      "description": "Muted earthy tones \u2014 sage, terracotta, warm white, botanical greens. Grounded and natural.",
+      "detection": {
+        "brightness": "medium_light",
+        "saturation": "low_medium",
+        "dominant_colors": [
+          "sage",
+          "terracotta",
+          "warm_white",
+          "olive",
+          "clay",
+          "sand"
+        ],
+        "background": "warm_neutral",
+        "contrast": "low_medium"
+      },
+      "trio": {
+        "header": "Cormorant Garamond",
+        "decorative": "Caveat",
+        "body": "Source Sans 3"
+      },
+      "alternates": [
+        {
+          "header": "Forum",
+          "decorative": "Patrick Hand",
+          "body": "Poppins"
+        },
+        {
+          "header": "Libre Baskerville",
+          "decorative": "Kalam",
+          "body": "Work Sans"
+        },
+        {
+          "header": "Lora",
+          "decorative": "Indie Flower",
+          "body": "Open Sans"
+        }
+      ]
+    },
+    "clean_tech": {
+      "label": "Clean Tech / Corporate",
+      "description": "White, blue-grey, and cool neutrals. Minimal, professional, digital product feel.",
+      "detection": {
+        "brightness": "very_light",
+        "saturation": "low",
+        "dominant_colors": [
+          "white",
+          "blue",
+          "grey",
+          "light_blue",
+          "cool_white"
+        ],
+        "background": "light",
+        "contrast": "medium"
+      },
+      "trio": {
+        "header": "Plus Jakarta Sans",
+        "decorative": "DM Sans",
+        "body": "Inter"
+      },
+      "alternates": [
+        {
+          "header": "Hanken Grotesk",
+          "decorative": "IBM Plex Sans",
+          "body": "Inter"
+        },
+        {
+          "header": "Syne",
+          "decorative": "Jost",
+          "body": "Work Sans"
+        },
+        {
+          "header": "Montserrat",
+          "decorative": "Oxygen",
+          "body": "Lato"
+        }
+      ]
+    },
+    "warm_retro_vintage": {
+      "label": "Warm Retro / Vintage",
+      "description": "Amber, rust, mustard, cream. Worn and nostalgic. Artisan, handmade, heritage.",
+      "detection": {
+        "brightness": "medium",
+        "saturation": "medium",
+        "dominant_colors": [
+          "amber",
+          "rust",
+          "mustard",
+          "burnt_orange",
+          "warm_cream"
+        ],
+        "background": "warm_medium",
+        "contrast": "medium"
+      },
+      "trio": {
+        "header": "Alfa Slab One",
+        "decorative": "Lobster",
+        "body": "Merriweather"
+      },
+      "alternates": [
+        {
+          "header": "Rokkitt",
+          "decorative": "Satisfy",
+          "body": "PT Serif"
+        },
+        {
+          "header": "Arvo",
+          "decorative": "Kaushan Script",
+          "body": "Lora"
+        },
+        {
+          "header": "Josefin Slab",
+          "decorative": "Yellowtail",
+          "body": "Source Serif 4"
+        }
+      ]
+    },
+    "whimsical_playful": {
+      "label": "Whimsical / Playful",
+      "description": "Bright mixed colors, illustrative, fun. Childlike joy, bold and energetic.",
+      "detection": {
+        "brightness": "medium_light",
+        "saturation": "very_high",
+        "dominant_colors": [
+          "mixed",
+          "rainbow",
+          "bright_multiple"
+        ],
+        "background": "colorful",
+        "contrast": "high"
+      },
+      "trio": {
+        "header": "Fredoka",
+        "decorative": "Indie Flower",
+        "body": "Nunito"
+      },
+      "alternates": [
+        {
+          "header": "Baloo 2",
+          "decorative": "Gochi Hand",
+          "body": "Quicksand"
+        },
+        {
+          "header": "Comfortaa",
+          "decorative": "Patrick Hand",
+          "body": "Varela Round"
+        },
+        {
+          "header": "Chewy",
+          "decorative": "Caveat",
+          "body": "Nunito Sans"
+        }
+      ]
+    },
+    "industrial_urban": {
+      "label": "Industrial / Urban",
+      "description": "Charcoal, concrete grey, raw and rough. Brutalist, street, architecture.",
+      "detection": {
+        "brightness": "dark_medium",
+        "saturation": "very_low",
+        "dominant_colors": [
+          "charcoal",
+          "concrete",
+          "dark_grey",
+          "steel",
+          "raw_white"
+        ],
+        "background": "dark_neutral",
+        "contrast": "medium_high"
+      },
+      "trio": {
+        "header": "Bebas Neue",
+        "decorative": "Barlow Condensed",
+        "body": "IBM Plex Sans"
+      },
+      "alternates": [
+        {
+          "header": "Oswald",
+          "decorative": "Teko",
+          "body": "Roboto"
+        },
+        {
+          "header": "Squada One",
+          "decorative": "Yanone Kaffeesatz",
+          "body": "Barlow"
+        },
+        {
+          "header": "Russo One",
+          "decorative": "Exo 2",
+          "body": "Work Sans"
+        }
+      ]
+    },
+    "boho_festival": {
+      "label": "Boho / Festival",
+      "description": "Terracotta, dusty rose, mustard, warm mixed tones. Eclectic, handmade, free-spirited.",
+      "detection": {
+        "brightness": "medium",
+        "saturation": "medium_high",
+        "dominant_colors": [
+          "terracotta",
+          "dusty_rose",
+          "mustard",
+          "sage",
+          "warm_mixed"
+        ],
+        "background": "warm_earthy",
+        "contrast": "medium"
+      },
+      "trio": {
+        "header": "Playfair Display",
+        "decorative": "Sacramento",
+        "body": "Lato"
+      },
+      "alternates": [
+        {
+          "header": "Lora",
+          "decorative": "Dancing Script",
+          "body": "Open Sans"
+        },
+        {
+          "header": "Cormorant Garamond",
+          "decorative": "Satisfy",
+          "body": "Raleway"
+        },
+        {
+          "header": "EB Garamond",
+          "decorative": "Kaushan Script",
+          "body": "Source Sans 3"
+        }
+      ]
+    },
+    "minimal_scandinavian": {
+      "label": "Minimal / Scandinavian",
+      "description": "White, pale grey, barely-there tones. Quiet, restrained, purposeful. Nordic calm.",
+      "detection": {
+        "brightness": "very_light",
+        "saturation": "very_low",
+        "dominant_colors": [
+          "white",
+          "pale_grey",
+          "off_white",
+          "light_grey"
+        ],
+        "background": "very_light",
+        "contrast": "very_low"
+      },
+      "trio": {
+        "header": "Josefin Sans",
+        "decorative": "Cormorant",
+        "body": "Work Sans"
+      },
+      "alternates": [
+        {
+          "header": "Raleway",
+          "decorative": "Crimson Text",
+          "body": "Lato"
+        },
+        {
+          "header": "Montserrat",
+          "decorative": "Libre Caslon Text",
+          "body": "Open Sans"
+        },
+        {
+          "header": "DM Sans",
+          "decorative": "Spectral",
+          "body": "Inter"
+        }
+      ]
+    },
+    "dark_romance_gothic": {
+      "label": "Dark Romance / Gothic",
+      "description": "Deep navy, burgundy, forest green, black. Moody, dramatic, mysterious, literary.",
+      "detection": {
+        "brightness": "very_dark",
+        "saturation": "medium",
+        "dominant_colors": [
+          "deep_navy",
+          "burgundy",
+          "forest_green",
+          "black",
+          "deep_purple"
+        ],
+        "background": "very_dark",
+        "contrast": "high"
+      },
+      "trio": {
+        "header": "Cinzel",
+        "decorative": "Pinyon Script",
+        "body": "EB Garamond"
+      },
+      "alternates": [
+        {
+          "header": "Cormorant Garamond",
+          "decorative": "Italianno",
+          "body": "Libre Baskerville"
+        },
+        {
+          "header": "Forum",
+          "decorative": "Euphoria Script",
+          "body": "Crimson Text"
+        },
+        {
+          "header": "Playfair Display",
+          "decorative": "Great Vibes",
+          "body": "Vollkorn"
+        }
+      ]
+    },
+    "modern_luxury_fashion": {
+      "label": "Modern Luxury / Fashion",
+      "description": "White or near-white, ultra-minimal, lots of breathing room. High-end editorial, runway, beauty.",
+      "detection": {
+        "brightness": "very_light",
+        "saturation": "near_zero",
+        "dominant_colors": [
+          "pure_white",
+          "champagne",
+          "very_pale_grey"
+        ],
+        "background": "near_white",
+        "contrast": "medium"
+      },
+      "trio": {
+        "header": "GFS Didot",
+        "decorative": "Montserrat",
+        "body": "Raleway"
+      },
+      "alternates": [
+        {
+          "header": "Bodoni Moda",
+          "decorative": "Josefin Sans",
+          "body": "Lato"
+        },
+        {
+          "header": "Fraunces",
+          "decorative": "Epilogue",
+          "body": "Inter"
+        },
+        {
+          "header": "Prata",
+          "decorative": "Karla",
+          "body": "IBM Plex Sans"
+        },
+        {
+          "header": "Playfair Display",
+          "decorative": "Oxygen",
+          "body": "Raleway"
+        }
+      ]
+    },
+    "editorial_modern": {
+      "label": "Editorial / Modern",
+      "description": "Clean white or light background, strong typographic pairings, magazine or blog feel. Confident and contemporary.",
+      "detection": {
+        "brightness": "light",
+        "saturation": "low",
+        "dominant_colors": [
+          "white",
+          "light_grey",
+          "warm_white"
+        ],
+        "background": "light",
+        "contrast": "medium_high"
+      },
+      "trio": {
+        "header": "Libre Caslon Text",
+        "decorative": "IBM Plex Sans",
+        "body": "Inter"
+      },
+      "alternates": [
+        {
+          "header": "Playfair Display",
+          "decorative": "Raleway",
+          "body": "Crimson Text"
+        },
+        {
+          "header": "Bodoni Moda",
+          "decorative": "Nunito",
+          "body": "Lora"
+        },
+        {
+          "header": "Noto Serif Display",
+          "decorative": "Lora",
+          "body": "Work Sans"
+        },
+        {
+          "header": "Hanken Grotesk",
+          "decorative": "Inter",
+          "body": "Epilogue"
+        },
+        {
+          "header": "Fraunces",
+          "decorative": "Epilogue",
+          "body": "Lato"
+        }
+      ]
+    }
+  }
+}

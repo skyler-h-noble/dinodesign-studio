@@ -1,5 +1,12 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
 import { toneToColorNumber, generateSemanticLightModeScale, findClosestColorN } from '../colorScale';
+// Reuse the contrast lookup tables that the CSS exporter already uses for
+// Text and Header palettes. Without this, Text-Primary / Header-Primary were
+// emitted as `{Text.Surfaces.Primary.Color-${n}}` which the lib resolves to
+// Primary-Color-9 regardless of surface tone — failing WCAG on Color-1
+// backgrounds. The getFixed* helpers return contrast-tuned references like
+// `{Colors.Primary.Color-7}` per the table in exportColorSystem.ts.
+import { getFixedTextToken, getFixedHeaderToken } from './exportColorSystem';
 
 /**
  * Theme configuration for generating Surfaces and Containers
@@ -93,77 +100,81 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       type: 'color'
     },
     'Text': {
+      // BW palette stays as the lib's raw reference (it has its own
+      // contrast-tuned greyscale handling that doesn't go through the
+      // color-N lookup). Branded palettes flow through getFixedTextToken
+      // so Text inherits the same contrast pairing as Text-Primary etc.
       value: config.defaultText === 'BW'
         ? `{Text.Surfaces.BW.Color-${n}}`
-        : `{Text.Surfaces.${config.defaultText}.Color-${n}}`,
+        : getFixedTextToken(n, false, config.defaultText),
       type: 'color'
     },
     'Text-Primary': {
-      value: `{Text.Surfaces.Primary.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Primary'),
       type: 'color'
     },
     'Text-Secondary': {
-      value: `{Text.Surfaces.Secondary.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Secondary'),
       type: 'color'
     },
     'Text-Tertiary': {
-      value: `{Text.Surfaces.Tertiary.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Tertiary'),
       type: 'color'
     },
     'Text-Neutral': {
-      value: `{Text.Surfaces.Neutral.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Neutral'),
       type: 'color'
     },
     'Text-Info': {
-      value: `{Text.Surfaces.Info.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Info'),
       type: 'color'
     },
     'Text-Success': {
-      value: `{Text.Surfaces.Success.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Success'),
       type: 'color'
     },
     'Text-Warning': {
-      value: `{Text.Surfaces.Warning.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Warning'),
       type: 'color'
     },
     'Text-Error': {
-      value: `{Text.Surfaces.Error.Color-${n}}`,
+      value: getFixedTextToken(n, false, 'Error'),
       type: 'color'
     },
     'Header': {
-      value: `{Header.Surfaces.${config.defaultHeader}.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, config.defaultHeader),
       type: 'color'
     },
     'Header-Primary': {
-      value: `{Header.Surfaces.Primary.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Primary'),
       type: 'color'
     },
     'Header-Secondary': {
-      value: `{Header.Surfaces.Secondary.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Secondary'),
       type: 'color'
     },
     'Header-Tertiary': {
-      value: `{Header.Surfaces.Tertiary.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Tertiary'),
       type: 'color'
     },
     'Header-Neutral': {
-      value: `{Header.Surfaces.Neutral.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Neutral'),
       type: 'color'
     },
     'Header-Info': {
-      value: `{Header.Surfaces.Info.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Info'),
       type: 'color'
     },
     'Header-Success': {
-      value: `{Header.Surfaces.Success.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Success'),
       type: 'color'
     },
     'Header-Warning': {
-      value: `{Header.Surfaces.Warning.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Warning'),
       type: 'color'
     },
     'Header-Error': {
-      value: `{Header.Surfaces.Error.Color-${n}}`,
+      value: getFixedHeaderToken(n, false, 'Error'),
       type: 'color'
     },
     'Border': {
@@ -183,7 +194,10 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       type: 'color'
     },
     'Hotlink': {
-      value: `{Text.Surfaces.Info.Color-${n}}`,
+      // Hotlinks share the contrast-tuned Info text mapping so links read
+      // on any surface tone without the user noticing fade-out on dark
+      // backgrounds.
+      value: getFixedTextToken(n, false, 'Info'),
       type: 'color'
     },
     'Hotlink-Visited': {
@@ -418,77 +432,80 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     'Text': {
+      // Same BW/branded split as the surface Text token — BW stays on the
+      // lib reference (greyscale has its own logic); branded palettes use
+      // getFixedTextToken for contrast against the container background.
       value: getContainerTextPalette(config.contTheme, config) === 'BW'
         ? `{Text.Containers.BW.Color-${config.contN}}`
-        : `{Text.Containers.${getContainerTextPalette(config.contTheme, config)}.Color-${config.contN}}`,
+        : getFixedTextToken(config.contN, true, getContainerTextPalette(config.contTheme, config)),
       type: 'color'
     },
     'Text-Primary': {
-      value: `{Text.Containers.Primary.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Primary'),
       type: 'color'
     },
     'Text-Secondary': {
-      value: `{Text.Containers.Secondary.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Secondary'),
       type: 'color'
     },
     'Text-Tertiary': {
-      value: `{Text.Containers.Tertiary.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Tertiary'),
       type: 'color'
     },
     'Text-Neutral': {
-      value: `{Text.Containers.Neutral.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Neutral'),
       type: 'color'
     },
     'Text-Info': {
-      value: `{Text.Containers.Info.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Info'),
       type: 'color'
     },
     'Text-Success': {
-      value: `{Text.Containers.Success.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Success'),
       type: 'color'
     },
     'Text-Warning': {
-      value: `{Text.Containers.Warning.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Warning'),
       type: 'color'
     },
     'Text-Error': {
-      value: `{Text.Containers.Error.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Error'),
       type: 'color'
     },
     'Header': {
-      value: `{Header.Containers.${getContainerHeaderPalette(config.contTheme, config)}.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, getContainerHeaderPalette(config.contTheme, config)),
       type: 'color'
     },
     'Header-Primary': {
-      value: `{Header.Containers.Primary.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Primary'),
       type: 'color'
     },
     'Header-Secondary': {
-      value: `{Header.Containers.Secondary.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Secondary'),
       type: 'color'
     },
     'Header-Tertiary': {
-      value: `{Header.Containers.Tertiary.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Tertiary'),
       type: 'color'
     },
     'Header-Neutral': {
-      value: `{Header.Containers.Neutral.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Neutral'),
       type: 'color'
     },
     'Header-Info': {
-      value: `{Header.Containers.Info.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Info'),
       type: 'color'
     },
     'Header-Success': {
-      value: `{Header.Containers.Success.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Success'),
       type: 'color'
     },
     'Header-Warning': {
-      value: `{Header.Containers.Warning.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Warning'),
       type: 'color'
     },
     'Header-Error': {
-      value: `{Header.Containers.Error.Color-${config.contN}}`,
+      value: getFixedHeaderToken(config.contN, true, 'Error'),
       type: 'color'
     },
     'Border': {
@@ -508,7 +525,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     'Hotlink': {
-      value: `{Text.Containers.Info.Color-${config.contN}}`,
+      value: getFixedTextToken(config.contN, true, 'Info'),
       type: 'color'
     },
     'Hotlink-Visited': {

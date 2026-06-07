@@ -37,6 +37,19 @@ exports.publishAddOn = addOns.publishAddOn;
 exports.listEntitledAddOns = addOns.listEntitledAddOns;
 exports.getAddOn = addOns.getAddOn;
 
+// CLIP moodboard → typography matcher. Replaces the studio's old Teachable
+// Machine pipeline. `warmAnalyzeMoodboard` should be fired client-side when
+// the moodboard finishes uploading so the heavy `analyzeMoodboard` call later
+// hits a warm container.
+const analyzeMoodboard = require('./analyzeMoodboard');
+exports.analyzeMoodboard = analyzeMoodboard.analyzeMoodboard;
+exports.warmAnalyzeMoodboard = analyzeMoodboard.warmAnalyzeMoodboard;
+
+// Google Cloud Vision text-region detection. Optional alternative to the
+// in-browser Tesseract path; the studio decides per-request which to use.
+const detectTextRegionsGCV = require('./detectTextRegionsGCV');
+exports.detectTextRegionsGCV = detectTextRegionsGCV.detectTextRegionsGCV;
+
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
 

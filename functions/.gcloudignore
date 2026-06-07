@@ -1,0 +1,19 @@
+# Inherits the .gitignore rules (node_modules etc would be ignored), so we
+# explicitly negate node_modules below — Cloud Functions needs deps shipped.
+.git
+.gitignore
+*.log
+.DS_Store
+
+# Re-include node_modules — Cloud Functions deploys without `npm install`.
+!node_modules/
+
+# CLIP runtime is Linux x64 only — strip the other platforms to stay under
+# the 250 MB deploy cap. (Saves ~165 MB across darwin/win32/linux-arm64.)
+node_modules/onnxruntime-node/bin/napi-v3/darwin/
+node_modules/onnxruntime-node/bin/napi-v3/win32/
+node_modules/onnxruntime-node/bin/napi-v3/linux/arm64/
+
+# Browser-only ONNX runtime is pulled in by @huggingface/transformers but
+# never executed server-side. Drops another ~93 MB.
+node_modules/onnxruntime-web/

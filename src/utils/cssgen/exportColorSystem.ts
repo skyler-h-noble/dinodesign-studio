@@ -710,7 +710,7 @@ function getHotlinkVisitedColor(primaryPalette: { tone: number; color: string }[
 /**
  * Get fixed Header token reference based on background number and container type
  */
-function getFixedHeaderToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
+export function getFixedHeaderToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
   const colorMap: { [key: string]: { surfaces: number; containers: number } } = {
     '1': { surfaces: 7, containers: 8 },
     '2': { surfaces: 7, containers: 8 },
@@ -737,7 +737,7 @@ function getFixedHeaderToken(backgroundNumber: number, isContainer: boolean, pal
 /**
  * Get fixed Text token reference based on background number and container type
  */
-function getFixedTextToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
+export function getFixedTextToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
   const colorMap: { [key: string]: { surfaces: number | string; containers: number | string } } = {
     '1': { surfaces: 8, containers: 10 },
     '2': { surfaces: 9, containers: 10 },

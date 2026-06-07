@@ -134,6 +134,125 @@ export async function extractColorsFromImage(imageUrl: string): Promise<Extracte
 }
 
 /**
+ * Image properties consumed by the server-side mood matcher in
+ * functions/analyzeMoodboard.js. Field names + value ranges mirror the Python
+ * notebook's extract_image_properties() so the server's matchMood() formulas
+ * stay identical.
+ *
+ *   brightness / saturation / contrast — all 0..1
+ *   hueFamily — coarse hue bucket of the dominant saturated pixels
+ */
+export type HueFamily =
+  | 'red' | 'orange' | 'amber' | 'yellow' | 'green'
+  | 'cyan' | 'blue' | 'purple' | 'pink' | 'neutral';
+
+export interface ImageProps {
+  brightness: number;
+  saturation: number;
+  contrast: number;
+  hueFamily: HueFamily;
+}
+
+/** RGB → HSV. Matches Python `colorsys.rgb_to_hsv` (h normalized to 0..1). */
+function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const v = max;
+  const s = max === 0 ? 0 : d / max;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r)      h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else                h = (r - g) / d + 4;
+    h = (h * 60) / 360;
+    if (h < 0) h += 1;
+  }
+  return [h, s, v];
+}
+
+function hueToFamily(h: number): HueFamily {
+  // Bin edges copied verbatim from the notebook's match_mood logic.
+  if (h < 0.05 || h > 0.95) return 'red';
+  if (h < 0.10)             return 'orange';
+  if (h < 0.17)             return 'amber';
+  if (h < 0.25)             return 'yellow';
+  if (h < 0.42)             return 'green';
+  if (h < 0.52)             return 'cyan';
+  if (h < 0.68)             return 'blue';
+  if (h < 0.78)             return 'purple';
+  return 'pink';
+}
+
+/** Browser port of the notebook's extract_image_properties(). 100×100 downsample,
+ *  luminance via 0.299/0.587/0.114, contrast = std(luminance), hue family from
+ *  mean hue of saturated (s > 0.2) pixels. */
+export async function extractImageProps(imageUrl: string): Promise<ImageProps> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve({ brightness: 0.5, saturation: 0.3, contrast: 0.2, hueFamily: 'neutral' });
+        return;
+      }
+
+      canvas.width = 100;
+      canvas.height = 100;
+      ctx.drawImage(img, 0, 0, 100, 100);
+      const { data } = ctx.getImageData(0, 0, 100, 100);
+
+      const n = data.length / 4;
+      const lum = new Float64Array(n);
+      let sumLum = 0;
+      let sumSat = 0;
+      const satHues: number[] = [];
+
+      for (let i = 0; i < n; i++) {
+        const r = data[i * 4]     / 255;
+        const g = data[i * 4 + 1] / 255;
+        const b = data[i * 4 + 2] / 255;
+
+        const L = 0.299 * r + 0.587 * g + 0.114 * b;
+        lum[i] = L;
+        sumLum += L;
+
+        const [h, s] = rgbToHsv(r, g, b);
+        sumSat += s;
+        if (s > 0.2) satHues.push(h);
+      }
+
+      const brightness = sumLum / n;
+      const saturation = sumSat / n;
+
+      let sqDev = 0;
+      for (let i = 0; i < n; i++) {
+        const d = lum[i] - brightness;
+        sqDev += d * d;
+      }
+      const contrast = Math.sqrt(sqDev / n);
+
+      let hueFamily: HueFamily = 'neutral';
+      if (satHues.length > 10) {
+        const meanHue = satHues.reduce((a, b) => a + b, 0) / satHues.length;
+        hueFamily = hueToFamily(meanHue);
+      }
+
+      resolve({ brightness, saturation, contrast, hueFamily });
+    };
+
+    img.onerror = () => {
+      resolve({ brightness: 0.5, saturation: 0.3, contrast: 0.2, hueFamily: 'neutral' });
+    };
+
+    img.src = imageUrl;
+  });
+}
+
+/**
  * Detect the surface style of an image based on overall brightness and saturation.
  */
 export async function assessImageStyle(

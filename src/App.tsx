@@ -28,7 +28,7 @@ import DesignSystemNameStage from './components/stages/DesignSystemNameStage';
 import UploadStage from './components/stages/UploadStage';
 import ColorStage from './components/stages/ColorStage';
 import ColorAssignmentStage from './components/stages/ColorAssignmentStage';
-import TypographyStage from './components/stages/TypographyStage';
+import TypographyStageV2 from './components/stages/TypographyStageV2';
 import ComponentStyleStage from './components/stages/ComponentStyleStage';
 import ReviewStage from './components/stages/ReviewStage';
 import ExportStage from './components/stages/ExportStage';
@@ -42,6 +42,7 @@ import AccessibilityReport from './components/AccessibilityReport';
 import DesignSystemDetail from './components/DesignSystemDetail';
 import MyDesignsPage from './components/MyDesignsPage';
 import AdminProposals from './components/AdminProposals';
+import TypographyTestPage from './components/TypographyTestPage';
 
 function MainApp() {
   const { user } = useAuth();
@@ -63,6 +64,11 @@ function MainApp() {
   const [, setDateCreated] = useState('');
   const [moodBoardUrl, setMoodBoardUrl] = useState<string | null>(null);
   const [moodBoardFile, setMoodBoardFile] = useState<File | null>(null);
+  // Public Storage URL for the moodboard — populated asynchronously by
+  // UploadStage once the file finishes uploading in the background.
+  // Distinct from moodBoardUrl (which holds the local blob: preview URL).
+  // TypographyStageV2 uses this so it doesn't have to re-upload itself.
+  const [moodBoardPublicUrl, setMoodBoardPublicUrl] = useState<string | null>(null);
   const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme | null>(null);
   const [userSelections, setUserSelections] = useState<UserSelections>({
     defaultTheme: 'light',
@@ -352,6 +358,9 @@ function MainApp() {
             onImageUploaded={(url, file) => {
               setMoodBoardUrl(url);
               setMoodBoardFile(file);
+              // New upload = stale public URL; clear it so v2 doesn't try
+              // to analyze the previous moodboard.
+              setMoodBoardPublicUrl(null);
               // Clear old color data so ColorStage re-extracts
               setSavedSchemes([]);
               setSavedTopColors([]);
@@ -361,6 +370,9 @@ function MainApp() {
               assessImageStyle(url).then(style => {
                 setSurfaceStyle(style);
               });
+            }}
+            onMoodboardPublicUrlReady={(publicUrl) => {
+              setMoodBoardPublicUrl(publicUrl);
             }}
             onGenerate={(_mode) => {
               goNext();
@@ -423,22 +435,18 @@ function MainApp() {
         );
       case 'typography':
         return (
-          <TypographyStage
+          <TypographyStageV2
             onNext={goNext}
             onBack={goBack}
             colorScheme={selectedColorScheme}
-            moodBoardUrl={moodBoardUrl}
+            // Prefer the public Storage URL prepped during upload — the
+            // analysis for it has been running in the background since
+            // the user picked their moodboard. Fall back to the blob URL
+            // only when V2 mounts before that finishes (rare).
+            moodBoardUrl={moodBoardPublicUrl ?? moodBoardUrl}
+            moodBoardFile={moodBoardFile}
             designSystemName={designSystemName}
             onTypographyComplete={setTypographyStyles}
-            savedFontSamples={savedFontSamples}
-            savedSelectedSample={savedSelectedSample}
-            onFontSamplesGenerated={(samples, selected) => {
-              setSavedFontSamples(samples);
-              setSavedSelectedSample(selected);
-            }}
-            savedTypographySettings={savedTypographySettings}
-            onTypographySettingsChange={setSavedTypographySettings}
-            savedFirstTrio={pendingReExport ? typographyStyles : undefined}
             decorativeMode={userSelections.decorativeMode}
             onDecorativeModeChange={(mode) => setUserSelections({ ...userSelections, decorativeMode: mode })}
           />
@@ -765,7 +773,7 @@ function MainApp() {
         {showTopBar && (
           <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
         )}
-        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 72 : 0, overflowX: 'hidden', background: 'var(--Background)' }}>
+        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 120 : 0, overflowX: 'hidden', background: 'var(--Background)' }}>
           {showPricingModal ? (
             <PricingPage
               onCheckout={async (selection: PurchaseSelection) => {
@@ -860,6 +868,7 @@ function App() {
         <Route path="/my-designs" element={<MyDesignsPage />} />
         <Route path="/my-designs/:id" element={<DesignSystemDetail />} />
         <Route path="/admin/proposals" element={<AdminProposals />} />
+        <Route path="/test/typography" element={<TypographyTestPage />} />
       </Routes>
     </BrowserRouter>
     </DynoDesignProvider>

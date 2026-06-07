@@ -1,50 +1,914 @@
-// Text detection and classification utility
-import Tesseract from 'tesseract.js';
-import * as tf from '@tensorflow/tfjs';
-
-// Suppress TensorFlow.js duplicate registration warnings
-// These occur during hot module replacement and are harmless
-(function suppressTensorFlowWarnings() {
-  const originalWarn = console.warn;
-  console.warn = (...args: any[]) => {
-    const message = args[0]?.toString() || '';
-    // Filter out TensorFlow.js backend/kernel registration warnings
-    if (
-      message.includes('already registered') ||
-      message.includes('Overwriting the platform') ||
-      message.includes('backend was already registered')
-    ) {
-      return; // Suppress these specific warnings
-    }
-    originalWarn.apply(console, args);
-  };
-})();
-
-// Teachable Machine model URLs (replace with your actual model URLs)
-const STYLE_MODEL_URL = 'https://lwnoble.github.io/figma-typography-models/style/';
-const WEIGHT_MODEL_URL = 'https://lwnoble.github.io/figma-typography-models/weight/';
-
-// Model cache to prevent reloading
-let styleModelCache: any = null;
-let weightModelCache: any = null;
-let styleMetadataCache: any = null;
-let weightMetadataCache: any = null;
+// Crop + analysis helpers for the GCV-driven typography pipeline.
+//
+// The text detection itself runs server-side via Google Cloud Vision (see
+// functions/detectTextRegionsGCV.js). This file's job is:
+//
+//   cropFromBboxes(imageUrl, bboxes) -> base64 PNG crops of the regions
+//                                       GCV identified, ready to pass to
+//                                       the CLIP per-role pipeline
+//   classifySpacingFromBbox(...)     -> coarse tight/normal/wide tracking
+//                                       estimate from the crop's pixel
+//                                       density
+//
+// Tesseract and pixel-fallback paths were removed — we trust GCV.
 
 export interface TextRegion {
   text: string;
-  bbox: {
-    x0: number;
-    y0: number;
-    x1: number;
-    y1: number;
-  };
+  bbox: { x0: number; y0: number; x1: number; y1: number };
   confidence: number;
-  className?: string;
-  probability?: number;
-  detectedWeight?: number;
-  isAllCaps?: boolean;
 }
 
+export interface OcrDiag {
+  wordCount: number;            // words GCV returned (or pixel regions, in fallback)
+  elapsedMs: number;            // GCV call time
+  pixelFallbackUsed?: boolean;  // true if we resorted to pixel flood-fill
+  error?: string;               // populated if GCV failed
+}
+
+export type SpacingClass = 'tight' | 'normal' | 'wide';
+export type VisualWeight = 'thin' | 'regular' | 'heavy';
+
+export interface StrokeAnalysis {
+  /** Weight bucket derived from stroke_width / letter_height. Independent
+   *  of tracking — a wide-tracked thin display sans no longer reads as
+   *  "thin" purely because of the air between letters. */
+  weight: VisualWeight;
+  /** Stroke width / letter height ratio (the underlying measurement). */
+  weightRatio: number;
+  /** True when ≥50% of vertical strokes have horizontal extensions at
+   *  their top or bottom — i.e. visible serif feet. */
+  hasSerifFeet: boolean;
+  /** Fraction of detected strokes that had serif feet. */
+  serifFootRatio: number;
+  /** How many vertical strokes were detected total. Low numbers (< 3)
+   *  mean the weight / serif signals are noisy and shouldn't be trusted
+   *  hard — fall back to CLIP. */
+  strokeCount: number;
+  /** True when the region has substantial text but very few clean vertical
+   *  stems — script and handwritten fonts curve/slant where regular fonts
+   *  go straight up and down, so they leave few stems to count. Computed
+   *  in cropFromBboxes (needs the OCR text length to normalise against
+   *  strokeCount). */
+  isLikelyScript: boolean;
+}
+
+export interface ExtractedTextRegion {
+  dataUrl: string;
+  height: number;
+  text: string;
+  isAllCaps: boolean;
+  /** Coarse letter-spacing classification from pixel density inside the
+   *  bbox. Tight = densely packed ink; wide = lots of air between glyphs.
+   *  Approximate — meant as a hint, not a measurement. */
+  spacing: SpacingClass;
+  /** Pixel-based stroke analysis on the original source bbox: weight from
+   *  stroke_width / letter_height, plus a binary serif/sans signal from
+   *  stroke terminals. Replaces the spacing-class proxy for weight which
+   *  conflated weight with tracking. */
+  stroke: StrokeAnalysis;
+}
+
+export interface TextCrops {
+  header?: string;
+  decorative?: string;
+  regionCount: number;
+  regions: ExtractedTextRegion[];
+  diag: OcrDiag;
+}
+
+// Decorative is only worth cropping if it's meaningfully smaller than the
+// header — otherwise we'd embed two nearly-identical crops and the rankings
+// would collapse onto the same fonts.
+const DECORATIVE_HEIGHT_RATIO = 0.8;
+
+// Padding around each crop so CLIP sees a little context.
+const CROP_PADDING = 15;
+
+// Square crop size we send to CLIP. ViT-B/32 resizes everything to 224.
+const CROP_SIZE = 224;
+
+/** Crop the source image at GCV-supplied bounding boxes and return the
+ *  TextCrops shape the cloud function expects. */
+export async function cropFromBboxes(
+  imageUrl: string,
+  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string }>,
+  meta: { elapsedMs: number },
+  maxRegions = 10,
+): Promise<TextCrops> {
+  let img: HTMLImageElement;
+  try {
+    img = await loadImage(imageUrl);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[gcv] image load failed:', msg);
+    return {
+      regionCount: 0,
+      regions: [],
+      diag: { wordCount: 0, elapsedMs: meta.elapsedMs, error: `image load: ${msg}` },
+    };
+  }
+
+  // Merge word boxes into phrases (GCV returns word-level boxes; users
+  // want phrase-level crops).
+  const phrases = mergeWordsIntoPhrases(bboxes);
+  phrases.sort((a, b) => (b.y1 - b.y0) - (a.y1 - a.y0));
+  const top = phrases.slice(0, maxRegions);
+
+  const heightSorted: ExtractedTextRegion[] = top.map((b) => {
+    const region: TextRegion = {
+      text: b.text ?? '',
+      confidence: 100,
+      bbox: { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 },
+    };
+    const stroke = analyzeStrokes(img, region.bbox);
+    const text = (b.text ?? '').trim();
+    // Substantial text (≥4 letters) with very few clean vertical stems is a
+    // strong signal for script / handwritten — those fonts curve and slant
+    // where regular fonts have a clean vertical stem to count. "elegant" (7
+    // letters, ~0-1 stems) flags as script; "LOGO" (4 letters, 2 stems) and
+    // "Mood Boards" (11 letters, ~4 stems) don't.
+    const letterCount = (text.match(/[A-Za-z]/g) ?? []).length;
+    const isLikelyScript = letterCount >= 4 && stroke.strokeCount * 5 < letterCount;
+    return {
+      dataUrl: regionToDataUrl(img, region),
+      height: b.y1 - b.y0,
+      text: b.text ?? '',
+      isAllCaps: text.length > 1
+        && text === text.toUpperCase()
+        && /[A-Z]/.test(text),
+      spacing: classifySpacingFromBbox(img, region.bbox),
+      stroke: { ...stroke, isLikelyScript },
+    };
+  });
+
+  // Decorative pick — hierarchical, with a weight-contrast preference woven
+  // in. The design principle: heavy + heavy flattens typographic hierarchy,
+  // so when the header reads visually heavy we'd rather pull a lighter
+  // companion (and vice versa). Pixel-density classes from
+  // classifySpacingFromBbox stand in for visual weight here — `tight` ≈
+  // heavy ink coverage, `wide` ≈ thin/airy, `normal` is in between.
+  //
+  //   1. If the header is NOT all-caps, look for an all-caps region with
+  //      CONTRASTING weight; if none has contrast, fall back to any
+  //      all-caps. (Overline / kicker pairing is still preferred over a
+  //      body-shaped second line.)
+  //   2. Otherwise (header already all-caps) try a contrast-weight region
+  //      among the rest; if none, fall back to the 2nd-tallest provided it's
+  //      meaningfully smaller than the header.
+  // Phase 2 — preferring script / calligraphy / handwritten when no
+  // all-caps exists and the header isn't already one — needs per-crop
+  // CLIP category classification on the server (not yet wired).
+  const header = heightSorted[0];
+  let decorativePickIdx: number | null = null;
+  if (header) {
+    // Prefer the pixel-measured stroke weight when we have enough strokes
+    // to trust it (≥2); otherwise fall back to the density-derived proxy
+    // for regions that are mostly curved letters or too small to scan.
+    const weightOf = (r: ExtractedTextRegion): VisualWeight =>
+      r.stroke.strokeCount >= 2 ? r.stroke.weight : visualWeightFromSpacing(r.spacing);
+    const headerWeight = weightOf(header);
+    const isContrast = (r: ExtractedTextRegion) =>
+      contrastsWith(headerWeight, weightOf(r));
+    const isSubheadLike = (r: ExtractedTextRegion) =>
+      !r.isAllCaps && isContrast(r) && r.height < header.height * DECORATIVE_HEIGHT_RATIO;
+
+    // Hard rule: header + decorative must differ in CASE when the header
+    // is all-caps. Same-case pairing on a heavy display headline reads as
+    // a label, not a hierarchical accent. (Mixed-case headers don't get
+    // this restriction — the kicker pattern is mixed-case header + all-caps
+    // overline.)
+    const respectsCaseRule = (r: ExtractedTextRegion) =>
+      !(header.isAllCaps && r.isAllCaps);
+
+    // Soft rule: the candidate must differ from the header on at LEAST one
+    // axis (case / serif-ness / weight / script-ness). Otherwise we'd be
+    // stacking two visually identical lines and calling one a "decorative"
+    // which fools no one. If nothing differs on any axis, we'd rather pick
+    // nothing and let the server fall back to a mood trio than commit to
+    // a non-pairing.
+    const differsFromHeader = (r: ExtractedTextRegion) => {
+      const caseDiffers   = header.isAllCaps !== r.isAllCaps;
+      const serifDiffers  = header.stroke.hasSerifFeet !== r.stroke.hasSerifFeet;
+      const weightDiffers = weightOf(header) !== weightOf(r);
+      const scriptDiffers = header.stroke.isLikelyScript !== r.stroke.isLikelyScript;
+      return caseDiffers || serifDiffers || weightDiffers || scriptDiffers;
+    };
+    const isValid = (r: ExtractedTextRegion) =>
+      respectsCaseRule(r) && differsFromHeader(r);
+
+    // Spatial proximity helper. A region is "just below" the header when
+    // its top edge is no more than ~1.5× the header height beneath the
+    // header's bottom edge — this is the "natural subtitle/accent slot"
+    // designers leave directly under a display line. Uses the original
+    // bbox y-coordinates, which `top` is parallel to heightSorted on.
+    const headerBbox = top[0];
+    const isJustBelowHeader = (i: number): boolean => {
+      if (i === 0) return false;
+      const bbox = top[i];
+      if (!bbox || !headerBbox) return false;
+      const headerH = headerBbox.y1 - headerBbox.y0;
+      const slotTop = headerBbox.y1 - headerH * 0.3; // generous overlap allowed
+      const slotBottom = headerBbox.y1 + headerH * 2.5;
+      return bbox.y0 >= slotTop && bbox.y0 <= slotBottom;
+    };
+
+    // Priority order:
+    //   1. script header → non-script decorative (only fires for script
+    //      headers, which need a stable foil to read against)
+    //   2. kicker (all-caps overline) — the classic editorial pairing for a
+    //      mixed-case header. Preferred over any axis-contrast pattern.
+    //   3. axis-contrast fallbacks for the cases where no all-caps line
+    //      exists on the moodboard:
+    //        a. heavy header → non-heavy mixed-case subhead
+    //        b. thin header  → heavier anchor
+    //   4. any-contrast / 2nd-tallest last resort
+    // Phase 2 (script / handwritten fallback when no all-caps exists)
+    // runs server-side after these.
+
+    // Phase 0 — script header → non-script decorative.
+    if (header.stroke.isLikelyScript && heightSorted.length > 1) {
+      const nonScriptIdx = heightSorted.findIndex(
+        (r, i) =>
+          i !== 0
+          && !r.stroke.isLikelyScript
+          && r.height < header.height * DECORATIVE_HEIGHT_RATIO
+          && isValid(r),
+      );
+      if (nonScriptIdx >= 0) decorativePickIdx = nonScriptIdx;
+    }
+
+    // Closest-to-header helper. Among regions matching the predicate,
+    // returns the one whose top edge sits closest to the header's bottom
+    // edge — the designer's intended decorative typically sits directly
+    // under the headline. Returns null when no region qualifies.
+    const findClosestMatch = (
+      predicate: (r: ExtractedTextRegion, i: number) => boolean,
+    ): number | null => {
+      const matches: Array<{ idx: number; distance: number }> = [];
+      for (let i = 1; i < heightSorted.length; i++) {
+        const r = heightSorted[i];
+        const bbox = top[i];
+        if (!bbox || !headerBbox) continue;
+        if (!predicate(r, i)) continue;
+        matches.push({ idx: i, distance: Math.abs(bbox.y0 - headerBbox.y1) });
+      }
+      if (matches.length === 0) return null;
+      matches.sort((a, b) => a.distance - b.distance);
+      return matches[0].idx;
+    };
+
+    // Phase 0.3 — heavy serif header: refined accent pairing. A heavy
+    // display serif calls for a delicate complement. Tier order matters:
+    // a thin all-caps kicker beats a script flourish even when the
+    // script sits closer — and within each tier, the closest candidate
+    // to the header wins.
+    if (
+      decorativePickIdx === null
+      && headerWeight === 'heavy'
+      && header.stroke.hasSerifFeet
+    ) {
+      const thinAllCaps = findClosestMatch((r) =>
+        r.isAllCaps
+        && weightOf(r) === 'thin'
+        && r.height < header.height * DECORATIVE_HEIGHT_RATIO
+        && isValid(r),
+      );
+      if (thinAllCaps !== null) {
+        decorativePickIdx = thinAllCaps;
+      } else {
+        const scriptIdx = findClosestMatch((r) =>
+          r.stroke.isLikelyScript
+          && r.height < header.height * DECORATIVE_HEIGHT_RATIO
+          && isValid(r),
+        );
+        if (scriptIdx !== null) decorativePickIdx = scriptIdx;
+      }
+    }
+
+    // Phase 0.5 — spatial proximity. Just-below + (all-caps OR script).
+    // Among multiple qualifying regions in the slot, the one physically
+    // closest to the header wins — same closest-wins principle as 0.3,
+    // applied to any header (not just heavy serif).
+    if (decorativePickIdx === null) {
+      const proximityIdx = findClosestMatch((r, i) =>
+        isJustBelowHeader(i)
+        && (r.isAllCaps || r.stroke.isLikelyScript)
+        && r.height < header.height * DECORATIVE_HEIGHT_RATIO
+        && isValid(r),
+      );
+      if (proximityIdx !== null) decorativePickIdx = proximityIdx;
+    }
+
+    // Phase 1 — kicker pattern (mixed-case header → all-caps overline).
+    if (decorativePickIdx === null && !header.isAllCaps) {
+      const contrastAllCaps = heightSorted.findIndex((r, i) => i !== 0 && r.isAllCaps && isContrast(r) && isValid(r));
+      const anyAllCaps      = heightSorted.findIndex((r, i) => i !== 0 && r.isAllCaps && isValid(r));
+      const allCapsIdx = contrastAllCaps >= 0 ? contrastAllCaps : anyAllCaps;
+      if (allCapsIdx >= 0) decorativePickIdx = allCapsIdx;
+    }
+
+    // Phase 1a — heavy header → light subhead.
+    if (decorativePickIdx === null && headerWeight === 'heavy' && heightSorted.length > 2) {
+      const subheadIdx = heightSorted.findIndex((r, i) => i !== 0 && isSubheadLike(r) && isValid(r));
+      if (subheadIdx >= 0) decorativePickIdx = subheadIdx;
+    }
+
+    // Phase 1b — thin header → heavier anchor.
+    if (decorativePickIdx === null && headerWeight === 'thin' && heightSorted.length > 1) {
+      const anchorIdx = heightSorted.findIndex(
+        (r, i) =>
+          i !== 0
+          && weightOf(r) !== 'thin'
+          && !r.stroke.isLikelyScript
+          && r.height < header.height * DECORATIVE_HEIGHT_RATIO
+          && isValid(r),
+      );
+      if (anchorIdx >= 0) decorativePickIdx = anchorIdx;
+    }
+
+    // Phase 2 — any-contrast fallback. No same-style 2nd-tallest rescue:
+    // if every smaller candidate is visually identical to the header on
+    // every axis (or violates the case rule when the header is all-caps),
+    // leave decorativePickIdx as null. The server will then surface a
+    // mood-driven decorative instead of stacking two interchangeable lines.
+    if (decorativePickIdx === null && heightSorted.length > 1) {
+      const contrastIdx = heightSorted.findIndex(
+        (r, i) =>
+          i !== 0
+          && isContrast(r)
+          && r.height < header.height * DECORATIVE_HEIGHT_RATIO
+          && isValid(r),
+      );
+      if (contrastIdx >= 0) decorativePickIdx = contrastIdx;
+    }
+  }
+
+  // Re-order so [0] = header, [1] = chosen decorative, then the rest by
+  // height. Lets callers read the chosen pair as regions[0] / regions[1]
+  // without tracking a separate decorativeIdx.
+  const regions: ExtractedTextRegion[] = [];
+  if (header) regions.push(header);
+  if (decorativePickIdx !== null && decorativePickIdx !== 0) {
+    regions.push(heightSorted[decorativePickIdx]);
+  }
+  for (let i = 0; i < heightSorted.length; i++) {
+    if (i === 0) continue;
+    if (i === decorativePickIdx) continue;
+    regions.push(heightSorted[i]);
+  }
+
+  return {
+    header: regions[0]?.dataUrl,
+    decorative: decorativePickIdx !== null ? regions[1]?.dataUrl : undefined,
+    regionCount: regions.length,
+    regions,
+    diag: { wordCount: bboxes.length, elapsedMs: meta.elapsedMs },
+  };
+}
+
+/** Visual-weight bucket inferred from a region's bbox pixel density. The
+ *  spacing classes from classifySpacingFromBbox already encode density:
+ *  `tight` means lots of ink (a heavy bold), `wide` means lots of air (a
+ *  thin/airy face). We treat that as a coarse weight proxy so the decorative
+ *  picker can favour contrast with the header. */
+function visualWeightFromSpacing(spacing: SpacingClass): VisualWeight {
+  if (spacing === 'tight') return 'heavy';
+  if (spacing === 'wide')  return 'thin';
+  return 'regular';
+}
+
+/** Two visual weights contrast iff they're not identical. Pairing heavy
+ *  with heavy (or thin with thin) flattens hierarchy — that's the case we
+ *  want the decorative pick to avoid when there's an alternative. */
+function contrastsWith(a: VisualWeight, b: VisualWeight): boolean {
+  return a !== b;
+}
+
+/** Classify a single OCR word by case so we can refuse to merge across
+ *  typographic boundaries. Returns 'unknown' when there isn't enough cased
+ *  text to tell — short words and punctuation shouldn't block a merge. */
+function wordCaseClass(text: string | undefined): 'caps' | 'mixed' | 'unknown' {
+  const trimmed = (text ?? '').trim();
+  const letters = trimmed.replace(/[^A-Za-z]/g, '');
+  if (letters.length < 2) return 'unknown';
+  if (letters === letters.toUpperCase()) return 'caps';
+  return 'mixed';
+}
+
+/** Two adjacent words can merge into one phrase only if their case classes
+ *  don't disagree. 'unknown' is treated as agnostic — won't block a merge
+ *  in either direction. This catches the "fit AND" cursive-next-to-caps
+ *  bug without splitting normal sentences like "Fall is here" or
+ *  homogeneous block-caps headlines like "MOOD BOARDS". */
+function caseClassesMergeable(curText: string | undefined, nextText: string | undefined): boolean {
+  const a = wordCaseClass(curText);
+  const b = wordCaseClass(nextText);
+  if (a === 'unknown' || b === 'unknown') return true;
+  return a === b;
+}
+
+function mergeWordsIntoPhrases(
+  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string }>,
+): Array<{ x0: number; y0: number; x1: number; y1: number; text: string }> {
+  if (bboxes.length === 0) return [];
+  const sorted = [...bboxes].sort((a, b) => {
+    const dy = a.y0 - b.y0;
+    return Math.abs(dy) < 20 ? a.x0 - b.x0 : dy;
+  });
+
+  const out: Array<{ x0: number; y0: number; x1: number; y1: number; text: string }> = [];
+  let cur = { ...sorted[0], text: sorted[0].text ?? '' };
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
+    const curH = cur.y1 - cur.y0;
+    const nextH = next.y1 - next.y0;
+    // Use the SMALLER of the two heights as the threshold reference.
+    // Otherwise the cluster's height grows as words merge in, the tolerance
+    // grows with it, and a single big headline ends up pulling in unrelated
+    // small labels from across the page (e.g. "Mood Boards" + "1969" + the
+    // Source Sans labels all getting glued together).
+    const refH = Math.min(curH, nextH);
+    const curMidY = (cur.y0 + cur.y1) / 2;
+    const nextMidY = (next.y0 + next.y1) / 2;
+    const onSameLine = Math.abs(curMidY - nextMidY) < refH * 0.5;
+    const horizGap = next.x0 - cur.x1;
+    const close = horizGap < refH * 1.5 && horizGap > -nextH;
+    // Style-boundary check: text case mismatch is a strong signal that the
+    // two words come from different typographic systems (e.g. cursive "fit"
+    // next to block-caps "AND"). Refuse the merge so each gets its own
+    // crop + classification.
+    const caseCompatible = caseClassesMergeable(cur.text, next.text);
+    if (onSameLine && close && caseCompatible) {
+      cur.x1 = Math.max(cur.x1, next.x1);
+      cur.y0 = Math.min(cur.y0, next.y0);
+      cur.y1 = Math.max(cur.y1, next.y1);
+      cur.text = `${cur.text} ${next.text ?? ''}`.trim();
+    } else {
+      out.push(cur);
+      cur = { ...next, text: next.text ?? '' };
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+    img.src = url;
+  });
+}
+
+function regionToDataUrl(img: HTMLImageElement, region: TextRegion): string {
+  const { x0, y0, x1, y1 } = region.bbox;
+  const sx = Math.max(0, x0 - CROP_PADDING);
+  const sy = Math.max(0, y0 - CROP_PADDING);
+  const sw = Math.min(img.width  - sx, x1 - x0 + CROP_PADDING * 2);
+  const sh = Math.min(img.height - sy, y1 - y0 + CROP_PADDING * 2);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CROP_SIZE;
+  canvas.height = CROP_SIZE;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context unavailable');
+
+  // White fill — CLIP treats transparent as black, which biases toward
+  // dark/heavy font matches.
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
+
+  // Letterbox-fit the source into 224×224 instead of stretching to fill.
+  // The previous version squashed wide phrases like "LOGO" or "Mood Boards"
+  // into a 1:1 box, stretching letters vertically by 3-5× and shrinking
+  // serif feet to nothing — CLIP then classified the rounded mush as a
+  // friendly sans. Preserving aspect ratio keeps the letterforms in the
+  // proportions CLIP's training data expected.
+  const aspect = sw / sh;
+  let dw: number;
+  let dh: number;
+  if (aspect >= 1) {
+    dw = CROP_SIZE;
+    dh = Math.max(1, Math.round(CROP_SIZE / aspect));
+  } else {
+    dh = CROP_SIZE;
+    dw = Math.max(1, Math.round(CROP_SIZE * aspect));
+  }
+  const dx = Math.round((CROP_SIZE - dw) / 2);
+  const dy = Math.round((CROP_SIZE - dh) / 2);
+
+  // `high` picks the browser's sharpest available downsampler. Default
+  // bilinear/bicubic blurs serif terminals into rounded blobs at small
+  // sizes, which contributed to the same misclassification.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+
+  return canvas.toDataURL('image/png');
+}
+
+/** Estimate letter-spacing from a region's pixel density inside its bbox.
+ *  Builds a small canvas of just the bbox, counts the fraction of dark
+ *  pixels, and bins into tight / normal / wide. Headlines with tight
+ *  tracking densely cover their bbox (>22% dark); tracked-out display
+ *  text leaves lots of whitespace (<10% dark). Approximate. */
+function classifySpacingFromBbox(
+  img: HTMLImageElement,
+  bbox: { x0: number; y0: number; x1: number; y1: number },
+): SpacingClass {
+  const w = bbox.x1 - bbox.x0;
+  const h = bbox.y1 - bbox.y0;
+  if (w <= 0 || h <= 0) return 'normal';
+
+  const MAX = 600;
+  const scale = Math.min(MAX / w, 1);
+  const cw = Math.max(1, Math.floor(w * scale));
+  const ch = Math.max(1, Math.floor(h * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 'normal';
+
+  ctx.drawImage(img, bbox.x0, bbox.y0, w, h, 0, 0, cw, ch);
+  const data = ctx.getImageData(0, 0, cw, ch).data;
+  const THRESHOLD = 120;
+  let darkCount = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (
+      data[i + 3] > 0
+      && data[i] < THRESHOLD
+      && data[i + 1] < THRESHOLD
+      && data[i + 2] < THRESHOLD
+    ) {
+      darkCount++;
+    }
+  }
+  const density = darkCount / (cw * ch);
+  if (density > 0.22) return 'tight';
+  if (density < 0.10) return 'wide';
+  return 'normal';
+}
+
+/** Pixel-based stroke analysis on the ORIGINAL-resolution source bbox.
+ *  Outputs three signals the rest of the pipeline needs to be reliable:
+ *
+ *  - `weight` from stroke_width / letter_height — the actual ratio type
+ *    designers use to describe weight (regular ≈ 0.08-0.15, bold ≈ 0.18-0.25,
+ *    black ≈ 0.25+). Doesn't get fooled by wide-tracked all-caps display
+ *    layouts the way the density proxy does.
+ *  - `hasSerifFeet` from the density excess at the top/bottom rows vs the
+ *    middle 30%. Serif terminals add horizontal projections at letter caps
+ *    and baseline; sans terminals are flat. CLIP at 224×224 can't see this,
+ *    a per-pixel scan on the source bbox can.
+ *  - `strokeCount` so callers know how much to trust the signals — a word
+ *    that's mostly curved letters (LOGO has 2 vertical stems, OOO has 0)
+ *    gives a noisy answer.
+ *
+ *  Falls back to `weight: 'regular'`, `hasSerifFeet: false`, `strokeCount: 0`
+ *  on degenerate inputs (zero-sized bbox, blank region, no vertical stems
+ *  detected). Callers should check `strokeCount` before treating the result
+ *  as ground truth. */
+function analyzeStrokes(
+  img: HTMLImageElement,
+  bbox: { x0: number; y0: number; x1: number; y1: number },
+): StrokeAnalysis {
+  const defaults: StrokeAnalysis = {
+    weight: 'regular', weightRatio: 0,
+    hasSerifFeet: false, serifFootRatio: 0,
+    strokeCount: 0,
+    isLikelyScript: false,
+  };
+  const sourceW = bbox.x1 - bbox.x0;
+  const sourceH = bbox.y1 - bbox.y0;
+  if (sourceW <= 0 || sourceH <= 0) return defaults;
+
+  // Render at a target letter height ~80 px so we have enough vertical
+  // resolution to measure stroke widths (a regular sans is ~6-9 px wide at
+  // that height, a thin is 2-4 px, a heavy is 12+ px). Never upscale more
+  // than 2× — that just blurs pixels we don't have.
+  const TARGET_H = 80;
+  const scale = Math.min(TARGET_H / sourceH, 2);
+  const w = Math.max(1, Math.round(sourceW * scale));
+  const h = Math.max(1, Math.round(sourceH * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return defaults;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, bbox.x0, bbox.y0, sourceW, sourceH, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+
+  const THRESHOLD = 120;
+  const bin = new Uint8Array(w * h);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    if (data[i + 3] > 0 && data[i] < THRESHOLD && data[i + 1] < THRESHOLD && data[i + 2] < THRESHOLD) {
+      bin[p] = 1;
+    }
+  }
+
+  // Trim whitespace rows so we measure relative to the actual letter
+  // height, not the bbox padding.
+  let firstRow = -1;
+  let lastRow = -1;
+  for (let y = 0; y < h; y++) {
+    let any = false;
+    for (let x = 0; x < w; x++) {
+      if (bin[y * w + x]) { any = true; break; }
+    }
+    if (any) {
+      if (firstRow < 0) firstRow = y;
+      lastRow = y;
+    }
+  }
+  if (firstRow < 0 || lastRow - firstRow < 4) return defaults;
+  const letterHeight = lastRow - firstRow + 1;
+
+  // Longest vertical dark-pixel run per column. Columns whose run covers
+  // ≥40% of letter height are "stem columns" — that's the threshold that
+  // captures the vertical stem of L, I, T, M, N, H without catching the
+  // horizontal bar of an A or the diagonal of an X.
+  const colRuns = new Uint16Array(w);
+  for (let x = 0; x < w; x++) {
+    let cur = 0;
+    let max = 0;
+    for (let y = firstRow; y <= lastRow; y++) {
+      if (bin[y * w + x]) {
+        cur++;
+        if (cur > max) max = cur;
+      } else {
+        cur = 0;
+      }
+    }
+    colRuns[x] = max;
+  }
+  const stemThreshold = letterHeight * 0.4;
+
+  // Cluster contiguous stem columns into strokes, and for each stroke
+  // capture its y-range so we can check the terminals (top/bottom rows)
+  // for horizontal serif extensions.
+  const stems: Array<{ xStart: number; xEnd: number; yStart: number; yEnd: number }> = [];
+  let stemStart = -1;
+  for (let x = 0; x <= w; x++) {
+    const isStem = x < w && colRuns[x] >= stemThreshold;
+    if (isStem) {
+      if (stemStart < 0) stemStart = x;
+    } else if (stemStart >= 0) {
+      const stemEnd = x - 1;
+      // Find this stem's actual y-range by scanning for dark pixels in
+      // any of its columns.
+      let yMin = h;
+      let yMax = -1;
+      for (let y = firstRow; y <= lastRow; y++) {
+        for (let xs = stemStart; xs <= stemEnd; xs++) {
+          if (bin[y * w + xs]) {
+            if (y < yMin) yMin = y;
+            if (y > yMax) yMax = y;
+            break;
+          }
+        }
+      }
+      if (yMax >= yMin) {
+        stems.push({ xStart: stemStart, xEnd: stemEnd, yStart: yMin, yEnd: yMax });
+      }
+      stemStart = -1;
+    }
+  }
+  if (stems.length === 0) return defaults;
+
+  // Median stroke width — robust to outliers like joined letterforms.
+  const strokeWidths = stems.map((s) => s.xEnd - s.xStart + 1);
+  const sortedWidths = [...strokeWidths].sort((a, b) => a - b);
+  const medianWidth = sortedWidths[Math.floor(sortedWidths.length / 2)];
+  const weightRatio = medianWidth / letterHeight;
+
+  let weight: VisualWeight = 'regular';
+  if (weightRatio < 0.10) weight = 'thin';
+  else if (weightRatio > 0.18) weight = 'heavy';
+
+  // Per-stem serif detection. For each vertical stroke, measure the
+  // horizontal extent of dark pixels at the top 3 rows and bottom 3 rows
+  // of its y-range, looking up to 1× the stroke's own width on either
+  // side. A serif foot shows up as a row that's noticeably wider than the
+  // stroke itself (typically ≥2× the stroke width with a ≥2 px floor for
+  // thin serifs). Vote across stems — a font with serifs has serif feet
+  // on the majority of its vertical stems (L, T, M, N, H, etc.).
+  const measureRowSpan = (y: number, xLow: number, xHigh: number): number => {
+    let leftMost = -1;
+    let rightMost = -1;
+    const lo = Math.max(0, xLow);
+    const hi = Math.min(w - 1, xHigh);
+    for (let x = lo; x <= hi; x++) {
+      if (bin[y * w + x]) {
+        if (leftMost < 0) leftMost = x;
+        rightMost = x;
+      }
+    }
+    return rightMost < 0 ? 0 : rightMost - leftMost + 1;
+  };
+
+  let stemsWithBothFeet = 0;
+  let stemsWithAnyFoot = 0;
+  for (const stem of stems) {
+    const mainWidth = stem.xEnd - stem.xStart + 1;
+    // Look further to the sides than the stem's own width — Bodoni L feet
+    // extend well beyond mainWidth, and we'd rather over-reach into white
+    // space (no false hits there) than under-reach into a thin cap serif.
+    const sideReach = Math.max(8, Math.floor(mainWidth * 1.5));
+    const xLow = stem.xStart - sideReach;
+    const xHigh = stem.xEnd + sideReach;
+    const bottomSpan = Math.max(
+      measureRowSpan(stem.yEnd,                                      xLow, xHigh),
+      measureRowSpan(Math.max(stem.yStart, stem.yEnd - 1),           xLow, xHigh),
+      measureRowSpan(Math.max(stem.yStart, stem.yEnd - 2),           xLow, xHigh),
+    );
+    const topSpan = Math.max(
+      measureRowSpan(stem.yStart,                                    xLow, xHigh),
+      measureRowSpan(Math.min(stem.yEnd, stem.yStart + 1),           xLow, xHigh),
+      measureRowSpan(Math.min(stem.yEnd, stem.yStart + 2),           xLow, xHigh),
+    );
+    // A terminal counts as a serif foot when the row's dark span is BOTH
+    // 2+ px wider than the stem (absolute floor — guards against
+    // anti-aliasing noise) AND ≥1.3× the stem width (relative — catches
+    // thicker slabs without rejecting hairline cap serifs).
+    const hasFootBottom = bottomSpan >= mainWidth + 2 && bottomSpan >= mainWidth * 1.3;
+    const hasFootTop    = topSpan    >= mainWidth + 2 && topSpan    >= mainWidth * 1.3;
+    if (hasFootBottom && hasFootTop) stemsWithBothFeet++;
+    if (hasFootBottom || hasFootTop) stemsWithAnyFoot++;
+  }
+
+  const serifFootRatio = stemsWithBothFeet / Math.max(1, stems.length);
+  // Count-based decision instead of ratio-based:
+  //   - ≥1 stem with feet on BOTH terminals = unambiguous serif (L's stem
+  //     in a Bodoni LOGO; M / B / d stems in a Bodoni "Mood"). Curve sides
+  //     never produce this — they have one or zero terminal feet at most.
+  //   - ≥2 stems with feet on either terminal = chunky slab pattern where
+  //     cap serifs may be partly clipped or asymmetric.
+  // Sans fonts never produce either signature because flat terminals
+  // don't extend horizontally at all. This makes us immune to the
+  // O/C/G/Q-vote-dilution problem that ratio-based detection had.
+  const hasSerifFeet = stemsWithBothFeet >= 1 || stemsWithAnyFoot >= 2;
+
+  return {
+    weight,
+    weightRatio,
+    hasSerifFeet,
+    serifFootRatio,
+    strokeCount: stems.length,
+    isLikelyScript: false, // populated in cropFromBboxes once the text is known
+  };
+}
+
+/** Pixel flood-fill region detector — used as a fallback when GCV returns
+ *  no regions or errors. Not OCR (no recognition); just finds bounding
+ *  boxes of connected dark blobs in the image and applies size + aspect
+ *  + density filters to drop obvious photo/swatch crops. Returns the same
+ *  TextCrops shape so callers can swap detectors transparently. */
+export async function cropPixelFallback(imageUrl: string): Promise<TextCrops> {
+  const t0 = Date.now();
+  let img: HTMLImageElement;
+  try {
+    img = await loadImage(imageUrl);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      regionCount: 0,
+      regions: [],
+      diag: { wordCount: 0, elapsedMs: Date.now() - t0, pixelFallbackUsed: true, error: `image load: ${msg}` },
+    };
+  }
+
+  const detected = estimatePixelTextRegions(img, 3);
+  console.info(`[pixel] fallback found ${detected.length} candidate regions`);
+  const regions: ExtractedTextRegion[] = detected.map((r) => ({
+    dataUrl: regionToDataUrl(img, r),
+    height: r.bbox.y1 - r.bbox.y0,
+    text: '',
+    isAllCaps: false,
+    spacing: classifySpacingFromBbox(img, r.bbox),
+    stroke: analyzeStrokes(img, r.bbox),
+  }));
+
+  return {
+    header: regions[0]?.dataUrl,
+    decorative: regions.length > 1 && regions[1].height < regions[0].height * DECORATIVE_HEIGHT_RATIO
+      ? regions[1].dataUrl
+      : undefined,
+    regionCount: regions.length,
+    regions,
+    diag: {
+      wordCount: regions.length,
+      elapsedMs: Date.now() - t0,
+      pixelFallbackUsed: true,
+    },
+  };
+}
+
+function estimatePixelTextRegions(
+  img: HTMLImageElement,
+  maxRegions = 3,
+): TextRegion[] {
+  const canvas = document.createElement('canvas');
+  // Downsample large moodboards so flood-fill stays cheap. Bboxes are
+  // scaled back to original-image coordinates before returning.
+  const MAX_DIM = 800;
+  const scale = Math.min(MAX_DIM / img.width, MAX_DIM / img.height, 1);
+  const w = Math.floor(img.width * scale);
+  const h = Math.floor(img.height * scale);
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return [];
+  ctx.drawImage(img, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+
+  const THRESHOLD = 120;
+  const visited = new Uint8Array(w * h);
+  const isDark = (i: number) =>
+    data[i + 3] > 0
+    && data[i]     < THRESHOLD
+    && data[i + 1] < THRESHOLD
+    && data[i + 2] < THRESHOLD;
+
+  const candidates: TextRegion[] = [];
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const pIdx = idx * 4;
+      if (visited[idx] || !isDark(pIdx)) continue;
+
+      let minX = x, minY = y, maxX = x, maxY = y;
+      let pixelCount = 0;
+      const queue: number[] = [idx];
+      visited[idx] = 1;
+      while (queue.length > 0) {
+        const cur = queue.shift() as number;
+        pixelCount++;
+        const cx = cur % w;
+        const cy = (cur - cx) / w;
+        if (cx < minX) minX = cx;
+        if (cy < minY) minY = cy;
+        if (cx > maxX) maxX = cx;
+        if (cy > maxY) maxY = cy;
+
+        const neighbors = [
+          cy > 0     ? cur - w : -1,
+          cy < h - 1 ? cur + w : -1,
+          cx > 0     ? cur - 1 : -1,
+          cx < w - 1 ? cur + 1 : -1,
+        ];
+        for (const n of neighbors) {
+          if (n < 0 || visited[n]) continue;
+          if (!isDark(n * 4)) continue;
+          visited[n] = 1;
+          queue.push(n);
+        }
+      }
+
+      const bboxW = maxX - minX;
+      const bboxH = maxY - minY;
+      const area = bboxW * bboxH;
+      const imgArea = w * h;
+      const aspect = bboxH > 0 ? bboxW / bboxH : Infinity;
+      const density = area > 0 ? pixelCount / area : 0;
+
+      const looksLikePhoto = bboxW > w * 0.4 || bboxH > h * 0.25;
+      const looksLikeSpeck = area < imgArea * 0.001;
+      // Real text headlines are usually wider than tall and rarely above 12:1.
+      const odd = aspect < 1.2 || aspect > 12;
+      const tooDense = density > 0.55;
+      const tooSparse = density < 0.12;
+      if (looksLikePhoto || looksLikeSpeck || odd || tooDense || tooSparse) continue;
+
+      candidates.push({
+        text: '',
+        confidence: 50,
+        bbox: {
+          x0: Math.round(minX / scale),
+          y0: Math.round(minY / scale),
+          x1: Math.round(maxX / scale),
+          y1: Math.round(maxY / scale),
+        },
+      });
+    }
+  }
+
+  candidates.sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0));
+  return candidates.slice(0, maxRegions);
+}
+
+// ── deprecated shims ────────────────────────────────────────────────
+// The legacy TypographyStage still imports these from this module. ESM
+// verifies named imports at parse time, so removing them entirely breaks
+// module load even though TypographyStage's classify call is never reached
+// in the new flow. These will be deleted once TypographyStage is replaced.
+
+/** @deprecated Old Teachable Machine shape — kept for module-load parity. */
 export interface DetectedTypography {
   headerStyle: string;
   decorativeStyle: string | null;
@@ -60,757 +924,21 @@ export interface DetectedTypography {
   hasText: boolean;
 }
 
-/**
- * Enhance image for better OCR results
- */
-function enhanceImageForOCR(canvas: HTMLCanvasElement): HTMLCanvasElement {
-  try {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return canvas;
-    
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    
-    console.log('🔧 Preprocessing image for OCR...');
-    
-    // Mild brightness and contrast enhancement
-    const brightness = 1.1;
-    const contrast = 1.3;
-    const intercept = 128 * (1 - contrast) / 2;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      let r = data[i];
-      let g = data[i + 1];
-      let b = data[i + 2];
-      
-      // Apply brightness
-      r = Math.min(255, r * brightness);
-      g = Math.min(255, g * brightness);
-      b = Math.min(255, b * brightness);
-      
-      // Apply contrast
-      r = Math.min(255, Math.max(0, r * contrast + intercept));
-      g = Math.min(255, Math.max(0, g * contrast + intercept));
-      b = Math.min(255, Math.max(0, b * contrast + intercept));
-      
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-    console.log('✅ Image preprocessed');
-    return canvas;
-  } catch (err) {
-    console.warn('⚠️ OCR preprocessing failed:', err);
-    return canvas;
-  }
-}
-
-/**
- * Group nearby text regions that are likely part of the same word/phrase
- */
-function groupTextRegions(words: TextRegion[], maxGapRatio = 1.5): TextRegion[][] {
-  if (words.length === 0) return [];
-  
-  // Sort by vertical position, then horizontal
-  const sorted = [...words].sort((a, b) => {
-    const yDiff = a.bbox.y0 - b.bbox.y0;
-    if (Math.abs(yDiff) < 20) {
-      return a.bbox.x0 - b.bbox.x0;
-    }
-    return yDiff;
-  });
-  
-  const groups: TextRegion[][] = [];
-  let currentGroup = [sorted[0]];
-  
-  for (let i = 1; i < sorted.length; i++) {
-    const current = sorted[i];
-    const previous = sorted[i - 1];
-    
-    const prevHeight = previous.bbox.y1 - previous.bbox.y0;
-    const currHeight = current.bbox.y1 - current.bbox.y0;
-    const avgHeight = (prevHeight + currHeight) / 2;
-    
-    // Check if on same line
-    const prevMidY = (previous.bbox.y0 + previous.bbox.y1) / 2;
-    const currMidY = (current.bbox.y0 + current.bbox.y1) / 2;
-    const verticalGap = Math.abs(currMidY - prevMidY);
-    const onSameLine = verticalGap < avgHeight * 0.5;
-    
-    // Check horizontal gap
-    const horizontalGap = current.bbox.x0 - previous.bbox.x1;
-    const averageCharWidth = avgHeight * 0.6;
-    const isClose = horizontalGap < averageCharWidth * maxGapRatio;
-    
-    if (onSameLine && isClose) {
-      currentGroup.push(current);
-    } else {
-      if (currentGroup.length > 0) {
-        groups.push(currentGroup);
-      }
-      currentGroup = [current];
-    }
-  }
-  
-  if (currentGroup.length > 0) {
-    groups.push(currentGroup);
-  }
-  
-  return groups;
-}
-
-/**
- * Merge a group of words into a single region
- */
-function mergeWordGroup(wordGroup: TextRegion[]): TextRegion | null {
-  if (wordGroup.length === 0) return null;
-  if (wordGroup.length === 1) return wordGroup[0];
-  
-  const minX = Math.min(...wordGroup.map(w => w.bbox.x0));
-  const minY = Math.min(...wordGroup.map(w => w.bbox.y0));
-  const maxX = Math.max(...wordGroup.map(w => w.bbox.x1));
-  const maxY = Math.max(...wordGroup.map(w => w.bbox.y1));
-  
-  const mergedText = wordGroup.map(w => w.text).join('');
-  const avgConfidence = wordGroup.reduce((sum, w) => sum + w.confidence, 0) / wordGroup.length;
-  
-  return {
-    text: mergedText,
-    confidence: avgConfidence,
-    bbox: { x0: minX, y0: minY, x1: maxX, y1: maxY }
-  };
-}
-
-/**
- * Merge horizontally adjacent text fragments (very aggressive)
- */
-function mergeHorizontallyAdjacentText(predictions: TextRegion[]): TextRegion[] {
-  if (!predictions || predictions.length === 0) return predictions;
-  
-  const sorted = [...predictions].sort((a, b) => a.bbox.x0 - b.bbox.x0);
-  const merged: TextRegion[] = [];
-  let current = { ...sorted[0] };
-  
-  console.log(`\n📦 Merging ${sorted.length} predictions (AGGRESSIVE MODE)...`);
-  
-  for (let i = 1; i < sorted.length; i++) {
-    const next = sorted[i];
-    const gap = next.bbox.x0 - current.bbox.x1;
-    
-    const textLength = current.text ? current.text.length : 1;
-    const currentWidth = current.bbox.x1 - current.bbox.x0;
-    const charWidth = currentWidth / textLength;
-    
-    const heightA = current.bbox.y1 - current.bbox.y0;
-    const heightB = next.bbox.y1 - next.bbox.y0;
-    const heightDiff = Math.abs(heightA - heightB);
-    const avgHeight = (heightA + heightB) / 2;
-    const heightSimilar = heightDiff < avgHeight * 0.5;
-    
-    // Very aggressive merge threshold
-    if (heightSimilar && gap < charWidth * 3.0 && gap > -charWidth) {
-      const beforeText = current.text || '';
-      const afterText = next.text || '';
-      
-      current.text = beforeText + afterText;
-      current.bbox.x1 = next.bbox.x1;
-      current.bbox.y0 = Math.min(current.bbox.y0, next.bbox.y0);
-      current.bbox.y1 = Math.max(current.bbox.y1, next.bbox.y1);
-      
-      if (!current.className && next.className) current.className = next.className;
-      if (!current.probability || (next.probability && next.probability > current.probability)) {
-        current.probability = next.probability;
-      }
-      if (!current.detectedWeight && next.detectedWeight) {
-        current.detectedWeight = next.detectedWeight;
-      }
-      
-      console.log(`  ✅ MERGED: "${beforeText}" + "${afterText}" = "${current.text}"`);
-    } else {
-      merged.push(current);
-      current = { ...next };
-    }
-  }
-  
-  merged.push(current);
-  console.log(`✅ Merge complete: ${predictions.length} → ${merged.length} elements\n`);
-  return merged;
-}
-
-/**
- * Detect text regions using Tesseract.js OCR
- */
-export async function detectTextRegions(imageElement: HTMLImageElement): Promise<TextRegion[]> {
-  console.log('🔍 Starting OCR text detection...');
-  
-  try {
-    // Create worker
-    const worker = await Tesseract.createWorker('eng');
-    console.log('✅ Tesseract worker created');
-    
-    // Recognize image
-    let result = await worker.recognize(imageElement);
-    
-    console.log('📦 TSV data type:', typeof result.data?.tsv);
-    console.log('📦 TSV sample:', result.data?.tsv ? String(result.data.tsv).substring(0, 200) : 'null');
-    
-    // DEBUG: Log the actual structure we received
-    console.log('📦 Raw Tesseract result:', result);
-    console.log('📦 Result keys:', Object.keys(result || {}));
-    console.log('📦 Result.data:', result?.data);
-    console.log('📦 Result.data keys:', result?.data ? Object.keys(result.data) : 'no data');
-    console.log('📦 Result.data.words:', result?.data?.words);
-    console.log('📦 Result.data.blocks:', result?.data?.blocks);
-    console.log('📦 Result.data.lines:', result?.data?.lines);
-    
-    // Safety check for result data
-    if (!result || !result.data) {
-      console.error('❌ OCR returned invalid data structure - no result.data');
-      console.log('Full result object:', JSON.stringify(result, null, 2));
-      await worker.terminate();
-      return [];
-    }
-    
-    // DEBUG: Show all available properties
-    console.log('📦 Available properties on result.data:', Object.keys(result.data));
-    
-    // Check for different Tesseract.js API versions
-    let words: any[] = [];
-    
-    // OPTION 1: Try to use TSV format which includes bounding boxes
-    if (result.data?.tsv && typeof result.data.tsv === 'string') {
-      console.log('✅ Using TSV format to extract word bounding boxes');
-      words = parseTesseractTSV(result.data.tsv);
-      console.log(`✅ Extracted ${words.length} words from TSV format`);
-    }
-    // OPTION 2: Try different possible structures
-    else if (result.data.words && Array.isArray(result.data.words)) {
-      words = result.data.words;
-      console.log('✅ Using result.data.words');
-    } else if (result.data.blocks && Array.isArray(result.data.blocks)) {
-      // Tesseract.js v5+ structure: blocks -> paragraphs -> lines -> words
-      console.log('✅ Using result.data.blocks (Tesseract v5 structure)');
-      console.log(`📦 Found ${result.data.blocks.length} blocks`);
-      
-      for (const block of result.data.blocks) {
-        if (block.paragraphs && Array.isArray(block.paragraphs)) {
-          for (const paragraph of block.paragraphs) {
-            if (paragraph.lines && Array.isArray(paragraph.lines)) {
-              for (const line of paragraph.lines) {
-                if (line.words && Array.isArray(line.words)) {
-                  words.push(...line.words);
-                }
-              }
-            }
-          }
-        }
-      }
-      console.log(`✅ Extracted ${words.length} words from block hierarchy`);
-    } else if (result.data.lines && Array.isArray(result.data.lines)) {
-      console.log('✅ Using result.data.lines');
-      // Extract words from lines
-      words = [];
-      for (const line of result.data.lines) {
-        if (line.words && Array.isArray(line.words)) {
-          words.push(...line.words);
-        }
-      }
-      console.log(`Extracted ${words.length} words from ${result.data.lines.length} lines`);
-    } else if (result.data.symbols && Array.isArray(result.data.symbols)) {
-      words = result.data.symbols;
-      console.log('✅ Using result.data.symbols');
-    }
-    
-    if (words.length === 0 && result.data.text && result.data.text.trim().length > 0) {
-      console.log('⚠️ Found text but no structured word data. Text content:', result.data.text);
-      console.log('📦 Blocks structure:', result.data.blocks);
-      console.log('🔧 Attempting manual text region estimation...');
-      
-      // Fall back to manual region detection using canvas and pixel analysis
-      words = await estimateTextRegionsFromImage(imageElement, result.data.text);
-      console.log(`📊 Estimated ${words.length} text regions from pixel analysis`);
-      
-      if (words.length === 0) {
-        await worker.terminate();
-        return [];
-      }
-    }
-    
-    console.log(`Initial OCR: Found ${words.length} word regions, confidence: ${Math.round(result.data.confidence || 0)}%`);
-    
-    // If low confidence, try with enhanced image
-    if (words.length < 3 || (result.data.confidence || 0) < 20) {
-      console.log('⚠️ Low confidence. Trying enhanced image...');
-      
-      const canvas = document.createElement('canvas');
-      canvas.width = imageElement.width;
-      canvas.height = imageElement.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(imageElement, 0, 0);
-        enhanceImageForOCR(canvas);
-        
-        result = await worker.recognize(canvas);
-        
-        // Re-parse from TSV if available
-        if (result.data?.tsv && typeof result.data.tsv === 'string') {
-          words = parseTesseractTSV(result.data.tsv);
-        } else {
-          words = result.data?.words || result.data?.lines || [];
-        }
-        console.log(`Enhanced OCR: Found ${words.length} regions`);
-      }
-    }
-    
-    await worker.terminate();
-    
-    if (words.length === 0) {
-      console.log('No text detected');
-      return [];
-    }
-    
-    // Pre-filter noise
-    const preFiltered = words.filter(word => {
-      const width = word.bbox.x1 - word.bbox.x0;
-      const height = word.bbox.y1 - word.bbox.y0;
-      return width >= 3 && height >= 3 && word.confidence > 5;
-    });
-    
-    console.log(`Pre-filtered: ${preFiltered.length} regions`);
-    
-    // Group nearby text
-    const textGroups = groupTextRegions(preFiltered as any, 1.8);
-    console.log(`Grouped into ${textGroups.length} text groups`);
-    
-    // Merge groups and filter
-    const validWords = textGroups
-      .map(group => mergeWordGroup(group as any))
-      .filter((region): region is TextRegion => {
-        if (!region) return false;
-        const width = region.bbox.x1 - region.bbox.x0;
-        const height = region.bbox.y1 - region.bbox.y0;
-        return width >= 12 && height >= 10 && region.confidence > 15;
-      });
-    
-    console.log(`✅ Final: ${validWords.length} valid text regions`);
-    
-    // Sort by height for debugging
-    const sorted = [...validWords].sort((a, b) => {
-      const heightA = a.bbox.y1 - a.bbox.y0;
-      const heightB = b.bbox.y1 - b.bbox.y0;
-      return heightB - heightA;
-    });
-    
-    sorted.forEach((region, i) => {
-      const height = region.bbox.y1 - region.bbox.y0;
-      console.log(`  ${i+1}. "${region.text}" (height: ${height}px)`);
-    });
-    
-    return validWords;
-    
-  } catch (error) {
-    console.error('OCR error:', error);
-    return [];
-  }
-}
-
-/**
- * Classify text regions using Teachable Machine models
- */
+/** @deprecated Replaced by GCV + CLIP. Throws if invoked. */
 export async function classifyTextRegions(
-  imageElement: HTMLImageElement,
-  regions: TextRegion[]
+  _imageElement: HTMLImageElement,
+  _regions: TextRegion[]
 ): Promise<DetectedTypography> {
-  console.log('🤖 Loading Teachable Machine models...');
-  
-  try {
-    // Clear any existing variables to prevent conflicts
-    if (!styleModelCache && !weightModelCache) {
-      console.log('🧹 Clearing TensorFlow backend...');
-      try {
-        // Dispose all tensors and clear the backend
-        tf.disposeVariables();
-        await tf.ready();
-      } catch (e) {
-        console.warn('⚠️ Backend cleanup warning:', e);
-      }
-    }
-    
-    // Load style model
-    if (!styleModelCache) {
-      console.log('📥 Loading style model...');
-      styleModelCache = await tf.loadLayersModel(STYLE_MODEL_URL + 'model.json');
-      const styleMetaResponse = await fetch(STYLE_MODEL_URL + 'metadata.json');
-      styleMetadataCache = await styleMetaResponse.json();
-      console.log('✅ Style model loaded');
-    } else {
-      console.log('♻️ Using cached style model');
-    }
-    
-    // Load weight model
-    if (!weightModelCache) {
-      console.log('📥 Loading weight model...');
-      weightModelCache = await tf.loadLayersModel(WEIGHT_MODEL_URL + 'model.json');
-      const weightMetaResponse = await fetch(WEIGHT_MODEL_URL + 'metadata.json');
-      weightMetadataCache = await weightMetaResponse.json();
-      console.log('✅ Weight model loaded');
-    } else {
-      console.log('♻️ Using cached weight model');
-    }
-    
-    console.log('✅ Models ready');
-    
-    // Sort regions by height (tallest first)
-    const sortedByHeight = [...regions].sort((a, b) => {
-      const heightA = a.bbox.y1 - a.bbox.y0;
-      const heightB = b.bbox.y1 - b.bbox.y0;
-      return heightB - heightA;
-    });
-    
-    console.log('\n📏 Text regions sorted by height:');
-    sortedByHeight.forEach((region, i) => {
-      const height = region.bbox.y1 - region.bbox.y0;
-      console.log(`  ${i+1}. "${region.text}" (height: ${height}px)`);
-    });
-    
-    if (sortedByHeight.length === 0) {
-      throw new Error('No text regions to classify');
-    }
-    
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Could not get canvas context');
-    
-    canvas.width = 224;
-    canvas.height = 224;
-    
-    // CLASSIFY ONLY THE TALLEST (HEADER)
-    console.log('\n🎯 Classifying HEADER (tallest text)...');
-    const headerRegion = sortedByHeight[0];
-    const headerResult = await classifySingleRegion(
-      tf, 
-      imageElement, 
-      headerRegion, 
-      canvas, 
-      ctx
-    );
-    
-    console.log(`✅ HEADER: "${headerRegion.text}"`);
-    console.log(`   Style: ${headerResult.style} (${(headerResult.styleConfidence*100).toFixed(0)}%)`);
-    console.log(`   Weight: ${headerResult.weight} (${(headerResult.weightConfidence*100).toFixed(0)}%)`);
-    console.log(`   All Caps: ${headerResult.isAllCaps}`);
-    
-    // CLASSIFY ONLY THE 2ND TALLEST (DECORATIVE) if it exists
-    let decorativeResult: any = null;
-    if (sortedByHeight.length > 1) {
-      console.log('\n🎯 Classifying DECORATIVE (2nd tallest text)...');
-      const decorativeRegion = sortedByHeight[1];
-      decorativeResult = await classifySingleRegion(
-        tf,
-        imageElement,
-        decorativeRegion,
-        canvas,
-        ctx
-      );
-      
-      console.log(`✅ DECORATIVE: "${decorativeRegion.text}"`);
-      console.log(`   Style: ${decorativeResult.style} (${(decorativeResult.styleConfidence*100).toFixed(0)}%)`);
-      console.log(`   Weight: ${decorativeResult.weight} (${(decorativeResult.weightConfidence*100).toFixed(0)}%)`);
-      console.log(`   All Caps: ${decorativeResult.isAllCaps}`);
-    }
-    
-    // BODY: Default readable style (no classification needed)
-    const bodyStyle = 'Sans Serif, Neo Grotesque';
-    const bodyWeight = 400;
-    
-    console.log('\n🎯 Font Role Assignment:');
-    console.log(`  Header: ${headerResult.style} (weight: ${headerResult.weight}) ${headerResult.isAllCaps ? '[ALL CAPS]' : ''}`);
-    console.log(`  Decorative: ${decorativeResult?.style || 'None'} (weight: ${decorativeResult?.weight || 400}) ${decorativeResult?.isAllCaps ? '[ALL CAPS]' : ''}`);
-    console.log(`  Body: ${bodyStyle} (weight: ${bodyWeight}) [Default readable]`);
-    
-    return {
-      headerStyle: headerResult.style,
-      decorativeStyle: decorativeResult?.style || null,
-      bodyStyle,
-      headerWeight: headerResult.weight,
-      decorativeWeight: decorativeResult?.weight || 400,
-      bodyWeight,
-      headerLetterSpacing: 0.05,
-      decorativeLetterSpacing: 0.15,
-      bodyLetterSpacing: 0,
-      headerIsAllCaps: headerResult.isAllCaps,
-      decorativeIsAllCaps: decorativeResult?.isAllCaps || false,
-      hasText: true
-    };
-    
-  } catch (error) {
-    console.error('Classification error:', error);
-    throw error;
-  }
+  throw new Error(
+    'classifyTextRegions has been removed. Use analyzeMoodboard from analyzeMoodboardClient.ts instead.'
+  );
 }
 
-/**
- * Classify a single text region using Teachable Machine models
- */
-async function classifySingleRegion(
-  tf: any,
-  imageElement: HTMLImageElement,
-  region: TextRegion,
-  canvas: HTMLCanvasElement,
-  ctx: CanvasRenderingContext2D
-): Promise<{
-  style: string;
-  styleConfidence: number;
-  weight: number;
-  weightConfidence: number;
-  isAllCaps: boolean;
-}> {
-  const bbox = region.bbox;
-  
-  // Add padding around the text
-  const padding = 15;
-  const x = Math.max(0, bbox.x0 - padding);
-  const y = Math.max(0, bbox.y0 - padding);
-  const width = (bbox.x1 - bbox.x0) + (padding * 2);
-  const height = (bbox.y1 - bbox.y0) + (padding * 2);
-  
-  // Clear canvas and draw cropped region
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0, 0, 224, 224);
-  ctx.drawImage(imageElement, x, y, width, height, 0, 0, 224, 224);
-  
-  // Create tensor from canvas
-  const tensor = tf.browser.fromPixels(canvas).toFloat().div(255.0).expandDims();
-  
-  // Get style prediction
-  const stylePrediction = await styleModelCache.predict(tensor as any).data() as Float32Array;
-  const styleResults = styleMetadataCache.labels.map((label: string, j: number) => ({
-    className: label,
-    probability: stylePrediction[j]
-  })).sort((a: any, b: any) => b.probability - a.probability);
-  
-  // Log top 3 style predictions
-  console.log('  📊 Style predictions:');
-  styleResults.slice(0, 3).forEach((result: any, i: number) => {
-    console.log(`     ${i+1}. ${result.className}: ${(result.probability*100).toFixed(1)}%`);
-  });
-  
-  // Get weight prediction
-  const weightPrediction = await weightModelCache.predict(tensor as any).data() as Float32Array;
-  const weightResults = weightMetadataCache.labels.map((label: string, j: number) => ({
-    weight: parseInt(label.replace(/\D/g, '')) || 400,
-    probability: weightPrediction[j]
-  })).sort((a: any, b: any) => b.probability - a.probability);
-  
-  // Log top 3 weight predictions
-  console.log('  📊 Weight predictions:');
-  weightResults.slice(0, 3).forEach((result: any, i: number) => {
-    console.log(`     ${i+1}. ${result.weight}: ${(result.probability*100).toFixed(1)}%`);
-  });
-  
-  tensor.dispose();
-  
-  // Detect ALL CAPS
-  const textIsAllCaps = region.text === region.text.toUpperCase() && /[A-Z]/.test(region.text);
-  console.log(`  🔤 OCR text: "${region.text}"`);
-  console.log(`  🔤 Text is all caps (from OCR): ${textIsAllCaps}`);
-  console.log(`  🔤 Top style: "${styleResults[0].className}"`);
-  
-  let isAllCaps = false;
-  let styleToUse = styleResults[0];
-  
-  // Check if Teachable Machine detected ALL CAPS
-  if (styleResults[0].className === 'ALL CAPS') {
-    isAllCaps = true;
-    console.log('  ✅ ALL CAPS detected by Teachable Machine!');
-    // Use the 2nd style result as the actual style
-    if (styleResults.length > 1) {
-      styleToUse = styleResults[1];
-      console.log(`  📝 Using 2nd style result as actual style: "${styleToUse.className}"`);
-    }
-  } else if (textIsAllCaps) {
-    isAllCaps = true;
-    console.log('  ✅ ALL CAPS detected from OCR text case!');
-  }
-  
-  console.log(`  🎯 Final: style="${styleToUse.className}", weight=${weightResults[0].weight}, allCaps=${isAllCaps}`);
-  
-  return {
-    style: styleToUse.className,
-    styleConfidence: styleToUse.probability,
-    weight: weightResults[0].weight,
-    weightConfidence: weightResults[0].probability,
-    isAllCaps
-  };
-}
-
-/**
- * Parse Tesseract.js TSV output to extract word bounding boxes
- */
-function parseTesseractTSV(tsv: string): TextRegion[] {
-  const lines = tsv.split('\n');
-  const words: TextRegion[] = [];
-  
-  console.log(`📋 Parsing TSV with ${lines.length} lines...`);
-  
-  // TSV format: level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
-  for (let i = 1; i < lines.length; i++) { // Skip header row
-    const parts = lines[i].split('\t');
-    if (parts.length < 12) continue; // Skip incomplete lines
-    
-    const level = parseInt(parts[0]);
-    const text = parts[11];
-    const conf = parseFloat(parts[10]);
-    const left = parseInt(parts[6]);
-    const top = parseInt(parts[7]);
-    const width = parseInt(parts[8]);
-    const height = parseInt(parts[9]);
-    
-    // DEBUG: Log first few entries
-    if (i <= 5) {
-      console.log(`  Line ${i}: level=${level}, text="${text}", conf=${conf}, bbox=[${left},${top},${width},${height}]`);
-    }
-    
-    // Only include word-level entries (level 5) with actual text
-    if (level === 5 && text && text.trim().length > 0 && conf > 0) {
-      words.push({
-        text: text.trim(),
-        confidence: conf,
-        bbox: { 
-          x0: left, 
-          y0: top, 
-          x1: left + width, 
-          y1: top + height 
-        }
-      });
-    }
-  }
-  
-  console.log(`📋 Parsed ${words.length} words from TSV format`);
-  if (words.length === 0) {
-    console.log('⚠️ No level-5 (word) entries found. Checking other levels...');
-    // Try to find any text at any level
-    for (let i = 1; i < Math.min(lines.length, 20); i++) {
-      const parts = lines[i].split('\t');
-      if (parts.length >= 12) {
-        const level = parseInt(parts[0]);
-        const text = parts[11];
-        const conf = parseFloat(parts[10]);
-        if (text && text.trim().length > 0) {
-          console.log(`  Found at level ${level}: "${text}" (conf: ${conf})`);
-        }
-      }
-    }
-  }
-  
-  return words;
-}
-
-/**
- * Estimate text regions from image using pixel analysis
- */
-async function estimateTextRegionsFromImage(imageElement: HTMLImageElement, textContent: string): Promise<TextRegion[]> {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return [];
-  
-  canvas.width = imageElement.width;
-  canvas.height = imageElement.height;
-  ctx.drawImage(imageElement, 0, 0);
-  
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  
-  const regions: TextRegion[] = [];
-  const visited = new Set<string>();
-  
-  // Simple thresholding to detect text pixels
-  const threshold = 150;
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const index = (y * canvas.width + x) * 4;
-      const r = data[index];
-      const g = data[index + 1];
-      const b = data[index + 2];
-      const a = data[index + 3];
-      
-      if (a > 0 && (r < threshold || g < threshold || b < threshold)) {
-        const key = `${x},${y}`;
-        if (!visited.has(key)) {
-          const region = findTextRegion(data, canvas.width, canvas.height, x, y, threshold);
-          if (region) {
-            regions.push(region);
-            for (let ry = region.bbox.y0; ry <= region.bbox.y1; ry++) {
-              for (let rx = region.bbox.x0; rx <= region.bbox.x1; rx++) {
-                visited.add(`${rx},${ry}`);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  // Assign text content to regions (simple heuristic)
-  const words = textContent.split(/\s+/);
-  let wordIndex = 0;
-  
-  for (const region of regions) {
-    if (wordIndex < words.length) {
-      region.text = words[wordIndex++];
-    } else {
-      region.text = '';
-    }
-    region.confidence = 100; // Placeholder confidence
-  }
-  
-  return regions;
-}
-
-/**
- * Find a text region starting from a given pixel
- */
-function findTextRegion(data: Uint8ClampedArray, width: number, height: number, startX: number, startY: number, threshold: number): TextRegion | null {
-  const queue: [number, number][] = [[startX, startY]];
-  const visited = new Set<string>();
-  let minX = startX;
-  let minY = startY;
-  let maxX = startX;
-  let maxY = startY;
-  
-  while (queue.length > 0) {
-    const [x, y] = queue.shift()!;
-    const key = `${x},${y}`;
-    if (visited.has(key)) continue;
-    visited.add(key);
-    
-    const index = (y * width + x) * 4;
-    const r = data[index];
-    const g = data[index + 1];
-    const b = data[index + 2];
-    const a = data[index + 3];
-    
-    if (a > 0 && (r < threshold || g < threshold || b < threshold)) {
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      
-      // Add neighbors to queue
-      if (x > 0) queue.push([x - 1, y]);
-      if (x < width - 1) queue.push([x + 1, y]);
-      if (y > 0) queue.push([x, y - 1]);
-      if (y < height - 1) queue.push([x, y + 1]);
-    }
-  }
-  
-  if (maxX - minX < 3 || maxY - minY < 3) return null;
-  
-  return {
-    text: '',
-    confidence: 0,
-    bbox: { x0: minX, y0: minY, x1: maxX, y1: maxY }
-  };
+/** @deprecated The Tesseract-based detector was removed; this shim only
+ *  exists so any lingering import in the legacy TypographyStage doesn't
+ *  break module load. */
+export async function detectTextRegions(
+  _imageElement: HTMLImageElement
+): Promise<{ regions: TextRegion[]; diag: OcrDiag }> {
+  return { regions: [], diag: { wordCount: 0, elapsedMs: 0, error: 'detectTextRegions removed — GCV is now the only OCR path' } };
 }

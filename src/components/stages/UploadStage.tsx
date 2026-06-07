@@ -4,15 +4,31 @@ import TuneIcon from '@mui/icons-material/Tune';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useState, useRef, useCallback } from 'react';
 import type { StageProps } from '../../types';
+import { warmAnalyzeMoodboard, getOrStartMoodboardAnalysis } from '../../utils/analyzeMoodboardClient';
+import { uploadDesignSystemFile, getPublicFileUrl } from '../../utils/firebase/storage';
 
 export type GenerationMode = 'guided' | 'auto';
 
+const TYPO_ANALYSIS_FOLDER = 'typography-v2-moodboards';
+
 interface Props extends StageProps {
   onImageUploaded: (imageUrl: string, file: File) => void;
+  /** Fired once the moodboard finishes uploading to Storage AND the
+   *  typography analysis has been kicked off. The URL is the public Storage
+   *  URL that downstream stages should use when they need a server-fetchable
+   *  reference (vs the blob: URL we hand to onImageUploaded for instant
+   *  preview). Optional — callers that don't need the v2 typography path
+   *  can omit it. */
+  onMoodboardPublicUrlReady?: (publicUrl: string) => void;
   onGenerate: (mode: GenerationMode) => void;
 }
 
-export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Props) {
+export default function UploadStage({
+  onBack,
+  onImageUploaded,
+  onMoodboardPublicUrlReady,
+  onGenerate,
+}: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -29,7 +45,34 @@ export default function UploadStage({ onBack, onImageUploaded, onGenerate }: Pro
     prevUrlRef.current = url;
     setPreview(url);
     onImageUploaded(url, file);
-  }, [onImageUploaded]);
+    // Prime the CLIP cloud function so the model is in memory by the time
+    // the user reaches the typography stage. Fire-and-forget; the real
+    // analyze call will surface any error that matters.
+    warmAnalyzeMoodboard();
+
+    // Kick off the actual typography analysis in the background so the
+    // result is waiting by the time the user finishes color extraction +
+    // color-assignment and lands on the typography stage. Storage upload
+    // happens here too because cloud functions can't fetch the local
+    // `blob:` URL we created for instant preview.
+    (async () => {
+      try {
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+        const filename = `${Date.now()}.${ext}`;
+        await uploadDesignSystemFile(TYPO_ANALYSIS_FOLDER, filename, file, file.type);
+        const publicUrl = getPublicFileUrl(TYPO_ANALYSIS_FOLDER, filename);
+        // Cache the analysis promise keyed by URL — when TypographyStageV2
+        // mounts, it calls the same function and gets THIS promise back.
+        getOrStartMoodboardAnalysis(publicUrl).catch(() => {/* logged in stage */});
+        // Tell App.tsx where the public URL is so it can pass it to the
+        // typography stage instead of the un-fetchable blob URL.
+        onMoodboardPublicUrlReady?.(publicUrl);
+      } catch (err) {
+        // Non-fatal — TypographyStageV2 has its own fallback upload path.
+        console.warn('[upload] background storage upload failed:', err);
+      }
+    })();
+  }, [onImageUploaded, onMoodboardPublicUrlReady]);
 
   // Note: we intentionally do NOT revoke the URL on unmount because the parent
   // (App) holds a reference to it for use in downstream stages (color extraction,
