@@ -22,7 +22,7 @@ export default function Playground() {
     }
     let mounted = true;
 
-    fetch(getPublicFileUrl(uuid, 'tokens-base.css'), { method: 'HEAD' })
+    fetch(getPublicFileUrl(uuid, 'foundation.css'), { method: 'HEAD' })
       .then(res => {
         if (mounted) { setExists(res.ok); setLoading(false); }
       })
@@ -52,17 +52,20 @@ export default function Playground() {
     );
   }
 
-  const cssUrls = [
-    getPublicFileUrl(uuid, 'tokens-base.css'),
-    getPublicFileUrl(uuid, 'tokens-semantic.css'),
-    getPublicFileUrl(uuid, 'tokens-component.css'),
-    getPublicFileUrl(uuid, 'tokens-light.css'),
-    getPublicFileUrl(uuid, 'tokens-dark.css'),
-  ];
-
+  // File names mirror what generateDesignSystem.ts uploads to
+  // design-systems/<uuid>/. The Provider maps each prop to a tag slot
+  // (foundation → #dyno-foundation, etc.) and the Phase 2 Netlify edge
+  // function pre-injects matching <link> tags into <head> — so when the
+  // Provider's loadCSSSource runs, it adopts the existing <link>s by id
+  // instead of re-fetching.
   return (
     <DynoDesignProvider
-      cssUrls={cssUrls}
+      foundationCSS={getPublicFileUrl(uuid, 'foundation.css')}
+      coreCSS={getPublicFileUrl(uuid, 'core.css')}
+      lightModeCSS={getPublicFileUrl(uuid, 'Light-Mode.css')}
+      darkModeCSS={getPublicFileUrl(uuid, 'Dark-Mode.css')}
+      baseCSS={getPublicFileUrl(uuid, 'base.css')}
+      stylesCSS={getPublicFileUrl(uuid, 'styles.css')}
       defaultTheme="Default"
       defaultStyle="Modern"
       defaultSurface="Surface"

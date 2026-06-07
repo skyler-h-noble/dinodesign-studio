@@ -124,13 +124,12 @@ const tokenUrl = (file) => TOKEN_BASE + encodeURIComponent(file) + '?alt=media';
 function App() {
   return (
     <DynoDesignProvider
-      cssUrls={[
-        tokenUrl('tokens-base.css'),
-        tokenUrl('tokens-semantic.css'),
-        tokenUrl('tokens-component.css'),
-        tokenUrl('tokens-light.css'),
-        tokenUrl('tokens-dark.css'),
-      ]}
+      foundationCSS={tokenUrl('foundation.css')}
+      coreCSS={tokenUrl('core.css')}
+      lightModeCSS={tokenUrl('Light-Mode.css')}
+      darkModeCSS={tokenUrl('Dark-Mode.css')}
+      baseCSS={tokenUrl('base.css')}
+      stylesCSS={tokenUrl('styles.css')}
       defaultTheme="Default"
       defaultStyle="${styleName}"
       defaultSurface="Surface"
@@ -139,6 +138,25 @@ function App() {
     </DynoDesignProvider>
   );
 }
+\`\`\`
+
+### Fastest first paint (optional)
+
+For the fastest possible time-to-styled-paint, also put the brand \`<link>\`
+tags directly in your HTML's \`<head>\` so the browser fetches CSS in parallel
+with the JS bundle. Use the same \`id="dyno-*"\` attributes — the Provider
+will adopt the existing tags instead of re-fetching them:
+
+\`\`\`html
+<!-- public/index.html -->
+<head>
+  <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
+  <link rel="stylesheet" id="dyno-foundation" data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Ffoundation.css?alt=media">
+  <link rel="stylesheet" id="dyno-core"       data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fcore.css?alt=media">
+  <link rel="stylesheet" id="dyno-mode"       data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2FLight-Mode.css?alt=media">
+  <link rel="stylesheet" id="dyno-base"       data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fbase.css?alt=media">
+  <link rel="stylesheet" id="dyno-styles"     data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fstyles.css?alt=media">
+</head>
 \`\`\`
 
 ---

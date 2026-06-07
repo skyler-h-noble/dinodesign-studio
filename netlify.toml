@@ -12,3 +12,11 @@
 [build]
   command = "npx vite build"
   publish = "dist"
+
+# Pre-inject the user's brand CSS into /playground HTML so the browser
+# fetches it in parallel with the JS bundle (no flash of lib defaults
+# while the SPA boots). See netlify/edge-functions/playground-css.ts
+# for the injection logic. Requires FIREBASE_STORAGE_BUCKET env var.
+[[edge_functions]]
+  path     = "/playground"
+  function = "playground-css"
