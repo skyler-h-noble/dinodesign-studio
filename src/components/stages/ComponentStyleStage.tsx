@@ -126,35 +126,9 @@ export default function ComponentStyleStage({
       }}>
         <div style={{ width: 296, padding: '8px 16px', boxSizing: 'border-box' }}>
           <VStack spacing={2}>
-            <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style</H3>
+            <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style Settings</H3>
 
-            {/* Presets */}
-            <VStack spacing={1}>
-              <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>Presets</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Choose a base style then fine-tune the details.</BodySmall>
-              <ButtonGroup
-                size="small"
-                value={selected}
-                onChange={(val: typeof selected) => {
-                  setSelected(val);
-                  setCustomizations(prev => ({
-                    ...prev,
-                    [val]: DEFAULT_CUSTOMIZATIONS[val],
-                  }));
-                }}
-              >
-                {STYLE_KEYS.map(styleKey => {
-                  const style = STYLE_DEFAULTS[styleKey];
-                  return (
-                    <Button key={styleKey} value={styleKey} size="small">
-                      {style.label}
-                    </Button>
-                  );
-                })}
-              </ButtonGroup>
-            </VStack>
-
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)', marginTop: 24 }}>Components</BodySmall>
+            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)', marginTop: 8 }}>Components</BodySmall>
             {[
               { key: 'button', label: 'Button', defaultOpen: true, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
@@ -216,6 +190,33 @@ export default function ComponentStyleStage({
       {/* ─── Right: main content ─── */}
       <div style={{ flex: 1, minWidth: 0, transition: 'margin 0.2s ease' }}>
         <VStack spacing={4} style={{ maxWidth: 600, margin: '0 auto', padding: '40px 24px' }}>
+
+          {/* Presets — base style picker. Lives in the main column so the
+              full row of options stays visible (the left nav crops them). */}
+          <VStack spacing={1} alignItems="center">
+            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>Presets</BodySmall>
+            <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Choose a base style then fine-tune the details.</BodySmall>
+            <ButtonGroup
+              size="small"
+              value={selected}
+              onChange={(val: typeof selected) => {
+                setSelected(val);
+                setCustomizations(prev => ({
+                  ...prev,
+                  [val]: DEFAULT_CUSTOMIZATIONS[val],
+                }));
+              }}
+            >
+              {STYLE_KEYS.map(styleKey => {
+                const style = STYLE_DEFAULTS[styleKey];
+                return (
+                  <Button key={styleKey} value={styleKey} size="small">
+                    {style.label}
+                  </Button>
+                );
+              })}
+            </ButtonGroup>
+          </VStack>
 
           {!settingsOpen && (
             <HStack spacing={2} style={{ justifyContent: 'center' }}>
@@ -281,12 +282,12 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Style</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
-                      <Button variant="primary" size="medium"
+                      <Button variant="default" size="medium"
                         sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Solid
                       </Button>
-                      <Button variant="primary-outline" size="medium"
+                      <Button variant="default-outline" size="medium"
                         sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Outline
@@ -303,17 +304,17 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Size</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Button variant="primary" size="small"
+                      <Button variant="default" size="small"
                         sx={{ minHeight: `${custom.smallButtonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Small
                       </Button>
-                      <Button variant="primary" size="medium"
+                      <Button variant="default" size="medium"
                         sx={{ minHeight: `${custom.buttonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Medium
                       </Button>
-                      <Button variant="primary" size="large"
+                      <Button variant="default" size="large"
                         sx={{ minHeight: `${custom.largeButtonHeight}px` }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         Large
@@ -325,7 +326,7 @@ export default function ComponentStyleStage({
                   <VStack spacing={2}>
                     <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Icon Buttons</Label>
                     <HStack spacing={2}>
-                      <Button variant="primary" size="medium" iconOnly
+                      <Button variant="default" size="medium" iconOnly
                         sx={{
                           minHeight: `${custom.buttonHeight}px`,
                           minWidth: `${custom.buttonHeight}px`,
@@ -335,7 +336,7 @@ export default function ComponentStyleStage({
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <CalendarTodayIcon style={{ fontSize: 20 }} />
                       </Button>
-                      <Button variant="primary-outline" size="medium" iconOnly
+                      <Button variant="default-outline" size="medium" iconOnly
                         sx={{
                           minHeight: `${custom.buttonHeight}px`,
                           minWidth: `${custom.buttonHeight}px`,
