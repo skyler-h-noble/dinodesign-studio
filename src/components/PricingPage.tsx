@@ -117,7 +117,12 @@ export default function PricingPage({ onCheckout }: Props) {
             style={{
               position: 'absolute',
               top: -10,
-              right: -8,
+              // Center the badge horizontally over the Annual button
+              // (the right half of the segmented control). `left: 75%`
+              // hits the midpoint of the right half; the transform shifts
+              // the badge's own center onto that point.
+              left: '75%',
+              transform: 'translateX(-50%)',
               padding: '2px 8px',
               borderRadius: 999,
               background: 'var(--Buttons-Success-Button)',
@@ -128,6 +133,7 @@ export default function PricingPage({ onCheckout }: Props) {
               letterSpacing: '0.06em',
               zIndex: 1,
               pointerEvents: 'none',
+              whiteSpace: 'nowrap',
             }}
           >
             Save 21%
