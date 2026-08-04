@@ -2,7 +2,7 @@
  * WCAG Contrast Verification for DinoDesign Fixed Structures
  *
  * Converts LCH colors (max chroma 70) → sRGB → relative luminance → WCAG contrast ratio
- * Tests all fixed structure mappings (Text, Header, Quiet, Border, Hover, Active)
+ * Tests all fixed structure mappings (Text, Header, Quiet, Border, Hover, Pressed)
  * across multiple hues to find worst-case contrast.
  *
  * Run: npx tsx src/utils/cssgen/verifyContrast.ts
@@ -297,7 +297,7 @@ const WCAG_LARGE_AA: WcagRequirement = { name: 'Large Text AA', ratio: 3.1, leve
 const WCAG_UI_AA: WcagRequirement = { name: 'UI Component AA', ratio: 3.1, level: 'AA (UI components / borders)' };
 // Quiet text is intentionally lower contrast — 2.5:1 is a reasonable minimum
 const WCAG_QUIET: WcagRequirement = { name: 'Quiet (decorative)', ratio: 2.5, level: 'Decorative minimum' };
-// Hover/Active need visual distinction, not contrast against text
+// Hover/Pressed need visual distinction, not contrast against text
 const WCAG_DISTINCTION: WcagRequirement = { name: 'Visual Distinction', ratio: 1.1, level: 'Visible shift' };
 
 // ============================================================

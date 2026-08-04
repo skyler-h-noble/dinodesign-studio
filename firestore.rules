@@ -149,5 +149,32 @@ service cloud.firestore {
     match /rateLimits/{key} {
       allow read, write: if false;
     }
+
+    // text-gate-feedback/{id}
+    //   Labeled training data for the typography matcher's text-vs-non-text
+    //   gate. Any signed-in user can create entries (their matcher runs
+    //   contribute to the corpus). Each entry must carry the writer's uid
+    //   so we can attribute and audit. No reads or updates from clients —
+    //   training pulls go through a Cloud Function / admin SDK.
+    match /text-gate-feedback/{id} {
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    // figma-conversion-feedback/{id}
+    //   Internal AAID workbench feedback. The same signed-in user who
+    //   creates a conversion record can patch it later with verdict +
+    //   correction (so we can wire the "save feedback" button after the
+    //   "Convert" call). Admin-only in practice — page is gated by
+    //   users/{uid}.isAdmin === true at the UI layer. Reads only via
+    //   Cloud Function / admin SDK for fine-tuning pulls.
+    match /figma-conversion-feedback/{id} {
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn()
+                    && resource.data.userId == request.auth.uid;
+      allow read, delete: if false;
+    }
   }
 }

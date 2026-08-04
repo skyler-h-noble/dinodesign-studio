@@ -12,6 +12,7 @@ import type { StageProps, ColorScheme, UserSelections, TypographyStyle, Componen
 import { generateAndUploadDesignSystem } from '../../utils/generateDesignSystem';
 import { LIB_DYNAMIC_CSS_FILES } from '../../utils/cssgen/exportToCSS';
 import { getPublicFileUrl } from '../../utils/firebase/storage';
+import { FigmaImportModal } from '../FigmaImportModal';
 import { db } from '../../utils/firebase/client';
 import { isDesignNameTaken } from '../../utils/designSystemNames';
 import { useAuth } from '../../contexts/AuthContext';
@@ -63,6 +64,39 @@ export default function ExportStage({
   const [copiedClaude, setCopiedClaude] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  // Rotating progress copy while the upload runs. The actual export step
+  // doesn't expose granular progress events, so this is a friendly
+  // narration on a fixed interval — same pattern as the typography stage's
+  // moodboard-analysis card. Real upload takes 8–20s depending on the
+  // network, so ~2s cadence shows the user we're still alive without
+  // burning through the list too fast.
+  const GENERATION_STEPS = [
+    'Mixing your color palettes…',
+    'Generating CSS tokens…',
+    'Compiling Figma variables…',
+    'Building the component theme…',
+    'Writing documentation…',
+    'Packaging your design system…',
+    'Uploading to your library…',
+    'Almost there…',
+  ];
+  const [genStepIdx, setGenStepIdx] = useState(0);
+  const [showFigmaImportModal, setShowFigmaImportModal] = useState(false);
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenStepIdx(0);
+      return;
+    }
+    const t = setInterval(
+      () => setGenStepIdx(i => Math.min(i + 1, GENERATION_STEPS.length - 1)),
+      2000,
+    );
+    return () => clearInterval(t);
+    // GENERATION_STEPS is a stable literal — its identity changes per
+    // render but its contents don't, so depending on isGenerating alone
+    // is correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGenerating]);
   // Tracks which dinoId we've already started a re-export for. React 18 dev
   // StrictMode invokes effects twice; without this ref the second invocation
   // would race against the first and the post-upload state updates
@@ -99,10 +133,18 @@ export default function ExportStage({
     typographySettings: typographySettings || null,
   });
 
-  // First export: no dinoId yet. Generate fresh UUID, write Firestore +
-  // 'created' event.
+  // First export — generate + upload the CSS / token files. Tracks
+  // completion via a ref instead of `dinoId` because dinoId can be set
+  // BEFORE the upload happens (saveDraftBeforeCheckout mints a UUID for
+  // the Stripe round-trip so the success page can rehydrate, then this
+  // stage inherits that UUID). Guarding on `dinoId` here used to make
+  // the export silently skip after Stripe came back, leaving an empty
+  // design-systems/<uuid>/ folder — the playground then 404'd on
+  // theme.json and fell back to the lib's seed brand.
+  const uploadStartedRef = useRef(false);
   useEffect(() => {
-    if (dinoId || isGenerating || !colorScheme || pendingReExport) return;
+    if (uploadStartedRef.current || isGenerating || !colorScheme || pendingReExport) return;
+    uploadStartedRef.current = true;
     let mounted = true;
     setIsGenerating(true);
     setGenError(null);
@@ -113,9 +155,17 @@ export default function ExportStage({
       // in the review→pricing flow and may now collide with an older design.
       if (user) {
         try {
-          const taken = await isDesignNameTaken(user.uid, designSystemName);
+          // Exclude the user's own pre-checkout draft (saveDraftBeforeCheckout
+          // wrote a doc at this exact dinoId with this exact name before
+          // Stripe). Without excludeId the check sees that draft as a
+          // duplicate and bails — that's the user's CURRENT in-progress
+          // design, not a collision.
+          const taken = await isDesignNameTaken(user.uid, designSystemName, dinoId || undefined);
           if (taken) {
-            if (!mounted) return;
+            // No `mounted` bail — StrictMode's first cleanup runs before
+            // this resolves, leaving the spinner stuck. Same pattern as
+            // the .then/.catch paths below; state updates on a torn-down
+            // component just warn.
             setGenError(`You already have a design system named "${designSystemName}". Go back and rename it before exporting.`);
             setIsGenerating(false);
             return;
@@ -137,9 +187,20 @@ export default function ExportStage({
         moodBoardFile,
         styleCustomizations,
         version: 1,
+        // CRITICAL — reuse the dinoId set by saveDraftBeforeCheckout (the
+        // Stripe round-trip mints it pre-payment so the success URL can
+        // rehydrate). Without this we'd mint a new UUID here and the
+        // playground URL (built from the pre-checkout dinoId) would 404.
+        uuid: dinoId || undefined,
       })
       .then(async id => {
-        if (!mounted) return;
+        // No `mounted` early-return here. React 18 StrictMode runs the
+        // effect twice in dev; the first invocation's cleanup sets the
+        // local `mounted` to false BEFORE the upload's promise resolves.
+        // Bailing on `!mounted` then leaves isGenerating stuck on true
+        // forever even though the upload succeeded. State updates on a
+        // truly unmounted component just warn — acceptable cost for
+        // avoiding the stuck-spinner case.
         if (user) {
           try {
             const snapshot = buildSnapshot(id);
@@ -184,13 +245,17 @@ export default function ExportStage({
         setIsGenerating(false);
       })
       .catch(err => {
-        if (!mounted) return;
+        // Same rationale as the .then above — don't bail on `mounted`.
         console.error('Generation failed:', err);
         setGenError(err.message);
         setIsGenerating(false);
       });
     })();
 
+    // We removed the unmount guards in .then/.catch above for StrictMode
+    // safety. Keeping the local `mounted` flag alive for the user-message
+    // path (the duplicate-name guard inside the async IIFE still uses it
+    // to avoid spuriously setting an error after navigation).
     return () => { mounted = false; };
   }, []);
 
@@ -299,7 +364,9 @@ export default function ExportStage({
         <VStack spacing={4} style={{ maxWidth: 800, margin: '0 auto', alignItems: 'center', paddingTop: 80 }}>
           <div className="typo-spinner" />
           <H2 sx={{ textAlign: 'center', width: 'auto' }}>Generating Your Design System</H2>
-          <Body sx={{ color: 'var(--Quiet)', textAlign: 'center', width: 'auto' }}>Uploading CSS tokens, Figma JSON, and documentation...</Body>
+          <Body sx={{ color: 'var(--Quiet)', textAlign: 'center', width: 'auto' }}>
+            {GENERATION_STEPS[genStepIdx]}
+          </Body>
         </VStack>
       </div>
     );
@@ -372,10 +439,16 @@ export default function ExportStage({
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Get a full Figma design system with your brand tokens applied to every component, style, and variable.
+                Get a full Figma design system with your brand tokens applied
+                to every component, style, and variable.
               </BodySmall>
-              <Button variant="primary" style={{ width: '100%' }} disabled>
-                Open Figma Template (Coming Soon)
+              <Button
+                variant="primary"
+                style={{ width: '100%' }}
+                onClick={() => setShowFigmaImportModal(true)}
+                disabled={!dinoId}
+              >
+                Get my design into Figma
               </Button>
             </VStack>
           </Card>
@@ -388,7 +461,7 @@ export default function ExportStage({
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Install the DinoDesign component library and connect your design system to your React project.
+                Install the OmniDesign component library and connect your design system to your React project.
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
                 <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
@@ -485,13 +558,13 @@ export default function ExportStage({
           </Card>
         )}
 
-        {/* Export directly to DinoDesign lib (dev workflow) */}
+        {/* Export directly to OmniDesign lib (dev workflow) */}
         {hasId && (
           <Card padding="medium" sx={{ width: '100%' }}>
             <VStack spacing={2}>
-              <BodySmall style={{ fontWeight: 600 }}>Export to DinoDesign</BodySmall>
+              <BodySmall style={{ fontWeight: 600 }}>Export to OmniDesign</BodySmall>
               <BodySmall style={{ color: 'var(--Quiet)' }}>
-                Writes the 3 dynamic CSS files (<code>base.css</code>, <code>Light-Mode.css</code>, <code>Dark-Mode.css</code>) to your DinoDesign folder. First time you'll pick the folder; after that the studio remembers it and writes directly. Static lib files are left alone. Chrome/Edge only.
+                Writes the 3 dynamic CSS files (<code>base.css</code>, <code>Light-Mode.css</code>, <code>Dark-Mode.css</code>) to your OmniDesign folder. First time you'll pick the folder; after that the studio remembers it and writes directly. Static lib files are left alone. Chrome/Edge only.
               </BodySmall>
               <Button
                 variant="primary-outline"
@@ -569,22 +642,28 @@ export default function ExportStage({
                         console.error(`Failed to write ${f}:`, e);
                       }
                     }
-                    alert(`Exported ${written} of ${LIB_DYNAMIC_CSS_FILES.length} dynamic CSS files to DinoDesign.`);
+                    alert(`Exported ${written} of ${LIB_DYNAMIC_CSS_FILES.length} dynamic CSS files to OmniDesign.`);
                   } catch (err) {
                     // AbortError = user cancelled the picker; ignore silently.
                     if ((err as { name?: string })?.name !== 'AbortError') {
-                      console.error('Export to DinoDesign failed:', err);
+                      console.error('Export to OmniDesign failed:', err);
                       alert('Export failed. See console for details.');
                     }
                   }
                 }}
               >
-                Export to DinoDesign
+                Export to OmniDesign
               </Button>
             </VStack>
           </Card>
         )}
       </VStack>
+      <FigmaImportModal
+        open={showFigmaImportModal}
+        onClose={() => setShowFigmaImportModal(false)}
+        id={dinoId || ''}
+        name={designSystemName}
+      />
     </div>
   );
 }

@@ -54,7 +54,7 @@ export default function PluginPairing() {
         }}>
           Figma plugin
         </BodySmall>
-        <Body>Pair the DinoDesign plugin so it can sign in as you.</Body>
+        <Body>Pair the OmniDesign plugin so it can sign in as you.</Body>
         <BodySmall style={{ color: 'var(--Quiet)' }}>
           Open the plugin in Figma, click <strong>Connect to my account</strong>,
           and enter the 6-character code it shows below.

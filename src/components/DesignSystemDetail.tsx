@@ -15,13 +15,14 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, addDoc, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
-import { getPublicFileUrl, getFigmaTemplateUrl } from '../utils/firebase/storage';
+import { getPublicFileUrl } from '../utils/firebase/storage';
 import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { generateAndUploadDesignSystem } from '../utils/generateDesignSystem';
 import AppHeader from './AppHeader';
+import { FigmaImportModal } from './FigmaImportModal';
 import {
   RenameDesignSystemModal, DeleteDesignSystemModal, RegenerateDesignSystemModal, MenuButton,
 } from './designSystemDialogs';
@@ -459,7 +460,7 @@ export default function DesignSystemDetail() {
  * Builds the design system's brand CSS from its snapshot (the same shape
  * the create flow stores in Firestore) and injects it into the document
  * head. Pair with `data-theme="Brand"` on a container so the page chrome
- * adopts the user's tokens instead of DinoDesign's defaults.
+ * adopts the user's tokens instead of OmniDesign's defaults.
  */
 function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
   const css = useMemo(() => {
@@ -496,7 +497,7 @@ function FigmaUpdateModal({ open, onClose, hasLinkedFile }: { open: boolean; onC
       <VStack spacing={3}>
         <Body>
           Your design system has been reprocessed and republished. To pull the
-          latest tokens into Figma, open the DinoDesign plugin and run an
+          latest tokens into Figma, open the OmniDesign plugin and run an
           update.
         </Body>
         <Card padding="medium">
@@ -505,7 +506,7 @@ function FigmaUpdateModal({ open, onClose, hasLinkedFile }: { open: boolean; onC
               In Figma
             </BodySmall>
             <Step n={1} body="Open your linked Figma file." />
-            <Step n={2} body="Open the DinoDesign plugin from Plugins → Development." />
+            <Step n={2} body="Open the OmniDesign plugin from Plugins → Development." />
             <Step n={3} body="Click Update Design System. The plugin already has your ID — no need to re-enter it." />
             <Step n={4} body="Wait for the run to finish. Your styles, variables, and components will refresh in place." />
           </VStack>
@@ -797,7 +798,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
           <BodySmall style={{ color: 'var(--Quiet)' }}>
-            Install the DinoDesign component library and connect your design system to your React project.
+            Install the OmniDesign component library and connect your design system to your React project.
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
@@ -958,19 +959,19 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
                     console.error(`Failed to write ${f}:`, e);
                   }
                 }
-                alert(`Pushed ${written} of ${LIB_DYNAMIC_CSS_FILES.length} dynamic CSS files to DinoDesign.`);
+                alert(`Pushed ${written} of ${LIB_DYNAMIC_CSS_FILES.length} dynamic CSS files to OmniDesign.`);
               } catch (err) {
                 if ((err as { name?: string })?.name !== 'AbortError') {
-                  console.error('Push to local DinoDesign failed:', err);
+                  console.error('Push to local OmniDesign failed:', err);
                   alert('Push failed. See console for details.');
                 }
               }
             }}
           >
-            Push to local DinoDesign
+            Push to local OmniDesign
           </Button>
           <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
-            Writes the 3 dynamic CSS files (base / Light-Mode / Dark-Mode) into your DinoDesign repo folder. Chrome/Edge only. First click prompts you to pick the folder; after that it remembers.
+            Writes the 3 dynamic CSS files (base / Light-Mode / Dark-Mode) into your OmniDesign repo folder. Chrome/Edge only. First click prompts you to pick the folder; after that it remembers.
           </BodySmall>
         </VStack>
       </Card>
@@ -980,118 +981,9 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
   );
 }
 
-function FigmaImportModal({
-  open, onClose, id, name,
-}: { open: boolean; onClose: () => void; id: string; name: string }) {
-  return (
-    <Modal open={open} onClose={onClose} title="Get your design into Figma" size="medium">
-      <VStack spacing={3} style={{ paddingTop: 8 }}>
-        <FigmaStep n={1} title="Download your Figma file">
-          <VStack spacing={2}>
-            <BodySmall>
-              Download the DinoDesign Figma file. We'll rename it to match your design system so it's easy to find in Figma.
-            </BodySmall>
-            <div>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={async () => {
-                  try {
-                    const res = await fetch(getFigmaTemplateUrl(), { cache: 'no-cache' });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const blob = await res.blob();
-                    const safe = (name || 'design-system')
-                      .trim()
-                      .replace(/[\\/:*?"<>|]+/g, '-')
-                      .replace(/\s+/g, ' ')
-                      || 'design-system';
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `${safe}.fig`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-                  } catch (err) {
-                    console.error('Figma template download failed:', err);
-                    alert('Could not download the Figma file. Please try again.');
-                  }
-                }}
-              >
-                Download {(name || 'design-system')}.fig
-              </Button>
-            </div>
-          </VStack>
-        </FigmaStep>
-        <FigmaStep
-          n={2}
-          title="Import into Figma"
-          body="Open Figma and import your file by dragging and dropping the .fig file into the Figma home screen, or click Import and select the downloaded file."
-        />
-        <FigmaStep
-          n={3}
-          title="Open the file"
-          body="Once imported, open the file. You'll land on the Almost There page, which walks you through connecting your branded design system."
-        />
-        <FigmaStep
-          n={4}
-          title="Install the DinoDesign Plugin"
-          body="From the Almost There page, install the DinoDesign Plugin directly in Figma."
-        />
-        <FigmaStep n={5} title="Enter your DinoDesign ID">
-          <BodySmall style={{ display: 'block', marginBottom: 8 }}>
-            In the plugin, paste in your unique DinoDesign ID:
-          </BodySmall>
-          <code style={{
-            display: 'inline-block',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            fontSize: '0.85em',
-            padding: '4px 10px',
-            borderRadius: 4,
-            background: 'var(--Container)',
-            border: '1px solid var(--Border)',
-            wordBreak: 'break-all',
-          }}>{id}</code>
-        </FigmaStep>
-        <FigmaStep
-          n={6}
-          title="Import your design system"
-          body="Press ⌘L to open the URL input field, paste in your Figma file URL, then click Import Design System. Let it run — this is where the magic happens."
-        />
-        <FigmaStep
-          n={7}
-          title="Explore"
-          body="Once complete, head to the Using Your DinoDesign System page for tips and tricks on getting the most out of your branded design system."
-        />
-      </VStack>
-    </Modal>
-  );
-}
-
-function FigmaStep({ n, title, body, children }: { n: number; title: string; body?: string; children?: React.ReactNode }) {
-  return (
-    <HStack spacing={2} style={{ alignItems: 'flex-start' }}>
-      <div style={{
-        flexShrink: 0,
-        width: 28,
-        height: 28,
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--Buttons-Primary-Button)',
-        color: 'var(--Buttons-Primary-Text)',
-        fontSize: '0.8rem',
-        fontWeight: 700,
-      }}>{n}</div>
-      <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
-        <BodySmall style={{ fontWeight: 600 }}>Step {n} — {title}</BodySmall>
-        {body && <BodySmall style={{ color: 'var(--Quiet)' }}>{body}</BodySmall>}
-        {children}
-      </VStack>
-    </HStack>
-  );
-}
+// FigmaImportModal lives in src/components/FigmaImportModal.tsx now —
+// shared with ExportStage's first-time creation flow. Import added near the
+// other top-of-file imports.
 
 function SettingsTab({ id, record, payments }: { id: string; record: Record; payments: PaymentRecord[] }) {
   const addOns = useMemo(() => {
@@ -1146,7 +1038,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
           </BodySmall>
           {record.linkedFigmaFiles.length === 0 ? (
             <BodySmall style={{ color: 'var(--Quiet)' }}>
-              No Figma files linked yet. Pair the DinoDesign plugin from your Account
+              No Figma files linked yet. Pair the OmniDesign plugin from your Account
               page, then run an import — the file you imported into will show up here.
             </BodySmall>
           ) : (

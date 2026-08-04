@@ -11,7 +11,15 @@
 // with quantization variants. The `quantized: true` flag drops the model
 // from ~150MB to ~60MB — well under Firebase Functions' 250MB deploy cap.
 
+const path = require('path');
+
 const MODEL_ID = 'Xenova/clip-vit-base-patch32';
+
+// The model files are BUNDLED with the function under functions/models/ (see
+// scripts to fetch them). Loading locally avoids downloading from HuggingFace
+// at runtime, which was getting rate-limited (HTTP 429) on Cloud Functions'
+// shared egress IP and crashing analyzeMoodboard with an opaque INTERNAL error.
+const LOCAL_MODEL_DIR = path.join(__dirname, 'models');
 
 // Cached singletons. Loaded once per warm container.
 let _modulePromise = null;
@@ -25,10 +33,15 @@ let _tokenizerPromise = null;
 async function loadModule() {
   if (!_modulePromise) {
     _modulePromise = import('@huggingface/transformers').then((mod) => {
-      // Cache model files in /tmp — Cloud Functions' only writable area.
+      // Load the model from the files bundled under functions/models/ and NEVER
+      // reach out to HuggingFace at runtime. Runtime HF downloads were being
+      // rate-limited (429) on the function's shared egress IP, which crashed
+      // the call with an opaque INTERNAL. localModelPath resolves files as
+      // `${localModelPath}/${MODEL_ID}/...`.
       mod.env.cacheDir = '/tmp/transformers-cache';
-      // No local model files bundled — always pull from HF Hub.
-      mod.env.allowLocalModels = false;
+      mod.env.allowLocalModels = true;
+      mod.env.localModelPath = LOCAL_MODEL_DIR;
+      mod.env.allowRemoteModels = false;
       return mod;
     });
   }
@@ -242,6 +255,54 @@ async function getBodyGroup(imgEmb, _branch, exclude, BODY_POOL, n = 20) {
   return topN(scores, n);
 }
 
+// ── Text-vs-non-text gate ────────────────────────────────────────────────────
+//
+// Zero-shot CLIP gate that runs BEFORE typography classification. Filters out
+// crops that are obviously not text — UI icons, photos, logo marks, decorative
+// shapes — so downstream pixel + category analysis doesn't waste cycles trying
+// to read serif feet off a camera icon.
+//
+// The prompt set deliberately mixes a couple of phrasings per class because
+// CLIP is sensitive to prompt wording; averaging across siblings reduces noise.
+// Class names ("text", "icon", "photo", "logo", "decoration") are returned as
+// `topLabel` so Step B can log which type the gate thought a rejected crop was.
+const TEXT_GATE_PROMPTS = {
+  text: [
+    'text or typography',
+    'a letter, word, or written character',
+    'a typeface sample',
+  ],
+  icon: [
+    'a UI icon or symbol',
+    'an interface icon',
+    'a pictogram',
+  ],
+  photo: [
+    'a photograph',
+    'a photo of a person or scene',
+  ],
+  logo: [
+    'a logo mark or brand symbol',
+  ],
+  decoration: [
+    'a decorative pattern or shape',
+    'abstract art or texture',
+  ],
+};
+
+/** Run the text-vs-non-text gate on a precomputed image embedding. Returns
+ *  { verdict: 'text' | 'reject', topLabel, scores } where topLabel is the
+ *  winning class name (one of the keys of TEXT_GATE_PROMPTS). Verdict is
+ *  'text' iff text wins outright. */
+async function classifyTextVsNonText(imgEmb) {
+  const result = await classifyFont(imgEmb, TEXT_GATE_PROMPTS);
+  return {
+    verdict: result.category === 'text' ? 'text' : 'reject',
+    topLabel: result.category,
+    scores: result.scores,
+  };
+}
+
 /** Cheap warm-up: triggers model + processor + tokenizer download/load so the
  *  next real call doesn't pay the cold-start cost. Studio fires this when the
  *  user uploads their moodboard, ~30s before they hit "Generate". */
@@ -255,8 +316,10 @@ module.exports = {
   cosineSimilarity,
   classifyFont,
   classifyModifiers,
+  classifyTextVsNonText,
   scoreFonts,
   getFontGroup,
   getBodyGroup,
   warmup,
+  TEXT_GATE_PROMPTS,
 };

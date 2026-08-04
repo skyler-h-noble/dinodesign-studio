@@ -113,10 +113,17 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
       : buttonRadius < 32
         ? buttonRadius
         : Math.round(buttonRadius / 2);
-  const cardRadius = buttonRadius + cardPadding;
+  // Cap the button radius's contribution to the card/modal CORNER so a pill
+  // button (very large radius) doesn't balloon the container into a stadium.
+  // Buttons can go full-pill; cards/containers stay tasteful. Padding still
+  // scales with the button radius — only the corner rounding is capped. The
+  // nesting rule (inner = outer − padding) still holds below the cap.
+  const CARD_CORNER_CAP = 20;
+  const cardCornerBase = Math.min(buttonRadius, CARD_CORNER_CAP);
+  const cardRadius = cardCornerBase + cardPadding;
 
   const modalPadding = Math.round(cardPadding * 1.5);
-  const modalRadius = buttonRadius + modalPadding;
+  const modalRadius = cardCornerBase + modalPadding;
 
   return {
     buttonRadius,

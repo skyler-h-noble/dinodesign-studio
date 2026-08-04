@@ -194,10 +194,27 @@ exports.analyzeMoodboard = onCall(RUNTIME_OPTS, async (request) => {
   let headerSource = 'whole_image';
   let decorativeSource = 'whole_image';
 
+  // Text-vs-non-text gate rejections. Each entry: { role, cropUrl, index?,
+  // topLabel, scores }. Returned with the response so the studio can show
+  // a "Not text" indicator + Step B can log them to Firestore for training.
+  const rejected = [];
+
   if (crops?.header) {
     try {
-      headerEmb = await clip.getImageEmbedding(crops.header);
-      headerSource = 'text_crop';
+      const candEmb = await clip.getImageEmbedding(crops.header);
+      const gate = await clip.classifyTextVsNonText(candEmb);
+      if (gate.verdict === 'text') {
+        headerEmb = candEmb;
+        headerSource = 'text_crop';
+      } else {
+        rejected.push({
+          role: 'header',
+          cropUrl: crops.header,
+          topLabel: gate.topLabel,
+          scores: gate.scores,
+        });
+        logger.info('header crop rejected by text gate', { topLabel: gate.topLabel });
+      }
     } catch (err) {
       logger.warn('header crop embedding failed, using whole image', { err: String(err) });
     }
@@ -208,10 +225,46 @@ exports.analyzeMoodboard = onCall(RUNTIME_OPTS, async (request) => {
   let decorativePickReason = crops?.decorative ? 'second_tallest_or_all_caps' : 'none';
   if (crops?.decorative) {
     try {
-      decorativeEmb = await clip.getImageEmbedding(crops.decorative);
-      decorativeSource = 'text_crop';
+      const candEmb = await clip.getImageEmbedding(crops.decorative);
+      const gate = await clip.classifyTextVsNonText(candEmb);
+      if (gate.verdict === 'text') {
+        decorativeEmb = candEmb;
+        decorativeSource = 'text_crop';
+      } else {
+        rejected.push({
+          role: 'decorative',
+          cropUrl: crops.decorative,
+          topLabel: gate.topLabel,
+          scores: gate.scores,
+        });
+        // Reset the pick reason — the client-provided crop didn't pass the gate
+        // so Phase 2 (script/handwritten fallback) gets a chance below.
+        decorativePickReason = 'gate_rejected_client_crop';
+        logger.info('decorative crop rejected by text gate', { topLabel: gate.topLabel });
+      }
     } catch (err) {
       logger.warn('decorative crop embedding failed, using whole image', { err: String(err) });
+    }
+  }
+
+  // Same-style guard. When the header and decorative crops come from text
+  // that's visually the same style (e.g. a moodboard where every headline
+  // is the same hand-painted brush lettering — "LEMON" + "TYPEFACE" both
+  // brush), the decorative embedding adds no new signal — it just doubles
+  // the header's vote. Result is the suggestion picks two fonts from the
+  // same category that read as the same family even though their names
+  // differ. Cosine similarity > 0.92 between the two crop embeddings is
+  // tight enough to mean "same drawn style" without flagging legitimate
+  // pairings (header sans + decorative sans of a different weight typically
+  // sit around 0.75–0.85). When triggered, fall the decorative back to the
+  // whole-image embedding so it ranks against the broader moodboard vibe.
+  if (headerSource === 'text_crop' && decorativeSource === 'text_crop') {
+    const sim = clip.cosineSimilarity(headerEmb, decorativeEmb);
+    if (sim > 0.92) {
+      logger.info('decorative crop matches header style; falling back to whole image', { sim });
+      decorativeEmb = imgEmb;
+      decorativeSource = 'whole_image';
+      decorativePickReason = 'same_style_as_header';
     }
   }
 
@@ -268,6 +321,20 @@ exports.analyzeMoodboard = onCall(RUNTIME_OPTS, async (request) => {
       if (!cand?.dataUrl) continue;
       try {
         const candEmb = await clip.getImageEmbedding(cand.dataUrl);
+        // Gate candidates too — phase 2 is otherwise the most permissive
+        // path into the decorative slot and would happily accept any icon
+        // that CLIP misreads as expressive script.
+        const gate = await clip.classifyTextVsNonText(candEmb);
+        if (gate.verdict !== 'text') {
+          rejected.push({
+            role: 'candidate',
+            index: i,
+            cropUrl: cand.dataUrl,
+            topLabel: gate.topLabel,
+            scores: gate.scores,
+          });
+          continue;
+        }
         const candCat = await classifyCategoryWithBranch(candEmb);
         if (SCRIPT_LIKE.has(candCat.category)) {
           decorativeEmb = candEmb;
@@ -378,6 +445,7 @@ exports.analyzeMoodboard = onCall(RUNTIME_OPTS, async (request) => {
       ? { key: mood.key, label: moodPreset.label, confidence: mood.confidence }
       : null,
     trios,
+    rejected,
     debug: {
       categoryScores: catScores,
       moodScores: mood.scores,
@@ -387,6 +455,7 @@ exports.analyzeMoodboard = onCall(RUNTIME_OPTS, async (request) => {
       headerCategory,
       decorativeCategory,
       ocrRegionCount: crops?.regionCount ?? 0,
+      rejectedCount: rejected.length,
     },
   };
 });

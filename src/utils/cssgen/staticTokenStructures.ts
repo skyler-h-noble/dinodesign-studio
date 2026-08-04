@@ -9,7 +9,7 @@ export { getStaticQuietTokensForLightMode, getStaticQuietTokensForDarkMode } fro
  * Generate hover tokens for a palette.
  *
  * These values become ACTIVE after post-processing swap.
- * Post-processing: Active = these values, Hover = mix(bg, these values)
+ * Post-processing: Pressed = these values, Hover = mix(bg, these values)
  *
  * Dark colors (1-5): one step darker (Color-1 → Black)
  * Gap color (6): one step darker
@@ -64,7 +64,7 @@ export function getStaticHoverTokens() {
 }
 
 /**
- * Active tokens use the same pattern as Hover.
+ * Pressed tokens use the same pattern as Hover.
  * Post-processing replaces these with the Hover values anyway,
  * so these are just placeholders that follow the same logic.
  */

@@ -317,10 +317,15 @@ export default function ColorStage({
     lChroma?: number[],
     dChroma?: number[],
     anchors?: ExtractedColor[],
+    overrides?: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>,
   ) => {
     const lc = lChroma || chromaPerColor;
     const dc = dChroma || darkChromaPerColor;
     const anchorsArr = anchors || anchorColors;
+    // Hue edits are applied via setState (async), so a caller firing this right
+    // after setHueOverridesByTop would read the STALE state through the closure.
+    // Callers pass the freshly-edited overrides here to bypass that.
+    const hOverrides = overrides || hueOverridesByTop;
     const primary = tops[pIdx].hex;
     const others = tops.filter((_, i) => i !== pIdx).map(c => c.hex);
     const reordered = [primary, ...others];
@@ -337,8 +342,8 @@ export default function ColorStage({
     const orderedTopIndices = [pIdx, ...tops.map((_, i) => i).filter(i => i !== pIdx)];
     const hueOverridesForScheme: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }> = {};
     orderedTopIndices.forEach((origIdx, schemeIdx) => {
-      if (hueOverridesByTop[origIdx]) {
-        hueOverridesForScheme[schemeIdx] = hueOverridesByTop[origIdx];
+      if (hOverrides[origIdx]) {
+        hueOverridesForScheme[schemeIdx] = hOverrides[origIdx];
       }
     });
     const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
@@ -357,7 +362,7 @@ export default function ColorStage({
         const lightC = lc[topIdx] ?? 62;
         const darkC = dc[topIdx] ?? 36;
         const lockedHex = lockedColorMap[topIdx];
-        const easing = hueOverridesByTop[topIdx];
+        const easing = hOverrides[topIdx];
         return {
           light: generateSemanticLightModeScale(anchorHex, lightC, lockedHex, easing?.light),
           dark: generateSemanticDarkModeScale(anchorHex, darkC, easing?.dark),
@@ -513,29 +518,29 @@ export default function ColorStage({
         const hasOverrides = hueOverridesByTop[idx]?.[toneMode] !== undefined;
 
         const applyEdit = () => {
-          setHueOverridesByTop(prev => {
-            const next = { ...prev };
-            const colorEntry = { ...(next[idx] || {}) };
-            colorEntry[toneMode] = { darkHue: hueEditDarkHue, lightHue: hueEditLightHue };
-            next[idx] = colorEntry;
-            return next;
-          });
+          // Build the new overrides synchronously and pass them straight into
+          // regeneration — setState is async, so relying on state here would
+          // regenerate with the pre-edit hues (the bug where edits didn't apply).
+          const nextOverrides = { ...hueOverridesByTop };
+          const colorEntry = { ...(nextOverrides[idx] || {}) };
+          colorEntry[toneMode] = { darkHue: hueEditDarkHue, lightHue: hueEditLightHue };
+          nextOverrides[idx] = colorEntry;
+          setHueOverridesByTop(nextOverrides);
           setHueEditTopIdx(null);
-          setTimeout(() => regenerateSchemes(topColors, primaryIndex), 0);
+          regenerateSchemes(topColors, primaryIndex, undefined, undefined, undefined, nextOverrides);
         };
 
         const resetEdit = () => {
-          setHueOverridesByTop(prev => {
-            const next = { ...prev };
-            if (!next[idx]) return prev;
-            const colorEntry = { ...next[idx] };
+          const nextOverrides = { ...hueOverridesByTop };
+          if (nextOverrides[idx]) {
+            const colorEntry = { ...nextOverrides[idx] };
             delete colorEntry[toneMode];
-            if (Object.keys(colorEntry).length === 0) delete next[idx];
-            else next[idx] = colorEntry;
-            return next;
-          });
+            if (Object.keys(colorEntry).length === 0) delete nextOverrides[idx];
+            else nextOverrides[idx] = colorEntry;
+          }
+          setHueOverridesByTop(nextOverrides);
           setHueEditTopIdx(null);
-          setTimeout(() => regenerateSchemes(topColors, primaryIndex), 0);
+          regenerateSchemes(topColors, primaryIndex, undefined, undefined, undefined, nextOverrides);
         };
 
         const onChromaChange = (v: number) => {
@@ -872,6 +877,15 @@ export default function ColorStage({
                         // Match the design system's button shape — uses the
                         // same --Button-Radius token that brand buttons resolve.
                         borderRadius: 'var(--Button-Radius, 6px)',
+                        // The lib swatch fill defaults to the round ICON radius;
+                        // pin it to --Button-Radius so the swatch tracks the
+                        // design system's button shape (concentric, 1px inset).
+                        // The lib applies the inner radius as an INLINE style
+                        // (round icon radius), which beats a normal class rule —
+                        // so we must use !important to pin it to the button radius.
+                        '& .btn-swatch-inner': {
+                          borderRadius: 'calc(var(--Button-Radius, 6px) - 1px) !important',
+                        },
                         width: '100%',
                         aspectRatio: '1',
                         height: 'auto',
@@ -939,6 +953,12 @@ export default function ColorStage({
                       sx={{
                         // Same shape as the brand's regular buttons.
                         borderRadius: 'var(--Button-Radius, 6px)',
+                        // Lib paints the inner fill at the round ICON radius via
+                        // an inline style — pin it to the button radius (!important
+                        // beats inline) so the swatch is a rounded square, not a circle.
+                        '& .btn-swatch-inner': {
+                          borderRadius: 'calc(var(--Button-Radius, 6px) - 1px) !important',
+                        },
                         width: 42,
                         height: 42,
                         minWidth: 42,

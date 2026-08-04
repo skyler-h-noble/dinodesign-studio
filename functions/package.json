@@ -7,7 +7,9 @@
     "node": "22"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "firebase deploy --only functions",
+    "deploy:matcher": "firebase deploy --only functions:analyzeMoodboard,functions:warmAnalyzeMoodboard,functions:detectTextRegionsGCV"
   },
   "keywords": [],
   "author": "",

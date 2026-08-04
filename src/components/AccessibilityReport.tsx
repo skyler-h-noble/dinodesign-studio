@@ -179,6 +179,7 @@ function SectionBlock({ section }: { section: ReportSection }) {
         <thead>
           <tr>
             <th>Check</th>
+            <th>Token</th>
             <th>Foreground</th>
             <th>Background</th>
             <th className="ar-num">Ratio</th>
@@ -190,6 +191,7 @@ function SectionBlock({ section }: { section: ReportSection }) {
           {section.checks.map((c, i) => (
             <tr key={i} className={c.passes ? '' : 'ar-row-fail'}>
               <td>{c.label}</td>
+              <td><code className="ar-token">{c.token}</code></td>
               <td>
                 <span className="ar-swatch-sm" style={{ background: c.fgColor }} aria-hidden />
                 <code>{c.fgColor}</code>
@@ -286,6 +288,7 @@ const reportCSS = `
   .ar-row-fail { background: #fdf0ee; }
   .ar-num { text-align: right; font-variant-numeric: tabular-nums; }
   .ar-table code { font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 11.5px; color: #444; }
+  .ar-token { font-size: 10.5px !important; color: #777 !important; white-space: nowrap; }
   .ar-pass { color: #0a7d2a; font-weight: 600; font-size: 11px; letter-spacing: 0.04em; }
   .ar-fail { color: #c0392b; font-weight: 700; font-size: 11px; letter-spacing: 0.04em; }
 

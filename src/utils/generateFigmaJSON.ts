@@ -8,6 +8,7 @@
  */
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
 
 interface ColorToken {
   value: string;
@@ -36,9 +37,11 @@ const SURFACE_NAMES = [
 ];
 
 /**
- * Derive shadow RGB from hex (same algorithm as computeDropshadow in exportColorSystem)
+ * Derive a tinted RGB triple from a hex by shifting lightness/saturation.
+ * Used ONLY for highlight/lowlight bevel colors (via deriveColorHex) — NOT
+ * for dropshadows, which use the shared Comeau math in ./dropshadow.
  */
-function deriveShadowRGB(hex: string, lightOffset = -35, satMultiplier = 1.5): string {
+function deriveBevelRGB(hex: string, lightOffset = -35, satMultiplier = 1.5): string {
   try {
     const clean = hex.replace('#', '');
     const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
@@ -57,7 +60,10 @@ function deriveShadowRGB(hex: string, lightOffset = -35, satMultiplier = 1.5): s
     }
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     const newS = clamp(s * 100 * satMultiplier, 0, 100) / 100;
-    const newL = clamp(l * 100 + lightOffset, 8, 92) / 100;
+    // Floor at 40% of the original lightness (min 8) so dark buttons don't
+    // collapse to near-black — matches computeDropshadow in exportColorSystem.
+    const minL = Math.max(8, l * 100 * 0.4);
+    const newL = clamp(l * 100 + lightOffset, minL, 92) / 100;
     const h2 = h;
     let sr: number, sg: number, sb: number;
     if (newS === 0) {
@@ -257,26 +263,35 @@ function resolveToHex(tokenValue: string, lookup: Record<string, string>, colors
  * Derive highlight/lowlight as hex color
  */
 function deriveColorHex(hex: string, lightOffset: number, satMultiplier: number): string {
-  const rgb = deriveShadowRGB(hex, lightOffset, satMultiplier);
+  const rgb = deriveBevelRGB(hex, lightOffset, satMultiplier);
   const parts = rgb.split(',').map(s => parseInt(s.trim()));
   return '#' + parts.map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
 /**
- * Get the "one step" Active Color-N for a given Color-N.
- * Dark (1-6): step darker. Light (7-12): step lighter.
- * Color-1 → 1 (black end), Color-12 → 12 (white end).
+ * Pressed hex for a button tone — one step in the button's OWN lightness
+ * direction (dark button → darker, light button → lighter), going to pure black
+ * at tone 1 and pure white at tone 12 so there's always a visible delta (Pressed
+ * never equals the button's own tone). Hover is a 50% blend of the button bg and
+ * this Pressed value. Matches the export + preview + engine. See
+ * docs/hover-active-calculation.md.
  */
-// Dark tones (1-5, tone ≤ 37): active goes darker
-// Light tones (6-12, tone ≥ 58): active goes lighter
-const ACTIVE_MAP: Record<string, number> = {
-  '1': 1, '2': 1, '3': 2, '4': 3, '5': 4,
-  '6': 7, '7': 8, '8': 9, '9': 10, '10': 11, '11': 12, '12': 12,
-};
-function getActiveColorN(colorN: string): string {
-  const n = colorN.replace('Color-', '');
-  if (n === 'Vibrant') return 'Color-10';
-  return `Color-${ACTIVE_MAP[n] || n}`;
+function _figmaIsLight(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const f = c.length === 3 ? c.split('').map(x => x + x).join('') : c;
+  const nn = parseInt(f, 16);
+  const r = (nn >> 16) & 255, g = (nn >> 8) & 255, b = nn & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+function pressedHexFor(colorKey: string, btnHex: string, palette: string, colors: any): string {
+  if (colorKey === 'Color-Vibrant') return colors[palette]?.['Color-10']?.value || btnHex;
+  const n = parseInt(colorKey.replace('Color-', ''), 10);
+  if (!Number.isFinite(n)) return btnHex;
+  const darkBtn = !_figmaIsLight(btnHex);          // dark button → step darker, light → lighter
+  const an = darkBtn ? n - 1 : n + 1;
+  if (an < 1) return '#000000';                    // darkest button (tone 1) → black
+  if (an > 12) return '#FFFFFF';                   // lightest button (tone 12) → white
+  return colors[palette]?.[`Color-${an}`]?.value || btnHex;
 }
 
 /**
@@ -334,7 +349,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // Export all sections from the design system (except Themes which go in their own collection)
     const MODES_SECTIONS = [
       'Colors', 'Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
-      'Hover', 'Active', 'Focus-Visible',
+      'Hover', 'Pressed', 'Focus-Visible',
       'Icon', 'Icon-Variant', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
       'Backgrounds',
@@ -356,9 +371,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       'Color-1': { value: '#00000000', type: 'color' },
     };
 
-    // Add computed Button-Hover, Button-Active, Button-Highlight, Button-Lowlight
+    // Add computed Button-Hover, Button-Pressed, Button-Highlight, Button-Lowlight
     if (colors) {
-      const btnSections = ['Button-Hover', 'Button-Active', 'Button-Highlight', 'Button-Lowlight'];
+      const btnSections = ['Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight'];
       for (const s of btnSections) modeSection[s] = {};
       const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
       for (const palette of palettes) {
@@ -367,12 +382,16 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
           if (!colorKey.startsWith('Color-')) continue;
           const btnHex = (colorVal as any).value;
-          const activeColorN = getActiveColorN(colorKey);
-          const activeHex = colors[palette]?.[activeColorN]?.value || btnHex;
-          modeSection['Button-Active'][palette][colorKey] = { value: activeHex, type: 'color' };
+          const activeHex = pressedHexFor(colorKey, btnHex, palette, colors);
+          modeSection['Button-Pressed'][palette][colorKey] = { value: activeHex, type: 'color' };
           modeSection['Button-Hover'][palette][colorKey] = { value: mixHex(btnHex, activeHex), type: 'color' };
-          const hlHex = deriveColorHex(btnHex, 25, 0.6);
-          const llHex = deriveColorHex(btnHex, -25, 1.4);
+          // Match the CSS/lib bevel math (exportColorSystem computeHighlight/
+          // computeLowlight): highlight L+25 sat×0.7, lowlight L-30 sat×0.85.
+          // Lowlight REDUCES saturation so it reads as a neutral recessed
+          // shadow, not a vibrant sibling of the body (the old ×1.4 boost read
+          // as a bottom-edge glow on Info/Success/Warning/Error).
+          const hlHex = deriveColorHex(btnHex, 25, 0.7);
+          const llHex = deriveColorHex(btnHex, -30, 0.85);
           // Apply bevel opacity as alpha channel
           const bevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
           const alphaHex = Math.round(bevelOpacity * 255 / 100).toString(16).padStart(2, '0');
@@ -410,9 +429,12 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         }
       }
 
-      // Dropshadow-Color: 5 levels with different opacities, derived from background
-      const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
-      for (let level = 1; level <= 5; level++) {
+      // Dropshadow-Color-1..5: per-elevation tinted shadow tokens. Both
+      // hue/saturation/lightness AND alpha vary per level (Comeau approach)
+      // so higher elevations read as more dramatic, not weaker. Math lives
+      // in src/utils/dropshadow.ts and is shared with the CSS exporter so
+      // the values are 1:1 across Figma and code.
+      for (const level of SHADOW_LEVELS) {
         const sectionName = `Dropshadow-Color-${level}`;
         modeSection[sectionName] = {};
         for (const palette of palettes) {
@@ -421,10 +443,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
             if (!colorKey.startsWith('Color-')) continue;
             const bgHex = (colorVal as any).value;
             if (bgHex && bgHex.startsWith('#')) {
-              const baseHex = deriveColorHex(bgHex, -25, 1.5);
-              const alphaHex = Math.round(opacities[level - 1] * 255).toString(16).padStart(2, '0');
               modeSection[sectionName][palette][colorKey] = {
-                value: `${baseHex}${alphaHex}`, type: 'color'
+                value: dropshadowHex8(bgHex, level as ShadowLevel),
+                type: 'color',
               };
             }
           }
@@ -483,11 +504,22 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                     continue;
                   }
                 }
-                // Fallback: compute hex inline
-                const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
+                // Fallback: the background didn't resolve to a known
+                // Default-Background / {Colors.Palette.Color-N} reference. Compute
+                // the tinted shadow DIRECTLY from the resolved surface hex using
+                // the shared Comeau-style math (identical to the
+                // Modes/Dropshadow-Color-N section and the CSS exporter) so the
+                // shadow stays brand-tinted instead of the flat black this path
+                // used to emit (`#00000047…`, which was also malformed 10-digit hex).
+                const fallbackBgHex = bgToken ? resolveToHex(bgToken, lookup, colors) : null;
+                const shadowSurfaceHex = fallbackBgHex && fallbackBgHex.startsWith('#')
+                  ? fallbackBgHex
+                  : '#ffffff';
                 for (let i = 0; i < 5; i++) {
-                  const alphaHex = Math.round(opacities[i] * 255).toString(16).padStart(2, '0');
-                  target[`Dropshadow-Color-${i + 1}`] = { value: `#00000047${alphaHex}`, type: 'color' };
+                  target[`Dropshadow-Color-${i + 1}`] = {
+                    value: dropshadowHex8(shadowSurfaceHex, (i + 1) as ShadowLevel),
+                    type: 'color',
+                  };
                 }
                 continue;
               }
@@ -519,7 +551,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
                 // Try to resolve to a Modes-aliasable reference:
                 // 1. {Colors.Palette.Color-N} → direct alias
-                // 2. {Hover/Active.Palette.Color-N} → alias to Modes/Hover or Modes/Active
+                // 2. {Hover/Pressed.Palette.Color-N} → alias to Modes/Hover or Modes/Pressed
                 // 3. {Text/Header/etc.Section.Palette.Color-N} → keep as token ref for plugin
                 // 4. Fall back to hex if nothing resolves
 
@@ -527,9 +559,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                   const modesRef = tokenVal.replace(/[{}]/g, '');
                   const topLevel = modesRef.split('.')[0];
                   const MODES_GROUPS = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
-                    'Hover', 'Active', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
+                    'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
-                    'Button-Hover', 'Button-Active', 'Button-Highlight', 'Button-Lowlight',
+                    'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
                     'Dropshadow-Color-1', 'Dropshadow-Color-2', 'Dropshadow-Color-3',
                     'Dropshadow-Color-4', 'Dropshadow-Color-5',
                     'Default-Background'];
@@ -557,7 +589,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
               } else if (val && typeof val === 'object' && !('value' in val)) {
                 target[key] = {};
                 processGroup(val, target[key]);
-                // If this is a button group with a Button key, compute Highlight/Lowlight and swap Hover/Active
+                // If this is a button group with a Button key, compute Highlight/Lowlight and swap Hover/Pressed
                 if ((val as any)['Button']) {
                   const btnToken = (val as any)['Button'];
                   if (btnToken?.value) {
@@ -569,7 +601,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                       const colorN = btnMatch[2];
                       // Link to Modes entries for button interactions
                       target[key]['Hover'] = { value: `{Button-Hover.${palette}.${colorN}}`, type: 'color' };
-                      target[key]['Active'] = { value: `{Button-Active.${palette}.${colorN}}`, type: 'color' };
+                      target[key]['Pressed'] = { value: `{Button-Pressed.${palette}.${colorN}}`, type: 'color' };
                       target[key]['Highlight'] = { value: `{Button-Highlight.${palette}.${colorN}}`, type: 'color' };
                       target[key]['Lowlight'] = { value: `{Button-Lowlight.${palette}.${colorN}}`, type: 'color' };
                       // Border palette should match the button's palette too —
@@ -742,7 +774,11 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
       // Surface properties — Text, Header, Quiet, Border, etc. for the default bg
       const surfaceColorN = `Color-${bgN}`;
-      const textSections = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant', 'Focus-Visible'];
+      // Focus-Visible is deliberately absent here: unlike these sections it is NOT
+      // palette-nested (Focus-Visible.Surfaces is keyed directly by Background-N),
+      // so the [palette][Color-N] lookup below always missed and the key was never
+      // written. It is handled separately after this loop.
+      const textSections = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
       for (const section of textSections) {
         const sectionData = modeData[section];
         if (!sectionData?.Surfaces?.[bgPalette]?.[surfaceColorN]) continue;
@@ -752,26 +788,44 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         if (hex) defBg[section] = { value: hex, type: 'color' };
       }
 
-      // Hover and Active for the default bg
+      // Focus-Visible — keyed by Background-N with no palette level, so it needs
+      // its own lookup shape. Themes reference {Default-Background.Focus-Visible}
+      // and {Default-Background.Container-Focus-Visible}; without these two keys
+      // every focus ring in every theme resolves to nothing (WCAG 2.4.7, 1.4.11).
+      const readFocusVisible = (group: 'Surfaces' | 'Containers', n: number): string | null => {
+        const token = modeData['Focus-Visible']?.[group]?.[`Background-${n}`];
+        let hex = token?.value;
+        if (!hex) return null;
+        if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        return hex || null;
+      };
+      const fvSurface = readFocusVisible('Surfaces', bgN);
+      if (fvSurface) defBg['Focus-Visible'] = { value: fvSurface, type: 'color' };
+      const fvContainer = readFocusVisible('Containers', contN);
+      if (fvContainer) defBg['Container-Focus-Visible'] = { value: fvContainer, type: 'color' };
+
+      // Hover and Pressed for the default bg
       const hoverData = modeData.Hover?.[bgPalette]?.[surfaceColorN];
-      const activeData = modeData.Active?.[bgPalette]?.[surfaceColorN];
+      const activeData = modeData.Pressed?.[bgPalette]?.[surfaceColorN];
       if (hoverData?.value) {
         let hex = hoverData.value;
         if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
-        // Post-process: Active = old hover, Hover = mix(bg, old hover)
+        // Post-process: Pressed = old hover, Hover = mix(bg, old hover)
         const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value || '#000000';
-        defBg['Active'] = { value: hex, type: 'color' };
+        defBg['Pressed'] = { value: hex, type: 'color' };
         defBg['Hover'] = { value: mixHex(bgHex, hex), type: 'color' };
       }
 
-      // Dropshadow for the default bg
+      // Dropshadow for the default bg — uses the shared Comeau-style math
+      // so this exact-hex fallback path matches the Modes/Dropshadow-Color-N
+      // values designers see when the link resolves normally.
       const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value;
       if (bgHex) {
-        const baseHex = deriveColorHex(bgHex, -25, 1.5);
-        const opacities = [0.28, 0.22, 0.17, 0.13, 0.10];
-        for (let i = 0; i < 5; i++) {
-          const alphaHex = Math.round(opacities[i] * 255).toString(16).padStart(2, '0');
-          defBg[`Dropshadow-Color-${i + 1}`] = { value: `${baseHex}${alphaHex}`, type: 'color' };
+        for (const level of SHADOW_LEVELS) {
+          defBg[`Dropshadow-Color-${level}`] = {
+            value: dropshadowHex8(bgHex, level as ShadowLevel),
+            type: 'color',
+          };
         }
       }
 
@@ -942,12 +996,24 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         'Lg-Input-Radius': r.lgInputRadius,
         'Input-Inner-Radius': r.inputInnerRadius,
         'Input-Focus-Radius': r.inputFocusRadius,
+        // Inset focus-ring corner radius — Input-Radius minus 1px so the
+        // inset 3px focus indicator's corners visually match the chrome's
+        // outer corners. Used by ListItem, TextField, Select, etc.
+        'Input-Inner-Focus-Visible': Math.max(0, r.inputRadius - 1),
         'Input-Swatch-Radius': r.inputSwatchRadius,
         'Sm-Input-Swatch-Radius': r.smInputSwatchRadius,
         'Lg-Input-Swatch-Radius': r.lgInputSwatchRadius,
         'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
       },
     };
+  }
+
+  // Page canvas background — precomputed hex so the Figma plugin sets it from
+  // one field instead of walking the Modes tree. It's the Primary palette's
+  // Color-12 in Light-Mode (the lightest Primary tone).
+  const pageBgHex = figma.Modes?.['Light-Mode']?.Colors?.Primary?.['Color-12']?.value;
+  if (typeof pageBgHex === 'string') {
+    figma.pageBackground = pageBgHex;
   }
 
   return figma;

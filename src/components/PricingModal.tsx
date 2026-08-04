@@ -302,7 +302,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
             }
           }}
         >
-          {useExistingCredit ? 'Use credit & get started' : 'Get started with DinoDesign'}
+          {useExistingCredit ? 'Use credit & get started' : 'Get started with OmniDesign'}
         </Button>
 
         {/* Back link if user has credits but is on buy flow */}

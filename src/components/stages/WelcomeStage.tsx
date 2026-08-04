@@ -11,7 +11,7 @@ export default function WelcomeStage({ onNext, onLoadSystem }: Props) {
   return (
     <VStack spacing={6} alignItems="center" style={{ padding: '80px 24px' }}>
       <VStack spacing={2} alignItems="center">
-        <H1 style={{ textAlign: 'center' }}>DinoDesign</H1>
+        <H1 style={{ textAlign: 'center' }}>OmniDesign</H1>
         <Body style={{ textAlign: 'center' }}>Evolve your prehistoric design system approach</Body>
       </VStack>
 

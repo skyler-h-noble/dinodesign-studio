@@ -128,7 +128,7 @@ export default function AdminProposals() {
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>Not authorized</H2>
           <Body style={{ color: 'var(--Quiet)' }}>
-            This page is restricted to DynoDesign admins.
+            This page is restricted to OmniDesign admins.
           </Body>
         </VStack>
       </>

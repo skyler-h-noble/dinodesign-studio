@@ -88,13 +88,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Primary.Color-${PC}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Primary.Color-${PC}}`, type: 'color' },
       Hover: { value: `{Hover.Primary.Color-${PC}}`, type: 'color' },
-      Active: { value: `{Active.Primary.Color-${PC}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Primary.Color-${PC}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Primary.Color-${PC}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Primary.Color-${PC}}`, type: 'color' },
       Hover: { value: `{Hover.Primary.Color-${PC}}`, type: 'color' },
-      Active: { value: `{Active.Primary.Color-${PC}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Primary.Color-${PC}}`, type: 'color' }
     }
   };
   
@@ -104,13 +104,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Secondary.Color-${SC}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Secondary.Color-${SC}}`, type: 'color' },
       Hover: { value: `{Hover.Secondary.Color-${SC}}`, type: 'color' },
-      Active: { value: `{Active.Secondary.Color-${SC}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Secondary.Color-${SC}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Secondary.Color-${SC}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Secondary.Color-${SC}}`, type: 'color' },
       Hover: { value: `{Hover.Secondary.Color-${SC}}`, type: 'color' },
-      Active: { value: `{Active.Secondary.Color-${SC}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Secondary.Color-${SC}}`, type: 'color' }
     }
   };
 
@@ -120,13 +120,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Tertiary.Color-${TC}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Tertiary.Color-${TC}}`, type: 'color' },
       Hover: { value: `{Hover.Tertiary.Color-${TC}}`, type: 'color' },
-      Active: { value: `{Active.Tertiary.Color-${TC}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Tertiary.Color-${TC}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Tertiary.Color-${TC}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Tertiary.Color-${TC}}`, type: 'color' },
       Hover: { value: `{Hover.Tertiary.Color-${TC}}`, type: 'color' },
-      Active: { value: `{Active.Tertiary.Color-${TC}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Tertiary.Color-${TC}}`, type: 'color' }
     }
   };
 
@@ -136,13 +136,13 @@ export function generateBaseButtons(
       Button: { value: '{Colors.Neutral.Color-8}', type: 'color' },
       Text: { value: '{Text.Surfaces.Neutral.Color-8}', type: 'color' },
       Hover: { value: '{Hover.Neutral.Color-8}', type: 'color' },
-      Active: { value: '{Active.Neutral.Color-8}', type: 'color' }
+      Pressed: { value: '{Pressed.Neutral.Color-8}', type: 'color' }
     },
     Medium: {
       Button: { value: '{Colors.Neutral.Color-8}', type: 'color' },
       Text: { value: '{Text.Surfaces.Neutral.Color-8}', type: 'color' },
       Hover: { value: '{Hover.Neutral.Color-8}', type: 'color' },
-      Active: { value: '{Active.Neutral.Color-8}', type: 'color' }
+      Pressed: { value: '{Pressed.Neutral.Color-8}', type: 'color' }
     }
   };
 
@@ -152,13 +152,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Info.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Info.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Info.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Info.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Info.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Info.Color-${OB}}`, type: 'color' }
     }
   };
   
@@ -168,13 +168,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Success.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Success.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Success.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Success.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Success.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Success.Color-${OB}}`, type: 'color' }
     }
   };
 
@@ -184,13 +184,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Warning.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Warning.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Warning.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Warning.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Warning.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Warning.Color-${OB}}`, type: 'color' }
     }
   };
 
@@ -200,13 +200,13 @@ export function generateBaseButtons(
       Button: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Error.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Error.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Error.Color-${OB}}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
       Hover: { value: `{Hover.Error.Color-${OB}}`, type: 'color' },
-      Active: { value: `{Active.Error.Color-${OB}}`, type: 'color' }
+      Pressed: { value: `{Pressed.Error.Color-${OB}}`, type: 'color' }
     }
   };
   
@@ -217,13 +217,13 @@ export function generateBaseButtons(
         Button: { value: '{White}', type: 'color' },
         Text: { value: '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
         Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
-        Active: { value: '{Active.Neutral.Color-12}', type: 'color' }
+        Pressed: { value: '{Pressed.Neutral.Color-12}', type: 'color' }
       },
       Medium: {
         Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
         Text: { value: '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
         Hover: { value: '{Hover.Neutral.Color-1}', type: 'color' },
-        Active: { value: '{Active.Neutral.Color-1}', type: 'color' }
+        Pressed: { value: '{Pressed.Neutral.Color-1}', type: 'color' }
       }
     };
   } else {
@@ -233,13 +233,13 @@ export function generateBaseButtons(
         Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
         Text: { value: '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
         Hover: { value: '{Hover.Neutral.Color-2}', type: 'color' },
-        Active: { value: '{Active.Neutral.Color-3}', type: 'color' }
+        Pressed: { value: '{Pressed.Neutral.Color-3}', type: 'color' }
       },
       Medium: {
         Button: { value: '{White}', type: 'color' },
         Text: { value: '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
         Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
-        Active: { value: '{Active.Neutral.Color-10}', type: 'color' }
+        Pressed: { value: '{Pressed.Neutral.Color-10}', type: 'color' }
       }
     };
   }
@@ -407,13 +407,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Default}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Default}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Default}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Default}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Default}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Default}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Default}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Default}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Default}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Default}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -423,13 +423,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Primary}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Primary}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Primary}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Primary}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Primary}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Primary}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Primary}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Primary}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Primary}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Primary}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -439,13 +439,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Secondary}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Secondary}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Secondary}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Secondary}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Secondary}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Secondary}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -455,13 +455,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Tertiary}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Tertiary}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -471,13 +471,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Neutral}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Neutral}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Neutral}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Neutral}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Neutral}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Neutral}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -487,13 +487,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Info}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Info}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Info}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Info}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Info}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Info}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Info}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Info}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Info}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Info}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -503,13 +503,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Success}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Success}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Success}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Success}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Success}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Success}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Success}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Success}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Success}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Success}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -519,13 +519,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Warning}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Warning}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Warning}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Warning}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Warning}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Warning}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Warning}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Warning}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Warning}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Warning}.Medium.Pressed}`, type: 'color' }
     }
   };
   
@@ -535,13 +535,13 @@ export function generateDefaultButton(
       Button: { value: `{Buttons.${buttonMappings.Error}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Error}.Light.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Error}.Light.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Error}.Light.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Error}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Error}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Error}.Medium.Text}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Error}.Medium.Hover}`, type: 'color' },
-      Active: { value: `{Buttons.${buttonMappings.Error}.Medium.Active}`, type: 'color' }
+      Pressed: { value: `{Buttons.${buttonMappings.Error}.Medium.Pressed}`, type: 'color' }
     }
   };
   

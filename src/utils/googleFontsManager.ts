@@ -389,7 +389,7 @@ export async function getFontsForStyleCategory(
   
   // ===== PATH 2: NO TEXT DETECTED (MOOD-BASED) - Pull from moodFontMapping JSON =====
   if (useMoodBased) {
-    // Check if category is a mood name (Active, Artistic, Business, etc.)
+    // Check if category is a mood name (Pressed, Artistic, Business, etc.)
     const moodFonts = moodFontMapping[category as MoodName];
     
     if (!moodFonts) {

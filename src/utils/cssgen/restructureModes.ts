@@ -9,7 +9,7 @@
  * 5. Border
  * 6. Border-Variant (generated from Border with 33 opacity)
  * 7. Hover
- * 8. Active
+ * 8. Pressed
  * 9. Focus-Visible
  * 10. Icon
  * 11. Icon-Variant
@@ -169,9 +169,9 @@ function restructureSingleMode(mode: any, colorSystem: any): any {
     restructured.Hover = mode.Hover;
   }
 
-  // 8. Active
-  if (mode.Active) {
-    restructured.Active = mode.Active;
+  // 8. Pressed
+  if (mode.Pressed) {
+    restructured.Pressed = mode.Pressed;
   }
 
   // 9. Focus-Visible

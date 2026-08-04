@@ -1,74 +1,88 @@
-# Hover / Active State Calculation
+# Hover / Pressed State Calculation
 
-How the accessibility report derives a button's hover and active colors from its fill, so contrast checks reflect what the user actually perceives on interaction.
+How every button's Hover and Pressed colors are derived from its resting fill.
+The rule is identical across the generated CSS, the Figma export, the live
+preview, and the engine — so all four agree — and the accessibility report reads
+these baked values rather than recomputing them.
 
-**Source file:** `src/utils/accessibilityReport.ts` — `adaptiveAlpha()` + `mixHex()` + the branch in `collectChecks()`.
+**Source of truth:** `staticTokenStructures.ts` `buildHoverForPalette()`, applied via
+`getStaticHoverTokens()` / `getStaticActiveTokens()` and assigned to
+`Modes.{mode}.Hover` / `.Pressed` in `exportColorSystem.ts`.
+**Mirrored in:** `exportToCSS.ts` (`pressedToneHex` / `hoverBlendHex`), `buildPreviewCSS.ts` (`activeAndHoverFor`), `generateFigmaJSON.ts` (`pressedHexFor`).
+**Consumed by:** `accessibilityReport.ts` reads the baked `Buttons.{palette}.{bucket}.Pressed` / `.Hover` tokens.
 
-## Goal
+> This previously pointed at `_pressedHex()` / `generateHoverColors()` /
+> `generateActiveColors()` in `exportColorSystem.ts`. Those were never called —
+> a stale duplicate that chose direction from a YIQ brightness threshold rather
+> than the tone split below, which disagreed on saturated mid-tones. They have
+> been deleted; `buildHoverForPalette()` is the only implementation.
 
-Instead of trusting whatever `Hover` / `Active` tokens an export happens to emit, compute both states deterministically from the button's resting fill + text pair. The target is a consistent perceived shift across the whole palette — mid-tone fills get a smaller overlay, near-extreme fills (very light or very dark) get a larger one, so hover and active always look distinct from the resting state.
+## The rule
 
-The rule runs the same in Light and Dark mode.
+For a button whose fill is `Color-N` of a palette:
 
-## Step 1 — Pick the overlay direction
+### Pressed
 
-Read the button's `text` color.
+One step in the **button's own lightness direction**:
 
-- **Dark text** (relative luminance ≤ 0.5) → the fill is one of the lighter tones (Color-6 through Color-12), so we **lighten** hover / active with white.
-- **Light text** (relative luminance > 0.5) → the fill is one of the darker tones (Color-1 through Color-5), so we **darken** with black.
+- **Dark button** (fill luminance ≤ 0.5, i.e. tones ~1-5) → step **darker**: `Color-(N−1)`.
+- **Light button** (fill luminance > 0.5, i.e. tones ~6-12) → step **lighter**: `Color-(N+1)`.
 
-This mirrors the design system's own rule: tones 1-5 pair with light text, tones 6-12 pair with dark text.
+At the extremes there is no next tone, so Pressed goes to a pure endpoint —
+never back to the button's own tone (there must always be a visible delta):
 
-## Step 2 — Set a target luminance shift
+- Darkest button (**tone 1**) → **`#000000`** (black).
+- Lightest button (**tone 12**) → **`#FFFFFF`** (white).
 
-Hover and active each have a calibrated target, picked so a fill at `L = 0.5` produces exactly the base percentage you specified:
+Direction is keyed on the **tone index**: 1-5 step darker, 6-12 step lighter.
+This matches where every `Text.Surfaces.{palette}` table flips from light text
+to dark text (Color-1..5 light, Color-6..12 dark), which is what makes the rule
+safe: the state always moves *away* from the text sitting on it, so contrast can
+only improve. A state can therefore never fail if the resting pair passes.
 
-|                              | Hover target | Active target |
-| ---------------------------- | ------------ | ------------- |
-| **Dark text** (white overlay)  | 0.15         | 0.25          |
-| **Light text** (black overlay) | 0.04         | 0.075         |
+(An earlier revision of this doc claimed direction was keyed on the fill's
+actual luminance. It is not, and it should not be — a luminance threshold
+disagrees with the tone split on saturated mid-tones such as `#ef5854`, which
+measures "light" by brightness while carrying light text. Keying on the tone
+index keeps the state aligned with the text.)
 
-`targetShift = baseAlpha × 0.5` — i.e. at mid-lightness, the resulting alpha equals the base (30% / 50% white, 8% / 15% black).
+### Hover
 
-## Step 3 — Compute the required alpha
+A 50% blend of the button background and its Pressed value:
 
 ```
-requiredAlpha = targetShift / |L_fill − L_overlay|
+Hover = mix50(fill, Pressed)
 ```
 
-Where `L_overlay` is `1` for white and `0` for black. As the fill approaches the overlay color, the denominator shrinks and alpha scales up — which is exactly the behavior we want, since mixing white into a nearly-white fill barely moves the needle unless the alpha is high.
+So Hover always sits halfway between the resting fill and the Pressed state —
+a subtler version of the same move.
 
-## Step 4 — Clamp
+## Worked examples
 
+| Fill tone | Button | Pressed | Hover |
+| --------- | ------ | ------- | ----- |
+| Color-9 (dark) | dark | Color-8 | mix(Color-9, Color-8) |
+| Color-3 (dark) | dark | Color-2 | mix(Color-3, Color-2) |
+| Color-10 (light) | light | Color-11 | mix(Color-10, Color-11) |
+| **Color-1** (darkest) | dark | **#000000** | mix(Color-1, #000) |
+| **Color-12** (lightest) | light | **#FFFFFF** | mix(Color-12, #fff) |
+
+## CSS usage
+
+```css
+/* Surface hover/pressed scrims */
+.interactive:hover  { background: var(--Hover); }
+.interactive:active { background: var(--Pressed); }
+
+/* Button hover/pressed */
+.btn:hover  { background: var(--Buttons-Primary-Hover); }
+.btn:active { background: var(--Buttons-Primary-Pressed); }
 ```
-alpha = min(0.95, max(baseAlpha, requiredAlpha))
-```
-
-- **Floor at baseAlpha.** Mid-tone fills keep their base percentage; we never reduce below it.
-- **Ceiling at 0.95.** Mixing pure white with white (or black with black) is a no-op, so there is no point going higher. If `|L_fill − L_overlay| < 0.001`, short-circuit to 0.95.
-
-## Step 5 — Blend
-
-Standard source-over alpha composite of overlay onto fill:
-
-```
-out = alpha × overlay + (1 − alpha) × fill
-```
-
-Result is an opaque 6-digit hex. That's the color that gets contrast-checked against the button text in the report.
-
-## Examples
-
-Values pulled from a live export (Dark mode · Light bucket, Primary palette among others):
-
-| Context                           | fill       | fill L | base α | adaptive α | hover result |
-| --------------------------------- | ---------- | ------ | ------ | ---------- | ------------ |
-| Primary (very pale cream fill)    | `#eee2be`  | ~0.78  | 30%    | ~68%       | `#f9f4e7`    |
-| Neutral (mid gray fill)           | `#c9c9c9`  | ~0.58  | 30%    | ~36%       | `#dcdcdc`    |
-| Info (medium blue fill)           | `#5784ff`  | ~0.26  | 30%    | 30% (floor)| `#89a9ff`    |
-
-Active uses the same math with a bigger target shift, so it lands further toward the overlay color than hover. For very-light fills, active can get pushed close to the overlay — e.g. Primary's active on a near-cream fill ends up around `#fefefc`.
 
 ## Why this matters for accessibility
 
-The report's Button rows check `contrast(text, hoverComposite)` and `contrast(text, activeComposite)` against the 4.5 : 1 threshold. Because the text / fill pairing was already chosen by the design system to clear contrast, and the hover / active composite always moves *toward* the overlay color (away from text in luminance), the adaptive shift preserves — and usually improves — contrast. The adaptive step just guarantees that, at the same time, the *visual* shift from resting to hover to active is distinguishable to the user, which matters for feedback affordance regardless of whether raw contrast already passed.
+Because Pressed always moves *away* from the resting fill in luminance (and the
+fill/text pairing was already chosen to clear contrast), the Hover/Pressed states
+preserve — and usually improve — text contrast, while guaranteeing a visible
+feedback shift from resting → hover → pressed. The accessibility report contrast-
+checks button text against the baked Hover and Pressed values at 4.5:1.

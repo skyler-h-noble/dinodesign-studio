@@ -44,24 +44,24 @@ function generateBWButtons(mode: 'Light-Mode' | 'Dark-Mode', theme: string) {
       Button: { value: `{White}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Neutral.Color-1}`, type: 'color' },
       Hover: { value: `{Hover.Neutral.Color-11}`, type: 'color' },
-      Active: { value: n === 4 ? `{Active.Neutral.Color-11}` : `{Active.Neutral.Color-10}`, type: 'color' }
+      Pressed: { value: n === 4 ? `{Pressed.Neutral.Color-11}` : `{Pressed.Neutral.Color-10}`, type: 'color' }
     } : {
       Button: { value: `{Colors.Neutral.Color-1}`, type: 'color' },
       Text: { value: `{Text.Surfaces.Neutral.Color-12}`, type: 'color' },
       Hover: { value: `{Hover.Neutral.Color-2}`, type: 'color' },
-      Active: { value: `{Active.Neutral.Color-3}`, type: 'color' }
+      Pressed: { value: `{Pressed.Neutral.Color-3}`, type: 'color' }
     };
     
     const containerButtonConfig = isLightBackground ? {
       Button: { value: `{White}`, type: 'color' },
       Text: { value: `{Text.Containers.Neutral.Color-1}`, type: 'color' },
       Hover: { value: `{Hover.Neutral.Color-11}`, type: 'color' },
-      Active: { value: n === 4 ? `{Active.Neutral.Color-11}` : `{Active.Neutral.Color-10}`, type: 'color' }
+      Pressed: { value: n === 4 ? `{Pressed.Neutral.Color-11}` : `{Pressed.Neutral.Color-10}`, type: 'color' }
     } : {
       Button: { value: `{Colors.Neutral.Color-1}`, type: 'color' },
       Text: { value: `{Text.Containers.Neutral.Color-12}`, type: 'color' },
       Hover: { value: `{Hover.Neutral.Color-2}`, type: 'color' },
-      Active: { value: `{Active.Neutral.Color-3}`, type: 'color' }
+      Pressed: { value: `{Pressed.Neutral.Color-3}`, type: 'color' }
     };
     
     result.Surfaces[`Background-${n}`] = surfaceButtonConfig;
@@ -85,14 +85,14 @@ function generateBWButtons(mode: 'Light-Mode' | 'Dark-Mode', theme: string) {
     Button: { value: `{Colors.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Surfaces.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
-    Active: { value: `{Active.Neutral.Color-${vibrantButtonN}}`, type: 'color' }
+    Pressed: { value: `{Pressed.Neutral.Color-${vibrantButtonN}}`, type: 'color' }
   };
 
   const containerVariantConfig = {
     Button: { value: `{Colors.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Containers.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.Neutral.Color-${vibrantButtonN}}`, type: 'color' },
-    Active: { value: `{Active.Neutral.Color-${vibrantButtonN}}`, type: 'color' }
+    Pressed: { value: `{Pressed.Neutral.Color-${vibrantButtonN}}`, type: 'color' }
   };
   
   result.Surfaces['Background-Vibrant'] = surfaceVariantConfig;
@@ -104,7 +104,7 @@ function generateBWButtons(mode: 'Light-Mode' | 'Dark-Mode', theme: string) {
 /**
  * Generate buttons for all backgrounds for a specific button type
  * Following the pattern from theme-definitions-3.md:
- * - Button, Text, Hover & Active use {Default-N} (the button's fixed or adaptive N)
+ * - Button, Text, Hover & Pressed use {Default-N} (the button's fixed or adaptive N)
  */
 function generateButtonsForMode(
   mode: 'Light-Mode' | 'Dark-Mode',
@@ -120,7 +120,7 @@ function generateButtonsForMode(
   
   // Generate for Color-1 through Color-12
   for (let n = 1; n <= 12; n++) {
-    // Determine which Color-N to use for Button, Text, Hover, Active
+    // Determine which Color-N to use for Button, Text, Hover, Pressed
     let buttonColorN: number | string;
     
     if (defaultN === 'adaptive') {
@@ -138,7 +138,7 @@ function generateButtonsForMode(
       Button: { value: `{Colors.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Text: { value: `{Text.Surfaces.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Hover: { value: `{Hover.${theme}.Color-${buttonColorN}}`, type: 'color' },
-      Active: { value: `{Active.${theme}.Color-${buttonColorN}}`, type: 'color' },
+      Pressed: { value: `{Pressed.${theme}.Color-${buttonColorN}}`, type: 'color' },
       // Highlight / Lowlight follow the button's own palette so a Secondary
       // (or Default-as-Secondary, tonal, laddered, etc.) button gets its bevel
       // tones from its own color, not from Primary.
@@ -150,7 +150,7 @@ function generateButtonsForMode(
       Button: { value: `{Colors.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Text: { value: `{Text.Containers.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Hover: { value: `{Hover.${theme}.Color-${buttonColorN}}`, type: 'color' },
-      Active: { value: `{Active.${theme}.Color-${buttonColorN}}`, type: 'color' },
+      Pressed: { value: `{Pressed.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Highlight: { value: `{Button-Highlight.${theme}.Color-${buttonColorN}}`, type: 'color' },
       Lowlight: { value: `{Button-Lowlight.${theme}.Color-${buttonColorN}}`, type: 'color' }
     };
@@ -178,7 +178,7 @@ function generateButtonsForMode(
     Button: { value: `{Colors.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Surfaces.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
-    Active: { value: `{Active.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
+    Pressed: { value: `{Pressed.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Highlight: { value: `{Button-Highlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Lowlight: { value: `{Button-Lowlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' }
   };
@@ -187,7 +187,7 @@ function generateButtonsForMode(
     Button: { value: `{Colors.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Text: { value: `{Text.Containers.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Hover: { value: `{Hover.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
-    Active: { value: `{Active.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
+    Pressed: { value: `{Pressed.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Highlight: { value: `{Button-Highlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' },
     Lowlight: { value: `{Button-Lowlight.${theme}.Color-${vibrantButtonN}}`, type: 'color' }
   };

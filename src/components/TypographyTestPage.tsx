@@ -26,6 +26,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { analyzeMoodboard, warmAnalyzeMoodboard, getOrStartMoodboardAnalysis } from '../utils/analyzeMoodboardClient';
 import type { MoodboardAnalysis, ExtractedTextRegion, FontTrio } from '../utils/analyzeMoodboardClient';
 import { uploadDesignSystemFile, getPublicFileUrl } from '../utils/firebase/storage';
+import { logGateFeedback, logGateRejections } from '../utils/textGateFeedback';
 
 const TEST_FOLDER = 'test-typography';
 
@@ -72,8 +73,9 @@ const HEADER_STYLE_PRESETS: StylePreset[] = [
   { label: 'Friendly sans',             family: 'Nunito',           category: 'Sans / Friendly',      modifiers: { weight: 'heavy',   width: 'normal'    }, weight: '700', letterSpacing: '0em' },
   { label: 'Bebas Neue (condensed)',    family: 'Bebas Neue',       category: 'Sans / Geometric',     modifiers: { weight: 'regular', width: 'condensed' }, weight: '400', letterSpacing: '0.08em', textTransform: 'uppercase' },
   { label: 'Condensed sans all-caps',   family: 'Oswald',           category: 'Sans / Geometric',     modifiers: { weight: 'regular', width: 'condensed' }, weight: '400', letterSpacing: '0.12em', textTransform: 'uppercase' },
-  { label: 'Script',                    family: 'Dancing Script',   category: 'Expressive / Script',  modifiers: { weight: 'regular', width: 'normal'    }, weight: '700', letterSpacing: '0em' },
-  { label: 'Handwritten',               family: 'Caveat',           category: 'Expressive / Hand',    modifiers: { weight: 'regular', width: 'normal'    }, weight: '700', letterSpacing: '0em' },
+  { label: 'Formal script',             family: 'Dancing Script',   category: 'Expressive / Formal Script',      modifiers: { weight: 'regular', width: 'normal'    }, weight: '700', letterSpacing: '0em' },
+  { label: 'Handwritten script',        family: 'Sacramento',       category: 'Expressive / Handwritten Script', modifiers: { weight: 'regular', width: 'normal'    }, weight: '700', letterSpacing: '0em' },
+  { label: 'Handwritten',               family: 'Caveat',           category: 'Expressive / Hand',               modifiers: { weight: 'regular', width: 'normal'    }, weight: '700', letterSpacing: '0em' },
   // ── Show more (hidden until the user expands) ───────────────────────
   { label: 'Bodoni (high contrast)',    family: 'Bodoni Moda',      category: 'Serif / Editorial',    modifiers: { weight: 'heavy',   width: 'normal'    }, weight: '800', letterSpacing: '0em' },
   { label: 'Cormorant (light serif)',   family: 'Cormorant Garamond', category: 'Serif / Editorial',  modifiers: { weight: 'thin',    width: 'normal'    }, weight: '300', letterSpacing: '0.02em' },
@@ -93,8 +95,8 @@ const HEADER_STYLE_PRESETS: StylePreset[] = [
   { label: 'Comfortaa',                 family: 'Comfortaa',        category: 'Sans / Friendly',      modifiers: { weight: 'regular', width: 'normal'    }, weight: '500', letterSpacing: '0em' },
   { label: 'Bangers',                   family: 'Bangers',          category: 'Expressive / Display', modifiers: { weight: 'heavy',   width: 'normal'    }, weight: '400', letterSpacing: '0.02em' },
   { label: 'Righteous',                 family: 'Righteous',        category: 'Expressive / Display', modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
-  { label: 'Great Vibes (script)',      family: 'Great Vibes',      category: 'Expressive / Script',  modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
-  { label: 'Sacramento (script)',       family: 'Sacramento',       category: 'Expressive / Script',  modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
+  { label: 'Great Vibes (formal)',      family: 'Great Vibes',      category: 'Expressive / Formal Script',      modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
+  { label: 'Sacramento (handwritten)',  family: 'Sacramento',       category: 'Expressive / Handwritten Script', modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
   { label: 'Patrick Hand',              family: 'Patrick Hand',     category: 'Expressive / Hand',    modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
   { label: 'Indie Flower',              family: 'Indie Flower',     category: 'Expressive / Hand',    modifiers: { weight: 'regular', width: 'normal'    }, weight: '400', letterSpacing: '0em' },
 ];
@@ -104,12 +106,6 @@ type BranchFilter = {
   sans: boolean;
   serif: boolean;
   expressive: boolean;
-  /** Exclusive "show only all-caps presets" filter. When true, every preset
-   *  whose textTransform isn't 'uppercase' gets hidden. When false (the
-   *  default), case isn't filtered at all. Behaves opposite to the branch
-   *  filters — those default-on and exclude when unchecked; this defaults
-   *  off and narrows when checked. */
-  allCaps: boolean;
 };
 
 /** Map a preset's display category to one of the three branch filters in
@@ -124,7 +120,7 @@ function presetBranch(category: string): BranchKey {
 }
 
 const DEFAULT_BRANCH_FILTER: BranchFilter = {
-  sans: true, serif: true, expressive: true, allCaps: false,
+  sans: true, serif: true, expressive: true,
 };
 
 // Decorative reuses the same family palette but a step lighter; all-caps
@@ -150,9 +146,10 @@ const CATEGORY_FAMILY_POOLS: Record<string, string[]> = {
   'Sans / Clean':         ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Work Sans', 'IBM Plex Sans', 'Manrope', 'Noto Sans'],
   'Sans / Geometric':     ['Poppins', 'Montserrat', 'Josefin Sans', 'DM Sans', 'Jost', 'Raleway', 'Space Grotesk', 'Outfit', 'Bebas Neue', 'Oswald', 'Anton', 'Barlow Condensed', 'Saira Condensed', 'Big Shoulders Display'],
   'Sans / Friendly':      ['Nunito', 'Comfortaa', 'Quicksand', 'Varela Round', 'Rubik', 'Fredoka', 'Dosis', 'Baloo 2'],
-  'Expressive / Display': ['Bangers', 'Righteous', 'Boogaloo', 'Titan One', 'Bungee', 'Lilita One', 'Passion One', 'Luckiest Guy'],
-  'Expressive / Script':  ['Dancing Script', 'Sacramento', 'Great Vibes', 'Satisfy', 'Allura', 'Pinyon Script', 'Yellowtail', 'Kaushan Script'],
-  'Expressive / Hand':    ['Caveat', 'Indie Flower', 'Patrick Hand', 'Permanent Marker', 'Shadows Into Light', 'Architects Daughter', 'Amatic SC', 'Rock Salt'],
+  'Expressive / Display':            ['Bangers', 'Righteous', 'Boogaloo', 'Titan One', 'Bungee', 'Lilita One', 'Passion One', 'Luckiest Guy'],
+  'Expressive / Formal Script':      ['Dancing Script', 'Great Vibes', 'Allura', 'Pinyon Script', 'Italianno', 'Parisienne', 'Mr De Havilland', 'Cookie'],
+  'Expressive / Handwritten Script': ['Sacramento', 'Satisfy', 'Yellowtail', 'Kaushan Script', 'Alex Brush', 'Courgette', 'Leckerli One', 'Yesteryear'],
+  'Expressive / Hand':               ['Caveat', 'Indie Flower', 'Patrick Hand', 'Permanent Marker', 'Shadows Into Light', 'Architects Daughter', 'Amatic SC', 'Rock Salt'],
 };
 
 /** When the user has picked a category preset, snap a CLIP-detected family
@@ -250,15 +247,37 @@ function effectiveBranchAndStyle(
   if (!region) {
     return { branch: clipBranch, style: clipStyle, pixelOverride: false };
   }
-  // Script signal first — substantial text with very few clean vertical
-  // stems is a categorical cursive call regardless of CLIP's branch.
+  // Script signal first — sparse stems mean cursive. Pixel can't tell
+  // formal calligraphy from casual cursive on its own; if CLIP landed
+  // on either Formal Script or Handwritten Script, trust CLIP's pick;
+  // otherwise default to Formal Script as the safe call (Dancing
+  // Script is a closer visual match for most ambiguous cases than
+  // Sacramento is).
   if (region.stroke.isLikelyScript) {
     if (clipBranch === 'Expressive' && clipStyle.includes('Script')) {
       return { branch: clipBranch, style: clipStyle, pixelOverride: false };
     }
     return {
       branch: 'Expressive',
-      style: 'Script / Cursive',
+      style: 'Formal Script',
+      pixelOverride: true,
+    };
+  }
+  // Hand-drawn / brush signal — CLIP routinely reads brush headlines like
+  // LEMON BIRD / DREAM / Squeeze as "Display / Decorative", which pulls
+  // block display fonts. The right pool depends on case: all-caps brush
+  // ≈ printed display ("Handwritten / Informal"), mixed-case brush ≈
+  // casual cursive ("Handwritten Script"). Pre-empt CLIP unless CLIP
+  // already landed somewhere in the hand family.
+  if (region.stroke.isLikelyHand) {
+    const clipAlreadyHand = clipBranch === 'Expressive'
+      && (clipStyle.includes('Hand') || clipStyle.includes('Informal'));
+    if (clipAlreadyHand) {
+      return { branch: clipBranch, style: clipStyle, pixelOverride: false };
+    }
+    return {
+      branch: 'Expressive',
+      style: region.isAllCaps ? 'Handwritten / Informal' : 'Handwritten Script',
       pixelOverride: true,
     };
   }
@@ -318,11 +337,25 @@ function clampFamilyToPixelBranch(
 ): string {
   if (userPickedCategory) return detectedFamily;
   if (!region) return detectedFamily;
-  // Script wins regardless of strokeCount — isLikelyScript uses
-  // text-length / stem-count and doesn't need stroke analysis to be
-  // reliable. Default to Dancing Script (top of the script pool).
+  // Script signal fires for flowing-cursive crops with sparse stems
+  // (Jui, Squee in cursive scripts). Routes to Formal Script (Dancing
+  // Script et al.) — engraved calligraphy is the calibration point for
+  // "looks like script."
   if (region.stroke.isLikelyScript) {
-    return CATEGORY_FAMILY_POOLS['Expressive / Script'][0];
+    return CATEGORY_FAMILY_POOLS['Expressive / Formal Script'][0];
+  }
+  // Hand-drawn signal — split by case. All-caps brush headlines (DREAM,
+  // LEMON BIRD, TYPEFACE) read as printed hand, so route to the Hand
+  // pool (Caveat / Permanent Marker / Shadows Into Light). Mixed-case
+  // brush text (hare, casual script-like chalk) reads as handwritten
+  // cursive, so route to Handwritten Script (Sacramento / Yellowtail /
+  // Kaushan). Cursive ↔ printed isn't directly detectable from pixels
+  // alone, but isAllCaps is a strong proxy: brush all-caps is almost
+  // always printed display, brush mixed-case skews cursive.
+  if (region.stroke.isLikelyHand) {
+    return region.isAllCaps
+      ? CATEGORY_FAMILY_POOLS['Expressive / Hand'][0]
+      : CATEGORY_FAMILY_POOLS['Expressive / Handwritten Script'][0];
   }
   // Same script-trust guard as effectiveBranchAndStyle: when CLIP said
   // Expressive · Script/Handwritten, don't let the pixel serif-feet
@@ -371,11 +404,16 @@ function pixelOverrideCategory(
 ): string | null {
   if (userPickedCategory) return null;
   if (!region) return null;
-  // Script signal first — when the region reads as script/handwritten, the
-  // entire trio family should pool-cycle through Expressive / Script so
-  // every alternative the user sees is on-brief.
+  // Script signal — trio cycles through Formal Script (calligraphy).
   if (region.stroke.isLikelyScript) {
-    return 'Expressive / Script';
+    return 'Expressive / Formal Script';
+  }
+  // Hand-drawn — split by case (see clampFamilyToPixelBranch for the
+  // same all-caps vs mixed-case proxy).
+  if (region.stroke.isLikelyHand) {
+    return region.isAllCaps
+      ? 'Expressive / Hand'
+      : 'Expressive / Handwritten Script';
   }
   // Trust CLIP when it confidently classified as Expressive ·
   // Script/Handwritten — script flourishes false-positive the per-stem
@@ -491,6 +529,24 @@ export interface TypographyTestPageProps {
   /** Fired when the user clicks Next. Receives a TypographyStyle[] derived
    *  from the SuggestedCards' current picks (auto + Customize overrides). */
   onTypographyComplete?: (styles: TypographyStyleOutput[]) => void;
+  /** Previously-saved selections. When the user returns to this stage from
+   *  a later step, we seed the per-role override state from these so their
+   *  family / weight / spacing / case customizations don't reset. Pass an
+   *  empty array (or omit) on first visit; we fall back to the matcher's
+   *  defaults. */
+  initialTypography?: TypographyStyleOutput[];
+  /** UI state to restore on re-entry — trio selection, body family mode,
+   *  customize-modal category picks. Paired with initialTypography. */
+  initialMeta?: TypographyMeta;
+  /** Fired whenever the meta state changes so the parent can persist it
+   *  alongside typographyStyles. */
+  onMetaChange?: (meta: TypographyMeta) => void;
+  /** Previously-uploaded custom fonts per role. On mount, the matcher
+   *  fetches each file from Firebase Storage and re-registers it via
+   *  FontFace so the persisted family name resolves. */
+  initialUploads?: TypographyUploads;
+  /** Fired whenever the upload set changes so the parent can persist it. */
+  onUploadsChange?: (uploads: TypographyUploads) => void;
   onNext?: () => void;
   onBack?: () => void;
 }
@@ -505,15 +561,68 @@ export interface TypographyStyleOutput {
   allCaps: boolean;
 }
 
+/** One persisted custom font upload. The `family` is the synthetic name the
+ *  matcher registered via FontFace; storagePath is the file's location in
+ *  Firebase Storage so the matcher can re-fetch and re-register it on a
+ *  fresh page load. fileName is kept for display. */
+export interface TypographyUpload {
+  family: string;
+  fileName: string;
+  storagePath: string;
+}
+
+/** Per-role custom font uploads. Persisted alongside TypographyStyleOutput[]
+ *  so the user's custom fonts survive a stage re-entry, page reload, or
+ *  Stripe redirect. */
+export interface TypographyUploads {
+  header?: TypographyUpload;
+  decorative?: TypographyUpload;
+  body?: TypographyUpload;
+}
+
+/** UI state the matcher needs to restore on stage re-entry but that doesn't
+ *  fit per-role (it's either shared or it's metadata about a user-driven
+ *  choice rather than typographic data). Persisted alongside the per-role
+ *  TypographyStyleOutput[] so customizations survive a round-trip through
+ *  later stages or a Stripe redirect. */
+export interface TypographyMeta {
+  /** Selected trio card index (position in the sorted trio list). */
+  trioIndex: number;
+  /** Body family-mode toggle (sans vs serif). */
+  bodyFamily: 'sans' | 'serif';
+  /** Whether the user has explicitly touched the body family toggle. When
+   *  false the Body SuggestedCard reads "Style: Suggested"; when true it
+   *  reads "Style: Customized". */
+  bodyFamilyTouched: boolean;
+  /** The category the user picked from the customize modal for the Header
+   *  role (e.g. "Sans / Geometric"). Drives the trio cycling + the
+   *  Suggested / Customized label state. Null when no preset was picked. */
+  headerPresetCategory: string | null;
+  decorativePresetCategory: string | null;
+}
+
 export default function TypographyTestPage({
   preloadedMoodboardUrl,
   hideUploadUI,
   decorativeMode,
   onDecorativeModeChange,
   onTypographyComplete,
+  initialTypography,
+  initialMeta,
+  onMetaChange,
+  initialUploads,
+  onUploadsChange,
   onNext,
   onBack,
 }: TypographyTestPageProps = {}) {
+  // Index initialTypography by type so we can pluck the saved value for each
+  // role at initialization time. Read once on first render — subsequent
+  // re-renders shouldn't snap user edits back to the saved values.
+  const initialByType = (() => {
+    const m: Partial<Record<'header' | 'decorative' | 'body', TypographyStyleOutput>> = {};
+    for (const s of initialTypography ?? []) m[s.type] = s;
+    return m;
+  })();
   const { user } = useAuth();
   const [preview, setPreview] = useState<string | null>(preloadedMoodboardUrl ?? null);
   const [status, setStatus] = useState<Status>('idle');
@@ -523,34 +632,46 @@ export default function TypographyTestPage({
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Selection state. Trio sets the baseline; per-role overrides win.
-  const [trioIdx, setTrioIdx] = useState(0);
-  const [headerOverride, setHeaderOverride] = useState<string | null>(null);
-  const [decorativeOverride, setDecorativeOverride] = useState<string | null>(null);
-  const [bodyOverride, setBodyOverride] = useState<string | null>(null);
+  // Initial values come from initialTypography (saved on a prior visit)
+  // when present, otherwise null so the matcher's auto pick is used.
+  const [trioIdx, setTrioIdx] = useState(initialMeta?.trioIndex ?? 0);
+  const [headerOverride, setHeaderOverride] = useState<string | null>(initialByType.header?.family ?? null);
+  const [decorativeOverride, setDecorativeOverride] = useState<string | null>(initialByType.decorative?.family ?? null);
+  const [bodyOverride, setBodyOverride] = useState<string | null>(initialByType.body?.family ?? null);
   // When a category preset is picked (e.g. "Sans / Geometric"), the trio
   // cards cycle through that category's font pool so each trio shows a
   // different family. Suggestion / upload picks leave these null so the
   // trios stay on the server's per-trio ranked families.
-  const [headerPresetCategory, setHeaderPresetCategory] = useState<string | null>(null);
-  const [decorativePresetCategory, setDecorativePresetCategory] = useState<string | null>(null);
-  const [bodyFamily, setBodyFamily] = useState<BodyFamily>('sans');
+  const [headerPresetCategory, setHeaderPresetCategory] = useState<string | null>(initialMeta?.headerPresetCategory ?? null);
+  const [decorativePresetCategory, setDecorativePresetCategory] = useState<string | null>(initialMeta?.decorativePresetCategory ?? null);
+  const [bodyFamily, setBodyFamily] = useState<BodyFamily>(initialMeta?.bodyFamily ?? 'sans');
   // Weight + letter-spacing overrides — populated when the user picks a
   // style preset so the visual matches the preset's vibe (Display = heavy
   // extended, Script = regular, etc.). Null means use the server specs.
-  const [headerWeightOverride, setHeaderWeightOverride] = useState<string | null>(null);
-  const [headerSpacingOverride, setHeaderSpacingOverride] = useState<string | null>(null);
-  const [headerCaseOverride, setHeaderCaseOverride] = useState<TextCase | null>(null);
-  const [decorativeWeightOverride, setDecorativeWeightOverride] = useState<string | null>(null);
-  const [decorativeSpacingOverride, setDecorativeSpacingOverride] = useState<string | null>(null);
-  const [decorativeCaseOverride, setDecorativeCaseOverride] = useState<TextCase | null>(null);
+  // On stage re-entry, seed from initialTypography so prior fine-tuning
+  // (per-role weight slider, letter-spacing slider, All-caps toggle) sticks.
+  const headerCaseFromSaved: TextCase | null = initialByType.header
+    ? (initialByType.header.allCaps ? 'uppercase' : 'normal') : null;
+  const decoCaseFromSaved: TextCase | null = initialByType.decorative
+    ? (initialByType.decorative.allCaps ? 'uppercase' : 'normal') : null;
+  const [headerWeightOverride, setHeaderWeightOverride] = useState<string | null>(initialByType.header?.weight ?? null);
+  const [headerSpacingOverride, setHeaderSpacingOverride] = useState<string | null>(initialByType.header?.letterSpacing ?? null);
+  const [headerCaseOverride, setHeaderCaseOverride] = useState<TextCase | null>(headerCaseFromSaved);
+  const [decorativeWeightOverride, setDecorativeWeightOverride] = useState<string | null>(initialByType.decorative?.weight ?? null);
+  const [decorativeSpacingOverride, setDecorativeSpacingOverride] = useState<string | null>(initialByType.decorative?.letterSpacing ?? null);
+  const [decorativeCaseOverride, setDecorativeCaseOverride] = useState<TextCase | null>(decoCaseFromSaved);
   // Uploaded custom fonts per role. Each entry holds the synthetic family
-  // name we registered via FontFace + the original file name for display.
-  const [headerUpload, setHeaderUpload] = useState<{ family: string; fileName: string } | null>(null);
-  const [decorativeUpload, setDecorativeUpload] = useState<{ family: string; fileName: string } | null>(null);
-  const [bodyUpload, setBodyUpload] = useState<{ family: string; fileName: string } | null>(null);
+  // name we registered via FontFace + the original file name for display +
+  // the Firebase Storage path so the file can be re-fetched on rehydrate.
+  const [headerUpload, setHeaderUpload] = useState<TypographyUpload | null>(initialUploads?.header ?? null);
+  const [decorativeUpload, setDecorativeUpload] = useState<TypographyUpload | null>(initialUploads?.decorative ?? null);
+  const [bodyUpload, setBodyUpload] = useState<TypographyUpload | null>(initialUploads?.body ?? null);
   // The image URL on Firebase Storage. Set after upload; consumed by the
   // analyzeMoodboard call.
-  const [, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(preloadedMoodboardUrl ?? null);
+  // Roles the user has marked "Not text" on the current run. Used to hide
+  // the corresponding CropDetail and to skip re-logging on toggle.
+  const [notTextMarked, setNotTextMarked] = useState<Set<string>>(new Set());
 
   // Customize modal state — null when closed, otherwise the role whose
   // gallery should render. Filters persist across opens so a user who
@@ -569,17 +690,35 @@ export default function TypographyTestPage({
   // so the Body SuggestedCard label flips from "Style: Suggested" to
   // "Style: Customized" — flipping the body family is an explicit user
   // choice, not the auto-pick.
-  const [bodyFamilyTouched, setBodyFamilyTouched] = useState(false);
+  const [bodyFamilyTouched, setBodyFamilyTouched] = useState(initialMeta?.bodyFamilyTouched ?? false);
+
+  // When the user comes back to this stage from a later step, we don't want
+  // the first-result auto-seed to wipe the choices they made before. Track
+  // whether we still need to honor initialTypography on the next result tick.
+  // Resets to true if the moodboard URL changes (i.e. genuinely new analysis).
+  const skipAutoSeedRef = useRef((initialTypography ?? []).length > 0);
 
   // When a fresh result lands, default-select the "From your moodboard text"
   // suggestion — that's the CLIP + OCR-driven pick and what most users will
   // want as their starting point. The user can switch to the mood-driven
   // suggestion or any preset, but they shouldn't have to make a click just
   // to apply what we already think is the best match.
+  //
+  // BUT: when the user is RETURNING to this stage with previously-saved
+  // picks (initialTypography seeded our state above), we keep their values
+  // and only seed the pieces that weren't saved — the auto-seed effect
+  // would otherwise overwrite their fine-tuning with the matcher's defaults.
   useEffect(() => {
     if (!result) return;
+    // Stage re-entry — leave all customize state alone. The state was already
+    // seeded from initialTypography + initialMeta at construction; auto-
+    // seeding from `result` would overwrite the user's prior selections.
+    if (skipAutoSeedRef.current) {
+      skipAutoSeedRef.current = false;
+      return;
+    }
     setTrioIdx(0);
-    setBodyOverride(null);
+    setBodyOverride(initialByType.body?.family ?? null);
     setHeaderPresetCategory(null);
     setDecorativePresetCategory(null);
     setBodyFamily('sans');
@@ -660,8 +799,41 @@ export default function TypographyTestPage({
     });
   }, [result]);
   const trio = sortedTrios[trioIdx];
-  const currentHeader = headerOverride ?? trio?.header ?? '';
-  const currentDecorative = decorativeOverride ?? trio?.decorative ?? '';
+  // Resolve the current pick's family the SAME way the trio cards do — through
+  // familyForTrioRole with the pixel-corrected category — so "Your current
+  // pick: #N" matches the selected trio card AND the exported font. Without
+  // this, the top card showed the raw server family (e.g. a Sacramento script)
+  // while the trio showed the pixel-corrected family (e.g. IBM Plex Sans),
+  // because only the trios applied the Sans/Serif correction.
+  const headerCategoryEffective = headerPresetCategory ?? (result
+    ? pixelOverrideCategory(headerPresetCategory, result.extractedText[0], result.headerBranch ?? result.branch, result.headerStyle ?? result.style)
+    : null);
+  const decorativeCategoryEffective = decorativePresetCategory ?? (result
+    ? pixelOverrideCategory(decorativePresetCategory, result.extractedText[1], result.decorativeBranch ?? result.branch, result.decorativeStyle ?? result.style)
+    : null);
+  const currentHeader = familyForTrioRole(trioIdx, headerCategoryEffective, headerOverride, trio?.header ?? '');
+  const currentDecorative = familyForTrioRole(trioIdx, decorativeCategoryEffective, decorativeOverride, trio?.decorative ?? '');
+
+  // Swap the Header and Decorative styles. Materializes each side's currently-
+  // resolved family as an explicit override (so the swap sticks even when a
+  // side is on its auto pick) and resets the trio to slot 0 so those overrides
+  // display. Category, weight, spacing, case, and upload swap with the family.
+  const swapHeaderDecorative = () => {
+    const hFam = currentHeader, dFam = currentDecorative;
+    setHeaderOverride(dFam || null);
+    setDecorativeOverride(hFam || null);
+    setHeaderPresetCategory(decorativePresetCategory);
+    setDecorativePresetCategory(headerPresetCategory);
+    setHeaderWeightOverride(decorativeWeightOverride);
+    setDecorativeWeightOverride(headerWeightOverride);
+    setHeaderSpacingOverride(decorativeSpacingOverride);
+    setDecorativeSpacingOverride(headerSpacingOverride);
+    setHeaderCaseOverride(decorativeCaseOverride);
+    setDecorativeCaseOverride(headerCaseOverride);
+    setHeaderUpload(decorativeUpload);
+    setDecorativeUpload(headerUpload);
+    setTrioIdx(0);
+  };
   const currentBody = bodyOverride ?? (bodyFamily === 'serif' ? BODY_SERIF_DEFAULT : (trio?.body ?? BODY_SANS_DEFAULT));
 
   // Effective spec values — preset overrides win; otherwise fall back to the
@@ -679,6 +851,16 @@ export default function TypographyTestPage({
   // styling so the suggestion preview matches what's literally on the board.
   const headerCrop = result?.extractedText[0];
   const decorativeCrop = result?.extractedText[1];
+
+  // Short category label matching the modal preset format
+  // ("Expressive / Display") instead of the CATEGORY_LABELS long form
+  // ("Expressive · Display / Decorative"). Splits "Display / Decorative" on
+  // " / " and keeps the first segment so the Suggested Card description
+  // reads the same as the modal's preset rows.
+  const shortCategoryLabel = (branch: string, style: string): string => {
+    const shortStyle = style.split(' / ')[0];
+    return `${branch} / ${shortStyle}`;
+  };
 
   const headerSuggestions: FontSuggestion[] = useMemo(() => {
     if (!result) return [];
@@ -701,34 +883,45 @@ export default function TypographyTestPage({
         clipTrio.header, headerCrop, headerPresetCategory, clipBranch, clipStyle,
       );
       const family = clampFamilyToCategory(familyAfterPixel, headerPresetCategory, headerOverride);
-      const wasClamped = family !== clipTrio.header;
-      const categoryStr = headerPresetCategory ?? `${branch} · ${style}`;
-      const confLabel = !wasClamped && !pixelOverride && conf !== undefined ? ` · ${Math.round(conf * 100)}% confidence` : '';
-      const clampedNote = headerPresetCategory && family !== clipTrio.header && !pixelOverride
-        ? ' · clamped to your pick'
-        : pixelOverride ? ' · pixel-corrected' : '';
+      // categoryStr matches the modal's preset format: "Expressive / Display"
+      // (or whatever the user explicitly picked). When auto-detected we
+      // shorten the long CATEGORY_LABELS style ("Display / Decorative" →
+      // "Display") so the SuggestedCard label reads the same as the modal.
+      const categoryStr = headerPresetCategory ?? shortCategoryLabel(branch, style);
+      // No internal-process annotation — "clamped to your pick" / "pixel-
+      // corrected" leak the matcher's decision-making into the UI, which the
+      // user neither needs nor wants. The visible category + weight is the
+      // verdict.
       out.push({
         label: 'From your moodboard text',
-        description: `${categoryStr}${confLabel}${clampedNote} · ${weight}, ${mod.width} · ${spacing} tracking${allCaps ? ' · ALL CAPS' : ''}`,
+        description: `${categoryStr} · ${weight}, ${mod.width}`,
         family,
         weight: css.weight,
         letterSpacing: css.letterSpacing,
         textTransform: allCaps ? 'uppercase' : undefined,
       });
     }
-    const moodTrio = result.trios.find((t) => t.type === 'mood_preset' || t.type === 'mood_alt');
-    if (moodTrio && moodTrio.mood) {
-      const family = clampFamilyToCategory(moodTrio.header, headerPresetCategory, headerOverride);
-      const wasClamped = family !== moodTrio.header;
-      out.push({
-        label: `From mood: ${moodTrio.mood.label}`,
-        description: wasClamped
-          ? 'Color-driven preset · clamped to your category pick'
-          : 'Color-driven preset (brightness, saturation, hue)',
-        family,
-        weight: result.specs.header.weight,
-        letterSpacing: result.specs.header.letter_spacing,
-      });
+    // Mood-driven suggestion ONLY surfaces as a fallback — when we couldn't
+    // detect any header text on the moodboard. The text-derived suggestion
+    // is always more precise when we have it, and showing both confuses
+    // users into thinking we're indecisive. headerCrop is the moodboard's
+    // tallest detected text region; null when OCR found nothing or the
+    // text gate rejected every candidate.
+    if (!headerCrop) {
+      const moodTrio = result.trios.find((t) => t.type === 'mood_preset' || t.type === 'mood_alt');
+      if (moodTrio && moodTrio.mood) {
+        const family = clampFamilyToCategory(moodTrio.header, headerPresetCategory, headerOverride);
+        const wasClamped = family !== moodTrio.header;
+        out.push({
+          label: `From mood: ${moodTrio.mood.label}`,
+          description: wasClamped
+            ? 'Color-driven preset · clamped to your category pick'
+            : 'Color-driven preset (brightness, saturation, hue)',
+          family,
+          weight: result.specs.header.weight,
+          letterSpacing: result.specs.header.letter_spacing,
+        });
+      }
     }
     return out;
   }, [result, headerCrop, headerPresetCategory, headerOverride]);
@@ -751,36 +944,57 @@ export default function TypographyTestPage({
         clipTrio.decorative, decorativeCrop, decorativePresetCategory, clipBranch, clipStyle,
       );
       const family = clampFamilyToCategory(familyAfterPixel, decorativePresetCategory, decorativeOverride);
-      const categoryStr = decorativePresetCategory ?? `${branch} · ${style}`;
-      const confLabel = !pixelOverride && conf !== undefined ? ` · ${Math.round(conf * 100)}% confidence` : '';
-      const clampedNote = decorativePresetCategory && family !== clipTrio.decorative && !pixelOverride
-        ? ' · clamped to your pick'
-        : pixelOverride ? ' · pixel-corrected' : '';
+      // See header branch for rationale — categoryStr / description match
+      // the modal's preset row format.
+      const categoryStr = decorativePresetCategory ?? shortCategoryLabel(branch, style);
+      // No process annotations — see header branch.
       out.push({
         label: 'From your moodboard text',
-        description: `${categoryStr}${confLabel}${clampedNote} · ${weight}, ${mod.width} · ${spacing} tracking${allCaps ? ' · ALL CAPS' : ''}`,
+        description: `${categoryStr} · ${weight}, ${mod.width}`,
         family,
         weight: css.weight,
         letterSpacing: css.letterSpacing,
         textTransform: allCaps ? 'uppercase' : undefined,
       });
     }
-    const moodTrio = result.trios.find((t) => t.type === 'mood_preset' || t.type === 'mood_alt');
-    if (moodTrio && moodTrio.mood) {
-      const family = clampFamilyToCategory(moodTrio.decorative, decorativePresetCategory, decorativeOverride);
-      const wasClamped = family !== moodTrio.decorative;
-      out.push({
-        label: `From mood: ${moodTrio.mood.label}`,
-        description: wasClamped
-          ? 'Color-driven preset · clamped to your category pick'
-          : 'Color-driven preset (brightness, saturation, hue)',
-        family,
-        weight: result.specs.decorative.weight,
-        letterSpacing: result.specs.decorative.letter_spacing,
-      });
+    // Mood-driven decorative — fallback path, two cases:
+    //   1. No header crop at all (truly no text on moodboard).
+    //   2. Header crop but no decorative crop (only ONE text region found).
+    //      Designers expect a decorative pairing even with a single source —
+    //      synthesize one from the mood preset's decorative recommendation,
+    //      then clamp it to contrast with the header (different category
+    //      pool — handled by clampFamilyToCategory + the trio's cross_pair
+    //      entry which already pairs against the header's category).
+    // When BOTH crops exist, the text-derived suggestion already covers it
+    // and adding a mood card here just makes the user pick between two
+    // visually similar options. Drop it.
+    if (!decorativeCrop) {
+      const moodTrio = result.trios.find((t) => t.type === 'mood_preset' || t.type === 'mood_alt');
+      if (moodTrio && moodTrio.mood) {
+        const family = clampFamilyToCategory(moodTrio.decorative, decorativePresetCategory, decorativeOverride);
+        const wasClamped = family !== moodTrio.decorative;
+        // Label nods to what the synthesis is based on — "From mood" when
+        // there's no text at all; "Paired with header" when we have a
+        // header but no decorative source.
+        const label = headerCrop
+          ? `Paired with header · ${moodTrio.mood.label}`
+          : `From mood: ${moodTrio.mood.label}`;
+        const description = headerCrop
+          ? 'Synthesized to contrast with your header'
+          : (wasClamped
+              ? 'Color-driven preset · clamped to your category pick'
+              : 'Color-driven preset (brightness, saturation, hue)');
+        out.push({
+          label,
+          description,
+          family,
+          weight: result.specs.decorative.weight,
+          letterSpacing: result.specs.decorative.letter_spacing,
+        });
+      }
     }
     return out;
-  }, [result, decorativeCrop, decorativePresetCategory, decorativeOverride]);
+  }, [result, headerCrop, decorativeCrop, decorativePresetCategory, decorativeOverride]);
 
   // Every font the page might render — kept as one list so the Google Fonts
   // <link> rebuilds once per result rather than per tab click.
@@ -807,6 +1021,8 @@ export default function TypographyTestPage({
   useGoogleFonts(allFamilies);
   const loadingPhrase = useLoadingPhrase(status);
 
+  const FONTS_FOLDER = 'typography-v2-fonts';
+
   const handleFontUpload = useCallback(async (file: File, role: 'header' | 'decorative' | 'body') => {
     try {
       const family = `custom-${role}-${Date.now()}`;
@@ -814,7 +1030,18 @@ export default function TypographyTestPage({
       const face = new FontFace(family, buffer);
       await face.load();
       document.fonts.add(face);
-      const upload = { family, fileName: file.name };
+      // Upload the file bytes to Firebase Storage so the font survives a
+      // stage re-entry / page reload / Stripe redirect. Fire-and-forget for
+      // the UI side — the in-memory FontFace is already registered, so the
+      // current session keeps working even if the upload is in flight. On
+      // rehydrate we'll fetch this back and re-register under the same
+      // synthetic family name. Filename includes the role and timestamp so
+      // collisions are impossible across users / sessions.
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+      const storagePath = `${family}.${ext}`;
+      uploadDesignSystemFile(FONTS_FOLDER, storagePath, file, file.type)
+        .catch((e) => console.warn(`font storage upload failed for ${role}:`, e));
+      const upload: TypographyUpload = { family, fileName: file.name, storagePath };
       if (role === 'header') {
         setHeaderUpload(upload);
         setHeaderOverride(family);
@@ -835,6 +1062,42 @@ export default function TypographyTestPage({
       console.error(`font upload failed for ${role}:`, e);
       alert(`Couldn't load that font file: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }, []);
+
+  // Re-register custom font FontFaces from initialUploads on mount. The
+  // persisted family name (e.g. "custom-header-1780868130246") is also the
+  // current headerOverride / decorativeOverride / bodyOverride seeded from
+  // initialTypography — so as soon as document.fonts has that family,
+  // every text element using it re-renders. Browsers auto-reflow when
+  // document.fonts changes, so we don't need to force anything. Each
+  // FontFace.load() is async; render shows a brief fallback flash while
+  // bytes download (typically <300 ms on warm Firebase Storage).
+  useEffect(() => {
+    if (!initialUploads) return;
+    const roles: Array<keyof TypographyUploads> = ['header', 'decorative', 'body'];
+    for (const role of roles) {
+      const entry = initialUploads[role];
+      if (!entry) continue;
+      // Skip if already registered (HMR / repeat mounts).
+      if (Array.from(document.fonts).some((f) => f.family === entry.family)) continue;
+      (async () => {
+        try {
+          const url = getPublicFileUrl(FONTS_FOLDER, entry.storagePath);
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+          const buffer = await res.arrayBuffer();
+          const face = new FontFace(entry.family, buffer);
+          await face.load();
+          document.fonts.add(face);
+        } catch (e) {
+          console.warn(`failed to re-register custom font for ${role}:`, e);
+        }
+      })();
+    }
+    // Run once on mount per initialUploads ref. We don't depend on individual
+    // role entries because we want the registration to happen as soon as the
+    // matcher loads, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePickPreset = useCallback((role: 'header' | 'decorative', preset: StylePreset) => {
@@ -884,6 +1147,10 @@ export default function TypographyTestPage({
       setElapsedMs(Date.now() - t0);
       setResult(r);
       setStatus('done');
+      // Auto-log every server-side gate rejection as a weak negative for the
+      // future fine-tuned classifier (Step C). Fire-and-forget — Firestore
+      // failures shouldn't surface in the matcher UI.
+      logGateRejections(url, r.rejected ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStatus('error');
@@ -911,6 +1178,7 @@ export default function TypographyTestPage({
         setElapsedMs(Date.now() - t0);
         setResult(r);
         setStatus('done');
+        logGateRejections(preloadedMoodboardUrl, r.rejected ?? []);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -964,8 +1232,45 @@ export default function TypographyTestPage({
     currentBody, bodyWeightOverride, bodySpacingOverride,
   ]);
 
+  // Sync UI meta (trio index, body family mode, preset categories) back to
+  // the parent so it persists alongside typographyStyles. Same effect-based
+  // approach as onTypographyComplete — fires on every meta change.
+  useEffect(() => {
+    if (!onMetaChange) return;
+    onMetaChange({
+      trioIndex: trioIdx,
+      bodyFamily,
+      bodyFamilyTouched,
+      headerPresetCategory,
+      decorativePresetCategory,
+    });
+  }, [
+    onMetaChange,
+    trioIdx, bodyFamily, bodyFamilyTouched,
+    headerPresetCategory, decorativePresetCategory,
+  ]);
+
+  // Mirror uploads back to the parent. Each role's record is null when no
+  // upload exists; we omit the key entirely for null so the parent always
+  // sees a consistent shape ({ header: {...} } not { header: null }).
+  useEffect(() => {
+    if (!onUploadsChange) return;
+    const next: TypographyUploads = {};
+    if (headerUpload) next.header = headerUpload;
+    if (decorativeUpload) next.decorative = decorativeUpload;
+    if (bodyUpload) next.body = bodyUpload;
+    onUploadsChange(next);
+  }, [onUploadsChange, headerUpload, decorativeUpload, bodyUpload]);
+
   return (
-    <div style={{ padding: '40px 24px' }}>
+    // Dim the page one surface step below the accordions. The lib Accordion
+    // paints data-surface="Surface"; without this the page (which inherits the
+    // parent theme's Surface) is the SAME tone, so the accordion sections blend
+    // into the background when a colored brand theme is active. Sitting the page
+    // on Surface-Dim lets the Surface accordions and Container preview cards
+    // both read as raised panels. data-surface re-resolves --Background within
+    // the inherited data-theme, so this honors the brand cascade.
+    <div data-surface="Surface-Dim" style={{ padding: '40px 24px', background: 'var(--Background)', minHeight: '100%' }}>
       <VStack spacing={4} style={{ maxWidth: 1400, margin: '0 auto', width: '100%' }}>
         {!inStageMode && (
           <VStack spacing={1}>
@@ -1008,10 +1313,15 @@ export default function TypographyTestPage({
             {inStageMode && (
               <>
                 <br />
-                The image URL the matcher received was{' '}
-                <code style={{ wordBreak: 'break-all' }}>{preloadedMoodboardUrl ?? '(none)'}</code>.
-                If that URL is a Firebase Storage signed URL it may have expired —
-                go back, re-upload the moodboard, and try again.
+                This is usually a temporary server issue — the font-matching
+                service can be busy or rate-limited, especially on a cold start.
+                Wait a moment and click Analyze again. If it keeps failing after a
+                few tries, go back and re-upload the moodboard.
+                <br />
+                <span style={{ opacity: 0.7, fontSize: '0.85em' }}>
+                  Technical detail: image was{' '}
+                  <code style={{ wordBreak: 'break-all' }}>{preloadedMoodboardUrl ?? '(none)'}</code>
+                </span>
               </>
             )}
           </Alert>
@@ -1034,7 +1344,21 @@ export default function TypographyTestPage({
         )}
 
         {preview && result && (
-          <DetectionDetails preview={preview} result={result} />
+          <DetectionDetails
+            preview={preview}
+            result={result}
+            moodboardUrl={imageUrl ?? preloadedMoodboardUrl ?? preview}
+            notTextMarked={notTextMarked}
+            onMarkNotText={(role, region) => {
+              setNotTextMarked(prev => new Set(prev).add(role));
+              logGateFeedback({
+                cropUrl: region.dataUrl,
+                moodboardUrl: imageUrl ?? preloadedMoodboardUrl ?? preview,
+                verdict: 'not-text',
+                role,
+              });
+            }}
+          />
         )}
 
         {result && (
@@ -1045,6 +1369,9 @@ export default function TypographyTestPage({
                   default so the user lands on the suggested font; Decorative
                   and Body collapse so the panel stays scannable. */}
               <VStack spacing={2} style={{ width: 380, flexShrink: 0 }}>
+                <Button variant="default-outline" size="small" onClick={swapHeaderDecorative} style={{ width: '100%' }}>
+                  ⇄ Swap Header &amp; Decorative
+                </Button>
                 <AccordionGroup spacing={1}>
                   <Accordion defaultExpanded>
                     <AccordionSummary>Header</AccordionSummary>
@@ -1067,7 +1394,7 @@ export default function TypographyTestPage({
                       </VStack>
                     </AccordionDetails>
                   </Accordion>
-                  <Accordion>
+                  <Accordion defaultExpanded>
                     <AccordionSummary>Decorative</AccordionSummary>
                     <AccordionDetails>
                       <VStack spacing={2}>
@@ -1219,6 +1546,9 @@ export default function TypographyTestPage({
         sampleText={customizeRole === 'decorative' ? 'jumps over the lazy dog' : 'The quick brown fox'}
         fontSize={customizeRole === 'decorative' ? 20 : 28}
         uploadedFont={customizeRole === 'decorative' ? decorativeUpload : headerUpload}
+        currentWeight={customizeRole === 'decorative' ? currentDecorativeWeight : currentHeaderWeight}
+        currentLetterSpacing={customizeRole === 'decorative' ? currentDecorativeSpacing : currentHeaderSpacing}
+        currentCase={customizeRole === 'decorative' ? currentDecorativeCase : currentHeaderCase}
         onPickPreset={(p) => {
           if (customizeRole) handlePickPreset(customizeRole, p);
         }}
@@ -1234,7 +1564,15 @@ export default function TypographyTestPage({
 
 // ── subcomponents ───────────────────────────────────────────────────
 
-function DetectionDetails({ preview, result }: { preview: string; result: MoodboardAnalysis }) {
+function DetectionDetails({
+  preview, result, moodboardUrl: _moodboardUrl, notTextMarked, onMarkNotText,
+}: {
+  preview: string;
+  result: MoodboardAnalysis;
+  moodboardUrl: string;
+  notTextMarked: Set<string>;
+  onMarkNotText: (role: string, region: ExtractedTextRegion) => void;
+}) {
   const header = result.extractedText[0];
   const decorative = result.extractedText[1];
   return (
@@ -1260,18 +1598,21 @@ function DetectionDetails({ preview, result }: { preview: string; result: Moodbo
                   flexShrink: 0,
                 }}
               />
-              {header ? (
+              {header && !notTextMarked.has('header') ? (
                 <CropDetail
                   role="Header (tallest)"
                   region={header}
                   branch={result.headerBranch ?? result.branch}
                   style={result.headerStyle ?? result.style}
                   modifiers={result.headerModifiers ?? result.modifiers}
+                  onMarkNotText={() => onMarkNotText('header', header)}
                 />
-              ) : (
+              ) : !header ? (
                 <Caption color="quiet">No header crop — using whole image.</Caption>
+              ) : (
+                <Caption color="quiet">Header reported as not text — thanks!</Caption>
               )}
-              {decorative ? (
+              {decorative && !notTextMarked.has('decorative') ? (
                 <CropDetail
                   role={`Decorative (${
                     result.decorativePickReason === 'script_handwritten'
@@ -1284,7 +1625,10 @@ function DetectionDetails({ preview, result }: { preview: string; result: Moodbo
                   branch={result.decorativeBranch ?? result.branch}
                   style={result.decorativeStyle ?? result.style}
                   modifiers={result.decorativeModifiers ?? result.modifiers}
+                  onMarkNotText={() => onMarkNotText('decorative', decorative)}
                 />
+              ) : decorative ? (
+                <Caption color="quiet">Decorative reported as not text — thanks!</Caption>
               ) : null}
             </HStack>
           </VStack>
@@ -1295,13 +1639,17 @@ function DetectionDetails({ preview, result }: { preview: string; result: Moodbo
 }
 
 function CropDetail({
-  role, region, branch, style, modifiers,
+  role, region, branch, style, modifiers, onMarkNotText,
 }: {
   role: string;
   region: ExtractedTextRegion;
   branch: string;
   style: string;
   modifiers: { weight: string; width: string };
+  /** Optional — when provided, renders a small "Not text" button at the
+   *  bottom of the card. Click logs a `not-text` verdict to Firestore
+   *  via the parent's handler and hides this card from the current view. */
+  onMarkNotText?: () => void;
 }) {
   return (
     <Card padding="small" style={{ flex: 1, minWidth: 280 }}>
@@ -1326,15 +1674,9 @@ function CropDetail({
         {(() => {
           const eff = effectiveBranchAndStyle(branch, style, region);
           return (
-            <>
-              <Caption color="quiet">
-                {eff.branch} · {eff.style}
-                {eff.pixelOverride ? ' · pixel-corrected' : ''}
-              </Caption>
-              {eff.pixelOverride && (
-                <Caption color="quiet">CLIP said: {branch} · {style}</Caption>
-              )}
-            </>
+            <Caption color="quiet">
+              {eff.branch} · {eff.style}
+            </Caption>
           );
         })()}
         <Caption color="quiet">
@@ -1351,6 +1693,16 @@ function CropDetail({
             {' '}{region.stroke.hasSerifFeet ? 'serif feet detected' : 'flat terminals (sans)'} ·
             {' '}{region.stroke.strokeCount} stems
           </Caption>
+        )}
+        {onMarkNotText && (
+          <Button
+            variant="default-outline"
+            size="small"
+            onClick={onMarkNotText}
+            sx={{ alignSelf: 'flex-start', marginTop: 4 }}
+          >
+            Not text
+          </Button>
         )}
       </VStack>
     </Card>
@@ -1597,6 +1949,7 @@ function TriosTab({
 
 function PresetList({
   presets, current, sampleText, fontSize, onPickPreset, branchFilter,
+  weightOverride, letterSpacingOverride, caseOverride,
 }: {
   presets: StylePreset[];
   current: string;
@@ -1606,21 +1959,24 @@ function PresetList({
   /** Optional checkbox filter — only presets whose category maps to an
    *  enabled branch are shown. When omitted, every preset is included. */
   branchFilter?: BranchFilter;
+  /** Shared style values from the modal's top controls. When provided,
+   *  every row renders with these instead of the preset's own hardcoded
+   *  weight/spacing/case so the user can compare families head-to-head
+   *  at one consistent style. */
+  weightOverride?: string;
+  letterSpacingOverride?: string;
+  caseOverride?: TextCase;
 }) {
   const filtered = branchFilter
-    ? presets.filter((p) => {
-        const branchOk = branchFilter[presetBranch(p.category)];
-        // allCaps acts as an exclusive narrowing filter: when checked,
-        // only presets whose textTransform is 'uppercase' survive; when
-        // unchecked, case isn't filtered at all.
-        const caseOk = !branchFilter.allCaps || p.textTransform === 'uppercase';
-        return branchOk && caseOk;
-      })
+    ? presets.filter((p) => branchFilter[presetBranch(p.category)])
     : presets;
   return (
     <VStack spacing={1}>
       {filtered.map((preset) => {
         const isSelected = preset.family === current;
+        const renderWeight = weightOverride ?? preset.weight;
+        const renderSpacing = letterSpacingOverride ?? preset.letterSpacing;
+        const renderCase = caseOverride ?? preset.textTransform;
         return (
           <Card
             key={preset.label}
@@ -1633,18 +1989,17 @@ function PresetList({
               <OverlineSmall color="quiet">{isSelected ? '✓ Sample' : 'Sample'}</OverlineSmall>
               <FontPreview
                 family={preset.family}
-                weight={preset.weight}
-                letterSpacing={preset.letterSpacing}
+                weight={renderWeight}
+                letterSpacing={renderSpacing}
                 fontSize={fontSize}
                 lineHeight={1.1}
                 fallback="sans-serif"
-                textTransform={preset.textTransform}
+                textTransform={renderCase}
               >
                 {sampleText}
               </FontPreview>
               <Caption color={isSelected ? 'primary' : 'quiet'}>
-                {preset.category} · {preset.modifiers.weight}, {preset.modifiers.width}
-                {preset.textTransform === 'uppercase' ? ', ALL CAPS' : ''}
+                {preset.category}
               </Caption>
             </VStack>
           </Card>
@@ -1793,10 +2148,33 @@ function InlineAdjuster({
  *  gallery (filterable by branch) and the font-upload affordance. One modal
  *  instance shared across roles — the role + the preset list to show are
  *  driven by props. */
+/** Snap an arbitrary CSS weight string to the closest entry in the modal's
+ *  three-step ButtonGroup so the control reflects the current pick instead
+ *  of silently sitting on "Regular" when the saved weight is 600/800/etc. */
+function snapWeightToBucket(weight: string): '300' | '500' | '700' {
+  const n = parseInt(weight, 10);
+  if (Number.isNaN(n)) return '500';
+  if (n <= 350) return '300';
+  if (n >= 650) return '700';
+  return '500';
+}
+
+/** Same idea for letter spacing — snap to the four buckets the ButtonGroup
+ *  exposes so an opened modal shows the matching segment. */
+function snapSpacingToBucket(spacing: string): '-0.02em' | '0em' | '0.05em' | '0.18em' {
+  const n = parseFloat(spacing);
+  if (Number.isNaN(n)) return '0em';
+  if (n <= -0.005) return '-0.02em';
+  if (n <= 0.025) return '0em';
+  if (n <= 0.1) return '0.05em';
+  return '0.18em';
+}
+
 function CustomizeModal({
   open, onClose, role, presets, current, sampleText, fontSize,
   uploadedFont, onPickPreset, onUpload,
   branchFilter, onBranchFilterChange,
+  currentWeight, currentLetterSpacing, currentCase,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1810,61 +2188,154 @@ function CustomizeModal({
   onUpload: (file: File) => void;
   branchFilter: BranchFilter;
   onBranchFilterChange: (next: BranchFilter) => void;
+  /** The role's current weight / letter-spacing / case. Used to seed the
+   *  modal's top controls on open so the user starts from where the role
+   *  already is, not a generic default. */
+  currentWeight: string;
+  currentLetterSpacing: string;
+  currentCase: TextCase;
 }) {
   const setFlag = (key: keyof BranchFilter, value: boolean) =>
     onBranchFilterChange({ ...branchFilter, [key]: value });
+
+  // Modal-local state for the shared weight / spacing / case controls. Init
+  // from the role's current pick so opening the modal doesn't reset what the
+  // user already had. Re-sync each time the modal opens.
+  const [modalWeight, setModalWeight] = useState(snapWeightToBucket(currentWeight));
+  const [modalSpacing, setModalSpacing] = useState(snapSpacingToBucket(currentLetterSpacing));
+  const [modalCase, setModalCase] = useState<TextCase>(currentCase);
+
+  useEffect(() => {
+    if (open) {
+      setModalWeight(snapWeightToBucket(currentWeight));
+      setModalSpacing(snapSpacingToBucket(currentLetterSpacing));
+      setModalCase(currentCase);
+    }
+  }, [open, currentWeight, currentLetterSpacing, currentCase]);
+
+  // One row per unique CATEGORY. With weight/spacing/case shared at the
+  // top, the only thing left to differentiate rows is the style family —
+  // and the user thinks in categories ("Sans / Clean", "Serif / Editorial"),
+  // not individual fonts. Pick the first preset of each category as that
+  // category's representative; the font engine substitutes other families
+  // from the category pool when needed.
+  const uniquePresets = useMemo(() => {
+    const seen = new Set<string>();
+    return presets.filter((p) => {
+      if (seen.has(p.category)) return false;
+      seen.add(p.category);
+      return true;
+    });
+  }, [presets]);
+
   return (
     <Modal open={open} onClose={onClose} title={`Customize ${role.toLowerCase()}`} size="large">
-      <VStack spacing={3}>
-        <VStack spacing={1}>
-          <Caption color="quiet">Filter styles</Caption>
-          <HStack spacing={2}>
-            <Checkbox
-              label="Sans serif"
-              checked={branchFilter.sans}
-              onChange={(e) => setFlag('sans', (e.target as HTMLInputElement).checked)}
-            />
-            <Checkbox
-              label="Serif"
-              checked={branchFilter.serif}
-              onChange={(e) => setFlag('serif', (e.target as HTMLInputElement).checked)}
-            />
-            <Checkbox
-              label="Script / Handwritten"
-              checked={branchFilter.expressive}
-              onChange={(e) => setFlag('expressive', (e.target as HTMLInputElement).checked)}
-            />
-            <Checkbox
-              label="All caps only"
-              checked={branchFilter.allCaps}
-              onChange={(e) => setFlag('allCaps', (e.target as HTMLInputElement).checked)}
-            />
-          </HStack>
+      {/* Three-region layout: top controls + filters and bottom upload are
+          fixed; the middle preset list is the only thing that scrolls.
+          The outer container caps its own height so the Modal body never
+          overflows — that would introduce a second scrollbar. */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: 'calc(100vh - 180px)',
+        minHeight: 400,
+      }}>
+        {/* Top — style controls + filters */}
+        <VStack spacing={3} style={{ flexShrink: 0 }}>
+          <VStack spacing={1}>
+            <Caption color="quiet">Style — applied to every option</Caption>
+            <VStack spacing={2}>
+              <HStack spacing={3}>
+                <VStack spacing={0}>
+                  <Caption color="quiet">Weight</Caption>
+                  <ButtonGroup
+                    value={modalWeight}
+                    onChange={(v: string) => setModalWeight(v as '300' | '500' | '700')}
+                    size="small"
+                  >
+                    <Button value="300" size="small">Thin</Button>
+                    <Button value="500" size="small">Regular</Button>
+                    <Button value="700" size="small">Heavy</Button>
+                  </ButtonGroup>
+                </VStack>
+                <VStack spacing={0}>
+                  <Caption color="quiet">Letter spacing</Caption>
+                  <ButtonGroup
+                    value={modalSpacing}
+                    onChange={(v: string) => setModalSpacing(v as '-0.02em' | '0em' | '0.05em' | '0.18em')}
+                    size="small"
+                  >
+                    <Button value="-0.02em" size="small">Tight</Button>
+                    <Button value="0em" size="small">Normal</Button>
+                    <Button value="0.05em" size="small">Wide</Button>
+                    <Button value="0.18em" size="small">Spaced</Button>
+                  </ButtonGroup>
+                </VStack>
+              </HStack>
+              <Checkbox
+                label="All caps"
+                checked={modalCase === 'uppercase'}
+                onChange={(e) =>
+                  setModalCase((e.target as HTMLInputElement).checked ? 'uppercase' : 'normal')
+                }
+              />
+            </VStack>
+          </VStack>
+          <Divider />
+          <VStack spacing={1}>
+            <Caption color="quiet">Filter styles</Caption>
+            <HStack spacing={2}>
+              <Checkbox
+                label="Sans serif"
+                checked={branchFilter.sans}
+                onChange={(e) => setFlag('sans', (e.target as HTMLInputElement).checked)}
+              />
+              <Checkbox
+                label="Serif"
+                checked={branchFilter.serif}
+                onChange={(e) => setFlag('serif', (e.target as HTMLInputElement).checked)}
+              />
+              <Checkbox
+                label="Script / Handwritten"
+                checked={branchFilter.expressive}
+                onChange={(e) => setFlag('expressive', (e.target as HTMLInputElement).checked)}
+              />
+            </HStack>
+          </VStack>
+          <Divider />
         </VStack>
-        <Divider />
-        {/* Scroll just the preset gallery so the filter row at the top and
-            the Upload affordance at the bottom stay pinned while the user
-            browses the whole list. The 320 px budget covers the modal
-            title + close button + filter row + divider + upload row + the
-            modal's own padding — anything left in the viewport is the
-            scrolling preset body. */}
-        <div style={{
-          maxHeight: 'calc(100vh - 320px)',
-          minHeight: 200,
-          overflowY: 'auto',
-          paddingRight: 8,
-        }}>
+
+        {/* Middle — scrolling preset gallery. flex:1 + minHeight:0 lets it
+            shrink inside the flex column so overflow:auto actually kicks
+            in instead of pushing the footer off-screen. */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px 8px 16px 0' }}>
           <PresetList
-            presets={presets}
+            presets={uniquePresets}
             current={current}
             sampleText={sampleText}
             fontSize={fontSize}
-            onPickPreset={(p) => { onPickPreset(p); onClose(); }}
+            weightOverride={modalWeight}
+            letterSpacingOverride={modalSpacing}
+            caseOverride={modalCase}
+            onPickPreset={(p) => {
+              // Apply the family the user clicked, but carry over the
+              // modal's shared style values so the role lands exactly
+              // where the user saw it in the preview row.
+              onPickPreset({
+                ...p,
+                weight: modalWeight,
+                letterSpacing: modalSpacing,
+                textTransform: modalCase,
+              });
+              onClose();
+            }}
             branchFilter={branchFilter}
           />
         </div>
-        <Divider />
-        <VStack spacing={1}>
+
+        {/* Bottom — upload block, fixed in footer */}
+        <VStack spacing={1} style={{ flexShrink: 0 }}>
+          <Divider />
           <Caption color="quiet">
             Or upload your own — .ttf, .otf, .woff, .woff2.
           </Caption>
@@ -1873,7 +2344,7 @@ function CustomizeModal({
             <Caption color="primary">Using uploaded font: {uploadedFont.fileName}</Caption>
           )}
         </VStack>
-      </VStack>
+      </div>
     </Modal>
   );
 }

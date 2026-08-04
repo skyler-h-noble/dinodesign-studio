@@ -40,10 +40,10 @@ export interface StyleCustomizations {
 }
 
 const STYLE_DEFAULTS: Record<ComponentStyle, { label: string; description: string } & StyleCustomizations> = {
-  professional: { label: 'Pro', description: 'Clean lines, minimal radius', cardPadding: 12, buttonRadius: 6, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 6, inputPadding: 2 },
-  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', cardPadding: 16, buttonRadius: 12, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 12, inputPadding: 2 },
-  bold: { label: 'Bold', description: 'Strong elements, generous rounding', cardPadding: 20, buttonRadius: 25, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 25, inputPadding: 4 },
-  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', cardPadding: 24, buttonRadius: 100, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 100, inputPadding: 4 },
+  professional: { label: 'Pro', description: 'Clean lines, minimal radius', cardPadding: 12, buttonRadius: 6, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 6, inputPadding: 8 },
+  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', cardPadding: 16, buttonRadius: 12, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 12, inputPadding: 12 },
+  bold: { label: 'Bold', description: 'Strong elements, generous rounding', cardPadding: 20, buttonRadius: 25, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 25, inputPadding: 12 },
+  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', cardPadding: 24, buttonRadius: 100, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 100, inputPadding: 16 },
 };
 
 const STYLE_KEYS: ComponentStyle[] = ['professional', 'modern', 'bold', 'playful'];
@@ -132,7 +132,7 @@ export default function ComponentStyleStage({
             {[
               { key: 'button', label: 'Button', defaultOpen: true, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider
+                  <Slider variant="default"
                     label="Desktop Button Height"
                     min={24}
                     max={48}
@@ -146,23 +146,23 @@ export default function ComponentStyleStage({
                     valueLabelDisplay="auto"
                   />
                   <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
-                  <Slider label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Border Radius (%)" min={0} max={100} value={custom.buttonRadius} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
               { key: 'icon', label: 'Icon Button', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Border Radius (%)" min={0} max={100} value={custom.iconButtonRadius} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.iconButtonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
               { key: 'input', label: 'Input', defaultOpen: false, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider label="Border Radius (%)" min={0} max={100} value={custom.inputRadius} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider label="Padding" min={0} max={16} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.inputRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                  <Slider variant="default" label="Padding" min={0} max={16} step={4} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
                 </VStack>
               )},
             ].map(section => {
@@ -198,6 +198,7 @@ export default function ComponentStyleStage({
             <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Choose a base style then fine-tune the details.</BodySmall>
             <ButtonGroup
               size="small"
+              fit="equal"
               value={selected}
               onChange={(val: typeof selected) => {
                 setSelected(val);

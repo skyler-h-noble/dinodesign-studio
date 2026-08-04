@@ -93,6 +93,16 @@ exports.detectTextRegionsGCV = onRequest(
         text: a.description || '',
         confidence: 100,
         bbox: bboxFromPoly(a.boundingPoly),
+        // Raw 4-vertex polygon. GCV orders these as top-left → top-right →
+        // bottom-right → bottom-left of the rotated bounding rect. The
+        // client uses these to compute the TRUE letter height for rotated
+        // text (the axis-aligned bbox is too tall for diagonal words like
+        // a slanted "breathe" sign and would win the height-sort despite
+        // being a small script).
+        poly: ((a.boundingPoly && a.boundingPoly.vertices) || []).map(v => ({
+          x: v.x || 0,
+          y: v.y || 0,
+        })),
       }));
 
       const elapsedMs = Date.now() - t0;

@@ -66,12 +66,19 @@ const CATEGORIES = {
     'art deco or carnival style font with elaborate ornamental glyphs not just bold sans serif',
     'illustrated picture font with shapes inside the letters not a clean sans serif',
   ],
-  expressive_script: [
-    'connected cursive script font with flowing handwritten letterforms',
-    'elegant calligraphic script typeface with letters that connect and flow',
-    'formal script font like elegant cursive handwriting from a pen',
-    'flowing connected script typography with curved letter connections',
-    'cursive script font with letters that join together and flow continuously',
+  expressive_script_formal: [
+    'elegant calligraphic script typeface with engraved formal letterforms',
+    'wedding invitation style cursive font with refined connected letters',
+    'classical copperplate calligraphy with high contrast strokes and flourishes',
+    'formal pointed pen script font with thin upstrokes and thick downstrokes',
+    'engraved invitation script with elegant swashes and decorative ligatures',
+  ],
+  expressive_script_handwritten: [
+    'casual handwritten cursive font with flowing connected letters',
+    'relaxed everyday cursive script like a friendly handwritten note',
+    'casual brush cursive typeface with informal connected letterforms',
+    'hand-written cursive style font with natural loose connections between letters',
+    'informal flowing handwritten script with the rhythm of a real pen',
   ],
   expressive_handwritten: [
     'casual handwritten font that looks like pen or marker writing',
@@ -120,7 +127,7 @@ const PRIMARY_BRANCH = {
 const CATEGORIES_BY_BRANCH = {
   serif:      ['serif_editorial', 'serif_workhorse', 'serif_slab'],
   sans_serif: ['sans_clean', 'sans_geometric', 'sans_friendly'],
-  expressive: ['expressive_display', 'expressive_script', 'expressive_handwritten'],
+  expressive: ['expressive_display', 'expressive_script_formal', 'expressive_script_handwritten', 'expressive_handwritten'],
 };
 
 const MODIFIERS = {
@@ -164,9 +171,10 @@ const CATEGORY_LABELS = {
   sans_clean:             ['Sans serif', 'Clean / Neutral'],
   sans_geometric:         ['Sans serif', 'Geometric / Constructed'],
   sans_friendly:          ['Sans serif', 'Friendly / Rounded'],
-  expressive_display:     ['Expressive', 'Display / Decorative'],
-  expressive_script:      ['Expressive', 'Script / Cursive'],
-  expressive_handwritten: ['Expressive', 'Handwritten / Informal'],
+  expressive_display:            ['Expressive', 'Display / Decorative'],
+  expressive_script_formal:      ['Expressive', 'Formal Script'],
+  expressive_script_handwritten: ['Expressive', 'Handwritten Script'],
+  expressive_handwritten:        ['Expressive', 'Handwritten / Informal'],
 };
 
 /** Letter-spacing (em) per role per category. Tuned in the notebook for each
@@ -180,20 +188,22 @@ const LETTER_SPACING = {
     sans_clean:             '-0.01em',
     sans_geometric:         '-0.02em',
     sans_friendly:          '0.01em',
-    expressive_display:     '0em',
-    expressive_script:      '0.02em',
-    expressive_handwritten: '0.02em',
+    expressive_display:            '0em',
+    expressive_script_formal:      '0.02em',
+    expressive_script_handwritten: '0.02em',
+    expressive_handwritten:        '0.02em',
   },
   decorative: {
-    serif_editorial:        '-0.01em',
-    serif_workhorse:        '0em',
-    serif_slab:             '0.02em',
-    sans_clean:             '0em',
-    sans_geometric:         '0em',
-    sans_friendly:          '0.02em',
-    expressive_display:     '0.02em',
-    expressive_script:      '0.03em',
-    expressive_handwritten: '0.03em',
+    serif_editorial:               '-0.01em',
+    serif_workhorse:               '0em',
+    serif_slab:                    '0.02em',
+    sans_clean:                    '0em',
+    sans_geometric:                '0em',
+    sans_friendly:                 '0.02em',
+    expressive_display:            '0.02em',
+    expressive_script_formal:      '0.03em',
+    expressive_script_handwritten: '0.03em',
+    expressive_handwritten:        '0.03em',
   },
   body: '0em',
 };

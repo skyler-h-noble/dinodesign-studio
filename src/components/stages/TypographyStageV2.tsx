@@ -7,10 +7,12 @@
 // hand off to the matcher we upload the actual File to Firebase Storage
 // and use that public URL.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { StageProps, TypographyStyle, ColorScheme } from '../../types';
 import TypographyTestPage, {
   type TypographyStyleOutput,
+  type TypographyMeta,
+  type TypographyUploads,
 } from '../TypographyTestPage';
 import { warmAnalyzeMoodboard } from '../../utils/analyzeMoodboardClient';
 import { uploadDesignSystemFile, getPublicFileUrl } from '../../utils/firebase/storage';
@@ -22,6 +24,19 @@ interface Props extends StageProps {
   moodBoardFile?: File | null;
   designSystemName?: string;
   onTypographyComplete: (styles: TypographyStyle[]) => void;
+  /** Previously-saved typography from the app-wide state. When non-empty,
+   *  the matcher rehydrates the user's prior selections (family / weight /
+   *  spacing / case per role) on stage re-entry so customizations survive
+   *  a round-trip through later stages. */
+  initialTypography?: TypographyStyle[];
+  /** UI state (trio index, body family mode, customize-modal categories)
+   *  to restore on stage re-entry. */
+  initialTypographyMeta?: TypographyMeta;
+  onTypographyMetaChange?: (meta: TypographyMeta) => void;
+  /** Custom font uploads per role — re-registered as FontFaces from
+   *  Firebase Storage on stage re-entry. */
+  initialTypographyUploads?: TypographyUploads;
+  onTypographyUploadsChange?: (uploads: TypographyUploads) => void;
   decorativeMode: 'surface-components' | 'only-selected';
   onDecorativeModeChange: (mode: 'surface-components' | 'only-selected') => void;
 }
@@ -36,10 +51,25 @@ export default function TypographyStageV2({
   decorativeMode,
   onDecorativeModeChange,
   onTypographyComplete,
+  initialTypography,
+  initialTypographyMeta,
+  onTypographyMetaChange,
+  initialTypographyUploads,
+  onTypographyUploadsChange,
 }: Props) {
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Stable forwarder so TypographyTestPage's "sync styles to parent" effect
+  // sees the same callback identity across renders. An inline arrow here
+  // would change refs every render, fire the effect again, and loop.
+  const handleTypographyComplete = useCallback(
+    (styles: TypographyStyleOutput[]) => {
+      onTypographyComplete(styles as TypographyStyle[]);
+    },
+    [onTypographyComplete],
+  );
 
   useEffect(() => {
     // Belt-and-suspenders re-warm on stage mount.
@@ -107,10 +137,12 @@ export default function TypographyStageV2({
       hideUploadUI
       decorativeMode={decorativeMode}
       onDecorativeModeChange={onDecorativeModeChange}
-      onTypographyComplete={(styles: TypographyStyleOutput[]) => {
-        // TypographyStyleOutput is structurally identical to TypographyStyle.
-        onTypographyComplete(styles as TypographyStyle[]);
-      }}
+      onTypographyComplete={handleTypographyComplete}
+      initialTypography={initialTypography as TypographyStyleOutput[] | undefined}
+      initialMeta={initialTypographyMeta}
+      onMetaChange={onTypographyMetaChange}
+      initialUploads={initialTypographyUploads}
+      onUploadsChange={onTypographyUploadsChange}
       onNext={onNext}
       onBack={onBack}
     />

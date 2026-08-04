@@ -4,11 +4,13 @@ import {
 } from '@dynodesign/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SpeedIcon from '@mui/icons-material/Speed';
-import PaletteIcon from '@mui/icons-material/Palette';
-import AccessibilityNewIcon from '@mui/icons-material/AccessibilityNew';
+import EnergySavingsLeafIcon from '@mui/icons-material/EnergySavingsLeaf';
 import DevicesIcon from '@mui/icons-material/Devices';
 import BrushIcon from '@mui/icons-material/Brush';
-import CodeIcon from '@mui/icons-material/Code';
+import SyncAltIcon from '@mui/icons-material/SyncAlt';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import AccessibilityNewIcon from '@mui/icons-material/AccessibilityNew';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +25,7 @@ function scrollTo(id: string) {
 export default function LandingPage() {
   const { user, signOut } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('');
 
   // Open the auth modal automatically when arriving via `/?login=true`,
   // then clean the URL so a refresh doesn't re-open it.
@@ -39,9 +42,8 @@ export default function LandingPage() {
 
   const NAV_LINKS: Array<{ label: string; id: string; href?: string }> = [
     { label: 'How it Works', id: 'how-it-works' },
-    { label: 'Gallery', id: 'gallery' },
+    { label: 'HI, not AI', id: 'human-intelligence' },
     { label: 'Resources', id: 'resources' },
-    { label: 'Add-Ons', id: 'addons', href: '/add-ons' },
     { label: 'Pricing', id: 'pricing' },
   ];
 
@@ -50,17 +52,43 @@ export default function LandingPage() {
     if (link?.href) {
       window.location.href = link.href;
     } else {
+      setActiveSection(id); // immediate feedback; the scrollspy keeps it in sync
       scrollTo(id);
     }
   };
 
+  // Scrollspy — highlight the nav tab for the section currently in view. A thin
+  // band across the upper-middle of the viewport (rootMargin) decides which
+  // section is "active", so the indicator advances as the page scrolls.
+  useEffect(() => {
+    const els = NAV_LINKS
+      .filter(l => !l.href)
+      .map(l => document.getElementById(l.id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (!els.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const inView = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (inView[0]) setActiveSection((inView[0].target as HTMLElement).id);
+      },
+      { rootMargin: '-45% 0px -50% 0px', threshold: 0 },
+    );
+    els.forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+    // NAV_LINKS is stable content; run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const FEATURES = [
-    { icon: <PaletteIcon />, title: '12-Tone LCH Palettes', description: 'Perceptually uniform color scales with bell-curve chroma distribution across light and dark modes.' },
-    { icon: <AccessibilityNewIcon />, title: 'WCAG AA Baked In', description: 'Every text, border, and button contrast ratio is verified against every background automatically.' },
-    { icon: <DevicesIcon />, title: '49 Components', description: 'Buttons, cards, inputs, modals, navigation — all styled with your brand tokens, ready to use.' },
-    { icon: <BrushIcon />, title: 'Figma Library', description: 'Complete Figma design system with variables, modes, and components matching your coded tokens 1:1.' },
-    { icon: <CodeIcon />, title: 'AI-Ready', description: 'CLAUDE.md integration file so AI coding assistants build with your design system correctly from day one.' },
-    { icon: <SpeedIcon />, title: 'Live in Minutes', description: 'Upload one image. Get a complete, hosted, production-ready design system — not a mockup.' },
+    { icon: <SyncAltIcon />, title: 'Design ↔ Code, both ways', description: 'Turn designs into production code and code into Figma designs — a genuine two-way bridge, not a one-off export.' },
+    { icon: <AutoAwesomeIcon />, title: 'Agentic prompt-to-anything', description: 'Prompt your way to code or a design. Built for agentic AI workflows so your assistant ships with your system from the first prompt.' },
+    { icon: <BrushIcon />, title: 'Complete Figma design system', description: 'A full Figma library — variables, modes, and components — matching your coded tokens 1:1.' },
+    { icon: <DevicesIcon />, title: 'Custom MUI component library', description: 'A branded MUI component library that adapts to mode, color, surface, and platform automatically.' },
+    { icon: <RocketLaunchIcon />, title: 'Hosted design system + Playground', description: 'Your tokens are hosted and production-ready from day one, with an interactive Playground to preview and test every component in your brand.' },
+    { icon: <AccessibilityNewIcon />, title: 'Built-in accessibility', description: 'Your components are assured to meet WCAG contrast and target-size requirements — in every state, on every system background color, in every mode.' },
+    { icon: <CheckCircleOutlineIcon />, title: 'No Figma Enterprise or Dev Mode required', description: 'Runs on a standard Figma Professional plan — its 10 variable modes cover your whole system. No Enterprise seat and no Dev Mode needed.' },
   ];
 
   const STEPS = [
@@ -72,7 +100,7 @@ export default function LandingPage() {
   const TESTIMONIALS = [
     { quote: 'We went from a mood board to a fully accessible design system in under 20 minutes. This would have taken our team weeks.', author: 'Design Lead', company: 'Series B Startup' },
     { quote: 'The Figma-to-code parity is incredible. Our designers and developers are finally speaking the same language.', author: 'VP Engineering', company: 'SaaS Platform' },
-    { quote: 'I\'m a solo founder with no design background. DinoDesign gave me a professional design system that looks like I hired an agency.', author: 'Founder', company: 'Indie App' },
+    { quote: 'I\'m a solo founder with no design background. OmniDesign gave me a professional design system that looks like I hired an agency.', author: 'Founder', company: 'Indie App' },
   ];
 
   return (
@@ -80,10 +108,10 @@ export default function LandingPage() {
       {/* ─── Top Nav (sticky) ─── */}
       <Section as="div" surface="Surface" style={{ position: 'sticky', top: 0, zIndex: 100 }}>
       <AppBar
-        brand="DinoDesign"
+        brand="OmniDesign"
         onBrandClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         centerSlot={
-          <Tabs onChange={(val: string) => handleNavClick(val)}>
+          <Tabs value={activeSection} onChange={(val: string) => handleNavClick(val)}>
             <TabList aria-label="Page sections">
               {NAV_LINKS.map(link => (
                 <Tab key={link.id} value={link.id}>{link.label}</Tab>
@@ -178,19 +206,62 @@ export default function LandingPage() {
         <VStack spacing={5} style={{ maxWidth: 900, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
             <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
-              Why DinoDesign
+              Why OmniDesign
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>A design system shouldn't take months</H2>
             <Body color="quiet" style={{ textAlign: 'center', maxWidth: 560 }}>
               Most teams spend weeks building design tokens, months on component libraries,
-              and never quite get accessibility right. DinoDesign does it all from a single image.
+              and never quite get accessibility right. OmniDesign does it all from a single
+              image — in minutes, not months.
             </Body>
           </VStack>
         </VStack>
       </Section>
 
+      {/* ─── HI, not AI (sustainability + token efficiency) ─── */}
+      <Section surface="Container" id="human-intelligence" padding="80px 24px">
+        <VStack spacing={5} style={{ maxWidth: 900, margin: '0 auto' }}>
+          <VStack spacing={1} alignItems="center">
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
+              HI, not AI
+            </BodySmall>
+            <H2 style={{ textAlign: 'center' }}>Built by human intelligence — not power-hungry AI</H2>
+            <Body color="quiet" style={{ textAlign: 'center', maxWidth: 620 }}>
+              OmniDesign builds your design system with design science, color theory, and WCAG
+              accessibility guidelines — human expertise, not energy-hungry generative models.
+              Better for your output, and better for the planet.
+            </Body>
+          </VStack>
+
+          <HStack spacing={4} style={{ alignItems: 'stretch' }}>
+            <Card padding="large" style={{ flex: 1 }}>
+              <VStack spacing={2} alignItems="flex-start">
+                <Icon size="medium" color="success"><EnergySavingsLeafIcon /></Icon>
+                <H3>Kinder to the environment</H3>
+                <BodySmall color="quiet">
+                  No massive AI compute burning energy to generate your system — human
+                  intelligence does the heavy lifting, so building a design system doesn't
+                  cost the earth.
+                </BodySmall>
+              </VStack>
+            </Card>
+            <Card padding="large" style={{ flex: 1 }}>
+              <VStack spacing={2} alignItems="flex-start">
+                <Icon size="medium" color="primary"><SpeedIcon /></Icon>
+                <H3>Fewer tokens, less design churn</H3>
+                <BodySmall color="quiet">
+                  Design is where agentic AI burns the most tokens — endless restyling and
+                  rework. Hand your AI a ready OmniDesign system and it spends tokens shipping
+                  features, not fighting your styles.
+                </BodySmall>
+              </VStack>
+            </Card>
+          </HStack>
+        </VStack>
+      </Section>
+
       {/* ─── What you get (Resources) ─── */}
-      <Section surface="Container" id="resources" padding="80px 24px">
+      <Section theme="Primary-Light" surface="Container" id="resources" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
             <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
@@ -213,57 +284,6 @@ export default function LandingPage() {
                   </div>
                   <BodySmall style={{ fontWeight: 700 }}>{f.title}</BodySmall>
                   <BodySmall color="quiet">{f.description}</BodySmall>
-                </VStack>
-              </Card>
-            ))}
-          </div>
-        </VStack>
-      </Section>
-
-      {/* ─── Gallery (placeholder) ─── */}
-      <Section id="gallery" padding="80px 24px">
-        <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <VStack spacing={1} alignItems="center">
-            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
-              Gallery
-            </BodySmall>
-            <H2 style={{ textAlign: 'center' }}>Design systems built with DinoDesign</H2>
-            <Body color="quiet" style={{ textAlign: 'center' }}>Coming soon — showcasing real design systems created by our users.</Body>
-          </VStack>
-        </VStack>
-      </Section>
-
-      {/* ─── Add-Ons ─── */}
-      <Section surface="Container" id="addons" padding="80px 24px">
-        <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <VStack spacing={1} alignItems="center">
-            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
-              Add-On Components
-            </BodySmall>
-            <H2 style={{ textAlign: 'center' }}>Expand your component catalog</H2>
-            <Body color="quiet" style={{ textAlign: 'center', maxWidth: 560 }}>
-              Premium components styled with your brand tokens — purchase individually and add to your design system.
-            </Body>
-          </VStack>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-            {[
-              { title: 'Hero Sections', description: 'Full-width hero layouts with image backgrounds, split content, and animated call-to-action patterns.', tag: 'Coming soon' },
-              { title: 'Footers', description: 'Multi-column footer templates with newsletter signup, social links, and sitemap layouts.', tag: 'Coming soon' },
-              { title: 'Gradient Headers', description: 'Dynamic gradient headers that blend your primary and secondary palette colors for impactful page intros.', tag: 'Coming soon' },
-              { title: 'Gradient Surfaces', description: 'Cards, boxes, and page backgrounds with smooth gradient fills derived from your LCH tone scale.', tag: 'Coming soon' },
-              { title: 'Charts & Data Viz', description: 'Bar, line, pie, and area charts pre-themed with your design tokens and accessible color sequences.', tag: 'Coming soon' },
-              { title: 'Marketing Blocks', description: 'Testimonial carousels, pricing tables, feature grids, and CTA sections — ready to drop in.', tag: 'Coming soon' },
-            ].map(addon => (
-              <Card key={addon.title} padding="medium">
-                <VStack spacing={2}>
-                  <HStack spacing={1} style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <BodySmall style={{ fontWeight: 700 }}>{addon.title}</BodySmall>
-                    <BodySmall color="quiet" style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                      {addon.tag}
-                    </BodySmall>
-                  </HStack>
-                  <BodySmall color="quiet">{addon.description}</BodySmall>
                 </VStack>
               </Card>
             ))}
@@ -315,7 +335,7 @@ export default function LandingPage() {
             onClick={() => window.location.href = '/create'}
             endIcon={<ArrowForwardIcon />}
           >
-            Get started with DinoDesign
+            Get started with OmniDesign
           </Button>
         </VStack>
       </Section>
@@ -365,7 +385,7 @@ export default function LandingPage() {
           >
             Get started — free to explore
           </Button>
-          <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
+          <BodySmall color="quiet" style={{ fontSize: '0.7rem', textAlign: 'center' }}>
             No account required until you export. Design your system first, pay when you're ready.
           </BodySmall>
         </VStack>
@@ -373,11 +393,11 @@ export default function LandingPage() {
 
       {/* ─── Footer ─── */}
       <Footer
-        brand={<H3 style={{ color: 'inherit', margin: 0 }}>DinoDesign</H3>}
+        brand={<H3 style={{ color: 'inherit', margin: 0 }}>OmniDesign</H3>}
         address={{
-          company: 'DinoDesign',
+          company: 'OmniDesign',
           lines: ['Built for designers + AI agents', 'San Francisco, CA'],
-          email: 'hello@dinodesign.dev',
+          email: 'hello@omnidesign.ai',
         }}
         columns={[
           {
@@ -385,18 +405,16 @@ export default function LandingPage() {
             links: [
               { label: 'How it Works', onClick: () => scrollTo('how-it-works') },
               { label: 'Pricing', onClick: () => scrollTo('pricing') },
-              { label: 'Add-Ons', href: '/add-ons' },
             ],
           },
           {
             title: 'Resources',
             links: [
-              { label: 'Gallery', onClick: () => scrollTo('gallery') },
               { label: 'Resources', onClick: () => scrollTo('resources') },
             ],
           },
         ]}
-        copyrightName="DinoDesign"
+        copyrightName="OmniDesign"
       />
 
       <AuthModal

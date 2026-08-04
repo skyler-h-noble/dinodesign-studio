@@ -259,7 +259,7 @@ export default function PricingPage({ onCheckout }: Props) {
         onClick={() => onCheckout({ tier: TIER, addOns: addOnSelection, oneTimeTotal: TIER.price })}
         endIcon={<ArrowForwardIcon />}
       >
-        Get started with DinoDesign
+        Get started with OmniDesign
       </Button>
 
       <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center', fontSize: '0.7rem' }}>

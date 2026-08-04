@@ -1,0 +1,79 @@
+{
+  "id": "6883:29407",
+  "name": "Test",
+  "type": "frame",
+  "x": 3337, "y": 13463, "width": 368, "height": 405,
+  "children": [
+    { "id": "6936:46178", "name": "Typography", "type": "instance", "x": 16, "y": 16, "width": 336, "height": 50 },
+    { "id": "6936:46226", "name": "Divider", "type": "instance", "x": 16, "y": 74, "width": 336, "height": 0 },
+    {
+      "id": "6936:46181", "name": "List", "type": "instance", "x": 16, "y": 82, "width": 336, "height": 81,
+      "children": [
+        {
+          "id": "0:25", "name": "Beginning Slot", "type": "slot", "x": 0, "y": 0, "width": 80, "height": 80,
+          "children": [
+            { "id": "0:26", "name": "Ratio", "type": "instance", "x": 0, "y": 0, "width": 80, "height": 80 }
+          ]
+        },
+        {
+          "id": "0:27", "name": "Text", "type": "frame", "x": 92, "y": 0, "width": 208, "height": 81,
+          "children": [
+            { "id": "0:28", "name": "Typography", "type": "instance", "x": 0, "y": 0,  "width": 208, "height": 17 },
+            { "id": "0:30", "name": "Typography", "type": "instance", "x": 0, "y": 21, "width": 208, "height": 32 },
+            { "id": "0:32", "name": "Typography", "type": "instance", "x": 0, "y": 57, "width": 208, "height": 24 }
+          ]
+        },
+        {
+          "id": "0:34", "name": "End Slot", "type": "slot", "x": 312, "y": 0, "width": 24, "height": 24,
+          "children": [
+            { "id": "0:35", "name": "Checkbox", "type": "instance", "x": 0, "y": 0, "width": 24, "height": 24 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6936:46196", "name": "List", "type": "instance", "x": 16, "y": 171, "width": 336, "height": 81,
+      "children": [
+        {
+          "id": "0:41", "name": "Beginning Slot", "type": "slot", "x": 0, "y": 0, "width": 80, "height": 80,
+          "children": [ { "id": "0:42", "name": "Ratio", "type": "instance", "x": 0, "y": 0, "width": 80, "height": 80 } ]
+        },
+        {
+          "id": "0:43", "name": "Text", "type": "frame", "x": 92, "y": 0, "width": 208, "height": 81,
+          "children": [
+            { "id": "0:44", "name": "Typography", "type": "instance", "x": 0, "y": 0,  "width": 208, "height": 17 },
+            { "id": "0:46", "name": "Typography", "type": "instance", "x": 0, "y": 21, "width": 208, "height": 32 },
+            { "id": "0:48", "name": "Typography", "type": "instance", "x": 0, "y": 57, "width": 208, "height": 24 }
+          ]
+        },
+        {
+          "id": "0:50", "name": "End Slot", "type": "slot", "x": 312, "y": 0, "width": 24, "height": 24,
+          "children": [ { "id": "0:51", "name": "Checkbox", "type": "instance", "x": 0, "y": 0, "width": 24, "height": 24 } ]
+        }
+      ]
+    },
+    {
+      "id": "6936:46211", "name": "List", "type": "instance", "x": 16, "y": 260, "width": 336, "height": 81,
+      "children": [
+        {
+          "id": "0:11", "name": "Beginning Slot", "type": "slot", "x": 0, "y": 0, "width": 80, "height": 80,
+          "children": [ { "id": "0:12", "name": "Ratio", "type": "instance", "x": 0, "y": 0, "width": 80, "height": 80 } ]
+        },
+        {
+          "id": "0:13", "name": "Text", "type": "frame", "x": 92, "y": 0, "width": 208, "height": 81,
+          "children": [
+            { "id": "0:14", "name": "Typography", "type": "instance", "x": 0, "y": 0,  "width": 208, "height": 17 },
+            { "id": "0:16", "name": "Typography", "type": "instance", "x": 0, "y": 21, "width": 208, "height": 32 },
+            { "id": "0:19", "name": "Typography", "type": "instance", "x": 0, "y": 57, "width": 208, "height": 24 }
+          ]
+        },
+        {
+          "id": "0:21", "name": "End Slot", "type": "slot", "x": 312, "y": 0, "width": 24, "height": 24,
+          "children": [ { "id": "0:22", "name": "Checkbox", "type": "instance", "x": 0, "y": 0, "width": 24, "height": 24 } ]
+        }
+      ]
+    },
+    { "id": "6883:29417", "name": "Focus-Visible", "type": "frame", "x": -3, "y": -3, "width": 374, "height": 411, "hidden": true },
+    { "id": "6934:46173", "name": "Avatar", "type": "instance", "x": 16, "y": 349, "width": 40, "height": 40 }
+  ]
+}

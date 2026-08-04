@@ -46,7 +46,7 @@ export default function AppHeader() {
 
   return (
     <AppBar
-      brand="DinoDesign"
+      brand="OmniDesign"
       onBrandClick={() => { window.location.href = '/'; }}
       endSlot={
         <HStack spacing={1} style={{ alignItems: 'center', gap: 8 }}>

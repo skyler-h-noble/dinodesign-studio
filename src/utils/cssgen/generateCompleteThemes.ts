@@ -1,12 +1,12 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
 import { toneToColorNumber, generateSemanticLightModeScale, findClosestColorN } from '../colorScale';
-// Reuse the contrast lookup tables that the CSS exporter already uses for
-// Text and Header palettes. Without this, Text-Primary / Header-Primary were
-// emitted as `{Text.Surfaces.Primary.Color-${n}}` which the lib resolves to
-// Primary-Color-9 regardless of surface tone — failing WCAG on Color-1
-// backgrounds. The getFixed* helpers return contrast-tuned references like
-// `{Colors.Primary.Color-7}` per the table in exportColorSystem.ts.
-import { getFixedTextToken, getFixedHeaderToken } from './exportColorSystem';
+// Text and Header roles reference the Text.*/Header.* families directly rather
+// than the getFixed* helpers. Those helpers return a raw {Colors.Palette.Color-N}
+// swatch, which is identical on every surface and in both modes — so an accent
+// that was legible on a light surface stayed dark on a dark container, giving
+// dark-on-dark text. The Text.Surfaces/Text.Containers tables already encode the
+// accessible pairing per mode and per surface tone, so referencing them is both
+// correct and self-maintaining.
 
 /**
  * Theme configuration for generating Surfaces and Containers
@@ -100,81 +100,80 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       type: 'color'
     },
     'Text': {
-      // BW palette stays as the lib's raw reference (it has its own
-      // contrast-tuned greyscale handling that doesn't go through the
-      // color-N lookup). Branded palettes flow through getFixedTextToken
-      // so Text inherits the same contrast pairing as Text-Primary etc.
+      // Both branches now reference the Text.Surfaces family — BW simply has
+      // its own greyscale entry in that same table, so it needs no special
+      // handling beyond picking the BW palette.
       value: config.defaultText === 'BW'
         ? `{Text.Surfaces.BW.Color-${n}}`
-        : getFixedTextToken(n, false, config.defaultText),
+        : `{Text.Surfaces.${config.defaultText}.Color-${n}}`,
       type: 'color'
     },
     'Text-Primary': {
-      value: getFixedTextToken(n, false, 'Primary'),
+      value: `{Text.Surfaces.Primary.Color-${n}}`,
       type: 'color'
     },
     'Text-Secondary': {
-      value: getFixedTextToken(n, false, 'Secondary'),
+      value: `{Text.Surfaces.Secondary.Color-${n}}`,
       type: 'color'
     },
     'Text-Tertiary': {
-      value: getFixedTextToken(n, false, 'Tertiary'),
+      value: `{Text.Surfaces.Tertiary.Color-${n}}`,
       type: 'color'
     },
     'Text-Neutral': {
-      value: getFixedTextToken(n, false, 'Neutral'),
+      value: `{Text.Surfaces.Neutral.Color-${n}}`,
       type: 'color'
     },
     'Text-Info': {
-      value: getFixedTextToken(n, false, 'Info'),
+      value: `{Text.Surfaces.Info.Color-${n}}`,
       type: 'color'
     },
     'Text-Success': {
-      value: getFixedTextToken(n, false, 'Success'),
+      value: `{Text.Surfaces.Success.Color-${n}}`,
       type: 'color'
     },
     'Text-Warning': {
-      value: getFixedTextToken(n, false, 'Warning'),
+      value: `{Text.Surfaces.Warning.Color-${n}}`,
       type: 'color'
     },
     'Text-Error': {
-      value: getFixedTextToken(n, false, 'Error'),
+      value: `{Text.Surfaces.Error.Color-${n}}`,
       type: 'color'
     },
     'Header': {
-      value: getFixedHeaderToken(n, false, config.defaultHeader),
+      value: `{Header.Surfaces.${config.defaultHeader}.Color-${n}}`,
       type: 'color'
     },
     'Header-Primary': {
-      value: getFixedHeaderToken(n, false, 'Primary'),
+      value: `{Header.Surfaces.Primary.Color-${n}}`,
       type: 'color'
     },
     'Header-Secondary': {
-      value: getFixedHeaderToken(n, false, 'Secondary'),
+      value: `{Header.Surfaces.Secondary.Color-${n}}`,
       type: 'color'
     },
     'Header-Tertiary': {
-      value: getFixedHeaderToken(n, false, 'Tertiary'),
+      value: `{Header.Surfaces.Tertiary.Color-${n}}`,
       type: 'color'
     },
     'Header-Neutral': {
-      value: getFixedHeaderToken(n, false, 'Neutral'),
+      value: `{Header.Surfaces.Neutral.Color-${n}}`,
       type: 'color'
     },
     'Header-Info': {
-      value: getFixedHeaderToken(n, false, 'Info'),
+      value: `{Header.Surfaces.Info.Color-${n}}`,
       type: 'color'
     },
     'Header-Success': {
-      value: getFixedHeaderToken(n, false, 'Success'),
+      value: `{Header.Surfaces.Success.Color-${n}}`,
       type: 'color'
     },
     'Header-Warning': {
-      value: getFixedHeaderToken(n, false, 'Warning'),
+      value: `{Header.Surfaces.Warning.Color-${n}}`,
       type: 'color'
     },
     'Header-Error': {
-      value: getFixedHeaderToken(n, false, 'Error'),
+      value: `{Header.Surfaces.Error.Color-${n}}`,
       type: 'color'
     },
     'Border': {
@@ -189,15 +188,15 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       value: `{Hover.${config.theme}.Color-${n}}`,
       type: 'color'
     },
-    'Active': {
-      value: `{Active.${config.theme}.Color-${n}}`,
+    'Pressed': {
+      value: `{Pressed.${config.theme}.Color-${n}}`,
       type: 'color'
     },
     'Hotlink': {
       // Hotlinks share the contrast-tuned Info text mapping so links read
       // on any surface tone without the user noticing fade-out on dark
       // backgrounds.
-      value: getFixedTextToken(n, false, 'Info'),
+      value: `{Text.Surfaces.Info.Color-${n}}`,
       type: 'color'
     },
     'Hotlink-Visited': {
@@ -205,7 +204,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       type: 'color'
     },
     'Focus-Visible': {
-      value: `{Focus-Visible.Surfaces.Color-${n}}`,
+      value: `{Focus-Visible.Surfaces.Background-${n}}`,
       type: 'color'
     },
 
@@ -221,7 +220,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
             'Text': { value: `{Buttons.${config.theme}.${shade}.Text}`, type: 'color' },
             'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${shade}.Hover}`, type: 'color' },
-            'Active': { value: `{Buttons.${config.theme}.${shade}.Active}`, type: 'color' },
+            'Pressed': { value: `{Buttons.${config.theme}.${shade}.Pressed}`, type: 'color' },
             'Highlight': { value: `{Button-Highlight.${config.theme}.Color-${n}}`, type: 'color' },
             'Lowlight': { value: `{Button-Lowlight.${config.theme}.Color-${n}}`, type: 'color' }
           };
@@ -233,7 +232,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
           'Text': { value: `{Default-Button.Default.${shade}.Text}`, type: 'color' },
           'Border': { value: `{Border.Surfaces.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
           'Hover': { value: `{Default-Button.Default.${shade}.Hover}`, type: 'color' },
-          'Active': { value: `{Default-Button.Default.${shade}.Active}`, type: 'color' },
+          'Pressed': { value: `{Default-Button.Default.${shade}.Pressed}`, type: 'color' },
           'Highlight': { value: `{Button-Highlight.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
           'Lowlight': { value: `{Button-Lowlight.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' }
         };
@@ -243,56 +242,56 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         'Text': { value: `{Buttons.Primary.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Primary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Primary.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Primary.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Primary.${shade}.Pressed}`, type: 'color' }
       },
       'Secondary': {
         'Button': { value: `{Buttons.Secondary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Secondary.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Secondary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Secondary.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Secondary.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Secondary.${shade}.Pressed}`, type: 'color' }
       },
       'Tertiary': {
         'Button': { value: `{Buttons.Tertiary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Tertiary.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Tertiary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Tertiary.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Tertiary.${shade}.Pressed}`, type: 'color' }
       },
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Neutral.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Neutral.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Neutral.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Neutral.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Neutral.${shade}.Pressed}`, type: 'color' }
       },
       'Info': {
         'Button': { value: `{Buttons.Info.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Info.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Info.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Info.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Info.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Info.${shade}.Pressed}`, type: 'color' }
       },
       'Success': {
         'Button': { value: `{Buttons.Success.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Success.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Success.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Success.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Success.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Success.${shade}.Pressed}`, type: 'color' }
       },
       'Warning': {
         'Button': { value: `{Buttons.Warning.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Warning.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Warning.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Warning.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Warning.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Warning.${shade}.Pressed}`, type: 'color' }
       },
       'Error': {
         'Button': { value: `{Buttons.Error.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Error.${shade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Error.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Error.${shade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Error.${shade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Error.${shade}.Pressed}`, type: 'color' }
       }
     },
 
@@ -406,23 +405,23 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Containers Section — reference Modes/Containers for Light/Dark mode adaptation
   theme.Containers = {
     'Container': {
-      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container}`,
+      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container}`,
       type: 'color'
     },
     'Container-Low': {
-      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-Low}`,
+      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Low}`,
       type: 'color'
     },
     'Container-Lowest': {
-      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-Lowest}`,
+      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Lowest}`,
       type: 'color'
     },
     'Container-High': {
-      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-High}`,
+      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-High}`,
       type: 'color'
     },
     'Container-Highest': {
-      value: `{Containers.${config.contTheme}.BG-${config.contN}.Container-Highest}`,
+      value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Highest}`,
       type: 'color'
     },
     'Quiet': {
@@ -432,80 +431,79 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     'Text': {
-      // Same BW/branded split as the surface Text token — BW stays on the
-      // lib reference (greyscale has its own logic); branded palettes use
-      // getFixedTextToken for contrast against the container background.
+      // Same BW/branded split as the surface Text token, both resolving
+      // through the Text.Containers family.
       value: getContainerTextPalette(config.contTheme, config) === 'BW'
         ? `{Text.Containers.BW.Color-${config.contN}}`
-        : getFixedTextToken(config.contN, true, getContainerTextPalette(config.contTheme, config)),
+        : `{Text.Containers.${getContainerTextPalette(config.contTheme, config)}.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Primary': {
-      value: getFixedTextToken(config.contN, true, 'Primary'),
+      value: `{Text.Containers.Primary.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Secondary': {
-      value: getFixedTextToken(config.contN, true, 'Secondary'),
+      value: `{Text.Containers.Secondary.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Tertiary': {
-      value: getFixedTextToken(config.contN, true, 'Tertiary'),
+      value: `{Text.Containers.Tertiary.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Neutral': {
-      value: getFixedTextToken(config.contN, true, 'Neutral'),
+      value: `{Text.Containers.Neutral.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Info': {
-      value: getFixedTextToken(config.contN, true, 'Info'),
+      value: `{Text.Containers.Info.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Success': {
-      value: getFixedTextToken(config.contN, true, 'Success'),
+      value: `{Text.Containers.Success.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Warning': {
-      value: getFixedTextToken(config.contN, true, 'Warning'),
+      value: `{Text.Containers.Warning.Color-${config.contN}}`,
       type: 'color'
     },
     'Text-Error': {
-      value: getFixedTextToken(config.contN, true, 'Error'),
+      value: `{Text.Containers.Error.Color-${config.contN}}`,
       type: 'color'
     },
     'Header': {
-      value: getFixedHeaderToken(config.contN, true, getContainerHeaderPalette(config.contTheme, config)),
+      value: `{Header.Containers.${getContainerHeaderPalette(config.contTheme, config)}.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Primary': {
-      value: getFixedHeaderToken(config.contN, true, 'Primary'),
+      value: `{Header.Containers.Primary.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Secondary': {
-      value: getFixedHeaderToken(config.contN, true, 'Secondary'),
+      value: `{Header.Containers.Secondary.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Tertiary': {
-      value: getFixedHeaderToken(config.contN, true, 'Tertiary'),
+      value: `{Header.Containers.Tertiary.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Neutral': {
-      value: getFixedHeaderToken(config.contN, true, 'Neutral'),
+      value: `{Header.Containers.Neutral.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Info': {
-      value: getFixedHeaderToken(config.contN, true, 'Info'),
+      value: `{Header.Containers.Info.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Success': {
-      value: getFixedHeaderToken(config.contN, true, 'Success'),
+      value: `{Header.Containers.Success.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Warning': {
-      value: getFixedHeaderToken(config.contN, true, 'Warning'),
+      value: `{Header.Containers.Warning.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Error': {
-      value: getFixedHeaderToken(config.contN, true, 'Error'),
+      value: `{Header.Containers.Error.Color-${config.contN}}`,
       type: 'color'
     },
     'Border': {
@@ -520,12 +518,12 @@ function generateSingleTheme(config: ThemeConfig): any {
       value: `{Hover.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
     },
-    'Active': {
-      value: `{Active.${config.contTheme}.Color-${config.contN}}`,
+    'Pressed': {
+      value: `{Pressed.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
     },
     'Hotlink': {
-      value: getFixedTextToken(config.contN, true, 'Info'),
+      value: `{Text.Containers.Info.Color-${config.contN}}`,
       type: 'color'
     },
     'Hotlink-Visited': {
@@ -533,7 +531,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     'Focus-Visible': {
-      value: `{Focus-Visible.Containers.Color-${config.contN}}`,
+      value: `{Focus-Visible.Containers.Background-${config.contN}}`,
       type: 'color'
     },
     
@@ -550,7 +548,7 @@ function generateSingleTheme(config: ThemeConfig): any {
             'Text': { value: `{Buttons.${config.theme}.${config.cShade}.Text}`, type: 'color' },
             'Border': { value: `{Border.Containers.${config.theme}.Color-${config.contN}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${config.cShade}.Hover}`, type: 'color' },
-            'Active': { value: `{Buttons.${config.theme}.${config.cShade}.Active}`, type: 'color' },
+            'Pressed': { value: `{Buttons.${config.theme}.${config.cShade}.Pressed}`, type: 'color' },
             'Highlight': { value: `{Button-Highlight.${config.theme}.Color-${config.contN}}`, type: 'color' },
             'Lowlight': { value: `{Button-Lowlight.${config.theme}.Color-${config.contN}}`, type: 'color' }
           };
@@ -560,7 +558,7 @@ function generateSingleTheme(config: ThemeConfig): any {
           'Text': { value: `{Default-Button.Default.${config.cShade}.Text}`, type: 'color' },
           'Border': { value: `{Border.Containers.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
           'Hover': { value: `{Default-Button.Default.${config.cShade}.Hover}`, type: 'color' },
-          'Active': { value: `{Default-Button.Default.${config.cShade}.Active}`, type: 'color' },
+          'Pressed': { value: `{Default-Button.Default.${config.cShade}.Pressed}`, type: 'color' },
           'Highlight': { value: `{Button-Highlight.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
           'Lowlight': { value: `{Button-Lowlight.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' }
         };
@@ -570,56 +568,56 @@ function generateSingleTheme(config: ThemeConfig): any {
         'Text': { value: `{Buttons.Primary.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Primary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Primary.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Primary.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Primary.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Secondary': {
         'Button': { value: `{Buttons.Secondary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Secondary.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Secondary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Secondary.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Secondary.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Secondary.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Tertiary': {
         'Button': { value: `{Buttons.Tertiary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Tertiary.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Tertiary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Tertiary.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Tertiary.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Neutral.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Neutral.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Neutral.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Neutral.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Neutral.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Info': {
         'Button': { value: `{Buttons.Info.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Info.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Info.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Info.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Info.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Info.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Success': {
         'Button': { value: `{Buttons.Success.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Success.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Success.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Success.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Success.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Success.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Warning': {
         'Button': { value: `{Buttons.Warning.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Warning.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Warning.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Warning.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Warning.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Warning.${config.cShade}.Pressed}`, type: 'color' }
       },
       'Error': {
         'Button': { value: `{Buttons.Error.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Error.${config.cShade}.Text}`, type: 'color' },
         'Border': { value: `{Border.Containers.Error.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Error.${config.cShade}.Hover}`, type: 'color' },
-        'Active': { value: `{Buttons.Error.${config.cShade}.Active}`, type: 'color' }
+        'Pressed': { value: `{Buttons.Error.${config.cShade}.Pressed}`, type: 'color' }
       }
     },
     
@@ -730,7 +728,12 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Resolve the user's button-mode choice to the palette the Default button
   // uses. Mirrors getButtonModeBorderMappings(buttonMode, mode).Default in
   // completeSimplifiedSystem.ts so Border + bevel match the body color.
-  const buttonMode = userSelections?.button || 'primary';
+  // Strip the -adaptive / -fixed suffix exactly like getSimplifiedDefaultSettings
+  // does. Without this, a stored value like "laddered-adaptive" fails every
+  // exact-match check below and falls through to 'Primary' — which is why the
+  // hosted Default-button border came out Primary (blue) instead of the
+  // laddered Secondary (brown), diverging from the preview.
+  const buttonMode = (userSelections?.button || 'primary').replace(/-fixed|-adaptive/g, '');
   const defaultButtonPalette: string = (() => {
     if (buttonMode === 'black-white') return mode === 'Dark-Mode' ? 'Primary' : 'Neutral';
     if (buttonMode === 'secondary') return 'Secondary';
@@ -791,7 +794,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     themes.Default.Surfaces['Border'] = { value: '{Default-Background.Border}', type: 'color' };
     themes.Default.Surfaces['Border-Variant'] = { value: '{Default-Background.Border-Variant}', type: 'color' };
     themes.Default.Surfaces['Hover'] = { value: '{Default-Background.Hover}', type: 'color' };
-    themes.Default.Surfaces['Active'] = { value: '{Default-Background.Active}', type: 'color' };
+    themes.Default.Surfaces['Pressed'] = { value: '{Default-Background.Pressed}', type: 'color' };
     themes.Default.Surfaces['Focus-Visible'] = { value: '{Default-Background.Focus-Visible}', type: 'color' };
     // Dropshadow-Color is handled by processGroup which reads the Background sibling
   }

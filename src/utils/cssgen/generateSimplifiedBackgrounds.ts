@@ -42,11 +42,8 @@ export function generateSimplifiedLightModeBackgrounds(
   let surfaceBrightWhite = 0.04;
   let surfaceBaseTone = 0;
   let useColor10ForContainers = false;
-  let containerLowestBlend = 0.12;
-  let containerLowBlend = 0.15;
-  let containerBlend = 0.18;
-  let containerHighBlend = 0.20;
-  let containerHighestBlend = 0.22;
+  // (The per-level container blend percentages that used to live here are gone:
+  // light-mode containers are now flat at Color-11 and don't step.)
 
   // SIMPLIFIED 1:1 mapping — Background-N uses Color-N regardless of tone-scale
   // values. Find the palette entry whose tone is closest to `tone` and use its
@@ -70,10 +67,9 @@ export function generateSimplifiedLightModeBackgrounds(
   const surfaceDimColor = blendColors('#000000', surfaceColor, surfaceDimBlack);
   const surfaceBrightColor = blendColors('#FFFFFF', surfaceColor, surfaceBrightWhite);
 
-  // Get the base container color
-  // For tonal mode: Use Color-10 for all backgrounds (provides contrast)
-  const baseContainerColorIndex = 9; // Always Color-10 (index 9)
-  const baseContainerColor = palette[baseContainerColorIndex]?.color || baseColor;
+  // (Tonal light containers used to blend from Color-10 toward the surface.
+  // They're now flat at Color-11, emitted as a token ref, so no base colour
+  // needs computing here.)
 
   // ========================================================================
   // CRITICAL FIX: Return TOKEN REFERENCES, not hex colors!
@@ -225,22 +221,28 @@ export function generateSimplifiedLightModeBackgrounds(
       };
     }
     
-    // Tonal mode: calculate blended container values (HEX, not CSS variables)
-    // Blend container base color (foreground) with Surface-Bright (background)
-    // Lower blend = more surface, less container | Higher blend = more container, less surface
-    const containerLowestColor = blendColors(baseContainerColor, surfaceColor, containerLowestBlend);
-    const containerLowColor = blendColors(baseContainerColor, surfaceColor, containerLowBlend);
-    const containerColor = blendColors(baseContainerColor, surfaceColor, containerBlend);
-    const containerHighColor = blendColors(baseContainerColor, surfaceColor, containerHighBlend);
-    const containerHighestColor = blendColors(baseContainerColor, surfaceColor, containerHighestBlend);
-    
-    console.log(`🎨 [TONAL MODE] Palette: ${paletteName}, Tone: ${tone}`);
-    console.log(`   Container: ${containerColor}`);
-    console.log(`   Container-Low: ${containerLowColor}`);
-    console.log(`   Container-Lowest: ${containerLowestColor}`);
-    console.log(`   Container-High: ${containerHighColor}`);
-    console.log(`   Container-Highest: ${containerHighestColor}`);
-    
+    // Tonal mode, light: all five container levels share ONE tone. Light mode
+    // conveys elevation with drop shadows, so the container colour does not
+    // step — unlike dark mode, where shadows don't read and the tone steps
+    // Color-2 → Color-4 instead (see generateSimplifiedDarkModeBackgrounds).
+    //
+    // Which tone depends on the background it sits on. A light background takes
+    // Color-11 (a near-white card). A DARK background must not: a near-white
+    // card on a near-black page is wrong, and the theme's foreground tokens are
+    // keyed for a dark card, so it would put dark text on a light container.
+    // Dark backgrounds therefore keep a near-black card at Color-2.
+    //
+    // Tones 1-5 are the dark half of the ramp and 6-12 the light half, so the
+    // split sits at surfaceBaseTone (0-based) >= 5.
+    //
+    // The previous logic blended Color-10 toward the surface by a per-level
+    // percentage (0.12 → 0.22), producing five distinct off-palette colours.
+    // That put containers on tones the foreground tables were never keyed for,
+    // which is what broke Quiet/Text/Header contrast on tonal themes.
+    const backgroundIsLight = surfaceBaseTone >= 5;
+    const tonalContainerTone = backgroundIsLight ? 11 : 2;
+    console.log(`🎨 [TONAL MODE] Palette: ${paletteName}, Tone: ${tone} — containers flat at Color-${tonalContainerTone}`);
+
     return {
       Surfaces: {
         'Surface': {
@@ -257,24 +259,27 @@ export function generateSimplifiedLightModeBackgrounds(
         }
       },
       Containers: {
-        'Container': {
-          value: containerColor, // HEX value from blend calculation
-          type: 'color'
-        },
+        // Flat across all five levels — elevation comes from drop shadows in
+        // light mode, not tone. Color-11 on a light background, Color-2 on a
+        // dark one. Emitted as a token ref so it stays linked to the palette.
         'Container-Lowest': {
-          value: containerLowestColor, // HEX value from blend calculation
+          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
           type: 'color'
         },
         'Container-Low': {
-          value: containerLowColor, // HEX value from blend calculation
+          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
+          type: 'color'
+        },
+        'Container': {
+          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
           type: 'color'
         },
         'Container-High': {
-          value: containerHighColor, // HEX value from blend calculation
+          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
           type: 'color'
         },
         'Container-Highest': {
-          value: containerHighestColor, // HEX value from blend calculation
+          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
           type: 'color'
         }
       }
@@ -355,7 +360,6 @@ export function generateSimplifiedDarkModeBackgrounds(
   let surfaceDimBlack = 0.02;
   let surfaceBrightWhite = 0.08;
   let surfaceBaseTone = 0;
-  let useColor5ForContainers = false;
 
   // SIMPLIFIED 1:1 mapping — Background-N uses Color-N. Match the input tone
   // to the closest palette entry instead of an if/else ladder, so future
@@ -367,19 +371,34 @@ export function generateSimplifiedDarkModeBackgrounds(
     if (d < bestDiff) { bestDiff = d; bestIdx = i; }
   }
   surfaceBaseTone = Math.min(bestIdx, 11);
-  // Container tone in dark mode: lighter-half backgrounds (Color-1..7) use
-  // a slightly lighter container (Color-5); darker-half backgrounds use the
-  // even darker Color-4 so the container stays distinct from the surface.
-  useColor5ForContainers = surfaceBaseTone <= 6;
-
   const surfaceColor = palette[surfaceBaseTone]?.color || baseColor;
   const surfaceDimColor = blendColors('#000000', surfaceColor, surfaceDimBlack);
   const surfaceBrightColor = blendColors('#FFFFFF', surfaceColor, surfaceBrightWhite);
 
-  // Use Color-5 or Color-4 for containers
-  const containerColor = useColor5ForContainers 
-    ? (palette[4]?.color || '#000000')  // Color-5
-    : (palette[3]?.color || '#000000'); // Color-4
+  // Dark-mode elevation is conveyed by STEPPING the container tone lighter,
+  // because drop shadows barely read dark-on-dark. The five levels are anchored
+  // to the palette's dark low tones (Color-2 → Color-4) with the in-between
+  // levels as 50% blends, so a more elevated container catches more light:
+  //
+  //   Container-Lowest  = Color-2
+  //   Container-Low     = 50% blend of Color-2 and Color-3
+  //   Container         = Color-3
+  //   Container-High    = 50% blend of Color-3 and Color-4
+  //   Container-Highest = Color-4
+  //
+  // These are anchored to the dark end of the palette regardless of which
+  // background you're on — they do NOT shift with the background tone. The
+  // previous logic collapsed all five levels onto a single tone (Color-5 for
+  // backgrounds 1-7, Color-4 for 8-12), which left dark mode with no elevation
+  // cue at all and put every container on one colour.
+  const darkColor2 = palette[1]?.color || '#111111'; // Color-2
+  const darkColor3 = palette[2]?.color || '#1f1f1f'; // Color-3
+  const darkColor4 = palette[3]?.color || '#2c2c2c'; // Color-4
+  const containerLowestColor = darkColor2;
+  const containerLowColor = blendColors(darkColor3, darkColor2, 0.50);
+  const containerColor = darkColor3;
+  const containerHighColor = blendColors(darkColor4, darkColor3, 0.50);
+  const containerHighestColor = darkColor4;
 
   // ========================================================================
   // CRITICAL FIX: Return TOKEN REFERENCES for Dark Mode too!
@@ -410,24 +429,27 @@ export function generateSimplifiedDarkModeBackgrounds(
         }
       },
       Containers: {
-        'Container': {
-          value: containerColor, // Blended color, keep as hex
-          type: 'color'
-        },
+        // Stepping ramp — see the anchor comment above. Color-2 and Color-4 are
+        // emitted as token refs so they stay linked to the palette; the two
+        // in-between levels are blends and have no token, so they stay hex.
         'Container-Lowest': {
-          value: containerColor, // Blended color, keep as hex
+          value: `{Colors.${paletteName}.Color-2}`,
           type: 'color'
         },
         'Container-Low': {
-          value: containerColor, // Blended color, keep as hex
+          value: containerLowColor,
+          type: 'color'
+        },
+        'Container': {
+          value: `{Colors.${paletteName}.Color-3}`,
           type: 'color'
         },
         'Container-High': {
-          value: containerColor, // Blended color, keep as hex
+          value: containerHighColor,
           type: 'color'
         },
         'Container-Highest': {
-          value: containerColor, // Blended color, keep as hex
+          value: `{Colors.${paletteName}.Color-4}`,
           type: 'color'
         }
       }
@@ -451,24 +473,25 @@ export function generateSimplifiedDarkModeBackgrounds(
       }
     },
     Containers: {
+      // Same stepping ramp as the token-ref branch above, as raw hex.
+      'Container-Lowest': {
+        value: containerLowestColor,
+        type: 'color'
+      },
+      'Container-Low': {
+        value: containerLowColor,
+        type: 'color'
+      },
       'Container': {
         value: containerColor,
         type: 'color'
       },
-      'Container-Lowest': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-Low': {
-        value: containerColor,
-        type: 'color'
-      },
       'Container-High': {
-        value: containerColor,
+        value: containerHighColor,
         type: 'color'
       },
       'Container-Highest': {
-        value: containerColor,
+        value: containerHighestColor,
         type: 'color'
       }
     }

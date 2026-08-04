@@ -1,5 +1,6 @@
 // Button logic update - OB=8 when PC>=9 - 12-tone scale
 import { blendColors } from '../colorScale';
+import { dropshadowBaseHex } from '../dropshadow';
 import chroma from 'chroma-js';
 import { 
   generateSimplifiedLightModeBackgrounds,
@@ -61,7 +62,7 @@ interface SurfacesDetails {
   Hotlink: ColorToken;
   'Hotlink-Visited': ColorToken;
   Hover: ColorToken;
-  Active: ColorToken;
+  Pressed: ColorToken;
 }
 
 interface ContainersDetails {
@@ -78,7 +79,7 @@ interface ContainersDetails {
   Hotlink: ColorToken;
   'Hotlink-Visited': ColorToken;
   Hover: ColorToken;
-  Active: ColorToken;
+  Pressed: ColorToken;
 }
 
 interface SurfacesAndContainers {
@@ -91,7 +92,7 @@ interface ButtonDetails {
   Text: ColorToken;
   Border: ColorToken;
   Hover: ColorToken;
-  Active: ColorToken;
+  Pressed: ColorToken;
 }
 
 interface ButtonsForBackground {
@@ -175,7 +176,7 @@ interface ComprehensiveSurfaceContainerVariation {
   Hotlink: { value: string; type: 'color' };
   'Hotlink-Visited': { value: string; type: 'color' };
   Hover: { value: string; type: 'color' };
-  Active: { value: string; type: 'color' };
+  Pressed: { value: string; type: 'color' };
   Buttons: ButtonsForBackground;
   Icons: IconsForBackground;
   Tags: TagsForBackground;
@@ -251,7 +252,7 @@ interface ModeSection {
       [colorKey: string]: ColorToken;
     };
   };
-  Active: {
+  Pressed: {
     [paletteKey: string]: {
       [colorKey: string]: ColorToken;
     };
@@ -680,15 +681,17 @@ function getBorderColor(bgColor: string, palette: { tone: number; color: string 
 }
 
 /**
- * Get border-variant color (Border color with 20% opacity - hex 33)
+ * Get border-variant color (Border color with 15% opacity - hex 26)
  */
 function getBorderVariantColor(bgColor: string, palette: { tone: number; color: string }[], isDark: boolean = false): string {
   // Get the border color with 3.1 contrast
   const borderColor = getBorderColor(bgColor, palette, isDark);
   
-  // Convert to 8-digit hex with 20% opacity (0x33 in hex ≈ 20% of 0xFF)
+  // Convert to 8-digit hex with 15% opacity (0x26 ≈ 15% of 0xFF) — matches the
+  // rest of the export + the Figma path + the live preview. Border-Variant is
+  // decorative (non-clickable), so it carries no contrast requirement.
   const rgb = chroma(borderColor).hex();
-  return `${rgb}33`; // Append 33 for 20% opacity
+  return `${rgb}26`; // Append 26 for 15% opacity
 }
 
 /**
@@ -722,7 +725,7 @@ export function getFixedHeaderToken(backgroundNumber: number, isContainer: boole
     '8': { surfaces: 5, containers: 5 },
     '9': { surfaces: 6, containers: 6 },
     '10': { surfaces: 3, containers: 3 },
-    '11': { surfaces: 2, containers: 2 },
+    '11': { surfaces: 5, containers: 2 }, // surface header aligned with the fixed structure (Color-11 → Color-5) so Primary-Light matches Default
     '12': { surfaces: 1, containers: 1 },
     '99': { surfaces: 5, containers: 5 }, // Background-Vibrant
   };
@@ -826,7 +829,7 @@ function getFixedBorderHexColor(backgroundNumber: number, isContainer: boolean, 
 }
 
 /**
- * Get Border-Variant value by appending 33 opacity to the Border reference or color
+ * Get Border-Variant value by appending 26 (15%) opacity to the Border reference or color
  * NOTE: This function is deprecated - we now resolve colors directly instead of using token references
  */
 function getBorderVariantValue(borderValue: string): string {
@@ -835,9 +838,9 @@ function getBorderVariantValue(borderValue: string): string {
     // Append 26 for 15% opacity
     return `${borderValue}26`;
   }
-  // Fallback for references: return black with 20% opacity (this shouldn't happen)
+  // Fallback for references: return black with 15% opacity (this shouldn't happen)
   console.warn(`getBorderVariantValue received a reference token: ${borderValue}. This should be resolved to hex first.`);
-  return '#00000033';
+  return '#00000026';
 }
 
 /**
@@ -1184,8 +1187,8 @@ function generateLightModeTonalSurfacesAndContainers(
         value: paletteName ? `{Hover.${paletteName}.Color-${surfaceBaseTone + 1}}` : surfaceDimColor,
         type: 'color'
       },
-      'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-${surfaceBaseTone + 1}}` : surfaceBrightColor,
+      'Pressed': {
+        value: paletteName ? `{Pressed.${paletteName}.Color-${surfaceBaseTone + 1}}` : surfaceBrightColor,
         type: 'color'
       }
     },
@@ -1242,8 +1245,8 @@ function generateLightModeTonalSurfacesAndContainers(
         value: paletteName ? `{Hover.${paletteName}.Color-${containerColorNumber}}` : containerLowestColor,
         type: 'color'
       },
-      'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-${containerColorNumber}}` : containerLowColor,
+      'Pressed': {
+        value: paletteName ? `{Pressed.${paletteName}.Color-${containerColorNumber}}` : containerLowColor,
         type: 'color'
       }
     }
@@ -1472,8 +1475,8 @@ function generateLightModeProfessionalSurfacesAndContainers(
         value: paletteName ? `{Hover.${paletteName}.Color-${surfaceBaseTone + 1}}` : blendColors('#000000', surfaceColor, 0.08),
         type: 'color'
       },
-      'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-${surfaceBaseTone + 1}}` : blendColors('#000000', surfaceColor, 0.12),
+      'Pressed': {
+        value: paletteName ? `{Pressed.${paletteName}.Color-${surfaceBaseTone + 1}}` : blendColors('#000000', surfaceColor, 0.12),
         type: 'color'
       },
       'Focus-Active': {
@@ -1538,8 +1541,8 @@ function generateLightModeProfessionalSurfacesAndContainers(
         value: paletteName ? `{Hover.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.08),
         type: 'color'
       },
-      'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.12),
+      'Pressed': {
+        value: paletteName ? `{Pressed.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.12),
         type: 'color'
       },
       'Focus-Active': {
@@ -1554,247 +1557,10 @@ function generateLightModeProfessionalSurfacesAndContainers(
   };
 }
 
-/**
- * Generate dark mode surfaces and containers for a given background color
- * Uses tone-specific blend formulas with #0E0E0E for neutral, #000000 or #FFFFFF for chromatic
- */
-function generateDarkModeSurfacesAndContainers(
-  baseColor: string,
-  tone: number,
-  isNeutral: boolean,
-  palette: { tone: number; color: string }[],
-  allPalettes?: {
-    primary: { tone: number; color: string }[];
-    neutral: { tone: number; color: string }[];
-  },
-  paletteName?: string,
-  backgroundNumber?: number
-): SurfacesAndContainers {
-  // Get tone80 for container calculations
-  const tone80Data = palette.find(p => p.tone === 80);
-  const tone80Color = tone80Data ? tone80Data.color : baseColor;
+// NOTE: generateDarkModeSurfacesAndContainers() was removed — it had no
+// callers. Dark-mode surfaces/containers are produced by
+// generateSimplifiedDarkModeBackgrounds() in generateSimplifiedBackgrounds.ts.
 
-  // NEW LOGIC: Surface-Dim always blends with #050505, Surface-Bright always blends with #ffffff
-  let surfaceDimBlend050505 = 0.08;  // Percentage of #050505 to blend
-  let surfaceBrightBlendFFFFFF = 0.10; // Percentage of #ffffff to blend
-  let containerLowestTone80 = 0.05;
-  let containerLowTone80 = 0.08;
-  let containerTone80 = 0.08;
-  let containerHighTone80 = 0.14;
-  let containerHighestTone80 = 0.16;
-  let surfaceColorNumber = 1; // Track which Color-N is being used for surface
-
-  // Map tone to Surface-Dim and Surface-Bright blend percentages
-  // SIMPLIFIED 1:1 MAPPING: Background-N → Color-N
-  if (tone === 1) { // Background-1 → Color-1
-    surfaceDimBlend050505 = 0.60;
-    surfaceBrightBlendFFFFFF = 0.10;
-    surfaceColorNumber = 1;
-  } else if (tone === 5) { // Background-2 → Color-2
-    surfaceDimBlend050505 = 0.50;
-    surfaceBrightBlendFFFFFF = 0.10;
-    surfaceColorNumber = 2;
-  } else if (tone === 12) { // Background-3 → Color-3
-    surfaceDimBlend050505 = 0.60;
-    surfaceBrightBlendFFFFFF = 0.10;
-    surfaceColorNumber = 3;
-  } else if (tone === 18) { // Background-4 → Color-4
-    surfaceDimBlend050505 = 0.40;
-    surfaceBrightBlendFFFFFF = 0.10;
-    surfaceColorNumber = 4;
-  } else if (tone === 24) { // Background-5 → Color-5
-    surfaceDimBlend050505 = 0.24;
-    surfaceBrightBlendFFFFFF = 0.12;
-    surfaceColorNumber = 5;
-  } else if (tone === 58) { // Background-6 → Color-6
-    surfaceDimBlend050505 = 0.10;
-    surfaceBrightBlendFFFFFF = 0.12;
-    surfaceColorNumber = 6;
-  } else if (tone === 64) { // Background-7 → Color-7
-    surfaceDimBlend050505 = 0.09;
-    surfaceBrightBlendFFFFFF = 0.15;
-    surfaceColorNumber = 7;
-  } else if (tone === 70) { // Background-8 → Color-8
-    surfaceDimBlend050505 = 0.08;
-    surfaceBrightBlendFFFFFF = 0.20;
-    surfaceColorNumber = 8;
-  } else if (tone === 76) { // Background-9 → Color-9
-    surfaceDimBlend050505 = 0.08;
-    surfaceBrightBlendFFFFFF = 0.25;
-    surfaceColorNumber = 9;
-  } else if (tone === 82) { // Background-10 → Color-10
-    surfaceDimBlend050505 = 0.08;
-    surfaceBrightBlendFFFFFF = 0.30;
-    surfaceColorNumber = 10;
-  } else if (tone === 85) { // Background-11 → Color-11
-    surfaceDimBlend050505 = 0.04;
-    surfaceBrightBlendFFFFFF = 0.18;
-    surfaceColorNumber = 11;
-  } else if (tone === 89) { // Background-12 → Color-12
-    surfaceDimBlend050505 = 0.04;
-    surfaceBrightBlendFFFFFF = 0.15;
-    surfaceColorNumber = 12;
-  } else {
-    // Default values for any other tones
-    surfaceDimBlend050505 = 0.08;
-    surfaceBrightBlendFFFFFF = 0.10;
-  }
-
-  // Surface is always the base color (the specific Dark Mode Color-N)
-  const surfaceColor = baseColor;
-
-  // Surface-Dim = adjacent tone one step darker (Color-1 Dim = black)
-  // Surface-Bright = adjacent tone one step lighter (Color-12 Bright = white)
-  const darkToneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
-  const currentToneIndex = darkToneScale.indexOf(tone);
-  const dimTone = currentToneIndex > 0 ? darkToneScale[currentToneIndex - 1] : -1;
-  const brightTone = currentToneIndex < darkToneScale.length - 1 ? darkToneScale[currentToneIndex + 1] : -1;
-  const dimPaletteEntry = dimTone >= 0 ? palette.find(p => p.tone === dimTone) : null;
-  const brightPaletteEntry = brightTone >= 0 ? palette.find(p => p.tone === brightTone) : null;
-  const surfaceDimColor = dimPaletteEntry ? dimPaletteEntry.color : '#000000';
-  const surfaceBrightColor = brightPaletteEntry ? brightPaletteEntry.color : '#FFFFFF';
-  
-  // Dark mode containers: step through adjacent tones, blend for mid-levels
-  const darkColor2 = palette.find(p => p.tone === 10)?.color || '#1a1a1a'; // Color-2
-  const darkColor3 = palette.find(p => p.tone === 19)?.color || '#2e2e2e'; // Color-3
-  const darkColor4 = palette.find(p => p.tone === 28)?.color || '#434343'; // Color-4
-  const containerLowestColor = darkColor2;                                  // Color-2
-  const containerLowColor = blendColors(darkColor3, darkColor2, 0.50);     // blend of 2 and 3
-  const containerColor = darkColor3;                                        // Color-3
-  const containerHighColor = blendColors(darkColor4, darkColor3, 0.50);    // blend of 3 and 4
-  const containerHighestColor = darkColor4;                                 // Color-4
-
-  // Use neutral palette for text colors if available, otherwise use current palette
-  const textPalette = allPalettes?.neutral || palette;
-  const primaryPalette = allPalettes?.primary || palette;
-
-  return {
-    Surfaces: {
-      'Surface': {
-        value: surfaceColor,
-        type: 'color'
-      },
-      'Surface-Dim': {
-        value: surfaceDimColor,
-        type: 'color'
-      },
-      'Surface-Bright': {
-        value: surfaceBrightColor,
-        type: 'color'
-      },
-      'Header': {
-        value: getHeaderColor(surfaceColor, textPalette, true),
-        type: 'color'
-      },
-      'Text': {
-        value: getTextColor(surfaceColor, textPalette, true),
-        type: 'color'
-      },
-      'Quiet': {
-        value: getTextQuietColor(surfaceColor, textPalette, true),
-        type: 'color'
-      },
-      'Border': {
-        value: getBorderColor(surfaceColor, palette, true),
-        type: 'color'
-      },
-      'Border-Variant': {
-        value: `${getBorderColor(surfaceColor, palette, true)}26`,
-        type: 'color'
-      },
-      'Hotlink': {
-        value: getHotlinkColor(primaryPalette, true),
-        type: 'color'
-      },
-      'Hotlink-Visited': {
-        value: getHotlinkVisitedColor(primaryPalette, true),
-        type: 'color'
-      },
-      'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-${surfaceColorNumber}}` : blendColors('#FFFFFF', surfaceColor, 0.08),
-        type: 'color'
-      },
-      'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-${surfaceColorNumber}}` : blendColors('#FFFFFF', surfaceColor, 0.12),
-        type: 'color'
-      },
-      'Focus-Active': {
-        value: backgroundNumber ? `{Focus-Active.Surfaces.Background-${backgroundNumber}}` : blendColors('#FFFFFF', surfaceColor, 0.10),
-        type: 'color'
-      },
-      'Focus-Visible': {
-        value: backgroundNumber ? `{Focus-Visible.Surfaces.Background-${backgroundNumber}}` : blendColors('#FFFFFF', surfaceColor, 0.10),
-        type: 'color'
-      }
-    },
-    Containers: {
-      'Container': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-Lowest': {
-        value: containerLowestColor,
-        type: 'color'
-      },
-      'Container-Low': {
-        value: containerLowColor,
-        type: 'color'
-      },
-      'Container-High': {
-        value: containerHighColor,
-        type: 'color'
-      },
-      'Container-Highest': {
-        value: containerHighestColor,
-        type: 'color'
-      },
-      'Header': {
-        value: getHeaderColor(containerColor, textPalette, true),
-        type: 'color'
-      },
-      'Text': {
-        value: getTextColor(containerColor, textPalette, true),
-        type: 'color'
-      },
-      'Quiet': {
-        value: getTextQuietColor(containerColor, textPalette, true),
-        type: 'color'
-      },
-      'Border': {
-        value: getBorderColor(containerColor, palette, true),
-        type: 'color'
-      },
-      'Border-Variant': {
-        value: `${getBorderColor(containerColor, palette, true)}26`,
-        type: 'color'
-      },
-      'Hotlink': {
-        value: getHotlinkColor(primaryPalette, true),
-        type: 'color'
-      },
-      'Hotlink-Visited': {
-        value: getHotlinkVisitedColor(primaryPalette, true),
-        type: 'color'
-      },
-      'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-5}` : blendColors('#FFFFFF', containerColor, 0.08),
-        type: 'color'
-      },
-      'Active': {
-        value: paletteName ? `{Active.${paletteName}.Color-5}` : blendColors('#FFFFFF', containerColor, 0.12),
-        type: 'color'
-      },
-      'Focus-Active': {
-        value: backgroundNumber ? `{Focus-Active.Containers.Background-${backgroundNumber}}` : blendColors('#FFFFFF', containerColor, 0.10),
-        type: 'color'
-      },
-      'Focus-Visible': {
-        value: backgroundNumber ? `{Focus-Visible.Containers.Background-${backgroundNumber}}` : blendColors('#FFFFFF', containerColor, 0.10),
-        type: 'color'
-      }
-    }
-  };
-}
 
 /**
  * Create a theme reference for a specific background
@@ -1866,7 +1632,7 @@ function createThemeReference(
       Hotlink: createReference('Surfaces', 'Hotlink'),
       'Hotlink-Visited': createReference('Surfaces', 'Hotlink-Visited'),
       Hover: createReference('Surfaces', 'Hover'),
-      Active: createReference('Surfaces', 'Active'),
+      Pressed: createReference('Surfaces', 'Pressed'),
       'Focus-Visible': createReference('Surfaces', 'Focus-Visible'),
       Buttons: {
         Primary: {
@@ -1874,112 +1640,112 @@ function createThemeReference(
           Text: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Text'),
           Border: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Border'),
           Hover: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Hover'),
-          Active: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Active')
+          Pressed: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Pressed')
         },
         'Primary-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Primary-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Primary-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Primary-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Primary-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Primary-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Primary-Light.Pressed')
         },
         Secondary: {
           Button: createButtonReference('Surfaces', bgName, 'Secondary.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Secondary.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Secondary.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Secondary.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Secondary.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Secondary.Pressed')
         },
         'Secondary-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Secondary-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Secondary-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Secondary-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Secondary-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Secondary-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Secondary-Light.Pressed')
         },
         Tertiary: {
           Button: createButtonReference('Surfaces', bgName, 'Tertiary.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Tertiary.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Tertiary.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Tertiary.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Tertiary.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary.Pressed')
         },
         'Tertiary-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Pressed')
         },
         Neutral: {
           Button: createButtonReference('Surfaces', bgName, 'Neutral.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Neutral.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Neutral.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Neutral.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Neutral.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Neutral.Pressed')
         },
         'Neutral-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Neutral-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Neutral-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Neutral-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Neutral-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Neutral-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Neutral-Light.Pressed')
         },
         Info: {
           Button: createButtonReference('Surfaces', bgName, 'Info.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Info.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Info.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Info.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Info.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Info.Pressed')
         },
         'Info-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Info-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Info-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Info-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Info-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Info-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Info-Light.Pressed')
         },
         Success: {
           Button: createButtonReference('Surfaces', bgName, 'Success.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Success.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Success.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Success.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Success.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Success.Pressed')
         },
         'Success-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Success-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Success-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Success-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Success-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Success-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Success-Light.Pressed')
         },
         Warning: {
           Button: createButtonReference('Surfaces', bgName, 'Warning.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Warning.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Warning.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Warning.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Warning.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Warning.Pressed')
         },
         'Warning-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Warning-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Warning-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Warning-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Warning-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Warning-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Warning-Light.Pressed')
         },
         Error: {
           Button: createButtonReference('Surfaces', bgName, 'Error.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Error.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Error.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Error.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Error.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Error.Pressed')
         },
         'Error-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Error-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Error-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Error-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Error-Light.Hover'),
-          Active: createButtonReference('Surfaces', bgName, 'Error-Light.Active')
+          Pressed: createButtonReference('Surfaces', bgName, 'Error-Light.Pressed')
         }
       },
       Icons: {
@@ -2051,7 +1817,7 @@ function createThemeReference(
       Hotlink: createReference('Containers', 'Hotlink'),
       'Hotlink-Visited': createReference('Containers', 'Hotlink-Visited'),
       Hover: createReference('Containers', 'Hover'),
-      Active: createReference('Containers', 'Active'),
+      Pressed: createReference('Containers', 'Pressed'),
       'Focus-Visible': createReference('Containers', 'Focus-Visible'),
       Buttons: {
         Primary: {
@@ -2059,112 +1825,112 @@ function createThemeReference(
           Text: createPrimaryButtonReference('Containers', bgName, 'Primary.Text'),
           Border: createPrimaryButtonReference('Containers', bgName, 'Primary.Border'),
           Hover: createPrimaryButtonReference('Containers', bgName, 'Primary.Hover'),
-          Active: createPrimaryButtonReference('Containers', bgName, 'Primary.Active')
+          Pressed: createPrimaryButtonReference('Containers', bgName, 'Primary.Pressed')
         },
         'Primary-Light': {
           Button: createButtonReference('Containers', bgName, 'Primary-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Primary-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Primary-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Primary-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Primary-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Primary-Light.Pressed')
         },
         Secondary: {
           Button: createButtonReference('Containers', bgName, 'Secondary.Button'),
           Text: createButtonReference('Containers', bgName, 'Secondary.Text'),
           Border: createButtonReference('Containers', bgName, 'Secondary.Border'),
           Hover: createButtonReference('Containers', bgName, 'Secondary.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Secondary.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Secondary.Pressed')
         },
         'Secondary-Light': {
           Button: createButtonReference('Containers', bgName, 'Secondary-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Secondary-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Secondary-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Secondary-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Secondary-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Secondary-Light.Pressed')
         },
         Tertiary: {
           Button: createButtonReference('Containers', bgName, 'Tertiary.Button'),
           Text: createButtonReference('Containers', bgName, 'Tertiary.Text'),
           Border: createButtonReference('Containers', bgName, 'Tertiary.Border'),
           Hover: createButtonReference('Containers', bgName, 'Tertiary.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Tertiary.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Tertiary.Pressed')
         },
         'Tertiary-Light': {
           Button: createButtonReference('Containers', bgName, 'Tertiary-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Tertiary-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Tertiary-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Tertiary-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Tertiary-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Tertiary-Light.Pressed')
         },
         Neutral: {
           Button: createButtonReference('Containers', bgName, 'Neutral.Button'),
           Text: createButtonReference('Containers', bgName, 'Neutral.Text'),
           Border: createButtonReference('Containers', bgName, 'Neutral.Border'),
           Hover: createButtonReference('Containers', bgName, 'Neutral.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Neutral.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Neutral.Pressed')
         },
         'Neutral-Light': {
           Button: createButtonReference('Containers', bgName, 'Neutral-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Neutral-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Neutral-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Neutral-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Neutral-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Neutral-Light.Pressed')
         },
         Info: {
           Button: createButtonReference('Containers', bgName, 'Info.Button'),
           Text: createButtonReference('Containers', bgName, 'Info.Text'),
           Border: createButtonReference('Containers', bgName, 'Info.Border'),
           Hover: createButtonReference('Containers', bgName, 'Info.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Info.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Info.Pressed')
         },
         'Info-Light': {
           Button: createButtonReference('Containers', bgName, 'Info-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Info-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Info-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Info-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Info-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Info-Light.Pressed')
         },
         Success: {
           Button: createButtonReference('Containers', bgName, 'Success.Button'),
           Text: createButtonReference('Containers', bgName, 'Success.Text'),
           Border: createButtonReference('Containers', bgName, 'Success.Border'),
           Hover: createButtonReference('Containers', bgName, 'Success.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Success.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Success.Pressed')
         },
         'Success-Light': {
           Button: createButtonReference('Containers', bgName, 'Success-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Success-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Success-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Success-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Success-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Success-Light.Pressed')
         },
         Warning: {
           Button: createButtonReference('Containers', bgName, 'Warning.Button'),
           Text: createButtonReference('Containers', bgName, 'Warning.Text'),
           Border: createButtonReference('Containers', bgName, 'Warning.Border'),
           Hover: createButtonReference('Containers', bgName, 'Warning.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Warning.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Warning.Pressed')
         },
         'Warning-Light': {
           Button: createButtonReference('Containers', bgName, 'Warning-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Warning-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Warning-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Warning-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Warning-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Warning-Light.Pressed')
         },
         Error: {
           Button: createButtonReference('Containers', bgName, 'Error.Button'),
           Text: createButtonReference('Containers', bgName, 'Error.Text'),
           Border: createButtonReference('Containers', bgName, 'Error.Border'),
           Hover: createButtonReference('Containers', bgName, 'Error.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Error.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Error.Pressed')
         },
         'Error-Light': {
           Button: createButtonReference('Containers', bgName, 'Error-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Error-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Error-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Error-Light.Hover'),
-          Active: createButtonReference('Containers', bgName, 'Error-Light.Active')
+          Pressed: createButtonReference('Containers', bgName, 'Error-Light.Pressed')
         }
       },
       Icons: {
@@ -2267,7 +2033,7 @@ function generateButtonsForBackground(
       buttonText: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Text}`,
       buttonBorder: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Border}`,
       buttonHover: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Hover}`,
-      buttonActive: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Active}`
+      buttonActive: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Pressed}`
     };
   };
 
@@ -2278,7 +2044,7 @@ function generateButtonsForBackground(
       buttonText: `{Text.${surfaceOrContainer}.${paletteName}.Color-${colorN}}`,
       buttonBorder: `{Border.${surfaceOrContainer}.${paletteName}.${bgName}}`,
       buttonHover: `{Hover.${paletteName}.Color-${colorN}}`,
-      buttonActive: `{Active.${paletteName}.Color-${colorN}}`
+      buttonActive: `{Pressed.${paletteName}.Color-${colorN}}`
     };
   };
 
@@ -2289,7 +2055,7 @@ function generateButtonsForBackground(
       buttonText: `{Text.${surfaceOrContainer}.${paletteName}.Color-9}`,
       buttonBorder: `{Border.${surfaceOrContainer}.${paletteName}.${bgName}}`,
       buttonHover: `{Hover.${paletteName}.Color-9}`,
-      buttonActive: `{Active.${paletteName}.Color-9}`
+      buttonActive: `{Pressed.${paletteName}.Color-9}`
     };
   };
 
@@ -2316,112 +2082,112 @@ function generateButtonsForBackground(
       Text: { value: primary.buttonText, type: 'color' },
       Border: { value: primary.buttonBorder, type: 'color' },
       Hover: { value: primary.buttonHover, type: 'color' },
-      Active: { value: primary.buttonActive, type: 'color' }
+      Pressed: { value: primary.buttonActive, type: 'color' }
     },
     'Primary-Light': {
       Button: { value: primaryLight.buttonBg, type: 'color' },
       Text: { value: primaryLight.buttonText, type: 'color' },
       Border: { value: primaryLight.buttonBorder, type: 'color' },
       Hover: { value: primaryLight.buttonHover, type: 'color' },
-      Active: { value: primaryLight.buttonActive, type: 'color' }
+      Pressed: { value: primaryLight.buttonActive, type: 'color' }
     },
     Secondary: {
       Button: { value: secondary.buttonBg, type: 'color' },
       Text: { value: secondary.buttonText, type: 'color' },
       Border: { value: secondary.buttonBorder, type: 'color' },
       Hover: { value: secondary.buttonHover, type: 'color' },
-      Active: { value: secondary.buttonActive, type: 'color' }
+      Pressed: { value: secondary.buttonActive, type: 'color' }
     },
     'Secondary-Light': {
       Button: { value: secondaryLight.buttonBg, type: 'color' },
       Text: { value: secondaryLight.buttonText, type: 'color' },
       Border: { value: secondaryLight.buttonBorder, type: 'color' },
       Hover: { value: secondaryLight.buttonHover, type: 'color' },
-      Active: { value: secondaryLight.buttonActive, type: 'color' }
+      Pressed: { value: secondaryLight.buttonActive, type: 'color' }
     },
     Tertiary: {
       Button: { value: tertiary.buttonBg, type: 'color' },
       Text: { value: tertiary.buttonText, type: 'color' },
       Border: { value: tertiary.buttonBorder, type: 'color' },
       Hover: { value: tertiary.buttonHover, type: 'color' },
-      Active: { value: tertiary.buttonActive, type: 'color' }
+      Pressed: { value: tertiary.buttonActive, type: 'color' }
     },
     'Tertiary-Light': {
       Button: { value: tertiaryLight.buttonBg, type: 'color' },
       Text: { value: tertiaryLight.buttonText, type: 'color' },
       Border: { value: tertiaryLight.buttonBorder, type: 'color' },
       Hover: { value: tertiaryLight.buttonHover, type: 'color' },
-      Active: { value: tertiaryLight.buttonActive, type: 'color' }
+      Pressed: { value: tertiaryLight.buttonActive, type: 'color' }
     },
     Neutral: {
       Button: { value: neutral.buttonBg, type: 'color' },
       Text: { value: neutral.buttonText, type: 'color' },
       Border: { value: neutral.buttonBorder, type: 'color' },
       Hover: { value: neutral.buttonHover, type: 'color' },
-      Active: { value: neutral.buttonActive, type: 'color' }
+      Pressed: { value: neutral.buttonActive, type: 'color' }
     },
     'Neutral-Light': {
       Button: { value: neutralLight.buttonBg, type: 'color' },
       Text: { value: neutralLight.buttonText, type: 'color' },
       Border: { value: neutralLight.buttonBorder, type: 'color' },
       Hover: { value: neutralLight.buttonHover, type: 'color' },
-      Active: { value: neutralLight.buttonActive, type: 'color' }
+      Pressed: { value: neutralLight.buttonActive, type: 'color' }
     },
     Info: {
       Button: { value: info.buttonBg, type: 'color' },
       Text: { value: info.buttonText, type: 'color' },
       Border: { value: info.buttonBorder, type: 'color' },
       Hover: { value: info.buttonHover, type: 'color' },
-      Active: { value: info.buttonActive, type: 'color' }
+      Pressed: { value: info.buttonActive, type: 'color' }
     },
     'Info-Light': {
       Button: { value: infoLight.buttonBg, type: 'color' },
       Text: { value: infoLight.buttonText, type: 'color' },
       Border: { value: infoLight.buttonBorder, type: 'color' },
       Hover: { value: infoLight.buttonHover, type: 'color' },
-      Active: { value: infoLight.buttonActive, type: 'color' }
+      Pressed: { value: infoLight.buttonActive, type: 'color' }
     },
     Success: {
       Button: { value: success.buttonBg, type: 'color' },
       Text: { value: success.buttonText, type: 'color' },
       Border: { value: success.buttonBorder, type: 'color' },
       Hover: { value: success.buttonHover, type: 'color' },
-      Active: { value: success.buttonActive, type: 'color' }
+      Pressed: { value: success.buttonActive, type: 'color' }
     },
     'Success-Light': {
       Button: { value: successLight.buttonBg, type: 'color' },
       Text: { value: successLight.buttonText, type: 'color' },
       Border: { value: successLight.buttonBorder, type: 'color' },
       Hover: { value: successLight.buttonHover, type: 'color' },
-      Active: { value: successLight.buttonActive, type: 'color' }
+      Pressed: { value: successLight.buttonActive, type: 'color' }
     },
     Warning: {
       Button: { value: warning.buttonBg, type: 'color' },
       Text: { value: warning.buttonText, type: 'color' },
       Border: { value: warning.buttonBorder, type: 'color' },
       Hover: { value: warning.buttonHover, type: 'color' },
-      Active: { value: warning.buttonActive, type: 'color' }
+      Pressed: { value: warning.buttonActive, type: 'color' }
     },
     'Warning-Light': {
       Button: { value: warningLight.buttonBg, type: 'color' },
       Text: { value: warningLight.buttonText, type: 'color' },
       Border: { value: warningLight.buttonBorder, type: 'color' },
       Hover: { value: warningLight.buttonHover, type: 'color' },
-      Active: { value: warningLight.buttonActive, type: 'color' }
+      Pressed: { value: warningLight.buttonActive, type: 'color' }
     },
     Error: {
       Button: { value: error.buttonBg, type: 'color' },
       Text: { value: error.buttonText, type: 'color' },
       Border: { value: error.buttonBorder, type: 'color' },
       Hover: { value: error.buttonHover, type: 'color' },
-      Active: { value: error.buttonActive, type: 'color' }
+      Pressed: { value: error.buttonActive, type: 'color' }
     },
     'Error-Light': {
       Button: { value: errorLight.buttonBg, type: 'color' },
       Text: { value: errorLight.buttonText, type: 'color' },
       Border: { value: errorLight.buttonBorder, type: 'color' },
       Hover: { value: errorLight.buttonHover, type: 'color' },
-      Active: { value: errorLight.buttonActive, type: 'color' }
+      Pressed: { value: errorLight.buttonActive, type: 'color' }
     }
   };
 }
@@ -2536,38 +2302,56 @@ function generateIconPaletteStructure(isDark: boolean = false) {
   const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
   const surfaces = ['Surfaces', 'Containers'];
   
-  // LIGHT MODE: Color values for background levels 1-6 (dark backgrounds) and 7-12 (light backgrounds)
-  const lightMode_DarkBackgroundColors = [10, 10, 10, 10, 8, 4];   // For Color-1 through Color-6
-  const lightMode_LightBackgroundColors = [4, 5, 5, 6, 6, 6];      // For Color-7 through Color-12
+  // Icons carry meaning, so under WCAG 1.4.11 they need the same 3:1 against the
+  // background that a Border does — and therefore the same tones. These arrays
+  // mirror Border.Surfaces exactly (verified identical across all eight
+  // palettes in both modes).
+  //
+  // The previous icon-specific tones sat too close to the background: they
+  // measured 86.8% passing in light mode and only 16.7% in dark. Adopting
+  // Border's tones takes both to ~100%.
+  //
+  // Keep these in step with the Border structures — if a Border tone changes,
+  // the matching icon tone must change with it or icons silently drop below 3:1.
+  const lightMode_DarkBackgroundColors = [6, 6, 7, 9, 10, 2];      // For Color-1 through Color-6
+  const lightMode_LightBackgroundColors = [5, 5, 5, 5, 5, 5];      // For Color-7 through Color-12
 
-  // DARK MODE: Different mappings for dark mode backgrounds
-  const darkMode_DarkBackgroundColors = [4, 5, 5, 6, 6, 10];       // For Color-1 through Color-6
-  const darkMode_LightBackgroundColors = [10, 10, 10, 10, 8, 9];   // For Color-7 through Color-12
+  const darkMode_DarkBackgroundColors = [6, 6, 7, 8, 9, 2];        // For Color-1 through Color-6
+  const darkMode_LightBackgroundColors = [3, 4, 5, 5, 5, 5];       // For Color-7 through Color-12
 
   const darkBgColors = isDark ? darkMode_DarkBackgroundColors : lightMode_DarkBackgroundColors;
   const lightBgColors = isDark ? darkMode_LightBackgroundColors : lightMode_LightBackgroundColors;
 
-  surfaces.forEach(surface => {
-    palettes.forEach(palette => {
-      // Color-1 through Color-6
-      darkBgColors.forEach((colorValue, index) => {
-        iconStructure[surface][palette][`Color-${index + 1}`] = {
-          value: `{Colors.${palette}.Color-${colorValue}}`,
-          type: 'color'
-        };
-      });
+  // Index N is the BACKGROUND tone. For Surfaces that is also the tone the
+  // surface renders at, so N indexes the arrays directly.
+  //
+  // Containers do NOT render at tone N: in dark mode every container level is
+  // drawn from the Color-2..Color-4 ramp regardless of background, and in light
+  // mode a container is flat Color-11 on a light background or Color-2 on a dark
+  // one. Keying icons by N therefore picked a tone for a background the
+  // container never has — putting dark icons on dark containers (e.g.
+  // #2d3d32 on #111111 = 1.64:1). Resolve the container's actual tone first.
+  const containerToneFor = (n: number): number => {
+    if (isDark) return 4;            // dark containers span Color-2..4; anchor on Color-4
+    return n <= 5 ? 2 : 11;          // light: Color-2 on a dark background, else Color-11
+  };
+  const toneAt = (n: number): number =>
+    n <= 6 ? darkBgColors[n - 1] : lightBgColors[n - 7];
 
-      // Color-7 through Color-12
-      lightBgColors.forEach((colorValue, index) => {
-        iconStructure[surface][palette][`Color-${index + 7}`] = {
-          value: `{Colors.${palette}.Color-${colorValue}}`,
+  surfaces.forEach(surface => {
+    const isContainer = surface === 'Containers';
+    palettes.forEach(palette => {
+      for (let n = 1; n <= 12; n++) {
+        const effectiveN = isContainer ? containerToneFor(n) : n;
+        iconStructure[surface][palette][`Color-${n}`] = {
+          value: `{Colors.${palette}.Color-${toneAt(effectiveN)}}`,
           type: 'color'
         };
-      });
-      
+      }
+
       // Color-Vibrant
       iconStructure[surface][palette]['Color-Vibrant'] = {
-        value: `{Colors.${palette}.Color-9}`,
+        value: `{Colors.${palette}.Color-${isContainer ? toneAt(containerToneFor(9)) : 9}}`,
         type: 'color'
       };
     });
@@ -2645,218 +2429,67 @@ function generateTagsForBackground(
  * Generate Focus-Visible section with fixed Info color mappings
  * This is consistent across all modes and never changes
  */
-function generateFocusVisibleSection(): FocusVisibleSection {
-  return {
-    Surfaces: {
-      'Background-1': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-2': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-3': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-4': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-5': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-6': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Background-7': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Background-8': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-9': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-10': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-11': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-12': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-Vibrant': { value: '{Colors.Info.Color-5}', type: 'color' }
-    },
-    Containers: {
-      'Background-1': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-2': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-3': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-4': { value: '{Colors.Info.Color-6}', type: 'color' },
-      'Background-5': { value: '{Colors.Info.Color-8}', type: 'color' },
-      'Background-6': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Background-7': { value: '{Colors.Info.Color-4}', type: 'color' },
-      'Background-8': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-9': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-10': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-11': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-12': { value: '{Colors.Info.Color-5}', type: 'color' },
-      'Background-Vibrant': { value: '{Colors.Info.Color-5}', type: 'color' }
+/**
+ * Focus ring colours, keyed by the background tone the ring sits on.
+ *
+ * A focus indicator is non-text UI, so WCAG 1.4.11 requires 3:1 against the
+ * background — the same requirement a Border has. These therefore use Border's
+ * tone mapping, applied to the Info palette so the ring keeps its own
+ * recognisable hue rather than blending into the theme.
+ *
+ * This is now per-mode. It previously returned one mode-independent structure
+ * with tones [6,6,6,6,8,4] / [4,5,5,5,5,5], which happened to clear 3:1 in dark
+ * mode but failed 15 of 96 light-mode backgrounds.
+ *
+ * Keep in step with the Border structures and with generateIconPaletteStructure
+ * — all three share the 3:1 requirement and must share the tones.
+ */
+function generateFocusVisibleSection(isDark: boolean = false): FocusVisibleSection {
+  // Mirrors Border.Surfaces (verified identical across all eight palettes).
+  const darkBgTones = isDark ? [6, 6, 7, 8, 9, 2] : [6, 6, 7, 9, 10, 2];   // Background-1..6
+  const lightBgTones = isDark ? [3, 4, 5, 5, 5, 5] : [5, 5, 5, 5, 5, 5];   // Background-7..12
+
+  const toneAt = (n: number): number => (n <= 6 ? darkBgTones[n - 1] : lightBgTones[n - 7]);
+
+  // Containers don't render at tone N — see generateIconPaletteStructure for the
+  // full reasoning. Dark containers span Color-2..4 (anchor on 4); light
+  // containers are Color-2 on a dark background, Color-11 otherwise. Without
+  // this the focus ring was keyed to a background the container never has.
+  const containerToneFor = (n: number): number => (isDark ? 4 : n <= 5 ? 2 : 11);
+
+  const build = (isContainer: boolean) => {
+    const out: Record<string, { value: string; type: 'color' }> = {};
+    for (let n = 1; n <= 12; n++) {
+      const effectiveN = isContainer ? containerToneFor(n) : n;
+      out[`Background-${n}`] = { value: `{Colors.Info.Color-${toneAt(effectiveN)}}`, type: 'color' };
     }
+    const vibrantN = isContainer ? containerToneFor(9) : 12;
+    out['Background-Vibrant'] = { value: `{Colors.Info.Color-${toneAt(vibrantN)}}`, type: 'color' };
+    return out;
   };
+
+  return { Surfaces: build(false), Containers: build(true) };
 }
 
 /**
  * Generate hover state colors for a palette
  * Based on the hover state calculation logic
  */
-function generateHoverColors(paletteColors: { [key: string]: ColorToken }, paletteName: string): { [key: string]: ColorToken } {
-  const hover: { [key: string]: ColorToken } = {};
-  
-  try {
-    // Color-1: Link to Hover Color-2
-    hover['Color-1'] = { value: `{Hover.${paletteName}.Color-2}`, type: 'color' };
-    
-    // Color-2: Link to Hover Color-3
-    hover['Color-2'] = { value: `{Hover.${paletteName}.Color-3}`, type: 'color' };
-    
-    // Color-3: Link to Hover Color-4
-    hover['Color-3'] = { value: `{Hover.${paletteName}.Color-4}`, type: 'color' };
-    
-    // Color-4: Blend Color-4 + Color-5 @ 50%
-    const color4 = paletteColors['Color-4']?.value || '#000000';
-    const color5 = paletteColors['Color-5']?.value || '#000000';
-    hover['Color-4'] = { 
-      value: chroma.mix(color4, color5, 0.5, 'lab').hex(), 
-      type: 'color' 
-    };
-  
-  // Color-5: Blend Color-5 + #000000 @ 12%
-  hover['Color-5'] = {
-    value: chroma.mix(color5, '#000000', 0.12, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-6: Blend Color-6 + #FFFFFF @ 12%
-  const color6 = paletteColors['Color-6']?.value || '#000000';
-  hover['Color-6'] = {
-    value: chroma.mix(color6, '#FFFFFF', 0.12, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-7: Blend Color-7 + #FFFFFF @ 15%
-  const color7 = paletteColors['Color-7']?.value || '#000000';
-  hover['Color-7'] = {
-    value: chroma.mix(color7, '#FFFFFF', 0.15, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-8: Blend Color-8 + #FFFFFF @ 15%
-  const color8 = paletteColors['Color-8']?.value || '#000000';
-  hover['Color-8'] = {
-    value: chroma.mix(color8, '#FFFFFF', 0.15, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-9: Blend Color-9 + #FFFFFF @ 20%
-  const color9 = paletteColors['Color-9']?.value || '#000000';
-  hover['Color-9'] = {
-    value: chroma.mix(color9, '#FFFFFF', 0.20, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-10: Blend Color-10 + Color-9 @ 25%
-  const color10 = paletteColors['Color-10']?.value || '#000000';
-  hover['Color-10'] = {
-    value: chroma.mix(color10, color9, 0.25, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-11: Blend Color-11 + Color-9 @ 25%
-  const color11 = paletteColors['Color-11']?.value || '#000000';
-  hover['Color-11'] = {
-    value: chroma.mix(color11, color9, 0.25, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-12: Blend Color-12 + Color-9 @ 25%
-  const color12 = paletteColors['Color-12']?.value || '#FFFFFF';
-  hover['Color-12'] = {
-    value: chroma.mix(color12, color9, 0.25, 'lab').hex(),
-    type: 'color'
-  };
-  
-  } catch (error) {
-    console.error(`Error generating hover colors for ${paletteName}:`, error);
-    // Return empty object or fallback values
-    return {};
-  }
-  
-  return hover;
-}
-
-/**
- * Generate active state colors for a palette
- * Based on the active state calculation logic
- */
-function generateActiveColors(paletteColors: { [key: string]: ColorToken }, paletteName: string): { [key: string]: ColorToken } {
-  const active: { [key: string]: ColorToken } = {};
-  
-  try {
-    // Color-1: Link to Active Color-3
-    active['Color-1'] = { value: `{Active.${paletteName}.Color-3}`, type: 'color' };
-    
-    // Color-2: Link to Active Color-4
-    active['Color-2'] = { value: `{Active.${paletteName}.Color-4}`, type: 'color' };
-    
-    // Color-3: Link to Active Color-5
-    active['Color-3'] = { value: `{Active.${paletteName}.Color-5}`, type: 'color' };
-    
-    // Color-4: Blend Color-4 + Color-5 @ 75%
-    const color4 = paletteColors['Color-4']?.value || '#000000';
-    const color5 = paletteColors['Color-5']?.value || '#000000';
-    active['Color-4'] = { 
-      value: chroma.mix(color4, color5, 0.75, 'lab').hex(), 
-      type: 'color' 
-    };
-  
-  // Color-5: Blend Color-5 + #000000 @ 20%
-  active['Color-5'] = {
-    value: chroma.mix(color5, '#000000', 0.20, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-6: Blend Color-6 + #FFFFFF @ 18%
-  const color6 = paletteColors['Color-6']?.value || '#000000';
-  active['Color-6'] = {
-    value: chroma.mix(color6, '#FFFFFF', 0.18, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-7: Blend Color-7 + #FFFFFF @ 20%
-  const color7 = paletteColors['Color-7']?.value || '#000000';
-  active['Color-7'] = {
-    value: chroma.mix(color7, '#FFFFFF', 0.20, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-8: Blend Color-8 + #FFFFFF @ 20%
-  const color8 = paletteColors['Color-8']?.value || '#000000';
-  active['Color-8'] = {
-    value: chroma.mix(color8, '#FFFFFF', 0.20, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-9: Blend Color-9 + #FFFFFF @ 25%
-  const color9 = paletteColors['Color-9']?.value || '#000000';
-  active['Color-9'] = {
-    value: chroma.mix(color9, '#FFFFFF', 0.25, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-10: Blend Color-10 + Color-9 @ 30%
-  const color10 = paletteColors['Color-10']?.value || '#000000';
-  active['Color-10'] = {
-    value: chroma.mix(color10, color9, 0.30, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-11: Blend Color-11 + Color-9 @ 30%
-  const color11 = paletteColors['Color-11']?.value || '#000000';
-  active['Color-11'] = {
-    value: chroma.mix(color11, color9, 0.30, 'lab').hex(),
-    type: 'color'
-  };
-
-  // Color-12: Blend Color-12 + Color-9 @ 30%
-  const color12 = paletteColors['Color-12']?.value || '#FFFFFF';
-  active['Color-12'] = {
-    value: chroma.mix(color12, color9, 0.30, 'lab').hex(),
-    type: 'color'
-  };
-  
-  } catch (error) {
-    console.error(`Error generating active colors for ${paletteName}:`, error);
-    // Return empty object or fallback values
-    return {};
-  }
-  
-  return active;
-}
+// ─── Shared hover/active step math — MUST stay identical to
+// buildPreviewCSS.ts's activeAndHoverFor so the hosted CSS/JSON matches the
+// studio preview exactly. Pressed/hover move ALONG the palette one tone away
+// from the text colour so contrast is preserved:
+//   - dark (light-text) button  → active = tone n-1 (next darker)
+//   - light (dark-text) button  → active = tone n+1 (next lighter)
+//   - hover = 50% mix(base tone, active tone)
+// Endpoints flip direction so there's always a visible delta. ───
+// NOTE: the hover/pressed helper island that used to live here
+// (_hoverRgb / _hoverIsLight / _hoverMix50 / _pressedHex / generateHoverColors /
+// generateActiveColors) has been removed. It was never called — the live
+// implementation is buildHoverForPalette() in staticTokenStructures.ts, applied
+// via getStaticHoverTokens() / getStaticActiveTokens(). The dead copy also used
+// a YIQ brightness threshold to choose direction, which disagreed with the real
+// rule (tones 1-5 step darker, 6-12 step lighter) on saturated mid-tones.
 
 /**
  * Flatten nested objects into hyphen-separated keys
@@ -3406,7 +3039,16 @@ function generateModesThemes(
     // BW (Black-White): Use BW-Button for buttons/tags, BW for other text
     const getButtonTextRef = (palette: string, nValue: number | string, shade: 'Light' | 'Medium', isContainer: boolean = false): string => {
       const isBWMode = textColoringSelection === 'black-white';
-      
+
+      // A black-white BUTTON (theme 'BW') must ALWAYS use contrasting text,
+      // regardless of the text-coloring selection. A black button (light mode)
+      // needs white text (Color-12 → #FFF); a white button (dark mode) needs
+      // black text (Color-1 → #000). Without this, a BW button with "Tonal" text
+      // coloring falls to {Buttons.BW.{shade}.Text} and renders black-on-black.
+      if (palette === 'BW') {
+        return `{Text.${isContainer ? 'Containers' : 'Surfaces'}.BW-Button.Color-${isDark ? 1 : 12}}`;
+      }
+
       if (isBWMode && !isDark) {
         // Black-White mode in Light Mode: Use BW-Button text for buttons/tags
         const nVal = typeof nValue === 'number' ? nValue : (nValue === 'Vibrant' ? 'Vibrant' : n);
@@ -3455,8 +3097,8 @@ function generateModesThemes(
         Hotlink: { value: `{Text.Surfaces.Info.Color-${n}}`, type: 'color' },
         'Hotlink-Visited': { value: `{Text.Surfaces.Hotlink-Visited.Color-${n}}`, type: 'color' },
         Hover: { value: `{Hover.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
-        Active: { value: `{Active.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
-        'Focus-Visible': { value: `{Focus-Visible.Surfaces.Color-${n}}`, type: 'color' },
+        Pressed: { value: `{Pressed.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
+        'Focus-Visible': { value: `{Focus-Visible.Surfaces.Background-${n}}`, type: 'color' },
         Icons: {
           Default: { value: `{Icon.Surfaces.Neutral.Color-${n}}`, type: 'color' },
           'Default-Variant': { value: `{Icon-Variant.Surfaces.Neutral.Color-${n}}`, type: 'color' },
@@ -3582,7 +3224,7 @@ function generateModesThemes(
         Border: { value: `{Border.Containers.${cont.ContDefaultTextTheme}.Color-${cont.ContN}}`, type: 'color' },
         'Border-Variant': { value: `{Border-Variant.Containers.${cont.ContDefaultTextTheme}.Color-${cont.ContN}}`, type: 'color' },
         Hover: { value: `{Hover.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
-        Active: { value: `{Active.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
+        Pressed: { value: `{Pressed.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
         Icons: {
           Default: { value: `{Icon.Containers.Neutral.Color-${cont.ContN}}`, type: 'color' },
           'Default-Variant': { value: `{Icon-Variant.Containers.Neutral.Color-${cont.ContN}}`, type: 'color' },
@@ -3927,8 +3569,8 @@ function generateThemesSection(
       Hotlink: { value: `{Text.Surfaces.Info.Color-${backgroundNum}}`, type: 'color' },
       'Hotlink-Visited': { value: `{Hotlink-Visited.Surfaces.Color-${backgroundNum}}`, type: 'color' },
       Hover: { value: `{Hover.${palette}.Color-${backgroundNum}}`, type: 'color' },
-      Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' },
-      'Focus-Visible': { value: `{Focus-Visible.Surfaces.Color-${backgroundNum}}`, type: 'color' },
+      Pressed: { value: `{Pressed.${palette}.Color-${backgroundNum}}`, type: 'color' },
+      'Focus-Visible': { value: `{Focus-Visible.Surfaces.Background-${backgroundNum}}`, type: 'color' },
       Buttons: {
         // NOTE: this entire Themes literal is dead in the live pipeline — it
         // gets overwritten by `generateCompleteSimplifiedSystem` at the
@@ -3942,83 +3584,83 @@ function generateThemesSection(
           Text: { value: `{Text.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
           Border: { value: `{Border.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
+          Pressed: { value: `{Pressed.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
           Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
           Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
           Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
+          Pressed: { value: `{Pressed.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Button}`, type: 'color' },
           Text: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Text}`, type: 'color' },
           Border: { value: `{Border.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Hover}`, type: 'color' },
-          Active: { value: `{Primary-Button.Surfaces.Background-7.Active}`, type: 'color' }
+          Pressed: { value: `{Primary-Button.Surfaces.Background-7.Pressed}`, type: 'color' }
         },
         'Primary-Light': {
           Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
           Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
           Border: { value: `{Border.Surfaces.Primary.Color-10}`, type: 'color' },
           Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
+          Pressed: { value: `{Pressed.Primary.Color-10}`, type: 'color' }
         },
         'Primary-Outline': {
           Button: { value: '#00000000', type: 'color' },
           Text: { value: `{Text.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Border: { value: `{Border.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Hover.${palette}.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' }
+          Pressed: { value: `{Pressed.${palette}.Color-${backgroundNum}}`, type: 'color' }
         },
         Secondary: {
           Button: { value: '{Colors.Secondary.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Secondary.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Secondary.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Secondary.Color-10}', type: 'color' },
-          Active: { value: '{Active.Secondary.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Secondary.Color-10}', type: 'color' }
         },
         Tertiary: {
           Button: { value: '{Colors.Tertiary.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Tertiary.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Tertiary.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Tertiary.Color-10}', type: 'color' },
-          Active: { value: '{Active.Tertiary.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Tertiary.Color-10}', type: 'color' }
         },
         Neutral: {
           Button: { value: '{Colors.Neutral.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Neutral.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Neutral.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Neutral.Color-10}', type: 'color' },
-          Active: { value: '{Active.Neutral.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Neutral.Color-10}', type: 'color' }
         },
         Info: {
           Button: { value: '{Colors.Info.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Info.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Info.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Info.Color-10}', type: 'color' },
-          Active: { value: '{Active.Info.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Info.Color-10}', type: 'color' }
         },
         Success: {
           Button: { value: '{Colors.Success.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Success.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Success.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Success.Color-10}', type: 'color' },
-          Active: { value: '{Active.Success.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Success.Color-10}', type: 'color' }
         },
         Warning: {
           Button: { value: '{Colors.Warning.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Warning.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Warning.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Warning.Color-10}', type: 'color' },
-          Active: { value: '{Active.Warning.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Warning.Color-10}', type: 'color' }
         },
         Error: {
           Button: { value: '{Colors.Error.Color-10}', type: 'color' },
           Text: { value: '{Text.Surfaces.Error.Color-10}', type: 'color' },
           Border: { value: '{Border.Surfaces.Error.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Error.Color-10}', type: 'color' },
-          Active: { value: '{Active.Error.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Error.Color-10}', type: 'color' }
         }
       },
       Icons: {
@@ -4082,8 +3724,8 @@ function generateThemesSection(
       Hotlink: { value: `{Text.Containers.Info.Color-${backgroundNum}}`, type: 'color' },
       'Hotlink-Visited': { value: `{Hotlink-Visited.Containers.Color-${backgroundNum}}`, type: 'color' },
       Hover: { value: `{Hover.${palette}.Color-${backgroundNum}}`, type: 'color' },
-      Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' },
-      'Focus-Visible': { value: `{Focus-Visible.Containers.Color-${backgroundNum}}`, type: 'color' },
+      Pressed: { value: `{Pressed.${palette}.Color-${backgroundNum}}`, type: 'color' },
+      'Focus-Visible': { value: `{Focus-Visible.Containers.Background-${backgroundNum}}`, type: 'color' },
       Buttons: {
         // Dead literal (overwritten by generateCompleteSimplifiedSystem). See
         // the matching note in the Surfaces Buttons block above.
@@ -4092,83 +3734,83 @@ function generateThemesSection(
           Text: { value: `{Text.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
           Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-${backgroundNum}}`, type: 'color' }
+          Pressed: { value: `{Pressed.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
         'Default-Light': {
           Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
           Text: { value: `{Text.Containers.Primary.Color-10}`, type: 'color' },
           Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Active: { value: `{Active.Primary.Color-10}`, type: 'color' }
+          Pressed: { value: `{Pressed.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Button}`, type: 'color' },
           Text: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Text}`, type: 'color' },
           Border: { value: `{Border.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Hover}`, type: 'color' },
-          Active: { value: `{Primary-Button.Containers.Background-7.Active}`, type: 'color' }
+          Pressed: { value: `{Primary-Button.Containers.Background-7.Pressed}`, type: 'color' }
         },
         'Primary-Light': {
           Button: { value: '{Colors.Primary.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Primary.Color-10}', type: 'color' },
           Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: '{Hover.Primary.Color-10}', type: 'color' },
-          Active: { value: '{Active.Primary.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Primary.Color-10}', type: 'color' }
         },
         'Primary-Outline': {
           Button: { value: '#00000000', type: 'color' },
           Text: { value: `{Text.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Border: { value: `{Border.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Hover.${palette}.Color-${backgroundNum}}`, type: 'color' },
-          Active: { value: `{Active.${palette}.Color-${backgroundNum}}`, type: 'color' }
+          Pressed: { value: `{Pressed.${palette}.Color-${backgroundNum}}`, type: 'color' }
         },
         Secondary: {
           Button: { value: '{Colors.Secondary.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Secondary.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Secondary.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Secondary.Color-10}', type: 'color' },
-          Active: { value: '{Active.Secondary.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Secondary.Color-10}', type: 'color' }
         },
         Tertiary: {
           Button: { value: '{Colors.Tertiary.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Tertiary.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Tertiary.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Tertiary.Color-10}', type: 'color' },
-          Active: { value: '{Active.Tertiary.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Tertiary.Color-10}', type: 'color' }
         },
         Neutral: {
           Button: { value: '{Colors.Neutral.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Neutral.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Neutral.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Neutral.Color-10}', type: 'color' },
-          Active: { value: '{Active.Neutral.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Neutral.Color-10}', type: 'color' }
         },
         Info: {
           Button: { value: '{Colors.Info.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Info.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Info.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Info.Color-10}', type: 'color' },
-          Active: { value: '{Active.Info.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Info.Color-10}', type: 'color' }
         },
         Success: {
           Button: { value: '{Colors.Success.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Success.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Success.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Success.Color-10}', type: 'color' },
-          Active: { value: '{Active.Success.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Success.Color-10}', type: 'color' }
         },
         Warning: {
           Button: { value: '{Colors.Warning.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Warning.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Warning.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Warning.Color-10}', type: 'color' },
-          Active: { value: '{Active.Warning.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Warning.Color-10}', type: 'color' }
         },
         Error: {
           Button: { value: '{Colors.Error.Color-10}', type: 'color' },
           Text: { value: '{Text.Containers.Error.Color-10}', type: 'color' },
           Border: { value: '{Border.Containers.Error.Color-11}', type: 'color' },
           Hover: { value: '{Hover.Error.Color-10}', type: 'color' },
-          Active: { value: '{Active.Error.Color-10}', type: 'color' }
+          Pressed: { value: '{Pressed.Error.Color-10}', type: 'color' }
         }
       },
       Icons: {
@@ -4412,7 +4054,7 @@ export function exportColorSystemToJSON(
   const colorSystem: ColorSystemExport = {
     Metadata: {
       Name: {
-        value: designSystemName || 'My Dino Design System',
+        value: designSystemName || 'My Design System',
         type: 'string'
       },
       'Date Created': {
@@ -4496,13 +4138,13 @@ export function exportColorSystemToJSON(
         Quiet: { Surfaces: {}, Containers: {} },
         Border: { Surfaces: {}, Containers: {} },
         Hover: {},
-        Active: {},
+        Pressed: {},
         Backgrounds: {},
         Icon: generateIconPaletteStructure(false), // Light-Mode
         'Icon-Variant': generateIconVariantPaletteStructure(false), // Light-Mode
         Tag: {},
         Charts: { Surfaces: {}, Containers: {} },
-        'Focus-Visible': generateFocusVisibleSection(),
+        'Focus-Visible': generateFocusVisibleSection(false), // Light-Mode
         Buttons: {}, // Will be populated with all button types
         Themes: {} // Will be populated with all 30 themes
       },
@@ -4513,13 +4155,13 @@ export function exportColorSystemToJSON(
         Quiet: { Surfaces: {}, Containers: {} },
         Border: { Surfaces: {}, Containers: {} },
         Hover: {},
-        Active: {},
+        Pressed: {},
         Backgrounds: {},
         Icon: generateIconPaletteStructure(true), // Dark-Mode
         'Icon-Variant': generateIconVariantPaletteStructure(true), // Dark-Mode
         Tag: {},
         Charts: { Surfaces: {}, Containers: {} },
-        'Focus-Visible': generateFocusVisibleSection(),
+        'Focus-Visible': generateFocusVisibleSection(true), // Dark-Mode
         Buttons: {}, // Will be populated with all button types
         Themes: {} // Will be populated with all 30 themes
       }
@@ -5604,14 +5246,14 @@ export function exportColorSystemToJSON(
                            'Background-6', 'Background-7', 'Background-6', 'Background-7', 'Background-8', 
                            'Background-9', 'Background-10', 'Background-11', 'Background-12', 'Background-Vibrant'];
 
-  // Helper function to convert button color reference to Hover/Active references
+  // Helper function to convert button color reference to Hover/Pressed references
   const getHoverActiveReferences = (buttonColorValue: string) => {
     // Extract the color reference from button value
     // Examples: 
-    // - "{Primary.Color-9}" → Hover: "{Hover.Primary.Color-9}", Active: "{Active.Primary.Color-9}"
-    // - "{Colors.Primary.Color-6}" → Hover: "{Hover.Primary.Color-6}", Active: "{Active.Primary.Color-6}"
-    // - "#FFFFFF" (White) → Hover: "{Hover.Neutral.Color-11}", Active: "{Active.Neutral.Color-11}"
-    // - "#000000" (Black) → Hover: "{Hover.Neutral.Color-1}", Active: "{Active.Neutral.Color-1}"
+    // - "{Primary.Color-9}" → Hover: "{Hover.Primary.Color-9}", Pressed: "{Pressed.Primary.Color-9}"
+    // - "{Colors.Primary.Color-6}" → Hover: "{Hover.Primary.Color-6}", Pressed: "{Pressed.Primary.Color-6}"
+    // - "#FFFFFF" (White) → Hover: "{Hover.Neutral.Color-11}", Pressed: "{Pressed.Neutral.Color-11}"
+    // - "#000000" (Black) → Hover: "{Hover.Neutral.Color-1}", Pressed: "{Pressed.Neutral.Color-1}"
     
     let hover = '';
     let active = '';
@@ -5619,11 +5261,11 @@ export function exportColorSystemToJSON(
     if (buttonColorValue === '#FFFFFF' || buttonColorValue === '#ffffff') {
       // White button → use Neutral Color-11
       hover = '{Hover.Neutral.Color-11}';
-      active = '{Active.Neutral.Color-11}';
+      active = '{Pressed.Neutral.Color-11}';
     } else if (buttonColorValue === '#000000' || buttonColorValue === '#000') {
       // Black button → use Neutral Color-1
       hover = '{Hover.Neutral.Color-1}';
-      active = '{Active.Neutral.Color-1}';
+      active = '{Pressed.Neutral.Color-1}';
     } else if (buttonColorValue.includes('{')) {
       // Extract palette and color from reference
       // Remove curly braces and "Colors." prefix if present
@@ -5637,7 +5279,7 @@ export function exportColorSystemToJSON(
         const colorNum = parts[1]; // "Color-9", "Color-5", etc.
         
         hover = `{Hover.${palette}.${colorNum}}`;
-        active = `{Active.${palette}.${colorNum}}`;
+        active = `{Pressed.${palette}.${colorNum}}`;
       }
     }
     
@@ -5668,7 +5310,7 @@ export function exportColorSystemToJSON(
               Button: { value: buttonColor, type: 'color' },
               Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-3}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           } else {
             const tonalConfig: { [key: number]: { button: string; text: string } } = {
@@ -5697,7 +5339,7 @@ export function exportColorSystemToJSON(
               Button: { value: config.button, type: 'color' },
               Text: { value: config.text, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           }
         } else if (mode === 'Dark-Mode') {
@@ -5710,7 +5352,7 @@ export function exportColorSystemToJSON(
               Button: { value: buttonColor, type: 'color' },
               Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-11}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           } else {
             const darkConfig: { [key: number]: { button: string; text: string } } = {
@@ -5739,7 +5381,7 @@ export function exportColorSystemToJSON(
               Button: { value: config.button, type: 'color' },
               Text: { value: config.text, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           }
         }
@@ -5757,7 +5399,7 @@ export function exportColorSystemToJSON(
             Button: { value: buttonColor, type: 'color' },
             Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-${primaryN}}`, type: 'color' },
             Hover: { value: hover, type: 'color' },
-            Active: { value: active, type: 'color' }
+            Pressed: { value: active, type: 'color' }
           };
         } else if (mode === 'Dark-Mode') {
           // Dark mode uses the extracted Primary Color-N
@@ -5769,7 +5411,7 @@ export function exportColorSystemToJSON(
             Button: { value: buttonColor, type: 'color' },
             Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-${primaryN}}`, type: 'color' },
             Hover: { value: hover, type: 'color' },
-            Active: { value: active, type: 'color' }
+            Pressed: { value: active, type: 'color' }
           };
         }
       }
@@ -5785,7 +5427,7 @@ export function exportColorSystemToJSON(
               Button: { value: buttonColor, type: 'color' },
               Text: { value: `{Text.${surfaceOrContainer}.Neutral.Color-1}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           } else {
             // Containers Background-5 to Vibrant: Black button with white text
@@ -5795,7 +5437,7 @@ export function exportColorSystemToJSON(
               Button: { value: buttonColor, type: 'color' },
               Text: { value: `{Text.${surfaceOrContainer}.White}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           }
         } else if (mode === 'Dark-Mode') {
@@ -5807,7 +5449,7 @@ export function exportColorSystemToJSON(
               Button: { value: buttonColor, type: 'color' },
               Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-2}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           } else {
             // Background-6 to Vibrant: Dark button with light text
@@ -5817,7 +5459,7 @@ export function exportColorSystemToJSON(
               Button: { value: buttonColor, type: 'color' },
               Text: { value: `{Text.${surfaceOrContainer}.Primary.Color-11}`, type: 'color' },
               Hover: { value: hover, type: 'color' },
-              Active: { value: active, type: 'color' }
+              Pressed: { value: active, type: 'color' }
             };
           }
         }
@@ -5983,6 +5625,22 @@ export function exportColorSystemToJSON(
     }
   };
 
+  // Dropshadow-Color uses the SHARED goldilocks math (../dropshadow), which
+  // always darkens proportionally to the surface — the darker the surface, the
+  // darker the shadow — with NO "keep it light so dark colors don't collapse"
+  // floor. (computeDropshadow above is kept ONLY for the bevel highlight/lowlight,
+  // which legitimately need a lighter/additive offset.) Returns an "r, g, b"
+  // triple to match the rgba(var(--Dropshadow-Color), α) consumers.
+  const computeDropshadowRGB = (hex: string): string => {
+    try {
+      const c = dropshadowBaseHex(hex).replace('#', '');
+      const n = parseInt(c.length === 3 ? c.split('').map(x => x + x).join('') : c, 16);
+      return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+    } catch {
+      return '0, 0, 0';
+    }
+  };
+
   // Lowlight: same hue, slightly *reduced* chroma (so it reads as a shadow,
   // not a more-saturated glow), and a stronger darkening offset. Saturated
   // semantic palettes (Info/Success/Warning/Error) had bevels reading as a
@@ -6028,6 +5686,82 @@ export function exportColorSystemToJSON(
     const backgrounds = (colorSystem.Modes[mode] as any).Backgrounds;
     if (!themes) { console.log(`  ⚠️ No themes found for ${mode}`); return; }
 
+    // Shared helpers for the 4.5-enforcement passes below.
+    const tonesForMode: any = mode === 'Dark-Mode' ? darkModeTonePalettes : tonePalettes;
+    const isDarkMode = mode === 'Dark-Mode';
+    const modeTree = colorSystem.Modes[mode] as any;
+    const deepResolve = (v: any, depth = 0): string | null => {
+      if (depth > 8 || typeof v !== 'string') return null;
+      if (v.startsWith('#')) return v;
+      if (!v.startsWith('{') || !v.endsWith('}')) return null;
+      let node: any = modeTree;
+      for (const part of v.slice(1, -1).split('.')) {
+        if (node == null) return null;
+        node = node[part];
+      }
+      if (node == null) return null;
+      const nv = typeof node === 'object' && 'value' in node ? node.value : node;
+      if (typeof nv !== 'string') return null;
+      return nv.startsWith('{') ? deepResolve(nv, depth + 1) : nv;
+    };
+    const CONTRAST_PALETTES = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+
+    // ── Enforce 4.5 contrast on Tag-Text vs its own Tag-BG ──────────────────
+    // Tag-Text must clear WCAG AA (4.5) against the tag's colored background.
+    // The generator points Tag-Text at the static Text.Surfaces table, which
+    // isn't guaranteed to pass on every palette tone. Resolve each tag's BG +
+    // current Text to hex: if the pair already clears 4.5 keep the tuned value,
+    // otherwise recompute an accessible one. Black-white text mode (Text refs
+    // .Surfaces.BW.) stays black/white; tonal mode uses findColorWithContrast
+    // against the tag's own palette. (Tag-BG itself carries no contrast rule.)
+    const tagSection = (colorSystem.Modes[mode] as any).Tag;
+    if (tagSection) {
+      for (const shade of ['Light', 'Medium']) {
+        for (const P of CONTRAST_PALETTES) {
+          const entry = tagSection?.[shade]?.[P];
+          const textNode = entry?.Text?.[P];
+          if (!entry || !textNode) continue;
+          const bgHex = deepResolve(entry.BG?.value);
+          if (!bgHex) continue;
+          const curHex = deepResolve(textNode.value);
+          if (curHex && getContrastRatio(bgHex, curHex) >= 4.5) continue; // already accessible — keep tuned value
+          const isBWText = typeof textNode.value === 'string' && /\.Surfaces\.BW\./.test(textNode.value);
+          if (isBWText) {
+            textNode.value = getContrastRatio(bgHex, '#000000') >= getContrastRatio(bgHex, '#ffffff') ? '#000000' : '#ffffff';
+          } else {
+            const pal = tonesForMode?.[P.toLowerCase()];
+            if (!pal) continue;
+            textNode.value = findColorWithContrast(bgHex, pal, 4.5, isDarkMode);
+          }
+        }
+      }
+    }
+
+    // ── Enforce 4.5 contrast on button / chip text vs the button fill ───────
+    // The lib Button + Chip render --Buttons-{C}-Text on --Buttons-{C}-Button,
+    // and --Buttons-{C}-Text resolves through --Text-Surfaces-{palette}-Color-N
+    // (the fill is Colors.{palette}.Color-N). So the rendered contrast is
+    // Text.Surfaces[palette][N] vs Colors[palette][N] — enforce that pairing.
+    // Keep the tuned static value where it already clears 4.5; only recompute
+    // genuine failures. Fixing the shared Text.Surfaces cell also hardens
+    // surface text at the same tone (same contract: text on Color-N).
+    const textSurfaces = modeTree?.Text?.Surfaces;
+    if (textSurfaces && colors) {
+      for (const P of CONTRAST_PALETTES) {
+        const pal = tonesForMode?.[P.toLowerCase()];
+        const cells = textSurfaces[P];
+        if (!pal || !cells) continue;
+        for (let n = 1; n <= 12; n++) {
+          const cell = cells[`Color-${n}`];
+          const fillHex = deepResolve(colors[P]?.[`Color-${n}`]?.value);
+          if (!cell || !fillHex) continue;
+          const curHex = deepResolve(cell.value);
+          if (curHex && getContrastRatio(fillHex, curHex) >= 4.5) continue; // keep tuned value
+          cell.value = findColorWithContrast(fillHex, pal, 4.5, isDarkMode);
+        }
+      }
+    }
+
     console.log(`  🔍 Processing ${Object.keys(themes).length} themes for ${mode}`);
     console.log(`  🔍 Colors palettes available: ${colors ? Object.keys(colors).join(', ') : 'NONE'}`);
     console.log(`  🔍 Backgrounds available: ${backgrounds ? Object.keys(backgrounds).join(', ') : 'NONE'}`);
@@ -6035,14 +5769,14 @@ export function exportColorSystemToJSON(
     Object.keys(themes).forEach(themeName => {
       const theme = themes[themeName];
 
-      // Helper: resolve a theme token's Border to hex, then compute Border-Variant (40% opacity)
+      // Helper: resolve a theme token's Border to hex, then compute Border-Variant (15% opacity)
       const resolveBorderVariant = (sectionData: any) => {
         const borderToken = sectionData?.Border?.value;
         if (!borderToken) return;
         // Border token is like "{Border.Surfaces.Neutral.Color-11}" — resolve through color ref
         const borderResolved = resolveColorToken(borderToken, colors, backgrounds);
         if (borderResolved) {
-          // Border-Variant = border color at 40% opacity as 8-digit hex
+          // Border-Variant = border color at 15% opacity (26) as 8-digit hex
           sectionData['Border-Variant'] = { value: `${borderResolved}26`, type: 'color' };
         } else {
           // Try to resolve via the intermediate: navigate the token path through modeData
@@ -6111,7 +5845,7 @@ export function exportColorSystemToJSON(
         if (bgToken) {
           const hex = resolveToHex(bgToken);
           if (hex) {
-            sectionData['Dropshadow-Color'] = { value: computeDropshadow(hex), type: 'color' };
+            sectionData['Dropshadow-Color'] = { value: computeDropshadowRGB(hex), type: 'color' };
           }
         }
 
@@ -6626,7 +6360,7 @@ export function exportColorSystemToJSON(
     Hotlink: { value: `{${surfaceType}.Hotlink}`, type: 'color' as const },
     'Hotlink-Visited': { value: `{${surfaceType}.Hotlink-Visited}`, type: 'color' as const },
     Hover: { value: `{${surfaceType}.Hover}`, type: 'color' as const },
-    Active: { value: `{${surfaceType}.Active}`, type: 'color' as const },
+    Pressed: { value: `{${surfaceType}.Pressed}`, type: 'color' as const },
     'Focus-Visible': { value: `{${surfaceType}.Focus-Visible}`, type: 'color' as const },
     Buttons: {
       Primary: {
@@ -6634,70 +6368,70 @@ export function exportColorSystemToJSON(
         Text: { value: `{${surfaceType}.Buttons.Primary.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Primary.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Primary.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Primary.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Primary.Pressed}`, type: 'color' as const }
       },
       'Primary-Light': {
         Button: { value: `{${surfaceType}.Buttons.Primary-Light.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Primary-Light.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Primary-Light.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Primary-Light.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Primary-Light.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Primary-Light.Pressed}`, type: 'color' as const }
       },
       'Primary-Outline': {
         Button: { value: `{${surfaceType}.Buttons.Primary-Outline.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Primary-Outline.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Primary-Outline.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Primary-Outline.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Primary-Outline.Pressed}`, type: 'color' as const }
       },
       Secondary: {
         Button: { value: `{${surfaceType}.Buttons.Secondary.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Secondary.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Secondary.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Secondary.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Secondary.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Secondary.Pressed}`, type: 'color' as const }
       },
       Tertiary: {
         Button: { value: `{${surfaceType}.Buttons.Tertiary.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Tertiary.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Tertiary.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Tertiary.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Tertiary.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Tertiary.Pressed}`, type: 'color' as const }
       },
       Neutral: {
         Button: { value: `{${surfaceType}.Buttons.Neutral.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Neutral.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Neutral.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Neutral.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Neutral.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Neutral.Pressed}`, type: 'color' as const }
       },
       Info: {
         Button: { value: `{${surfaceType}.Buttons.Info.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Info.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Info.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Info.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Info.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Info.Pressed}`, type: 'color' as const }
       },
       Success: {
         Button: { value: `{${surfaceType}.Buttons.Success.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Success.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Success.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Success.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Success.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Success.Pressed}`, type: 'color' as const }
       },
       Warning: {
         Button: { value: `{${surfaceType}.Buttons.Warning.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Warning.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Warning.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Warning.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Warning.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Warning.Pressed}`, type: 'color' as const }
       },
       Error: {
         Button: { value: `{${surfaceType}.Buttons.Error.Button}`, type: 'color' as const },
         Text: { value: `{${surfaceType}.Buttons.Error.Text}`, type: 'color' as const },
         Border: { value: `{${surfaceType}.Buttons.Error.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Error.Hover}`, type: 'color' as const },
-        Active: { value: `{${surfaceType}.Buttons.Error.Active}`, type: 'color' as const }
+        Pressed: { value: `{${surfaceType}.Buttons.Error.Pressed}`, type: 'color' as const }
       }
     },
     // Icons section removed - Icon tokens are background-specific and defined in Background-N structures
@@ -6767,8 +6501,8 @@ export function exportColorSystemToJSON(
     }
   };
 
-  // Apply static Hover and Active tokens (these are simple references, not generated colors)
-  console.log('📋 [JSON Export] Applying static Hover and Active token structures...');
+  // Apply static Hover and Pressed tokens (these are simple references, not generated colors)
+  console.log('📋 [JSON Export] Applying static Hover and Pressed token structures...');
   const staticHover = getStaticHoverTokens();
   const staticActive = getStaticActiveTokens();
   
@@ -6779,12 +6513,12 @@ export function exportColorSystemToJSON(
   const darkActive = JSON.parse(JSON.stringify(staticActive));
 
   colorSystem.Modes['Light-Mode'].Hover = lightHover;
-  colorSystem.Modes['Light-Mode'].Active = lightActive;
+  colorSystem.Modes['Light-Mode'].Pressed = lightActive;
   colorSystem.Modes['Dark-Mode'].Hover = darkHover;
-  colorSystem.Modes['Dark-Mode'].Active = darkActive;
-  console.log('  ✓ [JSON Export] Static Hover and Active tokens applied to all modes');
+  colorSystem.Modes['Dark-Mode'].Pressed = darkActive;
+  console.log('  ✓ [JSON Export] Static Hover and Pressed tokens applied to all modes');
 
-  // Post-process: new Active = old Hover, new Hover = mix(Button, old Hover)
+  // Post-process: new Pressed = old Hover, new Hover = mix(Button, old Hover)
   function mixHexColors(hex1: string, hex2: string): string {
     const parse = (h: string) => {
       const c = h.replace('#', '');
@@ -6810,7 +6544,7 @@ export function exportColorSystemToJSON(
     for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
       const modeColors = colorSystem.Modes[modeName].Colors;
       const hover = colorSystem.Modes[modeName].Hover;
-      const active = colorSystem.Modes[modeName].Active;
+      const active = colorSystem.Modes[modeName].Pressed;
       if (!modeColors || !hover || !active) continue;
 
       for (const palette of Object.keys(hover)) {
@@ -6822,7 +6556,7 @@ export function exportColorSystemToJSON(
             const buttonHex = modeColors[palette]?.[colorKey]?.value;
 
             if (oldHoverHex && buttonHex && oldHoverHex.startsWith('#') && buttonHex.startsWith('#')) {
-              // new Active = old Hover hex
+              // new Pressed = old Hover hex
               active[palette][colorKey] = { value: oldHoverHex, type: 'color' };
               // new Hover = mix(Button, old Hover)
               hover[palette][colorKey] = { value: mixHexColors(buttonHex, oldHoverHex), type: 'color' };
@@ -6831,9 +6565,9 @@ export function exportColorSystemToJSON(
         }
       }
     }
-    console.log('  ✓ [JSON Export] Hover/Active swapped: Active=oldHover, Hover=mix(Button,oldHover)');
+    console.log('  ✓ [JSON Export] Hover/Pressed swapped: Pressed=oldHover, Hover=mix(Button,oldHover)');
   } catch (e) {
-    console.error('  ✗ Hover/Active post-processing failed:', e);
+    console.error('  ✗ Hover/Pressed post-processing failed:', e);
   }
   
   // Apply static Quiet tokens
@@ -6843,7 +6577,7 @@ export function exportColorSystemToJSON(
   console.log('  ✓ [JSON Export] Static Quiet tokens applied to all modes');
 
   // ========================================
-  // Add Color-Vibrant and Color-Variant to Dark-Mode Header, Text, Quiet, Hover, and Active
+  // Add Color-Vibrant and Color-Variant to Dark-Mode Header, Text, Quiet, Hover, and Pressed
   // Both should use hex values from Light-Mode's Color-9
   // ========================================
   console.log('🎨 [JSON Export] Adding Color-Vibrant and Color-Variant to Dark-Mode...');
@@ -6851,7 +6585,7 @@ export function exportColorSystemToJSON(
   const themes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
   const toneScale = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99];
   
-  // Helper to get hex value for Color-9 from a theme's palette (for Text, Quiet, Hover, Active)
+  // Helper to get hex value for Color-9 from a theme's palette (for Text, Quiet, Hover, Pressed)
   const getColor11Hex = (themeName: string): string => {
     const themeMap: { [key: string]: any } = {
       'Neutral': tonePalettes.neutral,
@@ -6989,16 +6723,16 @@ export function exportColorSystemToJSON(
     }
   });
   
-  // Add Color-Vibrant and Color-Variant to Active
+  // Add Color-Vibrant and Color-Variant to Pressed
   themes.forEach(theme => {
-    if (colorSystem.Modes['Dark-Mode'].Active[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Active[theme]['Color-9']?.value;
+    if (colorSystem.Modes['Dark-Mode'].Pressed[theme]) {
+      const color11Value = colorSystem.Modes['Dark-Mode'].Pressed[theme]['Color-9']?.value;
       if (color11Value) {
-        colorSystem.Modes['Dark-Mode'].Active[theme]['Color-Vibrant'] = {
+        colorSystem.Modes['Dark-Mode'].Pressed[theme]['Color-Vibrant'] = {
           value: color11Value,
           type: 'color'
         };
-        colorSystem.Modes['Dark-Mode'].Active[theme]['Color-Variant'] = {
+        colorSystem.Modes['Dark-Mode'].Pressed[theme]['Color-Variant'] = {
           value: color11Value,
           type: 'color'
         };

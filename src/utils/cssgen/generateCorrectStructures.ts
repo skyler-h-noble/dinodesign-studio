@@ -171,7 +171,7 @@ export function generateTopLevelPrimaryButton(buttonStyle: 'primary-adaptive' | 
         Text: { value: `{Primary-Buttons.${styleType}.${surfaceOrContainer}.${bgName}.Text}`, type: 'color' },
         Border: { value: `{Primary-Buttons.${styleType}.${surfaceOrContainer}.${bgName}.Border}`, type: 'color' },
         Hover: { value: `{Primary-Buttons.${styleType}.${surfaceOrContainer}.${bgName}.Hover}`, type: 'color' },
-        Active: { value: `{Primary-Buttons.${styleType}.${surfaceOrContainer}.${bgName}.Active}`, type: 'color' }
+        Pressed: { value: `{Primary-Buttons.${styleType}.${surfaceOrContainer}.${bgName}.Pressed}`, type: 'color' }
       };
     });
     return section;

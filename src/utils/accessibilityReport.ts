@@ -23,6 +23,8 @@ type Mode = 'Light' | 'Dark';
 export interface ReportCheck {
   category: 'Text' | 'Header' | 'Focus' | 'Input' | 'Button';
   label: string;
+  /** Dot-path of the foreground token under test, e.g. Text.Surfaces.Primary.Color-9 */
+  token: string;
   fgColor: string;
   bgColor: string;
   ratio: number;
@@ -121,46 +123,6 @@ function compositeOver(overlayHex: string, baseHex: string): string {
   return `#${[mix(r, br), mix(g, bg), mix(b, bb)].map(c => c.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/**
- * Mix two opaque hex colors by alpha (0..1). Returns the composite as a
- * 6-digit hex. Used for the hover/active rule where we override the token's
- * Hover/Active with a deterministic blend of the fill against white (if
- * button text is dark) or black (if button text is light).
- */
-function mixHex(baseHex: string, overlayHex: string, alpha: number): string {
-  const base = parseHexRgba(baseHex);
-  const over = parseHexRgba(overlayHex);
-  if (!base || !over) return baseHex;
-  const [br, bg, bb] = base;
-  const [or, og, ob] = over;
-  const m = (o: number, b: number) => Math.round(o * alpha + b * (1 - alpha));
-  return `#${[m(or, br), m(og, bg), m(ob, bb)].map(c => c.toString(16).padStart(2, '0')).join('')}`;
-}
-
-/**
- * Compute the alpha required so the overlay produces a target perceived
- * luminance shift regardless of how close the fill is to the overlay color.
- * Near the ends (fill close to overlay), bigger alpha is needed for the
- * same visible shift; in the middle, the base alpha suffices.
- *
- *   baseAlpha is calibrated for fill.L = 0.5, giving targetShift = baseAlpha/2.
- *   requiredAlpha = targetShift / |fillL - overlayL|
- *   Clamped to [baseAlpha, 0.95] — never reduce below base, never allow a
- *   100% overlay (mixing pure white with white is a no-op).
- */
-function adaptiveAlpha(fillHex: string, overlayHex: string, baseAlpha: number): number {
-  const fill = hexToRgb(fillHex);
-  const overlay = hexToRgb(overlayHex);
-  if (!fill || !overlay) return baseAlpha;
-  const fillL = relativeLuminance(fill);
-  const overlayL = relativeLuminance(overlay);
-  const distance = Math.abs(fillL - overlayL);
-  if (distance < 0.001) return 0.95;
-  const targetShift = baseAlpha * 0.5; // calibrated for L=0.5 midpoint
-  const required = targetShift / distance;
-  return Math.min(0.95, Math.max(baseAlpha, required));
-}
-
 function relativeLuminance([r, g, b]: [number, number, number]): number {
   const toLin = (c: number) => {
     const s = c / 255;
@@ -212,6 +174,7 @@ function closestColorNKey(modeTree: any, palette: string, surfaceHex: string): s
 function check(
   category: ReportCheck['category'],
   label: string,
+  token: string,
   fg: string,
   bg: string,
   required: number,
@@ -219,7 +182,7 @@ function check(
   if (!fg || !bg) return null;
   const ratio = contrastRatio(fg, bg);
   return {
-    category, label, fgColor: fg, bgColor: bg, ratio, required,
+    category, label, token, fgColor: fg, bgColor: bg, ratio, required,
     passes: ratio >= required,
   };
 }
@@ -304,89 +267,101 @@ function collectChecks(
   // to use AS TEXT on any surface at that lightness. So "Primary Text on a
   // white surface" is Text.Surfaces.Primary.Color-12 (resolves to a dark
   // primary tone). This is the right lookup for the per-palette text rows.
-  const defaultText = getHex(modeTree, `Text.Surfaces.${bg.palette}.${bgColorKey}`);
-  checks.push(check('Text', 'Default Text', defaultText, surfaceBg, 4.5)!);
+  const defaultTextTok = `Text.Surfaces.${bg.palette}.${bgColorKey}`;
+  const defaultText = getHex(modeTree, defaultTextTok);
+  checks.push(check('Text', 'Default Text', defaultTextTok, defaultText, surfaceBg, 4.5)!);
 
   for (const pal of TEXT_PALETTES) {
-    const fg = getHex(modeTree, `Text.Surfaces.${pal}.${bgColorKey}`);
-    const c = check('Text', `${pal} Text`, fg, surfaceBg, 4.5);
+    const tok = `Text.Surfaces.${pal}.${bgColorKey}`;
+    const fg = getHex(modeTree, tok);
+    const c = check('Text', `${pal} Text`, tok, fg, surfaceBg, 4.5);
     if (c) checks.push(c);
   }
 
   // Quiet (secondary text — still subject to 4.5:1 for readability per AA)
-  const quiet = getHex(modeTree, `Quiet.Surfaces.${bg.palette}.${bgColorKey}`);
-  const cq = check('Text', 'Quiet Text', quiet, surfaceBg, 4.5);
+  const quietTok = `Quiet.Surfaces.${bg.palette}.${bgColorKey}`;
+  const quiet = getHex(modeTree, quietTok);
+  const cq = check('Text', 'Quiet Text', quietTok, quiet, surfaceBg, 4.5);
   if (cq) checks.push(cq);
 
   // Hotlink — conventional link color from Info palette, using its accessible
   // text tone for this surface lightness.
-  const hotlink = getHex(modeTree, `Text.Surfaces.Info.${bgColorKey}`);
-  const ch = check('Text', 'Hotlink', hotlink, surfaceBg, 4.5);
+  const hotlinkTok = `Text.Surfaces.Info.${bgColorKey}`;
+  const hotlink = getHex(modeTree, hotlinkTok);
+  const ch = check('Text', 'Hotlink', hotlinkTok, hotlink, surfaceBg, 4.5);
   if (ch) checks.push(ch);
 
-  // ── Headers (3:1, large text) ──
-  const defaultHeader = getHex(modeTree, `Header.Surfaces.${bg.palette}.${bgColorKey}`);
-  checks.push(check('Header', 'Default Header', defaultHeader, surfaceBg, 3)!);
+  // ── Headers (3.1:1, large text) ──
+  const defaultHeaderTok = `Header.Surfaces.${bg.palette}.${bgColorKey}`;
+  const defaultHeader = getHex(modeTree, defaultHeaderTok);
+  checks.push(check('Header', 'Default Header', defaultHeaderTok, defaultHeader, surfaceBg, 3.1)!);
   for (const pal of HEADER_PALETTES) {
-    const fg = getHex(modeTree, `Header.Surfaces.${pal}.${bgColorKey}`);
-    const c = check('Header', `${pal} Header`, fg, surfaceBg, 3);
+    const tok = `Header.Surfaces.${pal}.${bgColorKey}`;
+    const fg = getHex(modeTree, tok);
+    const c = check('Header', `${pal} Header`, tok, fg, surfaceBg, 3.1);
     if (c) checks.push(c);
   }
 
-  // ── Focus-Visible (3:1 UI component) ──
+  // ── Focus-Visible (3.1:1 UI component) ──
   // Focus-Visible.Surfaces is keyed by Background-N. Use the actual surface's
   // closest Color-N (already computed as bgColorKey) and convert to the
   // matching Background-N so derived surfaces (Containers, Surface-Dim)
   // resolve to an appropriate focus color for their real lightness.
   const bgSuffix = bgColorKey.replace('Color-', 'Background-');
+  const focusTok = `Focus-Visible.Surfaces.${bgSuffix}`;
   const focus =
-    getHex(modeTree, `Focus-Visible.Surfaces.${bgSuffix}`) ||
+    getHex(modeTree, focusTok) ||
     getHex(modeTree, `Focus-Visible.Surfaces.${bg.bgKey}`) ||
     getHex(modeTree, `Colors.Info.Color-Vibrant`);
-  const cf = check('Focus', 'Focus-Visible Ring', focus, surfaceBg, 3);
+  const cf = check('Focus', 'Focus-Visible Ring', focusTok, focus, surfaceBg, 3.1);
   if (cf) checks.push(cf);
 
-  // ── Input border (3:1) ──
-  const border = getHex(modeTree, `Border.Surfaces.${bg.palette}.${bgColorKey}`);
-  const cb = check('Input', 'Input Border', border, surfaceBg, 3);
+  // ── Input border (3.1:1) ──
+  const borderTok = `Border.Surfaces.${bg.palette}.${bgColorKey}`;
+  const border = getHex(modeTree, borderTok);
+  const cb = check('Input', 'Input Border', borderTok, border, surfaceBg, 3.1);
   if (cb) checks.push(cb);
-  const cab = check('Input', 'Input Active Border', focus, surfaceBg, 3);
+  const cab = check('Input', 'Input Active Border', focusTok, focus, surfaceBg, 3.1);
   if (cab) checks.push(cab);
 
   // ── Buttons ──
   // Pick Light or Medium bucket based on surface lightness (per token design).
   const bucket = isLight(surfaceBg) ? 'Light' : 'Medium';
   for (const pal of BUTTON_PALETTES) {
-    const fill = getHex(modeTree, `Buttons.${pal}.${bucket}.Button`);
-    const text = getHex(modeTree, `Buttons.${pal}.${bucket}.Text`);
+    const fillTok = `Buttons.${pal}.${bucket}.Button`;
+    const textTok = `Buttons.${pal}.${bucket}.Text`;
+    const fill = getHex(modeTree, fillTok);
+    const text = getHex(modeTree, textTok);
     // Button borders have their own dedicated token in Border.Surfaces —
     // the design system picks an accessible tone of the button's palette
     // against the current surface (distinct from the fill).
-    const border =
-      getHex(modeTree, `Border.Surfaces.${pal}.${bgColorKey}`) || fill;
+    const borderTok = `Border.Surfaces.${pal}.${bgColorKey}`;
+    const border = getHex(modeTree, borderTok) || fill;
     if (!fill || !text) continue; // skip if the variant isn't defined
 
-    // Button border vs surface (3:1)
-    if (border) checks.push(check('Button', `${pal} Button border → surface`, border, surfaceBg, 3)!);
+    // Button border vs surface (3.1:1)
+    if (border) checks.push(check('Button', `${pal} Button border → surface`, borderTok, border, surfaceBg, 3.1)!);
     // Button text vs button fill (4.5:1)
-    checks.push(check('Button', `${pal} Button text → fill`, text, fill, 4.5)!);
+    checks.push(check('Button', `${pal} Button text → fill`, textTok, text, fill, 4.5)!);
 
-    // Hover / Active derivation — same rule in both modes.
-    // The design system pairs dark text with lighter fills (tone 6-12) and
-    // light text with darker fills (tone 1-5). Base percentages are calibrated
-    // for mid-lightness fills; adaptiveAlpha boosts them when the fill sits
-    // close to the overlay color (near white or near black) so the visible
-    // shift stays consistent.
-    //   dark text  → hover base 30% white, active base 50% white
-    //   light text → hover base  8% black, active base 15% black
-    const textIsLight = isLight(text);
-    const overlay = textIsLight ? '#000000' : '#ffffff';
-    const hoverBase = textIsLight ? 0.08 : 0.30;
-    const activeBase = textIsLight ? 0.15 : 0.50;
-    const hoverComposed = mixHex(fill, overlay, adaptiveAlpha(fill, overlay, hoverBase));
-    const activeComposed = mixHex(fill, overlay, adaptiveAlpha(fill, overlay, activeBase));
-    checks.push(check('Button', `${pal} Button hover → text`, text, hoverComposed, 4.5)!);
-    checks.push(check('Button', `${pal} Button active → text`, text, activeComposed, 4.5)!);
+    // Hover / Pressed — READ the baked button-state tokens rather than
+    // recomputing. This is what makes the report match CSS + Figma exactly:
+    // all three resolve the same emitted token. The values are solid tones
+    // (the tone±1 hover/pressed rule); if a token is ever emitted as an
+    // 8-digit alpha overlay, compositeOver blends it onto the fill to get the
+    // perceived background. Button text is checked against each at 4.5.
+    const hoverTok = `Buttons.${pal}.${bucket}.Hover`;
+    const pressedTok = `Buttons.${pal}.${bucket}.Pressed`;
+    const hoverRaw = getHex(modeTree, hoverTok);
+    const pressedRaw = getHex(modeTree, pressedTok);
+    if (hoverRaw) {
+      const hoverBg = compositeOver(hoverRaw, fill);
+      checks.push(check('Button', `${pal} Button hover → text`, hoverTok, text, hoverBg, 4.5)!);
+    }
+    if (pressedRaw) {
+      const pressedBg = compositeOver(pressedRaw, fill);
+      checks.push(check('Button', `${pal} Button pressed → text`, pressedTok, text, pressedBg, 4.5)!);
+    }
   }
 
   return checks.filter(Boolean);

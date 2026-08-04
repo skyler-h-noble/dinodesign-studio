@@ -61,7 +61,12 @@ export interface MoodboardAnalysis {
   decorativeBranch?: Branch;
   decorativeStyle?: string;
   decorativeCategoryConfidence?: number;
-  decorativePickReason?: 'second_tallest_or_all_caps' | 'script_handwritten' | 'none';
+  decorativePickReason?:
+    | 'second_tallest_or_all_caps'
+    | 'script_handwritten'
+    | 'gate_rejected_client_crop'
+    | 'same_style_as_header'
+    | 'none';
   specs: TypographySpecs;
   mood: { key: string; label: string; confidence: number } | null;
   trios: FontTrio[];
@@ -78,6 +83,17 @@ export interface MoodboardAnalysis {
    *  tallest first. Surfaced so the picker can show "all text styles
    *  extracted from your file" without re-running OCR. */
   extractedText: ExtractedTextRegion[];
+  /** Crops the server-side text-vs-non-text CLIP gate rejected before
+   *  typography classification. Returned so the studio can (a) auto-log
+   *  them as weak negative labels, (b) surface a "filtered out" indicator
+   *  in the UI if useful. */
+  rejected?: Array<{
+    role: 'header' | 'decorative' | 'candidate';
+    index?: number;
+    cropUrl: string;
+    topLabel: string;
+    scores: Record<string, number>;
+  }>;
 }
 
 interface CallPayload {
@@ -182,7 +198,11 @@ async function safelyCropTextGCV(imageUrl: string): Promise<TextCrops> {
       throw new Error(`HTTP ${response.status}: ${body}`);
     }
     const data: {
-      words: Array<{ text: string; bbox: { x0: number; y0: number; x1: number; y1: number } }>;
+      words: Array<{
+        text: string;
+        bbox: { x0: number; y0: number; x1: number; y1: number };
+        poly?: Array<{ x: number; y: number }>;
+      }>;
       fullText: string;
       elapsedMs: number;
     } = await response.json();
@@ -194,7 +214,7 @@ async function safelyCropTextGCV(imageUrl: string): Promise<TextCrops> {
         diag: { wordCount: 0, elapsedMs: data.elapsedMs },
       };
     }
-    const bboxes = data.words.map((w) => ({ ...w.bbox, text: w.text }));
+    const bboxes = data.words.map((w) => ({ ...w.bbox, text: w.text, poly: w.poly }));
     return await cropFromBboxes(imageUrl, bboxes, { elapsedMs: data.elapsedMs });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

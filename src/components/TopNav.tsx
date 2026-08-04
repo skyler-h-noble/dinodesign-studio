@@ -10,7 +10,7 @@ export default function TopNav({ designSystemName }: TopNavProps) {
       <AppBar
         mode="desktop"
         barColor="default"
-        companyName={designSystemName || 'DinoDesign'}
+        companyName={designSystemName || 'OmniDesign'}
       />
     </ThemedZone>
   );

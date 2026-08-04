@@ -209,12 +209,12 @@ export function generateThemeStructure(
         "value": `{Hover.${theme}.Surfaces.Color-${n}}`,
         "type": "color"
       },
-      "Active": {
-        "value": `{Active.${theme}.Surfaces.Color-${n}}`,
+      "Pressed": {
+        "value": `{Pressed.${theme}.Surfaces.Color-${n}}`,
         "type": "color"
       },
       "Focus-Visible": {
-        "value": `{Focus-Visible.Surfaces.Color-${n}}`,
+        "value": `{Focus-Visible.Surfaces.Background-${n}}`,
         "type": "color"
       },
       "Buttons": {
@@ -235,8 +235,8 @@ export function generateThemeStructure(
             "value": `{Primary-Buttons.Surfaces.Background-${n}.Hover}`,
             "type": "color"
           },
-          "Active": {
-            "value": `{Primary-Buttons.Surfaces.Background-${n}.Active}`,
+          "Pressed": {
+            "value": `{Primary-Buttons.Surfaces.Background-${n}.Pressed}`,
             "type": "color"
           }
         },
@@ -257,8 +257,8 @@ export function generateThemeStructure(
             "value": "{Hover.Primary.Surfaces.Background-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Primary.Surfaces.Background-12}",
+          "Pressed": {
+            "value": "{Pressed.Primary.Surfaces.Background-12}",
             "type": "color"
           }
         },
@@ -279,8 +279,8 @@ export function generateThemeStructure(
             "value": `{Hover.${theme}.Surfaces.Color-${n}}`,
             "type": "color"
           },
-          "Active": {
-            "value": `{Active.${theme}.Surfaces.Color-${n}}`,
+          "Pressed": {
+            "value": `{Pressed.${theme}.Surfaces.Color-${n}}`,
             "type": "color"
           }
         },
@@ -301,8 +301,8 @@ export function generateThemeStructure(
             "value": "{Hover.Secondary.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Secondary.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Secondary.Surfaces.Color-12}",
             "type": "color"
           }
         },
@@ -323,8 +323,8 @@ export function generateThemeStructure(
             "value": "{Hover.Tertiary.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Tertiary.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Tertiary.Surfaces.Color-12}",
             "type": "color"
           }
         },
@@ -345,8 +345,8 @@ export function generateThemeStructure(
             "value": "{Hover.Neutral.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Neutral.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Neutral.Surfaces.Color-12}",
             "type": "color"
           }
         },
@@ -367,8 +367,8 @@ export function generateThemeStructure(
             "value": "{Hover.Info.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Info.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Info.Surfaces.Color-12}",
             "type": "color"
           }
         },
@@ -389,8 +389,8 @@ export function generateThemeStructure(
             "value": "{Hover.Success.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Success.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Success.Surfaces.Color-12}",
             "type": "color"
           }
         },
@@ -411,8 +411,8 @@ export function generateThemeStructure(
             "value": "{Hover.Warning.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Warning.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Warning.Surfaces.Color-12}",
             "type": "color"
           }
         },
@@ -433,8 +433,8 @@ export function generateThemeStructure(
             "value": "{Hover.Error.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Error.Surfaces.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Error.Surfaces.Color-12}",
             "type": "color"
           }
         }
@@ -649,12 +649,12 @@ export function generateThemeStructure(
         "value": `{Hover.${theme}.Containers.Color-${n}}`,
         "type": "color"
       },
-      "Active": {
-        "value": `{Active.${theme}.Containers.Color-${n}}`,
+      "Pressed": {
+        "value": `{Pressed.${theme}.Containers.Color-${n}}`,
         "type": "color"
       },
       "Focus-Visible": {
-        "value": `{Focus-Visible.Containers.Color-${n}}`,
+        "value": `{Focus-Visible.Containers.Background-${n}}`,
         "type": "color"
       },
       "Buttons": {
@@ -675,8 +675,8 @@ export function generateThemeStructure(
             "value": `{Primary-Buttons.Containers.Background-${n}.Hover}`,
             "type": "color"
           },
-          "Active": {
-            "value": `{Primary-Buttons.Containers.Background-${n}.Active}`,
+          "Pressed": {
+            "value": `{Primary-Buttons.Containers.Background-${n}.Pressed}`,
             "type": "color"
           }
         },
@@ -697,8 +697,8 @@ export function generateThemeStructure(
             "value": "{Hover.Primary.Containers.Background-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Primary.Containers.Background-12}",
+          "Pressed": {
+            "value": "{Pressed.Primary.Containers.Background-12}",
             "type": "color"
           }
         },
@@ -719,8 +719,8 @@ export function generateThemeStructure(
             "value": `{Hover.${theme}.Containers.Color-${n}}`,
             "type": "color"
           },
-          "Active": {
-            "value": `{Active.${theme}.Containers.Color-${n}}`,
+          "Pressed": {
+            "value": `{Pressed.${theme}.Containers.Color-${n}}`,
             "type": "color"
           }
         },
@@ -741,8 +741,8 @@ export function generateThemeStructure(
             "value": "{Hover.Secondary.Containers.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Secondary.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Secondary.Containers.Color-12}",
             "type": "color"
           }
         },
@@ -763,8 +763,8 @@ export function generateThemeStructure(
             "value": "{Hover.Tertiary.Containers.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Tertiary.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Tertiary.Containers.Color-12}",
             "type": "color"
           }
         },
@@ -785,8 +785,8 @@ export function generateThemeStructure(
             "value": "{Hover.Neutral.Surfaces.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Neutral.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Neutral.Containers.Color-12}",
             "type": "color"
           }
         },
@@ -807,8 +807,8 @@ export function generateThemeStructure(
             "value": "{Hover.Info.Containers.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Info.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Info.Containers.Color-12}",
             "type": "color"
           }
         },
@@ -829,8 +829,8 @@ export function generateThemeStructure(
             "value": "{Hover.Success.Containers.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Success.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Success.Containers.Color-12}",
             "type": "color"
           }
         },
@@ -851,8 +851,8 @@ export function generateThemeStructure(
             "value": "{Hover.Warning.Containers.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Warning.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Warning.Containers.Color-12}",
             "type": "color"
           }
         },
@@ -873,8 +873,8 @@ export function generateThemeStructure(
             "value": "{Hover.Error.Containers.Color-12}",
             "type": "color"
           },
-          "Active": {
-            "value": "{Active.Error.Containers.Color-12}",
+          "Pressed": {
+            "value": "{Pressed.Error.Containers.Color-12}",
             "type": "color"
           }
         }

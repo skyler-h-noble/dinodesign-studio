@@ -2,8 +2,7 @@
  * Fixed Border structure for Dark-Mode
  * This structure is constant and does not change based on color extraction
  */
-export const darkModeBorderFixed = {
-  Surfaces: {
+const darkModeBorderSurfaces = {
     Neutral: {
       'Color-1': { value: '{Colors.Neutral.Color-6}', type: 'color' as const },
       'Color-2': { value: '{Colors.Neutral.Color-6}', type: 'color' as const },
@@ -124,5 +123,37 @@ export const darkModeBorderFixed = {
       'Color-12': { value: '{Colors.Error.Color-5}', type: 'color' as const },
       'Color-Vibrant': { value: '{Colors.Error.Color-5}', type: 'color' as const }
     }
+};
+
+/**
+ * Container borders, derived from the Surfaces table.
+ *
+ * Dark-mode containers are drawn from the Color-2..Color-4 ramp regardless of
+ * which background they sit on, so a per-tone table is meaningless here. Every
+ * index resolves to the Surfaces entry for Color-4 — the lightest container
+ * level, and therefore the hardest case for a border to stay visible against.
+ *
+ * This block was previously absent entirely: exportColorSystem assigns
+ * `Modes['Dark-Mode'].Border = darkModeBorderFixed` and logs
+ * `darkModeBorderFixed.Containers || {}`, so the missing half reported zero
+ * palettes silently and dark container borders resolved to nothing.
+ */
+function containersFromSurfaces<T extends Record<string, Record<string, unknown>>>(
+  surfaces: T,
+  anchorFor: string | ((key: string) => string),
+): T {
+  const resolveAnchor = typeof anchorFor === 'function' ? anchorFor : () => anchorFor;
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const palette of Object.keys(surfaces)) {
+    out[palette] = {};
+    for (const key of Object.keys(surfaces[palette])) {
+      out[palette][key] = surfaces[palette][resolveAnchor(key)];
+    }
   }
+  return out as T;
+}
+
+export const darkModeBorderFixed = {
+  Surfaces: darkModeBorderSurfaces,
+  Containers: containersFromSurfaces(darkModeBorderSurfaces, 'Color-4'),
 };

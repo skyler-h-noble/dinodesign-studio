@@ -2,6 +2,7 @@ import chroma from 'chroma-js';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
 // lib's defaults for these resolve to {palette}-Color-9 regardless of the
 // surface tone, which fails WCAG on light surfaces. These helpers return
@@ -240,14 +241,15 @@ function mixHex(hex1: string, hex2: string): string {
   return '#' + [m(r1, r2), m(g1, g2), m(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
-/** Compute dropshadow color: same hue/chroma, L * 0.5 (was 0.625; darkened
- *  to match the CSS export's HSL -35 offset and give shadows more presence). */
+/** Aggregate `--Dropshadow-Color` tint. Uses the shared Comeau math
+ *  (`dropshadowBaseHex`, level 2 = standard card elevation) so the live
+ *  preview matches the CSS export and the per-level Dropshadow-Color-N tokens
+ *  exactly — one model for every shadow color. */
 function dropshadowFor(hex: string): string {
   try {
-    const [l, c, h] = chroma(hex).lch();
-    return chroma.lch(l * 0.5, c, h).hex();
+    return dropshadowBaseHex(hex, 2);
   } catch {
-    return 'rgba(0,0,0,0.15)';
+    return '#202020';
   }
 }
 function quietFor(hex: string) { return isLight(hex) ? '#777777' : '#aaaaaa'; }
@@ -257,6 +259,16 @@ function hexToRgb(hex: string): string {
   const c = hex.replace('#', '');
   const n = parseInt(c.substring(0, 6), 16);
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+
+/** Emit `  --Dropshadow-Color-N: #RRGGBBAA;` lines for a given surface
+ *  background. Used at every scope that emits a `--Dropshadow-Color` so
+ *  Effect-Level recipes inside that scope pick up the per-level colors
+ *  derived from the surface's own hue. */
+function emitDropshadowLevelLines(bgHex: string): string {
+  return SHADOW_LEVELS
+    .map(level => `  --Dropshadow-Color-${level}: ${dropshadowHex8(bgHex, level)};`)
+    .join('\n');
 }
 function borderFor(hex: string) { return isLight(hex) ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'; }
 
@@ -280,7 +292,8 @@ function getAccessibleTones(
   return {
     text: findAccessibleTone(bgHex, palette, textStart, 4.5),
     header: findAccessibleTone(bgHex, palette, headerStart, 3.1),
-    quiet: findAccessibleTone(bgHex, palette, quietStart, 3.1),
+    // Quiet is muted but still body-size text → must clear AA (4.5:1), not 3:1.
+    quiet: findAccessibleTone(bgHex, palette, quietStart, 4.5),
     border: findAccessibleTone(bgHex, palette, borderStart, 3.1),
   };
 }
@@ -360,20 +373,30 @@ export function buildPreviewCSS(input: BuildInput): string {
     }
   }
 
-  // Hover/Active calculation (per spec):
-  //   tone 1     → Active = #000000,           Hover = mix(palette[0], #000)
-  //   tones 2-5  → Active = palette[N-2],      Hover = mix(palette[N-1], palette[N-2])
-  //   tones 6-11 → Active = palette[N],        Hover = mix(palette[N-1], palette[N])
-  //   tone 12    → Active = #ffffff,           Hover = mix(palette[11], #fff)
+  // Hover/Pressed calculation (per spec):
+  //   tone 1     → Pressed = #000000,           Hover = mix(palette[0], #000)
+  //   tones 2-5  → Pressed = palette[N-2],      Hover = mix(palette[N-1], palette[N-2])
+  //   tones 6-11 → Pressed = palette[N],        Hover = mix(palette[N-1], palette[N])
+  //   tone 12    → Pressed = #ffffff,           Hover = mix(palette[11], #fff)
   // Endpoints clamp to pure black/white because there's no tone-1 of tone-1
   // and no tone+1 of tone-12 — the palette tops out at 12.
   function activeAndHoverFor(palette: Array<{ hex: string }>, n: number): { active: string; hover: string } {
     const baseHex = palette[n - 1]?.hex || '#888888';
-    let active: string;
-    if (n <= 1) active = '#000000';
-    else if (n >= 12) active = '#ffffff';
-    else if (n <= 5) active = palette[n - 2]?.hex || '#000000';
-    else active = palette[n]?.hex || '#ffffff';
+    // Pressed/hover move ALONG the palette, one tone away from the text colour so
+    // contrast is preserved (or grows):
+    //   - light-text (dark) button  → active = tone n-1 (next darker tone)
+    //   - dark-text (light) button  → active = tone n+1 (next lighter tone)
+    //   - hover = mix(base tone, active tone)
+    // Keyed on the button's own lightness (not raw N index) so it's correct
+    // regardless of palette ordering. At an endpoint we step the other way so
+    // there's always a visible delta.
+    const darkBtn = !isLight(baseHex); // dark button carries light text
+    const activeN = darkBtn ? n - 1 : n + 1;
+    // At the extremes go to pure black/white (never back to the button's own
+    // tone) so there's always a visible delta — matches the doc + export.
+    const active = activeN < 1 ? '#000000'
+      : activeN > 12 ? '#ffffff'
+      : (palette[activeN - 1]?.hex || baseHex);
     return { active, hover: mixHex(baseHex, active) };
   }
 
@@ -607,22 +630,89 @@ export function buildPreviewCSS(input: BuildInput): string {
       default: return { pal: vPrimary, n: PC };
     }
   };
+  // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
+  // Buttons-Tertiary-*). The lib's Light-Mode.css hardcodes these under every
+  // theme/surface combo (including pink #f5dddd for every -Hover token), so
+  // a secondary-variant button INSIDE a tertiary-themed Card otherwise falls
+  // through to the lib's pink. Re-emitting these inside each per-palette
+  // theme block at matching specificity makes the studio brand values win.
+  const emitPerPaletteButtonTokens = (surfaceBgForBorder: string, surfaceNForBorder: number): string => {
+    const palettes = [
+      { name: 'Primary', pal: vPrimary, n: PC },
+      { name: 'Secondary', pal: vSecondary, n: SC },
+      { name: 'Tertiary', pal: vTertiary, n: TC },
+    ];
+    return palettes.map(({ name, pal, n }) => {
+      const bg = p(pal, n);
+      const tones = getAccessibleTones(bg, n, pal);
+      const palBorder = p(pal, getAccessibleTones(surfaceBgForBorder, surfaceNForBorder, pal).border);
+      const { active, hover } = activeAndHoverFor(pal, n);
+      return `  --Buttons-${name}-Button: ${bg};
+  --Buttons-${name}-Text: ${p(pal, tones.text)};
+  --Buttons-${name}-Border: ${palBorder};
+  --Buttons-${name}-Hover: ${hover};
+  --Buttons-${name}-Pressed: ${active};
+  --Buttons-${name}-Highlight: ${highlightFor(bg)};
+  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};`;
+    }).join('\n');
+  };
+
+  // Tag-{Color}-Text contrast-aware emission. The lib hardcodes this token
+  // under every theme/surface combo using a tone-table lookup (Color-4 or
+  // BW-Color-1) that assumes a standard palette. For low-chroma or pastel
+  // palettes those tones fail 4.5:1 against the Color-8 tag bg. We rank
+  // four candidates (white, near-black, palette's darkest tone, palette's
+  // lightest tone) by actual computed contrast and emit the best.
+  // Reusable so we can inject the same override at every per-palette theme
+  // block where the lib's hardcoded value would otherwise shadow the main
+  // Brand block's value.
+  const emitTagTextTokens = (): string => {
+    const TAG_BG_N = 8;
+    const palettes = [
+      { name: 'Primary',   pal: vPrimary   },
+      { name: 'Secondary', pal: vSecondary },
+      { name: 'Tertiary',  pal: vTertiary  },
+    ];
+    return palettes.map(({ name, pal }) => {
+      const bg = p(pal, TAG_BG_N);
+      const candidates: Array<{ css: string; hex: string }> = [
+        { css: '#ffffff', hex: '#ffffff' },
+        { css: '#1a1a1a', hex: '#1a1a1a' },
+        { css: `var(--${name}-Color-12)`, hex: pal[11]?.hex ?? '#000' },
+        { css: `var(--${name}-Color-1)`,  hex: pal[0]?.hex  ?? '#fff' },
+      ];
+      const ranked = candidates
+        .map(c => ({ ...c, ratio: contrastRatio(bg, c.hex) }))
+        .sort((a, b) => b.ratio - a.ratio);
+      const pick = ranked.find(c => c.ratio >= 4.5) ?? ranked[0];
+      return `  --Tag-${name}-Text: ${pick.css};`;
+    }).join('\n');
+  };
+
   const emitDefaultBtnTokens = (surfaceTheme: SurfaceTheme): string => {
     const { pal, n } = getDefaultBtnPalForSurface(surfaceTheme);
     const sbg = p(palFor(surfaceTheme), nFor(surfaceTheme));
     const sn = nFor(surfaceTheme);
     const bg = p(pal, n);
     const tones = getAccessibleTones(bg, n, pal);
-    const txt = p(pal, tones.text);
+    // black-white: NEUTRAL is ordered dark→light (opposite the brand palettes),
+    // so the tone-table math mis-resolves the text/hover. BW is definitionally
+    // black-or-white, so derive text + hover explicitly from the bg's lightness:
+    // a black button gets white text and a subtle lighter hover (NOT a near-white
+    // scrim); a white button gets dark text and a subtle darker hover.
+    const isBW = effectiveButton === 'black-white';
+    const txt = isBW ? (isLight(bg) ? '#1a1a1a' : '#ffffff') : p(pal, tones.text);
     const palBorder = p(pal, getAccessibleTones(sbg, sn, pal).border);
-    const { hover, active } = activeAndHoverFor(pal, n);
+    const { hover, active } = isBW
+      ? (isLight(bg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
+      : activeAndHoverFor(pal, n);
     return `  --Buttons-Default-Button: ${bg};
   --Buttons-Default-Text: ${txt};
   --Buttons-Default-Border: ${palBorder};
   --Buttons-Default-Hover: ${hover};
-  --Buttons-Default-Active: ${active};
-  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(bg))};
-  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(bg))};`;
+  --Buttons-Default-Pressed: ${active};
+  --Buttons-Default-Highlight: ${highlightFor(bg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(bg)};`;
   };
 
   // ── Tertiary tag + text — always vibrant (light palette) ──
@@ -695,13 +785,14 @@ export function buildPreviewCSS(input: BuildInput): string {
     // those vars aren't defined in the lib's CSS, so we set both here.
     const hotlinkColorN = scopeTones.text;
     return `  --Dropshadow-Color: ${hexToRgb(dropshadowFor(scopeBg))};
+${emitDropshadowLevelLines(scopeBg)}
   --Text: ${textVal};
   --Header: ${headerVal};
   --Quiet: ${quietVal};
   --Border: ${borderVal};
   --Border-Variant: ${borderVariantVal};
   --Hover: ${scopeHover};
-  --Active: ${scopeActive};
+  --Pressed: ${scopeActive};
   --Hotlink: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
   --Link: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
@@ -710,7 +801,40 @@ export function buildPreviewCSS(input: BuildInput): string {
   --Buttons-Primary-Border: ${scopeBtnBorderPrimary};
   --Buttons-Secondary-Border: ${scopeBtnBorderSecondary};
   --Buttons-Tertiary-Border: ${scopeBtnBorderTertiary};
-  --Buttons-Default-Border: ${scopeDefaultBtnBorder};`;
+  --Buttons-Default-Border: ${scopeDefaultBtnBorder};
+${(() => {
+    // Defensive Default-button emission for the surface variant scopes
+    // (Surface-Dim / Bright / Dimmest). Without these, Buttons-Default-*
+    // inherit from the parent Brand block which is correct IN THEORY, but
+    // ANY same-or-higher-specificity rule injected by a downstream stylesheet
+    // (a Container override, a theme inside the scope, the lib's
+    // [data-surface] rules) would shadow the inherited value at this scope.
+    // Explicit at-scope values make the studio's chosen button mode stick
+    // through to ButtonGroup / Slider / etc. controls inside Surface-Dim
+    // panels like the ComponentStyleStage left nav.
+    let defPal: typeof vPrimary = vPrimary;
+    let defN = PC;
+    switch (effectiveButton) {
+      case 'secondary': case 'laddered': defPal = vSecondary; defN = SC; break;
+      case 'tonal': defPal = vPrimary; defN = PC; break;
+      case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(scopeBg) ? 1 : 12; break;
+      default: defPal = vPrimary; defN = PC; break;
+    }
+    const defBg = p(defPal, defN);
+    const defTones = getAccessibleTones(defBg, defN, defPal);
+    // black-white: explicit contrast text + subtle hover (NEUTRAL tone math is inverted).
+    const defIsBW = effectiveButton === 'black-white';
+    const defTxt = defIsBW ? (isLight(defBg) ? '#1a1a1a' : '#ffffff') : p(defPal, defTones.text);
+    const { hover, active } = defIsBW
+      ? (isLight(defBg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
+      : activeAndHoverFor(defPal, defN);
+    return `  --Buttons-Default-Button: ${defBg};
+  --Buttons-Default-Text: ${defTxt};
+  --Buttons-Default-Hover: ${hover};
+  --Buttons-Default-Pressed: ${active};
+  --Buttons-Default-Highlight: ${highlightFor(defBg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(defBg)};`;
+  })()}`;
   }
 
   // ── Build CSS ──
@@ -732,6 +856,7 @@ ${(() => {
   return `[data-theme="Brand-Status"] {
   --Background: ${statusBg};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(statusBg))};
+${emitDropshadowLevelLines(statusBg)}
   --Text: var(--${sc.palette}-Color-${tones.text});
 }`;
 })()}
@@ -748,7 +873,7 @@ ${(() => {
   }
   const abPalArr = abPal === 'Secondary' ? secondaryLight : abPal === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
   const { active: abOldHoverHex, hover: abHoverHex } = activeAndHoverFor(abPalArr, abN);
-  // Surface --Hover / --Active for the App Bar context: based on the App Bar's
+  // Surface --Hover / --Pressed for the App Bar context: based on the App Bar's
   // own BG tone, not whatever is inherited from the page surface (Primary-Light
   // would otherwise leak through and make ghost-button hovers look near-white).
   const appBarSurfacePalette = ac.palette === 'Primary' ? primaryLight : (ac.palette === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight);
@@ -766,26 +891,27 @@ ${(() => {
   [data-theme="Brand-App-Bar"] [data-theme="App-Bar"][data-surface="Surface-Bright"] {
   --Background: ${appBarBg};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(appBarBg))};
+${emitDropshadowLevelLines(appBarBg)}
   --Text: var(--${ac.palette}-Color-${tones.text});
   --Header: var(--${ac.palette}-Color-${tones.header});
   --Quiet: var(--${ac.palette}-Color-${tones.quiet});
   --Border: var(--${ac.palette}-Color-${tones.border});
   --Hover: ${appBarHover};
-  --Active: ${appBarActive};
+  --Pressed: ${appBarActive};
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${btnBorder};
   --Buttons-Primary-Hover: ${abHoverHex};
-  --Buttons-Primary-Active: ${abOldHoverHex};
+  --Buttons-Primary-Pressed: ${abOldHoverHex};
   --Buttons-Default-Button: transparent;
   --Buttons-Default-Text: var(--${ac.palette}-Color-${tones.text});
   --Buttons-Default-Border: var(--${ac.palette}-Color-${tones.border});
-  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
   --Buttons-Default-Hover: ${abHoverHex};
-  --Buttons-Default-Active: ${abOldHoverHex};
-  --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Buttons-Default-Pressed: ${abOldHoverHex};
+  --Buttons-Primary-Highlight: ${highlightFor(btnBg)};
+  --Buttons-Primary-Lowlight: ${lowlightFor(btnBg)};
 }`;
 })()}
 
@@ -804,13 +930,14 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
   --Surface-Bright: var(--${surfacePaletteName}-Color-${Math.min(surfaceN + 1, 12)});
   --Container: var(--${containerPaletteName}-Color-${containerN});
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg))};
+${emitDropshadowLevelLines(surfaceBg)}
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}26` : `${surfaceBorder}26`};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
-  --Active: ${activeAndHoverFor(surfacePalette, surfaceN).active};
+  --Pressed: ${activeAndHoverFor(surfacePalette, surfaceN).active};
   /* --Hotlink and friends share the contrast-tuned Info text mapping so
      ghost-variant buttons (which inherit color from --Hotlink) read on
      any surface tone. Same getFixedTextToken lookup as --Text-Info above. */
@@ -823,11 +950,11 @@ ${buildTextPaletteLines(surfaceN, false)}
 ${buildHeaderPaletteLines(surfaceN, false)}
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
-  --Effect-Level-1: 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
-  --Effect-Level-2: 0 2px 4px rgba(var(--Dropshadow-Color), 0.22), 0 1px 2px rgba(var(--Dropshadow-Color), 0.28);
-  --Effect-Level-3: 0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22);
-  --Effect-Level-4: 0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17);
-  --Effect-Level-5: 0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13);
+  --Effect-Level-1: ${effectLevelRecipe(1)};
+  --Effect-Level-2: ${effectLevelRecipe(2)};
+  --Effect-Level-3: ${effectLevelRecipe(3)};
+  --Effect-Level-4: ${effectLevelRecipe(4)};
+  --Effect-Level-5: ${effectLevelRecipe(5)};
 
 ${(() => {
     // Generate all button palette tokens
@@ -845,9 +972,9 @@ ${(() => {
   --Buttons-${name}-Text: ${p(pal, tones.text)};
   --Buttons-${name}-Border: ${palBorder};
   --Buttons-${name}-Hover: ${hover};
-  --Buttons-${name}-Active: ${active};
-  --Buttons-${name}-Highlight: ${hexToRgb(highlightFor(bg))};
-  --Buttons-${name}-Lowlight: ${hexToRgb(lowlightFor(bg))};`;
+  --Buttons-${name}-Pressed: ${active};
+  --Buttons-${name}-Highlight: ${highlightFor(bg)};
+  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};`;
     }).join('\n');
   })()}
 ${(() => {
@@ -864,27 +991,12 @@ ${(() => {
     return `  --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Border: ${btnBorder};
-  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
   --Buttons-Default-Hover: ${defHover};
-  --Buttons-Default-Active: ${defActive};`;
+  --Buttons-Default-Pressed: ${defActive};`;
   })()}
-${(() => {
-    // Tag text override. The lib's Dark-Mode.css sets Tag-{Color}-Text to
-    // Color-2 of each palette, assuming dark mode runs an inverted palette
-    // where Color-2 is near-white. The studio uses the LIGHT palette for
-    // tags in both modes (so tags stay vibrant), so Color-2 stays a pale
-    // tint — pale text on a saturated mid-tone bg fails contrast.
-    //
-    // Use the SAME contrast lookup that --Text-Primary/Secondary/Tertiary use
-    // (getFixedTextToken), so a tag's text picks the contrast-verified tone
-    // for its own palette and bg tone. Tag-{Color}-BG always resolves to the
-    // light-palette Color-8 of that name, so we look up text for surfaceN=8.
-    const TAG_BG_N = 8;
-    return ['Primary', 'Secondary', 'Tertiary']
-      .map(name => `  --Tag-${name}-Text: ${tokenRefToVar(getFixedTextToken(TAG_BG_N, false, name as any))};`)
-      .join('\n');
-  })()}
+${emitTagTextTokens()}
 
   --Container: ${containerBg};
   --Container-Low: ${containerBg};
@@ -919,10 +1031,10 @@ ${(() => {
     return `  --Container-Buttons-Default-Button: ${btnBg};
   --Container-Buttons-Default-Text: ${btnText};
   --Container-Buttons-Default-Border: ${contBtnBorder};
-  --Container-Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Container-Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Container-Buttons-Default-Highlight: ${highlightFor(btnBg)};
+  --Container-Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
   --Container-Buttons-Default-Hover: ${contHover};
-  --Container-Buttons-Default-Active: ${contActive};`;
+  --Container-Buttons-Default-Pressed: ${contActive};`;
   })()}
 }
 
@@ -951,46 +1063,85 @@ ${(() => {
   // surface tone. Otherwise on a white card (containerN=12) the hover would
   // resolve to ~white via the activeAndHoverFor endpoint rule.
   const { active: contBtnActive, hover: contBtnHover } = activeAndHoverFor(buttonModePalette, buttonModeN);
+  // Black-White buttons must contrast with the CARD they sit on, not the page
+  // surface. A BW button inside a BLACK card must be WHITE — the surface-based
+  // btnBg would make it black (invisible on the card). Derive from the
+  // container's own lightness; non-BW buttons keep their surface-based color.
+  const contIsBW = effectiveButton === 'black-white';
+  const contDefBg = contIsBW ? (isLight(containerBg) ? NEUTRAL[0] : NEUTRAL[NEUTRAL.length - 1]) : btnBg;
+  const contDefText = contIsBW ? (isLight(containerBg) ? '#ffffff' : '#1a1a1a') : btnText;
+  const contDefBorder = contIsBW ? contDefBg : buttonBorderCss;
+  const contDefHover = contIsBW ? (isLight(contDefBg) ? '#e0e0e0' : '#1a1a1a') : contBtnHover;
+  const contDefActive = contIsBW ? (isLight(contDefBg) ? '#cccccc' : '#2e2e2e') : contBtnActive;
   return `[data-theme="Brand"][data-surface="Container"],
+[data-theme="Brand"][data-surface="Container-High"],
+[data-theme="Brand"][data-surface="Container-Highest"],
+[data-theme="Brand"][data-surface="Container-Low"],
+[data-theme="Brand"][data-surface="Container-Lowest"],
 [data-theme="Brand"] [data-surface="Container"],
-[data-surface] [data-surface="Container"] {
+[data-theme="Brand"] [data-surface="Container-High"],
+[data-theme="Brand"] [data-surface="Container-Highest"],
+[data-theme="Brand"] [data-surface="Container-Low"],
+[data-theme="Brand"] [data-surface="Container-Lowest"],
+[data-surface] [data-surface="Container"],
+[data-surface] [data-surface="Container-High"],
+[data-surface] [data-surface="Container-Highest"],
+[data-surface] [data-surface="Container-Low"],
+[data-surface] [data-surface="Container-Lowest"] {
   --Background: var(--${containerPaletteName}-Color-${containerN});
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg))};
+${emitDropshadowLevelLines(containerBg)}
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}26` : `${containerBorder}26`};
   --Hover: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).hover};
-  --Active: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).active};
+  --Pressed: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).active};
+  /* Hotlink / Link use the SAME getFixedTextToken('Info') call as Text-Info
+     emitted by buildTextPaletteLines below — they ARE the same color in
+     this design system, the lib just exposes them under different names.
+     Without emitting at Container scope, Ghost-variant buttons inside a
+     Card inherit Hotlink from the parent Surface scope (often wrong tone)
+     or from the lib's Light-Mode.css [data-surface^="Container"] default. */
+  --Hotlink: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
+  --Hotlink-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
+  --Link: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
+  --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, containerTones.text + (containerN <= 5 ? -1 : 1)))});
+  --Link-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
 ${buildTextPaletteLines(containerN, true)}
 ${buildHeaderPaletteLines(containerN, true)}
-  --Buttons-Primary-Button: ${btnBg};
-  --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: ${buttonBorderCss};
-  --Buttons-Default-Button: ${btnBg};
-  --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Border: ${buttonBorderCss};
-  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
-  --Buttons-Default-Hover: ${contBtnHover};
-  --Buttons-Default-Active: ${contBtnActive};
-  --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Buttons-Primary-Button: ${contDefBg};
+  --Buttons-Primary-Text: ${contDefText};
+  --Buttons-Primary-Border: ${contDefBorder};
+  --Buttons-Default-Button: ${contDefBg};
+  --Buttons-Default-Text: ${contDefText};
+  --Buttons-Default-Border: ${contDefBorder};
+  --Buttons-Default-Highlight: ${highlightFor(contDefBg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(contDefBg)};
+  --Buttons-Default-Hover: ${contDefHover};
+  --Buttons-Default-Pressed: ${contDefActive};
+  --Buttons-Primary-Highlight: ${highlightFor(contDefBg)};
+  --Buttons-Primary-Lowlight: ${lowlightFor(contDefBg)};
   /* Light-Mode.css's [data-theme="Default"] [data-surface^="Container"]
-     rule writes --Buttons-Primary-Hover / -Active straight onto every Card
+     rule writes --Buttons-Primary-Hover / -Pressed straight onto every Card
      in the studio (because the outer App <main> still has
      data-theme="Default"), which beats the value inherited from this
      scope. Re-set them here so primary buttons inside branded Cards keep
      their primary-tinted hover/active. */
-  --Buttons-Primary-Hover: ${contBtnHover};
-  --Buttons-Primary-Active: ${contBtnActive};
-  /* Per-palette Highlight / Lowlight overrides inside container scope.
-     Lib's Light-Mode.css writes hardcoded teal triples onto every Card via
+  --Buttons-Primary-Hover: ${contDefHover};
+  --Buttons-Primary-Pressed: ${contDefActive};
+  /* Per-palette button overrides inside container scope.
+     Lib's Light-Mode.css writes hardcoded values onto every Card via
      [data-theme="Default"] [data-surface^="Container"] for Secondary,
-     Tertiary, Neutral. That rule's specificity (0,2,0) beats the brand's
-     (0,1,0) at the <main> level, so without these explicit re-overrides
-     at matching specificity the bevels stay teal regardless of brand. */
+     Tertiary, Neutral — including Hover/Pressed hexes from its OWN old
+     design system (e.g. --Buttons-Secondary-Hover: #b0ebff, a blue from
+     when that snapshot was generated). That rule's (0,2,0) specificity
+     beats the brand's (0,1,0) at the <main> level, so without these
+     explicit re-overrides at matching specificity the secondary button
+     hover stays blue regardless of brand. Emit Button / Text / Border /
+     Hover / Pressed / Highlight / Lowlight for each palette so every slot
+     a variant button could read points at the brand's palette. */
 ${(() => {
     const perPalette = [
       { name: 'Secondary', pal: vSecondary, n: SC },
@@ -999,8 +1150,16 @@ ${(() => {
     ];
     return perPalette.map(({ name, pal, n }) => {
       const bg = p(pal, n);
-      return `  --Buttons-${name}-Highlight: ${hexToRgb(highlightFor(bg))};
-  --Buttons-${name}-Lowlight: ${hexToRgb(lowlightFor(bg))};`;
+      const tones = getAccessibleTones(bg, n, pal);
+      const palBorder = p(pal, getAccessibleTones(containerBg, containerN, pal).border);
+      const { active, hover } = activeAndHoverFor(pal, n);
+      return `  --Buttons-${name}-Button: ${bg};
+  --Buttons-${name}-Text: ${p(pal, tones.text)};
+  --Buttons-${name}-Border: ${palBorder};
+  --Buttons-${name}-Hover: ${hover};
+  --Buttons-${name}-Pressed: ${active};
+  --Buttons-${name}-Highlight: ${highlightFor(bg)};
+  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};`;
     }).join('\n');
   })()}
 }`;
@@ -1046,6 +1205,8 @@ ${(() => {
   --Tag-Tertiary-BG: ${tagBg};
   --Tag-Tertiary-Text: ${tagText};
 ${emitDefaultBtnTokens('Tertiary')}
+${emitPerPaletteButtonTokens(tertiarySurfaceBg, TC)}
+${emitTagTextTokens()}
 }`;
 })()}
 
@@ -1057,16 +1218,20 @@ ${emitDefaultBtnTokens('Tertiary')}
   --Background: var(--Secondary-Color-${SC});
   --Surface: var(--Secondary-Color-${SC});
 ${emitDefaultBtnTokens('Secondary')}
+${emitPerPaletteButtonTokens(p(vSecondary, SC), SC)}
+${emitTagTextTokens()}
 }
 
 /* ══ Primary Theme ══
  * Cards with color="primary" (or other elements that set data-theme="Primary")
  * also need the brand's Default-button tokens — the lib emits hardcoded
- * Default-Hover/Active under [data-theme="Primary"][data-surface="Surface"]
+ * Default-Hover/Pressed under [data-theme="Primary"][data-surface="Surface"]
  * which would otherwise win over the main Brand block. */
 [data-theme="Primary"],
 [data-theme="Primary"][data-surface="Surface"] {
 ${emitDefaultBtnTokens('Primary')}
+${emitPerPaletteButtonTokens(p(primaryLight, PC), PC)}
+${emitTagTextTokens()}
 }
 
 /* ══ Nav Bar ══ */
@@ -1078,12 +1243,17 @@ ${(() => {
   let navDefN = PC;
   switch (effectiveButton) {
     case 'secondary': case 'laddered': navDefPal = vSecondary; navDefN = SC; break;
-    case 'black-white': navDefPal = NEUTRAL.map(h => ({ hex: h })) as any; navDefN = isLight(navBarBg) ? 1 : 12; break;
+    // Match btnBg's logic (surfaceBg-based), NOT navBarBg-based. btnBg
+    // resolves from the page surface so the button color is consistent
+    // across nav bars. Picking the hover tone from navBarBg used to give
+    // a black button (from surface=light) a white hover (from navBarBg=
+    // dark) — totally invisible after hovering.
+    case 'black-white': navDefPal = NEUTRAL.map(h => ({ hex: h })) as any; navDefN = isLight(surfaceBg) ? 1 : 12; break;
     default: navDefPal = vPrimary; navDefN = PC; break;
   }
   const { active: navDefOldHoverHex, hover: navDefHoverHex } = activeAndHoverFor(navDefPal, navDefN);
   const navBorderN = tones.border;
-  // Surface --Hover/--Active for Nav Bar context — based on Nav Bar's own tone.
+  // Surface --Hover/--Pressed for Nav Bar context — based on Nav Bar's own tone.
   const navBarSurfacePalette = nc.palette === 'Primary' ? primaryLight : (nc.palette === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight);
   const { active: navBarActive, hover: navBarHover } = activeAndHoverFor(navBarSurfacePalette, nc.n);
 
@@ -1093,12 +1263,13 @@ ${(() => {
   [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"][data-surface="Surface-Bright"] {
   --Background: ${navBarBg};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(navBarBg))};
+${emitDropshadowLevelLines(navBarBg)}
   --Text: ${p(primaryLight, tones.text)};
   --Header: ${p(primaryLight, tones.header)};
   --Quiet: ${p(primaryLight, tones.quiet)};
   --Border: ${p(primaryLight, navBorderN)};
   --Hover: ${navBarHover};
-  --Active: ${navBarActive};
+  --Pressed: ${navBarActive};
   /* Container tokens need to be set in the Brand-Nav-Bar scope too because
      the iPhone preview wraps EVERYTHING in [data-theme="Brand-Nav-Bar"].
      Without these, Card components inside the phone don't react to
@@ -1111,18 +1282,18 @@ ${(() => {
   --Container-Highest: ${containerBg};
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: ${effectiveButton === 'black-white' ? btnBg : p(primaryLight, navBorderN)};
+  --Buttons-Primary-Border: ${effectiveButton === 'black-white' ? btnBg : btnBorder};
   --Buttons-Primary-Hover: ${navDefHoverHex};
-  --Buttons-Primary-Active: ${navDefOldHoverHex};
+  --Buttons-Primary-Pressed: ${navDefOldHoverHex};
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Border: ${effectiveButton === 'black-white' ? btnBg : p(primaryLight, navBorderN)};
-  --Buttons-Default-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Default-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Buttons-Default-Border: ${effectiveButton === 'black-white' ? btnBg : btnBorder};
+  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
+  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
   --Buttons-Default-Hover: ${navDefHoverHex};
-  --Buttons-Default-Active: ${navDefOldHoverHex};
-  --Buttons-Primary-Highlight: ${hexToRgb(highlightFor(btnBg))};
-  --Buttons-Primary-Lowlight: ${hexToRgb(lowlightFor(btnBg))};
+  --Buttons-Default-Pressed: ${navDefOldHoverHex};
+  --Buttons-Primary-Highlight: ${highlightFor(btnBg)};
+  --Buttons-Primary-Lowlight: ${lowlightFor(btnBg)};
 }`;
 })()}
 
@@ -1238,11 +1409,23 @@ ${(() => {
   const cappedStyleRadius = Math.min(r.buttonRadius, buttonHeight);
   const cappedCardRadius = Math.min(r.cardRadius, buttonHeight);
   const cappedModalRadius = Math.min(r.modalRadius, buttonHeight);
+  // Accordion-specific cap. The Accordion summary is ~buttonHeight tall, so
+  // using --Style-Border-Radius at full cap (= buttonHeight) saturates into
+  // a stadium shape (radius ≥ height/2). Buttons are intentionally pill-able,
+  // accordions aren't. We can't lower --Style-Border-Radius without also
+  // de-pilling buttons, so emit a dedicated --Accordion-Radius capped at
+  // half the button height and override the lib's Accordion rule below.
+  const cappedAccordionRadius = Math.min(r.buttonRadius, Math.floor(buttonHeight / 2));
+  // Button radius caps at the LARGE button height — beyond that CSS clamps a
+  // pill anyway, and uncapped values (e.g. 100) over-round anything that reads
+  // --Button-Radius (accordions, swatches). Mirrors the export cap.
+  const largeButtonHeight = sc.largeButtonHeight ?? 56;
+  const cappedButtonRadius = Math.min(r.buttonRadius, largeButtonHeight);
   return `:root {
   --Style-Border-Radius: ${cappedStyleRadius}px;
-  --Button-Radius: ${r.buttonRadius}px;
-  --Sm-Button-Radius: ${r.smButtonRadius}px;
-  --Lg-Button-Radius: ${r.lgButtonRadius}px;
+  --Button-Radius: ${cappedButtonRadius}px;
+  --Sm-Button-Radius: ${Math.min(r.smButtonRadius, largeButtonHeight)}px;
+  --Lg-Button-Radius: ${Math.min(r.lgButtonRadius, largeButtonHeight)}px;
   --Button-Icon-Radius: ${r.iconButtonRadius}px;
   --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
   --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;
@@ -1250,10 +1433,30 @@ ${(() => {
   --Card-Padding: ${r.cardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;
+  --Accordion-Radius: ${cappedAccordionRadius}px;
   --Input-Radius: ${r.inputRadius}px;
+  --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;
   --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;
+  --Sm-Checkbox-Radius: 3.2px;
+  --Checkbox-Radius: 4px;
+  --Lg-Checkbox-Radius: 4.8px;
+}
+
+/* Accordion radius override — see --Accordion-Radius rationale above.
+   The lib's Accordion.js inlines borderRadius: var(--Style-Border-Radius)
+   so we override via the MUI class selector (Accordion is the only common
+   wrapper that reads Style-Border-Radius today; if more components join
+   we'll extract this into a shared rule). */
+.accordion-group,
+.MuiAccordion-root {
+  border-radius: var(--Button-Radius) !important;
+}
+.accordion-group > *,
+.MuiAccordion-root .MuiAccordionSummary-root,
+.MuiAccordion-root .MuiAccordionDetails-root {
+  border-radius: calc(var(--Button-Radius) - 1px) !important;
 }`;
 })()}
 

@@ -2,14 +2,18 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { DynoDesignProvider } from '@dynodesign/components';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import type { User } from 'firebase/auth';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
+import RenameDesignModal from './components/RenameDesignModal';
 import PricingPage, { type PurchaseSelection } from './components/PricingPage';
 import CheckoutSuccess from './components/CheckoutSuccess';
 import { redirectToCheckout } from './utils/stripe/checkout';
-import { db } from './utils/firebase/client';
+import { auth, db } from './utils/firebase/client';
 import { getPublicFileUrl } from './utils/firebase/storage';
+import { isDesignNameTaken } from './utils/designSystemNames';
 import type { Stage, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from './types';
+import type { TypographyMeta, TypographyUploads } from './components/TypographyTestPage';
 import { STAGE_ORDER } from './types';
 import {
   generateSemanticLightModeScale,
@@ -33,6 +37,7 @@ import ComponentStyleStage from './components/stages/ComponentStyleStage';
 import ReviewStage from './components/stages/ReviewStage';
 import ExportStage from './components/stages/ExportStage';
 import Playground from './components/Playground';
+import GeneratedPreview from './components/GeneratedPreview';
 import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
 import ToneTuner from './components/ToneTuner';
 import AccountPage from './components/AccountPage';
@@ -43,11 +48,25 @@ import DesignSystemDetail from './components/DesignSystemDetail';
 import MyDesignsPage from './components/MyDesignsPage';
 import AdminProposals from './components/AdminProposals';
 import TypographyTestPage from './components/TypographyTestPage';
+import AaidWorkbenchPage from './components/AaidWorkbenchPage';
+
+// Internal test accounts — these skip the pricing/Stripe checkout and go
+// straight to the export/delivery page so we can exercise the full design-
+// system flow (view hosted system, copy Dino ID, Figma import) without paying.
+// Everyone else still hits the pricing gate. Scope stays to these two emails
+// on purpose — this is NOT a global bypass.
+const TEST_EMAILS = new Set([
+  'lise.w.noble@gmail.com',
+  'skyler.h.noble@gmail.com',
+]);
+const canBypassCheckout = (u: User | null): boolean =>
+  !!u?.email && TEST_EMAILS.has(u.email.toLowerCase());
 
 function MainApp() {
   const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
 
   // True while the URL has `?id=...` but we haven't loaded the snapshot yet.
   // Hides the default 'name' stage from briefly flashing before rehydration
@@ -84,6 +103,15 @@ function MainApp() {
     decorativeMode: 'surface-components',
   });
   const [typographyStyles, setTypographyStyles] = useState<TypographyStyle[]>([]);
+  // Sidecar meta for the typography stage — trio index, body family mode,
+  // customize-modal categories. Persisted alongside typographyStyles so the
+  // matcher's full UI state rehydrates on re-entry (not just family/weight/
+  // spacing). See TypographyMeta in TypographyTestPage.
+  const [typographyMeta, setTypographyMeta] = useState<TypographyMeta | undefined>(undefined);
+  // Custom font uploads per role. Each record carries the synthetic family
+  // name + the Firebase Storage path so the matcher can re-fetch + re-
+  // register the FontFace on page reload / stage re-entry.
+  const [typographyUploads, setTypographyUploads] = useState<TypographyUploads | undefined>(undefined);
   const [componentStyle, setComponentStyle] = useState<ComponentStyle>('modern');
   const [dinoId, setDinoId] = useState<string | null>(null);
   const [surfaceStyle, setSurfaceStyle] = useState<SurfaceStyle>('light-tonal');
@@ -140,6 +168,11 @@ function MainApp() {
         if (s.colorScheme) setSelectedColorScheme(s.colorScheme);
         if (s.userSelections) setUserSelections(s.userSelections);
         if (Array.isArray(s.typographyStyles)) setTypographyStyles(s.typographyStyles);
+        // Sidecar meta + uploads — restore so the matcher UI rehydrates
+        // its trio pick, body family mode, customize-modal categories,
+        // and custom font registrations on edit / Stripe re-entry.
+        if (s.typographyMeta) setTypographyMeta(s.typographyMeta);
+        if (s.typographyUploads) setTypographyUploads(s.typographyUploads);
         if (s.componentStyle) setComponentStyle(s.componentStyle);
         if (s.surfaceStyle) setSurfaceStyle(s.surfaceStyle);
         // Restore the Core Colors swatches from the snapshot so editing
@@ -195,6 +228,39 @@ function MainApp() {
     return () => { cancelled = true; };
   }, [user]);
 
+  // Where a signed-in user goes once their design name is confirmed unique:
+  // straight to the export/delivery page for the internal test accounts,
+  // otherwise the pricing gate.
+  const routePastName = useCallback((u: User | null) => {
+    if (canBypassCheckout(u)) {
+      setStage('export');
+      window.scrollTo(0, 0);
+    } else {
+      setShowPricingModal(true);
+    }
+  }, []);
+
+  // Runs the moment a user is confirmed signed-in on the review→export path
+  // (either just authenticated in the modal, or already signed in when they
+  // hit Continue). Two jobs: (1) catch a name collision that only surfaces now
+  // — an anonymous user may have named their design the same as one they
+  // already own, so re-check against THEIR uid and open the rename modal (which
+  // keeps all their work — only the name changes) before we create a duplicate;
+  // (2) otherwise route past checkout for the test accounts / to pricing.
+  const proceedAfterAuth = useCallback(async (u: User | null) => {
+    if (!u) return;
+    try {
+      const taken = await isDesignNameTaken(u.uid, designSystemName, dinoId || undefined);
+      if (taken) {
+        setShowRenameModal(true);
+        return;
+      }
+    } catch {
+      // Non-fatal — let the export-stage backstop / Firestore enforce uniqueness.
+    }
+    routePastName(u);
+  }, [designSystemName, dinoId, routePastName]);
+
   const goNext = useCallback(() => {
     // Block leaving the upload stage without a mood board
     if (stage === 'upload' && !moodBoardUrl) {
@@ -214,8 +280,9 @@ function MainApp() {
         window.scrollTo(0, 0);
         return;
       }
-      // User is logged in — show pricing page
-      setShowPricingModal(true);
+      // Already logged in — re-check for a name collision, then route to
+      // pricing (or straight to export for the internal test accounts).
+      void proceedAfterAuth(user);
       return;
     }
     if (customNextRef.current) {
@@ -243,7 +310,7 @@ function MainApp() {
       setStage(nextStage);
       window.scrollTo(0, 0);
     }
-  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle, moodBoardUrl, user, pendingReExport]);
+  }, [stage, autoAssigned, selectedColorScheme, surfaceStyle, moodBoardUrl, user, pendingReExport, proceedAfterAuth]);
 
   const customBackRef = useRef<(() => void) | null>(null);
   const customNextRef = useRef<(() => void) | null>(null);
@@ -264,6 +331,9 @@ function MainApp() {
       colorScheme: selectedColorScheme,
       userSelections,
       typographyStyles,
+      // Sidecars so the matcher's full UI state rehydrates post-Stripe.
+      typographyMeta: typographyMeta || null,
+      typographyUploads: typographyUploads || null,
       componentStyle,
       styleCustomizations: savedStyleCustomizations?.[componentStyle] || null,
       surfaceStyle,
@@ -299,6 +369,8 @@ function MainApp() {
     selectedColorScheme,
     userSelections,
     typographyStyles,
+    typographyMeta,
+    typographyUploads,
     componentStyle,
     savedStyleCustomizations,
     surfaceStyle,
@@ -447,6 +519,11 @@ function MainApp() {
             moodBoardFile={moodBoardFile}
             designSystemName={designSystemName}
             onTypographyComplete={setTypographyStyles}
+            initialTypography={typographyStyles}
+            initialTypographyMeta={typographyMeta}
+            onTypographyMetaChange={setTypographyMeta}
+            initialTypographyUploads={typographyUploads}
+            onTypographyUploadsChange={setTypographyUploads}
             decorativeMode={userSelections.decorativeMode}
             onDecorativeModeChange={(mode) => setUserSelections({ ...userSelections, decorativeMode: mode })}
           />
@@ -531,7 +608,7 @@ function MainApp() {
 
   // Component style radii — from saved customizations or defaults
   const cardRadius = savedStyleCustomizations?.[componentStyle]?.radius ?? { professional: 4, modern: 8, bold: 16, playful: 24 }[componentStyle];
-  const buttonRadius = savedStyleCustomizations?.[componentStyle]?.buttonRadius ?? { professional: 2, modern: 4, bold: 8, playful: 64 }[componentStyle];
+  const buttonRadius = savedStyleCustomizations?.[componentStyle]?.buttonRadius ?? { professional: 6, modern: 12, bold: 25, playful: 100 }[componentStyle];
 
   // Apply brand tokens after color-assignment stage. When the user is
   // editing an existing design system (pendingReExport === true), the
@@ -575,10 +652,18 @@ function MainApp() {
 
   const bevelPx = Math.round(buttonHeight * bevel / 100);
 
+  // buttonRadius / iconButtonRadius are PERCENTS (0–100) of the button height.
+  // Convert to px (capped at the large button height, mirroring computeRadii /
+  // buildPreviewCSS) so studio chrome — e.g. the bottom-nav Continue button —
+  // matches the preview. These were previously emitted as `${percent}px`, which
+  // made every chrome button far more rounded than the design's actual radius.
+  const buttonRadiusPx = Math.min(Math.round(buttonHeight * buttonRadius / 100), largeButtonHeight);
+  const iconButtonRadiusPx = Math.min(Math.round(buttonHeight * iconButtonRadius / 100), largeButtonHeight);
+
   const styleVars = {
-    '--Style-Border-Radius': `${buttonRadius}px`,
-    '--Button-Radius': `${buttonRadius}px`,
-    '--Button-Icon-Radius': `${iconButtonRadius}px`,
+    '--Style-Border-Radius': `${buttonRadiusPx}px`,
+    '--Button-Radius': `${buttonRadiusPx}px`,
+    '--Button-Icon-Radius': `${iconButtonRadiusPx}px`,
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
     '--Button-Bevel-Px': `${bevelPx}px`,
@@ -588,28 +673,66 @@ function MainApp() {
     '--Button-Min-Width': `${minButtonWidth}px`,
     '--Card-Radius': `${cardRadius}px`,
     '--Card-Padding': `${cardRadius >= 16 ? 20 : 16}px`,
-    ...(applyBrand && headerFont ? {
-      '--Header-Font-Family': `'${headerFont.family}', serif`,
-      '--Font-Family-Header': `'${headerFont.family}', serif`,
-      '--Set-Font-Family-Header': `'${headerFont.family}', serif`,
-      '--Set-Font-Family-Header-Weight': headerFont.weight,
-      '--Set-Header-Letter-Spacing': headerFont.letterSpacing || '0em',
-      '--Set-Header-Text-Transform': headerFont.allCaps ? 'uppercase' : 'none',
-      '--Header-Text-Transform': headerFont.allCaps ? 'uppercase' : 'none',
-      '--Header-Letter-Spacing': headerFont.letterSpacing || '0em',
-    } : {}),
-    ...(applyBrand && decorativeFont ? {
-      '--Set-Font-Family-Decorative': `'${decorativeFont.family}', sans-serif`,
-      '--Set-Font-Family-Decorative-Weight': decorativeFont.weight,
-      '--Set-Font-Family-Decorative-Letter-Spacing': decorativeFont.letterSpacing || '0em',
-      '--Set-Font-Family-Decorative-Text-Transform': decorativeFont.allCaps ? 'uppercase' : 'none',
-    } : {}),
+    ...(applyBrand && headerFont ? (() => {
+      const headerTT = headerFont.allCaps ? 'uppercase' : 'none';
+      const headerLS = headerFont.letterSpacing || '0em';
+      // The lib's H1–H6 and Display components read per-size tokens
+      // (`--H1-Text-Transform`, `--Display-Large-Text-Transform`, etc.) —
+      // NOT the aggregate `--Header-Text-Transform`. Emit one variable
+      // per heading size so the all-caps choice actually reaches the
+      // rendered headers. Letter-spacing has the same shape but the
+      // existing aggregates already work because the lib treats them as
+      // fallbacks. We still emit per-size letter-spacing for symmetry.
+      const headerSizes = ['Display-Large', 'Display-Small', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+      const perSize: Record<string, string> = {};
+      for (const s of headerSizes) {
+        perSize[`--${s}-Text-Transform`] = headerTT;
+        perSize[`--${s}-Letter-Spacing`] = headerLS;
+      }
+      return {
+        '--Header-Font-Family': `'${headerFont.family}', serif`,
+        '--Font-Family-Header': `'${headerFont.family}', serif`,
+        '--Set-Font-Family-Header': `'${headerFont.family}', serif`,
+        '--Set-Font-Family-Header-Weight': headerFont.weight,
+        '--Set-Header-Letter-Spacing': headerLS,
+        '--Set-Header-Text-Transform': headerTT,
+        '--Header-Text-Transform': headerTT,
+        '--Header-Letter-Spacing': headerLS,
+        ...perSize,
+      };
+    })() : {}),
+    ...(applyBrand && decorativeFont ? (() => {
+      const decoTT = decorativeFont.allCaps ? 'uppercase' : 'none';
+      // Overline is the decorative role. The lib reads per-size tokens
+      // (`--Overline-Small-Text-Transform`, etc.) with a hardcoded `uppercase`
+      // fallback — so we MUST emit one per size, including when the choice is
+      // lowercase, or overline stays stuck in all-caps.
+      const overlineSizes = ['Overline-Small', 'Overline-Medium', 'Overline-Large'];
+      const perSize: Record<string, string> = {};
+      for (const s of overlineSizes) perSize[`--${s}-Text-Transform`] = decoTT;
+      return {
+        '--Set-Font-Family-Decorative': `'${decorativeFont.family}', sans-serif`,
+        '--Set-Font-Family-Decorative-Weight': decorativeFont.weight,
+        '--Set-Font-Family-Decorative-Letter-Spacing': decorativeFont.letterSpacing || '0em',
+        '--Set-Font-Family-Decorative-Text-Transform': decoTT,
+        ...perSize,
+      };
+    })() : {}),
     ...(applyBrand && bodyFont ? {
       '--Body-Font-Family': `'${bodyFont.family}', sans-serif`,
       '--Font-Family-Body': `'${bodyFont.family}', sans-serif`,
       '--Set-Font-Family-Body': `'${bodyFont.family}', sans-serif`,
       '--Set-Font-Family-Body-Weight': bodyFont.weight,
       '--Set-Font-Family-Body-Letter-Spacing': bodyFont.letterSpacing || '0em',
+      // Default font-family for the whole tree. The lib's H1–H6 and Body
+      // components consume their own --Header-Font-Family / --Body-Font-Family
+      // tokens explicitly, but raw HTML — inline <span>, <div>, <p> text
+      // that isn't wrapped in a lib component — only picks up the brand
+      // font when we set fontFamily on an ancestor. Without this, those
+      // bits of text fall back to the browser's default (Times Roman on
+      // most desktops) even when the picked Body font is Inter. Headings
+      // and Body components keep overriding; this is just the baseline.
+      fontFamily: `'${bodyFont.family}', sans-serif`,
     } : {}),
   } as React.CSSProperties;
 
@@ -665,7 +788,7 @@ function MainApp() {
           --Buttons-Primary-Text: var(--Buttons-Default-Text);
           --Buttons-Primary-Border: var(--Buttons-Default-Border);
           --Buttons-Primary-Hover: var(--Buttons-Default-Hover);
-          --Buttons-Primary-Active: var(--Buttons-Default-Active);
+          --Buttons-Primary-Pressed: var(--Buttons-Default-Pressed);
         }
       `}} />
       {/* Canonical @dynodesign/components 0.1.8 doesn't render the swatch
@@ -705,40 +828,40 @@ function MainApp() {
           applies the shadow, skipping ghost/text (flat by design). */}
       <style id="dino-button-bevel" dangerouslySetInnerHTML={{ __html: `
         .btn-primary, .btn-primary-outline, .btn-primary-light, .btn-outline {
-          --Current-Bevel-Highlight: var(--Buttons-Primary-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Primary-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Primary-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Primary-Lowlight, black);
         }
         .btn-default {
-          --Current-Bevel-Highlight: var(--Buttons-Default-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Default-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Default-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Default-Lowlight, black);
         }
         .btn-secondary, .btn-secondary-outline, .btn-secondary-light {
-          --Current-Bevel-Highlight: var(--Buttons-Secondary-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Secondary-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Secondary-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Secondary-Lowlight, black);
         }
         .btn-tertiary, .btn-tertiary-outline, .btn-tertiary-light {
-          --Current-Bevel-Highlight: var(--Buttons-Tertiary-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Tertiary-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Tertiary-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Tertiary-Lowlight, black);
         }
         .btn-neutral, .btn-neutral-outline, .btn-neutral-light {
-          --Current-Bevel-Highlight: var(--Buttons-Neutral-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Neutral-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Neutral-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Neutral-Lowlight, black);
         }
         .btn-info, .btn-info-outline, .btn-info-light {
-          --Current-Bevel-Highlight: var(--Buttons-Info-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Info-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Info-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Info-Lowlight, black);
         }
         .btn-success, .btn-success-outline, .btn-success-light {
-          --Current-Bevel-Highlight: var(--Buttons-Success-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Success-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Success-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Success-Lowlight, black);
         }
         .btn-warning, .btn-warning-outline, .btn-warning-light {
-          --Current-Bevel-Highlight: var(--Buttons-Warning-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Warning-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Warning-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Warning-Lowlight, black);
         }
         .btn-error, .btn-error-outline, .btn-error-light, .btn-danger {
-          --Current-Bevel-Highlight: var(--Buttons-Error-Highlight, 255, 255, 255);
-          --Current-Bevel-Lowlight: var(--Buttons-Error-Lowlight, 0, 0, 0);
+          --Current-Bevel-Highlight: var(--Buttons-Error-Highlight, white);
+          --Current-Bevel-Lowlight: var(--Buttons-Error-Lowlight, black);
         }
         /* Size-scaled bevel: --_bevel is derived from the bevel % × the
            button's own height token, matching DinoDesign Button.js. MUI adds
@@ -762,8 +885,8 @@ function MainApp() {
              edge — i.e., the bevel reads as the chosen % of button height and
              leaves the bg under the text untouched. */
           box-shadow:
-            inset var(--_bevel, 0px) var(--_bevel, 0px) var(--_bevel, 0px) calc(0px - var(--_bevel, 0px)) rgba(var(--Current-Bevel-Highlight, 255, 255, 255), var(--Button-Bevel-Opacity, 0.5)),
-            inset calc(0px - var(--_bevel, 0px)) calc(0px - var(--_bevel, 0px)) var(--_bevel, 0px) calc(0px - var(--_bevel, 0px)) rgba(var(--Current-Bevel-Lowlight, 0, 0, 0), var(--Button-Bevel-Opacity, 0.5));
+            inset var(--_bevel, 0px) var(--_bevel, 0px) var(--_bevel, 0px) calc(0px - var(--_bevel, 0px)) color-mix(in srgb, var(--Current-Bevel-Highlight, white) calc(var(--Button-Bevel-Opacity, 0.5) * 100%), transparent),
+            inset calc(0px - var(--_bevel, 0px)) calc(0px - var(--_bevel, 0px)) var(--_bevel, 0px) calc(0px - var(--_bevel, 0px)) color-mix(in srgb, var(--Current-Bevel-Lowlight, black) calc(var(--Button-Bevel-Opacity, 0.5) * 100%), transparent);
         }
       `}} />
       {/* Inject brand CSS — same tokens as the phone preview */}
@@ -836,8 +959,23 @@ function MainApp() {
           onClose={() => setShowAuthModal(false)}
           onSuccess={() => {
             setShowAuthModal(false);
-            // User just authenticated — show pricing
-            setShowPricingModal(true);
+            // Just authenticated — use the fresh Firebase user (context `user`
+            // hasn't propagated yet this tick). Re-checks the name for a
+            // collision, then routes to pricing (or export for test accounts).
+            void proceedAfterAuth(auth.currentUser);
+          }}
+        />
+
+        <RenameDesignModal
+          open={showRenameModal}
+          currentName={designSystemName}
+          userId={(user || auth.currentUser)?.uid || ''}
+          excludeId={dinoId || undefined}
+          onClose={() => setShowRenameModal(false)}
+          onConfirm={(newName) => {
+            setDesignSystemName(newName);
+            setShowRenameModal(false);
+            routePastName(user || auth.currentUser);
           }}
         />
 
@@ -859,6 +997,7 @@ function App() {
         <Route path="/add-ons" element={<AddOnCatalogPage />} />
         <Route path="/create" element={<MainApp />} />
         <Route path="/playground" element={<Playground />} />
+        <Route path="/preview" element={<GeneratedPreview />} />
         <Route path="/api/tokens/:uuid" element={<ApiTokensJson />} />
         <Route path="/api/tokens/:uuid/md" element={<ApiTokensMd />} />
         <Route path="/tune" element={<ToneTuner />} />
@@ -869,6 +1008,7 @@ function App() {
         <Route path="/my-designs/:id" element={<DesignSystemDetail />} />
         <Route path="/admin/proposals" element={<AdminProposals />} />
         <Route path="/test/typography" element={<TypographyTestPage />} />
+        <Route path="/admin/aaid-workbench" element={<AaidWorkbenchPage />} />
       </Routes>
     </BrowserRouter>
     </DynoDesignProvider>

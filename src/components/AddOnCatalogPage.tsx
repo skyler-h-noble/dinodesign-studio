@@ -28,7 +28,7 @@ export default function AddOnCatalogPage() {
       style={{ background: 'var(--Background)', color: 'var(--Text)', minHeight: '100vh' }}
     >
       <AppBar
-        brand="DinoDesign"
+        brand="OmniDesign"
         onBrandClick={() => { window.location.href = '/'; }}
         endSlot={
           <HStack spacing={1} style={{ alignItems: 'center' }}>

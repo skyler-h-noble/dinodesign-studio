@@ -50,6 +50,31 @@ export interface StrokeAnalysis {
    *  in cropFromBboxes (needs the OCR text length to normalise against
    *  strokeCount). */
   isLikelyScript: boolean;
+  /** True when the region looks BRUSH / HAND-drawn (Squeeze brush headline,
+   *  LEMON BIRD, chalk "hare") rather than a clean display sans. Distinct
+   *  from script — script is thin and flowing, hand is THICK and irregular.
+   *  Two triggers, either is enough:
+   *    1. measurementFailed (weight ratio > 50%) — the binarizer gave up
+   *       on heavy ink, which only happens on brush/painted/textured text;
+   *    2. weightRatio > 0.25 — visible brush ink (25%+ stroke / letter
+   *       height), regardless of whether stems were found.
+   *  Used downstream to override CLIP's "Display / Decorative" verdict to
+   *  "Handwritten / Informal" so the matcher pulls hand-drawn font pools
+   *  (Caveat, Permanent Marker, Shadows Into Light) instead of display
+   *  font pools (Bangers, Boogaloo). Computed in cropFromBboxes alongside
+   *  isLikelyScript. */
+  isLikelyHand: boolean;
+  /** True when the pixel scanner gave up because the result was nonsense
+   *  (e.g. heavy display lettering on a colored background where the
+   *  binarizer can't separate ink and clusters wide ink bands into single
+   *  "stems"). When set, ALL of strokeCount, weight, weightRatio, and
+   *  hasSerifFeet are unreliable and should be treated as "unknown" by
+   *  downstream classifiers — they should fall back to CLIP's verdict
+   *  rather than inferring anything from these defaults. Without this
+   *  flag, the script rule's "0 stems + large crop = script" path fires
+   *  on every crop where measurement failed, mislabeling brush display
+   *  headlines (DREAM, BIRD, etc.) as cursive. */
+  measurementFailed: boolean;
 }
 
 export interface ExtractedTextRegion {
@@ -87,11 +112,30 @@ const CROP_PADDING = 15;
 // Square crop size we send to CLIP. ViT-B/32 resizes everything to 224.
 const CROP_SIZE = 224;
 
+type Vertex = { x: number; y: number };
+
+/** Letter height = length of the SHORT side of GCV's rotated rect, i.e. the
+ *  distance from top-left to bottom-left of the polygon. For un-rotated text
+ *  this equals the bbox height; for a 30° tilted "breathe" sign the axis-
+ *  aligned bbox is ~1.4× taller than the actual letter height, and we want
+ *  the latter for height-sort. Falls back to axis-aligned height when poly
+ *  is missing. */
+function trueLetterHeight(
+  bbox: { x0: number; y0: number; x1: number; y1: number },
+  poly: Vertex[] | undefined,
+): number {
+  if (!poly || poly.length !== 4) return bbox.y1 - bbox.y0;
+  const [tl, , , bl] = poly;
+  const dx = tl.x - bl.x;
+  const dy = tl.y - bl.y;
+  return Math.hypot(dx, dy);
+}
+
 /** Crop the source image at GCV-supplied bounding boxes and return the
  *  TextCrops shape the cloud function expects. */
 export async function cropFromBboxes(
   imageUrl: string,
-  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string }>,
+  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string; poly?: Vertex[] }>,
   meta: { elapsedMs: number },
   maxRegions = 10,
 ): Promise<TextCrops> {
@@ -109,10 +153,30 @@ export async function cropFromBboxes(
   }
 
   // Merge word boxes into phrases (GCV returns word-level boxes; users
-  // want phrase-level crops).
-  const phrases = mergeWordsIntoPhrases(bboxes);
-  phrases.sort((a, b) => (b.y1 - b.y0) - (a.y1 - a.y0));
-  const top = phrases.slice(0, maxRegions);
+  // want phrase-level crops). First split any single token that packs two
+  // fonts (cursive run + block-caps, e.g. "fitAND") so each gets its own crop.
+  const phrases = mergeWordsIntoPhrases(splitCaseTransitionTokens(bboxes));
+
+  // Drop single-character phrases. A standalone "B" or "a" in a moodboard
+  // is almost always a decorative glyph specimen, a list bullet, or a
+  // logo initial — none of which are useful typography samples for the
+  // matcher. We count Unicode letters AND numbers (\p{L}|\p{N}) so
+  // non-Latin scripts and alphanumeric tags like "X1" / "7B" survive,
+  // while punctuation alone does not — "B." still counts as 1 char and
+  // gets dropped. Multi-char phrases like "A B C" still pass (3 chars).
+  const charCount = (s: string) => (s.match(/[\p{L}\p{N}]/gu) ?? []).length;
+  const phrasesFiltered = phrases.filter(p => charCount(p.text) >= 2);
+  const dropped = phrases.length - phrasesFiltered.length;
+  if (dropped > 0) console.info('[gcv] dropped', dropped, 'single-letter phrases');
+
+  // Sort by TRUE letter height (short side of the rotated polygon when
+  // available). Diagonal text — like a tilted neon "breathe" sign — has
+  // an axis-aligned bbox that's much taller than the actual letter height,
+  // which otherwise lets a tiny rotated script beat a large upright headline
+  // to the Header slot. For phrases with no poly we fall back to bbox
+  // height so the sort still works.
+  phrasesFiltered.sort((a, b) => trueLetterHeight(b, b.poly) - trueLetterHeight(a, a.poly));
+  const top = phrasesFiltered.slice(0, maxRegions);
 
   const heightSorted: ExtractedTextRegion[] = top.map((b) => {
     const region: TextRegion = {
@@ -122,22 +186,110 @@ export async function cropFromBboxes(
     };
     const stroke = analyzeStrokes(img, region.bbox);
     const text = (b.text ?? '').trim();
-    // Substantial text (≥4 letters) with very few clean vertical stems is a
-    // strong signal for script / handwritten — those fonts curve and slant
-    // where regular fonts have a clean vertical stem to count. "elegant" (7
-    // letters, ~0-1 stems) flags as script; "LOGO" (4 letters, 2 stems) and
-    // "Mood Boards" (11 letters, ~4 stems) don't.
+    // Text with very few clean vertical stems is a strong signal for script
+    // / handwritten — those fonts curve and slant where regular fonts have
+    // a clean vertical stem to count. "elegant" (7 letters, ~0-1 stems)
+    // flags as script; "LOGO" (4 letters, 2 stems) and "Mood Boards" (11
+    // letters, ~4 stems) don't. Letter floor sits at 3 so short cursive
+    // crops like "Jui" (3 letters, 0 stems, large bbox) still flag — the
+    // ratio check on Path A keeps short BLOCK words like "USA" / "the" /
+    // "and" safe (each has ≥1 stem, and 1 × 5 = 5 > 3 fails the ratio).
+    //
+    // When strokeCount === 0 we have to distinguish two cases:
+    //   - Tiny crop, scanner failed (TERRA: ~25 px tall): don't flag script.
+    //   - Cursive at a reasonable size (Squee: ~60 px tall): DO flag script,
+    //     because legitimate cursive at that size truly has no clean stems.
+    // We use the source bbox's letter height as the discriminator — below
+    // ~40 px the scanner can miss real stems to anti-aliasing, above that
+    // a zero count is a real signal.
+    //
+    // ALSO: when stroke.measurementFailed is true (weight-ratio sanity
+    // gate gave up on a nonsense measurement, typically heavy display
+    // lettering on a colored background like DREAM/LEMON BIRD), don't
+    // fire Path B. The 0 stems isn't "no stems found" — it's "we know
+    // there ARE stems but the binarizer gave us garbage." Falling back to
+    // CLIP is the right call in that case.
     const letterCount = (text.match(/[A-Za-z]/g) ?? []).length;
-    const isLikelyScript = letterCount >= 4 && stroke.strokeCount * 5 < letterCount;
+    const bboxLetterH = trueLetterHeight(b, b.poly);
+    // Inline all-caps check so Path C below can exclude all-caps candidates
+    // (they're the kicker pattern, not script). Mirrors the `isAllCaps`
+    // computation a few lines down on the returned region.
+    const isAllCapsInline = text.length > 1
+      && text === text.toUpperCase()
+      && /[A-Z]/.test(text);
+    // Per-letter aspect ratio — cursive letters are wider per height than
+    // block letters because each glyph spreads out into curves and
+    // ligatures. Used by Path D below as a script signal independent of
+    // stroke ratio (which can be misleading for high-contrast cursives
+    // like Allura where the downstrokes are 20%+ thick despite the font
+    // reading clearly as script).
+    const bboxWidth = b.x1 - b.x0;
+    const perLetterAspect = letterCount > 0 && bboxLetterH > 0
+      ? (bboxWidth / letterCount) / bboxLetterH
+      : 0;
+    const isLikelyScript = letterCount >= 3 && !stroke.measurementFailed && (
+      // Path A — strict ratio. Sparse stems relative to letter count
+      // (5 letters / 1 stem = clearly cursive).
+      (stroke.strokeCount >= 1 && stroke.strokeCount * 5 < letterCount)
+      // Path B — zero stems on a crop large enough to trust the count.
+      // Threshold 25 px (down from 40 → 30) catches small cursive like
+      // "board" without false-positiving on TERRA-style all-caps small
+      // crops, which the !isAllCaps guard handles.
+      || (
+        stroke.strokeCount === 0
+        && bboxLetterH >= 25
+        && !isAllCapsInline
+      )
+      // Path C — thin-stroked cursive with stems present. Stems fewer
+      // than letters, thin strokes (< 10% of letter height), not all-caps.
+      // Catches words like the calligraphic "Allura" where some uprights
+      // register as stems but strokes are still thin.
+      || (
+        stroke.strokeCount >= 1
+        && stroke.strokeCount < letterCount
+        && stroke.weightRatio < 0.10
+        && !isAllCapsInline
+      )
+      // Path D — wide-per-letter cursive. Each cursive glyph spreads >1×
+      // its height because of curves and connectors; block letters sit at
+      // ~0.5–0.9× wide-to-tall per letter. Combined with stems < letters
+      // and letterCount ≥ 4 (so 3-letter words like "the" don't false-
+      // positive when bbox padding inflates width) and !all-caps (kicker
+      // pattern is its own thing), this catches "board" (5 letters, 1
+      // upright stem, ~1.2× per-letter aspect, high-contrast cursive
+      // strokes that Path C's ratio gate misses).
+      || (
+        letterCount >= 4
+        && stroke.strokeCount >= 1
+        && stroke.strokeCount < letterCount
+        && perLetterAspect > 1.0
+        && !isAllCapsInline
+      )
+    );
+    // Hand-drawn / brush detection — distinct from script. Triggers on the
+    // signals that mean "thick irregular ink": either the scanner's weight-
+    // ratio sanity gate fired (heavy brush on a colored background broke
+    // the binarizer — DREAM, LEMON BIRD) OR the measured ratio is in brush
+    // territory (>25% of letter height — "hare" at 39%). Letter floor at 3
+    // matches the script floor for consistency. Mutually exclusive with
+    // isLikelyScript so a single crop never claims to be both — script
+    // wins when the signals overlap (thin sparse strokes look script-like
+    // even if the ratio sneaks past 25%).
+    const isLikelyHand = letterCount >= 3
+      && !isLikelyScript
+      && (stroke.measurementFailed || stroke.weightRatio > 0.25);
     return {
       dataUrl: regionToDataUrl(img, region),
-      height: b.y1 - b.y0,
+      // Use the polygon's short side for height so rotated text doesn't
+      // win comparisons it shouldn't (downstream `r.height < header.height
+      // * ratio` checks need a true letter-height, not a bbox-diagonal).
+      height: trueLetterHeight(b, b.poly),
       text: b.text ?? '',
       isAllCaps: text.length > 1
         && text === text.toUpperCase()
         && /[A-Z]/.test(text),
       spacing: classifySpacingFromBbox(img, region.bbox),
-      stroke: { ...stroke, isLikelyScript },
+      stroke: { ...stroke, isLikelyScript, isLikelyHand },
     };
   });
 
@@ -180,6 +332,19 @@ export async function cropFromBboxes(
     const respectsCaseRule = (r: ExtractedTextRegion) =>
       !(header.isAllCaps && r.isAllCaps);
 
+    // Earlier we had a "must come from a different panel" guard here to
+    // prevent the LEMON / TYPEFACE case (header and decorative both brush
+    // letters from the same specimen). It turned out to be redundant:
+    // respectsCaseRule already rejects LEMON / TYPEFACE (both all-caps) AND
+    // the server's font-pool exclude prevents the same family being picked
+    // for both roles. Its only practical effect was breaking VALID contrast
+    // pairings like "Mood" (mixed-case serif) + "Inspiration" (all-caps in
+    // the same panel) where two different styles legitimately coexist on
+    // one specimen. Trust the existing rules and let proximity work in our
+    // favor (Phase 0.5 picks the closest candidate that meets the contrast
+    // rules — exactly what designers intend when they stack a serif over a
+    // small-caps line).
+
     // Soft rule: the candidate must differ from the header on at LEAST one
     // axis (case / serif-ness / weight / script-ness). Otherwise we'd be
     // stacking two visually identical lines and calling one a "decorative"
@@ -191,10 +356,11 @@ export async function cropFromBboxes(
       const serifDiffers  = header.stroke.hasSerifFeet !== r.stroke.hasSerifFeet;
       const weightDiffers = weightOf(header) !== weightOf(r);
       const scriptDiffers = header.stroke.isLikelyScript !== r.stroke.isLikelyScript;
-      return caseDiffers || serifDiffers || weightDiffers || scriptDiffers;
+      const handDiffers   = header.stroke.isLikelyHand !== r.stroke.isLikelyHand;
+      return caseDiffers || serifDiffers || weightDiffers || scriptDiffers || handDiffers;
     };
-    const isValid = (r: ExtractedTextRegion) =>
-      respectsCaseRule(r) && differsFromHeader(r);
+    const isValid = (r: ExtractedTextRegion, i = -1) =>
+      respectsCaseRule(r) && differsFromHeader(r) && isSpatiallyCoherent(i);
 
     // Spatial proximity helper. A region is "just below" the header when
     // its top edge is no more than ~1.5× the header height beneath the
@@ -202,6 +368,30 @@ export async function cropFromBboxes(
     // designers leave directly under a display line. Uses the original
     // bbox y-coordinates, which `top` is parallel to heightSorted on.
     const headerBbox = top[0];
+
+    // Hard spatial cutoff. Decorative candidates must sit reasonably close
+    // to the header — designers compose typographic specimens as a tight
+    // cluster, not by scattering letterforms across the moodboard. Without
+    // this, every "no good kicker exists" case turns into a hunt that
+    // pulls all-caps from compass markings, watermarks, photo embedded
+    // text, etc. Radius = 3× header height from the header bbox center.
+    // Generous enough for a multi-line specimen ("Mood" + "board" +
+    // "Inspiration" all qualify), tight enough to exclude anything from a
+    // distant photo. When NO candidate qualifies, decorativePickIdx stays
+    // null and the client synthesizes a header-paired decorative from
+    // mood instead of a junk pick.
+    const isSpatiallyCoherent = (i: number): boolean => {
+      if (i === 0 || !headerBbox) return false;
+      const bbox = top[i];
+      if (!bbox) return false;
+      const headerH = headerBbox.y1 - headerBbox.y0;
+      const hcx = (headerBbox.x0 + headerBbox.x1) / 2;
+      const hcy = (headerBbox.y0 + headerBbox.y1) / 2;
+      const ccx = (bbox.x0 + bbox.x1) / 2;
+      const ccy = (bbox.y0 + bbox.y1) / 2;
+      const dist = Math.hypot(hcx - ccx, hcy - ccy);
+      return dist <= headerH * 3;
+    };
     const isJustBelowHeader = (i: number): boolean => {
       if (i === 0) return false;
       const bbox = top[i];
@@ -232,7 +422,7 @@ export async function cropFromBboxes(
           i !== 0
           && !r.stroke.isLikelyScript
           && r.height < header.height * DECORATIVE_HEIGHT_RATIO
-          && isValid(r),
+          && isValid(r, i),
       );
       if (nonScriptIdx >= 0) decorativePickIdx = nonScriptIdx;
     }
@@ -267,79 +457,85 @@ export async function cropFromBboxes(
       && headerWeight === 'heavy'
       && header.stroke.hasSerifFeet
     ) {
-      const thinAllCaps = findClosestMatch((r) =>
+      const thinAllCaps = findClosestMatch((r, i) =>
         r.isAllCaps
         && weightOf(r) === 'thin'
         && r.height < header.height * DECORATIVE_HEIGHT_RATIO
-        && isValid(r),
+        && isValid(r, i),
       );
       if (thinAllCaps !== null) {
         decorativePickIdx = thinAllCaps;
       } else {
-        const scriptIdx = findClosestMatch((r) =>
+        const scriptIdx = findClosestMatch((r, i) =>
           r.stroke.isLikelyScript
           && r.height < header.height * DECORATIVE_HEIGHT_RATIO
-          && isValid(r),
+          && isValid(r, i),
         );
         if (scriptIdx !== null) decorativePickIdx = scriptIdx;
       }
     }
 
-    // Phase 0.5 — spatial proximity. Just-below + (all-caps OR script).
-    // Among multiple qualifying regions in the slot, the one physically
-    // closest to the header wins — same closest-wins principle as 0.3,
-    // applied to any header (not just heavy serif).
+    // Phase 0.5 — spatial proximity. Just-below + (all-caps OR script OR
+    // hand-drawn). Hand-tagged regions belong here too — a brush "board"
+    // sitting under a serif "Mood" header is a classic editorial kicker
+    // and was being silently filtered out when only the script + all-caps
+    // signals counted. Among multiple qualifying regions in the slot, the
+    // one physically closest to the header wins.
     if (decorativePickIdx === null) {
       const proximityIdx = findClosestMatch((r, i) =>
         isJustBelowHeader(i)
-        && (r.isAllCaps || r.stroke.isLikelyScript)
+        && (r.isAllCaps || r.stroke.isLikelyScript || r.stroke.isLikelyHand)
         && r.height < header.height * DECORATIVE_HEIGHT_RATIO
-        && isValid(r),
+        && isValid(r, i),
       );
       if (proximityIdx !== null) decorativePickIdx = proximityIdx;
     }
 
     // Phase 1 — kicker pattern (mixed-case header → all-caps overline).
+    // Prefer the candidate physically closest to the header to avoid
+    // reaching across the image and grabbing junk all-caps from a photo
+    // (compass markings, watermark, etc.). Falls back to closest-match
+    // both for contrast-weighted and any-all-caps variants.
     if (decorativePickIdx === null && !header.isAllCaps) {
-      const contrastAllCaps = heightSorted.findIndex((r, i) => i !== 0 && r.isAllCaps && isContrast(r) && isValid(r));
-      const anyAllCaps      = heightSorted.findIndex((r, i) => i !== 0 && r.isAllCaps && isValid(r));
-      const allCapsIdx = contrastAllCaps >= 0 ? contrastAllCaps : anyAllCaps;
-      if (allCapsIdx >= 0) decorativePickIdx = allCapsIdx;
+      const contrastAllCaps = findClosestMatch((r, i) => i !== 0 && r.isAllCaps && isContrast(r) && isValid(r, i));
+      const anyAllCaps      = findClosestMatch((r, i) => i !== 0 && r.isAllCaps && isValid(r, i));
+      const allCapsIdx = contrastAllCaps !== null ? contrastAllCaps : anyAllCaps;
+      if (allCapsIdx !== null) decorativePickIdx = allCapsIdx;
     }
 
-    // Phase 1a — heavy header → light subhead.
+    // Phase 1a — heavy header → light subhead. Closest-match, same reason.
     if (decorativePickIdx === null && headerWeight === 'heavy' && heightSorted.length > 2) {
-      const subheadIdx = heightSorted.findIndex((r, i) => i !== 0 && isSubheadLike(r) && isValid(r));
-      if (subheadIdx >= 0) decorativePickIdx = subheadIdx;
+      const subheadIdx = findClosestMatch((r, i) => i !== 0 && isSubheadLike(r) && isValid(r, i));
+      if (subheadIdx !== null) decorativePickIdx = subheadIdx;
     }
 
-    // Phase 1b — thin header → heavier anchor.
+    // Phase 1b — thin header → heavier anchor. Closest-match, same reason.
     if (decorativePickIdx === null && headerWeight === 'thin' && heightSorted.length > 1) {
-      const anchorIdx = heightSorted.findIndex(
+      const anchorIdx = findClosestMatch(
         (r, i) =>
           i !== 0
           && weightOf(r) !== 'thin'
           && !r.stroke.isLikelyScript
           && r.height < header.height * DECORATIVE_HEIGHT_RATIO
-          && isValid(r),
+          && isValid(r, i),
       );
-      if (anchorIdx >= 0) decorativePickIdx = anchorIdx;
+      if (anchorIdx !== null) decorativePickIdx = anchorIdx;
     }
 
-    // Phase 2 — any-contrast fallback. No same-style 2nd-tallest rescue:
-    // if every smaller candidate is visually identical to the header on
-    // every axis (or violates the case rule when the header is all-caps),
-    // leave decorativePickIdx as null. The server will then surface a
-    // mood-driven decorative instead of stacking two interchangeable lines.
+    // Phase 2 — any-contrast fallback. Closest-match too so even this
+    // last resort respects spatial coherence. If every smaller candidate
+    // is visually identical to the header on every axis (or violates the
+    // case rule when the header is all-caps), decorativePickIdx stays
+    // null and the server surfaces a mood-driven decorative instead.
     if (decorativePickIdx === null && heightSorted.length > 1) {
-      const contrastIdx = heightSorted.findIndex(
+      const contrastIdx = findClosestMatch(
         (r, i) =>
           i !== 0
           && isContrast(r)
           && r.height < header.height * DECORATIVE_HEIGHT_RATIO
-          && isValid(r),
+          && isValid(r, i),
       );
-      if (contrastIdx >= 0) decorativePickIdx = contrastIdx;
+      if (contrastIdx !== null) decorativePickIdx = contrastIdx;
     }
   }
 
@@ -407,17 +603,55 @@ function caseClassesMergeable(curText: string | undefined, nextText: string | un
   return a === b;
 }
 
+/** Stylized logos are sometimes OCR'd by GCV as ONE token that actually holds
+ *  two fonts — a cursive lowercase run flowing straight into block-caps
+ *  ("fitAND"). The phrase merger can't split a single token, so we pre-split at
+ *  a lowercase-run → UPPERCASE-run boundary into two regions (proportional x),
+ *  letting each get its own crop + classification.
+ *
+ *  Guarded to fire ONLY on `word` + `CAPS` (≥2 each, caps running to the end):
+ *  "fitAND"/"fiTAND" split; "iPhone" / "eBay" / "McKinsey" (caps not trailing)
+ *  are left intact. The all-caps part is given a shorter letter height (caps
+ *  rise to ~72% of a flourished script's ascender-to-descender), so the script
+ *  part wins the "tallest = header" sort — which is what these logos intend. */
+function splitCaseTransitionTokens(
+  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string; poly?: Vertex[] }>,
+): Array<{ x0: number; y0: number; x1: number; y1: number; text?: string; poly?: Vertex[] }> {
+  const out: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string; poly?: Vertex[] }> = [];
+  for (const b of bboxes) {
+    const t = (b.text ?? '').trim();
+    // lowercase run (≥2, ending lowercase) directly followed by a CAPS run
+    // (≥2) that reaches the end of the token.
+    const m = /^([a-z][a-z0-9]*[a-z])([A-Z]{2,})$/.exec(t);
+    if (!m) { out.push(b); continue; }
+    const [, lower, upper] = m;
+    const w = b.x1 - b.x0;
+    const h = b.y1 - b.y0;
+    const splitX = b.x0 + Math.round(w * (lower.length / (lower.length + upper.length)));
+    const capBand = Math.round(h * 0.72); // caps are shorter than a flourished script
+    // Drop poly on the split parts — the axis-aligned bbox height is the
+    // representative letter height for each half (script keeps full height,
+    // caps get the shorter, baseline-anchored band).
+    out.push({ x0: b.x0, y0: b.y0, x1: splitX, y1: b.y1, text: lower });
+    out.push({ x0: splitX, y0: b.y1 - capBand, x1: b.x1, y1: b.y1, text: upper });
+  }
+  return out;
+}
+
 function mergeWordsIntoPhrases(
-  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string }>,
-): Array<{ x0: number; y0: number; x1: number; y1: number; text: string }> {
+  bboxes: Array<{ x0: number; y0: number; x1: number; y1: number; text?: string; poly?: Vertex[] }>,
+): Array<{ x0: number; y0: number; x1: number; y1: number; text: string; poly?: Vertex[] }> {
   if (bboxes.length === 0) return [];
   const sorted = [...bboxes].sort((a, b) => {
     const dy = a.y0 - b.y0;
     return Math.abs(dy) < 20 ? a.x0 - b.x0 : dy;
   });
 
-  const out: Array<{ x0: number; y0: number; x1: number; y1: number; text: string }> = [];
-  let cur = { ...sorted[0], text: sorted[0].text ?? '' };
+  const out: Array<{ x0: number; y0: number; x1: number; y1: number; text: string; poly?: Vertex[] }> = [];
+  // Keep the FIRST word's poly through the merge — for single-word phrases
+  // this is exact; for merged phrases the words share a baseline so the
+  // first word's rotation/letter-height is representative.
+  let cur = { ...sorted[0], text: sorted[0].text ?? '', poly: sorted[0].poly };
   for (let i = 1; i < sorted.length; i++) {
     const next = sorted[i];
     const curH = cur.y1 - cur.y0;
@@ -445,7 +679,7 @@ function mergeWordsIntoPhrases(
       cur.text = `${cur.text} ${next.text ?? ''}`.trim();
     } else {
       out.push(cur);
-      cur = { ...next, text: next.text ?? '' };
+      cur = { ...next, text: next.text ?? '', poly: next.poly };
     }
   }
   out.push(cur);
@@ -580,7 +814,10 @@ function analyzeStrokes(
     hasSerifFeet: false, serifFootRatio: 0,
     strokeCount: 0,
     isLikelyScript: false,
+    isLikelyHand: false,
+    measurementFailed: false,
   };
+  const failed: StrokeAnalysis = { ...defaults, measurementFailed: true };
   const sourceW = bbox.x1 - bbox.x0;
   const sourceH = bbox.y1 - bbox.y0;
   if (sourceW <= 0 || sourceH <= 0) return defaults;
@@ -686,6 +923,15 @@ function analyzeStrokes(
   const medianWidth = sortedWidths[Math.floor(sortedWidths.length / 2)];
   const weightRatio = medianWidth / letterHeight;
 
+  // Sanity gate. Real fonts cap at ~25–30% stroke ratio (extra-bold display
+  // serif on dense slab). Anything above ~50% means the scanner failed —
+  // typically a heavy display lettering on a colored background where the
+  // binarizer can't separate ink from background and clusters wide bands
+  // into single "stems" (DREAM at 217%, etc.). Return the defaults so
+  // downstream classifiers fall back to CLIP / spacing-derived proxies
+  // instead of trusting a nonsense weight / serif verdict.
+  if (weightRatio > 0.5) return failed;
+
   let weight: VisualWeight = 'regular';
   if (weightRatio < 0.10) weight = 'thin';
   else if (weightRatio > 0.18) weight = 'heavy';
@@ -711,6 +957,15 @@ function analyzeStrokes(
     return rightMost < 0 ? 0 : rightMost - leftMost + 1;
   };
 
+  // Sharpness offset — how far up the stem we sample to check whether the
+  // widening is a SHARP foot (true serif) or a GRADIENT flare (brush
+  // lettering, e.g. "LEMON" hand-painted display). True serifs return to
+  // stem width within 2–3 px of the terminal; brush flares are still much
+  // wider 6+ px up the stem because the brush carries weight gradually.
+  // ~6% of letter height with a 4 px floor keeps the check meaningful at
+  // tiny crops and proportional at large ones.
+  const SHARPNESS_OFFSET = Math.max(4, Math.round(letterHeight * 0.06));
+
   let stemsWithBothFeet = 0;
   let stemsWithAnyFoot = 0;
   for (const stem of stems) {
@@ -731,12 +986,35 @@ function analyzeStrokes(
       measureRowSpan(Math.min(stem.yEnd, stem.yStart + 1),           xLow, xHigh),
       measureRowSpan(Math.min(stem.yEnd, stem.yStart + 2),           xLow, xHigh),
     );
-    // A terminal counts as a serif foot when the row's dark span is BOTH
-    // 2+ px wider than the stem (absolute floor — guards against
-    // anti-aliasing noise) AND ≥1.3× the stem width (relative — catches
-    // thicker slabs without rejecting hairline cap serifs).
-    const hasFootBottom = bottomSpan >= mainWidth + 2 && bottomSpan >= mainWidth * 1.3;
-    const hasFootTop    = topSpan    >= mainWidth + 2 && topSpan    >= mainWidth * 1.3;
+    // Sharpness sample — span SHARPNESS_OFFSET px inside the stem. For a
+    // true serif this row sits above the foot's flare and reads near stem
+    // width. For a brush flare this row is still inside the gradient and
+    // reads much wider.
+    const innerBottomSpan = measureRowSpan(
+      Math.max(stem.yStart, stem.yEnd - SHARPNESS_OFFSET),
+      xLow, xHigh,
+    );
+    const innerTopSpan = measureRowSpan(
+      Math.min(stem.yEnd, stem.yStart + SHARPNESS_OFFSET),
+      xLow, xHigh,
+    );
+    // Sharpness threshold: anything more than 1.15× the stem at the inner
+    // sample row counts as gradient (brush), not a true foot. Keep it
+    // permissive — heavy slab serifs DO have some inward thickening, just
+    // not as much as a brush carries.
+    const bottomIsSharp = innerBottomSpan <= Math.max(mainWidth + 1, mainWidth * 1.15);
+    const topIsSharp    = innerTopSpan    <= Math.max(mainWidth + 1, mainWidth * 1.15);
+    // A terminal counts as a serif foot when:
+    //   1. the terminal-row dark span is 2+ px wider than the stem AND
+    //      ≥1.3× the stem width (catches the widening), AND
+    //   2. the SHARPNESS sample is back near stem width (rules out brush
+    //      flares that look "wide at the base" but never sharpen).
+    const hasFootBottom = bottomSpan >= mainWidth + 2
+                         && bottomSpan >= mainWidth * 1.3
+                         && bottomIsSharp;
+    const hasFootTop    = topSpan    >= mainWidth + 2
+                         && topSpan    >= mainWidth * 1.3
+                         && topIsSharp;
     if (hasFootBottom && hasFootTop) stemsWithBothFeet++;
     if (hasFootBottom || hasFootTop) stemsWithAnyFoot++;
   }
@@ -759,7 +1037,9 @@ function analyzeStrokes(
     hasSerifFeet,
     serifFootRatio,
     strokeCount: stems.length,
+    measurementFailed: false,
     isLikelyScript: false, // populated in cropFromBboxes once the text is known
+    isLikelyHand: false,   // populated in cropFromBboxes alongside script
   };
 }
 

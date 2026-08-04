@@ -9,44 +9,44 @@
   --Font-Family-Display: var(--Platform-Font-Families-Header);
   --Display-Small-Font-Size:     42px;
   --Display-Small-Font-Weight:   600;
-  --Display-Small-Line-Height:   42px;
+  --Display-Small-Line-Height:   52px;
   --Display-Small-Letter-Spacing: 0px;
   --Font-Family-Display: var(--Platform-Font-Families-Header);
   --Display-Large-Font-Size:     48px;
   --Display-Large-Font-Weight:   600;
-  --Display-Large-Line-Height:   48px;
+  --Display-Large-Line-Height:   60px;
   --Display-Large-Letter-Spacing: 0px;
 
   /* Headers */
   --Font-Family-Header: var(--Platform-Font-Families-Header);
   --H1-Font-Size:     32px;
   --H1-Font-Weight:   600;
-  --H1-Line-Height:   32px;
+  --H1-Line-Height:   40px;
   --H1-Letter-Spacing: 1.25px;
   --Font-Family-Header: var(--Platform-Font-Families-Header);
   --H2-Font-Size:     28px;
   --H2-Font-Weight:   600;
-  --H2-Line-Height:   28px;
+  --H2-Line-Height:   35px;
   --H2-Letter-Spacing: 1.25px;
   --Font-Family-Header: var(--Platform-Font-Families-Header);
   --H3-Font-Size:     24px;
   --H3-Font-Weight:   600;
-  --H3-Line-Height:   24px;
+  --H3-Line-Height:   30px;
   --H3-Letter-Spacing: 0px;
   --Font-Family-Header: var(--Platform-Font-Families-Header);
   --H4-Font-Size:     20px;
   --H4-Font-Weight:   600;
-  --H4-Line-Height:   20px;
+  --H4-Line-Height:   25px;
   --H4-Letter-Spacing: 0px;
   --Font-Family-Header: var(--Platform-Font-Families-Header);
   --H5-Font-Size:     18px;
   --H5-Font-Weight:   600;
-  --H5-Line-Height:   18px;
+  --H5-Line-Height:   22.5px;
   --H5-Letter-Spacing: 0px;
   --Font-Family-Header: var(--Platform-Font-Families-Header);
   --H6-Font-Size:     16px;
   --H6-Font-Weight:   600;
-  --H6-Line-Height:   16px;
+  --H6-Line-Height:   20px;
   --H6-Letter-Spacing: 0px;
 
   /* Subtitle */

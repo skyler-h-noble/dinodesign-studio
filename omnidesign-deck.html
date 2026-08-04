@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OmniDesign — Concept</title>
+<style>
+  :root{
+    --ink:#14213d; --quiet:#5b6478; --line:#e3e6ee; --bg:#ffffff;
+    --accent:#2f6f4f; --accent-soft:#eaf3ee; --dark:#14213d; --dark-ink:#eef1f7;
+    --radius:16px; --pad:64px; --maxw:1100px;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+  body{font-family:var(--sans);color:var(--ink);background:#0d1426}
+  .slide{min-height:100vh;scroll-snap-align:start;display:flex;flex-direction:column;justify-content:center;padding:var(--pad);position:relative}
+  .inner{width:100%;max-width:var(--maxw);margin:0 auto}
+  .light{background:var(--bg)} .soft{background:var(--accent-soft)}
+  .dark{background:var(--dark);color:var(--dark-ink)} .dark .quiet{color:#9aa6c0}
+  .eyebrow{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+  .dark .eyebrow{color:#7fd1a6}
+  h1{font-size:64px;line-height:1.05;font-weight:800;letter-spacing:-.02em}
+  h2{font-size:42px;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+  h3{font-size:20px;font-weight:700}
+  p{font-size:20px;line-height:1.5;color:var(--quiet);max-width:700px}
+  p.lead{font-size:22px}
+  .quiet{color:var(--quiet)}
+  .num{font-size:11px;letter-spacing:.1em;color:var(--quiet);position:absolute;top:32px;right:40px;font-weight:700}
+  .tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9aa6c0;border:1px solid #2b3759;border-radius:999px;padding:6px 12px;margin-top:24px}
+  .grid{display:grid;gap:18px;margin-top:34px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:#fff}
+  .card p{font-size:16px}
+  .stat{font-size:40px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+  .checks{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 30px;margin-top:30px;max-width:800px}
+  .check{display:flex;gap:12px;align-items:center;font-size:19px;font-weight:600}
+  .check b{color:var(--accent);font-size:18px}
+  .deliv{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 30px;margin-top:30px;max-width:840px}
+  .deliv .d{display:flex;gap:12px;align-items:flex-start;font-size:18px}
+  .deliv .d b{color:var(--accent)}
+  .deliv .d span{color:var(--quiet);font-size:16px}
+  /* image / placeholder frames */
+  .ph{position:relative;overflow:hidden;border:2px dashed #b9c2d6;border-radius:var(--radius);
+      background:repeating-linear-gradient(45deg,#f6f8fc,#f6f8fc 12px,#f1f4fa 12px,#f1f4fa 24px);
+      display:flex;align-items:center;justify-content:center;text-align:center;color:#8a93a8;font-size:14px;font-weight:600;padding:20px}
+  .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .ph .label{max-width:84%} .ph .cam{font-size:26px;display:block;margin-bottom:8px}
+  .io{display:grid;grid-template-columns:1fr 64px 1fr;align-items:center;margin-top:36px}
+  .io .arrow{text-align:center;font-size:36px;color:var(--accent);font-weight:800}
+  .io .ph{height:330px}
+  .cap{font-size:15px;color:var(--quiet);margin-top:20px}
+  .impact{display:grid;grid-template-columns:repeat(2,1fr);gap:16px 40px;margin-top:30px;max-width:860px}
+  .impact .row{display:flex;gap:12px;align-items:baseline}
+  .impact .big{font-size:24px;font-weight:800;color:#7fd1a6;white-space:nowrap}
+  .impact .row span{font-size:17px;color:#9aa6c0}
+  .nav{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);font-size:12px;color:#7d869c;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 14px;z-index:10}
+  @media print{.nav{display:none}.slide{min-height:100vh;page-break-after:always}}
+</style>
+</head>
+<body>
+
+<!-- 1 · TITLE -->
+<section class="slide dark">
+  <span class="num">01 / 06</span>
+  <div class="inner">
+    <div class="eyebrow">Design systems, automated</div>
+    <h1>The cornerstone,<br/>built in minutes.</h1>
+    <p class="lead quiet" style="margin-top:24px">OmniDesign turns a prompt or mood board into a complete, accessible, adaptive design system — coded <b style="color:#fff">+</b> Figma, perfectly in sync.</p>
+    <span class="tag">Concept · working prototype · patent-stage</span>
+  </div>
+</section>
+
+<!-- 2 · WHY NOW + THE BAR -->
+<section class="slide soft">
+  <span class="num">02 / 06</span>
+  <div class="inner">
+    <div class="eyebrow">Why it matters</div>
+    <h2>The design system is the cornerstone</h2>
+    <p style="margin-top:18px">The single source of truth that keeps design and engineering aligned, on-brand, and consistent at scale — more critical than ever in an AI-first, multi-platform, accessibility-regulated world. But it only delivers if it's built right:</p>
+    <div class="checks">
+      <div class="check"><b>✓</b> Well constructed &amp; extensive</div>
+      <div class="check"><b>✓</b> Design &amp; code perfectly in sync</div>
+      <div class="check"><b>✓</b> Adaptive — background, elevation &amp; platform</div>
+      <div class="check"><b>✓</b> Accessible at the core</div>
+      <div class="check"><b>✓</b> On-brand</div>
+      <div class="check"><b>✓</b> Easy to update</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · PROBLEM -->
+<section class="slide light">
+  <span class="num">03 / 06</span>
+  <div class="inner">
+    <div class="eyebrow">The problem</div>
+    <h2>Slow, costly — and still incomplete</h2>
+    <div class="grid g3">
+      <div class="card"><div class="stat">$25K–$250K+</div><p>to build (often $1M+ at scale).</p></div>
+      <div class="card"><div class="stat">Weeks–months</div><p>of team time — and never truly "done."</p></div>
+      <div class="card"><div class="stat">~4,000</div><p>ADA website lawsuits in 2025 — 75% hit companies under $25M.</p></div>
+    </div>
+    <p class="cap">And most still lack dark mode, build accessibility in late, aren't adaptive, and let design &amp; code drift apart.</p>
+  </div>
+</section>
+
+<!-- 4 · SOLUTION (mood board -> output) -->
+<section class="slide soft">
+  <span class="num">04 / 06</span>
+  <div class="inner">
+    <div class="eyebrow">The solution</div>
+    <h2>One mood board → a complete design system</h2>
+    <div class="io">
+      <div class="ph">
+        <img src="images/moodboard.png" alt="Mood board input" onerror="this.remove()" />
+        <div class="label"><span class="cam">📷</span>INPUT — your mood board / image<br/><small>save as images/moodboard.png</small></div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="ph">
+        <img src="images/output.png" alt="Generated design system" onerror="this.remove()" />
+        <div class="label"><span class="cam">📷</span>OUTPUT — the generated system<br/><small>save as images/output.png</small></div>
+      </div>
+    </div>
+    <p class="cap">Coded + Figma, in sync · accessible · adaptive (light/dark, background, elevation &amp; platform) · branded · extensible — in minutes.</p>
+  </div>
+</section>
+
+<!-- 5 · WHAT YOU GET -->
+<section class="slide light">
+  <span class="num">05 / 06</span>
+  <div class="inner">
+    <div class="eyebrow">What you get</div>
+    <h2>Everything, branded to you — and in sync</h2>
+    <div class="deliv">
+      <div class="d"><b>›</b><div><b style="color:var(--ink)">Coded component library</b><br/><span>production-ready</span></div></div>
+      <div class="d"><b>›</b><div><b style="color:var(--ink)">Matching Figma library</b><br/><span>variables, modes, components</span></div></div>
+      <div class="d"><b>›</b><div><b style="color:var(--ink)">Adaptive tokens</b><br/><span>light/dark, background, elevation &amp; platform</span></div></div>
+      <div class="d"><b>›</b><div><b style="color:var(--ink)">AI-agent integration</b><br/><span>coding tools build on it correctly</span></div></div>
+      <div class="d"><b>›</b><div><b style="color:var(--ink)">Hosted playground</b><br/><span>interactive, shareable</span></div></div>
+      <div class="d"><b>›</b><div><b style="color:var(--ink)">Accessible by construction</b><br/><span>contrast, target size, semantics</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · IMPACT + POV -->
+<section class="slide dark">
+  <span class="num">06 / 06</span>
+  <div class="inner">
+    <div class="eyebrow">The impact</div>
+    <h2>The cornerstone — finally built right.</h2>
+    <div class="impact">
+      <div class="row"><span class="big">Months → minutes.</span></div>
+      <div class="row"><span class="big">Six figures → a fraction.</span></div>
+      <div class="row"><span class="big">No drift.</span><span>design &amp; code, one source of truth</span></div>
+      <div class="row"><span class="big">Accessible by construction.</span><span>reduced legal exposure</span></div>
+      <div class="row"><span class="big">Lean.</span><span>lower ongoing cost, faster products</span></div>
+      <div class="row"><span class="big">AI-ready.</span><span>less rework, less wasted spend</span></div>
+    </div>
+    <p class="lead quiet" style="margin-top:34px">The foundations problem at the heart of every modern product org — solved end to end.</p>
+  </div>
+</section>
+
+<div class="nav">← → to navigate · Print → Save as PDF to export</div>
+<script>
+  let i=0;const s=[...document.querySelectorAll('.slide')];
+  addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){i=Math.min(i+1,s.length-1);s[i].scrollIntoView()}
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp'){i=Math.max(i-1,0);s[i].scrollIntoView()}
+  });
+</script>
+</body>
+</html>

@@ -5,7 +5,8 @@
  * Tags reference {Primary-Button-Text}, {Secondary-Button-Text}, etc.
  * which map differently based on text coloring mode:
  * - Tonal: {Primary-Button-Text} = Primary
- * - BW Light Mode: {Primary-Button-Text} = BW-Button
+ * - BW Light Mode: {Primary-Button-Text} = BW (text-on-surface; tag text sits on
+ *   the tag's own colored bg, NOT on a button overlay — BW-Button is its inverse)
  * - BW Dark Mode: {Primary-Button-Text} = Primary (same as tonal)
  * 
  * Structure:
@@ -30,17 +31,21 @@ function getTagTextMappings(
   Warning: string;
   Error: string;
 } {
-  // Light Mode + BW: All text uses BW-Button
+  // Light Mode + BW: tag text sits DIRECTLY on the tag's own colored background
+  // (Color-9), exactly like surface text — so it uses the BW (text-on-surface)
+  // mapping, NOT BW-Button (which is the inverse, for text on a black/white
+  // button overlaying the surface). Using BW-Button here inverted every tag
+  // (white text on light tags, black text on dark tags).
   if (textColoring === 'black-white' && mode === 'Light-Mode') {
     return {
-      Primary: 'BW-Button',
-      Secondary: 'BW-Button',
-      Tertiary: 'BW-Button',
-      Neutral: 'BW-Button',
-      Info: 'BW-Button',
-      Success: 'BW-Button',
-      Warning: 'BW-Button',
-      Error: 'BW-Button'
+      Primary: 'BW',
+      Secondary: 'BW',
+      Tertiary: 'BW',
+      Neutral: 'BW',
+      Info: 'BW',
+      Success: 'BW',
+      Warning: 'BW',
+      Error: 'BW'
     };
   }
   
