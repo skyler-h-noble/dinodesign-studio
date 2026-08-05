@@ -13,7 +13,10 @@ export { getStaticQuietTokensForLightMode, getStaticQuietTokensForDarkMode } fro
  *
  * Dark colors (1-5): one step darker (Color-1 → Black)
  * Gap color (6): one step darker
- * Light colors (7-12): one step lighter (Color-12 → White)
+ * Light colors (7-11): one step lighter
+ * Color-12: one step DARKER — it is already near-white in light mode, so a
+ *   step toward white produces no perceptible change. A white surface can only
+ *   signal its states by darkening.
  * Color-Vibrant: follows Color-9 pattern (one step lighter)
  */
 function buildHoverForPalette(palette: string): any {
@@ -29,7 +32,13 @@ function buildHoverForPalette(palette: string): any {
     'Color-9': { value: `{Colors.${palette}.Color-10}`, type: 'color' },
     'Color-10': { value: `{Colors.${palette}.Color-11}`, type: 'color' },
     'Color-11': { value: `{Colors.${palette}.Color-12}`, type: 'color' },
-    'Color-12': { value: '{White}', type: 'color' },
+    // Color-12 steps DARKER, not lighter. It is the top of the ramp — in light
+    // mode it is already near-white (#fcfcfc), so a step "lighter" toward
+    // {White} has almost nowhere to go and the state reads as no change at all.
+    // A white surface can only signal hover and pressed by getting slightly
+    // darker. Contrast is unaffected: dark text on Color-11 still measures
+    // ~9.4:1, since the move is tiny relative to the starting headroom.
+    'Color-12': { value: `{Colors.${palette}.Color-11}`, type: 'color' },
     'Color-Vibrant': { value: `{Colors.${palette}.Color-10}`, type: 'color' },
   };
 }
@@ -57,7 +66,9 @@ export function getStaticHoverTokens() {
       'Color-9': { value: '{Colors.Neutral.Color-10}', type: 'color' },
       'Color-10': { value: '{Colors.Neutral.Color-11}', type: 'color' },
       'Color-11': { value: '{Colors.Neutral.Color-12}', type: 'color' },
-      'Color-12': { value: '{White}', type: 'color' },
+      // Steps darker for the same reason as the palette ramp above — a
+      // near-white surface has no headroom to go lighter.
+      'Color-12': { value: '{Colors.Neutral.Color-11}', type: 'color' },
       'Color-Vibrant': { value: '{Colors.Neutral.Color-10}', type: 'color' }
     }
   };

@@ -25,14 +25,26 @@ For a button whose fill is `Color-N` of a palette:
 
 One step in the **button's own lightness direction**:
 
-- **Dark button** (fill luminance ≤ 0.5, i.e. tones ~1-5) → step **darker**: `Color-(N−1)`.
-- **Light button** (fill luminance > 0.5, i.e. tones ~6-12) → step **lighter**: `Color-(N+1)`.
+- Tones **1-5** → step **darker**: `Color-(N−1)`.
+- Tones **6-11** → step **lighter**: `Color-(N+1)`.
+- Tone **12** → step **darker**: `Color-11`. See below.
 
-At the extremes there is no next tone, so Pressed goes to a pure endpoint —
+At the dark extreme there is no next tone, so Pressed goes to a pure endpoint —
 never back to the button's own tone (there must always be a visible delta):
 
-- Darkest button (**tone 1**) → **`#000000`** (black).
-- Lightest button (**tone 12**) → **`#FFFFFF`** (white).
+- Darkest (**tone 1**) → **`#000000`** (black).
+
+**The light extreme is not symmetric.** Tone 12 is already near-white in light
+mode (`#fcfcfc`), so stepping "lighter" toward `#FFFFFF` moves almost nowhere —
+a white surface would show no hover or pressed feedback at all. There is no
+headroom above white, so tone 12 signals its states by getting slightly
+**darker** instead, to `Color-11`.
+
+This costs nothing in contrast. Dark text on a near-white surface starts around
+17:1, and the step is small: text on `Color-11` still measures ~9.4:1, far above
+the 4.5:1 requirement. The move is toward the text rather than away from it —
+the one place the general rule below is deliberately inverted — and it is safe
+precisely because the starting headroom is so large.
 
 Direction is keyed on the **tone index**: 1-5 step darker, 6-12 step lighter.
 This matches where every `Text.Surfaces.{palette}` table flips from light text
@@ -59,13 +71,16 @@ a subtler version of the same move.
 
 ## Worked examples
 
-| Fill tone | Button | Pressed | Hover |
-| --------- | ------ | ------- | ----- |
-| Color-9 (dark) | dark | Color-8 | mix(Color-9, Color-8) |
-| Color-3 (dark) | dark | Color-2 | mix(Color-3, Color-2) |
-| Color-10 (light) | light | Color-11 | mix(Color-10, Color-11) |
-| **Color-1** (darkest) | dark | **#000000** | mix(Color-1, #000) |
-| **Color-12** (lightest) | light | **#FFFFFF** | mix(Color-12, #fff) |
+| Fill tone | Direction | Pressed | Hover |
+| --------- | --------- | ------- | ----- |
+| Color-3 | darker | Color-2 | mix(Color-3, Color-2) |
+| Color-9 | lighter | Color-10 | mix(Color-9, Color-10) |
+| Color-10 | lighter | Color-11 | mix(Color-10, Color-11) |
+| **Color-1** (darkest) | darker | **#000000** | mix(Color-1, #000) |
+| **Color-12** (lightest) | **darker** — no headroom | **Color-11** | mix(Color-12, Color-11) |
+
+Note the last row runs against the general direction. Tones 1-11 move away from
+the text; tone 12 cannot, because it is already at the top of the ramp.
 
 ## CSS usage
 

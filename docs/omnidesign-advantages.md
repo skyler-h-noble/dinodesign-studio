@@ -225,6 +225,31 @@ platform formats — it doesn't compute accessible relationships, must be rebuil
 change, and will happily emit inaccessible values. OmniDesign's tokens are dynamic and
 accessibility-aware: they adapt per context and are guaranteed compliant.
 
+**vs. Material Design.** Material derives a whole theme from one seed colour, and the
+result is always tonal — every surface a pastel tint of the brand. That is a look, not a
+neutral default, and a product that doesn't want it has to fight the system to escape it.
+
+OmniDesign keeps the designer in the loop on the one decision that most defines a
+product's character: **what the background is.** Four choices, each a first-class path
+through the system rather than a deviation from it:
+
+| Background | Surfaces | Cards |
+| --- | --- | --- |
+| **White** | neutral white/near-white | white |
+| **Tonal** | pastel tints of the brand palette | `Color-11` |
+| **Colorful** | saturated brand colour | `Color-11` |
+| **Black** | near-black neutral | the assigned dark card colour |
+
+The accessibility guarantee holds across all four. Text, header, border, icon, focus and
+state tokens are all resolved *per background*, so choosing a colourful or black theme
+doesn't degrade contrast — it re-derives every paired token for that context. A designer
+picks the aesthetic; the system keeps it compliant.
+
+This is why the token families are indexed by background tone rather than by a single
+seed: `Text.Surfaces.<palette>.Color-N` answers "what text reads on a surface at tone N",
+which is a different question for a white page than for a black one. Material has no
+equivalent because it never has to ask.
+
 ---
 
 *Sources: [WebAIM Million 2025](https://webaim.org/projects/million/2025),

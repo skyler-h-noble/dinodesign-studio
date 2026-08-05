@@ -298,10 +298,14 @@ function pressedToneHex(palette: string, colorN: number, colorsData: any): strin
   // The tone split is the correct rule because it matches where every
   // Text.Surfaces table flips from light to dark text (Color-1..5 light,
   // Color-6..12 dark), so the state always moves away from the text.
-  const darkBtn = colorN <= 5;                  // tones 1-5 step darker, 6-12 lighter
+  // Tone 12 steps DARKER, not lighter. It sits at the top of the ramp and is
+  // already near-white in light mode (#fcfcfc), so a step toward #FFFFFF moves
+  // almost nowhere and a white surface shows no state feedback at all. Matches
+  // buildHoverForPalette(), which produces the baked tokens — if these two
+  // disagree, figma.json and the CSS describe the same token differently.
+  const darkBtn = colorN <= 5 || colorN >= 12;  // 1-5 and 12 step darker, 6-11 lighter
   const an = darkBtn ? colorN - 1 : colorN + 1;
-  if (an < 1) return '#000000';                 // darkest button (tone 1) → black
-  if (an > 12) return '#FFFFFF';                // lightest button (tone 12) → white
+  if (an < 1) return '#000000';                 // darkest (tone 1) → black
   return colorsData[palette]?.[`Color-${an}`]?.value || null;
 }
 
@@ -1228,6 +1232,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     tokenLookup['Default-Background.Surface'] = `{${bgKey}.Surfaces.Surface}`;
     tokenLookup['Default-Background.Surface-Dim'] = `{${bgKey}.Surfaces.Surface-Dim}`;
     tokenLookup['Default-Background.Surface-Bright'] = `{${bgKey}.Surfaces.Surface-Bright}`;
+    // No Default-Background.Surface-Dimmest: the Default theme keeps
+    // generateSingleTheme's own {Backgrounds.<pal>.Background-4...} reference
+    // for that surface. Surface-Dimmest is pinned to Color-4 in every theme and
+    // mode, so it is already mode-correct without the indirection — see the
+    // note beside overrideSurface in generateCompleteThemes.ts.
     tokenLookup['Default-Background.Container'] = `{${contBgKey}.Containers.Container}`;
     tokenLookup['Default-Background.Container-Low'] = `{${contBgKey}.Containers.Container-Low}`;
     tokenLookup['Default-Background.Container-Lowest'] = `{${contBgKey}.Containers.Container-Lowest}`;
@@ -1257,6 +1266,52 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // would send a dark container to a light hover.
     tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${defPal}.${contColorN}}`;
     tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${defPal}.${contColorN}}`;
+
+    // Per-surface foregrounds for the Default theme.
+    //
+    // Default cannot use the plain {Backgrounds.<pal>.Background-N} +
+    // {Text.Surfaces.<pal>.Color-N} pairing every other theme uses: its
+    // background depends on the user's selection AND differs per mode, while the
+    // Theme layer is mode-independent. Hence the Default-Background indirection
+    // — which must cover EVERY role. Any role left out keeps a hardcoded
+    // light-mode tone and pairs a tone-12 foreground with a Color-2 background
+    // in dark mode (#232f27 on #111111 = 1.36:1).
+    //
+    // Must stay in step with ROLE_SOURCES in generateFigmaJSON.ts; if the two
+    // emit different key sets, figma.json and the CSS drift apart.
+    const accentPalettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
+      'Info', 'Success', 'Warning', 'Error'];
+    const surfaceScopes: Array<{ prefix: string; tone: number }> = [
+      { prefix: '', tone: defN },
+      { prefix: 'Surface-Dim-', tone: Math.max(defN - 1, 1) },
+      { prefix: 'Surface-Bright-', tone: Math.min(defN + 1, 12) },
+    ];
+
+    for (const { prefix, tone } of surfaceScopes) {
+      const vColorN = `Color-${tone}`;
+      // Base roles resolve from their own family at the surface's own palette.
+      for (const prop of props) {
+        tokenLookup[`Default-Background.${prefix}${prop}`] = `{${prop}.Surfaces.${defPal}.${vColorN}}`;
+      }
+      // Accents resolve from their OWN palette at the surface's tone.
+      for (const pal of accentPalettes) {
+        tokenLookup[`Default-Background.${prefix}Text-${pal}`] = `{Text.Surfaces.${pal}.${vColorN}}`;
+        tokenLookup[`Default-Background.${prefix}Header-${pal}`] = `{Header.Surfaces.${pal}.${vColorN}}`;
+        tokenLookup[`Default-Background.${prefix}Icons-${pal}`] = `{Icon.Surfaces.${pal}.${vColorN}}`;
+        tokenLookup[`Default-Background.${prefix}Icons-${pal}-Variant`] = `{Icon-Variant.Surfaces.${pal}.${vColorN}}`;
+      }
+      // Icons-Default tracks --Text in every other theme (verified across all
+      // 20); Default must not be the exception. Its -Variant is the alpha form,
+      // matching generateSingleTheme's non-BW branch.
+      tokenLookup[`Default-Background.${prefix}Icons-Default`] = `{Text.Surfaces.${defPal}.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Icons-Default-Variant`] = `{Icon-Variant.Surfaces.${defPal}.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Hotlink`] = `{Text.Surfaces.Info.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Hotlink-Visited`] = `{Text.Surfaces.Hotlink-Visited.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Focus-Visible`] = `{Focus-Visible.Surfaces.Background-${tone}}`;
+      tokenLookup[`Default-Background.${prefix}Hover`] = `{Hover.${defPal}.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Pressed`] = `{Pressed.${defPal}.${vColorN}}`;
+    }
+
 
     // Hotlink
     tokenLookup['Default-Background.Hotlink'] = `{Text.Surfaces.Info.${colorN}}`;

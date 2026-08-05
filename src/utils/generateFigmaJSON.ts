@@ -824,6 +824,108 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         if (hex) defBg[section] = { value: hex, type: 'color' };
       }
 
+      // Per-surface foregrounds for the Default theme.
+      //
+      // Every other theme references {Backgrounds.<pal>.Background-N...} plus
+      // {Text.Surfaces.<pal>.Color-N} with a single consistent N, so its tokens
+      // stay paired. Default cannot: its background depends on the user's
+      // selection AND differs per mode (light Neutral-12, dark Neutral-2), and
+      // the Theme layer is mode-independent. Hence the Default-Background
+      // indirection — which therefore has to cover EVERY role, not just the base
+      // ones. Any role left behind keeps a hardcoded light-mode tone and pairs a
+      // tone-12 foreground with a Color-2 background in dark mode.
+      //
+      // ROLE_SOURCES maps each role to the family and palette it resolves from.
+      // `pal` null means the theme's own background palette.
+      const ACCENT_PALETTES = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
+        'Info', 'Success', 'Warning', 'Error'];
+      const ROLE_SOURCES: Array<{ role: string; section: string; pal: string | null; byBackground?: boolean }> = [
+        { role: 'Text', section: 'Text', pal: null },
+        { role: 'Quiet', section: 'Quiet', pal: null },
+        { role: 'Header', section: 'Header', pal: null },
+        { role: 'Border', section: 'Border', pal: null },
+        { role: 'Border-Variant', section: 'Border-Variant', pal: null },
+        { role: 'Hotlink', section: 'Text', pal: 'Info' },
+        { role: 'Hotlink-Visited', section: 'Text', pal: 'Hotlink-Visited' },
+        { role: 'Focus-Visible', section: 'Focus-Visible', pal: null, byBackground: true },
+        // Icons-Default tracks --Text in every other theme (verified across all
+        // 20); Default must not be the exception. Its -Variant is the alpha
+        // form, matching generateSingleTheme's non-BW branch.
+        { role: 'Icons-Default', section: 'Text', pal: null },
+        { role: 'Icons-Default-Variant', section: 'Icon-Variant', pal: null },
+        ...ACCENT_PALETTES.map(pal => ({ role: `Text-${pal}`, section: 'Text', pal })),
+        ...ACCENT_PALETTES.map(pal => ({ role: `Header-${pal}`, section: 'Header', pal })),
+      ];
+
+      /** Resolve one role at a given background tone, or null. */
+      const resolveRoleAt = (role: typeof ROLE_SOURCES[number], tone: number): string | null => {
+        const sectionData = modeData[role.section];
+        if (!sectionData) return null;
+        const token = role.byBackground
+          ? sectionData.Surfaces?.[`Background-${tone}`]
+          : sectionData.Surfaces?.[role.pal ?? bgPalette]?.[`Color-${tone}`];
+        let hex = token?.value;
+        if (!hex) return null;
+        if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        return hex?.startsWith('#') ? hex : null;
+      };
+
+      /** Icons.<name> and the states, which don't fit the ROLE_SOURCES shape. */
+      const writeExtras = (prefix: string, tone: number) => {
+        for (const [section, suffix] of [['Icon', ''], ['Icon-Variant', '-Variant']]) {
+          const sec = modeData[section];
+          if (!sec?.Surfaces) continue;
+          for (const pal of ACCENT_PALETTES) {
+            let hex = sec.Surfaces?.[pal]?.[`Color-${tone}`]?.value;
+            if (!hex) continue;
+            if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+            if (hex?.startsWith('#')) defBg[`${prefix}Icons-${pal}${suffix}`] = { value: hex, type: 'color' };
+          }
+        }
+        for (const state of ['Hover', 'Pressed']) {
+          let hex = modeData[state]?.[bgPalette]?.[`Color-${tone}`]?.value;
+          if (!hex) continue;
+          if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+          if (hex?.startsWith('#')) defBg[`${prefix}${state}`] = { value: hex, type: 'color' };
+        }
+      };
+
+      /** Which palette tone a resolved surface hex corresponds to. */
+      const toneForHex = (hexValue: string): number | null => {
+        if (!hexValue?.startsWith('#')) return null;
+        const palette = modeColors?.[bgPalette];
+        if (!palette) return null;
+        for (let n = 1; n <= 12; n++) {
+          if (palette[`Color-${n}`]?.value?.toLowerCase() === hexValue.toLowerCase()) return n;
+        }
+        return null;
+      };
+
+      // Base Surface uses the unprefixed keys; variants get "<variant>-".
+      //
+      // Surface-Dimmest is absent by design. Backgrounds.<pal>.Background-N
+      // .Surfaces defines only Surface, Surface-Dim and Surface-Bright, and the
+      // Default theme does not route its Dimmest surface through
+      // Default-Background — that surface is pinned to Color-4 in every theme
+      // and mode, so it is already mode-correct. See the note beside
+      // overrideSurface in generateCompleteThemes.ts.
+      const surfaceTargets: Array<{ prefix: string; tone: number | null }> = [
+        { prefix: '', tone: bgN },
+      ];
+      for (const variant of ['Surface-Dim', 'Surface-Bright']) {
+        if (defBg[variant]?.value === undefined) continue;
+        surfaceTargets.push({ prefix: `${variant}-`, tone: toneForHex(defBg[variant].value) });
+      }
+      for (const { prefix, tone } of surfaceTargets) {
+        if (tone === null) continue;
+        for (const role of ROLE_SOURCES) {
+          const hex = resolveRoleAt(role, tone);
+          if (hex) defBg[`${prefix}${role.role}`] = { value: hex, type: 'color' };
+        }
+        writeExtras(prefix, tone);
+      }
+
+
       // Focus-Visible — keyed by Background-N with no palette level, so it needs
       // its own lookup shape. Themes reference {Default-Background.Focus-Visible}
       // and {Default-Background.Container-Focus-Visible}; without these two keys
@@ -840,17 +942,17 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       const fvContainer = readFocusVisible('Containers', contN);
       if (fvContainer) defBg['Container-Focus-Visible'] = { value: fvContainer, type: 'color' };
 
-      // Hover and Pressed for the default bg
-      const hoverData = modeData.Hover?.[bgPalette]?.[surfaceColorN];
-      const activeData = modeData.Pressed?.[bgPalette]?.[surfaceColorN];
-      if (hoverData?.value) {
-        let hex = hoverData.value;
-        if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
-        // Post-process: Pressed = old hover, Hover = mix(bg, old hover)
-        const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value || '#000000';
-        defBg['Pressed'] = { value: hex, type: 'color' };
-        defBg['Hover'] = { value: mixHex(bgHex, hex), type: 'color' };
-      }
+      // Hover and Pressed for the base Surface are written by writeExtras above,
+      // which reads Modes.Hover / Modes.Pressed directly.
+      //
+      // A block here used to overwrite them by re-applying the post-process
+      // swap (Pressed = old Hover, Hover = mix(bg, old Hover)). That swap has
+      // already been applied to Modes.Hover / Modes.Pressed upstream in
+      // exportColorSystem, so doing it again shifted both states one step:
+      // Modes.Hover.Neutral.Color-12 is #fbfbfb, and re-swapping produced
+      // Pressed #fbfbfb / Hover #fcfcfc where the CSS emits #f9f9f9 / #fbfbfb.
+      // The variant scopes never had the bug because writeExtras is the only
+      // thing that writes them — which is why only Default/Surface diverged.
 
       // Dropshadow for the default bg — uses the shared Comeau-style math
       // so this exact-hex fallback path matches the Modes/Dropshadow-Color-N

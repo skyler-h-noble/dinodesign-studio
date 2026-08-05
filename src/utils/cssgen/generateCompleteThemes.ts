@@ -790,26 +790,77 @@ export function generateAllThemesWithSurfacesAndContainers(
     defaultButtonPalette
   });
 
-  // Override Default theme's Surface to reference Default-Background (Light/Dark adaptive)
-  if (themes.Default?.Surfaces) {
-    themes.Default.Surfaces['Background'] = { value: '{Default-Background.Surface}', type: 'color' };
-    themes.Default.Surfaces['Text'] = { value: '{Default-Background.Text}', type: 'color' };
-    themes.Default.Surfaces['Header'] = { value: '{Default-Background.Header}', type: 'color' };
-    themes.Default.Surfaces['Quiet'] = { value: '{Default-Background.Quiet}', type: 'color' };
-    themes.Default.Surfaces['Border'] = { value: '{Default-Background.Border}', type: 'color' };
-    themes.Default.Surfaces['Border-Variant'] = { value: '{Default-Background.Border-Variant}', type: 'color' };
-    themes.Default.Surfaces['Hover'] = { value: '{Default-Background.Hover}', type: 'color' };
-    themes.Default.Surfaces['Pressed'] = { value: '{Default-Background.Pressed}', type: 'color' };
-    themes.Default.Surfaces['Focus-Visible'] = { value: '{Default-Background.Focus-Visible}', type: 'color' };
+  // Route the Default theme's surfaces through Default-Background.
+  //
+  // Backgrounds AND foregrounds both have to route through Default-Background,
+  // the same way Containers do below. Only the background and a handful of
+  // neutral roles were overridden before, so every accent role kept
+  // generateSingleTheme's hardcoded tone indices — e.g. {Text.Surfaces.Primary
+  // .Color-4} — which describe the LIGHT-mode surface. The Theme layer is
+  // mode-independent, so those indices cannot flip; in dark mode the background
+  // resolved to Neutral Color-2 while Text-Primary stayed keyed to tone 4,
+  // giving #232f27 on #111111 = 1.36:1. Every other theme derives its accent
+  // tone from its own background tone (Black: bg Color-1 -> accents Color-9);
+  // Default is the only one that could not, which is exactly why the
+  // Default-Background indirection exists — and why it has to cover EVERY role.
+  // A role left out of this list silently keeps its light-mode tone.
+  //
+  // Must stay in step with ROLE_SOURCES in generateFigmaJSON.ts and the
+  // tokenLookup block in exportToCSS.ts; all three emit the same key set.
+  const DEFAULT_ACCENTS = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
+    'Info', 'Success', 'Warning', 'Error'];
+  // Flat roles sit directly on the surface section.
+  const DEFAULT_BG_ROLES = [
+    'Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
+    'Hover', 'Pressed', 'Focus-Visible',
+    'Hotlink', 'Hotlink-Visited',
+    ...DEFAULT_ACCENTS.map(p => `Text-${p}`),
+    ...DEFAULT_ACCENTS.map(p => `Header-${p}`),
+  ];
+  // Icons are NOT flat — they live in a nested `Icons` object keyed 'Default',
+  // 'Default-Variant', 'Primary', 'Primary-Variant', ... and only get flattened
+  // to --Icons-Primary when the CSS is emitted. Writing section['Icons-Primary']
+  // would create a key nothing reads and silently leave the real one untouched.
+  const DEFAULT_ICON_KEYS = ['Default', ...DEFAULT_ACCENTS]
+    .flatMap(p => [p, `${p}-Variant`]);
+  /**
+   * @param group   key on themes.Default (e.g. 'Surfaces-Dim')
+   * @param bgKey   Default-Background key holding this surface's background
+   * @param fgPrefix prefix its foreground keys carry ('' for the base Surface)
+   */
+  const overrideSurface = (group: string, bgKey: string, fgPrefix: string) => {
+    const section = themes.Default?.[group];
+    if (!section) return;
+    section['Background'] = { value: `{Default-Background.${bgKey}}`, type: 'color' };
+    for (const role of DEFAULT_BG_ROLES) {
+      if (section[role] === undefined) continue;
+      section[role] = { value: `{Default-Background.${fgPrefix}${role}}`, type: 'color' };
+    }
+    if (section['Icons']) {
+      for (const key of DEFAULT_ICON_KEYS) {
+        if (section['Icons'][key] === undefined) continue;
+        section['Icons'][key] = { value: `{Default-Background.${fgPrefix}Icons-${key}}`, type: 'color' };
+      }
+    }
     // Dropshadow-Color is handled by processGroup which reads the Background sibling
-  }
-  // Override Default Surface-Dim and Surface-Bright
-  if (themes.Default?.['Surfaces-Dim']) {
-    themes.Default['Surfaces-Dim']['Background'] = { value: '{Default-Background.Surface-Dim}', type: 'color' };
-  }
-  if (themes.Default?.['Surfaces-Bright']) {
-    themes.Default['Surfaces-Bright']['Background'] = { value: '{Default-Background.Surface-Bright}', type: 'color' };
-  }
+  };
+  overrideSurface('Surfaces', 'Surface', '');
+  overrideSurface('Surfaces-Dim', 'Surface-Dim', 'Surface-Dim-');
+  overrideSurface('Surfaces-Bright', 'Surface-Bright', 'Surface-Bright-');
+  // Surfaces-Dimmest is deliberately NOT routed through Default-Background.
+  //
+  // Surface-Dim and Surface-Bright are tone-relative to the theme's own
+  // background (N-1 / N+1), so they move per mode and need the indirection.
+  // Surface-Dimmest does not: generateSingleTheme pins it to Color-4 in every
+  // theme and every mode (see dimmestN above), and {Backgrounds.<pal>
+  // .Background-4.Surfaces.Surface} already resolves per mode on its own. Its
+  // foregrounds are built by buildSurfaceTokens(config, 4) and are therefore
+  // already paired against a tone-4 background.
+  //
+  // Routing it anyway is actively wrong: the background would move to the
+  // Default surface's tone while Buttons — which are not part of this override —
+  // keep their tone-4 borders. In light mode that put a light Color-9 border on
+  // a light Color-10 surface (1.47:1, under the 3:1 floor for UI boundaries).
   // Override Default Containers
   if (themes.Default?.Containers) {
     themes.Default.Containers['Container'] = { value: '{Default-Background.Container}', type: 'color' };
