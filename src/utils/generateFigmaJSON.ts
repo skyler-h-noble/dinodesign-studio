@@ -127,7 +127,7 @@ function resolveToColorRef(tokenValue: string, lookup: Record<string, string>, c
     if (colors) {
       for (const pal of Object.keys(colors)) {
         for (const [key, val] of Object.entries(colors[pal])) {
-          if ((val as any)?.value === tokenValue && key.startsWith('Color-')) {
+          if ((val as any)?.value === tokenValue && key.startsWith('Color-') && !key.endsWith('-Vibrant')) {
             return `{Colors.${pal}.${key}}`;
           }
         }
@@ -155,7 +155,7 @@ function resolveToColorRef(tokenValue: string, lookup: Record<string, string>, c
         if (colors) {
           for (const pal of Object.keys(colors)) {
             for (const [key, val] of Object.entries(colors[pal])) {
-              if ((val as any)?.value === resolved && key.startsWith('Color-')) {
+              if ((val as any)?.value === resolved && key.startsWith('Color-') && !key.endsWith('-Vibrant')) {
                 return `{Colors.${pal}.${key}}`;
               }
             }
@@ -185,9 +185,16 @@ function resolveToColorAlias(tokenValue: string, lookup: Record<string, string>)
     if (!current.includes('{')) break;
     const path = current.replace(/[{}]/g, '');
 
-    // Already a Colors reference
+    // Already a Colors reference.
+    //
+    // Color-Vibrant is excluded: it is no longer exported (see extractTokens),
+    // so returning a ref to it would leave a variable pointing at nothing —
+    // and an unresolved alias fails silently rather than erroring. Fall through
+    // to the lookup below so the chain resolves to a hex instead.
     const colorMatch = path.match(/^(?:Colors\.)?([\w-]+)\.(Color-[\w-]+)$/);
-    if (colorMatch) return `{Colors.${colorMatch[1]}.${colorMatch[2]}}`;
+    if (colorMatch && !colorMatch[2].endsWith('-Vibrant')) {
+      return `{Colors.${colorMatch[1]}.${colorMatch[2]}}`;
+    }
 
     const resolved = lookup[path];
     if (resolved) {
@@ -285,7 +292,7 @@ function _figmaIsLight(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
 }
 function pressedHexFor(colorKey: string, btnHex: string, palette: string, colors: any): string {
-  if (colorKey === 'Color-Vibrant') return colors[palette]?.['Color-10']?.value || btnHex;
+  if (colorKey.endsWith('-Vibrant')) return colors[palette]?.['Color-10']?.value || btnHex;
   const n = parseInt(colorKey.replace('Color-', ''), 10);
   if (!Number.isFinite(n)) return btnHex;
   const darkBtn = !_figmaIsLight(btnHex);          // dark button → step darker, light → lighter
@@ -330,6 +337,23 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // Recursively extract all leaf tokens (with value+type) to hex
     function extractTokens(source: any, target: any) {
       for (const [key, val] of Object.entries(source)) {
+        // Color-Vibrant is not exported to Figma.
+        //
+        // It was emitted into every palette-shaped table (Colors, Text, Header,
+        // Border, Icon, Hover, Pressed, Dropshadow-*, ...) because those tables
+        // iterate the palette and Color-Vibrant rode along — 527 definitions
+        // across 40 groups, referenced by exactly zero tokens. The importer
+        // only upserts and never deletes, so leaving them here would recreate
+        // the variables in Figma after they were removed by hand.
+        //
+        // This drops the exported TOKENS only. 'Vibrant' remains live as an
+        // internal tone selector (exportColorSystem: `isDark ? 'Vibrant' : PC`),
+        // which exportToCSS rewrites to Color-8 — removing that would change
+        // which tone dark-mode buttons pick.
+        // Matches every keying convention, not just Color-Vibrant: the
+        // Focus-Visible and Backgrounds tables are keyed by Background-N and so
+        // carry Background-Vibrant (15 more entries, likewise unreferenced).
+        if (key.endsWith('-Vibrant')) continue;
         if (val && typeof val === 'object' && 'value' in (val as any) && 'type' in (val as any)) {
           let hex = (val as any).value;
           // Resolve token references to hex
@@ -372,17 +396,42 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       'Color-1': { value: '#00000000', type: 'color' },
     };
 
-    // Add computed Button-Hover, Button-Pressed, Button-Highlight, Button-Lowlight
+    // Add computed Button-Hover, Button-Pressed, Button-Highlight, Button-Lowlight,
+    // Button-Border.
     if (colors) {
-      const btnSections = ['Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight'];
+      const btnSections = ['Button-Hover', 'Button-Pressed', 'Button-Highlight',
+        'Button-Lowlight'];
       for (const s of btnSections) modeSection[s] = {};
       const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
       for (const palette of palettes) {
         if (!colors[palette]) continue;
         for (const s of btnSections) modeSection[s][palette] = {};
+
+        // The tone the theme bakes into its button refs is the LIGHT-mode
+        // button tone, and the Theme layer is mode-independent so it cannot
+        // flip. In dark mode the actual fill comes from the mode-aware
+        // Buttons.<pal>.<shade> table instead (light Primary #70947b ->
+        // dark #d4e3d9), so every value derived from Colors.<pal>.Color-N
+        // describes the wrong button: the bevel highlight computed from
+        // #70947b is DARKER than a #d4e3d9 face, inverting it.
+        //
+        // In dark mode we therefore ignore N and derive from the real fill.
+        // Every N collapsing to the same value is intended: it is what makes
+        // the fix apply to all themes regardless of which tone they baked.
+        // Only the bevel and border use this. Button-Hover/Button-Pressed keep
+        // deriving from Colors.<pal>.Color-N, because pressedHexFor picks its
+        // step direction from colorKey's tone index — pairing a tone-12 fill
+        // with a tone-6 index would step the wrong way.
+        const darkFill = modeName === 'Dark-Mode'
+          ? (modeSection.Buttons?.[palette]?.Medium?.Button?.value
+            || modeSection.Buttons?.[palette]?.Light?.Button?.value
+            || null)
+          : null;
+
         for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-          if (!colorKey.startsWith('Color-')) continue;
+          if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
           const btnHex = (colorVal as any).value;
+          const bevelBase = darkFill || btnHex;
           const activeHex = pressedHexFor(colorKey, btnHex, palette, colors);
           modeSection['Button-Pressed'][palette][colorKey] = { value: activeHex, type: 'color' };
           modeSection['Button-Hover'][palette][colorKey] = { value: mixHex(btnHex, activeHex), type: 'color' };
@@ -391,15 +440,81 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           // Lowlight REDUCES saturation so it reads as a neutral recessed
           // shadow, not a vibrant sibling of the body (the old ×1.4 boost read
           // as a bottom-edge glow on Info/Success/Warning/Error).
-          const hlHex = deriveColorHex(btnHex, 25, 0.7);
-          const llHex = deriveColorHex(btnHex, -30, 0.85);
+          const hlHex = deriveColorHex(bevelBase, 25, 0.7);
+          const llHex = deriveColorHex(bevelBase, -30, 0.85);
           // Apply bevel opacity as alpha channel
           const bevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
           const alphaHex = Math.round(bevelOpacity * 255 / 100).toString(16).padStart(2, '0');
           modeSection['Button-Highlight'][palette][colorKey] = { value: `${hlHex}${alphaHex}`, type: 'color' };
           modeSection['Button-Lowlight'][palette][colorKey] = { value: `${llHex}${alphaHex}`, type: 'color' };
+
+          // Button borders are written into Default-Button-Border below, not
+          // here — see the block after this loop.
         }
       }
+
+      // ── Default-Button-Border ─────────────────────────────────────────
+      //
+      // Repurposed rather than adding a new group. It already has exactly the
+      // right shape (Surfaces/Containers x 9 palettes x 12 tones, mode-aware)
+      // and already exists in the Figma file — but nothing referenced it:
+      // 234 variables per mode, consumed by zero tokens.
+      //
+      // The theme's button Border used to bake a literal tone into the
+      // mode-independent Theme layer ({Border.Surfaces.Primary.Color-12}). For
+      // every theme but Default that tone is the same in both modes, so it
+      // stayed correct; Default's surface moves per mode, so its border kept
+      // describing a tone-12 surface while sitting on tone 2 — dark green on
+      // near-black (#2d3d32 on #111111, 1.64:1) ringing a near-white button.
+      //
+      //   Light: the existing Border.<scope>.<pal>.Color-N, verbatim.
+      //   Dark:  the button's own fill, so the border sits flush and the fill
+      //          alone delineates the control (~13:1 against the surface).
+      //
+      // Keeping the Surfaces/Containers split matters in light mode, where a
+      // button on a surface and one inside a container take different borders.
+      // The selection arrives as a combined string ('black-white',
+      // 'secondary-adaptive', 'tonal-fixed', ...), so match on the prefix
+      // rather than equality — see the parser in exportColorSystem.
+      const isBlackWhiteButtons =
+        String(designSystemJSON._userSelections?.button || '').startsWith('black-white');
+
+      const dbb: any = modeSection['Default-Button-Border'] || {};
+      for (const scope of ['Surfaces', 'Containers']) {
+        if (!dbb[scope]) continue;
+        for (const palette of Object.keys(dbb[scope])) {
+          // Default-Button-Border carries a "Default" palette but Buttons does
+          // not (it has BlackWhite instead), so the Default button's fill has
+          // to come from Default-Button. Without this fallback the dark lookup
+          // returns null for that palette and quietly falls through to the
+          // LIGHT border — reintroducing exactly the bug this block fixes, on
+          // the one palette most likely to be seen.
+          const readFill = () =>
+            modeSection.Buttons?.[palette]?.Medium?.Button?.value
+            || modeSection.Buttons?.[palette]?.Light?.Button?.value
+            || modeSection['Default-Button']?.[palette]?.Medium?.Button?.value
+            || modeSection['Default-Button']?.[palette]?.Light?.Button?.value
+            || null;
+
+          // A black-and-white button has no tonal ramp, so there is no "one
+          // step darker" edge to draw — the light-mode border would come from
+          // the tonal Border table and render a maroon ring around a black or
+          // white face. When that style is selected the border matches the fill
+          // in BOTH modes, not just dark.
+          //
+          // Scoped to the Default palette because that is the one the button
+          // style governs; the semantic palettes keep their own tonal borders.
+          const useFill = modeName === 'Dark-Mode'
+            || (isBlackWhiteButtons && palette === 'Default');
+          const fill = useFill ? readFill() : null;
+          for (const colorKey of Object.keys(dbb[scope][palette])) {
+            const light = modeSection.Border?.[scope]?.[palette]?.[colorKey]?.value;
+            const next = fill || light;
+            if (next) dbb[scope][palette][colorKey] = { value: next, type: 'color' };
+          }
+        }
+      }
+      modeSection['Default-Button-Border'] = dbb;
     }
 
     // Computed groups: Border-Variant, Dropshadow-Color per palette per Color-N
@@ -417,7 +532,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           modeSection['Border-Variant'][section][palette] = {};
           const borderPalette = borderSection[palette] || {};
           for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-')) continue;
+            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
             // Get border hex from Border section or derive from palette
             const borderToken = borderPalette[colorKey] as any;
             const borderHex = borderToken?.value || (colorVal as any).value;
@@ -452,7 +567,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           modeSection['Icon-Variant'][section][palette] = {};
           const iconPalette = iconSection[palette] || {};
           for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-')) continue;
+            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
             const iconToken = iconPalette[colorKey] as any;
             const iconHex = iconToken?.value || (colorVal as any).value;
             if (iconHex && iconHex.startsWith('#')) {
@@ -476,7 +591,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         for (const palette of palettes) {
           modeSection[sectionName][palette] = {};
           for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-')) continue;
+            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
             const bgHex = (colorVal as any).value;
             if (bgHex && bgHex.startsWith('#')) {
               modeSection[sectionName][palette][colorKey] = {
@@ -635,9 +750,30 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                     if (btnMatch) {
                       const palette = btnMatch[1];
                       const colorN = btnMatch[2];
-                      // Link to Modes entries for button interactions
-                      target[key]['Hover'] = { value: `{Button-Hover.${palette}.${colorN}}`, type: 'color' };
-                      target[key]['Pressed'] = { value: `{Button-Pressed.${palette}.${colorN}}`, type: 'color' };
+                      // Hover/Pressed point at the mode-aware Buttons.<pal>.<shade>
+                      // table, NOT at Button-Hover/Button-Pressed keyed by tone.
+                      //
+                      // colorN is the button's LIGHT-mode tone, and the Theme
+                      // layer is mode-independent so it cannot flip. The dark
+                      // fill comes from the shade table (Primary: light #70947b
+                      // -> dark #d4e3d9), so a tone-keyed hover resolved to
+                      // #799c84 in dark — a mid-sage hover on a near-white
+                      // button, and a straight divergence from the CSS, which
+                      // derives from the real fill (#cdded3).
+                      //
+                      // The shade table already carries correct per-mode Hover
+                      // and Pressed, and its light values are identical to the
+                      // tone-keyed ones, so light output is unchanged.
+                      const shadeMatch = String(btnToken.value).match(
+                        /\{((?:Buttons|Default-Button)\.[\w-]+\.[\w-]+)\.Button\}/
+                      );
+                      if (shadeMatch) {
+                        target[key]['Hover'] = { value: `{${shadeMatch[1]}.Hover}`, type: 'color' };
+                        target[key]['Pressed'] = { value: `{${shadeMatch[1]}.Pressed}`, type: 'color' };
+                      } else {
+                        target[key]['Hover'] = { value: `{Button-Hover.${palette}.${colorN}}`, type: 'color' };
+                        target[key]['Pressed'] = { value: `{Button-Pressed.${palette}.${colorN}}`, type: 'color' };
+                      }
                       target[key]['Highlight'] = { value: `{Button-Highlight.${palette}.${colorN}}`, type: 'color' };
                       target[key]['Lowlight'] = { value: `{Button-Lowlight.${palette}.${colorN}}`, type: 'color' };
                       // Border palette should match the button's palette too —
@@ -657,10 +793,21 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                           /\{Border\.([\w-]+)\.[\w-]+\.(Color-[\w-]+)\}/
                         );
                         if (borderMatch) {
-                          const scope = borderMatch[1];
                           const surfaceColorN = borderMatch[2];
+                          // Default-Button-Border, not Border.<scope>. Same
+                          // index, but the Modes layer supplies the light value
+                          // verbatim and the button's own fill in dark mode, so
+                          // the border goes flush instead of drawing a ring
+                          // keyed to a surface tone dark mode never uses.
+                          //
+                          // Border has per-variant scopes (Surface-Dim,
+                          // Container-High, ...) while Default-Button-Border
+                          // has only Surfaces and Containers, so the scope is
+                          // collapsed to whichever family it belongs to.
+                          const scope = /^Container/.test(borderMatch[1])
+                            ? 'Containers' : 'Surfaces';
                           target[key]['Border'] = {
-                            value: `{Border.${scope}.${palette}.${surfaceColorN}}`,
+                            value: `{Default-Button-Border.${scope}.${palette}.${surfaceColorN}}`,
                             type: 'color',
                           };
                         }
@@ -871,6 +1018,20 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       };
 
       /** Icons.<name> and the states, which don't fit the ROLE_SOURCES shape. */
+      /** Which (palette, tone) a hex belongs to, searching every palette. */
+      const findTone = (hexValue: string): { palette: string; n: number } | null => {
+        if (!hexValue?.startsWith('#')) return null;
+        const target = hexValue.toLowerCase();
+        for (const pal of Object.keys(modeColors || {})) {
+          for (let n = 1; n <= 12; n++) {
+            if (modeColors[pal]?.[`Color-${n}`]?.value?.toLowerCase() === target) {
+              return { palette: pal, n };
+            }
+          }
+        }
+        return null;
+      };
+
       const writeExtras = (prefix: string, tone: number) => {
         for (const [section, suffix] of [['Icon', ''], ['Icon-Variant', '-Variant']]) {
           const sec = modeData[section];
@@ -880,8 +1041,36 @@ export function generateFigmaJSON(designSystemJSON: any): any {
             if (!hex) continue;
             if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
             if (hex?.startsWith('#')) defBg[`${prefix}Icons-${pal}${suffix}`] = { value: hex, type: 'color' };
+
+            // On-<pal>: the foreground for content sitting ON the icon colour.
+            //
+            // Only the non-variant icon gets one — the -Variant roles are
+            // decorative alphas and carry no content. Icons-<pal> is picked to
+            // contrast with the SURFACE, so it can land on any tone; resolve
+            // which one and reuse Text.Surfaces.<pal>.Color-<tone>, the same
+            // fixed mapping every other foreground uses, so 4.5:1 holds by
+            // construction rather than by a separate calculation.
+            if (suffix !== '' || !hex?.startsWith('#')) continue;
+            const iconTone = findTone(hex);
+            if (!iconTone) continue;
+            let onHex = modeData.Text?.Surfaces?.[iconTone.palette]?.[`Color-${iconTone.n}`]?.value;
+            if (!onHex) continue;
+            if (onHex.includes('{')) onHex = resolveToHex(onHex, modeLookup, modeColors) || onHex;
+            if (onHex?.startsWith('#')) defBg[`${prefix}On-${pal}`] = { value: onHex, type: 'color' };
           }
         }
+        // On-Default. Icons-Default is written by the ROLE_SOURCES loop, which
+        // runs before this, so its resolved hex is already on defBg. It follows
+        // the theme's own palette rather than an accent one, which is why it
+        // sits outside the loop above.
+        const defIconHex = defBg[`${prefix}Icons-Default`]?.value;
+        const defTone = findTone(defIconHex || '');
+        if (defTone) {
+          let onHex = modeData.Text?.Surfaces?.[defTone.palette]?.[`Color-${defTone.n}`]?.value;
+          if (onHex?.includes('{')) onHex = resolveToHex(onHex, modeLookup, modeColors) || onHex;
+          if (onHex?.startsWith('#')) defBg[`${prefix}On-Default`] = { value: onHex, type: 'color' };
+        }
+
         for (const state of ['Hover', 'Pressed']) {
           let hex = modeData[state]?.[bgPalette]?.[`Color-${tone}`]?.value;
           if (!hex) continue;

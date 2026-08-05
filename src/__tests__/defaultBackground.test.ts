@@ -32,6 +32,12 @@ const EXPECTED_ROLES = [
   ...ACCENTS.map(p => `Text-${p}`),
   ...ACCENTS.map(p => `Header-${p}`),
   ...['Default', ...ACCENTS].flatMap(p => [`Icons-${p}`, `Icons-${p}-Variant`]),
+  // On-<pal>: foreground for content sitting ON the icon colour, at 4.5:1.
+  // exportColorSystem computes these for the other 17 themes, but it runs after
+  // the themes are built and cannot resolve Default's {Default-Background.*}
+  // icon refs — so Default has to route them, or it becomes the one theme
+  // silently missing On-*.
+  ...['Default', ...ACCENTS].map(p => `On-${p}`),
 ];
 
 // Surfaces-Dimmest is intentionally excluded — it is pinned to Color-4 in every

@@ -841,6 +841,19 @@ export function generateAllThemesWithSurfacesAndContainers(
         if (section['Icons'][key] === undefined) continue;
         section['Icons'][key] = { value: `{Default-Background.${fgPrefix}Icons-${key}}`, type: 'color' };
       }
+      // On-<pal> is CREATED here, not rewritten.
+      //
+      // exportColorSystem computes On-* for the other 17 themes by resolving
+      // the icon's rendered tone, but it runs after the themes are built — by
+      // then Default's icons are {Default-Background.*} refs it cannot resolve,
+      // so Default would silently end up as the one theme without On-*. Routing
+      // it through Default-Background is the same treatment Icons and
+      // Icon-Variant already get, and the producers compute the value.
+      for (const pal of DEFAULT_ACCENTS.concat('Default')) {
+        section['Icons'][`On-${pal}`] = {
+          value: `{Default-Background.${fgPrefix}On-${pal}}`, type: 'color',
+        };
+      }
     }
     // Dropshadow-Color is handled by processGroup which reads the Background sibling
   };
@@ -861,6 +874,34 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Default surface's tone while Buttons — which are not part of this override —
   // keep their tone-4 borders. In light mode that put a light Color-9 border on
   // a light Color-10 surface (1.47:1, under the 3:1 floor for UI boundaries).
+  // Dark mode: a button's border IS its fill.
+  //
+  // generateSingleTheme keys the button border to the THEME's surface tone
+  // ({Border.Surfaces.<pal>.Color-N}). For every theme but Default that tone is
+  // the same in both modes, so it stays correct. Default's surface moves per
+  // mode (light Neutral-12, dark Neutral-2), so its border kept describing a
+  // tone-12 surface while sitting on tone 2 — dark green on near-black
+  // (#2d3d32 on #111111, 1.64:1) drawn around a near-white button.
+  //
+  // In dark mode the fill already separates the button from the surface at
+  // ~13:1, so the border carries no information and should go flush rather
+  // than draw a ring. Applied to every theme for consistency; light mode is
+  // untouched. Mirrors the Default-Button-Border group in generateFigmaJSON,
+  // which carries the same rule for Figma (where the Theme layer cannot branch
+  // on mode and so needs the value supplied from the Modes layer instead).
+  if (mode === 'Dark-Mode') {
+    for (const theme of Object.values(themes) as any[]) {
+      for (const group of Object.values(theme) as any[]) {
+        const buttons = group?.Buttons;
+        if (!buttons || typeof buttons !== 'object') continue;
+        for (const btn of Object.values(buttons) as any[]) {
+          if (btn?.Button?.value === undefined || btn?.Border === undefined) continue;
+          btn.Border = { value: btn.Button.value, type: 'color' };
+        }
+      }
+    }
+  }
+
   // Override Default Containers
   if (themes.Default?.Containers) {
     themes.Default.Containers['Container'] = { value: '{Default-Background.Container}', type: 'color' };

@@ -5854,12 +5854,30 @@ export function exportColorSystemToJSON(
         let hex = resolveColorToken(btnToken, colors, backgrounds);
         if (hex) return hex;
         // Parse token like "{Buttons.Primary.Medium.Button}" and resolve via Buttons section
-        const btnMatch = btnToken.replace(/[{}]/g, '').match(/^Buttons\.(\w+)\.(\w+)\.Button$/);
+        const btnMatch = btnToken.replace(/[{}]/g, '')
+          .match(/^(Buttons|Default-Button)\.([\w-]+)\.([\w-]+)\.Button$/);
         if (btnMatch) {
-          const [, palette, shade] = btnMatch;
+          const [, group, palette, shade] = btnMatch;
+          const modeBtns = (colorSystem.Modes[mode] as any)[group]?.[palette];
+
+          // Honour the shade the token actually names.
+          //
+          // Buttons.<pal>.<shade>.Button is the mode-aware fill — Primary is
+          // #70947b in light and #d4e3d9 in dark. The Surfaces/Containers scan
+          // below ignores `shade` entirely and returns the FIRST Background-N
+          // it happens to iterate, which resolved to the light-mode tone in
+          // both modes. Every consumer of this hex then described the wrong
+          // button: the bevel highlight computed from #70947b is DARKER than a
+          // #d4e3d9 face, so dark-mode buttons rendered with an inverted bevel.
+          const shadeVal = modeBtns?.[shade]?.Button?.value;
+          if (shadeVal) {
+            if (shadeVal.startsWith('#')) return shadeVal;
+            const shadeHex = resolveColorToken(shadeVal, colors, backgrounds);
+            if (shadeHex) return shadeHex;
+          }
+
           // The Buttons section in mode has Surfaces/Containers with Background-N keys
           // Each entry has a Button.value that references Colors
-          const modeBtns = (colorSystem.Modes[mode] as any).Buttons?.[palette];
           if (modeBtns) {
             // Try Surfaces first, then Containers — find any Background-N with a Button value
             for (const section of ['Surfaces', 'Containers']) {
@@ -5964,6 +5982,133 @@ export function exportColorSystemToJSON(
           sectionData.Buttons[btnTheme].Highlight = { value: computeHighlight(hex), type: 'color' };
           sectionData.Buttons[btnTheme].Lowlight = { value: computeLowlight(hex), type: 'color' };
         });
+      });
+
+      // ── Icons.On-<palette> ────────────────────────────────────────────
+      //
+      // The foreground for text or glyphs sitting ON an icon colour, at 4.5:1.
+      //
+      // Icons-<pal> is chosen to contrast with the SURFACE, so it can land on
+      // any tone of its palette depending on theme, surface scope and mode.
+      // Rather than compute a fresh colour, resolve which tone the icon
+      // actually renders at and reuse Text.Surfaces.<pal>.Color-<tone> — the
+      // same fixed mapping every other foreground uses. That guarantees 4.5:1
+      // by construction instead of by a separate calculation, and it stays
+      // correct in both modes because the Text tables are per-mode.
+      //
+      // The tone is found by matching the resolved hex back to a palette,
+      // searching all palettes rather than assuming <pal>: Icons.Default
+      // follows the theme's own palette (or BW), so its tone does not live in
+      // a palette named "Default".
+      const ON_PALETTES = ['Default', 'Primary', 'Secondary', 'Tertiary',
+        'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+      const relLum = (hex: string): number | null => {
+        const m = /^#([0-9a-f]{6})/i.exec(hex);
+        if (!m) return null;
+        const ch = [0, 2, 4].map(i => {
+          const v = parseInt(m[1].slice(i, i + 2), 16) / 255;
+          return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+      };
+
+      const contrastOf = (a: string, b: string): number => {
+        const la = relLum(a), lb = relLum(b);
+        if (la === null || lb === null) return 0;
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+      };
+
+      const findTone = (hex: string): { palette: string; n: number } | null => {
+        if (!hex?.startsWith('#')) return null;
+        const target = hex.toLowerCase();
+        for (const pal of Object.keys(colors || {})) {
+          for (let n = 1; n <= 12; n++) {
+            if (colors[pal]?.[`Color-${n}`]?.value?.toLowerCase() === target) {
+              return { palette: pal, n };
+            }
+          }
+        }
+
+        // Nearest-tone fallback by luminance.
+        //
+        // Icons-Default resolves to a literal #ffffff in themes whose icons are
+        // plain black-or-white rather than a palette tone (Black, Error, Info,
+        // ...). Pure white is not Neutral Color-12 (#fcfcfc), so the exact match
+        // above finds nothing and On-Default silently never gets written — 138
+        // contexts short. Falling back to the closest Neutral tone keeps the
+        // pairing on the audited Text.Surfaces table instead of inventing a
+        // colour, and white/black land on the ends of the ramp as expected.
+        const lum = relLum(target);
+        if (lum === null) return null;
+        let best: { palette: string; n: number } | null = null;
+        let bestDelta = Infinity;
+        for (let n = 1; n <= 12; n++) {
+          const tone = colors?.Neutral?.[`Color-${n}`]?.value;
+          const tl = tone ? relLum(tone) : null;
+          if (tl === null) continue;
+          const d = Math.abs(tl - lum);
+          if (d < bestDelta) { bestDelta = d; best = { palette: 'Neutral', n }; }
+        }
+        return best;
+      };
+      // Resolve any {A.B.C} token by walking the mode tree, rather than
+      // pattern-matching known shapes.
+      //
+      // resolveColorToken only understands {Colors.*}, {Backgrounds.*} and raw
+      // hex. Icon refs are none of those: most themes use
+      // {Icon.<scope>.<pal>.Color-N}, but Icons.Default is a TEXT ref —
+      // {Text.Surfaces.BW.Color-5} — because the default icon follows the
+      // theme's text colour. Each shape that isn't handled returns null, the
+      // loop below hits `continue`, and the role is silently never written.
+      // Walking the tree handles every shape including ones added later.
+      const resolveRef = (ref: any, depth = 0): string | null => {
+        const s = String(ref || '');
+        if (s.startsWith('#')) return s;
+        if (depth > 6) return null;
+        const m = s.match(/^\{([^}]+)\}$/);
+        if (!m) return null;
+        let node: any = (colorSystem.Modes[mode] as any);
+        for (const part of m[1].split('.')) {
+          node = node?.[part];
+          if (node === undefined || node === null) return null;
+        }
+        return node?.value ? resolveRef(node.value, depth + 1) : null;
+      };
+
+      allSections.forEach(section => {
+        const sectionData = theme[section];
+        if (!sectionData?.Icons) return;
+        for (const pal of ON_PALETTES) {
+          const iconRef = sectionData.Icons[pal]?.value;
+          if (!iconRef) continue;
+          const iconHex = resolveRef(iconRef);
+          const tone = findTone(iconHex || '');
+          if (!tone || !iconHex) continue;
+
+          // Verify the pairing rather than trusting the tone lookup.
+          //
+          // Icons.Default is often itself a TEXT colour ({Text.Surfaces.BW
+          // .Color-5} resolves to #ffffff). Feeding that back through findTone
+          // matches a BW entry whose text is also white, so the table hands
+          // back the icon's own colour — 1.00:1. The table is right for real
+          // palette tones and circular for text colours, and nothing about the
+          // lookup distinguishes the two, so check the result and correct it.
+          const candidate = `{Text.Surfaces.${tone.palette}.Color-${tone.n}}`;
+          const candHex = resolveRef(candidate);
+          const iconLum = relLum(iconHex);
+          let value = candidate;
+          if (!candHex || iconLum === null || contrastOf(candHex, iconHex) < 4.5) {
+            // Fall back to the end of the Neutral ramp furthest from the icon,
+            // which keeps the value on a real token rather than a raw hex.
+            const farN = (iconLum ?? 0) > 0.5 ? 1 : 12;
+            const farRef = `{Text.Surfaces.Neutral.Color-${farN}}`;
+            const farHex = resolveRef(`{Colors.Neutral.Color-${farN}}`);
+            value = farHex && contrastOf(farHex, iconHex) >= 4.5
+              ? `{Colors.Neutral.Color-${farN}}`
+              : farRef;
+          }
+          sectionData.Icons[`On-${pal}`] = { value, type: 'color' };
+        }
       });
     });
     // Also add Highlight/Lowlight to mode-level Buttons section

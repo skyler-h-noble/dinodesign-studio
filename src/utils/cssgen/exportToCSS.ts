@@ -1281,6 +1281,32 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // emit different key sets, figma.json and the CSS drift apart.
     const accentPalettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
       'Info', 'Success', 'Warning', 'Error'];
+
+    /**
+     * Which (palette, tone) an Icon table entry renders at.
+     *
+     * Accepts either a resolved hex or a {Colors.<pal>.Color-N} ref — the Icon
+     * tables carry both shapes depending on how far generation has progressed.
+     * A hex is matched back across every palette rather than assumed to belong
+     * to the one being iterated, because Icons-Default follows the theme's own
+     * palette (or BW) and its tone does not live under "Default".
+     */
+    const iconToneFor = (raw: any): { palette: string; n: number } | null => {
+      if (typeof raw !== 'string' || !raw) return null;
+      const ref = raw.match(/^\{Colors\.([\w-]+)\.Color-(\d+)\}$/);
+      if (ref) return { palette: ref[1], n: Number(ref[2]) };
+      if (!raw.startsWith('#')) return null;
+      const target = raw.toLowerCase();
+      const palettes = modeData?.Colors || {};
+      for (const p of Object.keys(palettes)) {
+        for (let n = 1; n <= 12; n++) {
+          if (palettes[p]?.[`Color-${n}`]?.value?.toLowerCase() === target) {
+            return { palette: p, n };
+          }
+        }
+      }
+      return null;
+    };
     const surfaceScopes: Array<{ prefix: string; tone: number }> = [
       { prefix: '', tone: defN },
       { prefix: 'Surface-Dim-', tone: Math.max(defN - 1, 1) },
@@ -1299,6 +1325,27 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         tokenLookup[`Default-Background.${prefix}Header-${pal}`] = `{Header.Surfaces.${pal}.${vColorN}}`;
         tokenLookup[`Default-Background.${prefix}Icons-${pal}`] = `{Icon.Surfaces.${pal}.${vColorN}}`;
         tokenLookup[`Default-Background.${prefix}Icons-${pal}-Variant`] = `{Icon-Variant.Surfaces.${pal}.${vColorN}}`;
+
+        // On-<pal>: foreground for content sitting ON the icon colour.
+        //
+        // Unlike the roles above this cannot be expressed as a static token
+        // path. Icons-<pal> is chosen to contrast with the SURFACE, so the tone
+        // it renders at is not the surface tone — it has to be resolved, then
+        // matched back to a palette tone so the Text table can be indexed at
+        // the icon's OWN tone. Must stay in step with writeExtras in
+        // generateFigmaJSON.ts.
+        const iconTone = iconToneFor(modeData?.Icon?.Surfaces?.[pal]?.[vColorN]?.value);
+        if (iconTone) {
+          tokenLookup[`Default-Background.${prefix}On-${pal}`] =
+            `{Text.Surfaces.${iconTone.palette}.Color-${iconTone.n}}`;
+        }
+      }
+      // On-Default follows the theme's own palette rather than an accent one,
+      // so it is derived from the same source as Icons-Default below.
+      const defOnTone = iconToneFor(modeData?.Text?.Surfaces?.[defPal]?.[vColorN]?.value);
+      if (defOnTone) {
+        tokenLookup[`Default-Background.${prefix}On-Default`] =
+          `{Text.Surfaces.${defOnTone.palette}.Color-${defOnTone.n}}`;
       }
       // Icons-Default tracks --Text in every other theme (verified across all
       // 20); Default must not be the exception. Its -Variant is the alpha form,

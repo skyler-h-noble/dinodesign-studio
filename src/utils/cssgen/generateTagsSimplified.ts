@@ -181,7 +181,18 @@ export function generateLightModeTags(
 
 /**
  * Generate Tags section for Dark Mode
- * Uses Color-Vibrant for both Light and Medium backgrounds
+ *
+ * Uses Color-5 for both Light and Medium backgrounds.
+ *
+ * These were the last 16 references to Color-Vibrant, and they were the reason
+ * Figma and the CSS disagreed on every dark tag. Color-Vibrant is a FROZEN
+ * light-mode Color-8 — the same hex in both modes, matching no dark tone — so
+ * figma.json resolved these to the bright light value (#b8cfbf) while
+ * exportToCSS rewrote .Color-Vibrant to .Color-8 and emitted the dark tone
+ * (#94b39d). Parity never caught it because it compares no Tag roles.
+ *
+ * BG and Text move together to the same tone, so the pairing still comes from
+ * the audited Text.Surfaces table: 8.32-8.76:1 across all eight palettes.
  */
 export function generateDarkModeTags(
   textColoring: 'tonal' | 'black-white'
@@ -194,101 +205,101 @@ export function generateDarkModeTags(
   return {
     Light: {
       Primary: {
-        BG: { value: '{Colors.Primary.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Primary.Color-5}', type: 'color' },
         Text: {
-          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-Vibrant}`, type: 'color' }
+          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-5}`, type: 'color' }
         }
       },
       Secondary: {
-        BG: { value: '{Colors.Secondary.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Secondary.Color-5}', type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-Vibrant}`, type: 'color' }
+          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-5}`, type: 'color' }
         }
       },
       Tertiary: {
-        BG: { value: '{Colors.Tertiary.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Tertiary.Color-5}', type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-Vibrant}`, type: 'color' }
+          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-5}`, type: 'color' }
         }
       },
       Neutral: {
-        BG: { value: '{Colors.Neutral.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Neutral.Color-5}', type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-Vibrant}`, type: 'color' }
+          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-5}`, type: 'color' }
         }
       },
       Info: {
-        BG: { value: '{Colors.Info.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Info.Color-5}', type: 'color' },
         Text: {
-          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-Vibrant}`, type: 'color' }
+          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-5}`, type: 'color' }
         }
       },
       Success: {
-        BG: { value: '{Colors.Success.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Success.Color-5}', type: 'color' },
         Text: {
-          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-Vibrant}`, type: 'color' }
+          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-5}`, type: 'color' }
         }
       },
       Warning: {
-        BG: { value: '{Colors.Warning.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Warning.Color-5}', type: 'color' },
         Text: {
-          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-Vibrant}`, type: 'color' }
+          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-5}`, type: 'color' }
         }
       },
       Error: {
-        BG: { value: '{Colors.Error.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Error.Color-5}', type: 'color' },
         Text: {
-          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-Vibrant}`, type: 'color' }
+          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-5}`, type: 'color' }
         }
       }
     },
     Medium: {
       Primary: {
-        BG: { value: '{Colors.Primary.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Primary.Color-5}', type: 'color' },
         Text: {
-          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-Vibrant}`, type: 'color' }
+          Primary: { value: `{Text.Surfaces.${textMappings.Primary}.Color-5}`, type: 'color' }
         }
       },
       Secondary: {
-        BG: { value: '{Colors.Secondary.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Secondary.Color-5}', type: 'color' },
         Text: {
-          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-Vibrant}`, type: 'color' }
+          Secondary: { value: `{Text.Surfaces.${textMappings.Secondary}.Color-5}`, type: 'color' }
         }
       },
       Tertiary: {
-        BG: { value: '{Colors.Tertiary.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Tertiary.Color-5}', type: 'color' },
         Text: {
-          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-Vibrant}`, type: 'color' }
+          Tertiary: { value: `{Text.Surfaces.${textMappings.Tertiary}.Color-5}`, type: 'color' }
         }
       },
       Neutral: {
-        BG: { value: '{Colors.Neutral.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Neutral.Color-5}', type: 'color' },
         Text: {
-          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-Vibrant}`, type: 'color' }
+          Neutral: { value: `{Text.Surfaces.${textMappings.Neutral}.Color-5}`, type: 'color' }
         }
       },
       Info: {
-        BG: { value: '{Colors.Info.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Info.Color-5}', type: 'color' },
         Text: {
-          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-Vibrant}`, type: 'color' }
+          Info: { value: `{Text.Surfaces.${textMappings.Info}.Color-5}`, type: 'color' }
         }
       },
       Success: {
-        BG: { value: '{Colors.Success.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Success.Color-5}', type: 'color' },
         Text: {
-          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-Vibrant}`, type: 'color' }
+          Success: { value: `{Text.Surfaces.${textMappings.Success}.Color-5}`, type: 'color' }
         }
       },
       Warning: {
-        BG: { value: '{Colors.Warning.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Warning.Color-5}', type: 'color' },
         Text: {
-          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-Vibrant}`, type: 'color' }
+          Warning: { value: `{Text.Surfaces.${textMappings.Warning}.Color-5}`, type: 'color' }
         }
       },
       Error: {
-        BG: { value: '{Colors.Error.Color-Vibrant}', type: 'color' },
+        BG: { value: '{Colors.Error.Color-5}', type: 'color' },
         Text: {
-          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-Vibrant}`, type: 'color' }
+          Error: { value: `{Text.Surfaces.${textMappings.Error}.Color-5}`, type: 'color' }
         }
       }
     }

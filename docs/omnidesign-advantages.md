@@ -173,6 +173,46 @@ WCAG thresholds, backed by runtime contrast-fitting:
 - A built-in **accessibility checklist** validates all contrasts and target sizes against
   WCAG 2.2 AA, in both modes — proof of compliance, not a promise.
 
+**Sliders and switches that actually pass — the controls most systems get wrong.** These
+are the two components where accessibility quietly fails most often, because they're built
+from several pieces that each sit on a different colour, and it's easy to check one pairing
+and miss the rest. A slider handle isn't just on the page background — it also sits on the
+filled track, and on the empty rail, and it moves between all of them. Faint decorative
+tokens are a common culprit: a hairline rail at 20% opacity composites to within a whisker
+of the surface behind it and can never reach 3:1, no matter which colour it's derived from.
+
+OmniDesign holds every one of these pairings, not just the obvious one:
+
+- **Slider track** — clears 3:1 against the background by its *fill or its border*, so a
+  track can stay visually light and still be a legible control.
+- **Slider handle** — clears 3:1 against **every** surface it can touch: the background,
+  the filled track, and the empty rail. Because the handle travels, all three are checked,
+  not just the resting position.
+- **Switch** — the switch itself clears 3:1 against the background, and the dot inside it
+  clears 3:1 against the switch's own fill, so on-state and off-state are both readable.
+- **Switch handle** — keeps a 24×24px minimum target area and holds its contrast through
+  hover and pressed, so the state change can't push it below threshold.
+- **Every switch** — 24×24px minimum target area, regardless of the visual size the
+  designer picks.
+
+Because these are enforced from the tone tables rather than eyeballed per theme, they hold
+across all 324 theme × surface contexts in both modes — including the ones a designer will
+never manually review.
+
+**Decorative depth that can't break contrast — bevels included.** Designers get real
+creative range on components: bevelled and embossed buttons, raised edges, tactile depth.
+Most systems either forbid this or leave it to be checked by eye, because a bevel is a
+light and a dark edge painted over the fill — and anything painted over the fill can land
+underneath a label and quietly drop it below 4.5.
+
+OmniDesign takes the choice off the table structurally: **the highlight and lowlight are
+applied to the component's edges only and never render beneath text or icons**, so the
+surface the label actually sits on is still the fill the contrast tables were tuned for.
+The bevel is derived from that same fill per mode (highlight lighter, lowlight darker), so
+it stays a legible edge in light and dark rather than inverting. Decoration and legibility
+stop being a trade-off: the designer picks the treatment, and the contrast guarantee is
+unaffected either way.
+
 **Far less code, AI-native.** Inline styling is eliminated; developers stop writing
 per-background/mode/elevation overrides. An AI tool never has to reason about keeping
 components compliant across contexts — it sets `data-theme` + `data-surface` and moves on.
