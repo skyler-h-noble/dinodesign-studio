@@ -269,10 +269,9 @@ function _haRgb(hex: string): [number, number, number] {
   const n = parseInt(f, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
-function _haIsLight(hex: string): boolean {
-  const [r, g, b] = _haRgb(hex);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
-}
+// (_haIsLight removed — pressedToneHex keyed direction on a YIQ brightness
+// threshold, which disagreed with the tone-index rule the baked tokens use.
+// Nothing else needed it.)
 function _haMix50(h1: string, h2: string): string {
   const [r1, g1, b1] = _haRgb(h1);
   const [r2, g2, b2] = _haRgb(h2);
@@ -284,7 +283,21 @@ function _haMix50(h1: string, h2: string): string {
 function pressedToneHex(palette: string, colorN: number, colorsData: any): string | null {
   const base = colorsData?.[palette]?.[`Color-${colorN}`]?.value;
   if (!base) return null;
-  const darkBtn = !_haIsLight(base);            // dark button → step darker, light → lighter
+  // Direction keys on the TONE INDEX, matching buildHoverForPalette() in
+  // staticTokenStructures.ts — the implementation that produces the baked
+  // Hover/Pressed tokens — and docs/hover-active-calculation.md.
+  //
+  // This previously used a YIQ brightness threshold on the base colour, which
+  // disagrees with the tone split on colours sitting near the boundary. Success
+  // Color-6 (#2f9e5a) measures 0.459 by YIQ ("dark" → step darker → #006531)
+  // while the tone rule says 6 → lighter → #6abf84. The CSS and figma.json
+  // therefore described the same token differently, and the CSS direction moved
+  // TOWARD the dark text on that surface: 2.84:1 instead of 9.18:1.
+  //
+  // The tone split is the correct rule because it matches where every
+  // Text.Surfaces table flips from light to dark text (Color-1..5 light,
+  // Color-6..12 dark), so the state always moves away from the text.
+  const darkBtn = colorN <= 5;                  // tones 1-5 step darker, 6-12 lighter
   const an = darkBtn ? colorN - 1 : colorN + 1;
   if (an < 1) return '#000000';                 // darkest button (tone 1) → black
   if (an > 12) return '#FFFFFF';                // lightest button (tone 12) → white
@@ -1214,8 +1227,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
     // Hover/Pressed — reference {Hover/Pressed.Palette.Color-N}
     tokenLookup['Default-Background.Hover'] = `{Hover.${defPal}.${colorN}}`;
     tokenLookup['Default-Background.Pressed'] = `{Pressed.${defPal}.${colorN}}`;
-    tokenLookup['Default-Background.Container-Hover'] = `{Hover.${defPal}.${colorN}}`;
-    tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.${defPal}.${colorN}}`;
+    // Container states come from the Containers group, which is computed from
+    // the container colour. The flat family is indexed by background tone and
+    // would send a dark container to a light hover.
+    tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${defPal}.${colorN}}`;
+    tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${defPal}.${colorN}}`;
 
     // Hotlink
     tokenLookup['Default-Background.Hotlink'] = `{Text.Surfaces.Info.${colorN}}`;

@@ -514,12 +514,17 @@ function generateSingleTheme(config: ThemeConfig): any {
       value: `{Border-Variant.Containers.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
     },
+    // Containers have their own Hover/Pressed group, computed from the
+    // container colour rather than the background's tone. The flat
+    // {Hover.<palette>.Color-N} family is indexed by BACKGROUND tone and steps
+    // lighter for tones 6-12 — which sent dark containers to a light hover
+    // under white text. See buildContainerStates in exportColorSystem.ts.
     'Hover': {
-      value: `{Hover.${config.contTheme}.Color-${config.contN}}`,
+      value: `{Hover.Containers.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
     },
     'Pressed': {
-      value: `{Pressed.${config.contTheme}.Color-${config.contN}}`,
+      value: `{Pressed.Containers.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
     },
     'Hotlink': {
