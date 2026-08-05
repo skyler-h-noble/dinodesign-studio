@@ -777,8 +777,8 @@ export function buildPreviewCSS(input: BuildInput): string {
       ? `var(--${surfacePaletteName}-Color-${scopeTones.border})`
       : neutral(neutralBorderN);
     const borderVariantVal = tonal
-      ? `${p(surfacePalette, scopeTones.border)}26`
-      : `${neutral(neutralBorderN)}26`;
+      ? `${p(surfacePalette, scopeTones.border)}33`
+      : `${neutral(neutralBorderN)}33`;
     // Hotlink / Link use the SAME tone number as Text (just the Info palette),
     // so the link tone tracks the text tone exactly. The lib's Link component
     // reads --Link / --Link-Hover / --Link-Visited (separate from --Hotlink) —
@@ -935,7 +935,7 @@ ${emitDropshadowLevelLines(surfaceBg)}
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
-  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}26` : `${surfaceBorder}26`};
+  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}33` : `${surfaceBorder}33`};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
   --Pressed: ${activeAndHoverFor(surfacePalette, surfaceN).active};
   /* --Hotlink and friends share the contrast-tuned Info text mapping so
@@ -1095,7 +1095,7 @@ ${emitDropshadowLevelLines(containerBg)}
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
-  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}26` : `${containerBorder}26`};
+  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}33` : `${containerBorder}33`};
   --Hover: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).hover};
   --Pressed: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).active};
   /* Hotlink / Link use the SAME getFixedTextToken('Info') call as Text-Info

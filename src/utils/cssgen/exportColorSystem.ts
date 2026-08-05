@@ -1,5 +1,6 @@
 // Button logic update - OB=8 when PC>=9 - 12-tone scale
 import { blendColors } from '../colorScale';
+import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
 import { dropshadowBaseHex } from '../dropshadow';
 import chroma from 'chroma-js';
 import { 
@@ -681,17 +682,17 @@ function getBorderColor(bgColor: string, palette: { tone: number; color: string 
 }
 
 /**
- * Get border-variant color (Border color with 15% opacity - hex 26)
+ * Get border-variant color (Border color with 20% opacity - hex 33)
  */
 function getBorderVariantColor(bgColor: string, palette: { tone: number; color: string }[], isDark: boolean = false): string {
   // Get the border color with 3.1 contrast
   const borderColor = getBorderColor(bgColor, palette, isDark);
   
-  // Convert to 8-digit hex with 15% opacity (0x26 ≈ 15% of 0xFF) — matches the
+  // Convert to 8-digit hex with 20% opacity (0x33 = 20% of 0xFF) — matches the
   // rest of the export + the Figma path + the live preview. Border-Variant is
   // decorative (non-clickable), so it carries no contrast requirement.
   const rgb = chroma(borderColor).hex();
-  return `${rgb}26`; // Append 26 for 15% opacity
+  return `${rgb}33`; // Append 33 for 20% opacity
 }
 
 /**
@@ -835,10 +836,10 @@ function getFixedBorderHexColor(backgroundNumber: number, isContainer: boolean, 
 function getBorderVariantValue(borderValue: string): string {
   // If borderValue is a direct hex color
   if (borderValue.startsWith('#')) {
-    // Append 26 for 15% opacity
-    return `${borderValue}26`;
+    // Append 33 for 20% opacity
+    return `${borderValue}33`;
   }
-  // Fallback for references: return black with 15% opacity (this shouldn't happen)
+  // Fallback for references: return black with 20% opacity (this shouldn't happen)
   console.warn(`getBorderVariantValue received a reference token: ${borderValue}. This should be resolved to hex first.`);
   return '#00000026';
 }
@@ -1172,7 +1173,7 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}26` : `${getBorderColor(surfaceColor, palette, false)}26`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}33` : `${getBorderColor(surfaceColor, palette, false)}33`,
         type: 'color'
       },
       'Hotlink': {
@@ -1230,7 +1231,7 @@ function generateLightModeTonalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}26` : `${getBorderColor(containerColor, palette, false)}26`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}33` : `${getBorderColor(containerColor, palette, false)}33`,
         type: 'color'
       },
       'Hotlink': {
@@ -1460,7 +1461,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}26` : `${getBorderColor(surfaceColor, palette, false)}26`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}33` : `${getBorderColor(surfaceColor, palette, false)}33`,
         type: 'color'
       },
       'Hotlink': {
@@ -1526,7 +1527,7 @@ function generateLightModeProfessionalSurfacesAndContainers(
         type: 'color'
       },
       'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}26` : `${getBorderColor(containerColor, palette, false)}26`,
+        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}33` : `${getBorderColor(containerColor, palette, false)}33`,
         type: 'color'
       },
       'Hotlink': {
@@ -5769,31 +5770,9 @@ export function exportColorSystemToJSON(
     Object.keys(themes).forEach(themeName => {
       const theme = themes[themeName];
 
-      // Helper: resolve a theme token's Border to hex, then compute Border-Variant (15% opacity)
-      const resolveBorderVariant = (sectionData: any) => {
-        const borderToken = sectionData?.Border?.value;
-        if (!borderToken) return;
-        // Border token is like "{Border.Surfaces.Neutral.Color-11}" — resolve through color ref
-        const borderResolved = resolveColorToken(borderToken, colors, backgrounds);
-        if (borderResolved) {
-          // Border-Variant = border color at 15% opacity (26) as 8-digit hex
-          sectionData['Border-Variant'] = { value: `${borderResolved}26`, type: 'color' };
-        } else {
-          // Try to resolve via the intermediate: navigate the token path through modeData
-          const path = borderToken.replace(/[{}]/g, '').split('.');
-          let current: any = (colorSystem.Modes[mode] as any);
-          for (const part of path) {
-            if (!current || typeof current !== 'object') { current = null; break; }
-            current = current[part];
-          }
-          if (current?.value) {
-            const innerHex = resolveColorToken(current.value, colors, backgrounds);
-            if (innerHex) {
-              sectionData['Border-Variant'] = { value: `${innerHex}26`, type: 'color' };
-            }
-          }
-        }
-      };
+      // (resolveBorderVariant removed — it baked Border-Variant to a literal
+      // in the mode-independent Theme layer. See the note at its former call
+      // site below.)
 
       // Helper: resolve any token to hex by following the full chain
       const resolveToHex = (tokenValue: string): string | null => {
@@ -5849,8 +5828,20 @@ export function exportColorSystemToJSON(
           }
         }
 
-        // Border-Variant
-        resolveBorderVariant(sectionData);
+        // Border-Variant is deliberately NOT baked here.
+        //
+        // The Theme layer is mode-independent — one structure serves Light and
+        // Dark — so resolving a token to a literal here can only ever be correct
+        // for one mode. Border-Variant was being flattened to `${hex}26` from
+        // whichever mode ran, freezing the light-mode value into dark mode:
+        // figma.json carried #171d1926 where the CSS computed #0c120e26 for the
+        // same token. 153 tokens diverged that way, invisible to the contrast
+        // audit because Border-Variant is contrast-exempt.
+        //
+        // generateCompleteThemes already emits the reference
+        // {Border-Variant.Surfaces|Containers.<palette>.Color-N}, and that family
+        // in Modes is per-mode correct. Leaving the reference intact lets it
+        // resolve per mode exactly as its sibling Border does.
       });
       // Add Highlight and Lowlight to each button theme
       // Resolve button color: token is like "{Buttons.Primary.Medium.Button}"
@@ -6595,6 +6586,54 @@ export function exportColorSystemToJSON(
   darkActive.Containers = darkStates.pressed;
   console.log(`  ✓ [JSON Export] Container Hover/Pressed computed ` +
     `(${Object.keys(lightStates.hover).length} palettes per mode)`);
+
+  // ── Icon-Variant opacity ───────────────────────────────────────────────────
+  //
+  // generateIconVariantPaletteStructure() returns generateIconPaletteStructure()
+  // verbatim, so Icon-Variant shipped as an exact duplicate of Icon — 208
+  // variables with identical values and no differentiation at all.
+  //
+  // Icon-Variant is the de-emphasised form of an icon, so it is the icon colour
+  // at reduced opacity, exactly as Border-Variant relates to Border. Baked here
+  // rather than in the structure builder because that emits {Colors.*} token
+  // references, and a reference cannot carry an alpha channel — it has to become
+  // an 8-digit hex, which needs the resolved palette available.
+  function bakeIconVariantAlpha(mode: 'Light-Mode' | 'Dark-Mode') {
+    const colors = (colorSystem.Modes[mode] as any)?.Colors;
+    const iv = (colorSystem.Modes[mode] as any)?.['Icon-Variant'];
+    if (!colors || !iv) return 0;
+    let count = 0;
+    for (const section of ['Surfaces', 'Containers']) {
+      const sect = iv[section];
+      if (!sect) continue;
+      for (const palette of Object.keys(sect)) {
+        for (const colorKey of Object.keys(sect[palette])) {
+          const token = sect[palette][colorKey];
+          let hex = token?.value;
+          if (typeof hex !== 'string') continue;
+          // Resolve a {Colors.Palette.Color-N} reference to its hex first.
+          if (hex.includes('{')) {
+            const m = hex.replace(/[{}]/g, '').match(/^(?:Colors\.)?([\w-]+)\.(Color-[\w-]+)$/);
+            hex = m ? (colors?.[m[1]]?.[m[2]]?.value || '') : '';
+          }
+          if (!hex.startsWith('#')) continue;
+          // colorKey indexes the BACKGROUND tone, so the palette entry at that
+          // key is the surface the icon sits on.
+          const surfaceHex = colors?.[palette]?.[colorKey]?.value;
+          sect[palette][colorKey] = {
+            value: variantHex8(hex, ICON_VARIANT_ALPHA, surfaceHex),
+            type: 'color',
+          };
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+  const ivLight = bakeIconVariantAlpha('Light-Mode');
+  const ivDark = bakeIconVariantAlpha('Dark-Mode');
+  console.log(`  ✓ [JSON Export] Icon-Variant opacity applied ` +
+    `(${ivLight} light, ${ivDark} dark tokens)`);
 
   // Post-process: new Pressed = old Hover, new Hover = mix(Button, old Hover)
   function mixHexColors(hex1: string, hex2: string): string {

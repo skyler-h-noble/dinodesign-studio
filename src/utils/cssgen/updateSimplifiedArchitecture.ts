@@ -116,7 +116,7 @@ export function updateBorderVariantOpacity(designSystem: DesignSystem): DesignSy
             // In the actual JSON, this should resolve to the Border color + 66 for opacity
             surfaceColors[colorN] = {
               ...surfaceColors[colorN],
-              value: `{Border.${colorName}.Surfaces.Color-${n}}66` // Append 66 for 40% opacity
+              value: `{Border.${colorName}.Surfaces.Color-${n}}33` // Append 33 for 20% opacity
             };
           }
         });
@@ -141,7 +141,7 @@ export function updateBorderVariantOpacity(designSystem: DesignSystem): DesignSy
             
             containerColors[colorN] = {
               ...containerColors[colorN],
-              value: `{Border.Containers.${colorName}.Color-${n}}66` // Append 66 for 40% opacity
+              value: `{Border.Containers.${colorName}.Color-${n}}33` // Append 33 for 20% opacity
             };
           }
         });

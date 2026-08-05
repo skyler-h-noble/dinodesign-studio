@@ -9,6 +9,7 @@
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
+import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
 
 interface ColorToken {
   value: string;
@@ -405,7 +406,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     if (colors) {
       const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
 
-      // Border-Variant: border color at 15% opacity (hex + '26')
+      // Border-Variant: border color at 20% opacity (hex + '33')
       // Uses the Border section values if available, otherwise derives from palette
       modeSection['Border-Variant'] = {};
       const borderData = modeSection.Border || {};
@@ -421,8 +422,43 @@ export function generateFigmaJSON(designSystemJSON: any): any {
             const borderToken = borderPalette[colorKey] as any;
             const borderHex = borderToken?.value || (colorVal as any).value;
             if (borderHex && borderHex.startsWith('#')) {
+              // colorKey indexes the BACKGROUND tone, so the palette entry at
+              // that key is the surface this border sits on — which is what the
+              // adaptive alpha needs to keep the perceived weight even.
               modeSection['Border-Variant'][section][palette][colorKey] = {
-                value: `${borderHex.substring(0, 7)}26`, type: 'color'
+                value: variantHex8(borderHex, BORDER_VARIANT_ALPHA, (colorVal as any).value),
+                type: 'color',
+              };
+            }
+          }
+        }
+      }
+
+      // Icon-Variant: the icon colour at reduced opacity (adaptive, base 50%).
+      //
+      // Icon-Variant previously duplicated Icon exactly — 208 variables with
+      // identical values and no differentiation, in Figma and in CSS alike. It
+      // is the de-emphasised form of an icon, so it relates to Icon the way
+      // Border-Variant relates to Border.
+      //
+      // Computed here rather than aliased because a token reference cannot
+      // carry an alpha channel — it has to be baked as an 8-digit hex.
+      const iconData = modeSection.Icon || {};
+      modeSection['Icon-Variant'] = {};
+      for (const section of ['Surfaces', 'Containers']) {
+        modeSection['Icon-Variant'][section] = {};
+        const iconSection = iconData[section] || {};
+        for (const palette of palettes) {
+          modeSection['Icon-Variant'][section][palette] = {};
+          const iconPalette = iconSection[palette] || {};
+          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
+            if (!colorKey.startsWith('Color-')) continue;
+            const iconToken = iconPalette[colorKey] as any;
+            const iconHex = iconToken?.value || (colorVal as any).value;
+            if (iconHex && iconHex.startsWith('#')) {
+              modeSection['Icon-Variant'][section][palette][colorKey] = {
+                value: variantHex8(iconHex, ICON_VARIANT_ALPHA, (colorVal as any).value),
+                type: 'color',
               };
             }
           }

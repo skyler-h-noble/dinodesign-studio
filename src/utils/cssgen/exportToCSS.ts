@@ -9,6 +9,7 @@
  */
 
 import chroma from 'chroma-js';
+import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
@@ -1050,7 +1051,7 @@ function generateThemeColorsVariables(modeData: any): string {
  * Creates selectors like [data-theme="Primary-Light"] with scoped variables
  * Returns the CSS outside of :root block (to be appended after :root closes)
  */
-function generateThemesVariables(modeData: any, fullJsonData?: any): string {
+function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: string): string {
   console.log('🎨 [generateThemesVariables] Called');
   console.log('  ├─ Has modeData?', !!modeData);
   console.log('  ├─ Has modeData.Themes?', !!modeData?.Themes);
@@ -1135,7 +1136,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
   setFallback('Header.Containers.BW.Color-Vibrant', '{Neutral.Color-11}');
 
   // Add Border-Variant entries — theme references {Border-Variant.Surfaces.Palette.Color-N}
-  // Border-Variant = border color at 15% opacity (8-digit hex suffix '26')
+  // Border-Variant = border color at 20% opacity (8-digit hex suffix '33')
   // The Border section has the border color, so we resolve it and append '26'
   const palettesForBV = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
   for (const pal of palettesForBV) {
@@ -1155,8 +1156,13 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
             }
           }
           if (hex.startsWith('#') && !hex.includes('{')) {
-            // 8-digit hex with 15% opacity (0x26)
-            tokenLookup[`Border-Variant.${ctx}.${pal}.${colorN}`] = `${hex}26`;
+            // Adaptive alpha, floored at BORDER_VARIANT_ALPHA. colorN indexes
+            // the BACKGROUND tone, so the palette entry at that key is the
+            // surface this border sits on. A flat alpha measured a 27x spread
+            // in perceived weight across themes; see variantAlpha.ts.
+            const surfaceHex = modeData?.Colors?.[pal]?.[colorN]?.value;
+            tokenLookup[`Border-Variant.${ctx}.${pal}.${colorN}`] =
+              variantHex8(hex, BORDER_VARIANT_ALPHA, surfaceHex);
           }
         }
       }
@@ -1197,32 +1203,51 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
       case 'primary-light': defPal = 'Primary'; defN = 11; break;
       default: defPal = metadata?.['Background-Theme']?.value || 'Primary'; defN = 11; break;
     }
+    // Dark mode does NOT reuse the light-mode palette/tone. The selection above
+    // describes the LIGHT background; in dark mode the Default theme sits on the
+    // dark end of the ramp instead. Mirrors generateFigmaJSON.ts, which already
+    // did this — without it the CSS resolved Default-Background.Surface to
+    // Backgrounds.Neutral.Background-12, a LIGHT colour in the dark palette, so
+    // the Default theme rendered light-on-dark in Figma and dark-on-light on the
+    // web. Both files were internally consistent, so contrast checks passed on
+    // each; only a cross-artifact comparison caught it.
+    const isDarkMode = modeName === 'Dark-Mode';
+    const darkUsePrimary = bgSelection === 'primary-light' || bgSelection === 'primary-base' || bgSelection === 'primary';
+    if (isDarkMode) {
+      defPal = darkUsePrimary ? 'Primary' : 'Neutral';
+      defN = 2;                       // dark surfaces sit at Color-2
+    }
     const colorN = `Color-${defN}`;
+    // Dark containers are always tonal at Color-3 (see generateFigmaJSON).
+    const contN = isDarkMode ? 3 : defN;
+    const contColorN = `Color-${contN}`;
 
     // Background surfaces/containers — reference Backgrounds.{Palette}.Background-{N}
     const bgKey = `Backgrounds.${defPal}.Background-${defN}`;
+    const contBgKey = `Backgrounds.${defPal}.Background-${contN}`;
     tokenLookup['Default-Background.Surface'] = `{${bgKey}.Surfaces.Surface}`;
     tokenLookup['Default-Background.Surface-Dim'] = `{${bgKey}.Surfaces.Surface-Dim}`;
     tokenLookup['Default-Background.Surface-Bright'] = `{${bgKey}.Surfaces.Surface-Bright}`;
-    tokenLookup['Default-Background.Container'] = `{${bgKey}.Containers.Container}`;
-    tokenLookup['Default-Background.Container-Low'] = `{${bgKey}.Containers.Container-Low}`;
-    tokenLookup['Default-Background.Container-Lowest'] = `{${bgKey}.Containers.Container-Lowest}`;
-    tokenLookup['Default-Background.Container-High'] = `{${bgKey}.Containers.Container-High}`;
-    tokenLookup['Default-Background.Container-Highest'] = `{${bgKey}.Containers.Container-Highest}`;
+    tokenLookup['Default-Background.Container'] = `{${contBgKey}.Containers.Container}`;
+    tokenLookup['Default-Background.Container-Low'] = `{${contBgKey}.Containers.Container-Low}`;
+    tokenLookup['Default-Background.Container-Lowest'] = `{${contBgKey}.Containers.Container-Lowest}`;
+    tokenLookup['Default-Background.Container-High'] = `{${contBgKey}.Containers.Container-High}`;
+    tokenLookup['Default-Background.Container-Highest'] = `{${contBgKey}.Containers.Container-Highest}`;
 
     // Text, Header, Quiet, Border, etc. — reference {Section.Surfaces.Palette.Color-N}
     const props = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
     for (const prop of props) {
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
-      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${colorN}}`;
+      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${contColorN}}`;
     }
     // Focus-Visible uses a flat path (no palette nesting) AND is keyed by
     // Background-N, not Color-N. Using colorN here produced
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the
     // Default theme's focus ring unbound in both modes.
     const backgroundN = `Background-${defN}`;
+    const containerBackgroundN = `Background-${contN}`;
     tokenLookup['Default-Background.Focus-Visible'] = `{Focus-Visible.Surfaces.${backgroundN}}`;
-    tokenLookup['Default-Background.Container-Focus-Visible'] = `{Focus-Visible.Containers.${backgroundN}}`;
+    tokenLookup['Default-Background.Container-Focus-Visible'] = `{Focus-Visible.Containers.${containerBackgroundN}}`;
 
     // Hover/Pressed — reference {Hover/Pressed.Palette.Color-N}
     tokenLookup['Default-Background.Hover'] = `{Hover.${defPal}.${colorN}}`;
@@ -1230,8 +1255,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any): string {
     // Container states come from the Containers group, which is computed from
     // the container colour. The flat family is indexed by background tone and
     // would send a dark container to a light hover.
-    tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${defPal}.${colorN}}`;
-    tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${defPal}.${colorN}}`;
+    tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${defPal}.${contColorN}}`;
+    tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${defPal}.${contColorN}}`;
 
     // Hotlink
     tokenLookup['Default-Background.Hotlink'] = `{Text.Surfaces.Info.${colorN}}`;
@@ -2802,7 +2827,7 @@ function generateModeCSS(modeName: string, modeData: any): string {
   lines.push(' * Theme Data-Attribute Selectors (30 Themes)');
   lines.push(' * ======================================== */');
   lines.push('');
-  const themesVars = generateThemesVariables(modeData, fullJsonData);
+  const themesVars = generateThemesVariables(modeData, fullJsonData, modeName);
   if (themesVars) {
     lines.push(themesVars);
   }
@@ -3076,7 +3101,7 @@ function generateModeCSSFromSingleMode(modeData: any, modeName: string, fullJson
   lines.push(' * Theme Data-Attribute Selectors (30 Themes)');
   lines.push(' * ======================================== */');
   lines.push('');
-  const themesVarsV2 = generateThemesVariables(modeData, fullJsonData);
+  const themesVarsV2 = generateThemesVariables(modeData, fullJsonData, modeName);
   if (themesVarsV2) {
     lines.push(themesVarsV2);
   }
