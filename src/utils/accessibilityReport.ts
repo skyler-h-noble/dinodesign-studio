@@ -21,7 +21,7 @@
 type Mode = 'Light' | 'Dark';
 
 export interface ReportCheck {
-  category: 'Text' | 'Header' | 'Focus' | 'Input' | 'Button';
+  category: 'Text' | 'Header' | 'Focus' | 'Input' | 'Button' | 'Border' | 'Eyebrow';
   label: string;
   /** Dot-path of the foreground token under test, e.g. Text.Surfaces.Primary.Color-9 */
   token: string;
@@ -193,12 +193,14 @@ function check(
  * Which Background-N entries to treat as the user-selectable backgrounds.
  * These four match the ColorAssignmentStage background options.
  */
-const BACKGROUND_CHOICES: Array<{
+type BackgroundChoice = {
   label: string;                 // human-readable row header
-  palette: 'Neutral' | 'Primary';
+  palette: string;               // palette the surface is drawn from
   bgKey: string;                 // key under Backgrounds.{palette}.{bgKey}
   colorN: number | 'Vibrant';    // matching Color-N index for foreground token lookups
-}> = [
+};
+
+const BACKGROUND_CHOICES: BackgroundChoice[] = [
   { label: 'White',           palette: 'Neutral', bgKey: 'Background-12',      colorN: 12 },
   { label: 'Black',           palette: 'Neutral', bgKey: 'Background-1',       colorN: 1 },
   { label: 'Primary Light',   palette: 'Primary', bgKey: 'Background-11',      colorN: 11 },
@@ -222,7 +224,7 @@ const SURFACE_LEVELS: Array<{ label: string; group: 'Surfaces' | 'Containers'; k
  * Backgrounds values are sometimes direct hex, sometimes `{Colors.X.Color-N}`
  * refs — resolveRef handles both.
  */
-function resolveSurface(modeTree: any, bg: typeof BACKGROUND_CHOICES[number], surface: typeof SURFACE_LEVELS[number]): string {
+function resolveSurface(modeTree: any, bg: BackgroundChoice, surface: typeof SURFACE_LEVELS[number]): string {
   const node = modeTree?.Backgrounds?.[bg.palette]?.[bg.bgKey]?.[surface.group]?.[surface.key];
   if (node) {
     const value = typeof node === 'object' ? node.value : node;
@@ -244,13 +246,21 @@ const TEXT_PALETTES  = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', '
 const HEADER_PALETTES = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Success', 'Warning', 'Error'] as const;
 const BUTTON_PALETTES = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'] as const;
 
+// Quiet, Eyebrow and Border each ship a full per-palette table, but the report
+// only ever read the ONE entry matching the surface's own palette. A themed
+// zone can put any palette's Quiet/Eyebrow/Border on any surface, so the other
+// seven were never verified — the same shape of hole as the tone blind spot.
+const QUIET_PALETTES   = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'] as const;
+const EYEBROW_PALETTES = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'] as const;
+const BORDER_PALETTES  = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'] as const;
+
 function colorNKey(n: number | 'Vibrant'): string {
   return n === 'Vibrant' ? 'Color-Vibrant' : `Color-${n}`;
 }
 
 function collectChecks(
   modeTree: any,
-  bg: typeof BACKGROUND_CHOICES[number],
+  bg: BackgroundChoice,
   surfaceBg: string,
 ): ReportCheck[] {
   const checks: ReportCheck[] = [];
@@ -289,28 +299,59 @@ function collectChecks(
       if (c) checks.push(c);
     }
 
-    // Quiet (secondary text — still subject to 4.5:1 for readability per AA)
-    const quietTok = `Quiet.Surfaces.${bg.palette}.${bgColorKey}`;
-    const quiet = getHex(modeTree, quietTok);
-    const cq = check('Text', `Quiet Text${st.suffix}`, quietTok, quiet, st.bg, 4.5);
-    if (cq) checks.push(cq);
+    // Quiet (secondary text — still subject to 4.5:1 for readability per AA).
+    // Swept across every palette's table, not just the surface's own.
+    const cqd = check('Text', `Quiet Text${st.suffix}`,
+      `Quiet.Surfaces.${bg.palette}.${bgColorKey}`,
+      getHex(modeTree, `Quiet.Surfaces.${bg.palette}.${bgColorKey}`), st.bg, 4.5);
+    if (cqd) checks.push(cqd);
+    for (const pal of QUIET_PALETTES) {
+      const tok = `Quiet.Surfaces.${pal}.${bgColorKey}`;
+      const c = check('Text', `${pal} Quiet${st.suffix}`, tok, getHex(modeTree, tok), st.bg, 4.5);
+      if (c) checks.push(c);
+    }
 
-    // Hotlink — conventional link color from Info palette, using its accessible
-    // text tone for this surface lightness.
+    // Hotlink — the theme resolves `--Hotlink` to {Text.Surfaces.Info.Color-N},
+    // so that is the token measured here rather than a stand-in.
     const hotlinkTok = `Text.Surfaces.Info.${bgColorKey}`;
-    const hotlink = getHex(modeTree, hotlinkTok);
-    const chl = check('Text', `Hotlink${st.suffix}`, hotlinkTok, hotlink, st.bg, 4.5);
+    const chl = check('Text', `Hotlink${st.suffix}`, hotlinkTok, getHex(modeTree, hotlinkTok), st.bg, 4.5);
     if (chl) checks.push(chl);
+
+    // Hotlink-Visited — `--Hotlink-Visited` resolves to its own palette
+    // ({Text.Surfaces.Hotlink-Visited.Color-N}) and was not checked at all. A
+    // visited link is still body text and still has to clear 4.5.
+    const visitedTok = `Text.Surfaces.Hotlink-Visited.${bgColorKey}`;
+    const cvl = check('Text', `Hotlink Visited${st.suffix}`, visitedTok, getHex(modeTree, visitedTok), st.bg, 4.5);
+    if (cvl) checks.push(cvl);
 
     // Eyebrow — a small label above a heading, so it is body-sized text and
     // carries the full 4.5, not the 3:1 large-text allowance a Header gets.
     // Each background borrows a different brand colour (Primary → Secondary,
-    // Secondary → Tertiary, Tertiary/Neutral → Primary, states → BW), so it is
-    // resolved from the Eyebrows table rather than assumed to match Text.
+    // Secondary → Tertiary, Tertiary/Neutral → Primary, states → BW), and the
+    // Eyebrows table already encodes that rotation — so it is read from there
+    // rather than assumed to match Text.
     const eyebrowTok = `Eyebrows.Surfaces.${bg.palette}.${bgColorKey}`;
-    const eyebrow = getHex(modeTree, eyebrowTok);
-    const ceb = check('Text', `Eyebrow${st.suffix}`, eyebrowTok, eyebrow, st.bg, 4.5);
+    const ceb = check('Eyebrow', `Eyebrow${st.suffix}`, eyebrowTok, getHex(modeTree, eyebrowTok), st.bg, 4.5);
     if (ceb) checks.push(ceb);
+    for (const pal of EYEBROW_PALETTES) {
+      const tok = `Eyebrows.Surfaces.${pal}.${bgColorKey}`;
+      const c = check('Eyebrow', `${pal} Eyebrow${st.suffix}`, tok, getHex(modeTree, tok), st.bg, 4.5);
+      if (c) checks.push(c);
+    }
+  }
+
+  // ── Border (3:1 non-text) ──
+  // `--Border` outlines interactive boundaries, so it is measured against the
+  // surface in every state the surface can be in — a bordered input on a
+  // hovered row sits on the hover scrim, not on the resting background.
+  // Border-Variant is deliberately absent: it is decorative and carries no
+  // contrast requirement.
+  for (const st of textStates) {
+    for (const pal of BORDER_PALETTES) {
+      const tok = `Border.Surfaces.${pal}.${bgColorKey}`;
+      const c = check('Border', `${pal} Border${st.suffix}`, tok, getHex(modeTree, tok), st.bg, 3);
+      if (c) checks.push(c);
+    }
   }
 
   // ── Headers (3:1, large text) ──
@@ -346,6 +387,8 @@ function collectChecks(
   if (cf) checks.push(cf);
 
   // ── Input border (3:1) ──
+  // The resting outline is the theme's own `--Border`; the per-palette sweep
+  // above covers the rest.
   const borderTok = `Border.Surfaces.${bg.palette}.${bgColorKey}`;
   const border = getHex(modeTree, borderTok);
   const cb = check('Input', 'Input Border', borderTok, border, surfaceBg, 3);
@@ -425,6 +468,26 @@ function collectChecks(
 
 // ─── Public entry point ────────────────────────────────────────────────────
 
+/**
+ * Themed surfaces.
+ *
+ * A `data-theme="Primary"` + `data-surface="Surface"` block paints its
+ * Background from that palette's OWN tone, and the tone is whatever the user's
+ * colour extracted to — any of the twelve.
+ *
+ * The four BACKGROUND_CHOICES above only ever reach tones 1, 11, 12 and
+ * Vibrant, and the derived levels (Dim/Bright/Containers) land near them. So
+ * tones 5-9 were never checked at all — and that is exactly where the
+ * Border.Surfaces mapping was broken: Color-7 and Color-8 both pointed at
+ * Color-5, which measures 2.18:1 on a saturated blue against a 3:1 requirement.
+ * The report said 100% while shipping that.
+ *
+ * Only the three brand palettes are enumerated: those are the ones a page is
+ * themed with. Every surface here still sweeps all eight palettes' borders and
+ * text through collectChecks, so the full (palette × tone) matrix is covered.
+ */
+const THEME_SURFACE_PALETTES = ['Primary', 'Secondary', 'Tertiary'] as const;
+
 export function buildAccessibilityReport(tokens: any): ReportSection[] {
   const modes: Array<{ mode: Mode; tree: any }> = [];
   if (tokens?.Modes?.['Light-Mode']) modes.push({ mode: 'Light', tree: tokens.Modes['Light-Mode'] });
@@ -443,6 +506,27 @@ export function buildAccessibilityReport(tokens: any): ReportSection[] {
           surfaceLevel: surface.label,
           surfaceBg,
           checks,
+        });
+      }
+    }
+
+    // Themed surfaces at every tone — see THEME_SURFACE_PALETTES.
+    for (const palette of THEME_SURFACE_PALETTES) {
+      for (let n = 1; n <= 12; n++) {
+        const surfaceBg = getHex(tree, `Colors.${palette}.Color-${n}`);
+        if (!surfaceBg) continue;
+        const bg: BackgroundChoice = {
+          label: `${palette} theme`,
+          palette,
+          bgKey: `Background-${n}`,
+          colorN: n,
+        };
+        sections.push({
+          mode,
+          background: `${palette} theme (${palette}-${n})`,
+          surfaceLevel: 'Surface',
+          surfaceBg,
+          checks: collectChecks(tree, bg, surfaceBg),
         });
       }
     }

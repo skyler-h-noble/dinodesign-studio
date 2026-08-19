@@ -5267,8 +5267,13 @@ export function exportColorSystemToJSON(
         'Color-4': { value: `{Colors.${colorRef}.Color-9}`, type: 'color' },
         'Color-5': { value: `{Colors.${colorRef}.Color-10}`, type: 'color' },
         'Color-6': { value: `{Colors.${colorRef}.Color-2}`, type: 'color' },
-        'Color-7': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
-        'Color-8': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
+        // Color-7/8 must be Color-4, not Color-5. Color-5 against a mid-tone
+        // surface bottoms out at 2.18:1 (Color-7) and 2.95:1 (Color-8) on
+        // saturated blues — under the 3:1 non-text floor. Color-4 holds at
+        // 3.89 / 5.36 worst-case across a 24-hue sweep. Matches the preview's
+        // BORDER_LOOKUP_LIGHT_BG.
+        'Color-7': { value: `{Colors.${colorRef}.Color-4}`, type: 'color' },
+        'Color-8': { value: `{Colors.${colorRef}.Color-4}`, type: 'color' },
         'Color-9': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-10': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-11': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
@@ -5283,8 +5288,13 @@ export function exportColorSystemToJSON(
         'Color-4': { value: `{Colors.${colorRef}.Color-9}`, type: 'color' },
         'Color-5': { value: `{Colors.${colorRef}.Color-10}`, type: 'color' },
         'Color-6': { value: `{Colors.${colorRef}.Color-2}`, type: 'color' },
-        'Color-7': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
-        'Color-8': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
+        // Color-7/8 must be Color-4, not Color-5. Color-5 against a mid-tone
+        // surface bottoms out at 2.18:1 (Color-7) and 2.95:1 (Color-8) on
+        // saturated blues — under the 3:1 non-text floor. Color-4 holds at
+        // 3.89 / 5.36 worst-case across a 24-hue sweep. Matches the preview's
+        // BORDER_LOOKUP_LIGHT_BG.
+        'Color-7': { value: `{Colors.${colorRef}.Color-4}`, type: 'color' },
+        'Color-8': { value: `{Colors.${colorRef}.Color-4}`, type: 'color' },
         'Color-9': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-10': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },
         'Color-11': { value: `{Colors.${colorRef}.Color-5}`, type: 'color' },

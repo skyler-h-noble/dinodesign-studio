@@ -1,6 +1,6 @@
 import chroma from 'chroma-js';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
-import { toneToColorNumber } from './colorScale';
+import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -84,12 +84,15 @@ interface BuildInput {
   typographyStyles?: import('../types').TypographyStyle[];
 }
 
-// Neutral gray scale (12 tones) for black/white card coloring
-const NEUTRAL = [
-  '#050505', '#1a1a1a', '#2e2e2e', '#434343', '#585858',
-  '#8e8e8e', '#a3a3a3', '#b8b8b8', '#cccccc', '#e0e0e0',
-  '#f0f0f0', '#ffffff',
-];
+// Neutral gray scale (12 tones) for black/white card coloring.
+//
+// Generated from the same '#808080' seed the export uses (SEMANTIC_SEEDS.neutral
+// in generateFullPalettes.ts) rather than hand-written. The hand-written ramp
+// had drifted from the generated one at 11 of 12 tones — Color-9 was #cccccc
+// against the export's #e2e2e2 — and it had no dark variant at all, so dark
+// mode silently painted the light greys.
+const NEUTRAL_LIGHT: string[] = generateSemanticLightModeScale('#808080').map(t => t.hex);
+const NEUTRAL_DARK: string[] = generateSemanticDarkModeScale('#808080').map(t => t.hex);
 
 // ── Contrast-checked tone lookup ──
 // Starting points from neutral lightness calculations.
@@ -306,6 +309,9 @@ export function buildPreviewCSS(input: BuildInput): string {
   const { colorScheme, userSelections: sel, mode } = input;
   const isDark = mode === 'dark';
 
+  // Neutral ramp for this mode — the export swaps ramps the same way.
+  const NEUTRAL = isDark ? NEUTRAL_DARK : NEUTRAL_LIGHT;
+
   // Light palettes — used for vibrant elements (buttons, tags, icons) in ALL modes
   const lightPalettes = colorScheme.tonePalettes || {};
   const primaryLight = lightPalettes.primary || [];
@@ -442,8 +448,13 @@ export function buildPreviewCSS(input: BuildInput): string {
     } catch {
       labelIsLight = n <= 5; // fall back to the tone split
     }
-    // Both ends invert — neither has headroom.
-    const activeN = Math.min(Math.max(labelIsLight ? n - 1 : n + 1, 1), 12);
+    // Both ends invert — neither has headroom. Clamping to 1/12 would return
+    // the fill itself, so the button visibly did nothing on press; the ends
+    // land on 2/11 instead. Matches the export's swap pass.
+    let stepN = labelIsLight ? n - 1 : n + 1;
+    if (stepN < 1) stepN = 2;
+    if (stepN > 12) stepN = 11;
+    const activeN = stepN;
     const stepHex = palette[activeN - 1]?.hex || baseHex;
     // Color-1 moves a HALF step. Its gap to Color-2 is a tenfold luminance
     // change, so a full step reads as the button changing colour rather than
@@ -594,9 +605,13 @@ export function buildPreviewCSS(input: BuildInput): string {
   // Secondary: uses actual Secondary extracted color
   // Tonal: uses actual Primary extracted color (same as primary — the tone IS the color)
   // Laddered: Primary, Secondary, Tertiary cascade
-  // Black/White: pure contrast — switches to Laddered in dark mode
+  // Black/White: pure contrast, in BOTH modes — the face is chosen by the
+  // SURFACE's tone (black on a light tone, white on a dark one), so it needs no
+  // mode rule. This used to fall back to Laddered in dark mode, which silently
+  // replaced the style the user picked with a different one and disagreed with
+  // the export, whose Buttons.BlackWhite table keys on tone alone.
   // Buttons always use light/vibrant palette so they stay bright in dark mode
-  const effectiveButton = (isDark && sel.button === 'black-white') ? 'laddered' : sel.button;
+  const effectiveButton = sel.button;
   // Button text uses contrast-verified tones against the button background
   // Buttons always use vibrant (light) palette
   // btnBg = button fill color (RESOLVED hex from palette, not var() reference)
@@ -681,21 +696,30 @@ export function buildPreviewCSS(input: BuildInput): string {
     name === 'Secondary' ? bSecondary : name === 'Tertiary' ? bTertiary : bPrimary;
   const btnNFor = (name: SurfaceTheme): number =>
     isDark ? DARK_BUTTON_N : nFor(name);
-  const getDefaultBtnPalForSurface = (surfaceTheme: SurfaceTheme): { pal: typeof vPrimary; n: number } => {
+  // `name` is which palette family the button draws from. The fill reads it
+  // from the light ramp (buttons cross over in dark mode); the BORDER has to
+  // read the same family out of the CURRENT mode's ramp, because the border's
+  // job is to hold 3:1 against the surface and the surface is a dark-ramp
+  // colour in dark mode. The export does this by construction — its
+  // Border.Surfaces refs resolve inside whichever Modes block is being
+  // written — so the preview has to name the family to match it.
+  const getDefaultBtnPalForSurface = (
+    surfaceTheme: SurfaceTheme,
+  ): { pal: typeof vPrimary; n: number; name: SurfaceTheme | 'Neutral' } => {
     switch (effectiveButton) {
-      case 'primary': return { pal: bPrimary, n: btnPC };
-      case 'secondary': return { pal: bSecondary, n: btnSC };
-      case 'tonal': return { pal: btnPalFor(surfaceTheme), n: btnNFor(surfaceTheme) };
+      case 'primary': return { pal: bPrimary, n: btnPC, name: 'Primary' };
+      case 'secondary': return { pal: bSecondary, n: btnSC, name: 'Secondary' };
+      case 'tonal': return { pal: btnPalFor(surfaceTheme), n: btnNFor(surfaceTheme), name: surfaceTheme };
       case 'laddered': {
         const next: SurfaceTheme = surfaceTheme === 'Primary' ? 'Secondary'
           : surfaceTheme === 'Secondary' ? 'Tertiary' : 'Primary';
-        return { pal: btnPalFor(next), n: btnNFor(next) };
+        return { pal: btnPalFor(next), n: btnNFor(next), name: next };
       }
       case 'black-white': {
         const bg = p(palFor(surfaceTheme), nFor(surfaceTheme));
-        return { pal: NEUTRAL.map(h => ({ hex: h })) as any, n: isLight(bg) ? 1 : 12 };
+        return { pal: NEUTRAL.map(h => ({ hex: h })) as any, n: isLight(bg) ? 1 : 12, name: 'Neutral' };
       }
-      default: return { pal: bPrimary, n: btnPC };
+      default: return { pal: bPrimary, n: btnPC, name: 'Primary' };
     }
   };
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
@@ -758,10 +782,16 @@ export function buildPreviewCSS(input: BuildInput): string {
   };
 
   const emitDefaultBtnTokens = (surfaceTheme: SurfaceTheme): string => {
-    const { pal, n } = getDefaultBtnPalForSurface(surfaceTheme);
+    const { pal, n, name: btnPalName } = getDefaultBtnPalForSurface(surfaceTheme);
     const sbg = p(palFor(surfaceTheme), nFor(surfaceTheme));
     const sn = nFor(surfaceTheme);
-    const bg = p(pal, n);
+    // Same palette family as the fill, but read out of THIS mode's ramp.
+    const borderPal: typeof vPrimary = btnPalName === 'Neutral'
+      ? (NEUTRAL.map(h => ({ hex: h })) as never)
+      : palFor(btnPalName);
+    // The white face's fill is {White} (#ffffff, 70% in dark), NOT Neutral
+    // Color-12 — whiteFace() in generateButtonsSimplified.ts writes {White}.
+    const bg = effectiveButton === 'black-white' && n === 12 ? WHITE_TEXT : p(pal, n);
     const tones = getAccessibleTones(bg, n, pal);
     // black-white: NEUTRAL is ordered dark→light (opposite the brand palettes),
     // so the tone-table math mis-resolves the text/hover. BW is definitionally
@@ -769,11 +799,29 @@ export function buildPreviewCSS(input: BuildInput): string {
     // a black button gets white text and a subtle lighter hover (NOT a near-white
     // scrim); a white button gets dark text and a subtle darker hover.
     const isBW = effectiveButton === 'black-white';
-    const txt = isBW ? (isLight(bg) ? '#1a1a1a' : WHITE_TEXT) : p(pal, tones.text);
-    const palBorder = p(pal, getAccessibleTones(sbg, sn, pal).border);
-    const { hover, active } = isBW
-      ? (isLight(bg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
-      : activeAndHoverFor(pal, n);
+    const txt = isBW ? (isLight(bg) ? neutral(1) : WHITE_TEXT) : p(pal, tones.text);
+    // Black-white is the one style where the border IS the fill — a black
+    // button on a light tone and a white button on a dark tone, border matching
+    // and text inverted. Every other style keeps the tonal 3:1 border.
+    const palBorder = isBW
+      ? bg
+      : p(borderPal, getAccessibleTones(sbg, sn, borderPal).border);
+    // Black-white states read the Neutral Hover/Pressed tables at the indices
+    // blackFace()/whiteFace() name in generateButtonsSimplified.ts, rather than
+    // stepping from the fill. The white face's fill is pure white, which is off
+    // the ramp, so stepping from it would miss; and the dark faces deliberately
+    // start a tone or two in from the end.
+    const bwStates = () => {
+      if (isLight(bg)) return { // white face
+        hover: activeAndHoverFor(neutralPaletteArr, 11).hover,
+        active: activeAndHoverFor(neutralPaletteArr, isDark ? 10 : 12).active,
+      };
+      return { // black face
+        hover: activeAndHoverFor(neutralPaletteArr, isDark ? 2 : 1).hover,
+        active: activeAndHoverFor(neutralPaletteArr, isDark ? 3 : 1).active,
+      };
+    };
+    const { hover, active } = isBW ? bwStates() : activeAndHoverFor(pal, n);
     return `  --Buttons-Default-Button: ${bg};
   --Buttons-Default-Text: ${txt};
   --Buttons-Default-Border: ${palBorder};

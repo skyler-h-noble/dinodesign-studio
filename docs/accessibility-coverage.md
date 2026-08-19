@@ -28,6 +28,12 @@ A "context" is one fully-resolved combination a component can find itself in:
 
 Every check below runs in *all* 324. Nothing is sampled.
 
+> Read that claim carefully: it is complete over themes and surface scopes, but
+> each theme's surface tone comes from the user's extracted colour, so a single
+> brand exercises only a few of the twelve tones. See
+> [The tone blind spot](#the-tone-blind-spot-closed-2026-08-19) for what that
+> hid and how the in-app report now covers all twelve.
+
 ---
 
 ## The ten categories
@@ -123,3 +129,101 @@ colours. Two examples from real regressions:
 
 The same applies to Figma↔CSS parity: a "100%" run proves nothing about roles the
 comparison does not include.
+
+---
+
+## The tone blind spot (closed 2026-08-19)
+
+Counting contexts hid a second, sharper version of the same problem: the
+enumeration was complete in *themes* and *surface scopes*, and incomplete in
+**tones**.
+
+A theme's surface is painted at the tone the user's colour extracted to. So for
+any one brand, only a handful of the twelve tones are ever exercised — a Primary
+theme on a `#7b3f9d` brand sits at tone 5, and nothing in the run ever placed a
+surface at tone 7 or 8. The in-app report had the same shape from the other
+direction: its four background choices (White, Black, Primary Light, Primary
+Vibrant) reach tones 1, 11, 12 and Vibrant, and the derived Dim/Bright/Container
+levels land near them. **Tones 5–9 were never checked by either.**
+
+What that hid: `Border.Surfaces.<palette>.Color-7` and `.Color-8` both pointed at
+`Color-5`, which measures **2.18:1** against a saturated blue surface and 2.91:1
+on the deep purple the suite actually used — against a 3:1 requirement. It
+shipped in the CSS bundle and the Figma payload while every run reported 100%.
+
+**The close:** `buildAccessibilityReport` now adds a themed-surface pass —
+Primary, Secondary and Tertiary at all twelve tones, in both modes. Each of those
+surfaces still sweeps all eight palettes' borders and text, so the full
+(palette × tone) matrix is covered. Per brand: 64 → **136 sections**, 6,336 →
+**13,464 checks**.
+
+Verified by putting the broken mapping back: the report flags it at 2.91:1.
+A coverage fix that cannot fail on the bug it was written for is not a fix.
+
+---
+
+## The role blind spot (closed 2026-08-19)
+
+The same question — *what does the count vary over?* — has a third answer:
+**palettes**, and it was wrong for four roles.
+
+`Text` and `Header` swept all eight palettes. `Quiet`, `Eyebrow` and `Border`
+each read exactly **one** entry — the one matching the surface's own palette —
+even though all three ship a full eight-palette table. A themed zone can put any
+palette's Quiet, Eyebrow or Border on any surface, so seven of eight were never
+measured. `Hotlink-Visited` was not checked **at all**.
+
+What changed:
+
+| Role | Before | Now |
+| --- | --- | --- |
+| Quiet | 1 palette | all 8, × resting/hover/pressed |
+| Eyebrow | 1 palette, filed under Text | all 8, own **Eyebrow** category |
+| Border | 1 palette, filed under Input as "Input Border" | all 8, own **Border** category, × resting/hover/pressed |
+| Hotlink | Info palette (correct token — `--Hotlink` resolves to `{Text.Surfaces.Info.Color-N}`) | unchanged |
+| Hotlink-Visited | **not checked** | `{Text.Surfaces.Hotlink-Visited.Color-N}`, 4.5:1, × all states |
+
+Border is now measured against the hover and pressed surface scrims as well as
+the resting background: a bordered input on a hovered row sits on the scrim, not
+on the resting colour. `Border-Variant` is still deliberately absent — it is
+decorative and carries no contrast requirement.
+
+Eyebrow is read from the `Eyebrows` table rather than assumed to match Text,
+because the table encodes a rotation (Primary → Secondary, Secondary → Tertiary,
+Tertiary/Neutral → Primary, state palettes → BW). Verified that
+`Eyebrows.Surfaces.Primary.Color-N` and `Themes.Primary.Surfaces.Eyebrow` resolve
+to the same token.
+
+---
+
+## Current measured coverage
+
+Six brands, **141,984 checks, zero failures**. Per brand: **136 sections,
+23,664 checks**.
+
+| Category | Checks | Worst measured | Threshold |
+| --- | ---: | ---: | ---: |
+| Text (incl. Quiet, Hotlink, Visited) | 48,960 | 4.64:1 | 4.5:1 |
+| Button (incl. borders) | 29,376 | 4.01:1 | 3:1 / 4.5:1 |
+| Eyebrow | 22,032 | 5.50:1 | 4.5:1 |
+| Border | 19,584 | 4.01:1 | 3:1 |
+| Header | 19,584 | 3.95:1 | 3:1 |
+| Input | 1,632 | 3.04:1 | 3:1 |
+| Focus | 816 | 3.04:1 | 3:1 |
+
+`Focus-Visible.Surfaces.Background-7` at **3.04:1** is the thinnest margin in the
+system. It passes, and a narrow pass is a pass — the threshold is the
+requirement, not a floor to clear by some margin. Do not "improve" a compliant
+value: the focus tables are hand-tuned per Background-N, and padding one to buy
+headroom moves a colour the design intends.
+
+### The general rule
+
+Ask what a count *varies over*, not how large it is. Three axes, three holes:
+themes and surface scopes were enumerated, but **tones** were inherited from one
+brand's extracted colour, **palettes** were pinned to the surface's own for four
+roles, and one role (`Hotlink-Visited`) was absent entirely. Each looked like
+coverage because it was multiplied by the axes that *were* complete.
+
+The check that matters: for every role the system ships, name the axis it varies
+over and confirm the report varies over it too.

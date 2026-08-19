@@ -1,4 +1,9 @@
 import chroma from 'chroma-js';
+// The two LIGHT-MODE families that carry a 4.5:1 requirement. Imported rather
+// than restated so the guard below cannot drift from the tables it is
+// predicting. Both modules are leaves — no cycle back into this file.
+import { lightModeTextFixed } from './cssgen/lightModeTonalTextFixedStructure';
+import { getStaticQuietTokensForLightMode } from './cssgen/staticQuietStructures';
 
 /** The 12-tone light mode scale mapped to LCH lightness values */
 export const TONE_SCALE = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99] as const;
@@ -337,11 +342,47 @@ function generateScaledTones(
       const dist = Math.abs(tones[i].tone - lockedL);
       if (dist < provisionalDist) { provisionalDist = dist; provisionalIdx = i; }
     }
-    // Slots 1-5 carry light text, 6-12 carry dark text.
-    const tableEndHex = provisionalIdx + 1 <= 5
-      ? tones[tones.length - 1].hex   // light end
-      : tones[0].hex;                 // dark end
-    const canCarryText = contrastRatio(lockedHex, tableEndHex) >= 4.5;
+    // Test the slot against the BACKGROUNDS THE TABLES ACTUALLY PAIR IT WITH,
+    // not the far end of its own ramp.
+    //
+    // Testing the end tone is too lenient, and by a margin that matters. A
+    // locked #2563eb sits at L=46 and lands in the Color-5 slot, whose nominal
+    // lightness is 37 — so Color-5 ends up much lighter than its slot expects.
+    // Against Color-12 it measures 4.98 and sailed through; but Quiet pairs a
+    // Color-5 foreground with backgrounds down to Color-9, where it measures
+    // 4.48. One cell shipped under the line, and it was the user's own colour.
+    //
+    // So: find every background tone the Text and Quiet tables point AT this
+    // slot, and require the worst of them to clear 4.5.
+    const slotKey = `Color-${provisionalIdx + 1}`;
+    const quietLight = getStaticQuietTokensForLightMode() as any;
+    const pairedBackgrounds = new Set<number>();
+    for (const table of [ (lightModeTextFixed as any)?.Surfaces, quietLight?.Surfaces ]) {
+      const row = table?.Primary;
+      if (!row) continue;
+      for (const [bgKey, cell] of Object.entries<any>(row)) {
+        const bgN = parseInt(String(bgKey).replace('Color-', ''), 10);
+        if (!Number.isFinite(bgN) || bgN === provisionalIdx + 1) continue;
+        const ref = typeof cell === 'string' ? cell : cell?.value;
+        if (typeof ref !== 'string') continue;
+        // "{Colors.Primary.Color-5}" → does this cell point at our slot?
+        if (ref.endsWith(`.${slotKey}}`)) pairedBackgrounds.add(bgN);
+      }
+    }
+
+    let canCarryText: boolean;
+    if (pairedBackgrounds.size > 0) {
+      canCarryText = [...pairedBackgrounds].every(
+        (bgN) => contrastRatio(lockedHex, tones[bgN - 1].hex) >= 4.5,
+      );
+    } else {
+      // No 4.5 family uses this slot as a foreground, so there is nothing to
+      // guarantee. Fall back to the ramp's opposite end.
+      const tableEndHex = provisionalIdx + 1 <= 5
+        ? tones[tones.length - 1].hex   // light end
+        : tones[0].hex;                 // dark end
+      canCarryText = contrastRatio(lockedHex, tableEndHex) >= 4.5;
+    }
 
     if (!canCarryText) {
       // Nothing in its own ramp reaches 4.5, which only happens in the
@@ -352,13 +393,15 @@ function generateScaledTones(
         ? DEAD_ZONE_LOW
         : DEAD_ZONE_HIGH;
       placedHex = chroma.lch(target, lockedC, lockedH).hex();
+      const direction = target < lockedL ? 'darkened' : 'lightened';
       adjustment = {
         from: lockedHex,
         to: placedHex,
-        reason: `No text colour can reach the 4.5:1 minimum on ${lockedHex} `
-          + `(lightness ${lockedL.toFixed(0)}). Adjusted to ${placedHex} — the `
-          + `nearest lightness that supports accessible text — keeping the same `
-          + `hue and saturation.`,
+        reason: `${lockedHex} sits in the middle of the lightness range `
+          + `(${lockedL.toFixed(0)}), too close to the backgrounds it has to be `
+          + `read against — those pairings land near 4:1, under the 4.5:1 `
+          + `minimum. We ${direction} it slightly to ${placedHex}, keeping the `
+          + `same hue and saturation, so every pairing passes.`,
       };
     }
 

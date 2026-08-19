@@ -21,6 +21,7 @@ import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
 import { generateFigmaJSON } from '../utils/generateFigmaJSON';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
+import { buildAccessibilityReport } from '../utils/accessibilityReport';
 import type { ColorScheme, UserSelections } from '../types';
 
 // ─── Fixture ─────────────────────────────────────────────────────────────────
@@ -96,6 +97,13 @@ function buildAll(scheme: ColorScheme, sel: UserSelections, mode: 'light' | 'dar
     },
   );
 
+  // generateDesignSystem attaches this before calling the Figma generator.
+  // Omitting it makes every palette lookup fall back to Primary, so the
+  // harness reports divergences the real pipeline does not have.
+  (json as unknown as Record<string, unknown>)._userSelections = {
+    background: sel.background, button: sel.button,
+    cardColoring: sel.cardColoring, textColoring: sel.textColoring,
+  };
   return { previewCss, json, figma: generateFigmaJSON(json) };
 }
 
@@ -148,6 +156,20 @@ const norm = (hex: string | null) => {
 // ─── The matrix ──────────────────────────────────────────────────────────────
 
 const SCHEME = makeScheme(['#7b3f9d', '#2563eb', '#b8329b']);
+
+/** A brand whose Primary Color-6 carries a LIGHT label.
+ *
+ *  Every other fixture is deep purple, where keying the hover/pressed
+ *  direction on the tone index and on the label give the same answer — which
+ *  is exactly why a real divergence survived a green suite. This olive is the
+ *  case that tells them apart: its Color-6 lands at L=49 rather than 58, so
+ *  its text table flips at 7, and an index-keyed rule steps INTO the label. */
+const OLIVE_SCHEME = makeScheme(['#6b7a4f', '#c98b7e', '#e0c9a6']);
+
+const BRANDS: { label: string; scheme: ColorScheme }[] = [
+  { label: 'purple', scheme: SCHEME },
+  { label: 'olive', scheme: OLIVE_SCHEME },
+];
 
 const SELECTION_MATRIX: { label: string; sel: UserSelections }[] = [
   { label: 'white bg · tonal cards · primary buttons', sel: { background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'primary' } as UserSelections },
@@ -231,9 +253,23 @@ describe('preview ↔ export ↔ figma parity', () => {
     const sel = { background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'secondary' } as UserSelections;
     const { previewCss } = buildAll(SCHEME, sel, 'light');
     const btn = norm(previewToken(previewCss, /\[data-theme="Brand"\]/, 'Buttons-Default-Button'));
-    const picked = norm(SCHEME.colors[1]);
+    const picked = norm(SCHEME.colors[1])!;
     console.log(`  secondary button=${btn}  picked=${picked}`);
-    expect(btn).toBe(picked);
+    expect(btn).toBeTruthy();
+
+    // Not byte-identical to the pick. A locked colour whose slot cannot carry
+    // 4.5:1 is moved in LIGHTNESS ONLY — hue and chroma are preserved, and the
+    // UI tells the user it was adjusted. #2563eb is exactly that case: it sits
+    // at L=46 but lands in the Color-5 slot, and at its picked lightness the
+    // Quiet pairing measures 4.48.
+    //
+    // So the thing worth asserting is that the button is still the SECONDARY
+    // colour — same hue, and not the primary — rather than the same bytes.
+    const hueOf = (hex: string) => chroma(hex).lch()[2];
+    const dHue = Math.abs(((hueOf(btn!) - hueOf(picked) + 540) % 360) - 180);
+    expect(dHue, `button ${btn} is a different hue from the pick ${picked}`).toBeLessThan(8);
+    expect(btn, 'secondary button fell back to the primary colour')
+      .not.toBe(norm(SCHEME.colors[0]));
   });
 });
 
@@ -273,6 +309,7 @@ function themeToken(css: string, theme: string, token: string): string | null {
 }
 
 const THEMED = ['Primary', 'Secondary', 'Tertiary'];
+const BUTTON_SLOTS = ['Button', 'Text', 'Border', 'Hover', 'Pressed'];
 
 describe('per-theme button parity', () => {
   it.each(['primary', 'secondary', 'tonal', 'laddered'])(
@@ -285,12 +322,18 @@ describe('per-theme button parity', () => {
       const exportCss = (generateCSSFiles(json as never) as Record<string, string>)['Light-Mode.css'] ?? '';
 
       for (const theme of THEMED) {
-        const preview = norm(themeToken(previewCss, theme, 'Buttons-Default-Button'));
-        const exported = norm(themeToken(exportCss, theme, 'Buttons-Default-Button'));
-        console.log(`  ${buttonMode}/${theme}: preview=${preview ?? '—'} export=${exported ?? '—'}`);
-        expect(preview, `${buttonMode}/${theme} missing from preview`).toBeTruthy();
-        expect(exported, `${buttonMode}/${theme} missing from export`).toBeTruthy();
-        expect(exported, `${buttonMode} diverges on the ${theme} surface`).toBe(preview);
+        // Every slot, not only the fill. Comparing Button alone let a
+        // dark-mode Border divergence sit unnoticed: the two implementations
+        // agreed on the fill and disagreed on the edge.
+        for (const slot of BUTTON_SLOTS) {
+          const token = `Buttons-Default-${slot}`;
+          const preview = norm(themeToken(previewCss, theme, token));
+          const exported = norm(themeToken(exportCss, theme, token));
+          if (preview === null && exported === null) continue;
+          expect(preview, `${buttonMode}/${theme}/${slot} missing from preview`).toBeTruthy();
+          expect(exported, `${buttonMode}/${theme}/${slot} missing from export`).toBeTruthy();
+          expect(exported, `${buttonMode} diverges on ${theme}/${slot}`).toBe(preview);
+        }
       }
     },
   );
@@ -316,5 +359,233 @@ describe('per-theme button parity', () => {
     const exportCss = (generateCSSFiles(json as never) as Record<string, string>)['Light-Mode.css'] ?? '';
     const fills = THEMED.map((t) => norm(themeToken(exportCss, t, 'Buttons-Default-Button')));
     expect(new Set(fills).size, `${buttonMode} should not vary by surface`).toBe(1);
+  });
+});
+
+// Run the whole per-theme comparison against the olive brand too. It differs
+// from purple in exactly one way that matters — where its text table flips —
+// and that difference is invisible to every other fixture.
+describe('per-theme button parity — olive primary', () => {
+  it.each(['primary', 'secondary', 'tonal', 'laddered', 'black-white'])(
+    '%s agrees between preview and export on every themed surface',
+    (buttonMode) => {
+      const sel = {
+        background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: buttonMode,
+      } as UserSelections;
+      for (const mode of ['light', 'dark'] as const) {
+        const { previewCss, json } = buildAll(OLIVE_SCHEME, sel, mode);
+        const file = mode === 'light' ? 'Light-Mode.css' : 'Dark-Mode.css';
+        const exportCss = (generateCSSFiles(json as never) as Record<string, string>)[file] ?? '';
+        for (const theme of THEMED) {
+          for (const slot of BUTTON_SLOTS) {
+            const token = `Buttons-Default-${slot}`;
+            const preview = norm(themeToken(previewCss, theme, token));
+            const exported = norm(themeToken(exportCss, theme, token));
+            if (preview === null && exported === null) continue;
+            expect(exported, `${buttonMode}/${mode}/${theme}/${slot} diverges`).toBe(preview);
+          }
+        }
+      }
+    },
+  );
+});
+
+// ─── Rules, not fixtures ─────────────────────────────────────────────────────
+//
+// The tests above compare two implementations to each other, so they only fail
+// when the two disagree. These state what the output must be true of, so they
+// still fail when both sides are wrong in the same way.
+
+const contrast = (a: string, b: string): number => {
+  const l1 = chroma(a).luminance();
+  const l2 = chroma(b).luminance();
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+};
+
+const MODES = ['light', 'dark'] as const;
+const ALL_BUTTON_MODES = ['primary', 'secondary', 'tonal', 'laddered', 'black-white'];
+
+/** Every button slot for one theme, read out of the exported CSS. */
+function buttonSlots(css: string, theme: string): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const slot of BUTTON_SLOTS) out[slot] = norm(themeToken(css, theme, `Buttons-Default-${slot}`));
+  out.Background = norm(themeToken(css, theme, 'Background'));
+  return out;
+}
+
+function exportCssFor(scheme: ColorScheme, sel: UserSelections, mode: 'light' | 'dark') {
+  const { json } = buildAll(scheme, sel, mode);
+  const file = mode === 'light' ? 'Light-Mode.css' : 'Dark-Mode.css';
+  return { css: (generateCSSFiles(json as never) as Record<string, string>)[file] ?? '', json };
+}
+
+describe('black-white is a rule, not a palette', () => {
+  // "black buttons on light tones and white buttons on dark tones — the fill
+  // and the border should be the same and the text the inverse."
+  //
+  // Stated as a property so it holds for a brand nobody wrote a fixture for.
+  // The preview used to swap this style out for Laddered in dark mode, which
+  // no fixture comparison could catch, because both sides were read from the
+  // same swapped-out style.
+  it.each(BRANDS.map((b) => b.label))('%s honours the black-white contract', (label) => {
+    const scheme = BRANDS.find((b) => b.label === label)!.scheme;
+    const sel = {
+      background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'black-white',
+    } as UserSelections;
+
+    for (const mode of MODES) {
+      const { css } = exportCssFor(scheme, sel, mode);
+      for (const theme of THEMED) {
+        const s = buttonSlots(css, theme);
+        const where = `${label}/${mode}/${theme}`;
+        expect(s.Button, `${where}: no fill`).toBeTruthy();
+
+        // The fill is black or white — nothing in between.
+        const fillLum = chroma(s.Button!).luminance();
+        expect(
+          fillLum < 0.02 || fillLum > 0.7,
+          `${where}: fill ${s.Button} is neither black nor white (luminance ${fillLum.toFixed(3)})`,
+        ).toBe(true);
+
+        // The border IS the fill.
+        expect(s.Border, `${where}: border should equal the fill`).toBe(s.Button);
+
+        // The text is the inverse — a black button carries a light label.
+        const textIsLight = chroma(s.Text!).luminance() > fillLum;
+        expect(textIsLight, `${where}: text ${s.Text} is not the inverse of fill ${s.Button}`)
+          .toBe(fillLum < 0.5);
+        expect(contrast(s.Button!, s.Text!), `${where}: label contrast`).toBeGreaterThanOrEqual(4.5);
+
+        // The face follows the SURFACE: black lands on a light tone.
+        if (s.Background) {
+          const bgIsLight = chroma(s.Background).luminance() > 0.18;
+          expect(fillLum < 0.5, `${where}: ${bgIsLight ? 'light' : 'dark'} surface ${s.Background} got fill ${s.Button}`)
+            .toBe(bgIsLight);
+          expect(contrast(s.Button!, s.Background), `${where}: fill vs surface`).toBeGreaterThanOrEqual(3);
+        }
+      }
+    }
+  });
+});
+
+describe('hover and pressed never read worse than the resting button', () => {
+  // "So if it passes at the default button it should pass at hover and
+  // pressed." Both states move ALONG the ramp away from the label, so the
+  // label's contrast is preserved or grows — but the direction is computed,
+  // and computing it from the tone index instead of the label silently
+  // reversed it on brands whose text table flips somewhere other than 6.
+  it.each(ALL_BUTTON_MODES)('%s keeps its label legible in both states', (buttonMode) => {
+    const sel = {
+      background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: buttonMode,
+    } as UserSelections;
+
+    for (const brand of BRANDS) {
+      for (const mode of MODES) {
+        const { css } = exportCssFor(brand.scheme, sel, mode);
+        for (const theme of THEMED) {
+          const s = buttonSlots(css, theme);
+          if (!s.Button || !s.Text) continue;
+          const resting = contrast(s.Button, s.Text);
+          for (const state of ['Hover', 'Pressed']) {
+            const hex = s[state];
+            if (!hex) continue;
+            const where = `${buttonMode}/${brand.label}/${mode}/${theme}/${state}`;
+            const ratio = contrast(hex, s.Text);
+            // The state must not be a no-op either: a clamp that returned the
+            // fill itself made the button look dead on press and still passed
+            // every contrast check.
+            expect(hex, `${where}: state is identical to the resting fill`).not.toBe(s.Button);
+            if (resting >= 4.5) {
+              expect(ratio, `${where}: ${ratio.toFixed(2)} vs resting ${resting.toFixed(2)}`)
+                .toBeGreaterThanOrEqual(4.5);
+            } else {
+              // Resting already fails; the state must at least not be worse.
+              expect(ratio, `${where}: ${ratio.toFixed(2)} below resting ${resting.toFixed(2)}`)
+                .toBeGreaterThanOrEqual(resting - 0.01);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('the accessibility floor holds across brands', () => {
+  // The value proposition is "no failing WCAG allowed", so this asserts the
+  // floor over a spread of hues rather than the one brand a fixture happens to
+  // use. A single-brand check reported 4.83 while the real floor was 4.54.
+  const SWEEP: [string, string, string][] = [
+    ['#7b3f9d', '#2563eb', '#b8329b'],
+    ['#6b7a4f', '#c98b7e', '#e0c9a6'],
+    ['#2563eb', '#0f766e', '#eab308'],
+    ['#d92b2b', '#1e3a8a', '#84cc16'],
+    ['#0891b2', '#7c2d12', '#f97316'],
+    ['#22c55e', '#a855f7', '#0ea5e9'],
+  ];
+
+  it('every text check clears 4.5:1 on every brand', () => {
+    let worst = Infinity;
+    let worstAt = '';
+    let checked = 0;
+    const failures: string[] = [];
+
+    for (const colors of SWEEP) {
+      const scheme = makeScheme(colors);
+      for (const entry of SELECTION_MATRIX) {
+        const { json } = buildAll(scheme, entry.sel, 'light');
+        for (const section of buildAccessibilityReport(json)) {
+          for (const check of section.checks) {
+            checked++;
+            if (check.ratio < worst) {
+              worst = check.ratio;
+              worstAt = `${colors[0]} · ${entry.label} · ${section.mode}/${section.surfaceLevel} · ${check.token}`;
+            }
+            if (!check.passes) {
+              failures.push(
+                `${colors[0]} · ${entry.label} · ${section.surfaceLevel} · ${check.token}: `
+                + `${check.ratio.toFixed(2)} < ${check.required} (${check.fgColor} on ${check.bgColor})`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`  accessibility sweep: ${checked} checks, floor ${worst.toFixed(2)} at ${worstAt}`);
+    expect(checked, 'the sweep produced no checks at all').toBeGreaterThan(1000);
+    expect(failures.slice(0, 10).join('\n'), `${failures.length} checks below their threshold`).toBe('');
+  });
+});
+
+describe('Text.Surfaces stays a reference table', () => {
+  // Every cell must be a {…} reference into Colors. A baked hex here is how the
+  // Figma payload and the CSS drift apart: Figma binds the variable it is
+  // pointed at, so a literal silently becomes a detached value that no longer
+  // follows its palette.
+  it.each(BRANDS.map((b) => b.label))('%s emits no raw hex in Text.Surfaces', (label) => {
+    const scheme = BRANDS.find((b) => b.label === label)!.scheme;
+    const sel = {
+      background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'primary',
+    } as UserSelections;
+    const { json } = buildAll(scheme, sel, 'light');
+
+    const raw: string[] = [];
+    for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+      const surfaces = at(json, `Modes.${modeName}.Text.Surfaces`);
+      if (!surfaces) continue;
+      for (const [palette, tones] of Object.entries<any>(surfaces)) {
+        for (const [tone, cell] of Object.entries<any>(tones ?? {})) {
+          const value = typeof cell === 'string' ? cell : cell?.value;
+          if (typeof value !== 'string') continue;
+          // BW is the documented exception: it is defined as black-or-white,
+          // so it has no palette to reference.
+          if (palette === 'BW' || palette === 'BW-Button') continue;
+          if (!value.startsWith('{')) {
+            raw.push(`${modeName}.Text.Surfaces.${palette}.${tone} = ${value}`);
+          }
+        }
+      }
+    }
+    expect(raw.slice(0, 10).join('\n'), `${raw.length} raw values in Text.Surfaces`).toBe('');
   });
 });
