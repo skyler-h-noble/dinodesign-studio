@@ -21,66 +21,75 @@ these baked values rather than recomputing them.
 
 For a button whose fill is `Color-N` of a palette:
 
-### Pressed
+### Direction — decided by the LABEL
 
-One step in the **button's own lightness direction**:
+The invariant is simple: **the state moves away from the text sitting on it.**
 
-- Tones **1-5** → step **darker**: `Color-(N−1)`.
-- Tones **6-11** → step **lighter**: `Color-(N+1)`.
-- Tone **12** → step **darker**: `Color-11`. See below.
+- Label is **lighter** than the fill (light text) → step **darker**.
+- Label is **darker** than the fill (dark text) → step **lighter**.
 
-At the dark extreme there is no next tone, so Pressed goes to a pure endpoint —
-never back to the button's own tone (there must always be a visible delta):
+The label is read from `Text.Surfaces.{palette}.Color-N` — the same token the
+button actually renders — and compared to the fill by relative luminance.
 
-- Darkest (**tone 1**) → **`#000000`** (black).
+> **This used to key on the tone index** (1-5 darker, 6-12 lighter), on the
+> assumption that every palette's text table flips at tone 6. Measured across
+> brands, 23 of 24 palette/mode combinations do. The exception is exactly where
+> it broke: an olive primary (`#6b7a4f`, L=49) whose Color-6 still carries a
+> LIGHT label. Stepping "lighter" there walked into the label and took a 4.54:1
+> button to **2.17:1** pressed.
+>
+> An earlier revision keyed on the fill's own luminance, which is worse again —
+> a saturated mid-tone like `#ef5854` measures "light" by brightness while
+> carrying light text.
+>
+> Reading the label removes the assumption entirely. If the resting pair passes,
+> the states cannot fail.
 
-**The light extreme is not symmetric.** Tone 12 is already near-white in light
-mode (`#fcfcfc`), so stepping "lighter" toward `#FFFFFF` moves almost nowhere —
-a white surface would show no hover or pressed feedback at all. There is no
-headroom above white, so tone 12 signals its states by getting slightly
-**darker** instead, to `Color-11`.
+### Pressed — one step, except at the ends
 
-This costs nothing in contrast. Dark text on a near-white surface starts around
-17:1, and the step is small: text on `Color-11` still measures ~9.4:1, far above
-the 4.5:1 requirement. The move is toward the text rather than away from it —
-the one place the general rule below is deliberately inverted — and it is safe
-precisely because the starting headroom is so large.
+| Fill tone | Pressed |
+| --- | --- |
+| 2-11 | one full tone in the direction above |
+| **1** | **half a step lighter** — see below |
+| **12** | `Color-11` — darker, inverted |
 
-Direction is keyed on the **tone index**: 1-5 step darker, 6-12 step lighter.
-This matches where every `Text.Surfaces.{palette}` table flips from light text
-to dark text (Color-1..5 light, Color-6..12 dark), which is what makes the rule
-safe: the state always moves *away* from the text sitting on it, so contrast can
-only improve. A state can therefore never fail if the resting pair passes.
+**Both ends invert, because neither has headroom.**
 
-(An earlier revision of this doc claimed direction was keyed on the fill's
-actual luminance. It is not, and it should not be — a luminance threshold
-disagrees with the tone split on saturated mid-tones such as `#ef5854`, which
-measures "light" by brightness while carrying light text. Keying on the tone
-index keeps the state aligned with the text.)
+Tone 12 is already near-white (`#fcfcfc`); a step toward `#FFFFFF` moves almost
+nowhere. It costs nothing — text on `Color-11` still measures ~9.4:1.
 
-### Hover
+Tone 1 previously stepped to `#000000`. From a fill already at `#040404` that is
+a contrast ratio of **1.02 against itself** — no visible feedback whatsoever. It
+now steps lighter instead.
 
-A 50% blend of the button background and its Pressed value:
+### Why tone 1 moves only HALF a step
+
+`Color-1 → Color-2` is L=1 → L=10: a tenfold change in luminance. The same step
+at the light end (L=98 → L=99) is nothing. A full step at the dark end reads as
+the button changing colour rather than responding — `#040404` going visibly grey.
+
+Half a step lands at `#101010`:
 
 ```
-Hover = mix50(fill, Pressed)
+before   #040404 → hover #020202 (Δ1.012)  pressed #000000 (Δ1.023)   invisible
+after    #040404 → hover #0a0a0a (Δ1.036)  pressed #101010 (Δ1.077)
 ```
 
-So Hover always sits halfway between the resting fill and the Pressed state —
-a subtler version of the same move.
+Roughly 8× the delta, and the label still sits at ~13:1 because tones 1-5 carry
+light text and a slight lightening barely closes on it.
 
 ## Worked examples
 
-| Fill tone | Direction | Pressed | Hover |
-| --------- | --------- | ------- | ----- |
-| Color-3 | darker | Color-2 | mix(Color-3, Color-2) |
-| Color-9 | lighter | Color-10 | mix(Color-9, Color-10) |
-| Color-10 | lighter | Color-11 | mix(Color-10, Color-11) |
-| **Color-1** (darkest) | darker | **#000000** | mix(Color-1, #000) |
-| **Color-12** (lightest) | **darker** — no headroom | **Color-11** | mix(Color-12, Color-11) |
+| Fill tone | Label | Direction | Pressed | Hover |
+| --- | --- | --- | --- | --- |
+| Color-3 | light | darker | Color-2 | mix(Color-3, Color-2) |
+| Color-9 | dark | lighter | Color-10 | mix(Color-9, Color-10) |
+| Color-6 *(olive primary)* | **light** | **darker** | Color-5 | mix(Color-6, Color-5) |
+| **Color-1** | light | **lighter** — no headroom | **mix(Color-1, Color-2)** | mix(Color-1, Pressed) |
+| **Color-12** | dark | **darker** — no headroom | **Color-11** | mix(Color-12, Color-11) |
 
-Note the last row runs against the general direction. Tones 1-11 move away from
-the text; tone 12 cannot, because it is already at the top of the ramp.
+Row three is the case a tone-index rule gets wrong: same tone as a typical
+palette, opposite direction, because its label is light.
 
 ## CSS usage
 
@@ -96,8 +105,13 @@ the text; tone 12 cannot, because it is already at the top of the ramp.
 
 ## Why this matters for accessibility
 
-Because Pressed always moves *away* from the resting fill in luminance (and the
-fill/text pairing was already chosen to clear contrast), the Hover/Pressed states
-preserve — and usually improve — text contrast, while guaranteeing a visible
-feedback shift from resting → hover → pressed. The accessibility report contrast-
-checks button text against the baked Hover and Pressed values at 4.5:1.
+Because the state always moves *away from the label* — which is now read
+directly rather than inferred from the tone — contrast can only improve.
+
+**If the resting pair passes, the states pass.** That is the guarantee, and it
+holds for every tone except the two endpoints, where the inversion costs a
+little: Color-1 goes 15.79 → 14.63 and Color-12 goes 9.66 → 9.37. Both remain
+far above 4.5, which is what makes the inversion safe.
+
+The accessibility report contrast-checks button text against the baked Hover and
+Pressed values at 4.5:1, so this is verified rather than assumed.

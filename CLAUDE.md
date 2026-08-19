@@ -324,6 +324,60 @@ itself).
 
 ---
 
+## Design system invariants
+
+These are about **generating** tokens (`src/utils/cssgen/`,
+`generateFigmaJSON.ts`, `buildPreviewCSS.ts`), not about using components.
+Full reasoning and measurements: [docs/design-system-architecture.md](docs/design-system-architecture.md).
+
+Each rule below has already been broken once. The consequence is stated so it
+can't be reasoned away.
+
+1. **Never flatten or prune the Figma `Modes` collection without rewriting the
+   references in the same pass.** Theme, State and Surface alias into it by
+   name. One flatten orphaned **6,084 of 13,701 references**. If you do it,
+   count unresolved references before and after — `generateFigmaJSON` already
+   warns when they diverge.
+
+2. **A duplicated value is not automatically redundant.** The test is not "do
+   the copies match" but *"does anything select between them"*. The
+   `Light`/`Medium` button shades held identical values and the Theme layer
+   picked between them per surface — collapsing them destroyed a choice.
+   `BlackWhite`'s palette level also held identical values and nothing selected
+   between them — collapsing that was correct.
+
+3. **Changing a tone changes the label.** Text is derived from the fill, so a
+   one-tone move can flip white text to near-black. Check both.
+
+   Related: hover/pressed direction is decided by the **label**, not the tone
+   index — the state must move away from the text on it. The index is a proxy
+   that assumes every palette's text table flips at tone 6; the one palette
+   where it doesn't took a 4.54:1 button to 2.17:1.
+
+4. **A locked colour must still pass, and the user must be told if it moved.**
+   The user's hex is written verbatim into the nearest tone, which can put an
+   inaccessible colour where the generated ramp never would. Adjust only when
+   the colour genuinely cannot carry text from its own ramp — the dead-zone
+   band alone is the worst case at maximum chroma, and 229 of 229 sampled
+   in-band picks passed. Record the change so the UI can surface it.
+
+5. **The preview is a separate implementation from the export.** They diverge
+   silently — an unresolved `var()` paints nothing and reports nothing. Change
+   both, and cover it in `src/__tests__/tokenParity.test.ts`.
+
+6. **Assert per-theme, not only at Brand scope.** Tonal and primary produce the
+   same button at Brand scope and different ones on every themed surface. That
+   gap hid a real divergence through a passing parity suite.
+
+7. **Parity is not correctness.** Both sides can be wrong and still agree.
+   Assert the intended shape independently — e.g. a surface-scoped button mode
+   *must* differ across surfaces; a fixed one *must not*.
+
+8. **Verify before deleting anything that ships to Figma.** Deleted variables
+   cannot be recovered by re-importing: a recreated variable gets a new id, so
+   every layer bound to the old one stays unbound. Recovery is Figma's undo or
+   version history.
+
 ## Audit
 
 Before committing UI work, run a quick mental pass:
