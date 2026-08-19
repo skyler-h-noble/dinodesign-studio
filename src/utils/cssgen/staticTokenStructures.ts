@@ -21,7 +21,19 @@ export { getStaticQuietTokensForLightMode, getStaticQuietTokensForDarkMode } fro
  */
 function buildHoverForPalette(palette: string): any {
   return {
-    'Color-1': { value: '{Black}', type: 'color' },
+    // Color-1 steps LIGHTER, not darker — the mirror of Color-12 below.
+    //
+    // It is the bottom of the ramp. Stepping "darker" meant #000000, and from
+    // a fill that is already #040404 or #0c0010 that is no visible change:
+    // measured, a black button's pressed state came out at a contrast ratio of
+    // 1.02 against its own fill. There is no headroom below black, exactly as
+    // there is none above white, so the darkest tone signals its states by
+    // getting slightly lighter instead.
+    //
+    // Contrast stays safe for the same reason it does at the other end: tones
+    // 1-5 carry LIGHT text, and stepping to Color-2 moves toward that text only
+    // fractionally — it remains far darker than any label sitting on it.
+    'Color-1': { value: `{Colors.${palette}.Color-2}`, type: 'color' },
     'Color-2': { value: `{Colors.${palette}.Color-1}`, type: 'color' },
     'Color-3': { value: `{Colors.${palette}.Color-2}`, type: 'color' },
     'Color-4': { value: `{Colors.${palette}.Color-3}`, type: 'color' },
@@ -55,7 +67,8 @@ export function getStaticHoverTokens() {
     Error: buildHoverForPalette('Error'),
     'Hotlink-Visited': buildHoverForPalette('Hotlink-Visited'),
     BW: {
-      'Color-1': { value: '{Black}', type: 'color' },
+      // Lighter, for the same no-headroom reason as the palette ramp above.
+      'Color-1': { value: '{Colors.Neutral.Color-2}', type: 'color' },
       'Color-2': { value: '{Colors.Neutral.Color-1}', type: 'color' },
       'Color-3': { value: '{Colors.Neutral.Color-2}', type: 'color' },
       'Color-4': { value: '{Colors.Neutral.Color-3}', type: 'color' },

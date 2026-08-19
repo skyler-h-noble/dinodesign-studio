@@ -10,6 +10,8 @@
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
 import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
+import { buildTypeScale, resolveRoles, type TypeStyle, type FamilyRole } from './typeScale';
+import type { TypographyStyle } from '../types';
 
 interface ColorToken {
   value: string;
@@ -284,22 +286,54 @@ function deriveColorHex(hex: string, lightOffset: number, satMultiplier: number)
  * this Pressed value. Matches the export + preview + engine. See
  * docs/hover-active-calculation.md.
  */
-function _figmaIsLight(hex: string): boolean {
+/** Relative luminance (WCAG) — used only to compare a label against its fill. */
+function _figmaLuminance(hex: string): number {
   const c = hex.replace('#', '');
-  const f = c.length === 3 ? c.split('').map(x => x + x).join('') : c;
-  const nn = parseInt(f, 16);
-  const r = (nn >> 16) & 255, g = (nn >> 8) & 255, b = nn & 255;
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+  const full = c.length === 3 ? c.split('').map((x) => x + x).join('') : c.slice(0, 6);
+  const n = parseInt(full, 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const sr = v / 255;
+    return sr <= 0.03928 ? sr / 12.92 : Math.pow((sr + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
 }
-function pressedHexFor(colorKey: string, btnHex: string, palette: string, colors: any): string {
+
+function pressedHexFor(colorKey: string, btnHex: string, palette: string, colors: any, textTable?: any): string {
   if (colorKey.endsWith('-Vibrant')) return colors[palette]?.['Color-10']?.value || btnHex;
   const n = parseInt(colorKey.replace('Color-', ''), 10);
   if (!Number.isFinite(n)) return btnHex;
-  const darkBtn = !_figmaIsLight(btnHex);          // dark button → step darker, light → lighter
-  const an = darkBtn ? n - 1 : n + 1;
-  if (an < 1) return '#000000';                    // darkest button (tone 1) → black
-  if (an > 12) return '#FFFFFF';                   // lightest button (tone 12) → white
-  return colors[palette]?.[`Color-${an}`]?.value || btnHex;
+  // Direction keys on the TONE INDEX, matching buildHoverForPalette() — the
+  // implementation that bakes the real tokens. Keying on the fill's luminance
+  // instead (as this did) disagrees on saturated mid-tones that measure "light"
+  // while carrying light text, stepping the state toward its own label.
+  //
+  // Both ends invert, because neither has headroom: tone 1 stepping darker
+  // meant #000000, which from a #040404 fill is 1.02:1 against itself.
+  // Direction is decided by the LABEL — light text steps darker, dark text
+  // steps lighter — so the state always moves AWAY from the text on it. The
+  // tone index is only a proxy for that, and it is wrong wherever a palette's
+  // text table flips somewhere other than tone 6.
+  let labelIsLight = n <= 5; // proxy, used only if the table is unavailable
+  const labelRaw = textTable?.Surfaces?.[palette]?.[colorKey]?.value;
+  if (typeof labelRaw === 'string') {
+    let labelHex = labelRaw;
+    for (let hop = 0; hop < 8 && labelHex.startsWith('{'); hop++) {
+      const path = labelHex.slice(1, -1).split('.');
+      let node: any = { Colors: colors };
+      for (const key of path) node = node?.[key];
+      const next = typeof node === 'string' ? node : node?.value;
+      if (typeof next !== 'string') break;
+      labelHex = next;
+    }
+    if (labelHex.startsWith('#') && btnHex.startsWith('#')) {
+      try { labelIsLight = _figmaLuminance(labelHex) > _figmaLuminance(btnHex); } catch { /* keep proxy */ }
+    }
+  }
+  const an = Math.min(Math.max(labelIsLight ? n - 1 : n + 1, 1), 12);
+  const stepHex = colors[palette]?.[`Color-${an}`]?.value || btnHex;
+  // Color-1 moves a HALF step — its gap to Color-2 is a tenfold luminance
+  // change, so a full step reads as a colour change. Matches the export.
+  return n === 1 ? mixHex(btnHex, stepHex) : stepHex;
 }
 
 /**
@@ -316,6 +350,119 @@ function mixHex(hex1: string, hex2: string): string {
   const [r2, g2, b2] = parse(hex2);
   const mix = (a: number, b: number) => Math.round((a + b) / 2);
   return '#' + [mix(r1, r2), mix(g1, g2), mix(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+/** The tokens.json Typography section back into the role shape the scale is
+ *  built from. tokens.json is what generateFigmaJSON is handed, so this is the
+ *  one place the two exports could drift — they read the same fields. */
+function rolesFromTokensJSON(typo: any): TypographyStyle[] {
+  return [
+    {
+      type: 'header',
+      family: typo['Set-Font-Family-Header']?.value || '',
+      weight: typo['Set-Header-Font-Weight']?.value || '600',
+      letterSpacing: typo['Set-Header-Letter-Spacing']?.value || '0em',
+      allCaps: typo['Set-Header-Caps']?.value === 'uppercase',
+    },
+    {
+      type: 'decorative',
+      family: typo['Set-Font-Family-Display']?.value || typo['Set-Font-Family-Decorative']?.value || '',
+      weight: typo['Set-Decorative-Font-Weight']?.value || '600',
+      letterSpacing: typo['Set-Decorative-Letter-Spacing']?.value || '0em',
+      allCaps: typo['Set-Decorative-Caps']?.value === 'uppercase',
+      // Size and leading drive the Display ramp, so the Figma text styles land
+      // on the same numbers the CSS does. Absent values fall through to the
+      // scale's defaults.
+      displaySize: numOrUndef(typo['Set-Display-Size']?.value),
+      displayLeading: numOrUndef(typo['Set-Display-Leading']?.value),
+      // Carried for a plugin to read; Figma text styles can't apply either.
+      noise: numOrUndef(typo['Set-Display-Noise']?.value) ?? 0,
+      bounce: numOrUndef(typo['Set-Display-Bounce']?.value) ?? 0,
+    },
+    {
+      type: 'body',
+      family: typo['Set-Font-Family-Body']?.value || '',
+      weight: typo['Set-Body-Font-Weight']?.value || '400',
+      letterSpacing: '0em',
+      allCaps: false,
+    },
+  ];
+}
+
+/** A numeric token value, or undefined when it was never written. */
+const numOrUndef = (v: unknown): number | undefined => {
+  const n = parseFloat(String(v ?? ''));
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/** em → Figma's letter-spacing percent. */
+const emToPercent = (em: string): number => +((parseFloat(em) || 0) * 100).toFixed(2);
+
+/**
+ * The type scale in Figma's units. Line height ships in PIXELS, not percent:
+ * the Display and Header steps are chosen so every computed line height lands
+ * on a 4px multiple, and a percent round-trip loses that (48px × 117% = 56.16).
+ */
+function buildFigmaTypeScale(typo: any): any {
+  const roles = rolesFromTokensJSON(typo);
+  const resolved = resolveRoles(roles);
+  const familyFor = (role: FamilyRole) => resolved[role].family;
+
+  const entry = (s: TypeStyle, over?: { name: string; token: string; weight: number }) => ({
+    name: over?.name ?? s.name,
+    token: over?.token ?? s.token,
+    // Where the plugin writes this style's primitives in the Platform
+    // collection. Sizes and spacing are shared with the base step, so an extra
+    // weight points back at the step it hangs off.
+    variablePath: `Typography/${s.group}/${s.step}`,
+    group: s.group,
+    step: s.step,
+    familyRole: s.familyRole,
+    fontFamily: familyFor(s.familyRole),
+    // The eyebrow renders in the OS UI font on the web, which has no Figma
+    // equivalent — the family above is the stand-in, flagged so the plugin can
+    // say so rather than pretending it matched.
+    systemStackSubstitute: s.familyRole === 'eyebrow',
+    fontWeight: over?.weight ?? s.weight,
+    fontSize: s.size,
+    lineHeightUnit: 'PIXELS',
+    lineHeight: s.lineHeight,
+    letterSpacingUnit: 'PERCENT',
+    letterSpacingPercent: emToPercent(s.letterSpacing),
+    textCase: s.textTransform === 'uppercase' ? 'UPPER' : 'ORIGINAL',
+    paragraphSpacing: s.paragraphSpacing,
+    variationAxes: s.axes ?? null,
+    description: s.description || '',
+  });
+
+  const styles: any[] = [];
+  for (const s of buildTypeScale(roles)) {
+    styles.push(entry(s));
+    for (const w of s.extraWeights || []) {
+      // Caption/Legal carry their extra weight at the group level
+      // (--Caption-Bold-…), Body carries it per size (--Body-Small-Semibold-…).
+      const name = s.step === 'Standard' ? `${s.group}/${w.suffix}` : `${s.name}/${w.suffix}`;
+      styles.push(entry(s, { name, token: `${s.token}-${w.suffix}`, weight: w.weight }));
+    }
+  }
+
+  return {
+    // Only the Desktop ramp is generated; the other platforms keep the values
+    // the Figma template already holds.
+    platform: 'Desktop',
+    version: 1,
+    meta: {
+      displayFace: familyFor('display'),
+      headerFace: familyFor('header'),
+      eyebrowFace: familyFor('eyebrow'),
+      bodyFace: familyFor('body'),
+      // Figma has no equivalent for either, so they are recorded for reference
+      // and rendered only by the CSS export.
+      displayNoise: resolved.display.noise || 0,
+      displayBounce: resolved.display.bounce || 0,
+    },
+    styles,
+  };
 }
 
 export function generateFigmaJSON(designSystemJSON: any): any {
@@ -373,7 +520,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
     // Export all sections from the design system (except Themes which go in their own collection)
     const MODES_SECTIONS = [
-      'Colors', 'Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
+      'Colors', 'Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
       'Hover', 'Pressed', 'Focus-Visible',
       'Icon', 'Icon-Variant', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
@@ -415,26 +562,44 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         // describes the wrong button: the bevel highlight computed from
         // #70947b is DARKER than a #d4e3d9 face, inverting it.
         //
-        // In dark mode we therefore ignore N and derive from the real fill.
-        // Every N collapsing to the same value is intended: it is what makes
-        // the fix apply to all themes regardless of which tone they baked.
-        // Only the bevel and border use this. Button-Hover/Button-Pressed keep
-        // deriving from Colors.<pal>.Color-N, because pressedHexFor picks its
-        // step direction from colorKey's tone index — pairing a tone-12 fill
-        // with a tone-6 index would step the wrong way.
+        // In dark mode every tone's BEVEL derives from the real button fill,
+        // not from that tone's own colour. This looks like the table lying —
+        // all twelve keys carry one value — and it is deliberate.
+        //
+        // The Theme collection is MODE-INDEPENDENT: a Theme variable aliases to
+        // a Modes variable, and the light/dark pair lives on the Modes variable.
+        // So a theme referencing {Button-Lowlight.Primary.Color-8} cannot point
+        // somewhere else in dark mode — whatever dark value sits in Color-8 is
+        // what the dark button gets. The dark button's fill is Light-Mode
+        // Color-8, so Color-8's dark slot must hold THAT colour's bevel.
+        //
+        // Deriving each tone from the dark ramp instead was tried and reverted:
+        // it made the table honest and every dark bevel wrong (Primary resolved
+        // to #ac11ce against a real fill of #e9b7ff, where the CSS paints
+        // #b42fee). Color-Vibrant is still emitted and carries the same value,
+        // for anyone binding the vibrant fill by name.
         const darkFill = modeName === 'Dark-Mode'
           ? (modeSection.Buttons?.[palette]?.Medium?.Button?.value
             || modeSection.Buttons?.[palette]?.Light?.Button?.value
             || null)
           : null;
-
         for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-          if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
+          if (!colorKey.startsWith('Color-')) continue;
+          const isVibrant = colorKey.endsWith('-Vibrant');
           const btnHex = (colorVal as any).value;
           const bevelBase = darkFill || btnHex;
-          const activeHex = pressedHexFor(colorKey, btnHex, palette, colors);
+          // Vibrant's states are already computed against the vibrant fill in
+          // the export (Hover/Pressed.<pal>.Color-Vibrant, copied from
+          // Light-Mode Color-8). pressedHexFor can't be used here: it steps by
+          // the tone INDEX in colorKey, and 'Color-Vibrant' has no index.
+          const activeHex = isVibrant
+            ? (modeSection.Pressed?.[palette]?.['Color-Vibrant']?.value || btnHex)
+            : pressedHexFor(colorKey, btnHex, palette, colors, modeSection.Text);
+          const hoverHex = isVibrant
+            ? (modeSection.Hover?.[palette]?.['Color-Vibrant']?.value || mixHex(btnHex, activeHex))
+            : mixHex(btnHex, activeHex);
           modeSection['Button-Pressed'][palette][colorKey] = { value: activeHex, type: 'color' };
-          modeSection['Button-Hover'][palette][colorKey] = { value: mixHex(btnHex, activeHex), type: 'color' };
+          modeSection['Button-Hover'][palette][colorKey] = { value: hoverHex, type: 'color' };
           // Match the CSS/lib bevel math (exportColorSystem computeHighlight/
           // computeLowlight): highlight L+25 sat×0.7, lowlight L-30 sat×0.85.
           // Lowlight REDUCES saturation so it reads as a neutral recessed
@@ -452,6 +617,11 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           // here — see the block after this loop.
         }
       }
+
+      // Buttons/BlackWhite is built in exportColorSystem, not here, so the CSS
+      // gets the same table — the Theme and State collections link into it at
+      // their own tone. It arrives via the MODES_SECTIONS copy above.
+
 
       // ── Default-Button-Border ─────────────────────────────────────────
       //
@@ -479,12 +649,24 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       const isBlackWhiteButtons =
         String(designSystemJSON._userSelections?.button || '').startsWith('black-white');
 
+
+      // Which palette the Default button draws from. Mirrors the mapping in
+      // generateCompleteThemes so the border matches the fill beside it.
+      const defaultButtonPalette: string = (() => {
+        const mode = String(designSystemJSON?._userSelections?.button || 'primary')
+          .replace(/-fixed|-adaptive/g, '');
+        if (mode === 'black-white') return modeName === 'Dark-Mode' ? 'Primary' : 'Neutral';
+        if (mode === 'secondary' || mode === 'laddered') return 'Secondary';
+        return 'Primary';
+      })();
+
       const dbb: any = modeSection['Default-Button-Border'] || {};
       for (const scope of ['Surfaces', 'Containers']) {
         if (!dbb[scope]) continue;
         for (const palette of Object.keys(dbb[scope])) {
           // Default-Button-Border carries a "Default" palette but Buttons does
-          // not (it has BlackWhite instead), so the Default button's fill has
+          // not (it has the Black and White faces instead), so the Default
+          // button's fill has
           // to come from Default-Button. Without this fallback the dark lookup
           // returns null for that palette and quietly falls through to the
           // LIGHT border — reintroducing exactly the bug this block fixes, on
@@ -504,12 +686,52 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           //
           // Scoped to the Default palette because that is the one the button
           // style governs; the semantic palettes keep their own tonal borders.
-          const useFill = modeName === 'Dark-Mode'
-            || (isBlackWhiteButtons && palette === 'Default');
-          const fill = useFill ? readFill() : null;
+          // Dark mode uses the per-tone Border table, exactly as light does.
+          //
+          // It used to force the button's own fill into EVERY tone, which made
+          // the whole dark table one repeated value — 1 distinct of 12 against
+          // light's 6 — and that is what it looks like in Figma: every tone of
+          // every colour showing the same swatch.
+          //
+          // That blanket was compensating for a Theme-layer problem. The Theme
+          // collection is mode-independent, so the Default theme bakes the
+          // LIGHT surface's tone into its reference; in dark its surface moves
+          // to a different tone, and the border then described a surface the
+          // button was not on. Flattening every tone hid that, at the cost of
+          // the table meaning anything.
+          //
+          // Fixed where it belongs: each tone keeps its own border, and the
+          // fill is used only for the tone whose surface actually moves
+          // between modes — which is the one case the original note described.
+          // The Default palette is the Default THEME's own slot. Its surface
+          // moves between modes, so it takes the tonal border in light and the
+          // button's fill in dark — which is what the CSS emits for that theme.
+          // Every other palette keeps its per-tone border in both modes.
+          //
+          // Every tone keeps its own border, in both modes.
+          //
+          // An exception for "the tone the Default theme sits on" was tried and
+          // removed: this table is keyed by palette and tone, not by theme, so
+          // it cannot tell the Default theme from the White theme — they sit on
+          // the same tone. Forcing the fill there gave White an invisible
+          // border (1.24:1 against its own surface). A theme-level distinction
+          // has to be made in the Theme layer, not compensated for here.
+          const fill = readFill();
+          // The `Default` slot has no Border table of its own — Border is keyed
+          // by real palettes. In light mode it therefore reads the border of
+          // whichever palette the Default button actually uses, which is what
+          // the theme referenced before it got its own slot, and what the CSS
+          // emits. In dark it takes the fill, because its surface has moved.
+          const borderSourcePalette = palette === 'Default' ? defaultButtonPalette : palette;
           for (const colorKey of Object.keys(dbb[scope][palette])) {
-            const light = modeSection.Border?.[scope]?.[palette]?.[colorKey]?.value;
-            const next = fill || light;
+            const tonal = modeSection.Border?.[scope]?.[borderSourcePalette]?.[colorKey]?.value;
+            const mustUseFill =
+              // Black/white buttons: the border IS the fill, for every palette.
+              // There is no tonal ramp to draw an edge from, and a brand-tonal
+              // ring around a black button is the wrong reading.
+              isBlackWhiteButtons
+              || (modeName === 'Dark-Mode' && palette === 'Default');
+            const next = (mustUseFill ? fill : tonal) || tonal || fill;
             if (next) dbb[scope][palette][colorKey] = { value: next, type: 'color' };
           }
         }
@@ -709,7 +931,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                 if (tokenVal.includes('{')) {
                   const modesRef = tokenVal.replace(/[{}]/g, '');
                   const topLevel = modesRef.split('.')[0];
-                  const MODES_GROUPS = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
+                  const MODES_GROUPS = ['Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
                     'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
@@ -806,8 +1028,25 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                           // collapsed to whichever family it belongs to.
                           const scope = /^Container/.test(borderMatch[1])
                             ? 'Containers' : 'Surfaces';
+                          // The Default theme gets its OWN slot rather than
+                          // sharing the button palette's.
+                          //
+                          // Default and White both sit on tone 12 in light
+                          // mode, so they aliased the identical Modes variable
+                          // — and a variable holds one value per mode. In dark
+                          // their surfaces diverge (Default goes near-black,
+                          // White stays light), so no single value serves both.
+                          // Trying to resolve it inside the table failed for
+                          // exactly this reason: keyed by palette and tone, it
+                          // cannot tell the two themes apart.
+                          //
+                          // Default-Button-Border already carries a `Default`
+                          // palette, unused until now. Pointing the Default
+                          // theme at it gives each theme its own light/dark
+                          // pair, which is where the difference actually lives.
+                          const borderPalette = themeName === 'Default' ? 'Default' : palette;
                           target[key]['Border'] = {
-                            value: `{Default-Button-Border.${scope}.${palette}.${surfaceColorN}}`,
+                            value: `{Default-Button-Border.${scope}.${borderPalette}.${surfaceColorN}}`,
                             type: 'color',
                           };
                         }
@@ -1194,20 +1433,65 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   // ── Font Families from user selections ──
   const typo = designSystemJSON.Typography;
   if (typo) {
+    // Keys are the Figma variable names under Platform-Font-Families, verbatim,
+    // so the plugin can write each one without a translation table.
+    const axes = (() => {
+      try { return JSON.parse(typo['Set-Header-Axes']?.value || '{}') as Record<string, number>; }
+      catch { return {} as Record<string, number>; }
+    })();
+    const emToPx = (v: string | undefined, basis = 16) => Math.round((parseFloat(v || '0') || 0) * basis);
+
     figma.Fonts = {
+      // ── The four faces ──
       Body: typo['Set-Font-Family-Body']?.value || '',
       Header: typo['Set-Font-Family-Header']?.value || '',
+      Display: typo['Set-Font-Family-Display']?.value || typo['Set-Font-Family-Decorative']?.value || '',
+      Eyebrow: typo['Set-Font-Family-Eyebrow']?.value || '',
+      // Kept so an older template that still has a Decorative variable resolves.
       Decorative: typo['Set-Font-Family-Decorative']?.value || '',
+
+      // ── Body / Subtitle ──
       'Body-Font-Weight': parseInt(typo['Set-Body-Font-Weight']?.value || '400'),
       'Body-Semibold-Font-Weight': parseInt(typo['Set-Body-Semibold-Font-Weight']?.value || '600'),
-      'Body-Bold-Font-Weight': parseInt(typo['Set-Body-Bold-Font-Weight']?.value || '700'),
+      // Subtitle is Body at bold; one weight drives all three steps.
+      'Subtitle-Font-Weight': 700,
+
+      // ── Header ──
       'Header-Font-Weight': parseInt(typo['Set-Header-Font-Weight']?.value || '600'),
-      'Header-Character-Spacing': 0,
-      'Decorative-Font-Weight': parseInt(typo['Set-Decorative-Font-Weight']?.value || '400'),
-      'Decorative-Character-Spacing': 0,
+      'Header-Character-Spacing': emToPx(typo['Set-Header-Letter-Spacing']?.value),
+      // The six Google Sans Flex axes. wght is the font weight above; the rest
+      // are their own variables, plus the composed settings string.
+      'Header-Font-Width': axes.wdth ?? 100,
+      'Header-Optical-Size': axes.opsz ?? 18,
+      'Header-Slant': axes.slnt ?? 0,
+      'Header-Grade': axes.GRAD ?? 0,
+      'Header-Roundness': axes.ROND ?? 0,
+      'Header-Variation': Object.entries(axes)
+        .filter(([tag]) => tag !== 'wght')
+        .map(([tag, v]) => `"${tag}" ${v}`)
+        .join(', '),
+
+      // ── Eyebrow ──
+      'Eyebrow-Font-Weight': parseInt(typo['Set-Eyebrow-Font-Weight']?.value || '600'),
+      'Eyebrow-Character-Spacing': emToPx(typo['Set-Eyebrow-Letter-Spacing']?.value, 12),
+
+      // ── Display effects. Recorded for a plugin to render; a text style
+      //    can apply neither. ──
+      'Display-Noise': parseInt(typo['Set-Display-Noise']?.value || '0'),
+      'Display-Bounce': parseInt(typo['Set-Display-Bounce']?.value || '0'),
+
+      // ── Case ──
       'Header-Caps': typo['Set-Header-Caps']?.value === 'uppercase',
       'Decorative-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
     };
+
+    // ── The full type scale ──
+    // Fonts (above) only carries families, weights and case, so the plugin had
+    // nothing to write the Typography/* variables from — the ramp lived only in
+    // the Figma template and could drift from the CSS export without anything
+    // noticing. This section is the same scale the CSS is generated from, in
+    // Figma's units.
+    figma.Typography = buildFigmaTypeScale(typo);
   }
 
   // ── Component Style (Button, Card) ──
@@ -1334,6 +1618,163 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       },
     };
   }
+
+  // Flatten Buttons and Default-Button, and rewrite what points at them.
+  //
+  // Buttons/<Palette>/{Light,Medium}/<Slot> becomes Buttons/<Palette>/<Slot>,
+  // and Highlight, Lowlight and Border join the entry so a button is described
+  // in one place.
+  //
+  // The shade level carried no information: measured across all 9 types in
+  // both modes, Light and Medium held identical values in every slot. It used
+  // to matter for BlackWhite, whose two shades were the two faces — that is
+  // now Buttons/Black, Buttons/White and the resolved Buttons/BlackWhite table.
+  //
+  // A previous attempt flattened WITHOUT this rewrite and broke 6,084 of the
+  // 13,701 references in the Theme, State and Surface collections, because
+  // those alias into these exact names. The rewrite below is not optional, and
+  // the before/after unresolved counts are logged so a regression is visible
+  // rather than silent.
+  const flattenGroups = ['Buttons', 'Default-Button'];
+
+  const countUnresolved = (): number => {
+    const names = new Set<string>();
+    const collect = (n: any, path: string, d: number) => {
+      if (!n || typeof n !== 'object' || d > 10) return;
+      if (typeof n.value === 'string') { names.add(path); return; }
+      for (const [k, v] of Object.entries(n)) if (k !== 'type') collect(v, path ? `${path}.${k}` : k, d + 1);
+    };
+    collect(figma.Modes?.['Light-Mode'], '', 0);
+    let missing = 0;
+    const walk = (n: any, d: number) => {
+      if (!n || typeof n !== 'object' || d > 10) return;
+      if (typeof n.value === 'string') {
+        const v = n.value;
+        if (v.startsWith('{')) {
+          const ref = v.slice(1, -1);
+          // Only judge refs into the groups this pass touches; the rest point
+          // at other collections and are resolved elsewhere.
+          if (flattenGroups.some(g => ref.startsWith(g + '.')) && !names.has(ref)) missing++;
+        }
+        return;
+      }
+      for (const [k, v] of Object.entries(n)) if (k !== 'type') walk(v, d + 1);
+    };
+    walk(figma.Themes, 0);
+    walk(figma.SurfacesContainers, 0);
+    return missing;
+  };
+
+  const unresolvedBefore = countUnresolved();
+
+  for (const modeName of Object.keys(figma.Modes ?? {})) {
+    const modeSection: any = figma.Modes[modeName];
+    const bevelPct = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
+    const bevelAlphaHex = Math.round((bevelPct * 255) / 100).toString(16).padStart(2, '0');
+
+    for (const groupName of flattenGroups) {
+      const group: any = modeSection?.[groupName];
+      if (!group) continue;
+      for (const [entryName, node] of Object.entries<any>(group)) {
+        // BlackWhite is the resolved Scope/Palette/Tone table, not a shade
+        // pair — leave it alone.
+        if (entryName === 'BlackWhite') continue;
+        const shade = node?.Medium ?? node?.Light;
+        if (!shade || typeof shade !== 'object' || !shade.Button) continue;
+
+        const flat: any = {};
+        for (const [slot, token] of Object.entries<any>(shade)) flat[slot] = token;
+
+        const fill = typeof flat.Button?.value === 'string' ? flat.Button.value : '';
+        if (fill.startsWith('#')) {
+          const base = fill.slice(0, 7);
+          // A solid button's edge is its own fill — the same rule the CSS uses
+          // for --Buttons-<X>-Border. Surface-dependent borders stay in
+          // Default-Button-Border, which is scoped by surface and tone.
+          if (!flat.Border) flat.Border = { value: fill, type: 'color' };
+          flat.Highlight = { value: `${deriveColorHex(base, 25, 0.7)}${bevelAlphaHex}`, type: 'color' };
+          flat.Lowlight = { value: `${deriveColorHex(base, -30, 0.85)}${bevelAlphaHex}`, type: 'color' };
+        }
+        group[entryName] = flat;
+      }
+    }
+  }
+
+  // Rewrite every reference that still names a shade.
+  const SHADE_REF = new RegExp(`^\\{(${flattenGroups.join('|')})\\.([\\w-]+)\\.(Light|Medium)\\.([\\w-]+)\\}$`);
+  let refsRewritten = 0;
+  const rewrite = (n: any, d: number) => {
+    if (!n || typeof n !== 'object' || d > 10) return;
+    if (typeof n.value === 'string') {
+      const m = n.value.match(SHADE_REF);
+      if (m) { n.value = `{${m[1]}.${m[2]}.${m[4]}}`; refsRewritten++; }
+      return;
+    }
+    for (const [k, v] of Object.entries(n)) if (k !== 'type') rewrite(v, d + 1);
+  };
+  rewrite(figma.Themes, 0);
+  rewrite(figma.SurfacesContainers, 0);
+  rewrite(figma.Modes, 0);
+
+  const unresolvedAfter = countUnresolved();
+  console.log(`🔘 [Figma] Buttons/Default-Button flattened; ${refsRewritten} references rewritten (unresolved into these groups: ${unresolvedBefore} before, ${unresolvedAfter} after)`);
+  if (unresolvedAfter > unresolvedBefore) {
+    console.warn(`⚠️ [Figma] Flattening LEFT ${unresolvedAfter - unresolvedBefore} reference(s) dangling — the rewrite missed a form.`);
+  }
+
+  // Drop Buttons/Black and Buttons/White; BlackWhite supersedes them.
+  //
+  // They are the two source faces, and the export JSON still needs them —
+  // Default-Button is built from them (72 references in black-white mode).
+  // But those references resolve to hex before the payload is written, so in
+  // Figma nothing points at them by name, and the resolved
+  // Buttons/BlackWhite/<Scope>/<Palette>/<Color-N> table now answers the
+  // question they were there to answer.
+  //
+  // Guarded, not assumed: if anything in the payload still names them, they
+  // stay and the reason is logged. That check is the one missing step that
+  // made an earlier prune orphan thousands of aliases.
+  let bwSourcesPruned = 0;
+  {
+    const stillReferenced: string[] = [];
+    const scan = (n: any, path: string, d: number) => {
+      if (!n || typeof n !== 'object' || d > 11) return;
+      if (typeof n.value === 'string') {
+        if (/\{Buttons\.(Black|White)\b/.test(n.value)) stillReferenced.push(path);
+        return;
+      }
+      for (const [k, v] of Object.entries(n)) if (k !== 'type') scan(v, `${path}.${k}`, d + 1);
+    };
+    scan(figma, 'figma', 0);
+
+    if (stillReferenced.length > 0) {
+      console.warn(`⚠️ [Figma] Keeping Buttons/Black + Buttons/White — ${stillReferenced.length} reference(s) still name them, e.g. ${stillReferenced[0]}`);
+    } else {
+      for (const modeName of Object.keys(figma.Modes ?? {})) {
+        const group: any = figma.Modes[modeName]?.Buttons;
+        if (!group) continue;
+        for (const face of ['Black', 'White']) {
+          if (group[face]) { delete group[face]; bwSourcesPruned++; }
+        }
+      }
+      console.log(`🔘 [Figma] Buttons/Black + Buttons/White pruned (${bwSourcesPruned} groups); BlackWhite table retained`);
+    }
+  }
+
+  // NOTE — do not "optimise" the Modes collection by flattening or pruning it.
+  //
+  // A previous pass removed the Buttons/Default-Button Light|Medium level,
+  // deleted Buttons/Black + Buttons/White, and dropped the tone-keyed
+  // Button-Hover / Button-Pressed / Button-Highlight / Button-Lowlight groups,
+  // on the reasoning that the values were duplicated or unreachable. They are
+  // neither: the Theme, State and Surface collections alias INTO these names,
+  // and every removal orphaned the aliases pointing at it. It broke 6,084 of
+  // the 13,701 references in those collections — 44% — while the variable
+  // count "saved" was simply the wiring those collections run on.
+  //
+  // The duplication is real but load-bearing. If it is ever worth collapsing,
+  // the references in Themes/SurfacesContainers have to be rewritten in the
+  // same pass, and the count of unresolvable refs checked before and after.
 
   // Page canvas background — precomputed hex so the Figma plugin sets it from
   // one field instead of walking the Modes tree. It's the Primary palette's

@@ -2,6 +2,8 @@
 import { blendColors } from '../colorScale';
 import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
 import { dropshadowBaseHex } from '../dropshadow';
+import { HEADER_FAMILY } from '../moodAxes';
+import type { TypographyStyle } from '../../types';
 import chroma from 'chroma-js';
 import { 
   generateSimplifiedLightModeBackgrounds,
@@ -236,6 +238,12 @@ interface ModeSection {
       [colorKey: string]: ColorToken;
     };
   };
+  /** Small label above a heading — a brand-coloured text role per background.
+   *  Same shape as Text; built from it by reference. */
+  Eyebrows?: {
+    Surfaces: { [backgroundKey: string]: { [colorKey: string]: ColorToken } };
+    Containers: { [backgroundKey: string]: { [colorKey: string]: ColorToken } };
+  };
   Quiet: {
     Surfaces: { [backgroundKey: string]: any };
     Containers: { [backgroundKey: string]: any };
@@ -317,6 +325,8 @@ interface StyleSection {
 }
 
 interface TypographySection {
+  'Set-Font-Family-Display': { value: string; type: string };
+  'Set-Font-Family-Eyebrow': { value: string; type: string };
   'Set-Font-Family-Body': { value: string; type: string };
   'Set-Font-Family-Header': { value: string; type: string };
   'Set-Font-Family-Decorative': { value: string; type: string };
@@ -327,6 +337,15 @@ interface TypographySection {
   'Set-Body-Bold-Font-Weight': { value: string; type: string };
   'Set-Header-Caps': { value: string; type: string };
   'Set-Decorative-Caps': { value: string; type: string };
+  'Set-Header-Letter-Spacing': { value: string; type: string };
+  'Set-Display-Size': { value: string; type: string };
+  'Set-Display-Leading': { value: string; type: string };
+  'Set-Display-Noise': { value: string; type: string };
+  'Set-Display-Bounce': { value: string; type: string };
+  'Set-Header-Axes': { value: string; type: string };
+  'Set-Eyebrow-Font-Weight': { value: string; type: string };
+  'Set-Eyebrow-Letter-Spacing': { value: string; type: string };
+  'Set-Decorative-Letter-Spacing': { value: string; type: string };
   'Congative-Family-Body': { value: string; type: string };
 }
 
@@ -668,24 +687,24 @@ function findColorWithContrast(
 }
 
 /**
- * Get header color with 3.1 contrast ratio to background
+ * Get header color with 3:1 contrast ratio to background
  */
 function getHeaderColor(bgColor: string, palette: { tone: number; color: string }[], isDark: boolean = false): string {
-  return findColorWithContrast(bgColor, palette, 3.1, isDark);
+  return findColorWithContrast(bgColor, palette, 3, isDark);
 }
 
 /**
- * Get border color with 3.1 contrast ratio to background
+ * Get border color with 3:1 contrast ratio to background
  */
 function getBorderColor(bgColor: string, palette: { tone: number; color: string }[], isDark: boolean = false): string {
-  return findColorWithContrast(bgColor, palette, 3.1, isDark);
+  return findColorWithContrast(bgColor, palette, 3, isDark);
 }
 
 /**
  * Get border-variant color (Border color with 20% opacity - hex 33)
  */
 function getBorderVariantColor(bgColor: string, palette: { tone: number; color: string }[], isDark: boolean = false): string {
-  // Get the border color with 3.1 contrast
+  // Get the border color with 3:1 contrast
   const borderColor = getBorderColor(bgColor, palette, isDark);
   
   // Convert to 8-digit hex with 20% opacity (0x33 = 20% of 0xFF) — matches the
@@ -3938,7 +3957,10 @@ export function exportColorSystemToJSON(
   buttonStyle: 'primary-adaptive' | 'primary-fixed' | 'black-white' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed' = 'primary-fixed',
   extractedTones?: { primary: number; secondary: number; tertiary: number }, // Tones from extracted colors
   componentStyle?: 'professional' | 'modern' | 'bold' | 'playful', // Selected component style
-  typography?: { header?: { family: string; weight: string }; decorative?: { family: string; weight: string }; body?: { family: string; weight: string } }, // Selected typography
+  // The three picked roles, keyed by role. Was typed as family+weight only,
+  // which silently made every other field (allCaps, letterSpacing, and now the
+  // Header's axes) an error at the read site even though callers pass them.
+  typography?: Partial<Record<'header' | 'decorative' | 'body' | 'eyebrow', Omit<TypographyStyle, 'type'>>>, // Selected typography
   designSystemName?: string, // Design system name
   dateCreated?: string, // Date the design system was created
   dateUpdated?: string, // Date the design system was last updated
@@ -4302,7 +4324,10 @@ export function exportColorSystemToJSON(
     return family;
   };
 
-  const headerFamily = extractFontName(typography?.header?.family || 'Open Sans');
+  // The Header face is always Google Sans Flex — the picked family is ignored
+  // (designs saved before the switch still carry one). Its character comes from
+  // the axes, which ride along on the role and reach the CSS + Figma exports.
+  const headerFamily = HEADER_FAMILY;
   const decorativeFamily = extractFontName(typography?.decorative?.family || 'Open Sans');
   const bodyFamily = extractFontName(typography?.body?.family || 'Open Sans');
   
@@ -4312,16 +4337,42 @@ export function exportColorSystemToJSON(
   const congativeFamily = isSansSerif ? bodyFamily : 'Open Sans';
 
   colorSystem.Typography = {
-    'Set-Font-Family-Body': { value: bodyFamily, type: 'string' },
+    // The four faces. Display is the expressive pick (the Decorative slot in
+    // the picker), Header is always the Flex face, Eyebrow is the OS UI stack
+    // unless a design overrides it, Body is the reading face.
+    'Set-Font-Family-Display': { value: decorativeFamily, type: 'string' },
     'Set-Font-Family-Header': { value: headerFamily, type: 'string' },
+    'Set-Font-Family-Eyebrow': { value: typography?.eyebrow?.family || '', type: 'string' },
+    'Set-Font-Family-Body': { value: bodyFamily, type: 'string' },
+    // Kept so designs saved before the four faces still resolve.
     'Set-Font-Family-Decorative': { value: decorativeFamily, type: 'string' },
-    'Set-Header-Font-Weight': { value: typography?.header?.weight || '600', type: 'string' },
+    'Set-Header-Font-Weight': { value: String(typography?.header?.axes?.wght ?? typography?.header?.weight ?? '600'), type: 'string' },
     'Set-Decorative-Font-Weight': { value: typography?.decorative?.weight || '600', type: 'string' },
     'Set-Body-Font-Weight': { value: typography?.body?.weight || '400', type: 'string' },
     'Set-Body-Semibold-Font-Weight': { value: '600', type: 'string' },
     'Set-Body-Bold-Font-Weight': { value: '700', type: 'string' },
     'Set-Header-Caps': { value: typography?.header?.allCaps ? 'uppercase' : 'none', type: 'string' },
     'Set-Decorative-Caps': { value: typography?.decorative?.allCaps ? 'uppercase' : 'none', type: 'string' },
+    // Tracking per role. These were previously only written into core.css, so
+    // figma.json had no way to reproduce the header/display tracking the CSS
+    // ships — the two exports disagreed by however much the user had dialled in.
+    'Set-Header-Letter-Spacing': { value: typography?.header?.letterSpacing || '0em', type: 'string' },
+    'Set-Decorative-Letter-Spacing': { value: typography?.decorative?.letterSpacing || '0em', type: 'string' },
+    // Display size and leading — Figma CAN hold these, and without them the
+    // Figma text styles rebuild from the defaults, so a 96px Display exported
+    // as 72px.
+    'Set-Display-Size': { value: String(typography?.decorative?.displaySize ?? ''), type: 'string' },
+    'Set-Display-Leading': { value: String(typography?.decorative?.displayLeading ?? ''), type: 'string' },
+    // Figma has Display-Noise / Display-Bounce variables, so the amounts are
+    // carried even though a text style can't render either — a plugin reads
+    // them to draw the effect.
+    'Set-Display-Noise': { value: String(typography?.decorative?.noise ?? 0), type: 'string' },
+    'Set-Display-Bounce': { value: String(typography?.decorative?.bounce ?? 0), type: 'string' },
+    // The six Google Sans Flex axes. Figma has a variable per axis, so these
+    // travel rather than staying CSS-only.
+    'Set-Header-Axes': { value: JSON.stringify(typography?.header?.axes ?? {}), type: 'string' },
+    'Set-Eyebrow-Font-Weight': { value: typography?.eyebrow?.weight || '600', type: 'string' },
+    'Set-Eyebrow-Letter-Spacing': { value: typography?.eyebrow?.letterSpacing || '0em', type: 'string' },
     'Congative-Family-Body': { value: congativeFamily, type: 'string' }
   };
   
@@ -5057,6 +5108,61 @@ export function exportColorSystemToJSON(
   
   console.log('  ├─ [JSON Export] Applying fixed Dark-Mode Text structure');
   colorSystem.Modes['Dark-Mode'].Text = darkModeTextFixed;
+
+  // ── Eyebrows ──────────────────────────────────────────────────────────
+  //
+  // An eyebrow is the small label above a heading, and it reads best in a
+  // BRAND colour rather than the body text colour — but not the same brand
+  // colour as the background it sits on, or it disappears. So each background
+  // borrows the next colour round the rotation.
+  //
+  // Text.Surfaces.<Palette>.<Color-N> already means "the <Palette>-coloured
+  // text role, on a background at tone N" — it is exactly what the Theme layer
+  // reads for Text-Primary / Text-Secondary / Text-Tertiary. Eyebrows is
+  // emitted as REFERENCES into it rather than copied hexes, so it tracks the
+  // contrast work in Text automatically and cannot drift from it.
+  const EYEBROW_TEXT_ROLE: Record<string, string> = {
+    Neutral: 'Primary',     // includes the Black and White backgrounds
+    Primary: 'Secondary',
+    Secondary: 'Tertiary',
+    Tertiary: 'Primary',
+    Info: 'BW',             // the states carry enough colour already
+    Success: 'BW',
+    Warning: 'BW',
+    Error: 'BW',
+  };
+
+  const buildEyebrows = (textStructure: any): any => {
+    const eyebrows: any = { Surfaces: {}, Containers: {} };
+    for (const scope of ['Surfaces', 'Containers']) {
+      const src = textStructure?.[scope];
+      if (!src) continue;
+      for (const [background, role] of Object.entries(EYEBROW_TEXT_ROLE)) {
+        // Skip rather than invent: a missing palette here means the Text
+        // structure changed shape, and a fabricated entry would be worse than
+        // an absent one.
+        if (!src[background] || !src[role]) continue;
+        eyebrows[scope][background] = {};
+        for (const colorKey of Object.keys(src[background])) {
+          if (!src[role][colorKey]) continue;
+          eyebrows[scope][background][colorKey] = {
+            value: `{Text.${scope}.${role}.${colorKey}}`,
+            type: 'color',
+          };
+        }
+      }
+    }
+    return eyebrows;
+  };
+
+  colorSystem.Modes['Light-Mode'].Eyebrows = buildEyebrows(lightModeTextFixed);
+  colorSystem.Modes['Dark-Mode'].Eyebrows = buildEyebrows(darkModeTextFixed);
+  {
+    const eb = colorSystem.Modes['Light-Mode'].Eyebrows;
+    const n = Object.values(eb.Surfaces).reduce((t: number, p: any) => t + Object.keys(p).length, 0)
+            + Object.values(eb.Containers).reduce((t: number, p: any) => t + Object.keys(p).length, 0);
+    console.log(`  ├─ [JSON Export] Eyebrows built from Text (${n} tokens per mode, ${Object.keys(eb.Surfaces).length} backgrounds)`);
+  }
   console.log(`      ✓ Text applied: ${Object.keys(darkModeTextFixed).length} sections (Surfaces, Containers)`);
   console.log(`      ✓ Text.Surfaces.Neutral.Color-1 = ${darkModeTextFixed.Surfaces.Neutral['Color-1'].value}`);
   
@@ -6805,6 +6911,7 @@ export function exportColorSystemToJSON(
   try {
     for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
       const modeColors = colorSystem.Modes[modeName].Colors;
+      const modeTextTable: any = (colorSystem.Modes[modeName] as any).Text;
       const hover = colorSystem.Modes[modeName].Hover;
       const active = colorSystem.Modes[modeName].Pressed;
       if (!modeColors || !hover || !active) continue;
@@ -6814,14 +6921,63 @@ export function exportColorSystemToJSON(
         for (const colorKey of Object.keys(hover[palette])) {
           try {
             const oldHoverRef = hover[palette][colorKey]?.value;
-            const oldHoverHex = resolveColorRef(oldHoverRef, modeColors);
+            let oldHoverHex = resolveColorRef(oldHoverRef, modeColors);
             const buttonHex = modeColors[palette]?.[colorKey]?.value;
 
+            // Direction is decided by the LABEL, not by the tone index.
+            //
+            // The invariant is "the state moves away from the text sitting on
+            // it" — so light text steps darker, dark text steps lighter. That
+            // was previously approximated by assuming every palette's text
+            // table flips at tone 6. Measured across brands, 23 of 24
+            // palette/mode combinations do flip at 6 — and the one that does
+            // not is exactly where it broke: an olive primary whose Color-6
+            // still carries a LIGHT label. Stepping "lighter" walked into the
+            // label and took a 4.54:1 button to 2.17:1 pressed.
+            //
+            // Reading the label removes the assumption entirely.
+            const labelHex = resolveColorRef(
+              modeTextTable?.Surfaces?.[palette]?.[colorKey]?.value, modeColors,
+            );
+            let directedHoverHex = oldHoverHex;
+            if (labelHex && labelHex.startsWith('#') && buttonHex.startsWith('#')) {
+              const toneN = parseInt(colorKey.replace('Color-', ''), 10);
+              if (Number.isFinite(toneN)) {
+                const labelIsLight = getLuminance(labelHex) > getLuminance(buttonHex);
+                // Step away from the label; at an endpoint there is nowhere to
+                // go, so invert rather than sit still.
+                let stepN = labelIsLight ? toneN - 1 : toneN + 1;
+                if (stepN < 1) stepN = 2;
+                if (stepN > 12) stepN = 11;
+                const stepHex = modeColors[palette]?.[`Color-${stepN}`]?.value;
+                if (stepHex && stepHex.startsWith('#')) directedHoverHex = stepHex;
+              }
+            }
+            oldHoverHex = directedHoverHex;
+
             if (oldHoverHex && buttonHex && oldHoverHex.startsWith('#') && buttonHex.startsWith('#')) {
-              // new Pressed = old Hover hex
-              active[palette][colorKey] = { value: oldHoverHex, type: 'color' };
-              // new Hover = mix(Button, old Hover)
-              hover[palette][colorKey] = { value: mixHexColors(buttonHex, oldHoverHex), type: 'color' };
+              if (colorKey === 'Color-1') {
+                // Color-1 moves a HALF step, not a full one.
+                //
+                // It steps lighter (there is no headroom below black), but the
+                // Color-1 → Color-2 gap is the largest jump on the ramp in
+                // relative terms — L1 to L10 is a tenfold change in luminance,
+                // where the same step at the light end (L98 → L99) is nothing.
+                // A full step there reads as the button changing colour rather
+                // than responding: #040404 → #1b1b1b is a near-black going
+                // visibly grey.
+                //
+                // Half a step lands at #101010 — the same magnitude the dark
+                // mode already used and which reads correctly.
+                const softPressed = mixHexColors(buttonHex, oldHoverHex);
+                active[palette][colorKey] = { value: softPressed, type: 'color' };
+                hover[palette][colorKey] = { value: mixHexColors(buttonHex, softPressed), type: 'color' };
+              } else {
+                // new Pressed = old Hover hex
+                active[palette][colorKey] = { value: oldHoverHex, type: 'color' };
+                // new Hover = mix(Button, old Hover)
+                hover[palette][colorKey] = { value: mixHexColors(buttonHex, oldHoverHex), type: 'color' };
+              }
             }
           } catch { /* skip individual color */ }
         }
@@ -7124,6 +7280,321 @@ export function exportColorSystemToJSON(
   
   // Tag sections are now generated by the Complete Simplified System
   console.log('🏷️  [JSON Export] Tag sections already generated by Complete Simplified System');
+
+  // ========================================
+  // Bake the dark-mode buttons down to literal hex
+  // ========================================
+  // generateBaseButtons emits dark buttons as {Modes.Light-Mode.…Color-8}
+  // references so the intent is readable at the source. Nothing downstream
+  // resolves a cross-mode reference, though — the CSS writer and the Figma
+  // payload both look up names inside ONE mode, so an unbaked reference would
+  // ship as the literal string "{Modes.Light-Mode.Colors.Primary.Color-8}" and
+  // the token would silently have no colour.
+  //
+  // So resolve them at the very END of the export — Hover and Pressed are
+  // filled in hundreds of lines below where the buttons are generated, and
+  // then swapped again, so baking any earlier silently loses those two slots.
+  // Write the hex in place. This is the hard-coding: from this point on the dark button carries
+  // a colour, not a link, and editing the dark ramp will not move it.
+  const resolveInLightMode = (ref: string): string | null => {
+    let value = ref.startsWith('{Modes.Light-Mode.')
+      ? `{${ref.slice('{Modes.Light-Mode.'.length)}`
+      : ref;
+    // Follow the chain inside Light-Mode: Text.Surfaces.X.Color-8 is itself a
+    // reference to Colors.X.Color-N, so one hop is not enough.
+    for (let hop = 0; hop < 8 && value.startsWith('{'); hop++) {
+      const path = value.slice(1, -1).split('.');
+      let node: any = colorSystem.Modes['Light-Mode'];
+      for (const key of path) {
+        node = node?.[key];
+        if (node === undefined) return null;
+      }
+      value = typeof node === 'string' ? node : node?.value;
+      if (typeof value !== 'string') return null;
+    }
+    return value.startsWith('#') ? value : null;
+  };
+
+  const bakeCrossModeRefs = (node: any, trail: string): number => {
+    if (!node || typeof node !== 'object') return 0;
+    let baked = 0;
+    if (typeof node.value === 'string' && node.value.startsWith('{Modes.Light-Mode.')) {
+      const hex = resolveInLightMode(node.value);
+      if (hex) {
+        node.value = hex;
+        baked++;
+      } else {
+        console.warn(`⚠️ [JSON Export] Could not resolve ${trail} → ${node.value}`);
+      }
+      return baked;
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (key === 'type') continue;
+      baked += bakeCrossModeRefs(child, `${trail}.${key}`);
+    }
+    return baked;
+  };
+
+  // Color-Vibrant's states must come from Light-Mode too.
+  //
+  // Colors.<Palette>.Color-Vibrant is already Light-Mode Color-8 in BOTH modes,
+  // but the matching Hover and Pressed entries were still computed against the
+  // dark ramp — so they moved the wrong way. Hover came out DARKER than the
+  // fill and Pressed came back lighter, which reads as the button flinching and
+  // then recovering. Light-Mode's Color-8 states were designed against this
+  // exact fill and step consistently lighter.
+  //
+  // Runs last, after the Hover/Pressed swap pass, or that pass overwrites it.
+  let vibrantStates = 0;
+  for (const group of ['Hover', 'Pressed'] as const) {
+    const darkGroup = (colorSystem.Modes['Dark-Mode'] as any)[group];
+    const lightGroup = (colorSystem.Modes['Light-Mode'] as any)[group];
+    if (!darkGroup || !lightGroup) continue;
+    for (const palette of Object.keys(darkGroup)) {
+      const darkEntry = darkGroup[palette]?.['Color-Vibrant'];
+      const lightValue = lightGroup[palette]?.['Color-8'];
+      if (!darkEntry || !lightValue) continue;
+      const hex = resolveInLightMode(
+        typeof lightValue === 'string' ? lightValue : lightValue.value,
+      );
+      if (hex) {
+        darkEntry.value = hex;
+        vibrantStates++;
+      }
+    }
+  }
+  console.log(`🔘 [JSON Export] Dark Color-Vibrant Hover/Pressed copied from Light-Mode Color-8 (${vibrantStates} values)`);
+
+  const bakedButtonRefs = bakeCrossModeRefs(colorSystem.Modes['Dark-Mode'].Buttons, 'Dark-Mode.Buttons');
+  console.log(`🔘 [JSON Export] Dark-mode buttons pinned to Light-Mode Color-8 (${bakedButtonRefs} values baked to hex)`);
+
+  // Recompute the theme bevels from the button's REAL fill.
+  //
+  // Themes.<t>.<section>.Buttons.<X>.Highlight/Lowlight are derived hundreds of
+  // lines above, at a point where the fill is still the unresolved reference
+  // {Buttons.<X>.Medium.Button}. resolveButtonHex can't follow that, so it fell
+  // back to `colors[palette]['Color-' + colorN]` — the tone sitting in the same
+  // slot on the CURRENT mode's ramp. In dark mode that is the dark ramp's
+  // Color-8 (#8ba0ff) while the button actually paints light Color-8 (#b7c0ff),
+  // so every dark bevel was built from a colour the button never shows.
+  //
+  // The highlight hid it: both bases clamp at L=92, so they landed on the same
+  // value and only the lowlight visibly diverged from the Figma payload (which
+  // derives from the real fill and was correct all along).
+  //
+  // Runs LAST: it needs the baked fills from the pass above. Placed before
+  // them it silently corrects nothing, because the fill is still a reference
+  // into a mode this resolver cannot see.
+  let bevelsFixed = 0;
+  let bevelsVisited = 0, bevelsUnresolved = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const modeData: any = colorSystem.Modes[modeName];
+    const resolveHere = (ref: string): string | null => {
+      let value: any = ref;
+      for (let hop = 0; hop < 8 && typeof value === 'string' && value.startsWith('{'); hop++) {
+        const path = value.slice(1, -1).split('.');
+        let node: any = modeData;
+        for (const key of path) {
+          node = node?.[key];
+          if (node === undefined) return null;
+        }
+        value = typeof node === 'string' ? node : node?.value;
+      }
+      return typeof value === 'string' && value.startsWith('#') ? value : null;
+    };
+    for (const theme of Object.values<any>(modeData.Themes ?? {})) {
+      for (const section of Object.values<any>(theme ?? {})) {
+        const groups = section?.Buttons;
+        if (!groups || typeof groups !== 'object') continue;
+        for (const btn of Object.values<any>(groups)) {
+          const fill = btn?.Button?.value;
+          if (typeof fill !== 'string') continue;
+          bevelsVisited++;
+          const hex = resolveHere(fill);
+          // Leave it alone rather than overwrite a good value with a guess.
+          if (!hex) { bevelsUnresolved++; continue; }
+          const highlight = computeHighlight(hex);
+          const lowlight = computeLowlight(hex);
+          if (btn.Highlight?.value !== highlight || btn.Lowlight?.value !== lowlight) bevelsFixed++;
+          btn.Highlight = { value: highlight, type: 'color' };
+          btn.Lowlight = { value: lowlight, type: 'color' };
+        }
+      }
+    }
+  }
+  console.log(`🔘 [JSON Export] Theme bevels rebuilt from the resolved button fill (${bevelsFixed} corrected, ${bevelsVisited} visited, ${bevelsUnresolved} unresolved)`);
+
+  // ── Buttons.BlackWhite ────────────────────────────────────────────────
+  //
+  // A resolved table keyed by the BACKGROUND's tone: for any surface tone it
+  // states the whole black-or-white button — fill, label, border and both
+  // bevel layers. The Theme and State collections reference it at their own
+  // tone, so a black/white button follows the surface it lands on without the
+  // consumer choosing a face.
+  //
+  // Keyed by tone alone. Measured: at every tone all nine palettes agree on
+  // the face, in both modes, because the 12-tone scale is fixed lightness —
+  // so a palette level would be nine identical copies with nothing selecting
+  // between them.
+  //
+  // Built here rather than in the Figma payload so the CSS gets it too, and
+  // Highlight/Lowlight are RGB triplets like every other theme button, because
+  // the lib composes its bevel as rgb(var(--Buttons-<X>-Highlight)).
+  {
+    const resolveRef = (modeData: any, ref: any): string => {
+      const walk = (root: any, path: string[]): any => {
+        let node = root;
+        for (const key of path) node = node?.[key];
+        return node;
+      };
+      let v = typeof ref === 'string' ? ref : ref?.value ?? '';
+      for (let hop = 0; hop < 8 && typeof v === 'string' && v.startsWith('{'); hop++) {
+        const path = v.slice(1, -1).split('.');
+        // Some references are written relative to Colors rather than from the
+        // mode root — the White face is `{White}`, not `{Colors.White}`. Try
+        // the literal path first, then under Colors, before giving up.
+        const node = walk(modeData, path) ?? walk(modeData?.Colors, path);
+        v = typeof node === 'string' ? node : node?.value;
+        if (typeof v !== 'string') break;
+      }
+      return typeof v === 'string' ? v : '';
+    };
+
+    for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+      const modeData: any = colorSystem.Modes[modeName];
+      const faces: Record<string, any> = {};
+      for (const faceName of ['Black', 'White']) {
+        const src = modeData?.Buttons?.[faceName]?.Medium;
+        if (!src) continue;
+        const fill = resolveRef(modeData, src.Button);
+        if (!fill.startsWith('#')) continue;
+        faces[faceName] = {
+          Button: { value: fill, type: 'color' },
+          Text: { value: resolveRef(modeData, src.Text), type: 'color' },
+          // A solid button's edge is its own fill.
+          Border: { value: fill, type: 'color' },
+          Hover: { value: resolveRef(modeData, src.Hover), type: 'color' },
+          Pressed: { value: resolveRef(modeData, src.Pressed), type: 'color' },
+          Highlight: { value: computeHighlight(fill.slice(0, 7)), type: 'color' },
+          Lowlight: { value: computeLowlight(fill.slice(0, 7)), type: 'color' },
+        };
+      }
+      if (!faces.Black || !faces.White) continue;
+
+      // White face on tones 1-5, black from 6 up — the same threshold the
+      // Default-Button-Border BlackWhite map uses, so the two cannot drift.
+      const table: any = {};
+      for (const colorKey of Object.keys(modeData.Colors?.Neutral ?? {})) {
+        if (!colorKey.startsWith('Color-')) continue;
+        const toneNumber = parseInt(colorKey.replace('Color-', ''), 10);
+        // Color-Vibrant is skipped on purpose. This table is keyed by the
+        // BACKGROUND's tone, and Vibrant is never a background — it is a
+        // button fill. An entry for it would be a cell nothing can index.
+        if (!Number.isFinite(toneNumber)) continue;
+        const face = toneNumber >= 6 ? faces.Black : faces.White;
+        table[colorKey] = {
+          Button: { ...face.Button }, Text: { ...face.Text }, Border: { ...face.Border },
+          Hover: { ...face.Hover }, Pressed: { ...face.Pressed },
+          Highlight: { ...face.Highlight }, Lowlight: { ...face.Lowlight },
+        };
+      }
+      // A `Default` key for the Default THEME.
+      //
+      // The Theme layer is mode-independent, so the Default theme bakes the
+      // LIGHT surface's tone into its reference — and that tone is shared with
+      // the White theme. In dark mode the two surfaces diverge (Default goes
+      // near-black, White stays light), and one key cannot serve both: the
+      // Default theme ended up with a black button on a black surface, 1.0:1.
+      //
+      // So the face here is chosen from the Default theme's ACTUAL background
+      // in this mode, rather than from a tone index fixed in light mode.
+      const defaultBgHex = resolveRef(
+        modeData,
+        modeData?.Themes?.Default?.Surfaces?.Background?.value,
+      );
+      // Always emit the key. If it is skipped, the Default theme's reference
+      // resolves to nothing and the button silently loses its colour — which
+      // is exactly what happened when this was written behind a guard.
+      const bgIsLight = defaultBgHex.startsWith('#')
+        ? (() => {
+            try {
+              const c = defaultBgHex.replace('#', '').slice(0, 6);
+              const n = parseInt(c, 16);
+              const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+                const sr = v / 255;
+                return sr <= 0.03928 ? sr / 12.92 : Math.pow((sr + 0.055) / 1.055, 2.4);
+              });
+              return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2] > 0.18;
+            } catch { return modeName === 'Light-Mode'; }
+          })()
+        // Could not read the Default surface — fall back to the mode, which is
+        // right for every stock background choice.
+        : modeName === 'Light-Mode';
+      const defaultFace = bgIsLight ? faces.Black : faces.White;
+      table.Default = {
+        Button: { ...defaultFace.Button }, Text: { ...defaultFace.Text },
+        Border: { ...defaultFace.Border }, Hover: { ...defaultFace.Hover },
+        Pressed: { ...defaultFace.Pressed }, Highlight: { ...defaultFace.Highlight },
+        Lowlight: { ...defaultFace.Lowlight },
+      };
+
+      if (!modeData.Buttons) modeData.Buttons = {};
+      modeData.Buttons.BlackWhite = table;
+    }
+    const built = Object.keys((colorSystem.Modes['Light-Mode'] as any)?.Buttons?.BlackWhite ?? {}).length;
+    console.log(`⬛ [JSON Export] Buttons.BlackWhite table built (${built} tones per mode)`);
+  }
+
+  // ── Theme-level Eyebrow ───────────────────────────────────────────────
+  //
+  // Modes/Eyebrows is the lookup table; this is the token components actually
+  // read. Every theme/surface block already carries --Text, --Text-Primary,
+  // --Text-Secondary and so on, so --Eyebrow joins them there rather than
+  // being a flat variable nothing references. (The mode CSS never emits flat
+  // Modes variables — Text itself does not appear that way either.)
+  //
+  // The value is COPIED from the mapped role already present in the same
+  // block, so an eyebrow is the same hex as its text role by construction, not
+  // by a parallel calculation that could drift.
+  const EYEBROW_ROLE_BY_THEME = (theme: string): string => {
+    const base = theme.replace(/-Light$/, '');
+    if (['Info', 'Success', 'Warning', 'Error'].includes(base)) return 'BW';
+    if (base === 'Primary' || base === 'Default') return 'Text-Secondary';
+    if (base === 'Secondary') return 'Text-Tertiary';
+    // Tertiary, White, Black, Light-Gray, Neutral and anything unforeseen.
+    return 'Text-Primary';
+  };
+
+  let eyebrowTokens = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
+    if (!themes) continue;
+    for (const [themeName, theme] of Object.entries<any>(themes)) {
+      const role = EYEBROW_ROLE_BY_THEME(themeName);
+      for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
+        if (!section || typeof section !== 'object' || !section['Text-Primary']) continue;
+        const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
+
+        if (role !== 'BW') {
+          const source = section[role];
+          if (!source?.value) continue;
+          section.Eyebrow = { value: source.value, type: 'color' };
+          eyebrowTokens++;
+          continue;
+        }
+
+        // Black or white, whichever clears 4.5:1 on this background. That
+        // judgement is already made per tone in Text.<scope>.BW, so read the
+        // tone out of a sibling role's reference rather than recomputing it.
+        const sibling = String(section['Text-Primary'].value || '');
+        const tone = sibling.match(/\.(Color-[\w-]+)\}$/)?.[1];
+        if (!tone) continue;
+        section.Eyebrow = { value: `{Text.${scope}.BW.${tone}}`, type: 'color' };
+        eyebrowTokens++;
+      }
+    }
+  }
+  console.log(`👁️  [JSON Export] Theme-level Eyebrow added (${eyebrowTokens} tokens across both modes)`);
 
   console.log('✅ [JSON Export] Color system export complete!');
   return colorSystem;

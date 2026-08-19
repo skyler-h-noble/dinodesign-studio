@@ -45,6 +45,11 @@ interface ThemeConfig {
   // the current theme's palette, so a Secondary-mode Default button on the
   // Default theme ended up with a Primary border. This field fixes that.
   defaultButtonPalette: string;
+  /** True for tonal/laddered, where the Default button follows the surface's
+   *  palette rather than one global palette. */
+  surfaceScopedButton?: boolean;
+  /** True for the black/white button style, whose border is its own fill. */
+  blackWhiteButton?: boolean;
 }
 
 /**
@@ -227,12 +232,35 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         }
         // Non-semantic themes — Border + Highlight + Lowlight follow the user's
         // button-mode palette (defaultButtonPalette) so they match the body.
+        // Black/white resolves per SURFACE TONE, from the table that already
+        // encodes the rule: black face on light tones, white on dark, border
+        // equal to the fill, text the inverse. Routing it through the single
+        // Default-Button entry instead gave every theme the same face, which
+        // put a black button on a black surface (1.0:1 — an invisible control).
+        //
+        // Tonal/laddered read the surface's own palette; the fixed modes keep
+        // pointing at the single Default-Button entry.
+        const src = config.blackWhiteButton
+          // The Default theme takes the dedicated key: its surface moves
+          // between modes, and its tone is shared with the White theme, so a
+          // tone-keyed reference cannot describe both.
+          ? (config.themeName === 'Default'
+              ? 'Buttons.BlackWhite.Default'
+              : `Buttons.BlackWhite.Color-${n}`)
+          : config.surfaceScopedButton
+            ? `Buttons.${config.defaultButtonPalette}.${shade}`
+            : `Default-Button.Default.${shade}`;
         return {
-          'Button': { value: `{Default-Button.Default.${shade}.Button}`, type: 'color' },
-          'Text': { value: `{Default-Button.Default.${shade}.Text}`, type: 'color' },
-          'Border': { value: `{Border.Surfaces.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
-          'Hover': { value: `{Default-Button.Default.${shade}.Hover}`, type: 'color' },
-          'Pressed': { value: `{Default-Button.Default.${shade}.Pressed}`, type: 'color' },
+          'Button': { value: `{${src}.Button}`, type: 'color' },
+          'Text': { value: `{${src}.Text}`, type: 'color' },
+          // A black or white button has no tonal ramp to step to for an edge,
+          // so its border is its own fill — the face alone delineates it. The
+          // BlackWhite table already stores Border that way.
+          'Border': config.blackWhiteButton
+            ? { value: `{${src}.Border}`, type: 'color' }
+            : { value: `{Border.Surfaces.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
+          'Hover': { value: `{${src}.Hover}`, type: 'color' },
+          'Pressed': { value: `{${src}.Pressed}`, type: 'color' },
           'Highlight': { value: `{Button-Highlight.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' },
           'Lowlight': { value: `{Button-Lowlight.${config.defaultButtonPalette}.Color-${n}}`, type: 'color' }
         };
@@ -257,6 +285,20 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         'Border': { value: `{Border.Surfaces.Tertiary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Tertiary.${shade}.Pressed}`, type: 'color' }
+      },
+      // BlackWhite — linked to the tone-keyed Buttons.BlackWhite table at THIS
+      // surface's own tone, so the face follows the background it lands on
+      // (white on dark surfaces, black on light) without the consumer picking.
+      // Every slot comes from the same tone so the fill, label, border and
+      // bevel can never describe different faces.
+      'BlackWhite': {
+        'Button': { value: `{Buttons.BlackWhite.Color-${n}.Button}`, type: 'color' },
+        'Text': { value: `{Buttons.BlackWhite.Color-${n}.Text}`, type: 'color' },
+        'Border': { value: `{Buttons.BlackWhite.Color-${n}.Border}`, type: 'color' },
+        'Hover': { value: `{Buttons.BlackWhite.Color-${n}.Hover}`, type: 'color' },
+        'Pressed': { value: `{Buttons.BlackWhite.Color-${n}.Pressed}`, type: 'color' },
+        'Highlight': { value: `{Buttons.BlackWhite.Color-${n}.Highlight}`, type: 'color' },
+        'Lowlight': { value: `{Buttons.BlackWhite.Color-${n}.Lowlight}`, type: 'color' }
       },
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${shade}.Button}`, type: 'color' },
@@ -363,7 +405,12 @@ function generateSingleTheme(config: ThemeConfig): any {
 
   // Surfaces Section — each surface variant gets its own complete token set
   const dimN = Math.max(config.n - 1, 1);
-  const dimmestN = 4; // Surface-Dimmest always uses Color-4
+  // Surface-Dimmest = one tone darker than Surface-Dim (config.n - 2), floored
+  // at black. Relative to the theme's own surface — NOT pinned to a fixed
+  // Color-4 — so it's always the darkest surface, never coincides with
+  // Surface-Dim (which it did on the State themes, whose Dim already landed on
+  // Color-4), and re-themes like Dim/Bright do.
+  const dimmestN = Math.max(config.n - 2, 1);
   const brightN = Math.min(config.n + 1, 12);
 
   // Base Surface — reference Backgrounds structure for Light/Dark mode adaptation
@@ -558,12 +605,20 @@ function generateSingleTheme(config: ThemeConfig): any {
             'Lowlight': { value: `{Button-Lowlight.${config.theme}.Color-${config.contN}}`, type: 'color' }
           };
         }
+        // Black/white reads the tone table at the CONTAINER's own tone, so a
+        // button inside a container takes its face from the container it sits
+        // on rather than from the surface behind it.
+        const cSrc = config.blackWhiteButton
+          ? `Buttons.BlackWhite.Color-${config.contN}`
+          : `Default-Button.Default.${config.cShade}`;
         return {
-          'Button': { value: `{Default-Button.Default.${config.cShade}.Button}`, type: 'color' },
-          'Text': { value: `{Default-Button.Default.${config.cShade}.Text}`, type: 'color' },
-          'Border': { value: `{Border.Containers.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
-          'Hover': { value: `{Default-Button.Default.${config.cShade}.Hover}`, type: 'color' },
-          'Pressed': { value: `{Default-Button.Default.${config.cShade}.Pressed}`, type: 'color' },
+          'Button': { value: `{${cSrc}.Button}`, type: 'color' },
+          'Text': { value: `{${cSrc}.Text}`, type: 'color' },
+          'Border': config.blackWhiteButton
+            ? { value: `{${cSrc}.Border}`, type: 'color' }
+            : { value: `{Border.Containers.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
+          'Hover': { value: `{${cSrc}.Hover}`, type: 'color' },
+          'Pressed': { value: `{${cSrc}.Pressed}`, type: 'color' },
           'Highlight': { value: `{Button-Highlight.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
           'Lowlight': { value: `{Button-Lowlight.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' }
         };
@@ -588,6 +643,18 @@ function generateSingleTheme(config: ThemeConfig): any {
         'Border': { value: `{Border.Containers.Tertiary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Tertiary.${config.cShade}.Pressed}`, type: 'color' }
+      },
+      // BlackWhite — same table, keyed to the CONTAINER's tone rather than the
+      // surface's, so a black/white button inside a container reads against
+      // the container it actually sits on.
+      'BlackWhite': {
+        'Button': { value: `{Buttons.BlackWhite.Color-${config.contN}.Button}`, type: 'color' },
+        'Text': { value: `{Buttons.BlackWhite.Color-${config.contN}.Text}`, type: 'color' },
+        'Border': { value: `{Buttons.BlackWhite.Color-${config.contN}.Border}`, type: 'color' },
+        'Hover': { value: `{Buttons.BlackWhite.Color-${config.contN}.Hover}`, type: 'color' },
+        'Pressed': { value: `{Buttons.BlackWhite.Color-${config.contN}.Pressed}`, type: 'color' },
+        'Highlight': { value: `{Buttons.BlackWhite.Color-${config.contN}.Highlight}`, type: 'color' },
+        'Lowlight': { value: `{Buttons.BlackWhite.Color-${config.contN}.Lowlight}`, type: 'color' }
       },
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${config.cShade}.Button}`, type: 'color' },
@@ -746,6 +813,31 @@ export function generateAllThemesWithSurfacesAndContainers(
     if (buttonMode === 'laddered') return 'Secondary';
     return 'Primary'; // 'primary' or anything else
   })();
+
+  // Tonal and laddered are SURFACE-SCOPED: the button's palette depends on the
+  // surface it sits on, where primary/secondary/black-white use one palette
+  // everywhere. The constant above cannot express that — it made a tonal button
+  // resolve to Primary on every theme, so tonal and primary shipped identical
+  // CSS while the preview varied per surface.
+  //
+  //   tonal    — the surface's own palette, at that palette's extracted tone
+  //              (Primary→PC, Secondary→SC, Tertiary→TC). Neutral and semantic
+  //              surfaces have no brand tone to match, so they take Primary.
+  //   laddered — one step round the rotation, so the button contrasts in hue
+  //              with the surface rather than matching it.
+  const isBlackWhiteButton = buttonMode === 'black-white';
+  const SURFACE_SCOPED_BUTTON_MODES = ['tonal', 'laddered'];
+  const isSurfaceScopedButton = SURFACE_SCOPED_BUTTON_MODES.includes(buttonMode);
+  const LADDER_NEXT: Record<string, string> = {
+    Primary: 'Secondary', Secondary: 'Tertiary', Tertiary: 'Primary',
+  };
+  const buttonPaletteForSurface = (surfacePalette: string): string => {
+    if (!isSurfaceScopedButton) return defaultButtonPalette;
+    const brand = ['Primary', 'Secondary', 'Tertiary'].includes(surfacePalette)
+      ? surfacePalette
+      : 'Primary';
+    return buttonMode === 'laddered' ? LADDER_NEXT[brand] : brand;
+  };
   
   // Common text palette configurations
   const textPalettes = {
@@ -763,6 +855,8 @@ export function generateAllThemesWithSurfacesAndContainers(
   // 1. Default Theme (from user/calculated settings)
   themes.Default = generateSingleTheme({
     themeName: 'Default',
+    surfaceScopedButton: isSurfaceScopedButton,
+    blackWhiteButton: isBlackWhiteButton,
     theme: defaultSettings.defaultTheme,
     n: defaultSettings.defaultN,
     contTheme: defaultSettings.containerTheme,
@@ -787,7 +881,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     successHeader: 'Success',
     warningHeader: 'Warning',
     errorHeader: 'Error',
-    defaultButtonPalette
+    defaultButtonPalette: buttonPaletteForSurface(defaultSettings.defaultTheme),
   });
 
   // Route the Default theme's surfaces through Default-Background.
@@ -963,6 +1057,8 @@ export function generateAllThemesWithSurfacesAndContainers(
     themeName,
     theme,
     n,
+    surfaceScopedButton: isSurfaceScopedButton,
+    blackWhiteButton: isBlackWhiteButton,
     contTheme: theme,
     contN: n === 11 ? 10 : n === 12 ? 11 : Math.min(n + 1, 12),
     shade: n >= 9 ? 'Medium' as const : 'Light' as const,
@@ -985,7 +1081,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     successHeader: 'Success',
     warningHeader: 'Warning',
     errorHeader: 'Error',
-    defaultButtonPalette
+    defaultButtonPalette: buttonPaletteForSurface(theme),
   });
 
   // Primary, Secondary, Tertiary — N = PC/SC/TC

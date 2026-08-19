@@ -9,6 +9,8 @@ import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } f
 // design-token references (e.g. "{Colors.Primary.Color-8}") that we then
 // convert to CSS var() form below.
 import { getFixedTextToken, getFixedHeaderToken } from './cssgen/exportColorSystem';
+import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
+import { resolveRoles } from './typeScale';
 
 /** Convert a `{Colors.Palette.Color-N}` token reference (returned by
  *  getFixedTextToken / getFixedHeaderToken) into a CSS `var(--Palette-Color-N)`
@@ -168,7 +170,9 @@ function isLight(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
 }
 
-function textFor(hex: string) { return isLight(hex) ? '#1a1a1a' : '#ffffff'; }
+/** BW text on a background. `white` is 70% white in dark mode — the export
+ *  emits #ffffffb3 for Text.*.BW there, and pure white reads as glare. */
+function textFor(hex: string, white = '#ffffff') { return isLight(hex) ? '#1a1a1a' : white; }
 
 /** Derive highlight (lighter) or lowlight (darker) from a hex color via HSL shift */
 function deriveHex(hex: string, lightOffset: number, satMul: number): string {
@@ -291,10 +295,10 @@ function getAccessibleTones(
 
   return {
     text: findAccessibleTone(bgHex, palette, textStart, 4.5),
-    header: findAccessibleTone(bgHex, palette, headerStart, 3.1),
+    header: findAccessibleTone(bgHex, palette, headerStart, 3),
     // Quiet is muted but still body-size text → must clear AA (4.5:1), not 3:1.
     quiet: findAccessibleTone(bgHex, palette, quietStart, 4.5),
-    border: findAccessibleTone(bgHex, palette, borderStart, 3.1),
+    border: findAccessibleTone(bgHex, palette, borderStart, 3),
   };
 }
 
@@ -319,10 +323,16 @@ export function buildPreviewCSS(input: BuildInput): string {
   const secondary = isDark ? secondaryDark : secondaryLight;
   const tertiary = isDark ? tertiaryDark : tertiaryLight;
 
-  // Vibrant palette — always light mode (for buttons, tags, icons)
-  const vPrimary = primaryLight;
-  const vSecondary = secondaryLight;
-  const vTertiary = tertiaryLight;
+  // Vibrant palette — the palette buttons, tags and icons are drawn from.
+  //
+  // This used to be pinned to the LIGHT palettes in both modes, so a dark-mode
+  // button rendered the same hex as a light-mode one (29 of 35 button tokens
+  // were byte-identical across modes) while text, borders and surfaces all
+  // switched — the preview looked half-converted, and it disagreed with the
+  // export, which draws dark-mode buttons from the dark palettes.
+  const vPrimary = isDark ? primaryDark : primaryLight;
+  const vSecondary = isDark ? secondaryDark : secondaryLight;
+  const vTertiary = isDark ? tertiaryDark : tertiaryLight;
 
   const p = (arr: typeof primary, n: number) => arr[n - 1]?.hex || '#888';
   const neutral = (n: number) => NEUTRAL[n - 1] || '#888';
@@ -330,6 +340,26 @@ export function buildPreviewCSS(input: BuildInput): string {
   const PC = toneToColorNumber(colorScheme.extractedTones?.primary || 60);
   const SC = toneToColorNumber(colorScheme.extractedTones?.secondary || 60);
   const TC = toneToColorNumber(colorScheme.extractedTones?.tertiary || 60);
+  // Button tones. In dark mode every button sits at Color-12 of its palette —
+  // the same rule generateButtonsSimplified applies (DARK_BUTTON_N).
+  // Surfaces keep the extracted tones, so these are separate from PC/SC/TC.
+  // White as TEXT is 70% in dark mode; white as a SURFACE stays opaque. The
+  // export makes the same distinction (#ffffffb3 for Text.*.BW in Dark-Mode).
+  const WHITE_TEXT = isDark ? '#ffffffb3' : '#ffffff';
+  // Dark-mode buttons are pinned to the LIGHT ramp's Color-8 — see the
+  // matching block in generateButtonsSimplified.ts. That means both halves
+  // change in dark mode: the tone becomes 8, AND the palette the tone is read
+  // from becomes the light one. Getting only the tone right would produce a
+  // dark-ramp Color-8, which is a different colour entirely.
+  const DARK_BUTTON_N = 8;
+  const btnPC = isDark ? DARK_BUTTON_N : PC;
+  const btnSC = isDark ? DARK_BUTTON_N : SC;
+  const btnTC = isDark ? DARK_BUTTON_N : TC;
+  // Button palettes: always the light ramps, in both modes. Surfaces keep
+  // using v* (dark ramps in dark mode) — only buttons cross over.
+  const bPrimary = primaryLight;
+  const bSecondary = secondaryLight;
+  const bTertiary = tertiaryLight;
 
   // ── Resolve surface background ──
   let surfaceBg: string;
@@ -382,21 +412,43 @@ export function buildPreviewCSS(input: BuildInput): string {
   // and no tone+1 of tone-12 — the palette tops out at 12.
   function activeAndHoverFor(palette: Array<{ hex: string }>, n: number): { active: string; hover: string } {
     const baseHex = palette[n - 1]?.hex || '#888888';
-    // Pressed/hover move ALONG the palette, one tone away from the text colour so
-    // contrast is preserved (or grows):
-    //   - light-text (dark) button  → active = tone n-1 (next darker tone)
-    //   - dark-text (light) button  → active = tone n+1 (next lighter tone)
-    //   - hover = mix(base tone, active tone)
-    // Keyed on the button's own lightness (not raw N index) so it's correct
-    // regardless of palette ordering. At an endpoint we step the other way so
-    // there's always a visible delta.
-    const darkBtn = !isLight(baseHex); // dark button carries light text
-    const activeN = darkBtn ? n - 1 : n + 1;
-    // At the extremes go to pure black/white (never back to the button's own
-    // tone) so there's always a visible delta — matches the doc + export.
-    const active = activeN < 1 ? '#000000'
-      : activeN > 12 ? '#ffffff'
-      : (palette[activeN - 1]?.hex || baseHex);
+    // Pressed/hover move ALONG the palette, away from the text sitting on the
+    // button, so contrast is preserved or grows. Hover = mix(base, pressed).
+    //
+    // Direction keys on the TONE INDEX, matching buildHoverForPalette() in
+    // staticTokenStructures.ts — the implementation that bakes the real
+    // Hover/Pressed tokens. It previously keyed on the fill's LUMINANCE, which
+    // looks equivalent and is not: a saturated mid-tone like Success Color-6
+    // (#2f9e5a) measures "light" by brightness while carrying light text, so
+    // the preview stepped it toward its own label while the export stepped it
+    // away. Tones 1-5 carry light text and 6-12 carry dark text, so the tone
+    // split is what keeps the state moving away from the label.
+    //
+    // BOTH ENDS INVERT, because neither has headroom:
+    //   tone 1  → lighter. Stepping darker meant #000000, and from a fill
+    //             already at #040404 that is 1.02:1 against itself — invisible.
+    //   tone 12 → darker. Near-white already; a step toward #ffffff goes
+    //             nowhere.
+    // Direction is decided by the LABEL: light text steps darker, dark text
+    // steps lighter, so the state always moves AWAY from the text on it. This
+    // used to key on the tone index, which assumed every palette's text table
+    // flips at tone 6. Most do; an olive primary whose Color-6 still carries a
+    // light label does not, and there the index rule stepped INTO the label.
+    const labelIdx = getAccessibleTones(baseHex, n, palette).text;
+    const labelHex = palette[Math.max(0, Math.min(labelIdx - 1, 11))]?.hex || baseHex;
+    let labelIsLight: boolean;
+    try {
+      labelIsLight = chroma(labelHex).luminance() > chroma(baseHex).luminance();
+    } catch {
+      labelIsLight = n <= 5; // fall back to the tone split
+    }
+    // Both ends invert — neither has headroom.
+    const activeN = Math.min(Math.max(labelIsLight ? n - 1 : n + 1, 1), 12);
+    const stepHex = palette[activeN - 1]?.hex || baseHex;
+    // Color-1 moves a HALF step. Its gap to Color-2 is a tenfold luminance
+    // change, so a full step reads as the button changing colour rather than
+    // responding. Matches the export.
+    const active = n === 1 ? mixHex(baseHex, stepHex) : stepHex;
     return { active, hover: mixHex(baseHex, active) };
   }
 
@@ -417,7 +469,16 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   function navColor(opt: string) {
     const { palette, n } = resolveNavOption(opt);
-    if (palette === 'Neutral') return neutral(n);
+    if (palette === 'Neutral') {
+      // In dark mode a neutral nav goes DARK, the same way the page background
+      // does ('white' → neutral(2) above). Without this the light-mode ramp is
+      // read in dark mode and a White nav renders pure #ffffff on a dark page.
+      //
+      // The nav sits one step lighter than the surface so the two stay
+      // distinguishable — the page is neutral(2), so a white nav is neutral(2).
+      if (isDark) return neutral(opt === 'black' ? 1 : 2);
+      return neutral(n);
+    }
     return p(primary, n);
   }
 
@@ -540,7 +601,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // Buttons always use vibrant (light) palette
   // btnBg = button fill color (RESOLVED hex from palette, not var() reference)
   // btnText = accessible text on btnBg (resolved hex)
-  // btnBorder = border with 3.1:1 contrast to SURFACE (resolved hex)
+  // btnBorder = border with 3:1 contrast to SURFACE (resolved hex)
   let btnBg: string, btnText: string, btnBorder: string;
 
   // On Primary/Primary-Light backgrounds, primary/tonal buttons use border color
@@ -550,7 +611,7 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   switch (effectiveButton) {
     case 'tonal': {
-      // Tonal: button fill = border color (has 3.1:1 contrast to surface)
+      // Tonal: button fill = border color (has 3:1 contrast to surface)
       btnBg = p(primaryLight, borderToneN);
       const tonalTones = getAccessibleTones(btnBg, borderToneN, primaryLight);
       btnText = p(primaryLight, tonalTones.text);
@@ -558,22 +619,22 @@ export function buildPreviewCSS(input: BuildInput): string {
       break;
     }
     case 'secondary': {
-      btnBg = p(vSecondary, SC);
-      const scTones = getAccessibleTones(btnBg, SC, vSecondary);
+      btnBg = p(bSecondary, btnSC);
+      const scTones = getAccessibleTones(btnBg, btnSC, bSecondary);
       btnText = p(vSecondary, scTones.text);
       btnBorder = p(vSecondary, getAccessibleTones(surfaceBg, surfaceN, vSecondary).border);
       break;
     }
     case 'laddered': {
-      btnBg = p(vSecondary, SC);
-      const ladTones = getAccessibleTones(btnBg, SC, vSecondary);
+      btnBg = p(bSecondary, btnSC);
+      const ladTones = getAccessibleTones(btnBg, btnSC, bSecondary);
       btnText = p(vSecondary, ladTones.text);
       btnBorder = p(vSecondary, getAccessibleTones(surfaceBg, surfaceN, vSecondary).border);
       break;
     }
     case 'black-white':
       btnBg = isLight(surfaceBg) ? '#1a1a1a' : '#ffffff';
-      btnText = isLight(surfaceBg) ? '#ffffff' : '#1a1a1a';
+      btnText = isLight(surfaceBg) ? WHITE_TEXT : '#1a1a1a';
       btnBorder = btnBg;
       break;
     default: {
@@ -583,8 +644,8 @@ export function buildPreviewCSS(input: BuildInput): string {
         const bgTones = getAccessibleTones(btnBg, borderToneN, primaryLight);
         btnText = p(primaryLight, bgTones.text);
       } else {
-        btnBg = p(vPrimary, PC);
-        const defTones = getAccessibleTones(btnBg, PC, vPrimary);
+        btnBg = p(bPrimary, btnPC);
+        const defTones = getAccessibleTones(btnBg, btnPC, bPrimary);
         btnText = p(vPrimary, defTones.text);
       }
       btnBorder = p(primaryLight, getAccessibleTones(surfaceBg, surfaceN, primaryLight).border);
@@ -613,21 +674,28 @@ export function buildPreviewCSS(input: BuildInput): string {
     name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
   const nFor = (name: SurfaceTheme): number =>
     name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
+  // Button equivalents of palFor/nFor. Tonal and laddered buttons take their
+  // colour from a surface's palette, but they are still buttons — in dark mode
+  // that has to resolve to the light ramp at Color-8, not the dark surface tone.
+  const btnPalFor = (name: SurfaceTheme): typeof bPrimary =>
+    name === 'Secondary' ? bSecondary : name === 'Tertiary' ? bTertiary : bPrimary;
+  const btnNFor = (name: SurfaceTheme): number =>
+    isDark ? DARK_BUTTON_N : nFor(name);
   const getDefaultBtnPalForSurface = (surfaceTheme: SurfaceTheme): { pal: typeof vPrimary; n: number } => {
     switch (effectiveButton) {
-      case 'primary': return { pal: vPrimary, n: PC };
-      case 'secondary': return { pal: vSecondary, n: SC };
-      case 'tonal': return { pal: palFor(surfaceTheme), n: nFor(surfaceTheme) };
+      case 'primary': return { pal: bPrimary, n: btnPC };
+      case 'secondary': return { pal: bSecondary, n: btnSC };
+      case 'tonal': return { pal: btnPalFor(surfaceTheme), n: btnNFor(surfaceTheme) };
       case 'laddered': {
         const next: SurfaceTheme = surfaceTheme === 'Primary' ? 'Secondary'
           : surfaceTheme === 'Secondary' ? 'Tertiary' : 'Primary';
-        return { pal: palFor(next), n: nFor(next) };
+        return { pal: btnPalFor(next), n: btnNFor(next) };
       }
       case 'black-white': {
         const bg = p(palFor(surfaceTheme), nFor(surfaceTheme));
         return { pal: NEUTRAL.map(h => ({ hex: h })) as any, n: isLight(bg) ? 1 : 12 };
       }
-      default: return { pal: vPrimary, n: PC };
+      default: return { pal: bPrimary, n: btnPC };
     }
   };
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
@@ -638,9 +706,9 @@ export function buildPreviewCSS(input: BuildInput): string {
   // theme block at matching specificity makes the studio brand values win.
   const emitPerPaletteButtonTokens = (surfaceBgForBorder: string, surfaceNForBorder: number): string => {
     const palettes = [
-      { name: 'Primary', pal: vPrimary, n: PC },
-      { name: 'Secondary', pal: vSecondary, n: SC },
-      { name: 'Tertiary', pal: vTertiary, n: TC },
+      { name: 'Primary', pal: bPrimary, n: btnPC },
+      { name: 'Secondary', pal: bSecondary, n: btnSC },
+      { name: 'Tertiary', pal: bTertiary, n: btnTC },
     ];
     return palettes.map(({ name, pal, n }) => {
       const bg = p(pal, n);
@@ -701,7 +769,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     // a black button gets white text and a subtle lighter hover (NOT a near-white
     // scrim); a white button gets dark text and a subtle darker hover.
     const isBW = effectiveButton === 'black-white';
-    const txt = isBW ? (isLight(bg) ? '#1a1a1a' : '#ffffff') : p(pal, tones.text);
+    const txt = isBW ? (isLight(bg) ? '#1a1a1a' : WHITE_TEXT) : p(pal, tones.text);
     const palBorder = p(pal, getAccessibleTones(sbg, sn, pal).border);
     const { hover, active } = isBW
       ? (isLight(bg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
@@ -732,8 +800,8 @@ export function buildPreviewCSS(input: BuildInput): string {
     tertiaryHeader = `var(--Tertiary-Color-${tertiaryTones.header})`;
     tertiaryQuiet = `var(--Tertiary-Color-${tertiaryTones.quiet})`;
   } else {
-    tertiaryText = textFor(tertiaryContainerBg);
-    tertiaryHeader = textFor(tertiaryContainerBg);
+    tertiaryText = textFor(tertiaryContainerBg, WHITE_TEXT);
+    tertiaryHeader = textFor(tertiaryContainerBg, WHITE_TEXT);
     tertiaryQuiet = quietFor(tertiaryContainerBg);
   }
 
@@ -813,18 +881,18 @@ ${(() => {
     // through to ButtonGroup / Slider / etc. controls inside Surface-Dim
     // panels like the ComponentStyleStage left nav.
     let defPal: typeof vPrimary = vPrimary;
-    let defN = PC;
+    let defN = btnPC;
     switch (effectiveButton) {
-      case 'secondary': case 'laddered': defPal = vSecondary; defN = SC; break;
-      case 'tonal': defPal = vPrimary; defN = PC; break;
+      case 'secondary': case 'laddered': defPal = bSecondary; defN = btnSC; break;
+      case 'tonal': defPal = bPrimary; defN = btnPC; break;
       case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(scopeBg) ? 1 : 12; break;
-      default: defPal = vPrimary; defN = PC; break;
+      default: defPal = bPrimary; defN = btnPC; break;
     }
     const defBg = p(defPal, defN);
     const defTones = getAccessibleTones(defBg, defN, defPal);
     // black-white: explicit contrast text + subtle hover (NEUTRAL tone math is inverted).
     const defIsBW = effectiveButton === 'black-white';
-    const defTxt = defIsBW ? (isLight(defBg) ? '#1a1a1a' : '#ffffff') : p(defPal, defTones.text);
+    const defTxt = defIsBW ? (isLight(defBg) ? '#1a1a1a' : WHITE_TEXT) : p(defPal, defTones.text);
     const { hover, active } = defIsBW
       ? (isLight(defBg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
       : activeAndHoverFor(defPal, defN);
@@ -865,11 +933,11 @@ ${emitDropshadowLevelLines(statusBg)}
 ${(() => {
   const ac = appBarConfig;
   const tones = getAccessibleTones(appBarBg, ac.n, primaryLight);
-  let abPal = 'Primary', abN = PC;
+  let abPal = 'Primary', abN = btnPC;
   switch (effectiveButton) {
-    case 'secondary': case 'laddered': abPal = 'Secondary'; abN = SC; break;
+    case 'secondary': case 'laddered': abPal = 'Secondary'; abN = btnSC; break;
     case 'black-white': abPal = 'Neutral'; abN = isLight(appBarBg) ? 1 : 12; break;
-    default: abPal = 'Primary'; abN = PC; break;
+    default: abPal = 'Primary'; abN = btnPC; break;
   }
   const abPalArr = abPal === 'Secondary' ? secondaryLight : abPal === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
   const { active: abOldHoverHex, hover: abHoverHex } = activeAndHoverFor(abPalArr, abN);
@@ -959,9 +1027,9 @@ ${buildHeaderPaletteLines(surfaceN, false)}
 ${(() => {
     // Generate all button palette tokens
     const allPalettes = [
-      { name: 'Primary', palette: vPrimary, n: PC, paletteName: 'Primary' },
-      { name: 'Secondary', palette: vSecondary, n: SC, paletteName: 'Secondary' },
-      { name: 'Tertiary', palette: vTertiary, n: TC, paletteName: 'Tertiary' },
+      { name: 'Primary', palette: bPrimary, n: btnPC, paletteName: 'Primary' },
+      { name: 'Secondary', palette: bSecondary, n: btnSC, paletteName: 'Secondary' },
+      { name: 'Tertiary', palette: bTertiary, n: btnTC, paletteName: 'Tertiary' },
     ];
     return allPalettes.map(({ name, palette: pal, n }) => {
       const bg = p(pal, n);
@@ -980,12 +1048,12 @@ ${(() => {
 ${(() => {
     // Default button uses the selected button mode's palette and tones
     let defPal: typeof vPrimary = vPrimary;
-    let defN = PC;
+    let defN = btnPC;
     switch (effectiveButton) {
-      case 'secondary': case 'laddered': defPal = vSecondary; defN = SC; break;
-      case 'tonal': defPal = vPrimary; defN = PC; break;
+      case 'secondary': case 'laddered': defPal = bSecondary; defN = btnSC; break;
+      case 'tonal': defPal = bPrimary; defN = btnPC; break;
       case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(surfaceBg) ? 1 : 12; break;
-      default: defPal = vPrimary; defN = PC; break;
+      default: defPal = bPrimary; defN = btnPC; break;
     }
     const { active: defActive, hover: defHover } = activeAndHoverFor(defPal, defN);
     return `  --Buttons-Default-Button: ${btnBg};
@@ -1009,11 +1077,11 @@ ${emitTagTextTokens()}
   --Container-Quiet: ${containerQuiet};
   --Container-Border: ${containerBorder};
 ${(() => {
-    let cp = 'Primary', cn = PC;
+    let cp = 'Primary', cn = btnPC;
     switch (effectiveButton) {
-      case 'secondary': case 'laddered': cp = 'Secondary'; cn = SC; break;
+      case 'secondary': case 'laddered': cp = 'Secondary'; cn = btnSC; break;
       case 'black-white': cp = 'Neutral'; cn = isLight(containerBg) ? 1 : 12; break;
-      default: cp = 'Primary'; cn = PC; break;
+      default: cp = 'Primary'; cn = btnPC; break;
     }
     // Container button border uses the button mode's palette.
     // For black-white mode the border must match the button fill (so a black
@@ -1045,11 +1113,11 @@ ${(() => {
   // logic in the --Container-Buttons-Default-Border block above.
   let buttonModePaletteName: 'Primary' | 'Secondary' | 'Tertiary' | 'Neutral' = 'Primary';
   let buttonModePalette: typeof vPrimary = vPrimary;
-  let buttonModeN: number = PC;
+  let buttonModeN: number = btnPC;
   switch (effectiveButton) {
-    case 'secondary': case 'laddered': buttonModePaletteName = 'Secondary'; buttonModePalette = vSecondary; buttonModeN = SC; break;
+    case 'secondary': case 'laddered': buttonModePaletteName = 'Secondary'; buttonModePalette = bSecondary; buttonModeN = btnSC; break;
     case 'black-white': buttonModePaletteName = 'Neutral'; buttonModePalette = NEUTRAL.map(h => ({ hex: h })) as any; buttonModeN = isLight(containerBg) ? 1 : 12; break;
-    default: buttonModePaletteName = 'Primary'; buttonModePalette = vPrimary; buttonModeN = PC; break;
+    default: buttonModePaletteName = 'Primary'; buttonModePalette = bPrimary; buttonModeN = btnPC; break;
   }
   const buttonModeBorderN = getAccessibleTones(containerBg, containerN, buttonModePalette).border;
   // In black-white mode the border must match the button fill itself (black
@@ -1144,8 +1212,8 @@ ${buildHeaderPaletteLines(containerN, true)}
      a variant button could read points at the brand's palette. */
 ${(() => {
     const perPalette = [
-      { name: 'Secondary', pal: vSecondary, n: SC },
-      { name: 'Tertiary',  pal: vTertiary,  n: TC },
+      { name: 'Secondary', pal: bSecondary, n: btnSC },
+      { name: 'Tertiary',  pal: bTertiary,  n: btnTC },
       { name: 'Neutral',   pal: NEUTRAL.map(h => ({ hex: h })) as any, n: 8 },
     ];
     return perPalette.map(({ name, pal, n }) => {
@@ -1179,12 +1247,18 @@ ${(() => {
   // (e.g. dark neutral header on dark tertiary). Compute against the
   // tertiary palette at the user's TC tone so the H3 / body / border
   // resolve to readable tertiary tones.
-  const tertiarySurfaceBg = p(tertiaryLight, TC);
-  const tertiarySurfaceTones = getAccessibleTones(tertiarySurfaceBg, TC, tertiaryLight);
+  // In dark mode a Tertiary surface goes DARK, the same way the page background
+  // and the tertiary CONTAINER already do (p(tertiary, 3) above). Pinning it to
+  // TC in both modes is what left the tertiary card cream on a dark page — the
+  // one card that never followed the mode.
+  const tertiaryThemeN = isDark ? 3 : TC;
+  const tertiaryThemePal = isDark ? tertiaryDark : tertiaryLight;
+  const tertiarySurfaceBg = p(tertiaryThemePal, tertiaryThemeN);
+  const tertiarySurfaceTones = getAccessibleTones(tertiarySurfaceBg, tertiaryThemeN, tertiaryThemePal);
   return `[data-theme="Tertiary"],
 [data-theme="Tertiary"][data-surface="Surface"] {
-  --Background: var(--Tertiary-Color-${TC});
-  --Surface: var(--Tertiary-Color-${TC});
+  --Background: var(--Tertiary-Color-${tertiaryThemeN});
+  --Surface: var(--Tertiary-Color-${tertiaryThemeN});
   --Header: var(--Tertiary-Color-${tertiarySurfaceTones.header});
   --Text: var(--Tertiary-Color-${tertiarySurfaceTones.text});
   --Quiet: var(--Tertiary-Color-${tertiarySurfaceTones.quiet});
@@ -1240,22 +1314,28 @@ ${(() => {
   const tones = getAccessibleTones(navBarBg, nc.n, primaryLight);
   // Use the button mode's palette for hover/active
   let navDefPal: typeof vPrimary = vPrimary;
-  let navDefN = PC;
+  let navDefN = btnPC;
   switch (effectiveButton) {
-    case 'secondary': case 'laddered': navDefPal = vSecondary; navDefN = SC; break;
+    case 'secondary': case 'laddered': navDefPal = bSecondary; navDefN = btnSC; break;
     // Match btnBg's logic (surfaceBg-based), NOT navBarBg-based. btnBg
     // resolves from the page surface so the button color is consistent
     // across nav bars. Picking the hover tone from navBarBg used to give
     // a black button (from surface=light) a white hover (from navBarBg=
     // dark) — totally invisible after hovering.
     case 'black-white': navDefPal = NEUTRAL.map(h => ({ hex: h })) as any; navDefN = isLight(surfaceBg) ? 1 : 12; break;
-    default: navDefPal = vPrimary; navDefN = PC; break;
+    default: navDefPal = bPrimary; navDefN = btnPC; break;
   }
   const { active: navDefOldHoverHex, hover: navDefHoverHex } = activeAndHoverFor(navDefPal, navDefN);
   const navBorderN = tones.border;
   // Surface --Hover/--Pressed for Nav Bar context — based on Nav Bar's own tone.
   const navBarSurfacePalette = nc.palette === 'Primary' ? primaryLight : (nc.palette === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight);
   const { active: navBarActive, hover: navBarHover } = activeAndHoverFor(navBarSurfacePalette, nc.n);
+  // The button sits ON the nav bar, so its border has to contrast with the BAR,
+  // not with the page surface. btnBorder is derived from surfaceBg, so when
+  // Default Buttons = Primary and the nav bar is also Primary, the border lands
+  // on the bar's own colour and the button dissolves into the strip — a solid
+  // band of colour with a label on it and no button shape at all.
+  const navBtnBorder = p(navDefPal, getAccessibleTones(navBarBg, nc.n, navDefPal).border);
 
   return `[data-theme="Brand-Nav-Bar"],
   [data-theme="Brand-Nav-Bar"][data-surface="Surface"],
@@ -1282,12 +1362,12 @@ ${emitDropshadowLevelLines(navBarBg)}
   --Container-Highest: ${containerBg};
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: ${effectiveButton === 'black-white' ? btnBg : btnBorder};
+  --Buttons-Primary-Border: ${effectiveButton === 'black-white' ? btnBg : navBtnBorder};
   --Buttons-Primary-Hover: ${navDefHoverHex};
   --Buttons-Primary-Pressed: ${navDefOldHoverHex};
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Border: ${effectiveButton === 'black-white' ? btnBg : btnBorder};
+  --Buttons-Default-Border: ${effectiveButton === 'black-white' ? btnBg : navBtnBorder};
   --Buttons-Default-Highlight: ${highlightFor(btnBg)};
   --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
   --Buttons-Default-Hover: ${navDefHoverHex};
@@ -1330,7 +1410,7 @@ ${buildScopeTokens(brightBg, brightN)}
 [data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }`;
 })()}
 
-/* ══ Clickable Elements — border inherits 3.1:1 contrast from context ══ */
+/* ══ Clickable Elements — border inherits 3:1 contrast from context ══ */
 .clickable { border-color: var(--Border); }
 
 /* ══ Typography ══ */
@@ -1339,14 +1419,19 @@ ${(() => {
   const decorative = input.typographyStyles?.find(t => t.type === 'decorative');
   const body = input.typographyStyles?.find(t => t.type === 'body');
   if (!header && !body) return '';
-  const headerFamily = `'${header?.family || 'sans-serif'}', serif`;
+  // The Header face is always Google Sans Flex — never the picked family, and
+  // resolveRoles enforces that for designs saved before the switch. Reading it
+  // from there keeps the preview and the generated ramp on one answer.
+  const resolvedFaces = resolveRoles(input.typographyStyles);
+  const headerFamily = `'${resolvedFaces.header.family}', sans-serif`;
   const decorativeFamily = `'${decorative?.family || header?.family || 'sans-serif'}', sans-serif`;
   const bodyFamily = `'${body?.family || 'sans-serif'}', sans-serif`;
   // Use ^="Brand" so the typography tokens cascade into Brand and any
   // Brand-derived sub-themes (Brand-App-Bar, Brand-Nav-Bar, etc.) — that
   // way the AppBar / CreationTopBar / nav chrome pick up the user's
   // selected fonts, not just the body content under [data-theme="Brand"].
-  const headerWeight = header?.weight || '700';
+  // Weight is the wght axis on the Flex face.
+  const headerWeight = String(resolvedFaces.header.weight);
   const bodyWeight = body?.weight || '400';
   return `[data-theme="Brand"], [data-theme^="Brand-"], [data-theme="Brand"] *, [data-theme^="Brand-"] * {
   --Set-Font-Family-Header: ${headerFamily};
@@ -1375,7 +1460,17 @@ ${(() => {
   --Body-Font-Weight: ${bodyWeight};
   --Body-Small-Font-Weight: ${bodyWeight};
   --Body-Large-Font-Weight: ${bodyWeight};
-}`;
+}
+
+/* The generated ramp — the same declarations typography-tokens.css ships, so
+   the preview shows the sizes and leading the export actually produces rather
+   than the lib's shipped defaults. On the theme roots only; custom properties
+   inherit, and repeating 150 declarations under a universal selector doesn't. */
+[data-theme="Brand"], [data-theme^="Brand-"] {
+${typographyDeclarations(input.typographyStyles)}
+}
+
+${generateTypographyRules(input.typographyStyles)}`;
 })()}
 
 /* ══ Component Style ══ */

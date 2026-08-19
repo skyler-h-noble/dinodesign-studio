@@ -7,6 +7,8 @@ import { exportColorSystemToJSON } from './cssgen/exportColorSystem';
 import { generateCSSFiles, generateBaseCSS } from './cssgen/exportToCSS';
 import { generateFigmaJSON } from './generateFigmaJSON';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { typographyDeclarations } from './cssgen/generateTypographyTokensCSS';
+import { resolveRoles, SYSTEM_UI_STACK } from './typeScale';
 
 /**
  * Returns a public download URL for a file in a design system.
@@ -171,7 +173,7 @@ Apply \`data-theme\` to any element to change the color context for it and all c
 |----------|--------|
 | **Light** | Default, Primary-Light, Primary, Secondary-Light, Secondary, Tertiary-Light, Tertiary, Neutral-Light, Neutral |
 | **Dark** | Primary-Dark, Secondary-Dark, Tertiary-Dark, Neutral-Dark |
-| **Semantic** | Info-Light, Info, Success-Light, Success, Warning-Light, Warning, Error-Light, Error, Info-Dark, Success-Dark, Warning-Dark, Error-Dark |
+| **State** | Info-Light, Info, Success-Light, Success, Warning-Light, Warning, Error-Light, Error, Info-Dark, Success-Dark, Warning-Dark, Error-Dark |
 | **Navigation** | App-Bar, Nav-Bar, Status |
 
 \`\`\`jsx
@@ -636,7 +638,7 @@ Your design system includes these CSS files (all at \`https://firebasestorage.go
 |------|----------|
 | \`foundation.css\` | Raw palette colors (Color-1 through Color-12 for each palette), typography tokens, component sizing |
 | \`core.css\` | Text, Header, Quiet, Border, Hover, Pressed, Tag, Icon, Hotlink colors for all palettes and surfaces |
-| \`typography-tokens.css\` | Font family, weight, and size definitions |
+| \`typography-tokens.css\` | The full type scale — size, weight, line height, tracking and case for every named style. The Desktop ramp is generated from your chosen faces; every computed Display and Header line height lands on a 4px multiple. |
 | \`Light-Mode.css\` | All light theme selectors (Default through Neutral) |
 | \`Dark-Mode.css\` | All dark theme selectors |
 | \`base.css\` | Button tokens, Default-Button mappings, Background/Surface/Container definitions, effects |
@@ -689,9 +691,13 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
       input.colorScheme.extractedTones,
       input.componentStyle,
       {
-        header: header ? { family: header.family, weight: header.weight } : undefined,
-        decorative: decorative ? { family: decorative.family, weight: decorative.weight } : undefined,
-        body: body ? { family: body.family, weight: body.weight } : undefined,
+        // Pass the WHOLE role, not just family + weight. Letter spacing, case,
+        // the Header's Flex axes and the Display's size/leading/noise all live
+        // on the role, and the JSON export needs them to describe the same
+        // system the CSS does.
+        header: header ? { ...header, type: undefined } as never : undefined,
+        decorative: decorative ? { ...decorative, type: undefined } as never : undefined,
+        body: body ? { ...body, type: undefined } as never : undefined,
       },
       input.designSystemName,
       new Date().toISOString().split('T')[0],
@@ -818,6 +824,10 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   }, null, 2);
 
   // 5. Build foundation.css and styles.css (simple static files)
+  // The four faces, resolved once. Header is pinned to Google Sans Flex here
+  // (with its axes) rather than taken from the picked family, so a design saved
+  // before the switch still generates the same CSS as a fresh one.
+  const resolvedFaces = resolveRoles(input.typographyStyles);
   const headerFamily = header?.family || 'sans-serif';
   const decorativeFamily = decorative?.family || 'sans-serif';
   const bodyFamily = body?.family || 'sans-serif';
@@ -1024,31 +1034,19 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Platform-Label: "Desktop";
   --Button-Height: 32px;
   --Min-Button-Width: 80px;
-  --Set-Font-Family-Header: '${headerFamily}', serif;
-  --Set-Font-Family-Header-Weight: ${headerWeight};
+  --Set-Font-Family-Header: '${resolvedFaces.header.family}', sans-serif;
+  --Set-Font-Family-Header-Weight: ${resolvedFaces.header.weight};
   --Set-Header-Text-Transform: ${headerAllCaps};
   --Set-Header-Letter-Spacing: ${headerLetterSpacing};
+  /* The four faces. Display is the expressive pick, Eyebrow is the OS UI stack
+     unless a design overrides it, Header is always the Flex face. */
+  --Set-Font-Family-Display: '${decorativeFamily}', sans-serif;
+  --Set-Font-Family-Eyebrow: ${SYSTEM_UI_STACK};
+  /* Kept so designs saved before the four faces still resolve. */
   --Set-Font-Family-Decorative: '${decorativeFamily}', sans-serif;
   --Set-Font-Family-Decorative-Weight: ${decorativeWeight};
   --Set-Decorative-Text-Transform: ${decorativeAllCaps};
   --Set-Decorative-Letter-Spacing: ${decorativeLetterSpacing};
-  /* Per-size text-transform. The lib's Typography reads per-size tokens
-     (e.g. var(--Overline-Small-Text-Transform, uppercase)), NOT the aggregate
-     --Set-*-Text-Transform above — so the all-caps choice only reaches the
-     rendered text when we emit one token per size. Overline is the decorative
-     role; headers follow the header choice. Emitting "none" here is required
-     to override the lib's hardcoded uppercase fallback on overline. */
-  --Display-Large-Text-Transform: ${headerAllCaps};
-  --Display-Small-Text-Transform: ${headerAllCaps};
-  --H1-Text-Transform: ${headerAllCaps};
-  --H2-Text-Transform: ${headerAllCaps};
-  --H3-Text-Transform: ${headerAllCaps};
-  --H4-Text-Transform: ${headerAllCaps};
-  --H5-Text-Transform: ${headerAllCaps};
-  --H6-Text-Transform: ${headerAllCaps};
-  --Overline-Small-Text-Transform: ${decorativeAllCaps};
-  --Overline-Medium-Text-Transform: ${decorativeAllCaps};
-  --Overline-Large-Text-Transform: ${decorativeAllCaps};
   --Set-Font-Family-Body: '${bodyFamily}', sans-serif;
   --Set-Font-Family-Body-Weight: ${bodyWeight};
   --Set-Font-Family-Body-Semibold-Weight: 600;
@@ -1057,145 +1055,11 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Body-Letter-Spacing: 0;
   --Body-Line-Height: 24px;
   --Body-Paragraph-Spacing: 16px;
-  /* Per-size Body tokens — the lib's <Body>/<BodySmall>/<BodyLarge> read
-     --Body-{Small|Medium|Large}-* (NOT --Body-*). Sizes/line-heights from the
-     design's Body scale; weights alias the base Body weight tokens (400/600/700).
-     Same across platforms, so they live in :root and platforms inherit. */
-  --Body-Small-Font-Size: 14px;
-  --Body-Small-Line-Height: 21px;
-  --Body-Small-Letter-Spacing: 0;
-  --Body-Small-Font-Weight: var(--Body-Font-Weight);
-  --Body-Small-Semibold-Font-Weight: var(--Body-Semibold-Font-Weight);
-  --Body-Small-Bold-Font-Weight: var(--Body-Bold-Font-Weight);
-  --Body-Medium-Font-Size: 16px;
-  --Body-Medium-Line-Height: 24px;
-  --Body-Medium-Letter-Spacing: 0;
-  --Body-Medium-Font-Weight: var(--Body-Font-Weight);
-  --Body-Medium-Semibold-Font-Weight: var(--Body-Semibold-Font-Weight);
-  --Body-Medium-Bold-Font-Weight: var(--Body-Bold-Font-Weight);
-  --Body-Large-Font-Size: 18px;
-  --Body-Large-Line-Height: 27px;
-  --Body-Large-Letter-Spacing: 0;
-  --Body-Large-Font-Weight: var(--Body-Font-Weight);
-  --Body-Large-Semibold-Font-Weight: var(--Body-Semibold-Font-Weight);
-  --Body-Large-Bold-Font-Weight: var(--Body-Bold-Font-Weight);
-  /* Headers — sizes/line-heights from the design's Header scale (Desktop).
-     Weight + letter-spacing alias the base Header tokens (the lib reads
-     --Hn-Font-Weight / --Hn-Letter-Spacing, which weren't generated before). */
-  --H1-Font-Size: 32px;
-  --H1-Line-Height: 40px;
-  --H1-Font-Weight: var(--Header-Font-Weight);
-  --H1-Letter-Spacing: var(--Set-Header-Letter-Spacing);
-  --H1-Paragraph-Spacing: 0;
-  --H2-Font-Size: 28px;
-  --H2-Line-Height: 35px;
-  --H2-Font-Weight: var(--Header-Font-Weight);
-  --H2-Letter-Spacing: var(--Set-Header-Letter-Spacing);
-  --H2-Paragraph-Spacing: 0;
-  --H3-Font-Size: 24px;
-  --H3-Line-Height: 30px;
-  --H3-Font-Weight: var(--Header-Font-Weight);
-  --H3-Letter-Spacing: var(--Set-Header-Letter-Spacing);
-  --H3-Paragraph-Spacing: 0;
-  --H4-Font-Size: 20px;
-  --H4-Line-Height: 25px;
-  --H4-Font-Weight: var(--Header-Font-Weight);
-  --H4-Letter-Spacing: var(--Set-Header-Letter-Spacing);
-  --H4-Paragraph-Spacing: 0;
-  --H5-Font-Size: 18px;
-  --H5-Line-Height: 22.5px;
-  --H5-Font-Weight: var(--Header-Font-Weight);
-  --H5-Letter-Spacing: var(--Set-Header-Letter-Spacing);
-  --H5-Paragraph-Spacing: 0;
-  --H6-Font-Size: 16px;
-  --H6-Line-Height: 20px;
-  --H6-Font-Weight: var(--Header-Font-Weight);
-  --H6-Letter-Spacing: var(--Set-Header-Letter-Spacing);
-  --H6-Paragraph-Spacing: 0;
-  /* Display — the lib reads --Display-{Large|Small}-*. Weight is a fixed 600 in
-     the design (not bound to Header-Font-Weight); char-spacing 0. */
-  --Display-Large-Font-Size: 48px;
-  --Display-Large-Line-Height: 60px;
-  --Display-Large-Font-Weight: 600;
-  --Display-Large-Letter-Spacing: 0;
-  --Display-Small-Font-Size: 42px;
-  --Display-Small-Line-Height: 52px;
-  --Display-Small-Font-Weight: 600;
-  --Display-Small-Letter-Spacing: 0;
-  /* Subtitles — weight 700 (fixed), char-spacing 0. lib reads Subtitle-Small/Large. */
-  --Subtitle-Small-Font-Size: 16px;
-  --Subtitle-Small-Line-Height: 24px;
-  --Subtitle-Small-Font-Weight: 700;
-  --Subtitle-Small-Letter-Spacing: 0;
-  --Subtitle-Large-Font-Size: 18px;
-  --Subtitle-Large-Line-Height: 32px;
-  --Subtitle-Large-Font-Weight: 700;
-  --Subtitle-Large-Letter-Spacing: 0;
-  /* Captions — 14/21, default 500 / bold 700. */
-  --Caption-Font-Size: 14px;
-  --Caption-Line-Height: 21px;
-  --Caption-Letter-Spacing: 0.1px;
-  --Caption-Font-Weight: 500;
-  --Caption-Bold-Font-Weight: 700;
-  /* Legal — 10/15, default 400 / semibold 600. */
-  --Legal-Font-Size: 10px;
-  --Legal-Line-Height: 15px;
-  --Legal-Letter-Spacing: 0;
-  --Legal-Font-Weight: 400;
-  --Legal-Semibold-Font-Weight: 600;
-  /* Labels — weight 600, char-spacing 0. lib reads Label-ExtraSmall/Small/Medium/Large. */
-  --Label-ExtraSmall-Font-Size: 11px;
-  --Label-ExtraSmall-Line-Height: 16.5px;
-  --Label-ExtraSmall-Font-Weight: 600;
-  --Label-ExtraSmall-Letter-Spacing: 0.5px;
-  --Label-Small-Font-Size: 12.5px;
-  --Label-Small-Line-Height: 18.75px;
-  --Label-Small-Font-Weight: 600;
-  --Label-Small-Letter-Spacing: 0.25px;
-  --Label-Medium-Font-Size: 16px;
-  --Label-Medium-Line-Height: 24px;
-  --Label-Medium-Font-Weight: 600;
-  --Label-Medium-Letter-Spacing: 0;
-  --Label-Large-Font-Size: 18px;
-  --Label-Large-Line-Height: 27px;
-  --Label-Large-Font-Weight: 600;
-  --Label-Large-Letter-Spacing: 0;
-  /* Overline (decorative) — Decorative font/weight/char-spacing; per-size sizes. */
-  --Overline-Small-Font-Size: 14px;
-  --Overline-Small-Line-Height: 21px;
-  --Overline-Small-Font-Weight: var(--Decorative-Font-Weight);
-  --Overline-Small-Letter-Spacing: var(--Set-Decorative-Letter-Spacing);
-  --Overline-Medium-Font-Size: 16px;
-  --Overline-Medium-Line-Height: 24px;
-  --Overline-Medium-Font-Weight: var(--Decorative-Font-Weight);
-  --Overline-Medium-Letter-Spacing: var(--Set-Decorative-Letter-Spacing);
-  --Overline-Large-Font-Size: 18px;
-  --Overline-Large-Line-Height: 27px;
-  --Overline-Large-Font-Weight: var(--Decorative-Font-Weight);
-  --Overline-Large-Letter-Spacing: var(--Set-Decorative-Letter-Spacing);
-  /* Numbers — weight 700, char-spacing 0 (used by Avatar initials, etc.). */
-  --Number-Small-Font-Size: 16px;
-  --Number-Small-Line-Height: 16px;
-  --Number-Small-Font-Weight: 700;
-  --Number-Small-Letter-Spacing: 0;
-  --Number-Medium-Font-Size: 28px;
-  --Number-Medium-Line-Height: 28px;
-  --Number-Medium-Font-Weight: 700;
-  --Number-Medium-Letter-Spacing: 0;
-  --Number-Large-Font-Size: 36px;
-  --Number-Large-Line-Height: 36px;
-  --Number-Large-Font-Weight: 700;
-  --Number-Large-Letter-Spacing: 0;
-  /* Button typography — weight 600, char-spacing 0. (Button-Standard line-height
-     drives the default <Button>-style label; the existing --Button-Font-Size:16
-     stays the medium size.) */
-  --Button-ExtraSmall-Font-Size: 11px;
-  --Button-ExtraSmall-Line-Height: 11px;
-  --Button-ExtraSmall-Font-Weight: 600;
-  --Button-Small-Font-Size: 14px;
-  --Button-Small-Line-Height: 14px;
-  --Button-Small-Font-Weight: 600;
-  --Button-Standard-Line-Height: 20px;
+  /* Per-style ramp — generated from the same type scale that produces
+     typography-tokens.css, so a consumer that never sets data-platform gets
+     the identical Desktop values. Editing sizes here is wrong; edit
+     src/utils/typeScale.ts. */
+${typographyDeclarations(input.typographyStyles)}
   --Label-Font-Size: 14px;
   --Label-Line-Height: 20px;
   --Label-Letter-Spacing: 0px;
@@ -1331,7 +1195,9 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 }
 
 /* Decorative Font Application */
-/* Typography variants: Header uses body font by default, Decorative Header uses decorative font */
+/* In decorative mode, eyebrows swap onto the Display face. Re-pointing the
+   face token is all it takes — every style wearing that face follows, because
+   each one's --<style>-Font-Family is relative to it. */
 
 [data-surface="Surface"] [data-decorative],
 [data-surface="Surface-Dim"] [data-decorative],
@@ -1339,16 +1205,16 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 [data-surface="Surface-Bright"] [data-decorative] {
   --Font-Family-Header: var(--Set-Font-Family-Header);
   --Font-Family-Header-Weight: var(--Set-Font-Family-Header-Weight);
-  --Font-Family-Overline: var(--Set-Font-Family-Decorative);
+  --Font-Family-Eyebrow: var(--Font-Family-Display);
 }
 
 /* Explicit decorative variants — always available regardless of mode */
 [data-typography="decorative-header"] {
-  font-family: var(--Set-Font-Family-Header);
+  font-family: var(--Font-Family-Header);
   font-weight: var(--Set-Font-Family-Header-Weight);
 }
 [data-typography="decorative-overline"] {
-  font-family: var(--Set-Font-Family-Decorative);
+  font-family: var(--Font-Family-Display);
 }
 
 /* Cognitive Accessibility Overrides */
@@ -1371,8 +1237,10 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   // overrides — adding any would win on specificity and break Button.js.
   const stylesCSS = `/* Overrides */\n`;
 
-  // 6. Import typography-tokens.css
-  const { typographyTokensCSS } = await import('./typographyTokens');
+  // 6. Build typography-tokens.css — the Desktop ramp is generated from the
+  //    user's chosen faces; the other three platforms pass through unchanged.
+  const { buildTypographyTokensCSS } = await import('./typographyTokens');
+  const typographyTokensCSS = buildTypographyTokensCSS(input.typographyStyles);
 
   // 7. Assemble all files for upload
   const uploadFiles: { name: string; content: string; type: string }[] = [

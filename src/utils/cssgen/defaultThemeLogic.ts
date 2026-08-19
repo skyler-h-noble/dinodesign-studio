@@ -151,7 +151,7 @@ export function calculateDefaultThemeSettings(
       buttonDefaultN: primaryColorN,
 
       containerTheme: 'Neutral',
-      containerN: 3, // Black cards — surface is 2, container is 3
+      containerN: 3, // Black cards (see dark container ramp override for the actual tone)
       containerShade: 'Light',
 
       textColoringMode: 'black-white'
@@ -469,9 +469,15 @@ export function applyUserSelections(
       updated.containerN = 12;
       updated.containerShade = 'Light';
     } else if (userSelections.cardColoring === 'black') {
-      // Black uses Neutral Background-3 (dark container)
       updated.containerTheme = 'Neutral';
-      updated.containerN = 3;
+      // Card tone depends on the page background. If it's ALSO black, cards use
+      // Color-3 (#1f1f1f) — a clear 2-tone lift over the true-black Color-1
+      // (#040404) surface. On any non-black background, black cards use Color-2
+      // (#111111, near-black). This works via the dark ramp in
+      // generateSimplifiedBackgrounds: Neutral Bg-3 → Color-3 (unshifted),
+      // Neutral Bg-1 → Color-2 (shifted for the black background).
+      const bgIsBlack = updated.defaultTheme === 'Neutral' && updated.defaultN <= 2;
+      updated.containerN = bgIsBlack ? 3 : 1;
       updated.containerShade = 'Light';
     }
   } else if (userSelections.cardsText) {

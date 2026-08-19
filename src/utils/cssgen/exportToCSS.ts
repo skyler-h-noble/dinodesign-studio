@@ -15,6 +15,7 @@ import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
 import { computeRadii, migrateLegacyRadii } from '../componentRadii';
 import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from '../dropshadow';
+import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
   generateHeaderVariables,
   generateQuietVariables,
@@ -303,10 +304,18 @@ function pressedToneHex(palette: string, colorN: number, colorsData: any): strin
   // almost nowhere and a white surface shows no state feedback at all. Matches
   // buildHoverForPalette(), which produces the baked tokens — if these two
   // disagree, figma.json and the CSS describe the same token differently.
-  const darkBtn = colorN <= 5 || colorN >= 12;  // 1-5 and 12 step darker, 6-11 lighter
+  // Tone 1 steps LIGHTER, the mirror of tone 12. It sits at the bottom of the
+  // ramp; stepping darker meant #000000, and from a fill already at #040404
+  // that is a contrast ratio of 1.02 against itself — no visible feedback.
+  // Both ends invert because neither has headroom.
+  const darkBtn = (colorN >= 2 && colorN <= 5) || colorN >= 12;
   const an = darkBtn ? colorN - 1 : colorN + 1;
-  if (an < 1) return '#000000';                 // darkest (tone 1) → black
-  return colorsData[palette]?.[`Color-${an}`]?.value || null;
+  const stepHex = colorsData[palette]?.[`Color-${an}`]?.value || null;
+  // Color-1 moves a HALF step: the Color-1 → Color-2 gap is a tenfold change
+  // in luminance, so a full step reads as a colour change rather than a state.
+  // Matches the softening in exportColorSystem's Hover/Pressed pass.
+  if (colorN === 1 && stepHex && base) return _haMix50(base, stepHex);
+  return stepHex;
 }
 
 /** Hover hex = 50% blend of the button bg (Color-N) and its Pressed tone. */
@@ -526,6 +535,35 @@ function generateTextVariables(textPalette: any, paletteName: string): string {
  * Generate CSS variables for all text palettes in a mode
  * Handles nested structure: Text.Surfaces.Neutral.Color-1, Text.Containers.Primary.Color-1, etc.
  */
+/**
+ * Eyebrow color variables — --Eyebrows-<Scope>-<Background>-<Color-N>.
+ *
+ * Mirrors the Text emitter's naming so the two read as siblings. The values
+ * arrive as {Text.<Scope>.<Role>.<Color-N>} references, and tokenToVar turns
+ * each into a var() pointing at the Text variable, so an eyebrow is literally
+ * the same value as its text role rather than a second copy that can drift.
+ */
+function generateEyebrowsVariables(modeData: any): string {
+  const eyebrows = modeData?.Eyebrows;
+  if (!eyebrows) return '';
+
+  const lines: string[] = [];
+  for (const scope of ['Surfaces', 'Containers']) {
+    const scopeData = eyebrows[scope];
+    if (!scopeData) continue;
+    for (const background of Object.keys(scopeData)) {
+      for (const [colorKey, token] of Object.entries<any>(scopeData[background])) {
+        const value = token?.value;
+        if (!value) continue;
+        lines.push(`  --Eyebrows-${scope}-${background}-${colorKey}: ${tokenToVar(value)};`);
+      }
+    }
+  }
+  if (lines.length === 0) return '';
+  console.log(`👁️  [CSS] Generating Eyebrow variables... ${lines.length} tokens`);
+  return lines.join('\n');
+}
+
 function generateAllTextVariables(modeData: any): string {
   if (!modeData || !modeData.Text) return '';
   
@@ -1560,6 +1598,29 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     return lines;
   }
   
+  /**
+   * Paint the region from the tokens it just declared.
+   *
+   * Setting data-theme + data-surface now paints the element directly, so a
+   * section no longer needs a component wrapper to apply its own background —
+   * the attributes are the whole contract. Both properties resolve through the
+   * cascade, so they re-resolve automatically when the theme or surface flips.
+   *
+   * `background-color`, not `background`, so a designer's gradient or image on
+   * the same element isn't wiped out by the shorthand.
+   *
+   * The opt-out matters: some elements need the token scope WITHOUT the paint —
+   * an AppBar whose own root paints itself, or a wrapper that only exists to
+   * re-scope tokens for its children (what ThemedZone is for). Painting those
+   * would double-paint or overwrite the component's own background, so
+   * [data-paint="none"] suppresses it.
+   */
+  const paintLines = (): string[] => [
+    '  /* Paint the region from its own tokens. Opt out with data-paint="none". */',
+    '  background-color: var(--Background);',
+    '  color: var(--Text);',
+  ];
+
   const sections: string[] = [];
   const themes = modeData.Themes;
   
@@ -1643,6 +1704,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         }
 
         console.log(`      └─ ${variant.key} tokens generated: ${tokenLines.length}`);
+        surfaceLines.push(...paintLines());
         surfaceLines.push('}');
         surfaceLines.push('');
         sections.push(surfaceLines.join('\n'));
@@ -1697,12 +1759,25 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       }
 
       console.log(`      └─ Container tokens generated: ${tokenLines.length}`);
+      containerLines.push(...paintLines());
       containerLines.push('}');
       containerLines.push('');
       sections.push(containerLines.join('\n'));
     }
   });
   
+  // Opt-out, emitted last so it wins on specificity ties against the theme
+  // blocks above. Tokens still resolve — only the paint is suppressed.
+  sections.push([
+    '/* Token scope without the paint — for elements that paint themselves',
+    '   (an AppBar root) or exist only to re-scope tokens for children. */',
+    '[data-paint="none"] {',
+    '  background-color: revert;',
+    '  color: revert;',
+    '}',
+    '',
+  ].join('\n'));
+
   console.log(`  └─ Total theme sections generated: ${sections.length}`);
   const result = sections.join('\n');
   console.log(`      Result length: ${result.length} characters`);
@@ -2759,8 +2834,19 @@ function generateModeCSS(modeName: string, modeData: any): string {
   lines.push('   * ======================================== */');
   lines.push('');
   const textVars = generateAllTextVariables(modeData);
+  const eyebrowVars = generateEyebrowsVariables(modeData);
   if (textVars) {
     lines.push(textVars);
+  }
+
+  // Eyebrow section — sits with Text because every value is a reference into it.
+  if (eyebrowVars) {
+    lines.push('');
+    lines.push('  /* ========================================');
+    lines.push('   * Eyebrow Color Variables');
+    lines.push('   * ======================================== */');
+    lines.push('');
+    lines.push(eyebrowVars);
   }
   
   // Quiet section
@@ -3802,16 +3888,36 @@ function generateGoogleFontsImports(jsonData: any): string {
   
   const typography = jsonData.Typography;
   const fontFamilies = new Set<string>();
-  
+
   // Extract font family names
   const headerFamily = typography['Set-Font-Family-Header']?.value;
   const bodyFamily = typography['Set-Font-Family-Body']?.value;
   const decorativeFamily = typography['Set-Font-Family-Decorative']?.value;
-  
+
   console.log('  ├─ Header font:', headerFamily);
   console.log('  ├─ Body font:', bodyFamily);
   console.log('  └─ Decorative font:', decorativeFamily);
-  
+
+  // Collect every weight each family is actually declared at, so the Google
+  // Fonts request downloads the real weight files. A family-only import ships
+  // just 400, so the browser FAUX-styles Decorative 300 / Body-Semibold 600 /
+  // Body-Bold 700 — they look approximately right, so nothing reports it, but
+  // the weight files never arrive. Accumulate per family (a family shared across
+  // roles gets all its weights).
+  const familyWeights = new Map<string, Set<number>>();
+  const addWeight = (family: string | undefined, weightRaw: unknown) => {
+    if (!family) return;
+    const w = parseInt(String(weightRaw ?? ''), 10);
+    if (!Number.isFinite(w)) return;
+    if (!familyWeights.has(family)) familyWeights.set(family, new Set());
+    familyWeights.get(family)!.add(w);
+  };
+  addWeight(headerFamily, typography['Set-Header-Font-Weight']?.value);
+  addWeight(bodyFamily, typography['Set-Body-Font-Weight']?.value);
+  addWeight(bodyFamily, typography['Set-Body-Semibold-Font-Weight']?.value);
+  addWeight(bodyFamily, typography['Set-Body-Bold-Font-Weight']?.value);
+  addWeight(decorativeFamily, typography['Set-Decorative-Font-Weight']?.value);
+
   // Add to set (automatically handles duplicates)
   if (headerFamily) fontFamilies.add(headerFamily);
   if (bodyFamily) fontFamilies.add(bodyFamily);
@@ -3837,14 +3943,25 @@ function generateGoogleFontsImports(jsonData: any): string {
     
     // Convert font name to URL format (e.g., "Open Sans" -> "Open+Sans")
     const urlFontName = fontName.replace(/\s+/g, '+');
-    imports.push(`@import url('https://fonts.googleapis.com/css2?family=${urlFontName}&display=swap');`);
-    console.log(`  ✓ Adding Google Fonts import for: ${fontName}`);
+    // Append the declared weights so the real files load (no faux styling).
+    const weights = familyWeights.get(fontName);
+    const spec = weights && weights.size
+      ? `${urlFontName}:wght@${[...weights].sort((a, b) => a - b).join(';')}`
+      : urlFontName;
+    imports.push(`@import url('https://fonts.googleapis.com/css2?family=${spec}&display=swap');`);
+    console.log(`  ✓ Adding Google Fonts import for: ${fontName}${weights && weights.size ? ` @ ${[...weights].sort((a, b) => a - b).join(',')}` : ''}`);
   });
   
   if (imports.length === 0) {
     console.log('  ℹ️  No Google Fonts imports needed (all system fonts)');
   }
-  
+
+  // The Header face is always Google Sans Flex, and a plain family= request
+  // ships only the default instance — the axes would silently do nothing. This
+  // asks for the full range of every axis the design can drive.
+  imports.unshift(`@import url('https://fonts.googleapis.com/css2?${headerFontQueryParam()}&display=swap');`);
+  console.log(`  ✓ Adding Google Fonts import for: ${HEADER_FAMILY} (variable, all axes)`);
+
   return imports.join('\n');
 }
 
@@ -4459,15 +4576,15 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push(`  --Buttons-Error-Light-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
   lines.push(`  --Buttons-Error-Light-Hover: ${hoverHex('Error', 12)};`);
   lines.push(`  --Buttons-Error-Light-Pressed: ${pressedHex('Error', 12)};`);
-  // BlackWhite buttons
-  lines.push('  --Buttons-BlackWhite-Light-Button: var(--White);');
-  lines.push('  --Buttons-BlackWhite-Light-Text: var(--Text-Surfaces-BW-Button-Color-1);');
-  lines.push(`  --Buttons-BlackWhite-Light-Hover: ${hoverHex('Neutral', 12)};`);
-  lines.push(`  --Buttons-BlackWhite-Light-Pressed: ${pressedHex('Neutral', 12)};`);
-  lines.push('  --Buttons-BlackWhite-Medium-Button: var(--Neutral-Color-1);');
-  lines.push('  --Buttons-BlackWhite-Medium-Text: var(--Text-Surfaces-BW-Button-Color-12);');
-  lines.push(`  --Buttons-BlackWhite-Medium-Hover: ${hoverHex('Neutral', 1)};`);
-  lines.push(`  --Buttons-BlackWhite-Medium-Pressed: ${pressedHex('Neutral', 1)};`);
+  // Black and White buttons (were BlackWhite.Light / .Medium)
+  lines.push('  --Buttons-White-Button: var(--White);');
+  lines.push('  --Buttons-White-Text: var(--Text-Surfaces-BW-Button-Color-1);');
+  lines.push(`  --Buttons-White-Hover: ${hoverHex('Neutral', 12)};`);
+  lines.push(`  --Buttons-White-Pressed: ${pressedHex('Neutral', 12)};`);
+  lines.push('  --Buttons-Black-Button: var(--Neutral-Color-1);');
+  lines.push('  --Buttons-Black-Text: var(--Text-Surfaces-BW-Button-Color-12);');
+  lines.push(`  --Buttons-Black-Hover: ${hoverHex('Neutral', 1)};`);
+  lines.push(`  --Buttons-Black-Pressed: ${pressedHex('Neutral', 1)};`);
   // Default button — border matches the palette that the Default button's
   // OWN palette/color resolves to for the active theme. Mirrors
   // getButtonModeBorderMappings(buttonMode).Default in

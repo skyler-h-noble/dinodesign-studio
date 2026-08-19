@@ -391,20 +391,34 @@ export function generateSimplifiedDarkModeBackgrounds(
   // previous logic collapsed all five levels onto a single tone (Color-5 for
   // backgrounds 1-7, Color-4 for 8-12), which left dark mode with no elevation
   // cue at all and put every container on one colour.
-  const darkColor2 = palette[1]?.color || '#111111'; // Color-2
-  const darkColor3 = palette[2]?.color || '#1f1f1f'; // Color-3
-  const darkColor4 = palette[3]?.color || '#2c2c2c'; // Color-4
-  const containerLowestColor = darkColor2;
-  const containerLowColor = blendColors(darkColor3, darkColor2, 0.50);
-  const containerColor = darkColor3;
-  const containerHighColor = blendColors(darkColor4, darkColor3, 0.50);
-  const containerHighestColor = darkColor4;
+  // The Neutral (black) theme anchors its ramp ONE tone lower so cards read as
+  // near-black (Container = Color-2 #111111) on a true-black Color-1 surface,
+  // instead of the Color-3 grey that looked too light. Colored dark themes keep
+  // the Color-2/3/4 ramp. See the surfaceColorNumber shift below (black surface
+  // → Color-1) so the Color-2 card isn't the same tone as the surface.
+  // Only the actual BLACK Neutral background (its two darkest tones) shifts down;
+  // lighter Neutral (grey) themes keep the standard Color-2/3/4 ramp.
+  const isNeutralBlack = paletteName === 'Neutral' && surfaceBaseTone <= 1;
+  const rampLowN = isNeutralBlack ? 1 : 2;
+  const rampMidN = isNeutralBlack ? 2 : 3;
+  const rampHighN = isNeutralBlack ? 3 : 4;
+  const darkColorLow = palette[rampLowN - 1]?.color || '#111111';
+  const darkColorMid = palette[rampMidN - 1]?.color || '#1f1f1f';
+  const darkColorHigh = palette[rampHighN - 1]?.color || '#2c2c2c';
+  const containerLowestColor = darkColorLow;
+  const containerLowColor = blendColors(darkColorMid, darkColorLow, 0.50);
+  const containerColor = darkColorMid;
+  const containerHighColor = blendColors(darkColorHigh, darkColorMid, 0.50);
+  const containerHighestColor = darkColorHigh;
 
   // ========================================================================
   // CRITICAL FIX: Return TOKEN REFERENCES for Dark Mode too!
   // ========================================================================
   
   const surfaceColorNumber = Math.min(surfaceBaseTone + 1, 12); // Cap at Color-12 (max in 12-tone scale)
+  // Black (Neutral) surface drops to Color-1 (#040404, true black) so the
+  // near-black Color-2 card sits one tone above it instead of matching it.
+  const surfaceN = isNeutralBlack ? 1 : surfaceColorNumber;
   // Surface-Dim / Surface-Bright = adjacent palette tones so they stay in the
   // brand color family instead of falling out to a desaturated black/white blend.
   const dimColorNumber = Math.max(surfaceColorNumber - 1, 1);
@@ -416,7 +430,7 @@ export function generateSimplifiedDarkModeBackgrounds(
     return {
       Surfaces: {
         'Surface': {
-          value: `{Colors.${paletteName}.Color-${surfaceColorNumber}}`,
+          value: `{Colors.${paletteName}.Color-${surfaceN}}`,
           type: 'color'
         },
         'Surface-Dim': {
@@ -429,11 +443,13 @@ export function generateSimplifiedDarkModeBackgrounds(
         }
       },
       Containers: {
-        // Stepping ramp — see the anchor comment above. Color-2 and Color-4 are
+        // Stepping ramp — see the anchor comment above. The endpoint tones are
         // emitted as token refs so they stay linked to the palette; the two
         // in-between levels are blends and have no token, so they stay hex.
+        // Neutral (black) anchors one tone lower (Color-1/2/3) so cards read
+        // near-black; colored dark themes use Color-2/3/4.
         'Container-Lowest': {
-          value: `{Colors.${paletteName}.Color-2}`,
+          value: `{Colors.${paletteName}.Color-${rampLowN}}`,
           type: 'color'
         },
         'Container-Low': {
@@ -441,7 +457,7 @@ export function generateSimplifiedDarkModeBackgrounds(
           type: 'color'
         },
         'Container': {
-          value: `{Colors.${paletteName}.Color-3}`,
+          value: `{Colors.${paletteName}.Color-${rampMidN}}`,
           type: 'color'
         },
         'Container-High': {
@@ -449,7 +465,7 @@ export function generateSimplifiedDarkModeBackgrounds(
           type: 'color'
         },
         'Container-Highest': {
-          value: `{Colors.${paletteName}.Color-4}`,
+          value: `{Colors.${paletteName}.Color-${rampHighN}}`,
           type: 'color'
         }
       }

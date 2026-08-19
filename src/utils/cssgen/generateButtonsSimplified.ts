@@ -3,7 +3,7 @@
  * Based on the new two-layer architecture from color-tokens-1.json spec
  * 
  * LAYER 1: Buttons Section (Base Button Definitions)
- * - Primary, Secondary, Tertiary, Neutral, Info, Success, Warning, Error, BlackWhite
+ * - Primary, Secondary, Tertiary, Neutral, Info, Success, Warning, Error, Black, White
  * - Each has Light and Medium contrast levels
  * - Uses actual color values with {OB} calculation
  * 
@@ -53,17 +53,52 @@ export function generateBaseButtons(
 ): any {
   const isDark = mode === 'Dark-Mode';
 
-  // In Dark Mode, all buttons use Color-12 for both Light and Medium
-  // In Light Mode, buttons use the extracted tone values
-  const PC = isDark ? 12 : (extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9);
-  const rawSC = isDark ? 12 : (extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 11);
-  const rawTC = isDark ? 12 : (extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 11);
-  const adjustTone = (raw: number) => (raw === 11 || raw <= 5) ? (PC >= 9 ? 9 : 8) : raw;
-  const SC = isDark ? 12 : adjustTone(rawSC);
-  const TC = isDark ? 12 : adjustTone(rawTC);
+  // Dark-mode buttons do not use the dark ramp at all. Every button reaches
+  // across the mode boundary and takes Light-Mode Color-8 — one tone, every
+  // palette — so a dark-mode UI gets bright, saturated buttons carrying dark
+  // labels rather than tinted slabs pulled from the dark ramp.
+  //
+  // Cross-mode references are an established form in this export: Quiet's
+  // Color-Vibrant already reads {Modes.Light-Mode.Colors.X.Color-9}. They
+  // resolve to a baked hex in both the CSS bundle and the Figma payload, so
+  // downstream this IS a hard-coded colour — the reference only exists so the
+  // value keeps tracking the light ramp when the brand changes.
+  const DARK_BUTTON_N = 8;
 
-  // Calculate {OB} (Other Buttons): if PC >= 9 then 6, else 5. In Dark Mode = 12.
-  const OB = isDark ? 12 : (PC >= 9 ? 6 : 5);
+  // Light-mode tones. In dark mode these are computed but unused: shade()
+  // substitutes DARK_BUTTON_N for every palette.
+  const PC = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  // SC and TC are honoured EXACTLY — a Secondary button is Color-SC and a
+  // Tertiary is Color-TC, whatever tone that is.
+  //
+  // There used to be a floor here: `(raw === 11 || raw <= 5) ? (PC >= 9 ? 9 : 8)`.
+  // It contradicted the rule below ("SECONDARY BUTTON — both shades use
+  // Color-SC") and it silently swallowed every dark, saturated pick: a
+  // secondary of #2563eb lands on SC=5, tripped `raw <= 5`, and shipped as
+  // Color-8 (#b7c0ff) — the colour never appeared in the design at all. Button
+  // TEXT contrast is not this function's job; it is computed per button against
+  // whatever fill is chosen, so a dark fill simply gets a light label.
+  //
+  // The one case that is NOT a tone is a missing extraction — that still falls
+  // back to the other-buttons tone rather than pretending to be an SC.
+  const fallbackTone = PC >= 9 ? 9 : 8;
+  const SC = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : fallbackTone;
+  const TC = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : fallbackTone;
+
+  // State buttons (Info/Success/Warning/Error) are pinned to Color-5.
+  //
+  // This used to be `PC >= 9 ? 6 : 5`, so a light primary silently moved every
+  // state button one step lighter — and that step changes the LABEL, because
+  // the contrast logic follows the fill. Measured across all four palettes:
+  //
+  //   Color-5   white 7.2:1 ✓   black 2.8:1 ✗
+  //   Color-6   white 3.4:1 ✗   black 6.0:1 ✓
+  //
+  // So the tone silently decided whether an error button read white-on-red or
+  // black-on-salmon, depending on an unrelated choice of primary. Color-5 is
+  // the tone that carries a white label everywhere, which is what a state
+  // colour is for — the meaning should not shift with the brand.
+  const OB = 5;
   
   console.log(`🔘 [generateBaseButtons] Mode: ${mode}`);
   console.log(`  📊 EXTRACTED TONES INPUT:`, extractedTones);
@@ -79,171 +114,75 @@ export function generateBaseButtons(
   console.log(`     buttons.Neutral.Medium → {Colors.Neutral.Color-${OB}}`);
   
   const buttons: any = {};
-  
-  // PRIMARY BUTTON
-  // Both Light and Medium use Color-PC (the user's actual extracted primary)
-  // This matches the UI preview which always uses p(vPrimary, PC)
-  buttons.Primary = {
-    Light: {
-      Button: { value: `{Colors.Primary.Color-${PC}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Primary.Color-${PC}}`, type: 'color' },
-      Hover: { value: `{Hover.Primary.Color-${PC}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Primary.Color-${PC}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Primary.Color-${PC}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Primary.Color-${PC}}`, type: 'color' },
-      Hover: { value: `{Hover.Primary.Color-${PC}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Primary.Color-${PC}}`, type: 'color' }
-    }
-  };
-  
-  // SECONDARY BUTTON — both shades use Color-SC
-  buttons.Secondary = {
-    Light: {
-      Button: { value: `{Colors.Secondary.Color-${SC}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Secondary.Color-${SC}}`, type: 'color' },
-      Hover: { value: `{Hover.Secondary.Color-${SC}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Secondary.Color-${SC}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Secondary.Color-${SC}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Secondary.Color-${SC}}`, type: 'color' },
-      Hover: { value: `{Hover.Secondary.Color-${SC}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Secondary.Color-${SC}}`, type: 'color' }
-    }
-  };
 
-  // TERTIARY BUTTON — both shades use Color-TC
-  buttons.Tertiary = {
-    Light: {
-      Button: { value: `{Colors.Tertiary.Color-${TC}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Tertiary.Color-${TC}}`, type: 'color' },
-      Hover: { value: `{Hover.Tertiary.Color-${TC}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Tertiary.Color-${TC}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Tertiary.Color-${TC}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Tertiary.Color-${TC}}`, type: 'color' },
-      Hover: { value: `{Hover.Tertiary.Color-${TC}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Tertiary.Color-${TC}}`, type: 'color' }
-    }
-  };
-
-  // NEUTRAL BUTTON — always Color-8
-  buttons.Neutral = {
-    Light: {
-      Button: { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Neutral.Color-8}', type: 'color' },
-      Hover: { value: '{Hover.Neutral.Color-8}', type: 'color' },
-      Pressed: { value: '{Pressed.Neutral.Color-8}', type: 'color' }
-    },
-    Medium: {
-      Button: { value: '{Colors.Neutral.Color-8}', type: 'color' },
-      Text: { value: '{Text.Surfaces.Neutral.Color-8}', type: 'color' },
-      Hover: { value: '{Hover.Neutral.Color-8}', type: 'color' },
-      Pressed: { value: '{Pressed.Neutral.Color-8}', type: 'color' }
-    }
-  };
-
-  // INFO BUTTON — both shades use Color-OB
-  buttons.Info = {
-    Light: {
-      Button: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Info.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Info.Color-${OB}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Info.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Info.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Info.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Info.Color-${OB}}`, type: 'color' }
-    }
-  };
-  
-  // SUCCESS BUTTON — both shades use Color-OB
-  buttons.Success = {
-    Light: {
-      Button: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Success.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Success.Color-${OB}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Success.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Success.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Success.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Success.Color-${OB}}`, type: 'color' }
-    }
-  };
-
-  // WARNING BUTTON — both shades use Color-OB
-  buttons.Warning = {
-    Light: {
-      Button: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Warning.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Warning.Color-${OB}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Warning.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Warning.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Warning.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Warning.Color-${OB}}`, type: 'color' }
-    }
-  };
-
-  // ERROR BUTTON — both shades use Color-OB
-  buttons.Error = {
-    Light: {
-      Button: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Error.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Error.Color-${OB}}`, type: 'color' }
-    },
-    Medium: {
-      Button: { value: `{Colors.Error.Color-${OB}}`, type: 'color' },
-      Text: { value: `{Text.Surfaces.Error.Color-${OB}}`, type: 'color' },
-      Hover: { value: `{Hover.Error.Color-${OB}}`, type: 'color' },
-      Pressed: { value: `{Pressed.Error.Color-${OB}}`, type: 'color' }
-    }
-  };
-  
-  // BLACK/WHITE BUTTON (Special logic for Light vs Dark mode)
-  if (mode === 'Light-Mode') {
-    buttons.BlackWhite = {
-      Light: {
-        Button: { value: '{White}', type: 'color' },
-        Text: { value: '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
-        Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
-        Pressed: { value: '{Pressed.Neutral.Color-12}', type: 'color' }
-      },
-      Medium: {
-        Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        Text: { value: '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
-        Hover: { value: '{Hover.Neutral.Color-1}', type: 'color' },
-        Pressed: { value: '{Pressed.Neutral.Color-1}', type: 'color' }
-      }
+  /**
+   * The four colour slots for one palette at one tone.
+   *
+   * In dark mode the prefix sends every lookup into the Light-Mode collection
+   * and the tone is forced to Color-8, so fill, label, hover and pressed all
+   * come from the same light ramp and stay consistent with each other. Reading
+   * the fill from light and the label from dark would be the obvious bug here.
+   */
+  const shade = (palette: string, n: number) => {
+    const from = isDark ? 'Modes.Light-Mode.' : '';
+    const tone = isDark ? DARK_BUTTON_N : n;
+    return {
+      Button:  { value: `{${from}Colors.${palette}.Color-${tone}}`, type: 'color' },
+      Text:    { value: `{${from}Text.Surfaces.${palette}.Color-${tone}}`, type: 'color' },
+      Hover:   { value: `{${from}Hover.${palette}.Color-${tone}}`, type: 'color' },
+      Pressed: { value: `{${from}Pressed.${palette}.Color-${tone}}`, type: 'color' },
     };
-  } else {
-    // Dark Mode: BlackWhite button uses different colors
-    buttons.BlackWhite = {
-      Light: {
-        Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        Text: { value: '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
-        Hover: { value: '{Hover.Neutral.Color-2}', type: 'color' },
-        Pressed: { value: '{Pressed.Neutral.Color-3}', type: 'color' }
-      },
-      Medium: {
-        Button: { value: '{White}', type: 'color' },
-        Text: { value: '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
-        Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
-        Pressed: { value: '{Pressed.Neutral.Color-10}', type: 'color' }
-      }
-    };
-  }
-  
+  };
+
+  /** Light and Medium have carried identical values since the SC/TC rule
+   *  landed; they stay separate because the lib reads both names. */
+  const bothShades = (palette: string, n: number) => ({
+    Light: shade(palette, n),
+    Medium: shade(palette, n),
+  });
+
+  buttons.Primary   = bothShades('Primary', PC);
+  buttons.Secondary = bothShades('Secondary', SC);
+  buttons.Tertiary  = bothShades('Tertiary', TC);
+  buttons.Neutral   = bothShades('Neutral', 8);
+  buttons.Info      = bothShades('Info', OB);
+  buttons.Success   = bothShades('Success', OB);
+  buttons.Warning   = bothShades('Warning', OB);
+  buttons.Error     = bothShades('Error', OB);
+
+  // BLACK AND WHITE BUTTONS
+  //
+  // These used to be a single `BlackWhite` entry whose Light/Medium shades
+  // carried the two faces — and the shades SWAPPED between modes: "Light" was
+  // the white button in Light-Mode and the black one in Dark-Mode. Naming a
+  // black button "Light" is bad enough; having it mean the opposite depending
+  // on mode made every reference to it a guess.
+  //
+  // They are now two palettes named for the colour they are, stable across
+  // modes. Only the states differ per mode: a black face on a dark background
+  // has to step lighter to show a hover at all, and vice versa.
+  //
+  // The label reference is mode-dependent for a blunt reason: Light-Mode has a
+  // curated Text.Surfaces.BW-Button table, and Dark-Mode has no such group at
+  // all. Pointing dark at it shipped the literal string
+  // "{Text.Surfaces.BW-Button.Color-12}" into the Figma payload and the CSS,
+  // so the black/white button's label had no colour in dark mode. Dark points
+  // straight at the neutral ends instead.
+  const blackFace = () => ({
+    Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
+    Text: { value: isDark ? '{Colors.White}' : '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
+    Hover: { value: isDark ? '{Hover.Neutral.Color-2}' : '{Hover.Neutral.Color-1}', type: 'color' },
+    Pressed: { value: isDark ? '{Pressed.Neutral.Color-3}' : '{Pressed.Neutral.Color-1}', type: 'color' },
+  });
+  const whiteFace = () => ({
+    Button: { value: '{White}', type: 'color' },
+    Text: { value: isDark ? '{Colors.Neutral.Color-1}' : '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
+    Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
+    Pressed: { value: isDark ? '{Pressed.Neutral.Color-10}' : '{Pressed.Neutral.Color-12}', type: 'color' },
+  });
+  buttons.Black = { Light: blackFace(), Medium: blackFace() };
+  buttons.White = { Light: whiteFace(), Medium: whiteFace() };
+
   return buttons;
 }
 
@@ -337,18 +276,16 @@ function getButtonThemeMappings(
         Error: 'Error'
       };
     
-    case 'black-white':
+    case 'black-white': {
+      // Whichever face reads as the "solid" button for this mode: black on a
+      // light page, white on a dark one. This is the swap that used to be
+      // hidden inside the Light/Medium shade names.
+      const bw = mode === 'Dark-Mode' ? 'White' : 'Black';
       return {
-        Default: 'BlackWhite',
-        Primary: 'BlackWhite',
-        Secondary: 'BlackWhite',
-        Tertiary: 'BlackWhite',
-        Neutral: 'BlackWhite',
-        Info: 'BlackWhite',
-        Success: 'BlackWhite',
-        Warning: 'BlackWhite',
-        Error: 'BlackWhite'
+        Default: bw, Primary: bw, Secondary: bw, Tertiary: bw, Neutral: bw,
+        Info: bw, Success: bw, Warning: bw, Error: bw,
       };
+    }
     
     default:
       return {

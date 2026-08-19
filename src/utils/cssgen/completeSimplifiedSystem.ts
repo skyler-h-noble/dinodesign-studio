@@ -553,7 +553,7 @@ function generateDefaultButtonBorders(
     const surfaceBorders: any = {};
     const containerBorders: any = {};
 
-    // Border contrast lookup: 3.1:1 against the surface at each Color-N
+    // Border contrast lookup: 3:1 against the surface at each Color-N
     // Same pattern for both Surfaces and Containers, same for Light and Dark
     const lightBorderMap: Record<string, string> = {
       'Color-1': `{Colors.${variable}.Color-6}`,
@@ -597,6 +597,40 @@ function generateDefaultButtonBorders(
     borders.Surfaces[themeName] = surfaceBorders;
     borders.Containers[themeName] = containerBorders;
   });
+
+  // ── BlackWhite ────────────────────────────────────────────────────────
+  //
+  // The one entry whose border is chosen by TONE rather than by palette. A
+  // black-or-white button has no tonal ramp, so there is no "one step darker"
+  // edge to draw — the border simply matches the face: black on a light
+  // surface, white on a dark one.
+  //
+  // Same map in both modes, because the rule is about the surface underneath,
+  // not the mode. The thresholds are the dark border map's, reused verbatim so
+  // the two cannot drift: white at Color-1..5, black from Color-6 up.
+  const blackWhiteBorderMap: Record<string, string> = {
+    'Color-1': '{Colors.White}',
+    'Color-2': '{Colors.White}',
+    'Color-3': '{Colors.White}',
+    'Color-4': '{Colors.White}',
+    'Color-5': '{Colors.White}',
+    'Color-6': '{Colors.Neutral.Color-1}',
+    'Color-7': '{Colors.Neutral.Color-1}',
+    'Color-8': '{Colors.Neutral.Color-1}',
+    'Color-9': '{Colors.Neutral.Color-1}',
+    'Color-10': '{Colors.Neutral.Color-1}',
+    'Color-11': '{Colors.Neutral.Color-1}',
+    'Color-12': '{Colors.Neutral.Color-1}',
+    'Color-Vibrant': '{Colors.Neutral.Color-1}',
+  };
+  const bwSurfaceBorders: any = {};
+  const bwContainerBorders: any = {};
+  Object.entries(blackWhiteBorderMap).forEach(([colorN, value]) => {
+    bwSurfaceBorders[colorN] = { value, type: 'color' };
+    bwContainerBorders[colorN] = { value, type: 'color' };
+  });
+  borders.Surfaces.BlackWhite = bwSurfaceBorders;
+  borders.Containers.BlackWhite = bwContainerBorders;
 
   return borders;
 }
@@ -691,7 +725,22 @@ export function generateCompleteSimplifiedSystem(
   
   // Calculate OB - PC >= 9 then OB = 6, else OB = 5
   const PC = toneToColorNumber(extractedTones.primary);
-  const OB = PC >= 9 ? 6 : 5;
+  // Tag Medium is fixed at Color-6.
+  //
+  // It used to be `PC >= 9 ? 6 : 5`, so the primary colour decided the tag's
+  // tone — and the tone decides the LABEL, because the contrast logic follows
+  // the fill (Color-5 carries white text, Color-6 carries near-black). A tag
+  // therefore changed appearance because of an unrelated brand choice.
+  //
+  // Color-6 also puts weight between a tag and a button: at Color-5 a Primary
+  // tag rendered #7b3f9d — the exact colour of the Primary button — so a label
+  // read as heavy as an action. Color-6 is a tinted chip that still separates
+  // from a white surface (3.40) without the 3:1 a button's border needs.
+  //
+  // Note the naming is inverted from intuition: Tag "Light" is the PALE chip
+  // used on dark surfaces (Color-9); "Medium" is this one, used on light
+  // surfaces. The theme layer picks between them per surface.
+  const OB = 6;
   
   // Generate all sections with COMPLETE THEMES (includes Surfaces and Containers)
   const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections);

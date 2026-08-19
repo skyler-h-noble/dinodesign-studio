@@ -28,6 +28,23 @@ export interface TypographyStyle {
   weight: string;
   letterSpacing: string;
   allCaps: boolean;
+  /** Variable-font axis values for this role, keyed by axis tag ('wdth',
+   *  'opsz', 'slnt', …). Emitted as font-variation-settings in the export and
+   *  recorded on the Figma payload. Absent for static families. */
+  axes?: Record<string, number>;
+  /** Decorative role only — the Display-Large size in px. Medium and Small
+   *  scale from it and every line height re-lands on the 4px grid. */
+  displaySize?: number;
+  /** Decorative role only — the leading ratio for the Display ramp. Computed
+   *  line heights still snap to the 4px grid. */
+  displayLeading?: number;
+  /** Decorative role only — 0–100 grain amount. A font file can't be
+   *  roughened, so the export ships it as an SVG turbulence filter. */
+  noise?: number;
+  /** Decorative role only — 0–100 hand-lettering rise and fall. Needs one
+   *  element per character, so the export ships the rules plus the one-liner
+   *  that creates the spans. */
+  bounce?: number;
 }
 
 /** Hue overrides for the endpoints (Color-1 / Color-12) of a tone scale */
