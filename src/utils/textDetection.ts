@@ -805,7 +805,7 @@ function classifySpacingFromBbox(
  *  on degenerate inputs (zero-sized bbox, blank region, no vertical stems
  *  detected). Callers should check `strokeCount` before treating the result
  *  as ground truth. */
-function analyzeStrokes(
+export function analyzeStrokes(
   img: HTMLImageElement,
   bbox: { x0: number; y0: number; x1: number; y1: number },
 ): StrokeAnalysis {

@@ -18,15 +18,29 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Button, ButtonGroup, H1, H2, H3, Body, BodySmall, Caption, OverlineSmall,
-  Card, VStack, HStack, Divider, Alert, Link, Checkbox, Slider,
+  Card, VStack, HStack, Divider, Alert, Checkbox, Slider, Link,
   AccordionGroup, Accordion, AccordionSummary, AccordionDetails,
   Modal,
 } from '@dynodesign/components';
 import { useAuth } from '../contexts/AuthContext';
 import { analyzeMoodboard, warmAnalyzeMoodboard, getOrStartMoodboardAnalysis } from '../utils/analyzeMoodboardClient';
-import type { MoodboardAnalysis, ExtractedTextRegion, FontTrio } from '../utils/analyzeMoodboardClient';
+import type { MoodboardAnalysis, ExtractedTextRegion } from '../utils/analyzeMoodboardClient';
 import { uploadDesignSystemFile, getPublicFileUrl } from '../utils/firebase/storage';
+import { fontFamilyParam } from '../utils/googleFontWeights';
+import {
+  HEADER_FAMILY, moodToAxes, explainAxes, normalizeBranch, headerPresets,
+  type AxisValues,
+} from '../utils/moodAxes';
+import {
+  RolePanels, TypeSpecimen, NoiseFilter,
+  type TypeSystem, type FontChoice, type RoleName,
+  type DisplayRole, type HeaderRole, type EyebrowRole,
+} from './typography/TypeRoles';
 import { logGateFeedback, logGateRejections } from '../utils/textGateFeedback';
+import { moodFontMapping, type MoodName } from '../data/moodFontMapping';
+import { loadHeaderFlexFace } from '../utils/googleFontsManager';
+import { useFontMatch } from '../hooks/useFontMatch';
+import { DEFAULT_DISPLAY_SIZE, DISPLAY_LEADING } from '../utils/typeScale';
 
 const TEST_FOLDER = 'test-typography';
 
@@ -46,7 +60,7 @@ interface StylePreset {
 }
 
 interface FontSuggestion {
-  label: string;             // e.g. "From your moodboard text"
+  label: string;             // e.g. "Suggested:"
   description: string;       // e.g. CLIP detected category
   family: string;
   weight: string;
@@ -181,14 +195,15 @@ function familyForTrioRole(
   presetFamily: string | null,
   fallback: string,
 ): string {
+  // An explicit pick ALWAYS wins. This used to be reachable only when the
+  // category had an entry in CATEGORY_FAMILY_POOLS, so clicking a chip whose
+  // category came from anywhere else — the mood pool labels its groups
+  // "Calm · Monospace", which is not a pool key — was silently dropped and the
+  // trio's family was used instead. The click looked like it did nothing.
+  if (presetFamily) return presetFamily;
   if (presetCategory) {
     const pool = CATEGORY_FAMILY_POOLS[presetCategory];
-    if (pool && pool.length > 0) {
-      const ordered = presetFamily
-        ? [presetFamily, ...pool.filter((f) => f !== presetFamily)]
-        : pool;
-      return ordered[index % ordered.length];
-    }
+    if (pool && pool.length > 0) return pool[index % pool.length];
   }
   return fallback;
 }
@@ -197,6 +212,18 @@ function familyForTrioRole(
 // side has one canonical family — body doesn't get a style picker.
 const BODY_SANS_DEFAULT = 'Inter';
 const BODY_SERIF_DEFAULT = 'Source Serif Pro';
+
+// Body pools for the role panel's chips. Kept short on purpose: body copy is a
+// legibility decision, not an expressive one, so a long gallery would be a
+// worse question than a handful of known-good reading faces.
+const BODY_SANS_CHOICES = [
+  'Inter', 'Muli', 'Open Sans', 'Lato', 'Source Sans Pro', 'Nunito Sans',
+  'Work Sans', 'DM Sans', 'Karla', 'IBM Plex Sans',
+];
+const BODY_SERIF_CHOICES = [
+  'Source Serif Pro', 'Lora', 'Merriweather', 'Crimson Text', 'Spectral',
+  'PT Serif', 'Libre Baskerville', 'Bitter', 'Cardo', 'Noto Serif',
+];
 const BODY_SAMPLE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
 
 /** Pick the more trustworthy weight signal. The pixel-based stroke
@@ -494,24 +521,73 @@ function useLoadingPhrase(status: Status): string | null {
   return pool[idx % pool.length];
 }
 
+/** The Header face is never in the picked-families list — it is always Google
+ *  Sans Flex — so it loads on its own, once, with every axis's full range. A
+ *  plain family= request would ship only the default instance and the sliders
+ *  would move nothing. */
+function useHeaderFlexFace() {
+  useEffect(() => { loadHeaderFlexFace(); }, []);
+}
+
 /** Inject one combined Google Fonts <link> for every font in the result so
  *  arbitrary previews can render in their actual face. */
 function useGoogleFonts(families: string[]) {
   useEffect(() => {
     if (families.length === 0) return;
 
-    const param = families
-      .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;600;700;800`)
-      .join('&');
-
-    const id = 'typo-test-fonts';
-    document.getElementById(id)?.remove();
-    const link = document.createElement('link');
-    link.id = id;
-    link.rel = 'stylesheet';
-    link.href = `https://fonts.googleapis.com/css2?${param}&display=swap`;
-    document.head.appendChild(link);
+    // Request ONLY the weights each font actually ships (per Google's metadata),
+    // so the css2 API never 400s the whole request over a single-weight
+    // script/display font — while multi-weight fonts still load their real
+    // heavy/light faces. Limited to the weights the previews render.
+    // Batched, not one request. The pools now run to ~90 families, and a single
+    // css2 URL carrying all of them is long enough to be rejected outright —
+    // at which point NONE of the chips render in their own face, they all fall
+    // back to the same one. Smaller requests fail independently, so one bad
+    // family costs one batch instead of the whole panel.
+    const BATCH = 12;
+    document.querySelectorAll('link[data-typo-test-fonts]').forEach((l) => l.remove());
+    for (let i = 0; i < families.length; i += BATCH) {
+      const param = families
+        .slice(i, i + BATCH)
+        .map((f) => fontFamilyParam(f, [300, 400, 600, 700, 800]))
+        .join('&');
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?${param}&display=swap`;
+      link.setAttribute('data-typo-test-fonts', 'true');
+      document.head.appendChild(link);
+    }
   }, [families.join('|')]);
+}
+
+/**
+ * The classifier's mood → a key moodFontMapping actually has.
+ *
+ * The two vocabularies overlap but aren't identical (the classifier emits
+ * Modern, Warm, Tech, Professional; the mapping has Business, Futuristic,
+ * Stiff…), so an unmatched mood lands on Calm rather than an empty pool.
+ */
+function moodKeyFor(mood?: string | null): MoodName {
+  const raw = String(mood ?? '').replace(/-\d+$/, '').trim();
+  const keys = Object.keys(moodFontMapping) as MoodName[];
+  const exact = keys.find((k) => k.toLowerCase() === raw.toLowerCase());
+  if (exact) return exact;
+  const alias: Record<string, MoodName> = {
+    modern: 'Business', professional: 'Business', tech: 'Futuristic',
+    warm: 'Happy', bold: 'Loud', minimal: 'Stiff', formal: 'Sophisticated',
+    romantic: 'Elegant', friendly: 'Happy', energetic: 'Excited',
+    nostalgic: 'Vintage', creative: 'Artistic', quiet: 'Calm',
+  };
+  return alias[raw.toLowerCase()] ?? 'Calm';
+}
+
+/** Axes → a font-variation-settings string. wght is omitted: it is passed as
+ *  font-weight, and declaring it twice lets the two disagree. */
+function variationCss(axes: AxisValues): string {
+  return Object.entries(axes)
+    .filter(([tag]) => tag !== 'wght')
+    .map(([tag, v]) => `"${tag}" ${v}`)
+    .join(', ');
 }
 
 export interface TypographyTestPageProps {
@@ -524,6 +600,8 @@ export interface TypographyTestPageProps {
   hideUploadUI?: boolean;
   /** Current decorative-mode toggle from the upstream selection state.
    *  When present, a "Decorative Mode" toggle appears in the trios column. */
+  /** Kept in the contract so the value still reaches generateDesignSystem at
+   *  its default; the picker itself was removed from this step. */
   decorativeMode?: 'surface-components' | 'only-selected';
   onDecorativeModeChange?: (mode: 'surface-components' | 'only-selected') => void;
   /** Fired when the user clicks Next. Receives a TypographyStyle[] derived
@@ -554,11 +632,22 @@ export interface TypographyTestPageProps {
 /** Subset of the app-wide TypographyStyle we emit on Next. Kept local so the
  *  test page can be opened without importing the app's types. */
 export interface TypographyStyleOutput {
-  type: 'header' | 'decorative' | 'body';
+  type: 'header' | 'decorative' | 'body' | 'eyebrow';
   family: string;
   weight: string;
   letterSpacing: string;
   allCaps: boolean;
+  /** Header only — the Google Sans Flex axis values. Persisted so the sliders
+   *  come back where the user left them on stage re-entry. */
+  axes?: AxisValues;
+  /** Decorative (Display) only — the Display-Large size in px, which the
+   *  Medium and Small steps scale from. */
+  displaySize?: number;
+  /** Decorative (Display) only — the leading ratio for the Display ramp. */
+  displayLeading?: number;
+  /** Decorative (Display) only — 0–100 grain and hand-lettering rise/fall. */
+  noise?: number;
+  bounce?: number;
 }
 
 /** One persisted custom font upload. The `family` is the synthetic name the
@@ -595,9 +684,14 @@ export interface TypographyMeta {
    *  reads "Style: Customized". */
   bodyFamilyTouched: boolean;
   /** The category the user picked from the customize modal for the Header
-   *  role (e.g. "Sans / Geometric"). Drives the trio cycling + the
-   *  Suggested / Customized label state. Null when no preset was picked. */
+   *  role (e.g. "Sans / Geometric"). Kept for designs saved before the Header
+   *  became a Flex face; it no longer drives anything. */
   headerPresetCategory: string | null;
+  /** Lettering ignored; the Display is suggested from the palette mood. */
+  ignoreTextDetection?: boolean;
+  /** The category the user picked from the customize modal for the Decorative
+   *  role. Drives the trio cycling + the Suggested / Customized label state.
+   *  Null when no preset was picked. */
   decorativePresetCategory: string | null;
 }
 
@@ -619,7 +713,7 @@ export default function TypographyTestPage({
   // role at initialization time. Read once on first render — subsequent
   // re-renders shouldn't snap user edits back to the saved values.
   const initialByType = (() => {
-    const m: Partial<Record<'header' | 'decorative' | 'body', TypographyStyleOutput>> = {};
+    const m: Partial<Record<TypographyStyleOutput['type'], TypographyStyleOutput>> = {};
     for (const s of initialTypography ?? []) m[s.type] = s;
     return m;
   })();
@@ -654,6 +748,61 @@ export default function TypographyTestPage({
     ? (initialByType.header.allCaps ? 'uppercase' : 'normal') : null;
   const decoCaseFromSaved: TextCase | null = initialByType.decorative
     ? (initialByType.decorative.allCaps ? 'uppercase' : 'normal') : null;
+  // The Header face is Google Sans Flex, never a picked family, so its
+  // character lives in the axes rather than in a font choice. Null means "use
+  // the mood-derived recommendation"; the sliders write a full axis set here.
+  const [headerAxesOverride, setHeaderAxesOverride] = useState<AxisValues | null>(
+    initialByType.header?.axes ?? null
+  );
+  // Display grain and bounce. Neither is a font property — a font file can't be
+  // roughened and every glyph in a face is identical — so they ride on the role
+  // and are rendered by the CSS export as a filter and per-character offsets.
+  const [displaySize, setDisplaySize] = useState<number>(
+    initialByType.decorative?.displaySize ?? DEFAULT_DISPLAY_SIZE
+  );
+  const [displayLeading, setDisplayLeading] = useState<number>(
+    initialByType.decorative?.displayLeading ?? DISPLAY_LEADING
+  );
+  const [displayNoise, setDisplayNoise] = useState<number>(initialByType.decorative?.noise ?? 0);
+  const [displayBounce, setDisplayBounce] = useState<number>(initialByType.decorative?.bounce ?? 0);
+  // The eyebrow is the OS UI stack, so there is no family to pick — only how
+  // heavy and how tracked out the label sits.
+  const [eyebrowWeight, setEyebrowWeight] = useState<string>(initialByType.eyebrow?.weight ?? '600');
+  const [eyebrowSpacing, setEyebrowSpacing] = useState<string>(initialByType.eyebrow?.letterSpacing ?? '0.12em');
+  // Which role panels are open, and whether the six raw axes are showing.
+  const [openRoles, setOpenRoles] = useState<Set<RoleName>>(
+    () => new Set<RoleName>(['Display', 'Eyebrow', 'Header', 'Body'])
+  );
+  const [axesAdvanced, setAxesAdvanced] = useState(false);
+  // ONE region is sampled, not two. Detection picks the tallest block, which is
+  // right most of the time and wrong in a way that's hard to correct otherwise
+  // — OCR may have merged the words, or the interesting lettering may simply
+  // not be the biggest. So the user can point at a different one.
+  const [displayRegionIdx, setDisplayRegionIdx] = useState(0);
+  // When on, the sampled lettering is ignored entirely and the Display is
+  // suggested from the palette's MOOD instead. moodFontMapping exists for
+  // exactly this ("Used when NO text is detected in the mood board") — this
+  // makes it a choice rather than only a fallback, for boards whose lettering
+  // is incidental or misleading.
+  const [ignoreTextDetection, setIgnoreTextDetection] = useState(
+    initialMeta?.ignoreTextDetection ?? false
+  );
+  const [regionPickerOpen, setRegionPickerOpen] = useState(false);
+  // Which role panel the pointer or focus is in. Drives the preview highlight
+  // so a panel and the text it controls are visibly the same thing.
+  const [activeRole, setActiveRole] = useState<RoleName | null>(null);
+  // The preview is sticky at 72px and its height varies with the Display size,
+  // so the role panels can't hardcode where it ends. Measure it and hand the
+  // panels an offset to stick below.
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const [previewH, setPreviewH] = useState(0);
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => setPreviewH(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [result]);
   const [headerWeightOverride, setHeaderWeightOverride] = useState<string | null>(initialByType.header?.weight ?? null);
   const [headerSpacingOverride, setHeaderSpacingOverride] = useState<string | null>(initialByType.header?.letterSpacing ?? null);
   const [headerCaseOverride, setHeaderCaseOverride] = useState<TextCase | null>(headerCaseFromSaved);
@@ -698,7 +847,7 @@ export default function TypographyTestPage({
   // Resets to true if the moodboard URL changes (i.e. genuinely new analysis).
   const skipAutoSeedRef = useRef((initialTypography ?? []).length > 0);
 
-  // When a fresh result lands, default-select the "From your moodboard text"
+  // When a fresh result lands, default-select the "Suggested:"
   // suggestion — that's the CLIP + OCR-driven pick and what most users will
   // want as their starting point. The user can switch to the mood-driven
   // suggestion or any preset, but they shouldn't have to make a click just
@@ -753,7 +902,12 @@ export default function TypographyTestPage({
       ));
       setHeaderWeightOverride(hCss.weight);
       setHeaderSpacingOverride(hCss.letterSpacing);
-      setHeaderCaseOverride(hCrop?.isAllCaps ? 'uppercase' : 'normal');
+      // The Header never ACQUIRES caps. All-caps lettering in the image says
+      // something about the Display, which is the face being matched to it —
+      // propagating it here put two roles in caps at once, which is the pairing
+      // the Display/Header coupling exists to prevent. Only the Header's own
+      // checkbox turns it on.
+      setHeaderCaseOverride('normal');
 
       const dMod = result.decorativeModifiers ?? result.modifiers;
       const dCrop = result.extractedText[1];
@@ -818,22 +972,6 @@ export default function TypographyTestPage({
   // resolved family as an explicit override (so the swap sticks even when a
   // side is on its auto pick) and resets the trio to slot 0 so those overrides
   // display. Category, weight, spacing, case, and upload swap with the family.
-  const swapHeaderDecorative = () => {
-    const hFam = currentHeader, dFam = currentDecorative;
-    setHeaderOverride(dFam || null);
-    setDecorativeOverride(hFam || null);
-    setHeaderPresetCategory(decorativePresetCategory);
-    setDecorativePresetCategory(headerPresetCategory);
-    setHeaderWeightOverride(decorativeWeightOverride);
-    setDecorativeWeightOverride(headerWeightOverride);
-    setHeaderSpacingOverride(decorativeSpacingOverride);
-    setDecorativeSpacingOverride(headerSpacingOverride);
-    setHeaderCaseOverride(decorativeCaseOverride);
-    setDecorativeCaseOverride(headerCaseOverride);
-    setHeaderUpload(decorativeUpload);
-    setDecorativeUpload(headerUpload);
-    setTrioIdx(0);
-  };
   const currentBody = bodyOverride ?? (bodyFamily === 'serif' ? BODY_SERIF_DEFAULT : (trio?.body ?? BODY_SANS_DEFAULT));
 
   // Effective spec values — preset overrides win; otherwise fall back to the
@@ -844,6 +982,259 @@ export default function TypographyTestPage({
   const currentDecorativeWeight = decorativeWeightOverride ?? result?.specs.decorative.weight ?? '400';
   const currentDecorativeSpacing = decorativeSpacingOverride ?? result?.specs.decorative.letter_spacing ?? '0em';
   const currentDecorativeCase: TextCase = decorativeCaseOverride ?? 'normal';
+
+  // ── The sampled region ────────────────────────────────────────────────────
+  // Everything about the Display's character is measured off ONE crop. The
+  // server classified the first two (header / decorative); beyond that we still
+  // have the local pixel analysis on every region, so a hand-picked block falls
+  // back to the whole-image classification plus its own strokes.
+  const regions = result?.extractedText ?? [];
+  // Detection off → no crop. Everything measured off the lettering (weight,
+  // case, branch, and the whole font-match ranking) falls back to the mood.
+  const sampledRegion: ExtractedTextRegion | undefined =
+    ignoreTextDetection ? undefined : regions[displayRegionIdx];
+  const sampledClip = useMemo(() => {
+    if (displayRegionIdx === 1) {
+      return {
+        weight: result?.decorativeModifiers?.weight ?? result?.modifiers.weight ?? 'regular',
+        branch: result?.decorativeBranch ?? result?.branch ?? '',
+        style: result?.decorativeStyle ?? result?.style ?? '',
+        category: result?.decorativeCategory,
+      };
+    }
+    if (displayRegionIdx === 0) {
+      return {
+        weight: result?.headerModifiers?.weight ?? result?.modifiers.weight ?? 'regular',
+        branch: result?.headerBranch ?? result?.branch ?? '',
+        style: result?.headerStyle ?? result?.style ?? '',
+        category: result?.headerCategory,
+      };
+    }
+    return {
+      weight: result?.modifiers.weight ?? 'regular',
+      branch: result?.branch ?? '',
+      style: result?.style ?? '',
+      category: undefined as string | undefined,
+    };
+  }, [displayRegionIdx, result]);
+
+  /** Weight and branch as MEASURED on the sampled crop — pixels overrule CLIP. */
+  const sampledWeight = effectiveWeight(sampledClip.weight as 'thin' | 'regular' | 'heavy', sampledRegion);
+  const sampledBranchStyle = effectiveBranchAndStyle(sampledClip.branch, sampledClip.style, sampledRegion);
+  const sampledAllCaps = sampledRegion?.isAllCaps ?? false;
+
+  // The lettering's own case is the starting point for the Display — if the
+  // words in the image are set in caps, the Display is too until the user says
+  // otherwise. `null` override means "follow the image".
+  const displayAllCaps = decorativeCaseOverride !== null
+    ? decorativeCaseOverride === 'uppercase'
+    : sampledAllCaps;
+
+  // The Header never runs in caps while the Display does — see the note where
+  // it is applied. The user's own Header choice still stands when the Display
+  // is mixed case.
+  // Display in caps REMOVES caps from the Header. Display not in caps does not
+  // ADD them — the Header keeps whatever its own checkbox says, which defaults
+  // to off and is never set automatically.
+  const headerAllCaps = displayAllCaps ? false : currentHeaderCase === 'uppercase';
+
+  // ── Header axes ───────────────────────────────────────────────────────────
+  // The Header is set AGAINST the Decorative face rather than picked to match
+  // it: the Decorative role is the loud one by definition, so the Header's job
+  // is to be the quiet one. moodToAxes inverts the measured weight, flattens
+  // against a serif, and gets out of the way entirely when the Decorative face
+  // is script or hand-lettering.
+  const headerAxisOptions = useMemo(() => ({
+    displayWeight: sampledWeight,
+    displayBranch: normalizeBranch(sampledBranchStyle.branch, sampledClip.category ?? sampledBranchStyle.style),
+    displayCategory: sampledClip.category ?? sampledBranchStyle.style,
+  }), [sampledWeight, sampledBranchStyle.branch, sampledBranchStyle.style, sampledClip.category]);
+
+  const suggestedHeaderAxes = useMemo(
+    () => moodToAxes(result?.mood?.key ?? 'Modern', headerAxisOptions),
+    [result?.mood?.key, headerAxisOptions]
+  );
+  const currentHeaderAxes = headerAxesOverride ?? suggestedHeaderAxes;
+  const headerAxesRationale = useMemo(
+    () => explainAxes(result?.mood?.key ?? 'Modern', headerAxisOptions),
+    [result?.mood?.key, headerAxisOptions]
+  );
+  const headerAxesCustomized = headerAxesOverride !== null;
+  const setHeaderAxis = useCallback((tag: string, value: number) => {
+    setHeaderAxesOverride((prev) => ({ ...(prev ?? suggestedHeaderAxes), [tag]: value }));
+  }, [suggestedHeaderAxes]);
+
+  // ── The role panels ───────────────────────────────────────────────────────
+  // One object the panels and the specimen both read, so a control and its
+  // preview can never disagree about what the system currently is.
+  const typeSystem: TypeSystem = useMemo(() => ({
+    display: {
+      family: currentDecorative,
+      category: decorativePresetCategory ?? result?.decorativeCategory ?? '',
+      weight: currentDecorativeWeight,
+      letterSpacing: currentDecorativeSpacing,
+      allCaps: displayAllCaps,
+      size: displaySize,
+      leading: displayLeading,
+      noise: displayNoise,
+      bounce: displayBounce,
+      detectedWeight: sampledWeight,
+      detectedAllCaps: sampledAllCaps,
+    },
+    header: {
+      axes: currentHeaderAxes,
+      letterSpacing: currentHeaderSpacing,
+      // Two roles shouting at once reads as one voice. The Display is the loud
+      // one by definition, so when it is set in caps the Header steps back to
+      // sentence case — the same reasoning that inverts its weight.
+      allCaps: headerAllCaps,
+      rationale: headerAxesRationale,
+    },
+    eyebrow: { weight: eyebrowWeight, letterSpacing: eyebrowSpacing },
+    body: { family: currentBody, branch: bodyFamily },
+  }), [
+    currentDecorative, decorativePresetCategory, result, currentDecorativeWeight,
+    currentDecorativeSpacing, displayAllCaps, displaySize, displayLeading, displayNoise, displayBounce,
+    currentHeaderAxes, currentHeaderSpacing, headerAllCaps, headerAxesRationale,
+    eyebrowWeight, eyebrowSpacing, currentBody, bodyFamily,
+  ]);
+
+  // The headline the specimen sets — the biggest piece of text the matcher
+  // actually found, so the preview shows the user's own words.
+  const specimenHeadline = result?.extractedText?.[0]?.text?.trim() || 'Vivid Mornings';
+
+  // Font pools for the Display, RESTRICTED to what was detected.
+  //
+  // Offering every category is worse than useless: a moodboard whose lettering
+  // is hand-drawn was being shown Playfair, Lora and Roboto Slab first, none of
+  // which have anything to do with it. The pool starts at the detected category
+  // and widens only to the rest of that branch — an Expressive detection offers
+  // the other Expressive pools, never Serif or Sans.
+  const displayChoices: FontChoice[] = useMemo(() => {
+    if (ignoreTextDetection) {
+      // Straight from the palette's mood. The mapping groups by its own type
+      // labels (Display/Decorative, Calligraphy, …), which become the headings.
+      const key = moodKeyFor(result?.mood?.key ?? result?.mood?.label);
+      const pool = moodFontMapping[key] ?? [];
+      return pool.slice(0, 20).map((f) => ({
+        family: f.name, category: `${key} · ${f.type}`, label: f.name,
+      }));
+    }
+    const detectedCategory = sampledClip.category ?? sampledBranchStyle.style ?? '';
+    // Branch vocabularies differ between the classifier ('Sans serif') and the
+    // pool keys ('Sans / …'), so match on the first word rather than the label.
+    const rawBranch = (detectedCategory.split('/')[0] || sampledBranchStyle.branch || '').trim();
+    const branchKey = /serif/i.test(rawBranch) && !/sans/i.test(rawBranch) ? 'Serif'
+      : /sans/i.test(rawBranch) ? 'Sans'
+        : /express|script|hand|display/i.test(rawBranch) ? 'Expressive'
+          : '';
+
+    const allCategories = Object.keys(CATEGORY_FAMILY_POOLS);
+    const inBranch = branchKey
+      ? allCategories.filter((c) => c.startsWith(branchKey))
+      : allCategories;
+    // The detected category leads; its siblings follow. Anything unrecognised
+    // falls back to the whole set rather than showing nothing.
+    const exact = allCategories.find((c) => c.toLowerCase() === detectedCategory.toLowerCase());
+    const near = exact ?? inBranch.find((c) => {
+      const tail = detectedCategory.split('/').pop()?.trim().toLowerCase() ?? '';
+      return tail && c.toLowerCase().includes(tail.split(' ')[0]);
+    });
+    const ordered = [
+      ...(near ? [near] : []),
+      ...(inBranch.length ? inBranch : allCategories).filter((c) => c !== near),
+    ];
+
+    // Capped at 20, the detected category taken whole before its siblings are
+    // drawn on — the same budget omni uses. A branch's full pool ran to 30+,
+    // which turns a decision into a scroll.
+    const LIMIT = 20;
+    const out: FontChoice[] = [];
+    const seen = new Set<string>();
+    for (const category of ordered) {
+      if (out.length >= LIMIT) break;
+      for (const family of CATEGORY_FAMILY_POOLS[category] ?? []) {
+        if (out.length >= LIMIT) break;
+        if (seen.has(family)) continue;
+        seen.add(family);
+        out.push({ family, category, label: family });
+      }
+    }
+    return out;
+  }, [ignoreTextDetection, result?.mood?.key, result?.mood?.label,
+      sampledClip.category, sampledBranchStyle.style, sampledBranchStyle.branch]);
+  const bodyChoices: FontChoice[] = useMemo(() => {
+    const pool = bodyFamily === 'serif' ? BODY_SERIF_CHOICES : BODY_SANS_CHOICES;
+    return pool.map((f) => ({ family: f, category: bodyFamily === 'serif' ? 'Serif' : 'Sans serif', label: f }));
+  }, [bodyFamily]);
+
+  // Rank the Display pool against the sampled crop — stroke fingerprint plus
+  // ink overlay, both measured locally.
+  // No crop, nothing to measure against — the ranking is skipped rather than
+  // scoring every candidate against nothing.
+  const matchInput = useMemo(
+    () => sampledRegion
+      ? { dataUrl: sampledRegion.dataUrl, stroke: sampledRegion.stroke, text: sampledRegion.text }
+      : null,
+    [sampledRegion]
+  );
+  const displayFamilyPool = useMemo(
+    () => [...new Set(displayChoices.map((c) => c.family))],
+    [displayChoices]
+  );
+  const match = useFontMatch(matchInput, displayFamilyPool);
+
+  const headerAxisPresets = useMemo(
+    () => headerPresets(result?.mood?.key ?? 'Modern', headerAxisOptions),
+    [result?.mood?.key, headerAxisOptions]
+  );
+
+  const toggleRole = useCallback((role: RoleName) => {
+    setOpenRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(role)) next.delete(role); else next.add(role);
+      return next;
+    });
+  }, []);
+
+  const applyDisplayPatch = useCallback((patch: Partial<DisplayRole>) => {
+    if (patch.weight !== undefined) setDecorativeWeightOverride(patch.weight);
+    if (patch.letterSpacing !== undefined) setDecorativeSpacingOverride(patch.letterSpacing);
+    if (patch.allCaps !== undefined) setDecorativeCaseOverride(patch.allCaps ? 'uppercase' : 'normal');
+    if (patch.size !== undefined) setDisplaySize(patch.size);
+    if (patch.leading !== undefined) setDisplayLeading(patch.leading);
+    if (patch.noise !== undefined) setDisplayNoise(patch.noise);
+    if (patch.bounce !== undefined) setDisplayBounce(patch.bounce);
+  }, []);
+
+  const applyDisplayFont = useCallback((family: string, category: string) => {
+    setDecorativeOverride(family);
+    setDecorativePresetCategory(category);
+    setDecorativeUpload(null);
+  }, []);
+
+  const applyHeaderPatch = useCallback((patch: Partial<HeaderRole>) => {
+    if (patch.letterSpacing !== undefined) setHeaderSpacingOverride(patch.letterSpacing);
+    if (patch.allCaps !== undefined) setHeaderCaseOverride(patch.allCaps ? 'uppercase' : 'normal');
+  }, []);
+
+  const applyEyebrowPatch = useCallback((patch: Partial<EyebrowRole>) => {
+    if (patch.weight !== undefined) setEyebrowWeight(patch.weight);
+    if (patch.letterSpacing !== undefined) setEyebrowSpacing(patch.letterSpacing);
+  }, []);
+
+  const applyBodyBranch = useCallback((branch: BodyFamily) => {
+    setBodyFamily(branch);
+    setBodyOverride(null);
+    setBodyUpload(null);
+    setBodyFamilyTouched(true);
+  }, []);
+
+  const applyBodyFont = useCallback((family: string) => {
+    setBodyOverride(family);
+    setBodyUpload(null);
+    setBodyFamilyTouched(true);
+  }, []);
 
   // Suggestions: one CLIP-matched (from extracted text) + one mood-matched.
   // Tapping a suggestion applies its font / weight / spacing as a role override.
@@ -862,69 +1253,10 @@ export default function TypographyTestPage({
     return `${branch} / ${shortStyle}`;
   };
 
-  const headerSuggestions: FontSuggestion[] = useMemo(() => {
-    if (!result) return [];
-    const out: FontSuggestion[] = [];
-    const clipTrio = result.trios.find((t) => t.type === 'same_style' || t.type === 'cross_pair');
-    if (clipTrio) {
-      const mod = result.headerModifiers ?? result.modifiers;
-      const spacing = headerCrop?.spacing ?? 'normal';
-      const allCaps = headerCrop?.isAllCaps ?? false;
-      const weight = effectiveWeight(mod.weight, headerCrop);
-      const clipBranch = result.headerBranch ?? result.branch;
-      const clipStyle = result.headerStyle ?? result.style;
-      const { branch, style, pixelOverride } = effectiveBranchAndStyle(clipBranch, clipStyle, headerCrop);
-      const conf = result.headerCategoryConfidence;
-      const css = cssForDetectedSpec({ weight, spacing, allCaps });
-      // First clamp to pixel branch (when CLIP's branch is wrong), then to
-      // user preset category (which always wins). Description shows the
-      // user's category when picked, otherwise the effective branch.
-      const familyAfterPixel = clampFamilyToPixelBranch(
-        clipTrio.header, headerCrop, headerPresetCategory, clipBranch, clipStyle,
-      );
-      const family = clampFamilyToCategory(familyAfterPixel, headerPresetCategory, headerOverride);
-      // categoryStr matches the modal's preset format: "Expressive / Display"
-      // (or whatever the user explicitly picked). When auto-detected we
-      // shorten the long CATEGORY_LABELS style ("Display / Decorative" →
-      // "Display") so the SuggestedCard label reads the same as the modal.
-      const categoryStr = headerPresetCategory ?? shortCategoryLabel(branch, style);
-      // No internal-process annotation — "clamped to your pick" / "pixel-
-      // corrected" leak the matcher's decision-making into the UI, which the
-      // user neither needs nor wants. The visible category + weight is the
-      // verdict.
-      out.push({
-        label: 'From your moodboard text',
-        description: `${categoryStr} · ${weight}, ${mod.width}`,
-        family,
-        weight: css.weight,
-        letterSpacing: css.letterSpacing,
-        textTransform: allCaps ? 'uppercase' : undefined,
-      });
-    }
-    // Mood-driven suggestion ONLY surfaces as a fallback — when we couldn't
-    // detect any header text on the moodboard. The text-derived suggestion
-    // is always more precise when we have it, and showing both confuses
-    // users into thinking we're indecisive. headerCrop is the moodboard's
-    // tallest detected text region; null when OCR found nothing or the
-    // text gate rejected every candidate.
-    if (!headerCrop) {
-      const moodTrio = result.trios.find((t) => t.type === 'mood_preset' || t.type === 'mood_alt');
-      if (moodTrio && moodTrio.mood) {
-        const family = clampFamilyToCategory(moodTrio.header, headerPresetCategory, headerOverride);
-        const wasClamped = family !== moodTrio.header;
-        out.push({
-          label: `From mood: ${moodTrio.mood.label}`,
-          description: wasClamped
-            ? 'Color-driven preset · clamped to your category pick'
-            : 'Color-driven preset (brightness, saturation, hue)',
-          family,
-          weight: result.specs.header.weight,
-          letterSpacing: result.specs.header.letter_spacing,
-        });
-      }
-    }
-    return out;
-  }, [result, headerCrop, headerPresetCategory, headerOverride]);
+  // The Header no longer has a suggested FAMILY — it is always Google Sans
+  // Flex, and what gets suggested is the axis set (see suggestedHeaderAxes).
+  // The old family-suggestion memo lived here.
+
 
   const decorativeSuggestions: FontSuggestion[] = useMemo(() => {
     if (!result) return [];
@@ -949,7 +1281,7 @@ export default function TypographyTestPage({
       const categoryStr = decorativePresetCategory ?? shortCategoryLabel(branch, style);
       // No process annotations — see header branch.
       out.push({
-        label: 'From your moodboard text',
+        label: 'Suggested:',
         description: `${categoryStr} · ${weight}, ${mod.width}`,
         family,
         weight: css.weight,
@@ -1015,10 +1347,23 @@ export default function TypographyTestPage({
     );
     set.add(BODY_SANS_DEFAULT);
     set.add(BODY_SERIF_DEFAULT);
+    // The Body panel's own chips. Each chip sets its "Ag" in the family it
+    // names, which only reads as a choice if that family is actually loaded —
+    // an unloaded family silently renders in the fallback face and every chip
+    // looks identical.
+    BODY_SANS_CHOICES.forEach((f) => set.add(f));
+    BODY_SERIF_CHOICES.forEach((f) => set.add(f));
+    // The mood pool, for when the user ignores the lettering. These families
+    // (Oleo Script, Merienda, Bangers, Kalam…) are mostly NOT in the category
+    // pools, so without this every mood chip renders in the fallback face and
+    // the switch looks like it did nothing.
+    const moodPool = moodFontMapping[moodKeyFor(result?.mood?.key ?? result?.mood?.label)] ?? [];
+    moodPool.forEach((f) => set.add(f.name));
     return Array.from(set);
   }, [result]);
 
   useGoogleFonts(allFamilies);
+  useHeaderFlexFace();
   const loadingPhrase = useLoadingPhrase(status);
 
   const FONTS_FOLDER = 'typography-v2-fonts';
@@ -1205,17 +1550,32 @@ export default function TypographyTestPage({
     onTypographyComplete([
       {
         type: 'header',
-        family: currentHeader,
-        weight: currentHeaderWeight,
+        // Always the Flex face — the family is not the user's to pick here.
+        family: HEADER_FAMILY,
+        // Weight IS the wght axis, so font-weight and the axis can't disagree.
+        weight: String(currentHeaderAxes.wght),
         letterSpacing: currentHeaderSpacing,
-        allCaps: currentHeaderCase === 'uppercase',
+        allCaps: headerAllCaps,
+        axes: currentHeaderAxes,
       },
       {
         type: 'decorative',
         family: currentDecorative,
         weight: currentDecorativeWeight,
         letterSpacing: currentDecorativeSpacing,
-        allCaps: currentDecorativeCase === 'uppercase',
+        allCaps: displayAllCaps,
+        displaySize,
+        displayLeading,
+        noise: displayNoise,
+        bounce: displayBounce,
+      },
+      {
+        // The eyebrow has no family of its own — it renders in the OS UI stack.
+        type: 'eyebrow',
+        family: '',
+        weight: eyebrowWeight,
+        letterSpacing: eyebrowSpacing,
+        allCaps: true,
       },
       {
         type: 'body',
@@ -1227,8 +1587,9 @@ export default function TypographyTestPage({
     ]);
   }, [
     onTypographyComplete, result,
-    currentHeader, currentHeaderWeight, currentHeaderSpacing, currentHeaderCase,
-    currentDecorative, currentDecorativeWeight, currentDecorativeSpacing, currentDecorativeCase,
+    currentHeader, currentHeaderAxes, currentHeaderSpacing, headerAllCaps,
+    currentDecorative, currentDecorativeWeight, currentDecorativeSpacing, displayAllCaps,
+    displaySize, displayLeading, displayNoise, displayBounce, eyebrowWeight, eyebrowSpacing,
     currentBody, bodyWeightOverride, bodySpacingOverride,
   ]);
 
@@ -1243,11 +1604,12 @@ export default function TypographyTestPage({
       bodyFamilyTouched,
       headerPresetCategory,
       decorativePresetCategory,
+      ignoreTextDetection,
     });
   }, [
     onMetaChange,
     trioIdx, bodyFamily, bodyFamilyTouched,
-    headerPresetCategory, decorativePresetCategory,
+    headerPresetCategory, decorativePresetCategory, ignoreTextDetection,
   ]);
 
   // Mirror uploads back to the parent. Each role's record is null when no
@@ -1270,7 +1632,10 @@ export default function TypographyTestPage({
     // on Surface-Dim lets the Surface accordions and Container preview cards
     // both read as raised panels. data-surface re-resolves --Background within
     // the inherited data-theme, so this honors the brand cascade.
-    <div data-surface="Surface-Dim" style={{ padding: '40px 24px', background: 'var(--Background)', minHeight: '100%' }}>
+    <div data-surface="Surface-Dim" style={{ padding: '16px 24px 40px', background: 'var(--Background)', minHeight: '100%' }}>
+      {/* The Display grain filter has to exist in the document for
+          `filter: url(#…)` to resolve. Renders nothing when noise is 0. */}
+      <NoiseFilter noise={displayNoise} />
       <VStack spacing={4} style={{ maxWidth: 1400, margin: '0 auto', width: '100%' }}>
         {!inStageMode && (
           <VStack spacing={1}>
@@ -1343,12 +1708,45 @@ export default function TypographyTestPage({
           </Card>
         )}
 
+        {/* The specimen leads and stays put: it is the thing being decided,
+            so it sits above the reasoning and the controls rather than beside
+            them. */}
+        {result && (
+          // 72px clears the shell's 65px sticky top bar; at a smaller offset the
+          // preview sticks BEHIND it and reads as not sticking at all.
+          <div
+            ref={previewRef}
+            style={{
+              position: 'sticky',
+              top: 72,
+              zIndex: 2,
+              // An opaque band, not just a sticky card: without a background the
+              // detection crop and its caption scroll THROUGH the gaps around
+              // the card. The padding gives the band edges to hide them behind.
+              background: 'var(--Background)',
+              padding: '8px 0 12px',
+              marginBottom: 4,
+            }}
+          >
+            <TypeSpecimen
+              system={typeSystem}
+              headline={specimenHeadline}
+              activeRole={activeRole}
+              onHoverRole={setActiveRole}
+            />
+          </div>
+        )}
+
         {preview && result && (
           <DetectionDetails
             preview={preview}
             result={result}
             moodboardUrl={imageUrl ?? preloadedMoodboardUrl ?? preview}
             notTextMarked={notTextMarked}
+            sampledIdx={displayRegionIdx}
+            onPickRegion={() => setRegionPickerOpen(true)}
+            ignoreTextDetection={ignoreTextDetection}
+            onIgnoreTextDetectionChange={setIgnoreTextDetection}
             onMarkNotText={(role, region) => {
               setNotTextMarked(prev => new Set(prev).add(role));
               logGateFeedback({
@@ -1364,178 +1762,50 @@ export default function TypographyTestPage({
         {result && (
           <>
             <Divider />
-            <HStack spacing={3} alignItems="flex-start" style={{ width: '100%' }}>
-              {/* Left column: lib Accordion sections. Header is expanded by
-                  default so the user lands on the suggested font; Decorative
-                  and Body collapse so the panel stays scannable. */}
-              <VStack spacing={2} style={{ width: 380, flexShrink: 0 }}>
-                <Button variant="default-outline" size="small" onClick={swapHeaderDecorative} style={{ width: '100%' }}>
-                  ⇄ Swap Header &amp; Decorative
-                </Button>
-                <AccordionGroup spacing={1}>
-                  <Accordion defaultExpanded>
-                    <AccordionSummary>Header</AccordionSummary>
-                    <AccordionDetails>
-                      <VStack spacing={2}>
-                        <SuggestedCard
-                          current={currentHeader}
-                          weight={currentHeaderWeight}
-                          letterSpacing={currentHeaderSpacing}
-                          textCase={currentHeaderCase}
-                          sampleText="The quick brown fox"
-                          fontSize={28}
-                          description={headerSuggestions[0]?.description ?? 'No suggestion yet'}
-                          uploadedFont={headerUpload}
-                          customized={headerPresetCategory !== null || headerUpload !== null}
-                        />
-                        <Button variant="primary-outline" size="small" onClick={() => setCustomizeRole('header')}>
-                          Customize…
-                        </Button>
-                      </VStack>
-                    </AccordionDetails>
-                  </Accordion>
-                  <Accordion defaultExpanded>
-                    <AccordionSummary>Decorative</AccordionSummary>
-                    <AccordionDetails>
-                      <VStack spacing={2}>
-                        <SuggestedCard
-                          current={currentDecorative}
-                          weight={currentDecorativeWeight}
-                          letterSpacing={currentDecorativeSpacing}
-                          textCase={currentDecorativeCase}
-                          sampleText="jumps over the lazy dog"
-                          fontSize={20}
-                          description={decorativeSuggestions[0]?.description ?? 'No suggestion yet'}
-                          uploadedFont={decorativeUpload}
-                          customized={decorativePresetCategory !== null || decorativeUpload !== null}
-                        />
-                        <Button variant="primary-outline" size="small" onClick={() => setCustomizeRole('decorative')}>
-                          Customize…
-                        </Button>
-                      </VStack>
-                    </AccordionDetails>
-                  </Accordion>
-                  <Accordion>
-                    <AccordionSummary>Body</AccordionSummary>
-                    <AccordionDetails>
-                      <VStack spacing={2}>
-                        <ButtonGroup value={bodyFamily} onChange={(f: BodyFamily) => {
-                          setBodyFamily(f);
-                          setBodyOverride(null);
-                          setBodyUpload(null);
-                          setBodyFamilyTouched(true);
-                        }} size="small" style={{ width: '100%' }}>
-                          <Button value="sans" size="small" style={{ flex: 1 }}>Sans-serif</Button>
-                          <Button value="serif" size="small" style={{ flex: 1 }}>Serif</Button>
-                        </ButtonGroup>
-                        <SuggestedCard
-                          current={currentBody}
-                          weight={bodyWeightOverride ?? result.specs.body.regular.weight}
-                          letterSpacing={bodySpacingOverride ?? result.specs.body.regular.letter_spacing}
-                          textCase="normal"
-                          sampleText={BODY_SAMPLE}
-                          fontSize={14}
-                          description={bodyFamily === 'serif' ? 'Serif' : 'Sans serif'}
-                          uploadedFont={bodyUpload}
-                          customized={bodyFamilyTouched || bodyUpload !== null}
-                        />
-                        <FontUploadButton onUpload={(file) => handleFontUpload(file, 'body')} />
-                      </VStack>
-                    </AccordionDetails>
-                  </Accordion>
-                </AccordionGroup>
-              </VStack>
-
-              {/* Right / main: trios that reflect the user's current picks */}
-              <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
-                <TriosTab
-                  result={result}
-                  sortedTrios={sortedTrios}
-                  selectedIdx={trioIdx}
-                  currentHeader={currentHeader}
-                  currentHeaderWeight={currentHeaderWeight}
-                  currentHeaderSpacing={currentHeaderSpacing}
-                  currentHeaderCase={currentHeaderCase}
-                  currentDecorative={currentDecorative}
-                  currentDecorativeWeight={currentDecorativeWeight}
-                  currentDecorativeSpacing={currentDecorativeSpacing}
-                  currentDecorativeCase={currentDecorativeCase}
-                  currentBody={currentBody}
-                  bodyFamilyMode={bodyFamily}
-                  bodyWeight={bodyWeightOverride ?? result.specs.body.regular.weight}
-                  bodySpacing={bodySpacingOverride ?? result.specs.body.regular.letter_spacing}
-                  headerOverride={headerOverride}
-                  decorativeOverride={decorativeOverride}
-                  bodyOverride={bodyOverride}
-                  headerPresetCategory={headerPresetCategory}
-                  decorativePresetCategory={decorativePresetCategory}
-                  headerPixelCategory={pixelOverrideCategory(
-                    headerPresetCategory,
-                    result.extractedText[0],
-                    result.headerBranch ?? result.branch,
-                    result.headerStyle ?? result.style,
-                  )}
-                  decorativePixelCategory={pixelOverrideCategory(
-                    decorativePresetCategory,
-                    result.extractedText[1],
-                    result.decorativeBranch ?? result.branch,
-                    result.decorativeStyle ?? result.style,
-                  )}
-                  hasOverrides={
-                    headerOverride !== null
-                    || decorativeOverride !== null
-                    || bodyOverride !== null
-                  }
-                  adjusterOpenIdx={adjusterOpenTrioIdx}
-                  onToggleAdjuster={(i) => setAdjusterOpenTrioIdx((cur) => cur === i ? null : i)}
-                  onHeaderWeightChange={setHeaderWeightOverride}
-                  onHeaderSpacingChange={setHeaderSpacingOverride}
-                  onHeaderCaseChange={setHeaderCaseOverride}
-                  onDecorativeWeightChange={setDecorativeWeightOverride}
-                  onDecorativeSpacingChange={setDecorativeSpacingOverride}
-                  onDecorativeCaseChange={setDecorativeCaseOverride}
-                  onBodyWeightChange={setBodyWeightOverride}
-                  onBodySpacingChange={setBodySpacingOverride}
-                  onSelect={(i) => {
-                    // Selection-only: clicking a trio updates the highlighted
-                    // card but does NOT reset the user's role overrides. The
-                    // SuggestedCard on the left (auto-detected pick or
-                    // Customize-modal choice) persists across trio clicks.
-                    setTrioIdx(i);
-                  }}
-                />
-              </VStack>
-            </HStack>
-            {/* Decorative-mode toggle (only shown when the upstream stage
-                passes the controlled value + handler). Sits between the
-                trios grid and the stage navigation row. */}
-            {decorativeMode !== undefined && onDecorativeModeChange && (
-              <Card padding="medium">
-                <VStack spacing={1}>
-                  <H3>Decorative usage</H3>
-                  <Caption color="quiet">
-                    Choose where the decorative font appears in your generated
-                    components.
-                  </Caption>
-                  <ButtonGroup
-                    value={decorativeMode}
-                    onChange={onDecorativeModeChange}
-                    size="small"
-                    style={{ width: '100%' }}
-                  >
-                    <Button value="surface-components" size="small" style={{ flex: 1 }}>
-                      Surface components
-                    </Button>
-                    <Button value="only-selected" size="small" style={{ flex: 1 }}>
-                      Only where I select it
-                    </Button>
-                  </ButtonGroup>
-                </VStack>
-              </Card>
-            )}
+            {/* The four roles run side by side — Display first, because it is
+                the decision the other three are set against. */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 16,
+                alignItems: 'flex-start',
+                width: '100%',
+              }}
+            >
+              <RolePanels
+                system={typeSystem}
+                displayChoices={displayChoices}
+                bodyChoices={bodyChoices}
+                match={match}
+                headerPresets={headerAxisPresets}
+                open={openRoles}
+                onToggle={toggleRole}
+                advanced={axesAdvanced}
+                onToggleAdvanced={() => setAxesAdvanced((a) => !a)}
+                onDisplayChange={applyDisplayPatch}
+                onDisplayFont={applyDisplayFont}
+                onHeaderAxis={setHeaderAxis}
+                onHeaderAxes={(axes) => setHeaderAxesOverride(axes)}
+                onHeaderChange={applyHeaderPatch}
+                onEyebrowChange={applyEyebrowPatch}
+                onBodyBranch={applyBodyBranch}
+                onBodyFont={applyBodyFont}
+                onActiveRole={setActiveRole}
+                stickTop={previewH ? 72 + previewH + 8 : 0}
+              />
+            </div>
           </>
         )}
       </VStack>
+
+      <RegionPickerModal
+        open={regionPickerOpen}
+        regions={regions}
+        currentIdx={displayRegionIdx}
+        onClose={() => setRegionPickerOpen(false)}
+        onPick={(i) => { setDisplayRegionIdx(i); setRegionPickerOpen(false); }}
+      />
 
       <CustomizeModal
         open={customizeRole !== null}
@@ -1566,26 +1836,30 @@ export default function TypographyTestPage({
 
 function DetectionDetails({
   preview, result, moodboardUrl: _moodboardUrl, notTextMarked, onMarkNotText,
+  sampledIdx, onPickRegion, ignoreTextDetection, onIgnoreTextDetectionChange,
 }: {
   preview: string;
   result: MoodboardAnalysis;
   moodboardUrl: string;
   notTextMarked: Set<string>;
   onMarkNotText: (role: string, region: ExtractedTextRegion) => void;
+  /** Which detected block the Display is sampled from. */
+  sampledIdx: number;
+  onPickRegion: () => void;
+  /** Ignore the lettering and suggest from the palette mood instead. */
+  ignoreTextDetection: boolean;
+  onIgnoreTextDetectionChange: (v: boolean) => void;
 }) {
-  const header = result.extractedText[0];
-  const decorative = result.extractedText[1];
+  // ONE sample, not two. The second crop existed to pick a second family; the
+  // Header is a Flex face now, so there is a single piece of lettering the
+  // whole system is matched against.
+  const sampled = result.extractedText[sampledIdx];
   return (
     <AccordionGroup spacing={1}>
       <Accordion>
         <AccordionSummary>Detection details</AccordionSummary>
         <AccordionDetails>
           <VStack spacing={2}>
-            <Caption color="quiet">
-              The actual crops the matcher used. If the wrong text region is being
-              highlighted as Header, that's why the suggestion below doesn't
-              reflect your intended source.
-            </Caption>
             <HStack spacing={3} alignItems="flex-start" style={{ flexWrap: 'wrap' }}>
               <img
                 src={preview}
@@ -1598,39 +1872,40 @@ function DetectionDetails({
                   flexShrink: 0,
                 }}
               />
-              {header && !notTextMarked.has('header') ? (
+              {ignoreTextDetection ? (
+                <Caption color="quiet">
+                  Lettering ignored — the type system is being suggested from the
+                  palette mood.
+                </Caption>
+              ) : sampled && !notTextMarked.has('display') ? (
                 <CropDetail
-                  role="Header (tallest)"
-                  region={header}
+                  role={`Display — "${sampled.text}"`}
+                  region={sampled}
                   branch={result.headerBranch ?? result.branch}
                   style={result.headerStyle ?? result.style}
                   modifiers={result.headerModifiers ?? result.modifiers}
-                  onMarkNotText={() => onMarkNotText('header', header)}
                 />
-              ) : !header ? (
-                <Caption color="quiet">No header crop — using whole image.</Caption>
+              ) : !sampled ? (
+                <Caption color="quiet">No text crop — using the whole image.</Caption>
               ) : (
-                <Caption color="quiet">Header reported as not text — thanks!</Caption>
+                <Caption color="quiet">Reported as not text — thanks!</Caption>
               )}
-              {decorative && !notTextMarked.has('decorative') ? (
-                <CropDetail
-                  role={`Decorative (${
-                    result.decorativePickReason === 'script_handwritten'
-                      ? 'script / handwritten pick'
-                      : decorative.isAllCaps
-                      ? 'all-caps pick'
-                      : '2nd tallest'
-                  })`}
-                  region={decorative}
-                  branch={result.decorativeBranch ?? result.branch}
-                  style={result.decorativeStyle ?? result.style}
-                  modifiers={result.decorativeModifiers ?? result.modifiers}
-                  onMarkNotText={() => onMarkNotText('decorative', decorative)}
-                />
-              ) : decorative ? (
-                <Caption color="quiet">Decorative reported as not text — thanks!</Caption>
-              ) : null}
             </HStack>
+            {result.extractedText.length > 1 && !ignoreTextDetection && (
+              <Link onClick={onPickRegion}>Analyze a new text region in the image</Link>
+            )}
+            <Divider />
+            <Checkbox
+              checked={ignoreTextDetection}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                onIgnoreTextDetectionChange(e?.target?.checked ?? !ignoreTextDetection)}
+              label="Ignore the lettering — suggest from the palette mood"
+            />
+            <Caption color="quiet">
+              {ignoreTextDetection
+                ? `Suggestions come from the ${result.mood?.label ?? 'detected'} mood of your colours. Nothing is measured against the image, so there are no match scores.`
+                : 'Use this when the lettering on the board is incidental — a stock photo, a watermark, or type that has nothing to do with the brand.'}
+            </Caption>
           </VStack>
         </AccordionDetails>
       </Accordion>
@@ -1638,18 +1913,72 @@ function DetectionDetails({
   );
 }
 
+/**
+ * Pick which lettering the Display is measured against.
+ *
+ * Detection takes the tallest block, which is right most of the time and wrong
+ * in a way that is hard to correct otherwise — OCR may have merged the words,
+ * or the lettering worth matching may simply not be the biggest thing on the
+ * board. This is the escape hatch, one click deep, rather than a permanent
+ * grid of thumbnails competing with the controls.
+ */
+function RegionPickerModal({
+  open, regions, currentIdx, onClose, onPick,
+}: {
+  open: boolean;
+  regions: ExtractedTextRegion[];
+  currentIdx: number;
+  onClose: () => void;
+  onPick: (idx: number) => void;
+}) {
+  if (!open) return null;
+  return (
+    <Modal open={open} onClose={onClose} title="Analyze a new text region">
+      <VStack spacing={2} style={{ maxWidth: 640 }}>
+        <Caption color="quiet">
+          Every block of lettering the detector found. Pick the one the type system
+          should be matched against.
+        </Caption>
+        <VStack spacing={1} style={{ width: '100%' }}>
+          {regions.map((r, i) => (
+            <Card key={i} padding="small">
+              <HStack spacing={2} alignItems="center" justifyContent="space-between">
+                <img
+                  src={r.dataUrl}
+                  alt={r.text || `Detected lettering ${i + 1}`}
+                  style={{ height: 44, maxWidth: 260, objectFit: 'contain' }}
+                />
+                <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
+                  <BodySmall>{r.text || '(no text read)'}</BodySmall>
+                  <Caption color="quiet">
+                    {r.stroke.weight}{r.isAllCaps ? ' · all caps' : ''}
+                  </Caption>
+                </VStack>
+                <Button
+                  size="small"
+                  variant={i === currentIdx ? 'primary' : 'default-outline'}
+                  onClick={() => onPick(i)}
+                >
+                  {i === currentIdx ? 'Sampled' : 'Use this'}
+                </Button>
+              </HStack>
+            </Card>
+          ))}
+        </VStack>
+        <Button variant="default-outline" size="small" onClick={onClose}>Close</Button>
+      </VStack>
+    </Modal>
+  );
+}
+
 function CropDetail({
-  role, region, branch, style, modifiers, onMarkNotText,
+  role, region, branch, style, modifiers,
 }: {
   role: string;
   region: ExtractedTextRegion;
   branch: string;
   style: string;
   modifiers: { weight: string; width: string };
-  /** Optional — when provided, renders a small "Not text" button at the
-   *  bottom of the card. Click logs a `not-text` verdict to Firestore
-   *  via the parent's handler and hides this card from the current view. */
-  onMarkNotText?: () => void;
 }) {
   return (
     <Card padding="small" style={{ flex: 1, minWidth: 280 }}>
@@ -1694,258 +2023,11 @@ function CropDetail({
             {' '}{region.stroke.strokeCount} stems
           </Caption>
         )}
-        {onMarkNotText && (
-          <Button
-            variant="default-outline"
-            size="small"
-            onClick={onMarkNotText}
-            sx={{ alignSelf: 'flex-start', marginTop: 4 }}
-          >
-            Not text
-          </Button>
-        )}
       </VStack>
     </Card>
   );
 }
 
-function TriosTab({
-  result, sortedTrios, selectedIdx,
-  currentHeader, currentHeaderWeight, currentHeaderSpacing, currentHeaderCase,
-  currentDecorative, currentDecorativeWeight, currentDecorativeSpacing, currentDecorativeCase,
-  currentBody, bodyFamilyMode, bodyWeight, bodySpacing,
-  headerOverride, decorativeOverride, bodyOverride,
-  headerPresetCategory, decorativePresetCategory,
-  headerPixelCategory, decorativePixelCategory,
-  hasOverrides, onSelect,
-  adjusterOpenIdx, onToggleAdjuster,
-  onHeaderWeightChange, onHeaderSpacingChange, onHeaderCaseChange,
-  onDecorativeWeightChange, onDecorativeSpacingChange, onDecorativeCaseChange,
-  onBodyWeightChange, onBodySpacingChange,
-}: {
-  result: MoodboardAnalysis;
-  sortedTrios: FontTrio[];
-  selectedIdx: number;
-  currentHeader: string;
-  currentHeaderWeight: string;
-  currentHeaderSpacing: string;
-  currentHeaderCase: TextCase;
-  currentDecorative: string;
-  currentDecorativeWeight: string;
-  currentDecorativeSpacing: string;
-  currentDecorativeCase: TextCase;
-  currentBody: string;
-  bodyFamilyMode: BodyFamily;
-  bodyWeight: string;
-  bodySpacing: string;
-  headerOverride: string | null;
-  decorativeOverride: string | null;
-  bodyOverride: string | null;
-  headerPresetCategory: string | null;
-  decorativePresetCategory: string | null;
-  /** Pixel-detector category override — when set, all trio cards cycle
-   *  through the corrected branch's pool so the trio rendering matches
-   *  what the SuggestedCard advertises (no more "left says serif, trios
-   *  show sans"). User's explicit preset pick still wins. */
-  headerPixelCategory: string | null;
-  decorativePixelCategory: string | null;
-  hasOverrides: boolean;
-  onSelect: (i: number) => void;
-  adjusterOpenIdx: number | null;
-  onToggleAdjuster: (i: number) => void;
-  onHeaderWeightChange: (w: string) => void;
-  onHeaderSpacingChange: (ls: string) => void;
-  onHeaderCaseChange: (c: TextCase) => void;
-  onDecorativeWeightChange: (w: string) => void;
-  onDecorativeSpacingChange: (ls: string) => void;
-  onDecorativeCaseChange: (c: TextCase) => void;
-  onBodyWeightChange: (w: string) => void;
-  onBodySpacingChange: (ls: string) => void;
-}) {
-  return (
-    <VStack spacing={2}>
-      {hasOverrides && (
-        <VStack spacing={1}>
-          <Caption color="primary">Your current pick: #{selectedIdx + 1}</Caption>
-          <Card padding="medium">
-            <VStack spacing={1}>
-              <FontPreview
-                family={currentHeader}
-                weight={currentHeaderWeight}
-                letterSpacing={currentHeaderSpacing}
-                fontSize={36}
-                lineHeight={1.1}
-                fallback="serif"
-                textTransform={currentHeaderCase}
-              >
-                The quick brown fox
-              </FontPreview>
-              <FontPreview
-                family={currentDecorative}
-                weight={currentDecorativeWeight}
-                letterSpacing={currentDecorativeSpacing}
-                fontSize={24}
-                lineHeight={1.2}
-                fallback="serif"
-                textTransform={currentDecorativeCase}
-              >
-                jumps over the lazy dog
-              </FontPreview>
-              <FontPreview
-                family={currentBody}
-                weight={bodyWeight}
-                letterSpacing={bodySpacing}
-                fontSize={14}
-                lineHeight={1.5}
-                fallback="sans-serif"
-              >
-                {BODY_SAMPLE}
-              </FontPreview>
-              <BodySmall color="quiet">
-                {currentHeader} · {currentDecorative} · {currentBody}
-              </BodySmall>
-            </VStack>
-          </Card>
-        </VStack>
-      )}
-      {/* Cards stay in their sorted order (same_style / cross_pair first,
-          then mood). Selecting one just toggles the checkbox and highlights
-          the card — re-ordering on selection was visually unsettling. The
-          "Your current pick: #N" label at the top tells the user which
-          card is active. */}
-      {sortedTrios.map((trio, i) => (
-        <Card
-          key={i}
-          clickable
-          selected={i === selectedIdx}
-          onClick={() => onSelect(i)}
-          padding="medium"
-        >
-          <VStack spacing={1}>
-            <HStack spacing={1} alignItems="center" justifyContent="space-between">
-              <Caption color="quiet"><strong>#{i + 1}</strong></Caption>
-              {/* Top-right pick checkbox. Clicking the checkbox is equivalent
-                  to clicking the card itself — both fire onSelect(i). */}
-              <Checkbox
-                checked={i === selectedIdx}
-                onChange={() => onSelect(i)}
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-              />
-            </HStack>
-            {/* When a category preset is picked, each trio cycles through that
-                category's pool so every card shows a DIFFERENT family in the
-                same style. Without a category, the per-trio server family is
-                used — the user's specific override is shown in the "Your
-                current pick" card at the top instead of being smeared across
-                every trio. Weight / spacing / case always follow the user's
-                left-panel picks. */}
-            {(() => {
-              // User's explicit preset pick wins; otherwise fall back to the
-              // pixel-detector override (when CLIP and pixels disagreed on
-              // serif vs sans); otherwise use the server's per-trio family.
-              const headerCategoryEffective = headerPresetCategory ?? headerPixelCategory;
-              const decorativeCategoryEffective = decorativePresetCategory ?? decorativePixelCategory;
-              const headerFamily = familyForTrioRole(i, headerCategoryEffective, headerOverride, trio.header);
-              const decorativeFamily = familyForTrioRole(i, decorativeCategoryEffective, decorativeOverride, trio.decorative);
-              // Body family resolution: user-typed override wins; otherwise
-              // the sans/serif toggle decides — serif mode swaps in the body
-              // serif default so every trio's body reflects the user's pick.
-              const bodyFamily = bodyOverride
-                ?? (bodyFamilyMode === 'serif' ? BODY_SERIF_DEFAULT : trio.body);
-              const adjusterOpen = adjusterOpenIdx === i;
-              return (
-                <>
-                  <FontPreview
-                    family={headerFamily}
-                    weight={currentHeaderWeight}
-                    letterSpacing={currentHeaderSpacing}
-                    fontSize={36}
-                    lineHeight={1.1}
-                    fallback="sans-serif"
-                    textTransform={currentHeaderCase}
-                  >
-                    The quick brown fox
-                  </FontPreview>
-                  <FontPreview
-                    family={decorativeFamily}
-                    weight={currentDecorativeWeight}
-                    letterSpacing={currentDecorativeSpacing}
-                    fontSize={24}
-                    lineHeight={1.2}
-                    fallback="sans-serif"
-                    textTransform={currentDecorativeCase}
-                  >
-                    jumps over the lazy dog
-                  </FontPreview>
-                  <FontPreview
-                    family={bodyFamily}
-                    weight={bodyWeight}
-                    letterSpacing={bodySpacing}
-                    fontSize={14}
-                    lineHeight={1.5}
-                    fallback="sans-serif"
-                  >
-                    {BODY_SAMPLE}
-                  </FontPreview>
-                  <Divider />
-                  <HStack
-                    spacing={2}
-                    alignItems="center"
-                    justifyContent="space-between"
-                    style={{ paddingRight: 12 }}
-                  >
-                    <BodySmall color="quiet">
-                      {headerFamily} · {decorativeFamily} · {bodyFamily ?? '—'}
-                    </BodySmall>
-                    <Link
-                      textStyle="body-small"
-                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); onToggleAdjuster(i); }}
-                      style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-                    >
-                      Settings {adjusterOpen ? '▾' : '▸'}
-                    </Link>
-                  </HStack>
-                  {adjusterOpen && (
-                    <VStack spacing={1} onClick={(e) => e.stopPropagation()}>
-                      <Caption color="quiet">Header</Caption>
-                      <InlineAdjuster
-                        family={headerFamily}
-                        weight={currentHeaderWeight}
-                        letterSpacing={currentHeaderSpacing}
-                        onWeightChange={onHeaderWeightChange}
-                        onLetterSpacingChange={onHeaderSpacingChange}
-                        allCaps={currentHeaderCase === 'uppercase'}
-                        onAllCapsChange={(b) => onHeaderCaseChange(b ? 'uppercase' : 'normal')}
-                      />
-                      <Caption color="quiet">Decorative</Caption>
-                      <InlineAdjuster
-                        family={decorativeFamily}
-                        weight={currentDecorativeWeight}
-                        letterSpacing={currentDecorativeSpacing}
-                        onWeightChange={onDecorativeWeightChange}
-                        onLetterSpacingChange={onDecorativeSpacingChange}
-                        allCaps={currentDecorativeCase === 'uppercase'}
-                        onAllCapsChange={(b) => onDecorativeCaseChange(b ? 'uppercase' : 'normal')}
-                      />
-                      <Caption color="quiet">Body</Caption>
-                      <InlineAdjuster
-                        family={bodyFamily}
-                        weight={bodyWeight}
-                        letterSpacing={bodySpacing}
-                        onWeightChange={onBodyWeightChange}
-                        onLetterSpacingChange={onBodySpacingChange}
-                      />
-                    </VStack>
-                  )}
-                </>
-              );
-            })()}
-          </VStack>
-        </Card>
-      ))}
-    </VStack>
-  );
-}
 
 function PresetList({
   presets, current, sampleText, fontSize, onPickPreset, branchFilter,
@@ -2031,52 +2113,17 @@ function FontUploadButton({ onUpload }: { onUpload: (file: File) => void }) {
   );
 }
 
+/**
+ * The Header panel. There is no font picker here on purpose: the Header face is
+ * always Google Sans Flex, and its character comes from the six axes, set
+ * against the Decorative face. The rationale line says why it landed where it
+ * did, so the recommendation reads as a decision rather than magic.
+ */
+
 /** The simplified per-role panel content. Just the auto-picked font preview
  *  with a "Style: Suggested" / "Style: Customized" overline and a one-line
  *  description. The Customize button lives OUTSIDE the card so the card
  *  itself is purely a presentation of the current pick. */
-function SuggestedCard({
-  current, weight, letterSpacing, textCase, sampleText, fontSize,
-  description, uploadedFont, customized = false,
-}: {
-  current: string;
-  weight: string;
-  letterSpacing: string;
-  textCase: TextCase;
-  sampleText: string;
-  fontSize: number;
-  description: string;
-  uploadedFont: { family: string; fileName: string } | null;
-  /** True when the user explicitly picked a style via the Customize modal
-   *  or uploaded a font. Flips the label from "Suggested" to "Customized"
-   *  so the user can tell which roles still reflect the auto-pick. */
-  customized?: boolean;
-}) {
-  return (
-    <Card padding="medium">
-      <VStack spacing={2}>
-        <OverlineSmall color="quiet">
-          Style: {customized ? 'Customized' : 'Suggested'}
-        </OverlineSmall>
-        <FontPreview
-          family={current}
-          weight={weight}
-          letterSpacing={letterSpacing}
-          fontSize={fontSize + 4}
-          lineHeight={1.1}
-          fallback="sans-serif"
-          textTransform={textCase}
-        >
-          {sampleText}
-        </FontPreview>
-        <Caption color="quiet">{description}</Caption>
-        {uploadedFont && (
-          <Caption color="primary">Using uploaded font: {uploadedFont.fileName}</Caption>
-        )}
-      </VStack>
-    </Card>
-  );
-}
 
 /** Inline weight + letter-spacing adjuster. Toggled open per role; shows
  *  the chosen family (read-only — to change it the user opens the Customize
@@ -2350,7 +2397,8 @@ function CustomizeModal({
 }
 
 function FontPreview({
-  family, weight, letterSpacing, fontSize, lineHeight, fallback, textTransform, children,
+  family, weight, letterSpacing, fontSize, lineHeight, fallback, textTransform,
+  variationSettings, children,
 }: {
   family: string;
   weight: string | number;
@@ -2359,6 +2407,8 @@ function FontPreview({
   lineHeight: number;
   fallback: 'serif' | 'sans-serif';
   textTransform?: TextCase;
+  /** Variable-font axes, for the Google Sans Flex Header face. */
+  variationSettings?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -2375,6 +2425,7 @@ function FontPreview({
         // switching from an all-caps preset to a non-all-caps preset wasn't
         // clearing the uppercase styling).
         textTransform: textTransform === 'uppercase' ? 'uppercase' : 'none',
+        ...(variationSettings ? { fontVariationSettings: variationSettings } : {}),
       }}
     >
       {children}

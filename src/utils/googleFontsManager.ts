@@ -1,5 +1,7 @@
 // Google Fonts API integration for fetching and managing fonts dynamically
 import { moodFontMapping, type MoodName } from '../data/moodFontMapping';
+import { fontFamilyParam } from './googleFontWeights';
+import { headerFontQueryParam } from './moodAxes';
 
 export interface GoogleFont {
   family: string;
@@ -445,8 +447,23 @@ export async function getFontsForStyleCategory(
   }));
 }
 
+/** The Header face, requested with the full range of every axis. A plain
+ *  `family=Google+Sans+Flex` request ships only the default instance, so the
+ *  axes would resolve to nothing and every header would render at 400/100. */
+export function loadHeaderFlexFace(): void {
+  if (document.querySelector('link[data-header-flex]')) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?${headerFontQueryParam()}&display=swap`;
+  link.setAttribute('data-header-flex', 'true');
+  document.head.appendChild(link);
+}
+
 // Load fonts into the document using WebFontLoader approach
 export async function loadGoogleFonts(fontFamilies: string[]): Promise<void> {
+  // The Header face is always loaded — it isn't one of the picked families.
+  loadHeaderFlexFace();
+
   if (fontFamilies.length === 0) return;
 
   console.log(`📦 Loading ${fontFamilies.length} Google Fonts...`);
@@ -459,11 +476,13 @@ export async function loadGoogleFonts(fontFamilies: string[]): Promise<void> {
   const batchSize = 10;
   for (let i = 0; i < fontFamilies.length; i += batchSize) {
     const batch = fontFamilies.slice(i, i + batchSize);
+    // Request only the weights each family actually ships (Google metadata), so
+    // the css2 API never 400s the batch over a single-weight script/display font
+    // while multi-weight fonts still load their real faces. fontFamilyParam
+    // returns the full `family=…[:wght@…]` param; strip the leading `family=` for
+    // the `&family=`-joined URL below.
     const fontString = batch
-      .map(family => {
-        const urlFamily = family.replace(/\s+/g, '+');
-        return `${urlFamily}:wght@300;400;600;700`;
-      })
+      .map(family => fontFamilyParam(family, [300, 400, 600, 700]).replace(/^family=/, ''))
       .join('&family=');
 
     const link = document.createElement('link');
