@@ -5,7 +5,7 @@ import {
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
 import { generateColorSchemes } from '../../utils/colorSchemes';
@@ -47,6 +47,24 @@ interface Props extends StageProps {
    *  and keep the user out of the extraction sub-step. */
   editMode?: boolean;
 }
+
+/**
+ * Swatch corner radius.
+ *
+ * A swatch follows the brand's button radius so it reads as part of the same
+ * shape language — but only up to a point. Past 16px the brand is decidedly
+ * rounded, and a square swatch at, say, 20px looks like a mistake rather than
+ * a choice, so it snaps to a full 56px and reads as a circle/pill.
+ *
+ * The threshold is pure CSS: the middle term goes negative when the radius is
+ * at or below 16, and clamp() falls back to its minimum (the button radius);
+ * above 16 the term explodes past the maximum and clamp() returns 56px. That
+ * keeps the rule live against --Button-Radius without plumbing the numeric
+ * radius down into this screen.
+ */
+const SWATCH_RADIUS =
+  'clamp(var(--Button-Radius, 6px), (var(--Button-Radius, 6px) - 16px) * 1000, 56px)';
+const SWATCH_INNER_RADIUS = `calc(${SWATCH_RADIUS} - 1px)`;
 
 export default function ColorStage({
   onNext,
@@ -140,6 +158,27 @@ export default function ColorStage({
   // Local slider value during drag — committed to chromaPerColor on release for smooth dragging
   const [chromaDragValue, setChromaDragValue] = useState<number | null>(null);
 
+  // Colours the generator had to move.
+  //
+  // A locked hex is written verbatim into the tone nearest its lightness. If
+  // that colour cannot carry accessible text — nothing in its own ramp reaches
+  // 4.5:1 — the generator shifts its lightness to the nearest value that can
+  // and records what it did. Silently altering someone's brand colour would be
+  // worse than the adjustment, so it is surfaced here.
+  const colorAdjustments = useMemo(() => {
+    const palettes: Array<[string, any]> = [
+      ['Primary', selectedScheme?.tonePalettes?.primary],
+      ['Secondary', selectedScheme?.tonePalettes?.secondary],
+      ['Tertiary', selectedScheme?.tonePalettes?.tertiary],
+    ];
+    const found: Array<{ role: string; from: string; to: string; reason: string }> = [];
+    for (const [role, palette] of palettes) {
+      const step = (palette as Array<any> | undefined)?.find((t) => t?.adjusted);
+      if (step?.adjusted) found.push({ role, ...step.adjusted });
+    }
+    return found;
+  }, [selectedScheme]);
+
   const openHexEditor = (hex: string, index: number, source: 'top' | 'additional') => {
     setHexEditValue(hex);
     setHexEditIndex(index);
@@ -197,6 +236,31 @@ export default function ColorStage({
     }
     setHexEditIndex(null);
   };
+
+  // Per-color chroma has to be derived for EVERY flow, not just the edit one.
+  //
+  // The state initialises to a flat [62, 62, …] placeholder, and until this
+  // runs, every palette is generated at chroma 62 regardless of what the color
+  // actually is. On a muted deep pink (matching peak nearer 40) that pushes the
+  // mid tones to a vivid magenta that appears nowhere in the ramp the user was
+  // shown — which is what Tonal buttons render, since they take the border
+  // tone. It also desaturates/shifts the tone a Secondary button reads.
+  //
+  // The bootstrap effect below did this correctly but was gated on editMode, so
+  // the fix only appeared once you opened Settings — or reordered the colors,
+  // which regenerates the palettes through a path that derives the peak itself.
+  useEffect(() => {
+    if (topColors.length === 0) return;
+    if (savedColorEdits?.chromaPerColor?.length !== topColors.length) {
+      setChromaPerColor(topColors.map(c => Math.min(Math.round(getMatchingPeakChroma(c.hex, false)), 70)));
+    }
+    if (savedColorEdits?.darkChromaPerColor?.length !== topColors.length) {
+      setDarkChromaPerColor(topColors.map(c => Math.min(Math.round(getMatchingPeakChroma(c.hex, true)), 42)));
+    }
+    // Keyed on the colors themselves: re-derive when the extraction changes,
+    // and never stomp a value the user has since dragged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topColors.map(c => c.hex).join('|')]);
 
   // Edit flow bootstrap: skip image analysis, populate the scheme list
   // from the seeded topColors so the user has theme variants to choose
@@ -308,6 +372,34 @@ export default function ColorStage({
       next[swapIndex] = replacement;
       return next;
     });
+    // A swap replaces the COLOUR, so the anchor has to move with it.
+    //
+    // anchorColors deliberately stays put when the user nudges to a different
+    // TONE of the same colour, which keeps the generated ramp stable. A swap is
+    // a different thing: the hue changes entirely. Leaving the old anchor meant
+    // every palette kept being generated from the colour that was swapped out —
+    // an olive seed with plum-tinted containers, because the ramp was still
+    // being built from the plum.
+    setAnchorColors(prev => {
+      const next = [...prev];
+      next[swapIndex] = replacement;
+      return next;
+    });
+    // Anything tuned for the OLD colour at this slot is now meaningless: a hue
+    // easing dialled for plum is wrong for olive, and a locked hex pins the
+    // ramp to a colour that is no longer in the scheme.
+    setLockedColorMap(prev => {
+      if (!(swapIndex in prev)) return prev;
+      const next = { ...prev };
+      delete next[swapIndex];
+      return next;
+    });
+    setHueOverridesByTop(prev => {
+      if (!(swapIndex in prev)) return prev;
+      const next = { ...prev };
+      delete next[swapIndex];
+      return next;
+    });
     setSwapIndex(null);
   }, [swapIndex]);
 
@@ -361,7 +453,13 @@ export default function ColorStage({
         const anchorHex = anchorsArr[topIdx]?.hex || colorHex;
         const lightC = lc[topIdx] ?? 62;
         const darkC = dc[topIdx] ?? 36;
-        const lockedHex = lockedColorMap[topIdx];
+        // Pin the ramp to the colour the user actually sees. Without this the
+        // palette is generated from the ANCHOR plus a chroma value that need not
+        // match the picked hex, so tone SC — the tone every Secondary button
+        // reads — came out a desaturated cousin of the swatch beside it.
+        // lockedHex overwrites only the step nearest the colour's own lightness,
+        // so the anchor, chroma and hue easing still shape every other tone.
+        const lockedHex = lockedColorMap[topIdx] ?? colorHex;
         const easing = hOverrides[topIdx];
         return {
           light: generateSemanticLightModeScale(anchorHex, lightC, lockedHex, easing?.light),
@@ -876,7 +974,7 @@ export default function ColorStage({
                       sx={{
                         // Match the design system's button shape — uses the
                         // same --Button-Radius token that brand buttons resolve.
-                        borderRadius: 'var(--Button-Radius, 6px)',
+                        borderRadius: SWATCH_RADIUS,
                         // The lib swatch fill defaults to the round ICON radius;
                         // pin it to --Button-Radius so the swatch tracks the
                         // design system's button shape (concentric, 1px inset).
@@ -884,7 +982,7 @@ export default function ColorStage({
                         // (round icon radius), which beats a normal class rule —
                         // so we must use !important to pin it to the button radius.
                         '& .btn-swatch-inner': {
-                          borderRadius: 'calc(var(--Button-Radius, 6px) - 1px) !important',
+                          borderRadius: `${SWATCH_INNER_RADIUS} !important`,
                         },
                         width: '100%',
                         aspectRatio: '1',
@@ -952,12 +1050,12 @@ export default function ColorStage({
                       title={swapIndex !== null ? `Click to swap with top color #${swapIndex + 1}` : `${color.hex} — click to view`}
                       sx={{
                         // Same shape as the brand's regular buttons.
-                        borderRadius: 'var(--Button-Radius, 6px)',
+                        borderRadius: SWATCH_RADIUS,
                         // Lib paints the inner fill at the round ICON radius via
                         // an inline style — pin it to the button radius (!important
                         // beats inline) so the swatch is a rounded square, not a circle.
                         '& .btn-swatch-inner': {
-                          borderRadius: 'calc(var(--Button-Radius, 6px) - 1px) !important',
+                          borderRadius: `${SWATCH_INNER_RADIUS} !important`,
                         },
                         width: 42,
                         height: 42,
@@ -1114,6 +1212,23 @@ export default function ColorStage({
             <BodySmall style={{ color: 'var(--Quiet)' }}>Click to change</BodySmall>
           </VStack>
 
+          {colorAdjustments.length > 0 && (
+            <Alert severity="warning">
+              <VStack spacing={1}>
+                <Body>
+                  {colorAdjustments.length === 1
+                    ? 'One colour was adjusted to meet contrast requirements'
+                    : `${colorAdjustments.length} colours were adjusted to meet contrast requirements`}
+                </Body>
+                {colorAdjustments.map((adj) => (
+                  <BodySmall key={adj.role}>
+                    <strong>{adj.role}</strong>: {adj.from} → {adj.to}. {adj.reason}
+                  </BodySmall>
+                ))}
+              </VStack>
+            </Alert>
+          )}
+
           {/* Primary color swatches with radio buttons. We use a plain
               <button> here instead of the lib's <Button swatch> because the
               lib variant hardcodes its corner radius — when the brand sets
@@ -1134,7 +1249,7 @@ export default function ColorStage({
                     style={{
                       width: swatchSize,
                       height: swatchSize,
-                      borderRadius: 'var(--Button-Radius, 6px)',
+                      borderRadius: SWATCH_RADIUS,
                       background: color.hex,
                       border: isPrimary
                         ? '2px solid var(--Buttons-Default-Border, var(--Border))'
@@ -1358,7 +1473,7 @@ export default function ColorStage({
                             width: '100%',
                             height: 56,
                             background: displayColor,
-                            borderRadius: 'var(--Button-Radius, 6px)',
+                            borderRadius: SWATCH_RADIUS,
                             border: '1px solid var(--Border, rgba(0,0,0,0.1))',
                             boxSizing: 'border-box',
                           }}

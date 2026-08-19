@@ -14,7 +14,42 @@ export interface ToneStep {
   lightness: number;
   hex: string;
   colorNumber: number; // 1-12
+  /** Set when the user's chosen colour had to be moved to meet WCAG. The UI
+   *  must surface this — a silently altered brand colour is worse than the
+   *  adjustment itself. */
+  adjusted?: {
+    from: string;
+    to: string;
+    reason: string;
+  };
 }
+
+/**
+ * The structural dead zone: lightness values that cannot carry accessible text.
+ *
+ * Verified across 360 hues — at brand chroma, NO foreground tone in the scale
+ * reaches 4.5:1 against a background between these bounds. The 12-tone scale
+ * exists to exclude it: the original 14-tone design had tones at L=46.6 and
+ * L=53, and both were removed. Color-5 (L=37) and Color-6 (L=58) now sit
+ * exactly either side of the gap.
+ *
+ * See docs/ip-strategy-v4-additions.md.
+ */
+/** WCAG contrast ratio between two hexes. */
+function contrastRatio(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, b2] = chroma(hex).rgb().map((v) => {
+      const sr = v / 255;
+      return sr <= 0.03928 ? sr / 12.92 : Math.pow((sr + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b2;
+  };
+  const l1 = lum(a), l2 = lum(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+const DEAD_ZONE_LOW = 37;
+const DEAD_ZONE_HIGH = 58;
 
 /**
  * Find the Color-N (1-12) in a generated tone scale whose hex most closely
@@ -253,13 +288,88 @@ function generateScaledTones(
     };
   });
 
-  // If a locked hex is provided, replace the closest tone with the exact hex
+  // If a locked hex is provided, replace the closest tone with the exact hex.
+  //
+  // The generated ramp never lands in the dead zone — that is the whole point
+  // of the 12-tone scale. But this override writes the user's colour in
+  // verbatim, so a mid-range pick puts a lightness back into the gap the scale
+  // was built to exclude, at the one tone the user controls. Downstream,
+  // nothing can then reach 4.5:1 against it, and the contrast repair is forced
+  // to choose between two failing options.
+  //
+  // No failing contrast ships. If the pick is inside the gap, its LIGHTNESS is
+  // moved to the nearer edge — hue and chroma are preserved, so it stays
+  // recognisably the chosen colour — and the change is recorded so the UI can
+  // tell the user their colour was adjusted and why.
   if (lockedHex) {
-    const [lockedL] = chroma(lockedHex).lch();
+    const [lockedL, lockedC, lockedH] = chroma(lockedHex).lch();
+
+    let placedHex = lockedHex;
+    let adjustment: ToneStep['adjusted'];
+
+    // Only adjust a colour that ACTUALLY fails.
+    //
+    // The dead-zone band is the worst case at maximum chroma (62-70). Being
+    // inside it is not itself a failure: measured across 413 picks spanning
+    // 360 hues, 229 landed in the band and NONE of them failed — real picks
+    // sit below peak chroma. Snapping on the band alone moved working colours
+    // (a #7b3f9d at L=38 carrying 6.91:1 was being nudged for nothing), which
+    // breaks the more important promise: the user's colour is theirs.
+    //
+    // Test what the TABLE will actually pair it with — not the best case.
+    //
+    // Text.Surfaces maps a background tone to a foreground tone by SLOT: a
+    // slot on the dark-text side takes the ramp's dark end, a slot on the
+    // light-text side takes its light end. The system does not get to pick
+    // whichever happens to score better.
+    //
+    // Taking max(dark end, light end) was too lenient and is what let a 4.54:1
+    // primary through: the light end scored 4.64, but the colour landed in a
+    // slot the table pairs with the DARK end, which measures 4.49 — under the
+    // line. The repair pass then substituted a raw hex, so that one cell was
+    // no longer driven by the table at all.
+    //
+    // Predict the slot the same way the placement below does, then test the
+    // end the table would use for it.
+    let provisionalIdx = 0;
+    let provisionalDist = Infinity;
+    for (let i = 0; i < tones.length; i++) {
+      const dist = Math.abs(tones[i].tone - lockedL);
+      if (dist < provisionalDist) { provisionalDist = dist; provisionalIdx = i; }
+    }
+    // Slots 1-5 carry light text, 6-12 carry dark text.
+    const tableEndHex = provisionalIdx + 1 <= 5
+      ? tones[tones.length - 1].hex   // light end
+      : tones[0].hex;                 // dark end
+    const canCarryText = contrastRatio(lockedHex, tableEndHex) >= 4.5;
+
+    if (!canCarryText) {
+      // Nothing in its own ramp reaches 4.5, which only happens in the
+      // dead zone. Move the LIGHTNESS to the nearer edge of that zone —
+      // the smallest change that makes an accessible pair possible — and
+      // keep hue and chroma so it stays recognisably the chosen colour.
+      const target = (lockedL - DEAD_ZONE_LOW) <= (DEAD_ZONE_HIGH - lockedL)
+        ? DEAD_ZONE_LOW
+        : DEAD_ZONE_HIGH;
+      placedHex = chroma.lch(target, lockedC, lockedH).hex();
+      adjustment = {
+        from: lockedHex,
+        to: placedHex,
+        reason: `No text colour can reach the 4.5:1 minimum on ${lockedHex} `
+          + `(lightness ${lockedL.toFixed(0)}). Adjusted to ${placedHex} — the `
+          + `nearest lightness that supports accessible text — keeping the same `
+          + `hue and saturation.`,
+      };
+    }
+
+    // Match against the PLACED colour, so the slot and its metadata agree with
+    // the hex actually stored. Previously only .hex was replaced, leaving
+    // .tone and .lightness describing a colour that was no longer there.
+    const [placedL] = chroma(placedHex).lch();
     let closestIdx = 0;
     let closestDist = Infinity;
     for (let i = 0; i < tones.length; i++) {
-      const dist = Math.abs(tones[i].tone - lockedL);
+      const dist = Math.abs(tones[i].tone - placedL);
       if (dist < closestDist) {
         closestDist = dist;
         closestIdx = i;
@@ -267,7 +377,8 @@ function generateScaledTones(
     }
     tones[closestIdx] = {
       ...tones[closestIdx],
-      hex: lockedHex,
+      hex: placedHex,
+      ...(adjustment ? { adjusted: adjustment } : {}),
     };
   }
 

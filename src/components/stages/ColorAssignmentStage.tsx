@@ -1,5 +1,5 @@
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, ButtonGroup, Select, Link, Modal,
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, ButtonGroup, Select, Link, Modal, Checkbox,
 } from '@dynodesign/components';
 import chroma from 'chroma-js';
 import { useState, useRef } from 'react';
@@ -76,6 +76,10 @@ export default function ColorAssignmentStage({
   const dragItem = useRef<number | null>(null);
   const dragOver = useRef<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  // When on, Status / App / Navigation bars move together — changing one sets all.
+  const [syncNav, setSyncNav] = useState<boolean>(
+    () => userSelections.status === userSelections.appBar && userSelections.appBar === userSelections.navBar,
+  );
 
   const update = (partial: Partial<UserSelections>) => {
     onSelectionsChanged({ ...userSelections, ...partial });
@@ -260,7 +264,11 @@ export default function ColorAssignmentStage({
                   className="dino-color-select"
                   style={{ ['--select-trigger-color' as any]: getNavColor(userSelections[nav.key]) }}
                   value={userSelections[nav.key]}
-                  onChange={(val: string) => update({ [nav.key]: val as NavOption })}
+                  onChange={(val: string) => {
+                    const v = val as NavOption;
+                    if (syncNav) update({ status: v, appBar: v, navBar: v });
+                    else update({ [nav.key]: v });
+                  }}
                   options={nav.options.map(opt => ({
                     value: opt.value,
                     label: opt.label,
@@ -270,6 +278,17 @@ export default function ColorAssignmentStage({
               </VStack>
             ))}
           </div>
+
+          <Checkbox
+            label="Sync Status, App & Navigation bars"
+            checked={syncNav}
+            onChange={(e) => {
+              const on = (e.target as HTMLInputElement).checked;
+              setSyncNav(on);
+              // Turning sync on unifies all three to the Status Bar's value.
+              if (on) update({ appBar: userSelections.status, navBar: userSelections.status });
+            }}
+          />
         </VStack>
       </Card>
 
