@@ -201,6 +201,9 @@ function MainApp() {
         // design systems persisted a transient blob URL into the snapshot;
         // the file itself is always at design-systems/{id}/moodboard.png.
         setMoodBoardUrl(getPublicFileUrl(editId, 'moodboard.png'));
+        // The fetchable source, for the case where generation has not run yet
+        // and the canonical moodboard.png therefore does not exist.
+        if (s.moodBoardSourceUrl) setMoodBoardPublicUrl(s.moodBoardSourceUrl);
         setDinoId(editId);
         setOriginalSnapshot(s);
         setAutoAssigned(true); // skip auto-assign overrides
@@ -337,7 +340,20 @@ function MainApp() {
       componentStyle,
       styleCustomizations: savedStyleCustomizations?.[componentStyle] || null,
       surfaceStyle,
-      moodBoardUrl: moodBoardUrl || getPublicFileUrl(id, 'moodboard.png'),
+      // NEVER the blob: URL. moodBoardUrl holds a URL.createObjectURL handle
+      // into this tab's memory — it dies with the tab, UploadStage revokes it
+      // on the next upload, and it is unreachable from another browser, from
+      // cloud functions, and from Figma. Persisting it wrote a dead link into
+      // Firestore; the rehydrate path at the top of this file already had to
+      // work around exactly that. The file itself always lands at
+      // design-systems/{id}/moodboard.png, which is what every consumer reads.
+      moodBoardUrl: getPublicFileUrl(id, 'moodboard.png'),
+      // Where the bytes can still be fetched from after a Stripe round-trip.
+      // moodBoardFile is a File in memory and does not survive the redirect,
+      // and the canonical copy above is written BY generation — so without
+      // this the post-checkout run has nothing to upload and the image is
+      // silently lost. This copy is uploaded by UploadStage up front.
+      moodBoardSourceUrl: moodBoardPublicUrl || null,
       topColors: savedTopColors || null,
       colorEdits: savedColorEdits || null,
       typographySettings: savedTypographySettings || null,
@@ -571,7 +587,12 @@ function MainApp() {
             componentStyle={componentStyle}
             dinoId={dinoId}
             onDinoIdGenerated={setDinoId}
-            moodBoardUrl={moodBoardUrl}
+            moodBoardUrl={
+              // Prefer the durable Storage copy: after a Stripe redirect the
+              // File is gone and moodBoardUrl may point at a moodboard.png
+              // that generation has not written yet.
+              moodBoardPublicUrl ?? moodBoardUrl
+            }
             moodBoardFile={moodBoardFile}
             surfaceStyle={surfaceStyle}
             styleCustomizations={savedStyleCustomizations?.[componentStyle]}
@@ -660,8 +681,21 @@ function MainApp() {
   const buttonRadiusPx = Math.min(Math.round(buttonHeight * buttonRadius / 100), largeButtonHeight);
   const iconButtonRadiusPx = Math.min(Math.round(buttonHeight * iconButtonRadius / 100), largeButtonHeight);
 
+  // Horizontal button padding. The lib's Button sets
+  // `padding: 0 var(--Sm-Button-Padding)` with NO fallback, so when the shell
+  // doesn't define these the whole shorthand is invalid and the browser drops
+  // it — every small Button in the studio renders with zero side padding (the
+  // cramped Light/Dark segmented control). Same derivation the export and
+  // generateFigmaJSON use, so studio chrome matches what ships.
+  const buttonPaddingPx = buttonRadiusPx > 8 ? Math.round(buttonRadiusPx / 2) : 4;
+  const smButtonPaddingPx = buttonRadiusPx >= 8 ? 8 : buttonRadiusPx;
+  const lgButtonPaddingPx = buttonRadiusPx > 32 ? Math.round((buttonRadiusPx * 2) / 3) : 16;
+
   const styleVars = {
     '--Style-Border-Radius': `${buttonRadiusPx}px`,
+    '--Button-Padding': `${buttonPaddingPx}px`,
+    '--Sm-Button-Padding': `${smButtonPaddingPx}px`,
+    '--Large-Button-Padding': `${lgButtonPaddingPx}px`,
     '--Button-Radius': `${buttonRadiusPx}px`,
     '--Button-Icon-Radius': `${iconButtonRadiusPx}px`,
     '--Button-Bevel': `${bevel}`,
@@ -896,7 +930,12 @@ function MainApp() {
         {showTopBar && (
           <CreationTopBar designSystemName={designSystemName} onBack={goBack} themed={applyBrand} />
         )}
-        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 120 : 0, overflowX: 'hidden', background: 'var(--Background)' }}>
+        {/* overflow-x is `clip`, not `hidden`. `hidden` forces overflow-y to
+            compute to `auto`, which makes this a scroll container that never
+            actually scrolls (it grows with its content) — and that silently
+            disables position:sticky for every descendant. `clip` prevents the
+            same horizontal overflow without creating a scrollport. */}
+        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 120 : 0, overflowX: 'clip', background: 'var(--Background)' }}>
           {showPricingModal ? (
             <PricingPage
               onCheckout={async (selection: PurchaseSelection) => {
