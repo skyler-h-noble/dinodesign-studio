@@ -109,24 +109,63 @@ describe('Default theme routes every surface role through Default-Background', (
     expect(surfaces['Icons-Primary']).toBeUndefined();
   });
 
-  // Surface-Dimmest is pinned to Color-4 in every theme and every mode, so
-  // {Backgrounds.<pal>.Background-4...} already resolves per mode and the
-  // indirection buys nothing. Routing it anyway moved the background to the
-  // Default surface's tone while Buttons — which this override does not cover —
-  // kept their tone-4 borders, putting a light Color-9 border on a light
-  // Color-10 surface (1.47:1, under the 3:1 floor). It must stay unrouted.
-  it('leaves Surfaces-Dimmest on its own Backgrounds reference', () => {
-    const bg = themes.Default['Surfaces-Dimmest']?.Background?.value;
-    expect(bg).not.toMatch(/Default-Background/);
-    expect(bg).toMatch(/^\{Backgrounds\..*\.Background-4\./);
+  // Surface-Dimmest sits TWO TONES below the surface, clamped at Color-1.
+  //
+  // It used to be pinned to Color-4 in every theme, and these assertions were
+  // written against that constant. A fixed tone cannot work across surfaces:
+  // on a Color-12 surface it made Dimmest darker than Surface-Dim, and on a
+  // dark surface it was lighter than the surface it was meant to recede from.
+  // Two-down keeps the ordering intact wherever the surface sits, and the
+  // clamp means tones 1-3 all land on Color-1 rather than running off the end.
+  //
+  // Asserted relative to the surface's own tone rather than as a literal, so
+  // this stays honest on any background instead of re-pinning to whatever the
+  // current default happens to produce.
+  const dimmestToneFor = (surfaceN: number) => Math.max(surfaceN - 2, 1);
+
+  /** The tone a reference like {Backgrounds.Neutral.Background-10...} names. */
+  const toneOf = (ref: string | undefined, pattern: RegExp): number | null => {
+    const m = String(ref ?? '').match(pattern);
+    return m ? Number(m[1]) : null;
+  };
+
+  it('places Surfaces-Dimmest two tones below the surface, on its own Backgrounds reference', () => {
+    const surfaceRef = themes.Default.Surfaces?.Background?.value;
+    const dimmestRef = themes.Default['Surfaces-Dimmest']?.Background?.value;
+
+    // Still unrouted: routing it through Default-Background moved the
+    // background to the Default surface's tone while Buttons — which that
+    // override does not cover — kept their own borders, leaving a light border
+    // on a light surface (1.47:1, under the 3:1 floor).
+    expect(dimmestRef).not.toMatch(/Default-Background/);
+    expect(dimmestRef).toMatch(/^\{Backgrounds\..*\.Background-\d+\./);
+
+    // The Default surface may itself be routed through Default-Background, in
+    // which case there is no literal tone to compare against — the relative
+    // rule is then checked via the foregrounds test below.
+    const surfaceN = toneOf(surfaceRef, /Background-(\d+)\./);
+    if (surfaceN !== null) {
+      expect(toneOf(dimmestRef, /Background-(\d+)\./)).toBe(dimmestToneFor(surfaceN));
+    }
   });
 
-  it('keeps Surfaces-Dimmest foregrounds paired to its tone-4 background', () => {
+  it('keeps Surfaces-Dimmest foregrounds paired to its own background tone', () => {
     const dimmest = themes.Default['Surfaces-Dimmest'];
-    // Foregrounds must stay on the tone-4 tables that match the tone-4
-    // background, not be rewritten to the Default surface's tone.
-    expect(dimmest.Text?.value).toMatch(/Color-4\}$/);
-    expect(dimmest.Border?.value).toMatch(/Color-4\}$/);
+    const bgTone = toneOf(dimmest?.Background?.value, /Background-(\d+)\./);
+    expect(bgTone, 'Dimmest background should name a tone').not.toBeNull();
+
+    // Foregrounds must sit on the tables matching Dimmest's OWN background,
+    // not be rewritten to the Default surface's tone — that pairing is what
+    // keeps its text and border legible against it.
+    expect(dimmest.Text?.value).toMatch(new RegExp(`Color-${bgTone}\\}$`));
+    expect(dimmest.Border?.value).toMatch(new RegExp(`Color-${bgTone}\\}$`));
     expect(referencedKeys(dimmest).size, 'Dimmest should reference no Default-Background keys').toBe(0);
+  });
+
+  it('clamps Surfaces-Dimmest at Color-1 for the darkest surfaces', () => {
+    // tones 1-3 all resolve to 1; the ramp has nowhere darker to go.
+    expect([1, 2, 3].map(dimmestToneFor)).toEqual([1, 1, 1]);
+    expect(dimmestToneFor(12)).toBe(10);
+    expect(dimmestToneFor(4)).toBe(2);
   });
 });

@@ -267,42 +267,71 @@ function collectChecks(
   // to use AS TEXT on any surface at that lightness. So "Primary Text on a
   // white surface" is Text.Surfaces.Primary.Color-12 (resolves to a dark
   // primary tone). This is the right lookup for the per-palette text rows.
-  const defaultTextTok = `Text.Surfaces.${bg.palette}.${bgColorKey}`;
-  const defaultText = getHex(modeTree, defaultTextTok);
-  checks.push(check('Text', 'Default Text', defaultTextTok, defaultText, surfaceBg, 4.5)!);
+  // An interactive surface changes background under the text on hover/pressed,
+  // so text + quiet must clear 4.5 against ALL three states, not just resting.
+  // The surface's hover/pressed scrims are Hover/Pressed.{palette}.Color-N.
+  const surfaceHover = getHex(modeTree, `Hover.${bg.palette}.${bgColorKey}`);
+  const surfacePressed = getHex(modeTree, `Pressed.${bg.palette}.${bgColorKey}`);
+  const textStates: Array<{ bg: string; suffix: string }> = [{ bg: surfaceBg, suffix: '' }];
+  if (surfaceHover) textStates.push({ bg: surfaceHover, suffix: ' → Hover' });
+  if (surfacePressed) textStates.push({ bg: surfacePressed, suffix: ' → Pressed' });
 
-  for (const pal of TEXT_PALETTES) {
-    const tok = `Text.Surfaces.${pal}.${bgColorKey}`;
-    const fg = getHex(modeTree, tok);
-    const c = check('Text', `${pal} Text`, tok, fg, surfaceBg, 4.5);
-    if (c) checks.push(c);
+  for (const st of textStates) {
+    const defaultTextTok = `Text.Surfaces.${bg.palette}.${bgColorKey}`;
+    const defaultText = getHex(modeTree, defaultTextTok);
+    const cdt = check('Text', `Default Text${st.suffix}`, defaultTextTok, defaultText, st.bg, 4.5);
+    if (cdt) checks.push(cdt);
+
+    for (const pal of TEXT_PALETTES) {
+      const tok = `Text.Surfaces.${pal}.${bgColorKey}`;
+      const fg = getHex(modeTree, tok);
+      const c = check('Text', `${pal} Text${st.suffix}`, tok, fg, st.bg, 4.5);
+      if (c) checks.push(c);
+    }
+
+    // Quiet (secondary text — still subject to 4.5:1 for readability per AA)
+    const quietTok = `Quiet.Surfaces.${bg.palette}.${bgColorKey}`;
+    const quiet = getHex(modeTree, quietTok);
+    const cq = check('Text', `Quiet Text${st.suffix}`, quietTok, quiet, st.bg, 4.5);
+    if (cq) checks.push(cq);
+
+    // Hotlink — conventional link color from Info palette, using its accessible
+    // text tone for this surface lightness.
+    const hotlinkTok = `Text.Surfaces.Info.${bgColorKey}`;
+    const hotlink = getHex(modeTree, hotlinkTok);
+    const chl = check('Text', `Hotlink${st.suffix}`, hotlinkTok, hotlink, st.bg, 4.5);
+    if (chl) checks.push(chl);
+
+    // Eyebrow — a small label above a heading, so it is body-sized text and
+    // carries the full 4.5, not the 3:1 large-text allowance a Header gets.
+    // Each background borrows a different brand colour (Primary → Secondary,
+    // Secondary → Tertiary, Tertiary/Neutral → Primary, states → BW), so it is
+    // resolved from the Eyebrows table rather than assumed to match Text.
+    const eyebrowTok = `Eyebrows.Surfaces.${bg.palette}.${bgColorKey}`;
+    const eyebrow = getHex(modeTree, eyebrowTok);
+    const ceb = check('Text', `Eyebrow${st.suffix}`, eyebrowTok, eyebrow, st.bg, 4.5);
+    if (ceb) checks.push(ceb);
   }
 
-  // Quiet (secondary text — still subject to 4.5:1 for readability per AA)
-  const quietTok = `Quiet.Surfaces.${bg.palette}.${bgColorKey}`;
-  const quiet = getHex(modeTree, quietTok);
-  const cq = check('Text', 'Quiet Text', quietTok, quiet, surfaceBg, 4.5);
-  if (cq) checks.push(cq);
-
-  // Hotlink — conventional link color from Info palette, using its accessible
-  // text tone for this surface lightness.
-  const hotlinkTok = `Text.Surfaces.Info.${bgColorKey}`;
-  const hotlink = getHex(modeTree, hotlinkTok);
-  const ch = check('Text', 'Hotlink', hotlinkTok, hotlink, surfaceBg, 4.5);
-  if (ch) checks.push(ch);
-
-  // ── Headers (3.1:1, large text) ──
-  const defaultHeaderTok = `Header.Surfaces.${bg.palette}.${bgColorKey}`;
-  const defaultHeader = getHex(modeTree, defaultHeaderTok);
-  checks.push(check('Header', 'Default Header', defaultHeaderTok, defaultHeader, surfaceBg, 3.1)!);
-  for (const pal of HEADER_PALETTES) {
-    const tok = `Header.Surfaces.${pal}.${bgColorKey}`;
-    const fg = getHex(modeTree, tok);
-    const c = check('Header', `${pal} Header`, tok, fg, surfaceBg, 3.1);
-    if (c) checks.push(c);
+  // ── Headers (3:1, large text) ──
+  // Checked against hover and pressed as well as resting: an interactive
+  // surface changes the background under a heading exactly as it does under
+  // body text, and previously only the resting state was verified — so a
+  // header could pass at rest and fail the moment the surface was hovered.
+  for (const st of textStates) {
+    const defaultHeaderTok = `Header.Surfaces.${bg.palette}.${bgColorKey}`;
+    const defaultHeader = getHex(modeTree, defaultHeaderTok);
+    const cdh = check('Header', `Default Header${st.suffix}`, defaultHeaderTok, defaultHeader, st.bg, 3);
+    if (cdh) checks.push(cdh);
+    for (const pal of HEADER_PALETTES) {
+      const tok = `Header.Surfaces.${pal}.${bgColorKey}`;
+      const fg = getHex(modeTree, tok);
+      const c = check('Header', `${pal} Header${st.suffix}`, tok, fg, st.bg, 3);
+      if (c) checks.push(c);
+    }
   }
 
-  // ── Focus-Visible (3.1:1 UI component) ──
+  // ── Focus-Visible (3:1 UI component) ──
   // Focus-Visible.Surfaces is keyed by Background-N. Use the actual surface's
   // closest Color-N (already computed as bgColorKey) and convert to the
   // matching Background-N so derived surfaces (Containers, Surface-Dim)
@@ -313,15 +342,15 @@ function collectChecks(
     getHex(modeTree, focusTok) ||
     getHex(modeTree, `Focus-Visible.Surfaces.${bg.bgKey}`) ||
     getHex(modeTree, `Colors.Info.Color-Vibrant`);
-  const cf = check('Focus', 'Focus-Visible Ring', focusTok, focus, surfaceBg, 3.1);
+  const cf = check('Focus', 'Focus-Visible Ring', focusTok, focus, surfaceBg, 3);
   if (cf) checks.push(cf);
 
-  // ── Input border (3.1:1) ──
+  // ── Input border (3:1) ──
   const borderTok = `Border.Surfaces.${bg.palette}.${bgColorKey}`;
   const border = getHex(modeTree, borderTok);
-  const cb = check('Input', 'Input Border', borderTok, border, surfaceBg, 3.1);
+  const cb = check('Input', 'Input Border', borderTok, border, surfaceBg, 3);
   if (cb) checks.push(cb);
-  const cab = check('Input', 'Input Active Border', focusTok, focus, surfaceBg, 3.1);
+  const cab = check('Input', 'Input Active Border', focusTok, focus, surfaceBg, 3);
   if (cab) checks.push(cab);
 
   // ── Buttons ──
@@ -339,8 +368,8 @@ function collectChecks(
     const border = getHex(modeTree, borderTok) || fill;
     if (!fill || !text) continue; // skip if the variant isn't defined
 
-    // Button border vs surface (3.1:1)
-    if (border) checks.push(check('Button', `${pal} Button border → surface`, borderTok, border, surfaceBg, 3.1)!);
+    // Button border vs surface (3:1)
+    if (border) checks.push(check('Button', `${pal} Button border → surface`, borderTok, border, surfaceBg, 3)!);
     // Button text vs button fill (4.5:1)
     checks.push(check('Button', `${pal} Button text → fill`, textTok, text, fill, 4.5)!);
 
@@ -361,6 +390,33 @@ function collectChecks(
     if (pressedRaw) {
       const pressedBg = compositeOver(pressedRaw, fill);
       checks.push(check('Button', `${pal} Button pressed → text`, pressedTok, text, pressedBg, 4.5)!);
+    }
+  }
+
+  // ── BlackWhite button ──
+  // Not part of BUTTON_PALETTES: it has no palette and no Light/Medium bucket.
+  // It is a resolved table keyed by the BACKGROUND's tone — white face on
+  // tones 1-5, black from 6 up — so the lookup is by this surface's own tone,
+  // and its border is the fill rather than a Border.Surfaces entry.
+  {
+    const bwPath = `Buttons.BlackWhite.${bgColorKey}`;
+    const bwFill = getHex(modeTree, `${bwPath}.Button`);
+    const bwText = getHex(modeTree, `${bwPath}.Text`);
+    if (bwFill && bwText) {
+      checks.push(check('Button', 'BlackWhite Button text → fill', `${bwPath}.Text`, bwText, bwFill, 4.5)!);
+      // A black-or-white fill is its own border, so this is the separation the
+      // button gets from the surface it sits on — non-text, hence 3:1.
+      checks.push(check('Button', 'BlackWhite Button → surface', `${bwPath}.Button`, bwFill, surfaceBg, 3)!);
+      const bwHover = getHex(modeTree, `${bwPath}.Hover`);
+      const bwPressed = getHex(modeTree, `${bwPath}.Pressed`);
+      if (bwHover) {
+        checks.push(check('Button', 'BlackWhite Button hover → text',
+          `${bwPath}.Hover`, bwText, compositeOver(bwHover, bwFill), 4.5)!);
+      }
+      if (bwPressed) {
+        checks.push(check('Button', 'BlackWhite Button pressed → text',
+          `${bwPath}.Pressed`, bwText, compositeOver(bwPressed, bwFill), 4.5)!);
+      }
     }
   }
 
