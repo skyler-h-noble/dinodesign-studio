@@ -83,6 +83,12 @@
   gap: 12px;
   width: 100%;
   overflow-x: auto;
+  /* Room for the cards' box shadows.
+     `overflow-x: auto` makes this a scroll container, and a scroll container
+     clips on BOTH axes — the browser promotes the other axis away from
+     `visible`. So the cards' own `overflow: visible` cannot save their
+     shadows; the space has to exist inside this box. */
+  padding-bottom: 10px;
 }
 
 .assign-bg-buttons {

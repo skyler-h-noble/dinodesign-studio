@@ -50,6 +50,33 @@ import AdminProposals from './components/AdminProposals';
 import TypographyTestPage from './components/TypographyTestPage';
 import AaidWorkbenchPage from './components/AaidWorkbenchPage';
 
+/**
+ * Re-map a scheme's tone palettes onto a new role order.
+ *
+ * `newColors` is a permutation of `scheme.colors`, so each role's palette
+ * already exists — it just belongs to a different slot now. Looking the colour
+ * up and moving its palette preserves the chroma peak, locked hex and hue
+ * easing that produced it. A colour that is somehow not in the original list
+ * (defensive only) falls back to a fresh scale.
+ */
+function reorderedPalettes(scheme: any, newColors: [string, string, string]) {
+  const ROLES = ['primary', 'secondary', 'tertiary'] as const;
+  const old: string[] = scheme.colors || [];
+  const light: any = {};
+  const dark: any = {};
+  newColors.forEach((hex, newIdx) => {
+    const oldIdx = old.findIndex(c => String(c).toLowerCase() === String(hex).toLowerCase());
+    const src = oldIdx >= 0 ? ROLES[oldIdx] : null;
+    light[ROLES[newIdx]] = src && scheme.tonePalettes?.[src]
+      ? scheme.tonePalettes[src]
+      : generateSemanticLightModeScale(hex);
+    dark[ROLES[newIdx]] = src && scheme.darkModeTonePalettes?.[src]
+      ? scheme.darkModeTonePalettes[src]
+      : generateSemanticDarkModeScale(hex);
+  });
+  return { tonePalettes: light, darkModeTonePalettes: dark };
+}
+
 // Internal test accounts — these skip the pricing/Stripe checkout and go
 // straight to the export/delivery page so we can exercise the full design-
 // system flow (view hosted system, copy Dino ID, Figma import) without paying.
@@ -507,16 +534,15 @@ function MainApp() {
                   secondary: getLightness(newColors[1]),
                   tertiary: getLightness(newColors[2]),
                 },
-                tonePalettes: {
-                  primary: generateSemanticLightModeScale(newColors[0]),
-                  secondary: generateSemanticLightModeScale(newColors[1]),
-                  tertiary: generateSemanticLightModeScale(newColors[2]),
-                },
-                darkModeTonePalettes: {
-                  primary: generateSemanticDarkModeScale(newColors[0]),
-                  secondary: generateSemanticDarkModeScale(newColors[1]),
-                  tertiary: generateSemanticDarkModeScale(newColors[2]),
-                },
+                // REORDER the existing palettes; do not regenerate them.
+                //
+                // A reorder changes which colour plays which ROLE — the colours
+                // themselves are unchanged. Rebuilding here called the scale
+                // generator with no maxChroma, no locked hex and no hue easing,
+                // so every per-colour setting the Colors step established was
+                // silently discarded the moment you dragged a card. The ramps
+                // that came back were defaults wearing the right hues.
+                ...reorderedPalettes(selectedColorScheme, newColors),
               });
             }}
           />
@@ -680,6 +706,15 @@ function MainApp() {
   // made every chrome button far more rounded than the design's actual radius.
   const buttonRadiusPx = Math.min(Math.round(buttonHeight * buttonRadius / 100), largeButtonHeight);
   const iconButtonRadiusPx = Math.min(Math.round(buttonHeight * iconButtonRadius / 100), largeButtonHeight);
+  // Small and large need their OWN radius, measured against their OWN height —
+  // that is what computeRadii does (pct(buttonRadius, smallButtonHeight) etc).
+  // Emitting only --Button-Radius left --Sm-Button-Radius and --Lg-Button-Radius
+  // undefined, so every large Button in the studio chrome — the bottom-nav
+  // Continue button most visibly — fell back to the lib's default and rendered
+  // under-rounded next to the preview's fully-pill Large. Same failure as the
+  // padding note below: a var the lib reads with no fallback.
+  const smButtonRadiusPx = Math.min(Math.round(smallButtonHeight * buttonRadius / 100), smallButtonHeight);
+  const lgButtonRadiusPx = Math.min(Math.round(largeButtonHeight * buttonRadius / 100), largeButtonHeight);
 
   // Horizontal button padding. The lib's Button sets
   // `padding: 0 var(--Sm-Button-Padding)` with NO fallback, so when the shell
@@ -697,6 +732,8 @@ function MainApp() {
     '--Sm-Button-Padding': `${smButtonPaddingPx}px`,
     '--Large-Button-Padding': `${lgButtonPaddingPx}px`,
     '--Button-Radius': `${buttonRadiusPx}px`,
+    '--Sm-Button-Radius': `${smButtonRadiusPx}px`,
+    '--Lg-Button-Radius': `${lgButtonRadiusPx}px`,
     '--Button-Icon-Radius': `${iconButtonRadiusPx}px`,
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,

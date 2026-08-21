@@ -227,12 +227,30 @@ export default function ColorStage({
         next[hexEditIndex] = { ...next[hexEditIndex], hex: hexEditValue };
         return next;
       });
+      // Re-derive THIS colour's chroma peak from the new hex.
+      //
+      // Without this the ramp keeps the peak derived from the colour that used
+      // to be here, so a vivid new pick renders as a muted ramp with one
+      // saturated tone stamped into it — the whole curve describing a colour
+      // that is no longer there. The auto-derive effect below cannot do it: it
+      // is keyed on the LENGTH of the list, which does not change when a hex is
+      // edited in place.
+      const peaks = rederiveChromaFor(hexEditIndex, hexEditValue);
+
       // Track lock state
-      if (hexLocked) {
-        setLockedColorMap(prev => ({ ...prev, [hexEditIndex]: hexEditValue }));
-      } else {
-        setLockedColorMap(prev => { const n = { ...prev }; delete n[hexEditIndex]; return n; });
-      }
+      const nextLocked = { ...lockedColorMap };
+      if (hexLocked) nextLocked[hexEditIndex] = hexEditValue;
+      else delete nextLocked[hexEditIndex];
+      setLockedColorMap(nextLocked);
+
+      // Rebuild the schemes now — see the note in handleSwap.
+      const nextTops = topColors.map((c, i) =>
+        (i === hexEditIndex ? { ...c, hex: hexEditValue } : c));
+      const nextAnchors = anchorColors.map((c, i) =>
+        (i === hexEditIndex ? { ...c, hex: hexEditValue } : c));
+      const nextLight = [...chromaPerColor]; nextLight[hexEditIndex] = peaks.light;
+      const nextDark = [...darkChromaPerColor]; nextDark[hexEditIndex] = peaks.dark;
+      regenerateSchemes(nextTops, primaryIndex, nextLight, nextDark, nextAnchors, undefined, nextLocked);
     }
     setHexEditIndex(null);
   };
@@ -365,6 +383,147 @@ export default function ColorStage({
     return () => { cancelled = true; };
   }, [moodBoardUrl]);
 
+  /**
+   * Re-derive one slot's chroma peak from the hex now sitting in it.
+   *
+   * Both ways a colour can change — swapping it out, or typing a new hex —
+   * have to do this, and neither did. The auto-derive effect cannot: it is
+   * guarded on the LENGTH of the colour list, which is identical before and
+   * after a colour is replaced in place. So the ramp kept the peak derived
+   * from the colour that used to be here, and a vivid new pick rendered as a
+   * muted ramp of the right hue — a #ec5a63 red drawn at peak 21 reads as
+   * dusty rose, which is what made the tone rows disagree with the swatches
+   * above them.
+   */
+  const rederiveChromaFor = useCallback((slot: number, hex: string) => {
+    const light = Math.min(Math.round(getMatchingPeakChroma(hex, false)), 70);
+    const dark = Math.min(Math.round(getMatchingPeakChroma(hex, true)), 42);
+    setChromaPerColor(prev => { const n = [...prev]; n[slot] = light; return n; });
+    setDarkChromaPerColor(prev => { const n = [...prev]; n[slot] = dark; return n; });
+    // Returned so the caller can hand the NEW values straight to
+    // regenerateSchemes — setState is async, so regenerating without them
+    // rebuilds from the peaks that were there before the change.
+    return { light, dark };
+  }, []);
+
+
+  const regenerateSchemes = useCallback((
+    tops: ExtractedColor[],
+    pIdx: number,
+    lChroma?: number[],
+    dChroma?: number[],
+    anchors?: ExtractedColor[],
+    overrides?: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>,
+    lockedOverride?: Record<number, string>,
+  ) => {
+    const lc = lChroma || chromaPerColor;
+    const dc = dChroma || darkChromaPerColor;
+    const anchorsArr = anchors || anchorColors;
+    // Hue edits are applied via setState (async), so a caller firing this right
+    // after setHueOverridesByTop would read the STALE state through the closure.
+    // Callers pass the freshly-edited overrides here to bypass that.
+    const hOverrides = overrides || hueOverridesByTop;
+    // Same stale-closure problem as the hue overrides above: swapping or
+    // re-hexing a colour clears or sets its lock via setState, so a caller
+    // firing this immediately after would still read the OLD lock and pin the
+    // ramp to the colour that was just replaced.
+    const lockedMap = lockedOverride || lockedColorMap;
+    const primary = tops[pIdx].hex;
+    const others = tops.filter((_, i) => i !== pIdx).map(c => c.hex);
+    const reordered = [primary, ...others];
+    // Build locked colors array: [primary locked hex, secondary locked hex, ...]
+    const locked: (string | undefined)[] = [
+      lockedMap[pIdx],
+      ...tops.filter((_, i) => i !== pIdx).map((_, i) => {
+        const origIdx = i >= pIdx ? i + 1 : i;
+        return lockedMap[origIdx];
+      }),
+    ];
+    // Translate hueOverridesByTop (keyed by topColors index) to reordered scheme indices
+    // Reordered: [primary=tops[pIdx], ...tops without pIdx] → indices 0/1/2 in scheme
+    const orderedTopIndices = [pIdx, ...tops.map((_, i) => i).filter(i => i !== pIdx)];
+    const hueOverridesForScheme: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }> = {};
+    orderedTopIndices.forEach((origIdx, schemeIdx) => {
+      if (hOverrides[origIdx]) {
+        hueOverridesForScheme[schemeIdx] = hOverrides[origIdx];
+      }
+    });
+    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
+
+    // Post-process: regenerate each scheme's tonePalettes/darkModeTonePalettes
+    // from anchorColors[topIdx] + chromaPerColor[topIdx] + per-color hue easing —
+    // exactly the inputs the Settings panel uses to render its tone palettes.
+    // Otherwise the same maxChroma (primary's) gets applied to all 3 roles, and
+    // the picked-tone hex (which may have shifted away from anchor) drives
+    // hue/chroma toward saturated palettes that don't match the visible tones.
+    const refined = generated.map(scheme => {
+      const roles = scheme.colors.map(colorHex => {
+        const topIdx = tops.findIndex(t => t.hex === colorHex);
+        // A scheme colour is not always one of the user's Core Colors.
+        // Analogous, Triadic, Complementary and Split-Complementary ROTATE the
+        // primary's hue, so two of their three colours never appear in `tops`
+        // and the lookup fails. This used to `return null`, which made the
+        // whole scheme fall through unrefined and keep generateColorSchemes'
+        // palettes — where primary's chroma is applied to all three roles.
+        //
+        // That is exactly what the refinement below exists to prevent, and it
+        // was silently skipping the four schemes that need it most: the tone
+        // rows in Settings showed the per-colour ramps while the export shipped
+        // the unrefined ones.
+        //
+        // A derived colour has no Core Color to inherit from, so it derives its
+        // own peak from itself — the same rule a Core Color follows.
+        const isTop = topIdx >= 0;
+        const anchorHex = isTop ? (anchorsArr[topIdx]?.hex || colorHex) : colorHex;
+        const lightC = isTop
+          ? (lc[topIdx] ?? 62)
+          : Math.min(Math.round(getMatchingPeakChroma(colorHex, false)), 70);
+        const darkC = isTop
+          ? (dc[topIdx] ?? 36)
+          : Math.min(Math.round(getMatchingPeakChroma(colorHex, true)), 42);
+        // Pin the ramp to the colour the user actually sees. Without this the
+        // palette is generated from the ANCHOR plus a chroma value that need not
+        // match the picked hex, so tone SC — the tone every Secondary button
+        // reads — came out a desaturated cousin of the swatch beside it.
+        // lockedHex overwrites only the step nearest the colour's own lightness,
+        // so the anchor, chroma and hue easing still shape every other tone.
+        const lockedHex = isTop ? (lockedMap[topIdx] ?? colorHex) : colorHex;
+        const easing = isTop ? hOverrides[topIdx] : undefined;
+        return {
+          light: generateSemanticLightModeScale(anchorHex, lightC, lockedHex, easing?.light),
+          dark: generateSemanticDarkModeScale(anchorHex, darkC, easing?.dark),
+        };
+      });
+      if (!roles[0] || !roles[1] || !roles[2]) return scheme;
+      return {
+        ...scheme,
+        tonePalettes: {
+          primary: roles[0].light,
+          secondary: roles[1].light,
+          tertiary: roles[2].light,
+        },
+        darkModeTonePalettes: {
+          primary: roles[0].dark,
+          secondary: roles[1].dark,
+          tertiary: roles[2].dark,
+        },
+      };
+    });
+
+    setSchemes(refined);
+    onSchemesGenerated?.(refined);
+    if (selectedScheme) {
+      const updated = refined.find(s => s.name === selectedScheme.name);
+      onSchemeSelected(updated || refined[0]);
+    } else {
+      onSchemeSelected(refined[0]);
+    }
+  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, anchorColors, lockedColorMap, hueOverridesByTop]);
+
+  // Declared AFTER regenerateSchemes on purpose: it lists that callback as a
+  // dependency, and a dependency array is evaluated during render — so with
+  // handleSwap above it, `regenerateSchemes` was still in its temporal dead
+  // zone and the component threw on first render.
   const handleSwap = useCallback((replacement: ExtractedColor) => {
     if (swapIndex === null) return;
     setTopColors(prev => {
@@ -400,97 +559,31 @@ export default function ColorStage({
       delete next[swapIndex];
       return next;
     });
+    // The chroma peak was derived from the colour being replaced, so it is as
+    // stale as the locked hex and the hue easing cleared above.
+    const peaks = rederiveChromaFor(swapIndex, replacement.hex);
+
+    // Rebuild the schemes NOW rather than at export.
+    //
+    // Every other way of changing a colour — clicking a tone, moving the
+    // primary, dragging chroma, applying a hue edit — calls this explicitly.
+    // The two paths that change a Core Colour outright did not, so the schemes
+    // (and the export that reads them) kept the previous colours until some
+    // unrelated action happened to trigger a rebuild.
+    //
+    // Every value is passed explicitly: the setState calls above are async, so
+    // regenerating off the closure would rebuild from what was there before.
+    const nextTops = topColors.map((c, i) => (i === swapIndex ? replacement : c));
+    const nextAnchors = anchorColors.map((c, i) => (i === swapIndex ? replacement : c));
+    const nextLight = [...chromaPerColor]; nextLight[swapIndex] = peaks.light;
+    const nextDark = [...darkChromaPerColor]; nextDark[swapIndex] = peaks.dark;
+    const nextLocked = { ...lockedColorMap }; delete nextLocked[swapIndex];
+    const nextOverrides = { ...hueOverridesByTop }; delete nextOverrides[swapIndex];
+    regenerateSchemes(nextTops, primaryIndex, nextLight, nextDark, nextAnchors, nextOverrides, nextLocked);
+
     setSwapIndex(null);
-  }, [swapIndex]);
-
-  const regenerateSchemes = useCallback((
-    tops: ExtractedColor[],
-    pIdx: number,
-    lChroma?: number[],
-    dChroma?: number[],
-    anchors?: ExtractedColor[],
-    overrides?: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>,
-  ) => {
-    const lc = lChroma || chromaPerColor;
-    const dc = dChroma || darkChromaPerColor;
-    const anchorsArr = anchors || anchorColors;
-    // Hue edits are applied via setState (async), so a caller firing this right
-    // after setHueOverridesByTop would read the STALE state through the closure.
-    // Callers pass the freshly-edited overrides here to bypass that.
-    const hOverrides = overrides || hueOverridesByTop;
-    const primary = tops[pIdx].hex;
-    const others = tops.filter((_, i) => i !== pIdx).map(c => c.hex);
-    const reordered = [primary, ...others];
-    // Build locked colors array: [primary locked hex, secondary locked hex, ...]
-    const locked: (string | undefined)[] = [
-      lockedColorMap[pIdx],
-      ...tops.filter((_, i) => i !== pIdx).map((_, i) => {
-        const origIdx = i >= pIdx ? i + 1 : i;
-        return lockedColorMap[origIdx];
-      }),
-    ];
-    // Translate hueOverridesByTop (keyed by topColors index) to reordered scheme indices
-    // Reordered: [primary=tops[pIdx], ...tops without pIdx] → indices 0/1/2 in scheme
-    const orderedTopIndices = [pIdx, ...tops.map((_, i) => i).filter(i => i !== pIdx)];
-    const hueOverridesForScheme: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }> = {};
-    orderedTopIndices.forEach((origIdx, schemeIdx) => {
-      if (hOverrides[origIdx]) {
-        hueOverridesForScheme[schemeIdx] = hOverrides[origIdx];
-      }
-    });
-    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
-
-    // Post-process: regenerate each scheme's tonePalettes/darkModeTonePalettes
-    // from anchorColors[topIdx] + chromaPerColor[topIdx] + per-color hue easing —
-    // exactly the inputs the Settings panel uses to render its tone palettes.
-    // Otherwise the same maxChroma (primary's) gets applied to all 3 roles, and
-    // the picked-tone hex (which may have shifted away from anchor) drives
-    // hue/chroma toward saturated palettes that don't match the visible tones.
-    const refined = generated.map(scheme => {
-      const roles = scheme.colors.map(colorHex => {
-        const topIdx = tops.findIndex(t => t.hex === colorHex);
-        if (topIdx < 0) return null;
-        const anchorHex = anchorsArr[topIdx]?.hex || colorHex;
-        const lightC = lc[topIdx] ?? 62;
-        const darkC = dc[topIdx] ?? 36;
-        // Pin the ramp to the colour the user actually sees. Without this the
-        // palette is generated from the ANCHOR plus a chroma value that need not
-        // match the picked hex, so tone SC — the tone every Secondary button
-        // reads — came out a desaturated cousin of the swatch beside it.
-        // lockedHex overwrites only the step nearest the colour's own lightness,
-        // so the anchor, chroma and hue easing still shape every other tone.
-        const lockedHex = lockedColorMap[topIdx] ?? colorHex;
-        const easing = hOverrides[topIdx];
-        return {
-          light: generateSemanticLightModeScale(anchorHex, lightC, lockedHex, easing?.light),
-          dark: generateSemanticDarkModeScale(anchorHex, darkC, easing?.dark),
-        };
-      });
-      if (!roles[0] || !roles[1] || !roles[2]) return scheme;
-      return {
-        ...scheme,
-        tonePalettes: {
-          primary: roles[0].light,
-          secondary: roles[1].light,
-          tertiary: roles[2].light,
-        },
-        darkModeTonePalettes: {
-          primary: roles[0].dark,
-          secondary: roles[1].dark,
-          tertiary: roles[2].dark,
-        },
-      };
-    });
-
-    setSchemes(refined);
-    onSchemesGenerated?.(refined);
-    if (selectedScheme) {
-      const updated = refined.find(s => s.name === selectedScheme.name);
-      onSchemeSelected(updated || refined[0]);
-    } else {
-      onSchemeSelected(refined[0]);
-    }
-  }, [selectedScheme, onSchemeSelected, chromaPerColor, darkChromaPerColor, anchorColors, lockedColorMap, hueOverridesByTop]);
+  }, [swapIndex, rederiveChromaFor, topColors, anchorColors, chromaPerColor,
+      darkChromaPerColor, lockedColorMap, hueOverridesByTop, primaryIndex, regenerateSchemes]);
 
   const handleGenerateThemes = useCallback(() => {
     regenerateSchemes(topColors, primaryIndex);
@@ -963,13 +1056,22 @@ export default function ColorStage({
                       size="large"
                       className="dino-swatch"
                       style={{ ['--swatch-color' as any]: color.hex }}
+                      // Single click SWITCHES the colour, double click opens the
+                      // editor. These were the other way round: the common action
+                      // (swap this swatch for another) needed a double click while
+                      // the rare one (type a hex, lock it) fired on a single.
+                      // The timer only exists so the first half of a double click
+                      // does not also open the swap.
                       onClick={() => {
                         if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
-                        clickTimer.current = setTimeout(() => { clickTimer.current = null; openHexEditor(color.hex, i, 'top'); }, 350);
+                        clickTimer.current = setTimeout(() => {
+                          clickTimer.current = null;
+                          setSwapIndex(isSwapActive ? null : i);
+                        }, 350);
                       }}
                       onDoubleClick={() => {
                         if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
-                        setSwapIndex(isSwapActive ? null : i);
+                        openHexEditor(color.hex, i, 'top');
                       }}
                       sx={{
                         // Match the design system's button shape — uses the
@@ -1209,7 +1311,10 @@ export default function ColorStage({
         <VStack spacing={3}>
           <VStack spacing={1}>
             <BodySmall style={{ fontWeight: 600 }}>Core Colors</BodySmall>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>Click to change</BodySmall>
+            <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <strong>Click</strong> a colour to swap it for another.
+              {' '}<strong>Double-click</strong> to type an exact hex or lock it.
+            </BodySmall>
           </VStack>
 
           {colorAdjustments.length > 0 && (
@@ -1314,8 +1419,10 @@ export default function ColorStage({
               </HStack>
 
               <BodySmall style={{ fontSize: '0.75rem' }}>
-                <strong>Click any tone</strong> to update which tone represents each color.
-                {' '}(Mode: {toneMode}, Max Chroma: {toneMode === 'light' ? chromaPerColor[0] : darkChromaPerColor[0]})
+                Each row is the full 12-tone scale built from that colour.
+                {' '}<strong>Click any tone</strong> to choose which one represents the colour —
+                {' '}the scale itself does not change.
+                {' '}<strong>Edit</strong> adjusts the colour's hue and saturation.
               </BodySmall>
 
               {topColors.map((color, colorIdx) => {
@@ -1337,28 +1444,50 @@ export default function ColorStage({
                 return (
                   <VStack key={colorIdx} spacing={1}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
-                      <Body style={{ fontWeight: 700, fontSize: '0.85rem', flex: 1 }}>
+                      <Body style={{ fontWeight: 700, fontSize: '0.85rem', flex: 1, minWidth: 0 }}>
                         {colorName}
                       </Body>
-                      <Link
-                        onClick={(e: React.MouseEvent) => {
-                          e.preventDefault();
-                          const baseHue = (() => {
-                            const h = chroma(anchor.hex).get('lch.h');
-                            return isNaN(h) ? 0 : Math.round(h);
-                          })();
-                          const existingDark = hueOverridesByTop[colorIdx]?.[toneMode]?.darkHue;
-                          const existingLight = hueOverridesByTop[colorIdx]?.[toneMode]?.lightHue;
-                          setHueEditDarkHue(existingDark !== undefined ? existingDark : baseHue);
-                          setHueEditLightHue(existingLight !== undefined ? existingLight : baseHue);
-                          setHueEditFocus(null);
-                          setChromaDragValue(null);
-                          setHueEditTopIdx(colorIdx);
-                        }}
-                        style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}
-                      >
-                        Edit
-                      </Link>
+                      {/* Editing is a LIGHT-mode action: the modal tunes the
+                          colour itself, and the dark ramp is derived from it.
+                          Offering it in dark mode implies you can tune the two
+                          independently, which you cannot — so it is rendered as
+                          plain text rather than a link, with the reason on hover.
+                          Not a disabled Link: a link you cannot follow still
+                          reads as actionable. */}
+                      {/* Fixed slot so the row geometry is identical in both
+                          modes. Link renders inline and BodySmall renders block,
+                          so swapping them directly let the name lose its space
+                          and wrap to three lines the moment you hit Dark Mode. */}
+                      <div style={{ flexShrink: 0, textAlign: 'right', minWidth: 28, lineHeight: 1 }}>
+                      {toneMode === 'dark' ? (
+                        <BodySmall
+                          title="Switch to Light Mode to edit this colour — the dark scale is derived from it."
+                          style={{ color: 'var(--Quiet)', fontSize: '0.7rem', whiteSpace: 'nowrap', display: 'inline' }}
+                        >
+                          Edit
+                        </BodySmall>
+                      ) : (
+                        <Link
+                          onClick={(e: React.MouseEvent) => {
+                            e.preventDefault();
+                            const baseHue = (() => {
+                              const h = chroma(anchor.hex).get('lch.h');
+                              return isNaN(h) ? 0 : Math.round(h);
+                            })();
+                            const existingDark = hueOverridesByTop[colorIdx]?.[toneMode]?.darkHue;
+                            const existingLight = hueOverridesByTop[colorIdx]?.[toneMode]?.lightHue;
+                            setHueEditDarkHue(existingDark !== undefined ? existingDark : baseHue);
+                            setHueEditLightHue(existingLight !== undefined ? existingLight : baseHue);
+                            setHueEditFocus(null);
+                            setChromaDragValue(null);
+                            setHueEditTopIdx(colorIdx);
+                          }}
+                          style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}
+                        >
+                          Edit
+                        </Link>
+                      )}
+                      </div>
                     </div>
 
                     {/* Tone palette */}
