@@ -373,6 +373,14 @@ interface SpacingSection {
 }
 
 interface ColorSystemExport {
+  /** Which Color-N each brand colour sits at — Default Primary/Secondary/
+   *  Tertiary Tone. Emitted so consumers (and the CSS + Figma exports) can read
+   *  the brand's position on the scale instead of inferring it from hexes. */
+  Brand: {
+    DPT: { value: string; type: 'string' };
+    DST: { value: string; type: 'string' };
+    DTT: { value: string; type: 'string' };
+  };
   Metadata: {
     Name: { value: string; type: 'string' };
     'Date Created': { value: string; type: 'string' };
@@ -2467,7 +2475,12 @@ function generateTagsForBackground(
 function generateFocusVisibleSection(isDark: boolean = false): FocusVisibleSection {
   // Mirrors Border.Surfaces (verified identical across all eight palettes).
   const darkBgTones = isDark ? [6, 6, 7, 8, 9, 2] : [6, 6, 7, 9, 10, 2];   // Background-1..6
-  const lightBgTones = isDark ? [3, 4, 5, 5, 5, 5] : [5, 5, 5, 5, 5, 5];   // Background-7..12
+  // Background-7..12. Light mode's first two entries are Color-4, NOT Color-5,
+  // to stay in step with Border.Surfaces — Color-5 measures 2.18:1 against a
+  // saturated surface at tone 7 and 2.95:1 at tone 8, both under the 3:1 floor.
+  // This array is a MIRROR of that table, so when Border moved, this had to
+  // move with it; leaving it behind put the focus ring at 2.98:1.
+  const lightBgTones = isDark ? [3, 4, 5, 5, 5, 5] : [4, 4, 5, 5, 5, 5];   // Background-7..12
 
   const toneAt = (n: number): number => (n <= 6 ? darkBgTones[n - 1] : lightBgTones[n - 7]);
 
@@ -4074,7 +4087,24 @@ export function exportColorSystemToJSON(
   const OB = PC >= 9 ? 6 : 5; // Other buttons (OB = 8 if PC >= 9, else 6)
   console.log(`🎯 [JSON Export] OB calculated: ${OB} (PC = ${PC})`);
   
+  // ── Brand tones ────────────────────────────────────────────────────────
+  //
+  // Which Color-N each brand colour actually sits at. The generator computes
+  // this in half a dozen places (toneToColorNumber(extractedTones.primary))
+  // and then throws it away, so nothing downstream can tell you where the
+  // brand lives without reverse-engineering it from hexes.
+  //
+  //   DPT / DST / DTT — Default Primary / Secondary / Tertiary Tone
+  const DPT = extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9;
+  const DST = extractedTones?.secondary ? toneToColorNumber(extractedTones.secondary) : 9;
+  const DTT = extractedTones?.tertiary ? toneToColorNumber(extractedTones.tertiary) : 9;
+
   const colorSystem: ColorSystemExport = {
+    Brand: {
+      DPT: { value: String(DPT), type: 'string' },
+      DST: { value: String(DST), type: 'string' },
+      DTT: { value: String(DTT), type: 'string' },
+    },
     Metadata: {
       Name: {
         value: designSystemName || 'My Design System',

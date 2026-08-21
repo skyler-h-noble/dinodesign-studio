@@ -14,6 +14,7 @@ import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
 import { computeRadii, migrateLegacyRadii } from '../componentRadii';
+import { solveThemeScrims, generateTextOverImageCSS } from './generateTextOverImage';
 import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
@@ -3062,6 +3063,65 @@ function generateCSSHeader(jsonData: any): string {
  * 2. Multiple modes: { "Light-Mode-Tonal": {...}, "Light-Mode-Professional": {...}, "Dark-Mode": {...} }
  * 3. Nested modes: { Backgrounds: {...}, Modes: { "Light-Mode-Tonal": {...}, ... }, Theme: {...} }
  */
+/**
+ * Resolve every theme's Background/Text pair and solve its scrim.
+ *
+ * Reads the SAME two tokens the theme publishes, so a scrim can never protect
+ * a colour the theme is not actually using. Light-Mode only: a scrim is a
+ * property of the theme's own pair, and the dark pair gets its own entry from
+ * the Dark-Mode tree when a consumer switches.
+ */
+function buildTextOverImageCSS(jsonData: any): string {
+  const mode = jsonData?.Modes?.['Light-Mode'];
+  const themes = mode?.Themes;
+  if (!themes) return '';
+
+  const deref = (value: any): string => {
+    let v = typeof value === 'string' ? value : value?.value;
+    for (let hop = 0; hop < 8 && typeof v === 'string' && v.startsWith('{'); hop++) {
+      const path = v.slice(1, -1).split('.');
+      let node: any = mode;
+      for (const key of path) node = node?.[key];
+      if (node === undefined) {
+        node = jsonData;
+        for (const key of path) node = node?.[key];
+      }
+      v = typeof node === 'string' ? node : node?.value;
+    }
+    return typeof v === 'string' ? v : '';
+  };
+
+  // Every foreground a themed poster can put on the scrim, with the ratio it
+  // owes. Header takes 3:1 (large text); the rest are body-sized and take 4.5.
+  // Solving only Text was the original defect — a poster whose title is
+  // --Header and whose eyebrow is --Eyebrow got a scrim tuned for neither.
+  const ROLES: { role: string; key: string; target: number }[] = [
+    { role: '--Text', key: 'Text', target: 4.5 },
+    { role: '--Quiet', key: 'Quiet', target: 4.5 },
+    { role: '--Eyebrow', key: 'Eyebrow', target: 4.5 },
+    { role: '--Header', key: 'Header', target: 3 },
+  ];
+
+  const pairs: Record<string, { background: string; foregrounds: any[] }> = {};
+  for (const [name, theme] of Object.entries<any>(themes)) {
+    const surfaces = theme?.Surfaces;
+    if (!surfaces) continue;
+    const background = deref(surfaces.Background);
+    if (!/^#[0-9a-f]{6}$/i.test(background)) continue;
+
+    const foregrounds = ROLES
+      .map(r => ({ role: r.role, hex: deref(surfaces[r.key]), target: r.target }))
+      // An 8-digit hex carries alpha; the solver needs opaque values, and
+      // translucent text over a photo is a different problem than this one.
+      .filter(f => /^#[0-9a-f]{6}$/i.test(f.hex));
+
+    if (!foregrounds.length) continue;
+    pairs[name] = { background, foregrounds };
+  }
+  if (!Object.keys(pairs).length) return '';
+  return generateTextOverImageCSS(solveThemeScrims(pairs));
+}
+
 export function generateCSSFiles(jsonData: any): { [filename: string]: string } {
   const cssFiles: { [filename: string]: string } = {}; 
   
@@ -3126,7 +3186,15 @@ img {
     const validatedBaseCSS = baseCSS.split('\n').map(line => validateCSSLine(line)).join('\n');
     cssFiles['base.css'] = validatedBaseCSS;
     console.log(`✅ Generated base.css (${baseCSS.split('\n').length} lines)`);
-    
+
+    // Text-over-image scrims — one per theme, solved for the worst possible
+    // image. See generateTextOverImage.ts for why this needs no image.
+    const scrimCSS = buildTextOverImageCSS(jsonData);
+    if (scrimCSS) {
+      cssFiles['text-over-image.css'] = scrimCSS;
+      console.log('✅ Generated text-over-image.css');
+    }
+
     return cssFiles;
   }
   
@@ -4771,6 +4839,15 @@ export function generateBaseCSS(jsonData: any): string {
     const cappedCardRadius = Math.min(r.cardRadius, buttonHeight);
     const cappedModalRadius = Math.min(r.modalRadius, buttonHeight);
     lines.push(':root {');
+    // Where the brand sits on the 12-tone scale. Read from the payload rather
+    // than recomputed, so the CSS cannot disagree with Figma.
+    const brand = (jsonData as any)?.Brand;
+    if (brand?.DPT?.value) {
+      lines.push(`  /* Default Primary / Secondary / Tertiary Tone — the Color-N each brand colour sits at. */`);
+      lines.push(`  --DPT: ${brand.DPT.value};`);
+      lines.push(`  --DST: ${brand.DST?.value ?? brand.DPT.value};`);
+      lines.push(`  --DTT: ${brand.DTT?.value ?? brand.DPT.value};`);
+    }
     // --Style-Border-Radius is what the lib's Card component consumes by
     // default. Emitting it explicitly here (the legacy export path stopped
     // writing it) ensures exported designs match the preview cap.

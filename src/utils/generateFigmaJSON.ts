@@ -468,6 +468,17 @@ function buildFigmaTypeScale(typo: any): any {
 export function generateFigmaJSON(designSystemJSON: any): any {
   const figma: any = { Modes: {}, Themes: {}, SurfacesContainers: {} };
 
+  // Carry the brand's tone positions through to Figma. Same three values the
+  // CSS emits as --DPT / --DST / --DTT, read from the same place so the two
+  // cannot drift.
+  if (designSystemJSON?.Brand) {
+    figma.Brand = {
+      DPT: designSystemJSON.Brand.DPT?.value,
+      DST: designSystemJSON.Brand.DST?.value,
+      DTT: designSystemJSON.Brand.DTT?.value,
+    };
+  }
+
   const modes = ['Light-Mode', 'Dark-Mode'];
 
   for (const modeName of modes) {
@@ -992,12 +1003,23 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                       if (shadeMatch) {
                         target[key]['Hover'] = { value: `{${shadeMatch[1]}.Hover}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{${shadeMatch[1]}.Pressed}`, type: 'color' };
+                        // Bevel follows the same rule as Hover/Pressed. The
+                        // shade table carries per-mode Highlight/Lowlight
+                        // derived from the real fill; the tone-keyed
+                        // Button-Highlight/Button-Lowlight groups are keyed by
+                        // the button's LIGHT-mode tone, and the Theme layer is
+                        // mode-independent so it cannot flip. Pointing at the
+                        // tone table gave a bevel computed from the light fill
+                        // sitting on the dark button — the same divergence the
+                        // Hover/Pressed fix above corrects.
+                        target[key]['Highlight'] = { value: `{${shadeMatch[1]}.Highlight}`, type: 'color' };
+                        target[key]['Lowlight'] = { value: `{${shadeMatch[1]}.Lowlight}`, type: 'color' };
                       } else {
                         target[key]['Hover'] = { value: `{Button-Hover.${palette}.${colorN}}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{Button-Pressed.${palette}.${colorN}}`, type: 'color' };
+                        target[key]['Highlight'] = { value: `{Button-Highlight.${palette}.${colorN}}`, type: 'color' };
+                        target[key]['Lowlight'] = { value: `{Button-Lowlight.${palette}.${colorN}}`, type: 'color' };
                       }
-                      target[key]['Highlight'] = { value: `{Button-Highlight.${palette}.${colorN}}`, type: 'color' };
-                      target[key]['Lowlight'] = { value: `{Button-Lowlight.${palette}.${colorN}}`, type: 'color' };
                       // Border palette should match the button's palette too —
                       // the upstream JSON hardcodes Border to Primary for the
                       // Default button (and similar) regardless of the user's
@@ -1044,7 +1066,16 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                           // palette, unused until now. Pointing the Default
                           // theme at it gives each theme its own light/dark
                           // pair, which is where the difference actually lives.
-                          const borderPalette = themeName === 'Default' ? 'Default' : palette;
+                          // The Default-theme override applies to the DEFAULT
+                          // BUTTON ONLY, not to every button role that happens
+                          // to sit in the Default theme. Keying it on the theme
+                          // alone sent the Info button's border to
+                          // Default-Button-Border.Surfaces.Default.Color-N while
+                          // its fill, text, hover, pressed and both bevels all
+                          // came from Buttons/Info — one variable in the group
+                          // pointing at a different palette than the other six.
+                          const borderPalette =
+                            (themeName === 'Default' && key === 'Default') ? 'Default' : palette;
                           target[key]['Border'] = {
                             value: `{Default-Button-Border.${scope}.${borderPalette}.${surfaceColorN}}`,
                             type: 'color',
