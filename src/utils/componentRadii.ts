@@ -120,10 +120,27 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   // nesting rule (inner = outer − padding) still holds below the cap.
   const CARD_CORNER_CAP = 20;
   const cardCornerBase = Math.min(buttonRadius, CARD_CORNER_CAP);
-  const cardRadius = cardCornerBase + cardPadding;
 
+  // Then cap the RESULT.
+  //
+  // Capping only the corner term did not do what its comment claimed: above a
+  // 24px button radius `cardPadding` is the larger of the two and was added on
+  // top uncapped, so cards landed at 44-51px — several times a conventional
+  // card. It was also non-monotonic, because cardPadding switches from
+  // `buttonRadius` to `buttonRadius / 2` at 32: one notch on the slider (65% to
+  // 66%) dropped the card from 51px to 36px, making cards LESS round as the
+  // button got rounder.
+  //
+  // Capping the total fixes both — above the cap the curve is flat, so the
+  // cliff has nothing to fall off.
+  const CARD_RADIUS_MAX = 24;
+  const cardRadius = Math.min(cardCornerBase + cardPadding, CARD_RADIUS_MAX);
+
+  // Modals take the same ceiling. Their padding is 1.5x a card's, so an uncapped
+  // modal corner reached ~66px — and leaving it uncapped while the card is
+  // capped at 24 would make a modal visibly rounder than the cards inside it.
   const modalPadding = Math.round(cardPadding * 1.5);
-  const modalRadius = cardCornerBase + modalPadding;
+  const modalRadius = Math.min(cardCornerBase + modalPadding, CARD_RADIUS_MAX);
 
   return {
     buttonRadius,

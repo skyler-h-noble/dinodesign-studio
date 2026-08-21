@@ -15,7 +15,7 @@ import { AXES, HEADER_FAMILY, type AxisValues } from '../../utils/moodAxes';
 import type { FontMatchState } from '../../hooks/useFontMatch';
 import type { FontScore } from '../../utils/fontMatch';
 import { FontChip } from './FontChip';
-import { NOISE_FILTER_ID, noiseParams, bounceChars, SYSTEM_UI_STACK } from '../../utils/typeScale';
+import { NOISE_FILTER_ID, noiseParams, bounceChars, SYSTEM_UI_STACK, displayLeadingFor, displayLineHeight } from '../../utils/typeScale';
 
 export type TextCase = 'normal' | 'uppercase';
 export type BodyBranch = 'sans' | 'serif';
@@ -505,11 +505,15 @@ export function RolePanels(p: RolePanelsProps) {
                         value={emToNum(s.display.letterSpacing)} min={-0.08} max={0.3} step={0.005}
                         onChange={(v) => p.onDisplayChange({ letterSpacing: `${v}em` })}
                       />
-                      <RangeField
-                        label={`Line height (${s.display.leading.toFixed(2)})`}
-                        value={s.display.leading} min={0.95} max={1.6} step={0.01}
-                        onChange={(v) => p.onDisplayChange({ leading: v })}
-                      />
+                      {/* Line height is calculated, not set. It slides from 1.3
+                          at 32px to 1.1 at 120px, because a ratio that reads as
+                          comfortable on small type opens a gap on a hero — and
+                          each of the three steps gets its own, rather than the
+                          whole ramp sharing Large's. Shown, not offered. */}
+                      <Caption color="quiet">
+                        {`Line height ${displayLeadingFor(s.display.size).toFixed(2)} `
+                          + `— ${displayLineHeight(s.display.size)}px, calculated from the size`}
+                      </Caption>
                       <RangeField
                         label={`Noise / grain (${s.display.noise})`}
                         value={s.display.noise} min={0} max={100}

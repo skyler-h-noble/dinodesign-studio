@@ -177,8 +177,55 @@ const evenRound = (n: number) => Math.round(n / 2) * 2;
  */
 export const DISPLAY_LEADING = 1.3;
 
-export function displayLineHeight(size: number, leading = DISPLAY_LEADING): number {
-  return Math.ceil((size * leading) / 4) * 4;
+/** The band Display leading is allowed to move within. */
+export const DISPLAY_LEADING_LOOSE = 1.3;   // smallest Display size
+export const DISPLAY_LEADING_TIGHT = 1.1;   // largest Display size
+
+/** The Display size slider's ends, which the leading is interpolated across. */
+export const DISPLAY_SIZE_MIN = 32;
+export const DISPLAY_SIZE_MAX = 120;
+
+/**
+ * Leading for a Display size — calculated, not chosen.
+ *
+ * Big type needs tighter leading: the same ratio that reads as comfortable at
+ * 32px opens a visible gap at 120px, because the space between lines grows with
+ * the size while the eye's need for it does not. So the ratio slides from 1.3
+ * at the small end to 1.1 at the large end rather than staying flat.
+ *
+ * This replaces a user-facing slider. A ratio is a poor thing to ask someone to
+ * set — it has to be re-judged every time the size moves, and the earlier flat
+ * 1.3 was chosen for a 72px hero and then applied unchanged to every size.
+ */
+export function displayLeadingFor(size: number): number {
+  const span = DISPLAY_SIZE_MAX - DISPLAY_SIZE_MIN;
+  const t = Math.min(1, Math.max(0, (size - DISPLAY_SIZE_MIN) / span));
+  return DISPLAY_LEADING_LOOSE - t * (DISPLAY_LEADING_LOOSE - DISPLAY_LEADING_TIGHT);
+}
+
+/**
+ * Line height in px, on the 4px grid.
+ *
+ * `leading` stays overridable for callers that genuinely have one, but the
+ * default is now derived from the size rather than a single constant — so each
+ * Display step gets its own ratio instead of the whole ramp sharing Large's.
+ */
+export function displayLineHeight(size: number, leading = displayLeadingFor(size)): number {
+  // Round to the NEAREST 4px, then clamp back inside the 1.1-1.3 band.
+  //
+  // Always rounding up (the previous behaviour) pushed small sizes out the top:
+  // 32px at 1.30 is 41.6, which ceils to 44 — an effective 1.375, above the
+  // ceiling. The band is the requirement and the 4px grid is the constraint, so
+  // the grid has to yield where the two disagree.
+  const target = size * leading;
+  let px = Math.round(target / 4) * 4;
+  const floorPx = size * DISPLAY_LEADING_TIGHT;
+  const ceilPx = size * DISPLAY_LEADING_LOOSE;
+  if (px < floorPx) px = Math.ceil(floorPx / 4) * 4;
+  if (px > ceilPx) px = Math.floor(ceilPx / 4) * 4;
+  // The band is 20% of the size, so it holds a 4px multiple for every size the
+  // Display ramp can take. This is the floor if one ever does not.
+  return Math.max(4, px);
 }
 
 /**
@@ -192,7 +239,7 @@ export function displayLineHeight(size: number, leading = DISPLAY_LEADING): numb
  * and the three steps converge rather than inverting — a Display-Small larger
  * than its Display-Large would be worse than a flat ramp.
  */
-export function displaySteps(largeSize = DEFAULT_DISPLAY_SIZE, leading = DISPLAY_LEADING) {
+export function displaySteps(largeSize = DEFAULT_DISPLAY_SIZE, leading?: number) {
   const large = Math.max(16, evenRound(largeSize));
   const small = Math.min(H1_SIZE, large);
   const medium = Math.min(large, Math.max(small, evenRound((large + small) / 2)));
@@ -200,7 +247,9 @@ export function displaySteps(largeSize = DEFAULT_DISPLAY_SIZE, leading = DISPLAY
   return (['large', 'medium', 'small'] as const).map((key) => ({
     ...DISPLAY_STEP_TOKENS[key],
     size: sizes[key],
-    lineHeight: displayLineHeight(sizes[key], leading),
+    // Each step computes its own ratio from its own size. An explicit `leading`
+    // still wins, so a caller with a real reason can flatten the ramp.
+    lineHeight: displayLineHeight(sizes[key], leading ?? displayLeadingFor(sizes[key])),
   }));
 }
 
@@ -416,7 +465,8 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
     out.push({ ...s, description: s.description ?? GROUP_DESCRIPTIONS[s.group] ?? '' });
   };
 
-  for (const step of displaySteps(roles.display.size ?? DEFAULT_DISPLAY_SIZE, roles.display.leading ?? DISPLAY_LEADING)) {
+  // No stored leading is passed: it is calculated per step from the size now.
+  for (const step of displaySteps(roles.display.size ?? DEFAULT_DISPLAY_SIZE)) {
     push({
       token: step.token, name: `Display/${step.step}`, group: 'Display', step: step.step,
       familyRole: 'display', weightFromFace: true,

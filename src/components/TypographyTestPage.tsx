@@ -1792,7 +1792,22 @@ export default function TypographyTestPage({
                 onBodyBranch={applyBodyBranch}
                 onBodyFont={applyBodyFont}
                 onActiveRole={setActiveRole}
-                stickTop={previewH ? 72 + previewH + 8 : 0}
+                stickTop={(() => {
+                  if (!previewH) return 0;
+                  const proposed = 72 + previewH + 8;
+                  // A sticky header only earns its keep if there is room to
+                  // scroll content underneath it. The preview's height tracks
+                  // the Display size, so at 72px it runs ~550px tall and this
+                  // lands ~630px down — most of the viewport. The header then
+                  // detaches almost immediately and floats in the middle of the
+                  // card, over the controls it is supposed to label.
+                  //
+                  // Past a third of the viewport, stay in normal flow instead.
+                  const maxUseful = typeof window !== 'undefined'
+                    ? window.innerHeight * 0.35
+                    : 260;
+                  return proposed <= maxUseful ? proposed : 0;
+                })()}
               />
             </div>
           </>
