@@ -405,11 +405,19 @@ export function generateSimplifiedDarkModeBackgrounds(
   const darkColorLow = palette[rampLowN - 1]?.color || '#111111';
   const darkColorMid = palette[rampMidN - 1]?.color || '#1f1f1f';
   const darkColorHigh = palette[rampHighN - 1]?.color || '#2c2c2c';
-  const containerLowestColor = darkColorLow;
-  const containerLowColor = blendColors(darkColorMid, darkColorLow, 0.50);
-  const containerColor = darkColorMid;
-  const containerHighColor = blendColors(darkColorHigh, darkColorMid, 0.50);
-  const containerHighestColor = darkColorHigh;
+  // Containers are ONE tone at five opacities, not five tones: Color-3
+  // composited over Color-2 at 50 / 65 / 75 / 85 / 100%. Elevation reads as the
+  // container gaining presence against a fixed backdrop rather than marching
+  // through the palette, so the five levels stay unmistakably the same material
+  // and the steps can sit closer together than whole tones allow.
+  const containerBacking = palette[1]?.color || '#111111';   // Color-2
+  const containerFace = palette[2]?.color || '#1f1f1f';      // Color-3
+  const atOpacity = (a: number) => blendColors(containerFace, containerBacking, a);
+  const containerLowestColor = atOpacity(0.50);
+  const containerLowColor = atOpacity(0.65);
+  const containerColor = atOpacity(0.75);
+  const containerHighColor = atOpacity(0.90);
+  const containerHighestColor = containerFace;
 
   // ========================================================================
   // CRITICAL FIX: Return TOKEN REFERENCES for Dark Mode too!
@@ -423,7 +431,11 @@ export function generateSimplifiedDarkModeBackgrounds(
   // brand color family instead of falling out to a desaturated black/white blend.
   const dimColorNumber = Math.max(surfaceColorNumber - 1, 1);
   const brightColorNumber = Math.min(surfaceColorNumber + 1, 12);
-  const surfaceDimToken = paletteName ? `{Colors.${paletteName}.Color-${dimColorNumber}}` : surfaceDimColor;
+  // Dim bottoms out at TRUE BLACK as a literal. Now that Color-1 is L3 there is
+  // somewhere darker to go, and no tone in the ramp is black any more — so this
+  // cannot be a token reference.
+  const surfaceDimToken = '#000000';
+  void dimColorNumber;
   const surfaceBrightToken = paletteName ? `{Colors.${paletteName}.Color-${brightColorNumber}}` : surfaceBrightColor;
 
   if (paletteName) {
@@ -448,8 +460,16 @@ export function generateSimplifiedDarkModeBackgrounds(
         // in-between levels are blends and have no token, so they stay hex.
         // Neutral (black) anchors one tone lower (Color-1/2/3) so cards read
         // near-black; colored dark themes use Color-2/3/4.
+        // Four blends and one pure tone. Only Container-Highest is a palette
+        // colour, so only it can be a token reference — the rest are Color-3
+        // composited over Color-2 and have no token to point at.
+        //
+        // Emitting token refs for Lowest/Container as well is what produced a
+        // NON-MONOTONIC ramp: the refs resolved to whole tones (Color-2, -3, -4)
+        // while Low and High resolved to blends, so the five levels came off two
+        // different curves and Container-High landed BELOW Container.
         'Container-Lowest': {
-          value: `{Colors.${paletteName}.Color-${rampLowN}}`,
+          value: containerLowestColor,
           type: 'color'
         },
         'Container-Low': {
@@ -457,7 +477,7 @@ export function generateSimplifiedDarkModeBackgrounds(
           type: 'color'
         },
         'Container': {
-          value: `{Colors.${paletteName}.Color-${rampMidN}}`,
+          value: containerColor,
           type: 'color'
         },
         'Container-High': {
@@ -465,7 +485,7 @@ export function generateSimplifiedDarkModeBackgrounds(
           type: 'color'
         },
         'Container-Highest': {
-          value: `{Colors.${paletteName}.Color-${rampHighN}}`,
+          value: `{Colors.${paletteName}.Color-3}`,
           type: 'color'
         }
       }

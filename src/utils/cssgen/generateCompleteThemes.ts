@@ -201,7 +201,23 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       // Hotlinks share the contrast-tuned Info text mapping so links read
       // on any surface tone without the user noticing fade-out on dark
       // backgrounds.
-      value: `{Text.Surfaces.Info.Color-${n}}`,
+      //
+      // DARK SURFACES take Color-Vibrant instead. On tones 1-4 the tone-mapped
+      // Info text is a deep blue that a reader has to hunt for; Vibrant is the
+      // light ramp's Color-8, bright enough to read as a link at a glance and
+      // the same value the buttons and tags already use on dark.
+      //
+      // The cut is at 4, not 5. Tone 5 is L37 in light mode but L24 in dark —
+      // the index means different lightnesses in the two ramps, and Vibrant
+      // against a light-mode tone-5 surface measures 4.08-4.30, under the line.
+      // Tone 5+ therefore keeps the mapped text.
+      // {Colors.Info.Color-Vibrant} — the vibrant COLOUR itself, not
+      // Text.Surfaces.Info.Color-Vibrant, which means "text to use ON a vibrant
+      // surface" and is therefore dark. Pointing at the text table put a
+      // near-black blue on a black surface at 1.20:1.
+      value: n <= 4
+        ? `{Colors.Info.Color-Vibrant}`
+        : `{Text.Surfaces.Info.Color-${n}}`,
       type: 'color'
     },
     'Hotlink-Visited': {
@@ -575,7 +591,10 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     'Hotlink': {
-      value: `{Text.Containers.Info.Color-${config.contN}}`,
+      // Same rule as the surface Hotlink above — dark containers take Vibrant.
+      value: config.contN <= 4
+        ? `{Colors.Info.Color-Vibrant}`
+        : `{Text.Containers.Info.Color-${config.contN}}`,
       type: 'color'
     },
     'Hotlink-Visited': {

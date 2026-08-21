@@ -9,7 +9,10 @@ import { getStaticQuietTokensForLightMode } from './cssgen/staticQuietStructures
 export const TONE_SCALE = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99] as const;
 
 /** The 12-tone dark mode scale — shifted darker for dark mode surfaces */
-export const DARK_TONE_SCALE = [1, 5, 12, 18, 24, 58, 64, 70, 76, 82, 85, 89] as const;
+// Color-1 is L3, not L1. At L1 it is near-pure black, which reads as a hole
+// rather than a surface once it IS the page background. True black stays
+// available as a literal for Surface-Dim / Surface-Dimmest, which want the floor.
+export const DARK_TONE_SCALE = [3, 5, 12, 18, 24, 58, 64, 70, 76, 82, 85, 89] as const;
 
 /** Color-N position (1-12) labels */
 export const COLOR_POSITIONS = Array.from({ length: 12 }, (_, i) => i + 1);
