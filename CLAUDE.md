@@ -378,6 +378,36 @@ can't be reasoned away.
    every layer bound to the old one stays unbound. Recovery is Figma's undo or
    version history.
 
+## What the generated CSS deliberately does NOT do
+
+Two contracts that are invisible in the code and have each cost a debugging
+session. They belong with the invariants above because breaking them is easy
+and the failure is silent.
+
+**The output styles no bare elements.** No `body`, `html`, `p`, `h1` or `*`
+rule is emitted in any of the six files — only custom properties and opt-in
+`.typography-*` classes. A consumer who loads the CSS and expects text to look
+right gets nothing, and that is correct: a design system that restyled `body`
+on import would change pages nobody asked it to change. Do not "fix" this by
+adding an element rule to the generator. The consumer-side setup is documented
+in the lib's CLAUDE.md under *Page setup*.
+
+**Eyebrow and Overline are one concept under two names.** Eyebrow is the FACE
+and the COLOUR role (`--Eyebrow`, `--Font-Family-Eyebrow`,
+`--Font-Weight-Eyebrow`); Overline is the TYPE STYLE, and it owns the sizes
+(`--Overline-{Small,Medium,Large}-Font-Size`, `-Letter-Spacing`).
+`--Eyebrow-Font-Size` does not exist. The split is deliberate — the colour role
+and the type style vary on different axes, and `Overline` is the lib's
+component name — but a consumer will reach for `--Eyebrow-Font-Size` and get a
+silent fallback. If you ever collapse the two names, alias rather than rename:
+the CSS is frozen per design system in Storage, so an old system loaded against
+new consumer code has to keep resolving.
+
+`--Eyebrow` is a ROTATION off the surface's palette (Primary→Secondary,
+Secondary→Tertiary, Tertiary/Neutral→Primary, states→BW), encoded in the
+`Eyebrows` table. It is not a muted `--Text`, and anything that substitutes
+`--Quiet` for it discards the rotation.
+
 ## Audit
 
 Before committing UI work, run a quick mental pass:
