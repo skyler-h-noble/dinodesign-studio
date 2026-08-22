@@ -1,4 +1,8 @@
 import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from './firebase/storage';
+import {
+  bevelCSS, bevelJSON, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
+} from './bevelGeometry';
+import { extractHeroImage } from './heroImage';
 import { STORAGE_BUCKET } from './firebase/client';
 import type { ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../types';
 import { toneToColorNumber } from './colorScale';
@@ -721,31 +725,43 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
       },
     );
 
-    // Add Platform section to JSON
+    // Add Platform section to JSON.
+    // `buttonHeight` proper is derived further down (after migrateLegacyRadii),
+    // which is AFTER this point in the same scope — reading it here would hit
+    // the temporal dead zone. Read the same input the migration defaults from.
+    const platformDesktopButtonHeight = input.styleCustomizations?.buttonHeight ?? 32;
     designSystemJSON.Platform = {
       Desktop: {
         'Container-Padding': { value: 'var(--Sizing-4)', type: 'spacing' },
-        'Button-Height': { value: '32px', type: 'sizing' },
+        'Button-Height': { value: `${platformButtonHeight('Desktop', platformDesktopButtonHeight)}px`, type: 'sizing' },
         'Min-Button-Width': { value: '80px', type: 'sizing' },
         'Min-Stack-Gap': { value: '0px', type: 'spacing' },
+        'Target': { value: `${PLATFORM_TARGET.Desktop}px`, type: 'sizing' },
+        'Platform-Spacer': { value: `${PLATFORM_SPACER.Desktop}px`, type: 'spacing' },
         'Platform-Label': { value: 'Desktop', type: 'string' },
       },
       'IOS-Mobile': {
         'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
-        'Button-Height': { value: '44px', type: 'sizing' },
+        'Button-Height': { value: `${platformButtonHeight('IOS-Mobile', platformDesktopButtonHeight)}px`, type: 'sizing' },
         'Min-Stack-Gap': { value: '10px', type: 'spacing' },
+        'Target': { value: `${PLATFORM_TARGET['IOS-Mobile']}px`, type: 'sizing' },
+        'Platform-Spacer': { value: `${PLATFORM_SPACER['IOS-Mobile']}px`, type: 'spacing' },
         'Platform-Label': { value: 'IOS-Mobile', type: 'string' },
       },
       'IOS-Tablet': {
         'Container-Padding': { value: 'var(--Sizing-3)', type: 'spacing' },
-        'Button-Height': { value: '48px', type: 'sizing' },
+        'Button-Height': { value: `${platformButtonHeight('IOS-Tablet', platformDesktopButtonHeight)}px`, type: 'sizing' },
         'Min-Stack-Gap': { value: '10px', type: 'spacing' },
+        'Target': { value: `${PLATFORM_TARGET['IOS-Tablet']}px`, type: 'sizing' },
+        'Platform-Spacer': { value: `${PLATFORM_SPACER['IOS-Tablet']}px`, type: 'spacing' },
         'Platform-Label': { value: 'IOS-Tablet', type: 'string' },
       },
       Android: {
         'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
-        'Button-Height': { value: '48px', type: 'sizing' },
+        'Button-Height': { value: `${platformButtonHeight('Android', platformDesktopButtonHeight)}px`, type: 'sizing' },
         'Min-Stack-Gap': { value: '12px', type: 'spacing' },
+        'Target': { value: `${PLATFORM_TARGET.Android}px`, type: 'sizing' },
+        'Platform-Spacer': { value: `${PLATFORM_SPACER.Android}px`, type: 'spacing' },
         'Platform-Label': { value: 'Android', type: 'string' },
       },
     };
@@ -813,6 +829,16 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     name: input.designSystemName,
     foundation: getPublicFileUrl(uuid, 'foundation.css'),
     core:       getPublicFileUrl(uuid, 'core.css'),
+    // Listed between core and the mode sheets because that is the cascade
+    // order the Provider loads in (foundation → core → typography → mode →
+    // base → styles).
+    //
+    // Omitting this slot did not fail loudly: the Provider simply never
+    // fetched the brand's ramp, so the lib's BUNDLED typography-tokens.css
+    // won on [data-platform="Desktop"] and replaced it. A header weight of
+    // 857 rendered as 600 and H1 came out 32px instead of 48px — a design
+    // system quietly wearing the lib's default type.
+    typography: getPublicFileUrl(uuid, 'typography-tokens.css'),
     lightMode:  getPublicFileUrl(uuid, 'Light-Mode.css'),
     darkMode:   getPublicFileUrl(uuid, 'Dark-Mode.css'),
     base:       getPublicFileUrl(uuid, 'base.css'),
@@ -850,6 +876,10 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const smallButtonHeight = sc.smallButtonHeight;
   const largeButtonHeight = sc.largeButtonHeight;
   const minButtonWidth = input.styleCustomizations?.minButtonWidth ?? 60;
+  // The large button's text floor. A 56px-tall button needs more room before it
+  // stops looking like a stub, so it is the standard floor plus 40px rather
+  // than a second number to keep in sync.
+  const lgMinButtonWidth = minButtonWidth + 40;
   const bevelPercent = input.styleCustomizations?.bevel ?? 0;
   const bevelOpacity = input.styleCustomizations?.bevelOpacity ?? 50;
   const bevelPx = Math.round(buttonHeight * bevelPercent / 100);
@@ -880,9 +910,16 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Small-Button-Height: ${smallButtonHeight}px;
   --Large-Button-Height: ${largeButtonHeight}px;
   --Button-Min-Width: ${minButtonWidth}px;
+  --Lg-Button-Min-Width: ${lgMinButtonWidth}px;
   --Button-Bevel: ${bevelPercent};
   --Button-Bevel-Px: ${bevelPx}px;
   --Button-Bevel-Opacity: ${bevelOpacity / 100};
+  /* Bevel geometry — the literal box-shadow numbers, same values the Figma
+     Platform/Components collections carry (there as bare numbers, here as px).
+     Small and large don't vary by platform, so they live here; medium's live
+     in core.css beside the platform button heights they're derived from. */
+${bevelCSS('Sm-', smallButtonHeight, bevelPercent)}
+${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Style-Border-Radius: var(--Button-Radius);
 
   /* Card */
@@ -894,6 +931,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   /* Modal */
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${r.modalRadius}px;
+  --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
   --Modal-Inner-Radius: ${r.modalInnerRadius}px;
   --Modal-Focus-Radius: ${r.modalFocusRadius}px;
 
@@ -1066,14 +1104,27 @@ ${typographyDeclarations(input.typographyStyles)}
   --Label-Paragraph-Spacing: 4px;
   --Button-Font-Size: 16px;
   --Button-Line-Height: 20px;
+  /* Medium bevel geometry — derived from THIS platform's button height, which
+     is why it lives beside the height rather than in foundation.css. Each
+     [data-platform] block below re-emits it for its own height. */
+${bevelCSS('', buttonHeight, bevelPercent)}
+  /* Hit target. The SMALL button keeps its visual size on every platform; the
+     lib wraps it in a box that grows to --Target using --Platform-Spacer, so
+     the button looks identical while the tappable area meets the platform
+     minimum. */
+  --Target: ${PLATFORM_TARGET.Desktop}px;
+  --Platform-Spacer: ${PLATFORM_SPACER.Desktop}px;
 }
 
 /* iOS Mobile */
 [data-platform="IOS-Mobile"] {
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "IOS-Mobile";
-  --Button-Height: 44px;
+  --Button-Height: ${platformButtonHeight('IOS-Mobile', buttonHeight)}px;
   --Min-Stack-Gap: 10px;
+${bevelCSS('', platformButtonHeight('IOS-Mobile', buttonHeight), bevelPercent)}
+  --Target: ${PLATFORM_TARGET['IOS-Mobile']}px;
+  --Platform-Spacer: ${PLATFORM_SPACER['IOS-Mobile']}px;
   --Body-Font-Size: 16px;
   --Body-Letter-Spacing: -.5px;
   --Body-Line-Height: 24px;
@@ -1114,8 +1165,11 @@ ${typographyDeclarations(input.typographyStyles)}
 [data-platform="IOS-Tablet"] {
   --Container-Padding: var(--Sizing-3);
   --Platform-Label: "IOS-Tablet";
-  --Button-Height: 48px;
+  --Button-Height: ${platformButtonHeight('IOS-Tablet', buttonHeight)}px;
   --Min-Stack-Gap: 10px;
+${bevelCSS('', platformButtonHeight('IOS-Tablet', buttonHeight), bevelPercent)}
+  --Target: ${PLATFORM_TARGET['IOS-Tablet']}px;
+  --Platform-Spacer: ${PLATFORM_SPACER['IOS-Tablet']}px;
   --Body-Font-Size: 17px;
   --Body-Letter-Spacing: -.5px;
   --Body-Line-Height: 25.5px;
@@ -1156,8 +1210,11 @@ ${typographyDeclarations(input.typographyStyles)}
 [data-platform="Android"] {
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "Android";
-  --Button-Height: 48px;
+  --Button-Height: ${platformButtonHeight('Android', buttonHeight)}px;
   --Min-Stack-Gap: 12px;
+${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
+  --Target: ${PLATFORM_TARGET['Android']}px;
+  --Platform-Spacer: ${PLATFORM_SPACER['Android']}px;
   --Body-Font-Size: 16px;
   --Body-Line-Height: 24px;
   --Body-Letter-Spacing: .5px;
@@ -1306,6 +1363,38 @@ ${typographyDeclarations(input.typographyStyles)}
       }
       await uploadDesignSystemFile(uuid, 'moodboard.png', blob, blob.type || 'image/png');
       console.log(`Mood board uploaded (${(blob.size / 1024).toFixed(0)}KB)`);
+
+      // hero.png — the best landscape photograph FROM the board, not the board.
+      //
+      // A moodboard is a grid of panels on a flat ground, so using it whole as a
+      // hero shows gaps, background and type specimens. extractHeroImage finds
+      // the panels, scores which are photographs, and crops the best landscape
+      // one. Saved alongside rather than replacing the board: the board is still
+      // the portrait of the system, this is the one image out of it.
+      //
+      // Best-effort. A failure here must not fail the export — the design system
+      // is complete without a hero, and every consumer already treats the file
+      // as optional.
+      try {
+        const heroSourceUrl = URL.createObjectURL(blob);
+        try {
+          const hero = await extractHeroImage(heroSourceUrl);
+          const heroBlob = await (await fetch(hero.dataUrl)).blob();
+          await uploadDesignSystemFile(uuid, 'hero.png', heroBlob, 'image/png');
+          console.log(
+            `Hero image uploaded (${(heroBlob.size / 1024).toFixed(0)}KB, `
+            + `${hero.crop.w}x${hero.crop.h}`
+            + (hero.fellBack
+              ? ', no panels found — cropped the whole board'
+              : `, best of ${hero.candidates.length} panels at ${(hero.candidates[0].score * 100).toFixed(0)}%`)
+            + ')',
+          );
+        } finally {
+          URL.revokeObjectURL(heroSourceUrl);
+        }
+      } catch (e) {
+        console.warn('Hero image skipped:', e);
+      }
     } catch (e) {
       console.error('Mood board upload error:', e);
     }

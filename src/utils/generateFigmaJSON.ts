@@ -8,6 +8,9 @@
  */
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import {
+  bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
+} from './bevelGeometry';
 import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
 import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
 import { buildTypeScale, resolveRoles, type TypeStyle, type FamilyRole } from './typeScale';
@@ -18,24 +21,37 @@ interface ColorToken {
   type: 'color';
 }
 
+/**
+ * The themes exported to Figma, in the order they become MODES of the Theme
+ * collection. Nine, against Figma's cap of ten.
+ *
+ * This list is written out rather than derived so the mode ORDER is stable —
+ * Figma keys a mode by position as well as name, and a reordering churns the
+ * file. But a hand-written list is exactly how this drifted: it still held the
+ * pre-consolidation eighteen (the six -Light variants, White, Light-Gray,
+ * Black) long after those were retired, and it never gained Neutral. Ten dead
+ * names looked up nothing and skipped in silence, while Neutral — a theme the
+ * CSS emits in full — was never looked up at all, so it could not reach Figma.
+ *
+ * assertThemesMatch below now fails that loudly instead.
+ */
 const THEMES = [
-  'Default', 'Primary', 'Primary-Light', 'Secondary', 'Secondary-Light',
-  'Tertiary', 'Tertiary-Light', 'White', 'Light-Gray', 'Black',
-  'Info', 'Info-Light', 'Success', 'Success-Light',
-  'Warning', 'Warning-Light', 'Error', 'Error-Light',
+  'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
+  'Info', 'Success', 'Warning', 'Error',
 ];
 
-const SURFACE_GROUPS_INTERNAL = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'];
+const SURFACE_GROUPS_INTERNAL = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'];
 const SURFACE_GROUP_NAMES: Record<string, string> = {
   'Surfaces': 'Surface',
   'Surfaces-Dim': 'Surface-Dim',
   'Surfaces-Dimmest': 'Surface-Dimmest',
   'Surfaces-Bright': 'Surface-Bright',
+  'Surfaces-Brightest': 'Surface-Brightest',
   'Containers': 'Containers',
 };
 
 const SURFACE_NAMES = [
-  'Surface', 'Surface-Dim', 'Surface-Dimmest', 'Surface-Bright',
+  'Surface', 'Surface-Dim', 'Surface-Dimmest', 'Surface-Bright', 'Surface-Brightest',
   'Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest',
 ];
 
@@ -66,7 +82,16 @@ function deriveBevelRGB(hex: string, lightOffset = -35, satMultiplier = 1.5): st
     // Floor at 40% of the original lightness (min 8) so dark buttons don't
     // collapse to near-black — matches computeDropshadow in exportColorSystem.
     const minL = Math.max(8, l * 100 * 0.4);
-    const newL = clamp(l * 100 + lightOffset, minL, 92) / 100;
+    let newLPct = clamp(l * 100 + lightOffset, minL, 92);
+    // Never let a lowlight come out lighter than its fill, or a highlight
+    // darker. At the ends of the scale the floor and ceiling overshoot past the
+    // fill and invert the bevel — a black button got a lowlight at the floor of
+    // L 8 against a fill of L 1.6, a shadow lighter than the thing casting it.
+    // Same clamp as computeDropshadow in exportColorSystem; the two must agree
+    // or Figma and CSS render different bevels.
+    if (lightOffset < 0) newLPct = Math.min(newLPct, l * 100);
+    else if (lightOffset > 0) newLPct = Math.max(newLPct, l * 100);
+    const newL = newLPct / 100;
     const h2 = h;
     let sr: number, sg: number, sb: number;
     if (newS === 0) {
@@ -633,6 +658,51 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // gets the same table — the Theme and State collections link into it at
       // their own tone. It arrives via the MODES_SECTIONS copy above.
 
+      // ── BlackWhite in the flat button sections ────────────────────────
+      //
+      // BlackWhite cannot ride the palettes loop above: that loop derives every
+      // value from Colors.<pal>.Color-N, and BlackWhite has no tonal ramp —
+      // it is two fixed faces chosen by the surface's tone. So it was absent
+      // from Button-Hover, Button-Pressed, Button-Highlight and Button-Lowlight
+      // in BOTH modes, while sitting present in Buttons. A theme referencing
+      // {Button-Lowlight.BlackWhite.Color-N} found nothing and resolved to no
+      // colour, which reads as "no bevel" rather than as an error.
+      //
+      // Mirrored from the Buttons table rather than recomputed, so the two
+      // cannot disagree about a black button's shadow.
+      //
+      // The formats differ and must be reconciled: Buttons stores Highlight and
+      // Lowlight as "r, g, b" triples (they feed rgba() in CSS), while these
+      // sections store 8-digit hex carrying the bevel opacity as alpha. A
+      // triple written here would not parse as a colour.
+      const bwButtons: any = (modeSection as any).Buttons?.BlackWhite;
+      if (bwButtons) {
+        const SLOT_FOR: Record<string, string> = {
+          'Button-Hover': 'Hover', 'Button-Pressed': 'Pressed',
+          'Button-Highlight': 'Highlight', 'Button-Lowlight': 'Lowlight',
+        };
+        const bevelOpacityBW = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
+        const alphaBW = Math.round(bevelOpacityBW * 255 / 100).toString(16).padStart(2, '0');
+        const asHex = (v: string, withAlpha: boolean): string | null => {
+          if (typeof v !== 'string') return null;
+          if (v.startsWith('#')) return withAlpha && v.length === 7 ? `${v}${alphaBW}` : v;
+          const parts = v.split(',').map((x) => parseInt(x.trim(), 10));
+          if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+          const hex = '#' + parts.slice(0, 3).map((n) => n.toString(16).padStart(2, '0')).join('');
+          return withAlpha ? `${hex}${alphaBW}` : hex;
+        };
+        for (const sec of btnSections) (modeSection as any)[sec].BlackWhite = {};
+        for (const [colorKey, entry] of Object.entries<any>(bwButtons)) {
+          if (!colorKey.startsWith('Color-')) continue;
+          for (const sec of btnSections) {
+            const raw = entry?.[SLOT_FOR[sec]]?.value;
+            const isBevel = sec === 'Button-Highlight' || sec === 'Button-Lowlight';
+            const hex = asHex(raw, isBevel);
+            if (hex) (modeSection as any)[sec].BlackWhite[colorKey] = { value: hex, type: 'color' };
+          }
+        }
+      }
+
 
       // ── Default-Button-Border ─────────────────────────────────────────
       //
@@ -841,8 +911,31 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
     // ── Themes section (only build once from Light-Mode) ──
     if (modeName === 'Light-Mode' && themes) {
+      // A theme the generator produces but this list omits cannot reach Figma,
+      // and a name here that the generator no longer produces is dead. Neither
+      // shows up as an error at import — the collection is simply short a mode.
+      const generated = Object.keys(themes);
+      const missingFromExport = generated.filter((t) => !THEMES.includes(t));
+      const deadNames = THEMES.filter((t) => !generated.includes(t));
+      if (missingFromExport.length) {
+        console.warn(
+          `\u26A0\uFE0F [Figma] ${missingFromExport.length} generated theme(s) are NOT in the export list ` +
+          `and will be absent from the Theme collection: ${missingFromExport.join(', ')}`,
+        );
+      }
+      if (deadNames.length) {
+        console.warn(
+          `\u26A0\uFE0F [Figma] ${deadNames.length} name(s) in the export list are no longer generated: ` +
+          `${deadNames.join(', ')}`,
+        );
+      }
+      if (THEMES.length > 10) {
+        console.warn(
+          `\u26A0\uFE0F [Figma] ${THEMES.length} themes exceeds Figma's 10-mode cap; the tail will not import.`,
+        );
+      }
+
       for (const themeName of THEMES) {
-        // Light-Gray isn't in the source themes — skip if not found
         const theme = themes[themeName];
         if (!theme) continue;
 
@@ -1272,6 +1365,16 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         { role: 'Icons-Default-Variant', section: 'Icon-Variant', pal: null },
         ...ACCENT_PALETTES.map(pal => ({ role: `Text-${pal}`, section: 'Text', pal })),
         ...ACCENT_PALETTES.map(pal => ({ role: `Header-${pal}`, section: 'Header', pal })),
+        // Text-BW resolves from the BlackWhite map rather than a palette family
+        // — white below tone 6, black from 6 up — but it is otherwise an
+        // ordinary role and must appear here like the rest.
+        //
+        // Left out, Default's Surface / Surface-Dim / Surface-Bright referenced
+        // {Default-Background.*Text-BW} against a section that had no such key,
+        // so those aliases resolved to nothing while Containers (which points
+        // straight at the map, needing no indirection) linked correctly. That
+        // asymmetry is the visible symptom of a role missing from this list.
+        { role: 'Text-BW', section: 'Default-Button-Border', pal: 'BlackWhite' },
       ];
 
       /** Resolve one role at a given background tone, or null. */
@@ -1375,6 +1478,17 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         if (defBg[variant]?.value === undefined) continue;
         surfaceTargets.push({ prefix: `${variant}-`, tone: toneForHex(defBg[variant].value) });
       }
+      // Surface-Brightest is not a variant of Background-N like Dim and Bright
+      // are — it is a different Background-N (11, or 12 once Bright has taken
+      // 11), so there is no defBg entry to read a tone from and it has to be
+      // computed the same way generateCompleteThemes computes brightestN. If
+      // the two ever disagree, Default's brightest surface pairs foregrounds
+      // solved for one tone with a background painted at another.
+      const defBrightTone = Math.min(bgN + 1, 12);
+      surfaceTargets.push({
+        prefix: 'Surface-Brightest-',
+        tone: defBrightTone >= 11 ? 12 : 11,
+      });
       for (const { prefix, tone } of surfaceTargets) {
         if (tone === null) continue;
         for (const role of ROLE_SOURCES) {
@@ -1512,8 +1626,19 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       'Display-Bounce': parseInt(typo['Set-Display-Bounce']?.value || '0'),
 
       // ── Case ──
+      //
+      // Text case cannot be bound to a Figma variable, so the plugin writes it
+      // onto the text style itself. These flags are the only way it knows what
+      // to write.
+      //
+      // Display-Caps and Decorative-Caps are the same value under two names:
+      // the studio stores the picked DISPLAY font under the `decorative` role.
+      // Emitting both means the plugin can read the honest name while older
+      // payloads still resolve — and it stops Display styles inheriting the
+      // HEADER's case, which is what they did when no Display flag existed.
       'Header-Caps': typo['Set-Header-Caps']?.value === 'uppercase',
       'Decorative-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
+      'Display-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
     };
 
     // ── The full type scale ──
@@ -1544,9 +1669,6 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // safety cap applied in Button.js's --_bevel calc. Slider max is 20% so
     // this only kicks in defensively for restored designs or hand-edited input.
     const bevelPct = csRaw.bevel ?? 0;
-    const bevelMed = Math.round(Math.min(cs.buttonHeight * bevelPct / 100, cs.buttonHeight / 5));
-    const bevelSm = Math.round(Math.min(cs.smallButtonHeight * bevelPct / 100, cs.smallButtonHeight / 5));
-    const bevelLg = Math.round(Math.min(cs.largeButtonHeight * bevelPct / 100, cs.largeButtonHeight / 5));
     // Padding tokens derived from the computed medium button radius.
     const buttonPadding = r.buttonRadius > 8 ? Math.round(r.buttonRadius / 2) : 4;
     const smButtonPadding = r.buttonRadius >= 8 ? 8 : r.buttonRadius;
@@ -1554,7 +1676,15 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // Single source of truth for border width — referenced by both the
     // emitted Button-Border-Width token and the height calculations
     // (inner height = outer - border × 2).
-    const BUTTON_BORDER_WIDTH = 2;
+    //
+    // 1px. It was 2px, which also made every Figma inner height and swatch 2px
+    // shorter than it should be, since they subtract this twice.
+    //
+    // The token keeps being emitted even though the value is now a constant
+    // nobody varies: it already ships to Figma, and a deleted Figma variable
+    // cannot be recovered by re-importing — a recreated variable gets a new id,
+    // so every layer bound to the old one stays unbound (invariant 8).
+    const BUTTON_BORDER_WIDTH = 1;
     figma.Components = {
       Button: {
         'Button-Radius': r.buttonRadius,
@@ -1575,50 +1705,47 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         'Button-Icon-Focus-Radius': r.iconButtonFocusRadius,
         'Sm-Button-Icon-Focus-Radius': r.smIconButtonFocusRadius,
         'Lg-Button-Icon-Focus-Radius': r.lgIconButtonFocusRadius,
-        // Figma height tokens are the INNER button height (the colored
-        // fill rect inside the border box). DinoDesign's button has a
-        // border on top AND bottom, so we subtract Button-Border-Width
-        // twice from the user's selected outer height. Was previously
-        // `-2` (single border width), which made every button 2px taller
-        // than intended once the border doubled up in Figma.
-        'Button-Height': cs.buttonHeight - (BUTTON_BORDER_WIDTH * 2),
-        'Sm-Button-Height': cs.smallButtonHeight - (BUTTON_BORDER_WIDTH * 2),
-        'Lg-Button-Height': cs.largeButtonHeight - (BUTTON_BORDER_WIDTH * 2),
-        // Swatch tokens — square swatches inside each button size, 6px
-        // smaller than the inner button height so they leave a 3px gap
-        // on every side of the swatch (a touch tighter than the icon
-        // tokens, matching the Select swatch spec).
-        'Button-Swatch': cs.buttonHeight - (BUTTON_BORDER_WIDTH * 2) - 6,
-        'Sm-Button-Swatch': cs.smallButtonHeight - (BUTTON_BORDER_WIDTH * 2) - 6,
-        'Lg-Button-Swatch': cs.largeButtonHeight - (BUTTON_BORDER_WIDTH * 2) - 6,
+        // The OUTER height — the user's selected value, unmodified.
+        //
+        // These used to subtract Button-Border-Width twice, because the Figma
+        // component's height token drove the inner fill rect and the border sat
+        // outside it. That is no longer how the component is built, so the
+        // subtraction now makes every button 2px SHORT of the chosen height.
+        //
+        // It also fixes a name collision: Platform/Button-Height has always been
+        // the outer height (platformButtonHeight returns cs.buttonHeight
+        // unmodified), so the two variables shared a name and meant different
+        // things — 32 in one collection and 30 in the other. Binding a frame to
+        // the wrong one produced a 2px error with nothing to explain it.
+        'Button-Height': cs.buttonHeight,
+        'Sm-Button-Height': cs.smallButtonHeight,
+        'Lg-Button-Height': cs.largeButtonHeight,
+        // Swatch tokens — square swatches inside each button size, 6px smaller
+        // than the button height so they leave a 3px gap on every side (a touch
+        // tighter than the icon tokens, matching the Select swatch spec).
+        //
+        // Measured from the same height as the tokens above, so the 3px gap is
+        // preserved. Left subtracting the border, these would be sized against
+        // an inner box that no longer exists.
+        'Button-Swatch': cs.buttonHeight - 6,
+        'Sm-Button-Swatch': cs.smallButtonHeight - 6,
+        'Lg-Button-Swatch': cs.largeButtonHeight - 6,
         'Button-Min-Width': csRaw.minButtonWidth ?? 60,
+        // Large's text floor — the standard floor plus 40px. Derived, not a
+        // second number to keep in sync.
+        'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
         'Button-Border-Width': BUTTON_BORDER_WIDTH,
         'Button-Padding': buttonPadding,
         'Sm-Button-Padding': smButtonPadding,
         'Lg-Button-Padding': largeButtonPadding,
-        // Medium (default) — top-left highlight, bottom-right lowlight
-        'Button-Highlight-Offset-x': -bevelMed,
-        'Button-Highlight-Offset-y': -bevelMed,
-        'Button-Highlight-Blur-Radius': bevelMed,
-        'Button-Highlight-Spread-Radius': 0,
-        'Button-Lowlight-Offset-x': bevelMed,
-        'Button-Lowlight-Offset-y': bevelMed,
-        'Button-Lowlight-Blur-Radius': bevelMed,
-        'Button-Lowlight-Spread-Radius': 0,
-        // Small
-        'Sm-Button-Highlight-Offset-x': -bevelSm,
-        'Sm-Button-Highlight-Offset-y': -bevelSm,
-        'Sm-Button-Highlight-Blur-Radius': bevelSm,
-        'Sm-Button-Lowlight-Offset-x': bevelSm,
-        'Sm-Button-Lowlight-Offset-y': bevelSm,
-        'Sm-Button-Lowlight-Blur-Radius': bevelSm,
-        // Large
-        'Lg-Button-Highlight-Offset-x': -bevelLg,
-        'Lg-Button-Highlight-Offset-y': -bevelLg,
-        'Lg-Button-Highlight-Blur-Radius': bevelLg,
-        'Lg-Button-Lowlight-Offset-x': bevelLg,
-        'Lg-Button-Lowlight-Offset-y': bevelLg,
-        'Lg-Button-Lowlight-Blur-Radius': bevelLg,
+        // Bevel geometry, small and large. These heights don't vary by
+        // platform, so they live here; MEDIUM's live in the Platform
+        // collection because its height does.
+        //
+        // Built from bevelGeometry.ts, the same module the CSS export uses —
+        // identical numbers, px there and bare numbers here.
+        ...bevelJSON('Sm-', cs.smallButtonHeight, bevelPct),
+        ...bevelJSON('Lg-', cs.largeButtonHeight, bevelPct),
       },
       Card: {
         'Card-Radius': r.cardRadius,
@@ -1647,7 +1774,36 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         'Lg-Input-Swatch-Radius': r.lgInputSwatchRadius,
         'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
       },
+      // Components/Other — the floating frame of a dropdown or menu panel.
+      // Not under Input: it follows Input-Radius but is bounded separately
+      // (by Card-Radius and a 16px ceiling), so filing it with the input
+      // radii would imply it tracks them all the way up. It does not.
+      Other: {
+        'Dropdown-Frame-Radius': r.dropdownFrameRadius,
+      },
     };
+
+    // ── Platform collection ──────────────────────────────────────────────
+    // The default (medium) button is the one that resizes per platform, so
+    // its height AND its bevel geometry both live here rather than in
+    // Components/Button. Binding a component's height to
+    // Platform/Button-Height in Figma makes it follow the platform mode, the
+    // same way [data-platform] does in CSS.
+    //
+    // Target is the platform's minimum hit area. The SMALL button keeps its
+    // visual size everywhere; a wrapper grows to Target using Platform-Spacer,
+    // so the button looks identical while staying tappable.
+    figma.Platform = Object.fromEntries(
+      PLATFORMS.map((platform) => {
+        const height = platformButtonHeight(platform, cs.buttonHeight);
+        return [platform, {
+          'Button-Height': height,
+          'Target': PLATFORM_TARGET[platform],
+          'Platform-Spacer': PLATFORM_SPACER[platform],
+          ...bevelJSON('', height, bevelPct),
+        }];
+      })
+    );
   }
 
   // Flatten Buttons and Default-Button, and rewrite what points at them.
@@ -1806,6 +1962,63 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   // The duplication is real but load-bearing. If it is ever worth collapsing,
   // the references in Themes/SurfacesContainers have to be rewritten in the
   // same pass, and the count of unresolvable refs checked before and after.
+
+  // ── BlackWhite button Lowlight — resolved here, not aliased ──────────────
+  //
+  // Themes asks for the black/white button's bevel at its own surface tone:
+  //
+  //   {Buttons.BlackWhite.Color-<n>.Lowlight}
+  //
+  // That target is a Modes variable, and Modes is at its ceiling — the payload
+  // carries ~4,700 variables per mode, so BlackWhite's twelve cannot be added
+  // to the file. An alias whose target does not exist in Figma does not fail
+  // loudly; the binding is simply absent and the button renders with no bevel,
+  // which is the "black button has no lowlight" report.
+  //
+  // So this level is answered without a BlackWhite variable at all:
+  //
+  //   black face (Color-6..12)  ->  #000000, a literal
+  //   white face (Color-1..5)   ->  {Button-Lowlight.Neutral.Color-12}
+  //
+  // Black can be a literal because the Themes collection's modes are the nine
+  // THEMES, not light/dark — a literal here cannot vary by mode. Pure black is
+  // the one value that is safe in both: it sits at or below the fill in each
+  // (#040404 light, #0b0b0b dark), so the shadow can never come out LIGHTER
+  // than the button, which is the failure that reads as a glowing black button.
+  //
+  // White borrows Neutral's top tone, which is an existing variable, so that
+  // face keeps a real light/dark value instead of being frozen too.
+  //
+  // The tone comes out of the reference itself, so this needs no knowledge of
+  // which surface a theme sits on — the alias already states it.
+  //
+  // NOTE: this is the only reference into Button-Lowlight in the whole payload;
+  // nothing else aliases the four flat Button-* sections. If those are ever
+  // dropped to reclaim variables, this line has to move with them.
+  const BW_LOWLIGHT_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.Lowlight\}$/;
+  const BW_BLACK_FROM_TONE = 6;   // Color-1..5 paint white, 6..12 paint black
+  let bwLowlightResolved = 0, bwLowlightBlack = 0;
+  const resolveBlackWhiteLowlight = (n: any, d: number) => {
+    if (!n || typeof n !== 'object' || d > 12) return;
+    if (typeof n.value === 'string') {
+      const m = n.value.match(BW_LOWLIGHT_REF);
+      if (m) {
+        const tone = Number(m[1]);
+        if (tone >= BW_BLACK_FROM_TONE) { n.value = '#000000'; bwLowlightBlack++; }
+        else n.value = '{Button-Lowlight.Neutral.Color-12}';
+        bwLowlightResolved++;
+      }
+      return;
+    }
+    for (const [k, v] of Object.entries(n)) if (k !== 'type') resolveBlackWhiteLowlight(v, d + 1);
+  };
+  resolveBlackWhiteLowlight(figma.Themes, 0);
+  resolveBlackWhiteLowlight(figma.SurfacesContainers, 0);
+  console.log(
+    `\u26AB [Figma] BlackWhite Lowlight resolved without a Modes variable: ` +
+    `${bwLowlightResolved} (${bwLowlightBlack} black -> #000000, ` +
+    `${bwLowlightResolved - bwLowlightBlack} white -> Neutral Color-12)`,
+  );
 
   // Page canvas background — precomputed hex so the Figma plugin sets it from
   // one field instead of walking the Modes tree. It's the Primary palette's

@@ -96,6 +96,22 @@ function styleBlock(s: TypeStyle): string {
   if (s.paragraphSpacing) {
     lines.push(`  --${s.token}-Paragraph-Spacing: ${px(s.paragraphSpacing)};`);
   }
+  // Eyebrow is the name. Overline is the old one, and both are emitted.
+  //
+  // ALIAS, NOT RENAME — a design system's CSS is frozen in Storage and can
+  // never be regenerated, and consumers upgrade the lib on their own schedule.
+  // Dropping --Overline-* would leave every consumer still on a pre-rename lib
+  // with an unresolved var(), which paints nothing and reports nothing.
+  //
+  // The alias points AT the Eyebrow token rather than restating the value, so
+  // the two can never drift: one number, one canonical name, and a second name
+  // that reads it.
+  if (s.token.startsWith('Eyebrow-')) {
+    const overline = s.token.replace(/^Eyebrow-/, 'Overline-');
+    for (const prop of ['Font-Size', 'Font-Weight', 'Line-Height', 'Letter-Spacing', 'Text-Transform']) {
+      lines.push(`  --${overline}-${prop}: var(--${s.token}-${prop});`);
+    }
+  }
   return lines.join('\n');
 }
 
@@ -189,6 +205,27 @@ ${displaySelectors('.typography')} {
 .typography.typography-overline-medium,
 .typography.typography-overline-large {
   font-family: var(--Font-Family-Eyebrow);
+}
+
+/* ---------------------------------------------------------------------------
+   Prose lists — opt in with .typography-list on the <ul> or <ol>.
+
+   The marker takes --Eyebrow: the accent that is already ROTATED off the
+   surface's palette (Primary->Secondary, Secondary->Tertiary, and so on), so a
+   list picks up the same accent as the eyebrow above it instead of the page
+   inventing one. The list TEXT is untouched and stays on --Text; only the
+   bullet or number is accented.
+
+   Opt-in, not a bare li::marker rule, for the same reason nothing else here
+   styles bare elements: importing the CSS must not repaint lists in a
+   consumer's app that never asked for it.
+
+   ::marker only honours a short list of properties. color is one of them;
+   background, padding and size are not, so a bullet that needs a custom size
+   still needs the ::before technique.
+--------------------------------------------------------------------------- */
+.typography-list > li::marker {
+  color: var(--Eyebrow);
 }`;
 }
 

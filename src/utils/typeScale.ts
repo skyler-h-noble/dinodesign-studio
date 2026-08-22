@@ -8,7 +8,7 @@
 //   Display   Large, Medium, Small    → Decorative face
 //   Header    H1…H6                   → Header face
 //   Body      Small 14 / Medium 16 / Large 18, each × Regular / Semibold / Bold
-//   Overline  Small, Medium, Large    → the eyebrow spec: uppercase, tracked
+//   Eyebrow   Small, Medium, Large    → uppercase, tracked
 //   Subtitle · Caption · Label · Legal · Number · Button → Body face
 //
 // Two things carried over from omni that the old static ramp did not have:
@@ -104,7 +104,7 @@ export interface ExtraWeight {
 
 export interface TypeStyle {
   /** Token base — the string the lib interpolates, e.g. 'H1', 'Display-Large',
-   *  'Overline-Small', 'Button-Standard'. */
+   *  'Eyebrow-Small', 'Button-Standard'. */
   token: string;
   /** Slash name used by Figma text styles, e.g. 'Header/H1'. */
   name: string;
@@ -284,18 +284,31 @@ export const BODY_EXTRA_WEIGHTS: ExtraWeight[] = [
  *  from BODY_SIZES rather than restated, so the two can never drift apart. */
 export const SUBTITLE_WEIGHT = 700;
 
-/** Overline is omni's Eyebrow role: small utility labels, uppercase, tracked
- *  out, 1.5 leading. Smaller sizes get MORE tracking — the standard optical
- *  correction. Weight is fixed at 600; an eyebrow reads as a label, not as
- *  body copy, and it is too small for the body role's weight to carry it. */
-export const OVERLINE_STEPS = [
-  { token: 'Overline-Small', step: 'Small', size: 12, letterSpacing: '0.12em' },
-  { token: 'Overline-Medium', step: 'Medium', size: 13, letterSpacing: '0.1em' },
-  { token: 'Overline-Large', step: 'Large', size: 15, letterSpacing: '0.08em' },
+/** Eyebrow: small utility labels, uppercase, tracked out, 1.5 leading. Smaller
+ *  sizes get MORE tracking — the standard optical correction. Weight is fixed
+ *  at 600; an eyebrow reads as a label, not as body copy, and it is too small
+ *  for the body role's weight to carry it.
+ *
+ *  This used to be called Overline, and the size tokens carried that name even
+ *  after the face and colour role became Eyebrow — which meant an eyebrow was
+ *  spelled two ways depending on which property you were setting. The tokens
+ *  are Eyebrow now; --Overline-* is still emitted as an alias so design systems
+ *  and lib versions from before the rename keep resolving. */
+export const EYEBROW_STEPS = [
+  { token: 'Eyebrow-Small', step: 'Small', size: 12, letterSpacing: '0.12em' },
+  { token: 'Eyebrow-Medium', step: 'Medium', size: 13, letterSpacing: '0.1em' },
+  { token: 'Eyebrow-Large', step: 'Large', size: 15, letterSpacing: '0.08em' },
 ];
 
-export const OVERLINE_LINE_HEIGHT = 1.5;
-export const OVERLINE_WEIGHT = 600;
+/** The pre-rename token names, kept so the CSS export can emit aliases. */
+export const EYEBROW_LEGACY_TOKEN = {
+  'Eyebrow-Small': 'Overline-Small',
+  'Eyebrow-Medium': 'Overline-Medium',
+  'Eyebrow-Large': 'Overline-Large',
+};
+
+export const EYEBROW_LINE_HEIGHT = 1.5;
+export const EYEBROW_WEIGHT = 600;
 
 /**
  * The rest of the system. Every one of these uses the BODY face — they're
@@ -351,14 +364,14 @@ export const SYSTEM_STYLES: SystemStyleSpec[] = [
 /** Order the exports and the Figma payload use. */
 export const GROUP_ORDER = [
   'Display', 'Header', 'Subtitle', 'Body', 'Caption',
-  'Label', 'Legal', 'Overline', 'Number', 'Button',
+  'Label', 'Legal', 'Eyebrow', 'Number', 'Button',
 ];
 
 /** Usage guidance per group. Travels into the Figma text-style description so
  *  the rule sits next to the style where a designer will actually meet it. */
 export const GROUP_DESCRIPTIONS: Record<string, string> = {
   Display: 'Large and Medium belong in Header or Hero areas. Small is the one sized to sit inside a component — a card title, a stat, a pull quote.',
-  Overline: 'Eyebrow label — uppercase and tracked. Sits above a heading.',
+  Eyebrow: 'Eyebrow label — uppercase and tracked. Sits above a heading.',
 };
 
 // ─── Role resolution ─────────────────────────────────────────────────────────
@@ -454,7 +467,7 @@ const pxToEm = (px: number | undefined, size: number): string =>
  *   Display  → the DISPLAY face, which is the user's Decorative pick. It used
  *              to follow Header, which left the expressive face with nowhere
  *              to appear at size.
- *   Overline → the EYEBROW face and the eyebrow spec (12/13/15, uppercase,
+ *   Eyebrow  → the EYEBROW face and spec (12/13/15, uppercase,
  *              tracked). It used to be the decorative face at 14/16/18.
  */
 export function buildTypeScale(styles: TypographyStyle[] | undefined | null): TypeStyle[] {
@@ -517,12 +530,12 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
     });
   }
 
-  for (const step of OVERLINE_STEPS) {
+  for (const step of EYEBROW_STEPS) {
     push({
-      token: step.token, name: `Overline/${step.step}`, group: 'Overline', step: step.step,
+      token: step.token, name: `Eyebrow/${step.step}`, group: 'Eyebrow', step: step.step,
       familyRole: 'eyebrow',
-      size: step.size, weight: OVERLINE_WEIGHT,
-      lineHeight: Math.round(step.size * OVERLINE_LINE_HEIGHT * 100) / 100,
+      size: step.size, weight: EYEBROW_WEIGHT,
+      lineHeight: Math.round(step.size * EYEBROW_LINE_HEIGHT * 100) / 100,
       letterSpacing: step.letterSpacing, textTransform: 'uppercase', paragraphSpacing: 0,
       axes: roles.eyebrow.axes,
     });
