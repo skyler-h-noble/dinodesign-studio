@@ -1339,46 +1339,13 @@ function estimatePixelTextRegions(
   return candidates.slice(0, maxRegions);
 }
 
-// ── deprecated shims ────────────────────────────────────────────────
-// The legacy TypographyStage still imports these from this module. ESM
-// verifies named imports at parse time, so removing them entirely breaks
-// module load even though TypographyStage's classify call is never reached
-// in the new flow. These will be deleted once TypographyStage is replaced.
-
-/** @deprecated Old Teachable Machine shape — kept for module-load parity. */
-export interface DetectedTypography {
-  headerStyle: string;
-  decorativeStyle: string | null;
-  bodyStyle: string;
-  headerWeight: number;
-  decorativeWeight: number;
-  bodyWeight: number;
-  headerLetterSpacing: number;
-  decorativeLetterSpacing: number;
-  bodyLetterSpacing: number;
-  headerIsAllCaps: boolean;
-  decorativeIsAllCaps: boolean;
-  hasText: boolean;
-}
-
-/** @deprecated Replaced by GCV + CLIP. Throws if invoked. */
-export async function classifyTextRegions(
-  _imageElement: HTMLImageElement,
-  _regions: TextRegion[]
-): Promise<DetectedTypography> {
-  throw new Error(
-    'classifyTextRegions has been removed. Use analyzeMoodboard from analyzeMoodboardClient.ts instead.'
-  );
-}
-
-/** @deprecated The Tesseract-based detector was removed; this shim only
- *  exists so any lingering import in the legacy TypographyStage doesn't
- *  break module load. */
-export async function detectTextRegions(
-  _imageElement: HTMLImageElement
-): Promise<{ regions: TextRegion[]; diag: OcrDiag }> {
-  return { regions: [], diag: { wordCount: 0, elapsedMs: 0, error: 'detectTextRegions removed — GCV is now the only OCR path' } };
-}
+// NOTE: the deprecated shims that sat here — DetectedTypography,
+// classifyTextRegions and detectTextRegions — were removed with the legacy
+// TypographyStage that was their only importer. They existed purely so that
+// ESM's parse-time check of named imports would not fail module load; the
+// comment above them said they would go once that stage was replaced, and it
+// now has been. TextRegion and OcrDiag stay: both are declared at the top of
+// this file and used by the live path.
 
 /**
  * Does this OCR string look like real lettering?
