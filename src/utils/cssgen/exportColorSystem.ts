@@ -251,10 +251,20 @@ interface ModeSection {
     Surfaces: { [backgroundKey: string]: any };
     Containers: { [backgroundKey: string]: any };
   };
+  /**
+   * Text.{Surfaces|Containers}.<Palette>.<Color-N>
+   *
+   * Three levels, not two. Typed without the Surfaces/Containers layer, the
+   * compiler read "Surfaces" as a PALETTE name — so Text.Surfaces[palette]
+   * resolved to a single ColorToken and every [Color-N] on it was an error
+   * against a type that had already gone wrong one level up.
+   *
+   * Eyebrows, declared immediately below, says "same shape as Text" and has
+   * carried the correct shape all along.
+   */
   Text: {
-    [paletteKey: string]: {
-      [colorKey: string]: ColorToken;
-    };
+    Surfaces: { [paletteKey: string]: { [colorKey: string]: ColorToken } };
+    Containers: { [paletteKey: string]: { [colorKey: string]: ColorToken } };
   };
   /** Small label above a heading — a brand-coloured text role per background.
    *  Same shape as Text; built from it by reference. */
@@ -305,14 +315,27 @@ interface ModeSection {
   Icon: IconsSectionForMode;
   'Icon-Variant': IconsSectionForMode;
   Buttons: ButtonsSectionForMode;
-  Tags: TagsSectionForMode;
+  /**
+   * `Tag`, singular — that is the key the generator writes and the key the
+   * payload carries. This was declared as `Tags` and nothing has ever produced
+   * a section by that name, so the one real section went unchecked while the
+   * type vouched for a phantom.
+   */
+  Tag: TagsSectionForMode;
   Charts: {
     Surfaces: { [backgroundKey: string]: any };
     Containers: { [backgroundKey: string]: any };
   };
   'Primary-Buttons': PrimaryButtonsSectionForMode;
-  Theme: any;
+  /** Written a few thousand lines below, and previously undeclared. */
+  Themes: { [themeKey: string]: any };
+  'Default-Button': { [key: string]: any };
+  'Default-Button-Border': { [key: string]: any };
   'Focus-Visible'?: FocusVisibleSection;
+  /* `Theme` (singular) was declared here and is written only inside a block
+     comment — a section that has not existed for as long as that comment has
+     been there. Removed rather than left as `any`, which is what let it sit
+     unnoticed. */
 }
 
 interface ShadowDetail {
@@ -3526,7 +3549,7 @@ export function exportColorSystemToJSON(
       'Light-Mode': {
         Colors: {},
         Header: { Surfaces: {}, Containers: {} },
-        Text: {},
+        Text: { Surfaces: {}, Containers: {} },
         Quiet: { Surfaces: {}, Containers: {} },
         Border: { Surfaces: {}, Containers: {} },
         Hover: {},
@@ -3534,16 +3557,20 @@ export function exportColorSystemToJSON(
         Backgrounds: {},
         Icon: generateIconPaletteStructure(false), // Light-Mode
         'Icon-Variant': generateIconVariantPaletteStructure(false), // Light-Mode
-        Tag: {},
+        Tag: { Surfaces: {}, Containers: {} },
         Charts: { Surfaces: {}, Containers: {} },
         'Focus-Visible': generateFocusVisibleSection(false), // Light-Mode
-        Buttons: {}, // Will be populated with all button types
+        // Seeded with the Surfaces/Containers pair every consumer indexes,
+        // as Header/Quiet/Border/Charts above already do. Starting these
+        // three as a bare {} meant the first read of .Surfaces on them was
+        // undefined until something happened to populate it.
+        Buttons: { Surfaces: {}, Containers: {} },
         Themes: {} // Will be populated with all 30 themes
       },
       'Dark-Mode': {
         Colors: {},
         Header: { Surfaces: {}, Containers: {} },
-        Text: {},
+        Text: { Surfaces: {}, Containers: {} },
         Quiet: { Surfaces: {}, Containers: {} },
         Border: { Surfaces: {}, Containers: {} },
         Hover: {},
@@ -3551,10 +3578,14 @@ export function exportColorSystemToJSON(
         Backgrounds: {},
         Icon: generateIconPaletteStructure(true), // Dark-Mode
         'Icon-Variant': generateIconVariantPaletteStructure(true), // Dark-Mode
-        Tag: {},
+        Tag: { Surfaces: {}, Containers: {} },
         Charts: { Surfaces: {}, Containers: {} },
         'Focus-Visible': generateFocusVisibleSection(true), // Dark-Mode
-        Buttons: {}, // Will be populated with all button types
+        // Seeded with the Surfaces/Containers pair every consumer indexes,
+        // as Header/Quiet/Border/Charts above already do. Starting these
+        // three as a bare {} meant the first read of .Surfaces on them was
+        // undefined until something happened to populate it.
+        Buttons: { Surfaces: {}, Containers: {} },
         Themes: {} // Will be populated with all 30 themes
       }
     },
