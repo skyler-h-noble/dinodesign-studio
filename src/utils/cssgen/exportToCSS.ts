@@ -1271,6 +1271,25 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     tokenLookup['Default-Background.Surface'] = `{${bgKey}.Surfaces.Surface}`;
     tokenLookup['Default-Background.Surface-Dim'] = `{${bgKey}.Surfaces.Surface-Dim}`;
     tokenLookup['Default-Background.Surface-Bright'] = `{${bgKey}.Surfaces.Surface-Bright}`;
+    // Surface-Brightest. overrideSurface in generateCompleteThemes routes the
+    // Default theme's brightest surface through Default-Background alongside
+    // the other three, but this lookup was never given the matching entry — so
+    // the reference survived into the CSS as var(--Default-Background-Surface-
+    // Brightest), a name nothing defines. An undefined custom property is not
+    // an error: the declaration is dropped and the element keeps whatever it
+    // inherited, so [data-theme="Default"][data-surface="Surface-Brightest"]
+    // simply painted its parent's background. The only unresolved reference in
+    // the whole bundle, out of ~6,000.
+    // A Backgrounds row carries only Surface, Surface-Dim and Surface-Bright.
+    // Brightest is not a member of it — every other theme reaches its brightest
+    // surface by pointing at a DIFFERENT row's Surface, and Default has to do
+    // the same. Same rule as generateSingleTheme: Bright is one tone up, and
+    // Brightest takes 11 unless Bright has already claimed it, in which case 12.
+
+    const defBrightN = Math.min(defN + 1, 12);
+    const defBrightestN = defBrightN >= 11 ? 12 : 11;
+    tokenLookup['Default-Background.Surface-Brightest'] =
+      `{Backgrounds.${defPal}.Background-${defBrightestN}.Surfaces.Surface}`;
     // No Default-Background.Surface-Dimmest: the Default theme keeps
     // generateSingleTheme's own {Backgrounds.<pal>.Background-4...} reference
     // for that surface. Surface-Dimmest is pinned to Color-4 in every theme and
