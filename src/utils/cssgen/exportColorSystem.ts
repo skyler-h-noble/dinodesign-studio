@@ -871,719 +871,17 @@ function getBorderVariantValue(borderValue: string): string {
   return '#00000026';
 }
 
-/**
- * Generate light mode TONAL surfaces and containers for a given base color
- * Uses tone-specific formulas and mixes with tone80 for containers
- */
-function generateLightModeTonalSurfacesAndContainers(
-  baseColor: string, 
-  tone: number,
-  palette: { tone: number; color: string }[],
-  isChromatic: boolean = false,
-  allPalettes?: {
-    primary: { tone: number; color: string }[];
-    neutral: { tone: number; color: string }[];
-  },
-  paletteName?: string,
-  backgroundNumber?: number
-): SurfacesAndContainers {
-  // Get tone80 for container calculations
-  const tone80Data = palette.find(p => p.tone === 80);
-  const tone80Color = tone80Data ? tone80Data.color : baseColor;
-
-  // Get tone 71 (palette index 8) for Background-6, 7, and Vibrant container calculations
-  const color9 = palette.length > 8 ? palette[8].color : tone80Color;
-
-  // Get tone 81 (palette index 9) for Background-1 to Background-5, 8-9 container calculations
-  const color10 = palette.length > 9 ? palette[9].color : tone80Color;
-
-  // Get tone 90 (palette index 10) - no longer used for containers
-  const color11 = palette.length > 10 ? palette[10].color : tone80Color;
-
-  let surfaceDimBlack = 0.04;
-  let surfaceWhite = 0.05;
-  let surfaceBrightWhite = 0.04;
-  let surfaceBaseTone = tone; // Which tone to use for Surface (default: same as background)
-  let containerLowestBlend = 0.05;
-  let containerLowBlend = 0.08;
-  let containerBlend = 0.08;
-  let containerHighBlend = 0.14;
-  let containerHighestBlend = 0.16;
-  let useColor9ForContainers = false; // Flag to use Color-7 for Backgrounds 8-9 and Vibrant
-  let useColor10ForContainers = false; // Flag to use Color-8 for Backgrounds 1-5, 6-7, 10-11
-  let useColor11ForContainers = false; // Flag to use Color-9 (deprecated)
-
-  // Different logic for chromatic (Primary/Secondary/Tertiary) vs Neutral
-  if (isChromatic) {
-    // Primary, Secondary, Tertiary surfaces
-    // SIMPLIFIED 1:1 MAPPING: Background-N → Color-N
-    if (tone === 1) { // Background-1 → Color-1
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 0; // Color-1 (index 0)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 10) { // Background-2 → Color-2
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 1; // Color-2 (index 1)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 19) { // Background-3 → Color-3
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 2; // Color-3 (index 2)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 28) { // Background-4 → Color-4
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 3; // Color-4 (index 3)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 37) { // Background-5 → Color-5
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 4; // Color-5 (index 4)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.12;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 58) { // Background-6 → Color-6
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 5; // Color-6 (index 5)
-      surfaceBrightWhite = 0.04;
-      useColor9ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 71) { // Background-7 → Color-7
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 6; // Color-7 (index 6)
-      surfaceBrightWhite = 0.04;
-      useColor9ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 81) { // Background-8 → Color-8
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 7; // Color-8 (index 7)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 90) { // Background-9 → Color-9
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 8; // Color-9 (index 8)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 95) { // Background-10 → Color-10
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 9; // Color-10 (index 9)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 98) { // Background-11 → Color-11
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 10; // Color-11 (index 10)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    } else if (tone === 99) { // Background-12 → Color-12
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-      useColor10ForContainers = true;
-      containerLowestBlend = 0.10;
-      containerLowBlend = 0.15;
-      containerBlend = 0.18;
-      containerHighBlend = 0.20;
-      containerHighestBlend = 0.22;
-    }
-  } else {
-    // Neutral surfaces - SIMPLIFIED 1:1 MAPPING: Background-N → Color-N
-    if (tone === 1) { // Background-1 → Color-1
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 0; // Color-1 (index 0)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 10) { // Background-2 → Color-2
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 1; // Color-2 (index 1)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 19) { // Background-3 → Color-3
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 2; // Color-3 (index 2)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 28) { // Background-4 → Color-4
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 3; // Color-4 (index 3)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 37) { // Background-5 → Color-5
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 4; // Color-5 (index 4)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 58) { // Background-6 → Color-6
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 5; // Color-6 (index 5)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 71) { // Background-7 → Color-7
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 6; // Color-7 (index 6)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 81) { // Background-8 → Color-8
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 7; // Color-8 (index 7)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 90) { // Background-9 → Color-9
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.01;
-      surfaceBaseTone = 8; // Color-9 (index 8)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 95) { // Background-10 → Color-10
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 9; // Color-10 (index 9)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 98) { // Background-11 → Color-11
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 10; // Color-11 (index 10)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 99) { // Background-12 → Color-12
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-    }
-  }
-
-  // Get the correct base color for Surface using index-based lookup
-  const surfaceBaseColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone < palette.length
-    ? palette[surfaceBaseTone].color
-    : baseColor;
-
-  // Surface = pure Color-N (no blending)
-  // Surface-Dim = adjacent tone one step darker (Color-1 Dim = black)
-  // Surface-Bright = adjacent tone one step lighter (Color-12 Bright = white)
-  const surfaceColor = surfaceBaseColor; // Pure color, no blending
-  const surfaceDimColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone > 0
-    ? palette[surfaceBaseTone - 1].color
-    : '#000000'; // Color-1 Dim = black
-  const surfaceBrightColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone < palette.length - 1
-    ? palette[surfaceBaseTone + 1].color
-    : '#FFFFFF'; // Color-12 Bright = white
-  
-  // Determine which color to use for container blending
-  let containerBaseColor: string;
-  let containerColorNumber = 5; // Default to Color-5 (tone80)
-  if (useColor9ForContainers) {
-    containerBaseColor = color9;
-    containerColorNumber = 7;
-  } else if (useColor10ForContainers) {
-    containerBaseColor = color10;
-    containerColorNumber = 8;
-  } else if (useColor11ForContainers) {
-    containerBaseColor = color11;
-    containerColorNumber = 9;
-  } else {
-    containerBaseColor = tone80Color;
-    containerColorNumber = 5;
-  }
-  
-  // Light mode: all containers use Color-11 (L=98) — use drop shadows for elevation
-  const containerToneColor = palette[10]?.color || '#f0f0f0'; // Color-11 (0-based index 10)
-  const containerColor = containerToneColor;
-  const containerLowestColor = containerToneColor;
-  const containerLowColor = containerToneColor;
-  const containerHighColor = containerToneColor;
-  const containerHighestColor = containerToneColor;
-  
-  console.log(`📦 [CONTAINER DEBUG] ${paletteName || 'Unknown'}-Background-${backgroundNumber || '?'}:`);
-  console.log(`   Base: Color-${containerColorNumber} = ${containerBaseColor}`);
-  console.log(`   Surface-Bright: ${surfaceBrightColor}`);
-  console.log(`   Container-Lowest: ${containerLowestBlend * 100}% blend → ${containerLowestColor}`);
-  console.log(`   Container-Low: ${containerLowBlend * 100}% blend → ${containerLowColor}`);
-  console.log(`   Container: ${containerBlend * 100}% blend → ${containerColor}`);
-  console.log(`   Container-High: ${containerHighBlend * 100}% blend → ${containerHighColor}`);
-  console.log(`   Container-Highest: ${containerHighestBlend * 100}% blend → ${containerHighestColor}`);
-
-  // Use neutral palette for text colors if available, otherwise use current palette
-  const textPalette = allPalettes?.neutral || palette;
-  const primaryPalette = allPalettes?.primary || palette;
-
-  return {
-    Surfaces: {
-      'Surface': {
-        value: surfaceColor,
-        type: 'color'
-      },
-      'Surface-Dim': {
-        value: surfaceDimColor,
-        type: 'color'
-      },
-      'Surface-Bright': {
-        value: surfaceBrightColor,
-        type: 'color'
-      },
-      'Header': {
-        value: paletteName && backgroundNumber ? getFixedHeaderToken(backgroundNumber, false, paletteName) : getHeaderColor(surfaceColor, textPalette, false),
-        type: 'color'
-      },
-      'Text': {
-        value: paletteName && backgroundNumber ? getFixedTextToken(backgroundNumber, false, paletteName) : getTextColor(surfaceColor, textPalette, false),
-        type: 'color'
-      },
-      'Quiet': {
-        value: getTextQuietColor(surfaceColor, textPalette, false),
-        type: 'color'
-      },
-      'Border': {
-        value: paletteName && backgroundNumber ? getFixedBorderToken(backgroundNumber, false, paletteName) : getBorderColor(surfaceColor, palette, false),
-        type: 'color'
-      },
-      'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}33` : `${getBorderColor(surfaceColor, palette, false)}33`,
-        type: 'color'
-      },
-      'Hotlink': {
-        value: '{Colors.Primary.Color-7}',
-        type: 'color'
-      },
-      'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-6}',
-        type: 'color'
-      },
-      'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-${surfaceBaseTone + 1}}` : surfaceDimColor,
-        type: 'color'
-      },
-      'Pressed': {
-        value: paletteName ? `{Pressed.${paletteName}.Color-${surfaceBaseTone + 1}}` : surfaceBrightColor,
-        type: 'color'
-      }
-    },
-    Containers: {
-      'Container': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-Lowest': {
-        value: containerLowestColor,
-        type: 'color'
-      },
-      'Container-Low': {
-        value: containerLowColor,
-        type: 'color'
-      },
-      'Container-High': {
-        value: containerHighColor,
-        type: 'color'
-      },
-      'Container-Highest': {
-        value: containerHighestColor,
-        type: 'color'
-      },
-      'Header': {
-        value: paletteName && backgroundNumber ? getFixedHeaderToken(backgroundNumber, true, paletteName) : getHeaderColor(containerColor, textPalette, false),
-        type: 'color'
-      },
-      'Text': {
-        value: paletteName && backgroundNumber ? getFixedTextToken(backgroundNumber, true, paletteName) : getTextColor(containerColor, textPalette, false),
-        type: 'color'
-      },
-      'Quiet': {
-        value: getTextQuietColor(containerColor, textPalette, false),
-        type: 'color'
-      },
-      'Border': {
-        value: paletteName && backgroundNumber ? getFixedBorderToken(backgroundNumber, true, paletteName) : getBorderColor(containerColor, palette, false),
-        type: 'color'
-      },
-      'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}33` : `${getBorderColor(containerColor, palette, false)}33`,
-        type: 'color'
-      },
-      'Hotlink': {
-        value: '{Colors.Primary.Color-7}',
-        type: 'color'
-      },
-      'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-6}',
-        type: 'color'
-      },
-      'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-${containerColorNumber}}` : containerLowestColor,
-        type: 'color'
-      },
-      'Pressed': {
-        value: paletteName ? `{Pressed.${paletteName}.Color-${containerColorNumber}}` : containerLowColor,
-        type: 'color'
-      }
-    }
-  };
-}
-
-/**
- * Generate light mode PROFESSIONAL surfaces and containers
- * All containers are #FFFFFF
- */
-function generateLightModeProfessionalSurfacesAndContainers(
-  baseColor: string,
-  tone: number,
-  palette: { tone: number; color: string }[],
-  isChromatic: boolean = false,
-  allPalettes?: {
-    primary: { tone: number; color: string }[];
-    neutral: { tone: number; color: string }[];
-  },
-  paletteName?: string,
-  backgroundNumber?: number
-): SurfacesAndContainers {
-  let surfaceDimBlack = 0.04;
-  let surfaceWhite = 0.05;
-  let surfaceBrightWhite = 0.04;
-  let surfaceBaseTone = tone; // Which tone to use for Surface (default: same as background)
-
-  // SIMPLIFIED 1:1 MAPPING: Background-N → Color-N (same as Tonal mode)
-  if (isChromatic) {
-    // Primary, Secondary, Tertiary surfaces
-    // LIGHT_MODE_TONES = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
-    // Index (palette[]):   0   1   2   3   4    5     6   7   8   9  10  11  12  13
-    // Color-N:             1   2   3   4   5    6     7   8   9  10  11  12  13  14
-    if (tone === 1) { // Background-1 → Color-1
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 0; // Color-1 (index 0)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 10) { // Background-2 → Color-2
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 1; // Color-2 (index 1)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 19) { // Background-3 → Color-3
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 2; // Color-3 (index 2)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 28) { // Background-4 → Color-4
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 3; // Color-4 (index 3)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 37) { // Background-5 → Color-5
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 4; // Color-5 (index 4)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 58) { // Background-6 → Color-6
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 5; // Color-6 (index 5)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 71) { // Background-7 → Color-7
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 6; // Color-7 (index 6)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 81) { // Background-8 → Color-8
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 7; // Color-8 (index 7)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 90) { // Background-9 → Color-9
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 8; // Color-9 (index 8)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 95) { // Background-10 → Color-10
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 9; // Color-10 (index 9)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 98) { // Background-11 → Color-11
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 10; // Color-11 (index 10)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 99) { // Background-12 → Color-12
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-    }
-  } else {
-    // Neutral surfaces - SIMPLIFIED 1:1 MAPPING: Background-N → Color-N
-    if (tone === 1) { // Background-1 → Color-1
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 0; // Color-1 (index 0)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 10) { // Background-2 → Color-2
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 1; // Color-2 (index 1)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 19) { // Background-3 → Color-3
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 2; // Color-3 (index 2)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 28) { // Background-4 → Color-4
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 3; // Color-4 (index 3)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 37) { // Background-5 → Color-5
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 4; // Color-5 (index 4)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 58) { // Background-6 → Color-6
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 5; // Color-6 (index 5)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 71) { // Background-7 → Color-7
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 6; // Color-7 (index 6)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 81) { // Background-8 → Color-8
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 7; // Color-8 (index 7)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 90) { // Background-9 → Color-9
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.01;
-      surfaceBaseTone = 8; // Color-9 (index 8)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 95) { // Background-10 → Color-10
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.0;
-      surfaceBaseTone = 9; // Color-10 (index 9)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 98) { // Background-11 → Color-11
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 10; // Color-11 (index 10)
-      surfaceBrightWhite = 0.04;
-    } else if (tone === 99) { // Background-12 → Color-12
-      surfaceDimBlack = 0.04;
-      surfaceWhite = 0.05;
-      surfaceBaseTone = 11; // Color-12 (index 11)
-      surfaceBrightWhite = 0.04;
-    }
-  }
-
-  // Get the correct base color for Surface using index-based lookup
-  const surfaceBaseColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone < palette.length
-    ? palette[surfaceBaseTone].color
-    : baseColor;
-
-  // Surface = pure Color-N (no blending)
-  // Surface-Dim = adjacent tone one step darker (Color-1 Dim = black)
-  // Surface-Bright = adjacent tone one step lighter (Color-12 Bright = white)
-  const surfaceColor = surfaceBaseColor; // Pure color, no blending
-  const surfaceDimColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone > 0
-    ? palette[surfaceBaseTone - 1].color
-    : '#000000'; // Color-1 Dim = black
-  const surfaceBrightColor = typeof surfaceBaseTone === 'number' && surfaceBaseTone < palette.length - 1
-    ? palette[surfaceBaseTone + 1].color
-    : '#FFFFFF'; // Color-12 Bright = white
-  
-  // Professional mode: all containers are white
-  const containerColor = '#FFFFFF';
-
-  // Use neutral palette for text colors if available, otherwise use current palette
-  const textPalette = allPalettes?.neutral || palette;
-  const primaryPalette = allPalettes?.primary || palette;
-
-  return {
-    Surfaces: {
-      'Surface': {
-        value: surfaceColor,
-        type: 'color'
-      },
-      'Surface-Dim': {
-        value: surfaceDimColor,
-        type: 'color'
-      },
-      'Surface-Bright': {
-        value: surfaceBrightColor,
-        type: 'color'
-      },
-      'Header': {
-        value: paletteName && backgroundNumber ? getFixedHeaderToken(backgroundNumber, false, paletteName) : getHeaderColor(surfaceColor, textPalette, false),
-        type: 'color'
-      },
-      'Text': {
-        value: paletteName && backgroundNumber ? getFixedTextToken(backgroundNumber, false, paletteName) : getTextColor(surfaceColor, textPalette, false),
-        type: 'color'
-      },
-      'Quiet': {
-        value: getTextQuietColor(surfaceColor, textPalette, false),
-        type: 'color'
-      },
-      'Border': {
-        value: paletteName && backgroundNumber ? getFixedBorderToken(backgroundNumber, false, paletteName) : getBorderColor(surfaceColor, palette, false),
-        type: 'color'
-      },
-      'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, false, palette)}33` : `${getBorderColor(surfaceColor, palette, false)}33`,
-        type: 'color'
-      },
-      'Hotlink': {
-        value: '{Colors.Primary.Color-7}',
-        type: 'color'
-      },
-      'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-6}',
-        type: 'color'
-      },
-      'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-${surfaceBaseTone + 1}}` : blendColors('#000000', surfaceColor, 0.08),
-        type: 'color'
-      },
-      'Pressed': {
-        value: paletteName ? `{Pressed.${paletteName}.Color-${surfaceBaseTone + 1}}` : blendColors('#000000', surfaceColor, 0.12),
-        type: 'color'
-      },
-      'Focus-Active': {
-        value: backgroundNumber ? `{Focus-Active.Surfaces.Background-${backgroundNumber}}` : blendColors('#000000', surfaceColor, 0.10),
-        type: 'color'
-      },
-      'Focus-Visible': {
-        value: backgroundNumber ? `{Focus-Visible.Surfaces.Background-${backgroundNumber}}` : blendColors('#000000', surfaceColor, 0.10),
-        type: 'color'
-      }
-    },
-    Containers: {
-      'Container': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-Lowest': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-Low': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-High': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Container-Highest': {
-        value: containerColor,
-        type: 'color'
-      },
-      'Header': {
-        value: paletteName && backgroundNumber ? getFixedHeaderToken(backgroundNumber, true, paletteName) : getHeaderColor(containerColor, textPalette, false),
-        type: 'color'
-      },
-      'Text': {
-        value: paletteName && backgroundNumber ? getFixedTextToken(backgroundNumber, true, paletteName) : getTextColor(containerColor, textPalette, false),
-        type: 'color'
-      },
-      'Quiet': {
-        value: getTextQuietColor(containerColor, textPalette, false),
-        type: 'color'
-      },
-      'Border': {
-        value: paletteName && backgroundNumber ? getFixedBorderToken(backgroundNumber, true, paletteName) : getBorderColor(containerColor, palette, false),
-        type: 'color'
-      },
-      'Border-Variant': {
-        value: paletteName && backgroundNumber ? `${getFixedBorderHexColor(backgroundNumber, true, palette)}33` : `${getBorderColor(containerColor, palette, false)}33`,
-        type: 'color'
-      },
-      'Hotlink': {
-        value: '{Colors.Primary.Color-7}',
-        type: 'color'
-      },
-      'Hotlink-Visited': {
-        value: '{Colors.Hotlink-Visited.Color-6}',
-        type: 'color'
-      },
-      'Hover': {
-        value: paletteName ? `{Hover.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.08),
-        type: 'color'
-      },
-      'Pressed': {
-        value: paletteName ? `{Pressed.${paletteName}.Color-11}` : blendColors('#000000', containerColor, 0.12),
-        type: 'color'
-      },
-      'Focus-Active': {
-        value: backgroundNumber ? `{Focus-Active.Containers.Background-${backgroundNumber}}` : blendColors('#000000', containerColor, 0.10),
-        type: 'color'
-      },
-      'Focus-Visible': {
-        value: backgroundNumber ? `{Focus-Visible.Containers.Background-${backgroundNumber}}` : blendColors('#000000', containerColor, 0.10),
-        type: 'color'
-      }
-    }
-  };
-}
+// NOTE: generateLightModeTonalSurfacesAndContainers() and
+// generateLightModeProfessionalSurfacesAndContainers() were removed — neither
+// had a caller. Light-mode surfaces/containers are produced by
+// generateSimplifiedLightModeBackgrounds() in generateSimplifiedBackgrounds.ts.
+//
+// They were not merely unused, they were STALE: both still pinned
+// Hotlink-Visited to {Colors.Hotlink-Visited.Color-6} — a fixed tone off the
+// raw palette — where the live path solves it per surface through
+// {Text.Surfaces.Hotlink-Visited.Color-N}. Reading them to answer "how is
+// this token derived" gave the wrong answer, which is the real cost of dead
+// code that shadows a live rule.
 
 // NOTE: generateDarkModeSurfacesAndContainers() was removed — it had no
 // callers. Dark-mode surfaces/containers are produced by
@@ -2570,7 +1868,22 @@ function generateModesThemes(
     status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
   },
   userSelections?: {
-    background?: 'white' | 'black' | 'primary';
+    /** Matches completeSimplifiedSystem.ts and generateFigmaJSON.ts. This copy
+     *  was the stale one of the three: it listed only white/black/primary while
+     *  the code below branches on 'neutral-light', 'neutral-dark' and
+     *  'primary-light' as well. Those branches were unreachable as far as the
+     *  compiler could tell, and a background selected as neutral-light fell
+     *  through to the Primary default. */
+    background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
+      | 'primary-dark' | 'neutral-light' | 'neutral-dark';
+    /** WHICH palette the Default background is drawn from, and at which tone.
+     *  Both are read below to decide the Default theme's surface, and both were
+     *  missing from this type while the caller has always supplied them
+     *  (see UserSelections in types/index.ts, produced by autoAssignColors).
+     *  The values flowed; only the type did not know about them, so twenty
+     *  reads of a field TypeScript believed did not exist went unchecked. */
+    backgroundTheme?: 'Primary' | 'Neutral';
+    backgroundN?: number;
     appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
@@ -3928,16 +3241,6 @@ function generateThemesSection(
     'Nav-Bar': createTheme(navBarConfig.n, navBarConfig.theme),  // Use Nav Bar selection
     Status: createTheme(statusConfig.n, statusConfig.theme)  // Use Status Bar selection
   };
-  
-  console.log(`🎨🎨🎨 [generateModesThemes] === END for ${modeName} - Generated ${Object.keys(themes).length} themes ===\n`);
-  const sampleTheme = themes['Primary-Light'];
-  if (sampleTheme) {
-    console.log(`  📋 Sample Theme (Primary-Light):`);
-    console.log(`      Surfaces keys (${Object.keys(sampleTheme.Surfaces).length}):`, Object.keys(sampleTheme.Surfaces).slice(0, 10).join(', '));
-    console.log(`      Containers keys (${Object.keys(sampleTheme.Containers).length}):`, Object.keys(sampleTheme.Containers).slice(0, 10).join(', '));
-  }
-  
-  return themes;
 }
 
 /**
@@ -3982,7 +3285,13 @@ export function exportColorSystemToJSON(
   schemeType?: 'monochromatic' | 'analogous' | 'complementary' | 'triadic' | 'split-complementary' | 'tetradic', // Color scheme type
   userSelections?: { // User selections from ColorAssignmentStage - takes precedence over calculated defaults
     defaultTheme?: 'light' | 'dark';
-    background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
+    background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium'
+      | 'primary-dark' | 'primary-base' | 'neutral-light' | 'neutral-dark';
+    /** Read a few lines below to pick the Default background's palette and
+     *  tone. This is the SECOND inline copy of this shape in this file and it
+     *  was missing them too — the same fields, the same silent undefined. */
+    backgroundTheme?: 'Primary' | 'Neutral';
+    backgroundN?: number;
     appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
@@ -7155,7 +6464,9 @@ export function exportColorSystemToJSON(
       'Success': tonePalettes.success,
       'Warning': tonePalettes.warning,
       'Error': tonePalettes.error,
-      'Hotlink-Visited': tonePalettes.hotlinkVisited
+      // The key is kebab-case; reading .hotlinkVisited returned undefined,
+      // so every Hotlink-Visited lookup in this map resolved to nothing.
+      'Hotlink-Visited': tonePalettes['hotlink-visited']
     };
     
     const palette = themeMap[themeName];
@@ -7177,7 +6488,9 @@ export function exportColorSystemToJSON(
       'Success': tonePalettes.success,
       'Warning': tonePalettes.warning,
       'Error': tonePalettes.error,
-      'Hotlink-Visited': tonePalettes.hotlinkVisited
+      // The key is kebab-case; reading .hotlinkVisited returned undefined,
+      // so every Hotlink-Visited lookup in this map resolved to nothing.
+      'Hotlink-Visited': tonePalettes['hotlink-visited']
     };
     
     const palette = themeMap[themeName];

@@ -17,13 +17,18 @@ export function autoAssignColors(
   const isDarkPrimary = PC < 5;
   const isMonochromatic = colorScheme.name?.toLowerCase() === 'monochromatic';
 
-  let background: string;
-  let backgroundTheme: 'Primary' | 'Neutral';
-  let backgroundN: number;
-  let defaultTheme: 'light' | 'dark';
-  let appBar: string;
-  let navBar: string;
-  let status: string;
+  // Typed from UserSelections rather than as bare `string`. The function
+  // declares it returns UserSelections, whose appBar / navBar / status are
+  // narrow unions — so widening the locals to `string` moved the mismatch from
+  // the assignment, where the wrong value is written, to the return, where it
+  // is already too late to say which one was wrong.
+  let background: UserSelections['background'];
+  let backgroundTheme: UserSelections['backgroundTheme'];
+  let backgroundN: UserSelections['backgroundN'];
+  let defaultTheme: UserSelections['defaultTheme'];
+  let appBar: UserSelections['appBar'];
+  let navBar: UserSelections['navBar'];
+  let status: UserSelections['status'];
   let button: UserSelections['button'];
   let textColoring: UserSelections['textColoring'];
   let cardColoring: UserSelections['cardColoring'];
