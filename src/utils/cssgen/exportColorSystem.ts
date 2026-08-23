@@ -66,6 +66,10 @@ interface SurfacesDetails {
   'Hotlink-Visited': ColorToken;
   Hover: ColorToken;
   Pressed: ColorToken;
+  /** Emitted by every surface and container block below, and declared by
+   *  neither of these interfaces until now — so the one token whose whole job
+   *  is to be VISIBLE was the one the type did not know about. */
+  'Focus-Visible'?: ColorToken;
 }
 
 interface ContainersDetails {
@@ -83,6 +87,10 @@ interface ContainersDetails {
   'Hotlink-Visited': ColorToken;
   Hover: ColorToken;
   Pressed: ColorToken;
+  /** Emitted by every surface and container block below, and declared by
+   *  neither of these interfaces until now — so the one token whose whole job
+   *  is to be VISIBLE was the one the type did not know about. */
+  'Focus-Visible'?: ColorToken;
 }
 
 interface SurfacesAndContainers {
@@ -122,25 +130,35 @@ interface ButtonsSectionForMode {
   Containers: { [backgroundKey: string]: ButtonsForBackground };
 }
 
+/**
+ * The nine icon roles, and their -Variant twins.
+ *
+ * The variants are OPTIONAL because they are produced by a different function:
+ * generateIconsForBackground returns the base nine, and
+ * generateIconVariantPaletteStructure supplies the variants into a sibling
+ * `Icon-Variant` section. Requiring them here made the base generator's honest
+ * return value a type error, which is the type describing a shape nothing
+ * builds rather than the code being wrong.
+ */
 interface IconsForBackground {
   Default: ColorToken;
-  'Default-Variant': ColorToken;
   Primary: ColorToken;
-  'Primary-Variant': ColorToken;
   Secondary: ColorToken;
-  'Secondary-Variant': ColorToken;
   Tertiary: ColorToken;
-  'Tertiary-Variant': ColorToken;
   Neutral: ColorToken;
-  'Neutral-Variant': ColorToken;
   Info: ColorToken;
-  'Info-Variant': ColorToken;
   Success: ColorToken;
-  'Success-Variant': ColorToken;
   Warning: ColorToken;
-  'Warning-Variant': ColorToken;
   Error: ColorToken;
-  'Error-Variant': ColorToken;
+  'Default-Variant'?: ColorToken;
+  'Primary-Variant'?: ColorToken;
+  'Secondary-Variant'?: ColorToken;
+  'Tertiary-Variant'?: ColorToken;
+  'Neutral-Variant'?: ColorToken;
+  'Info-Variant'?: ColorToken;
+  'Success-Variant'?: ColorToken;
+  'Warning-Variant'?: ColorToken;
+  'Error-Variant'?: ColorToken;
 }
 
 interface IconsSectionForMode {
@@ -266,14 +284,22 @@ interface ModeSection {
       [colorKey: string]: ColorToken;
     };
   };
+  /**
+   * Backgrounds.<Palette>.Background-<N>.{Surfaces|Containers}.<token>
+   *
+   * Two levels deeper than this type used to claim. It described the innermost
+   * token bag — Surface / Surface-Dim / Container — as if it sat directly under
+   * the palette, so every `backgroundsRef['Background-' + n] = …` was indexing a
+   * type that had no such key, and the whole subtree below it fell back to
+   * `any`. The references the rest of the file writes state the real shape:
+   * `{Backgrounds.Primary.Background-9.Surfaces.Surface}`.
+   */
   Backgrounds: {
-    [backgroundKey: string]: {
-      Surface: ColorToken;
-      'Surface-Dim': ColorToken;
-      'Surface-Bright': ColorToken;
-      Container: ColorToken;
-      'Container-Low': ColorToken;
-      'Container-Lowest': ColorToken;
+    [paletteKey: string]: {
+      [backgroundKey: string]: {
+        Surfaces: { [tokenKey: string]: ColorToken };
+        Containers: { [tokenKey: string]: ColorToken };
+      };
     };
   };
   Icon: IconsSectionForMode;
@@ -1886,6 +1912,7 @@ function generateModesThemes(
     backgroundN?: number;
     appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
     buttonBehavior?: 'adaptive' | 'fixed';
     cardColoring?: 'tonal' | 'white' | 'black';
@@ -3297,6 +3324,9 @@ export function exportColorSystemToJSON(
     status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     button?: 'primary-adaptive' | 'primary-fixed' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
+    /** Read below; declared in defaultThemeLogic.ts, which carries the legacy
+     *  string form alongside the union. */
+    cardsText?: 'tonal' | 'professional' | 'default' | string;
     textColoring?: 'tonal' | 'black-white';
   }
 ): ColorSystemExport {
@@ -4585,10 +4615,15 @@ export function exportColorSystemToJSON(
   colorSystem.Modes['Light-Mode'].Eyebrows = buildEyebrows(lightModeTextFixed, 'light');
   colorSystem.Modes['Dark-Mode'].Eyebrows = buildEyebrows(darkModeTextFixed, 'dark');
   {
+    // Assigned two lines above, but Eyebrows is optional on the type — and this
+    // block only exists to log a count, so a guard is honest where a `!` would
+    // be a promise the type cannot keep.
     const eb = colorSystem.Modes['Light-Mode'].Eyebrows;
-    const n = Object.values(eb.Surfaces).reduce((t: number, p: any) => t + Object.keys(p).length, 0)
-            + Object.values(eb.Containers).reduce((t: number, p: any) => t + Object.keys(p).length, 0);
-    console.log(`  ├─ [JSON Export] Eyebrows solved for chroma (${n} tokens per mode, ${Object.keys(eb.Surfaces).length} backgrounds)`);
+    if (eb) {
+      const n = Object.values(eb.Surfaces).reduce((t: number, p: any) => t + Object.keys(p).length, 0)
+              + Object.values(eb.Containers).reduce((t: number, p: any) => t + Object.keys(p).length, 0);
+      console.log(`  ├─ [JSON Export] Eyebrows solved for chroma (${n} tokens per mode, ${Object.keys(eb.Surfaces).length} backgrounds)`);
+    }
   }
   console.log(`      ✓ Text applied: ${Object.keys(darkModeTextFixed).length} sections (Surfaces, Containers)`);
   console.log(`      ✓ Text.Surfaces.Neutral.Color-1 = ${darkModeTextFixed.Surfaces.Neutral['Color-1'].value}`);
