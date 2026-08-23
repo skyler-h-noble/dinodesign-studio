@@ -75,7 +75,6 @@ export function moodKeyFor(mood?: string | null): MoodName {
   // fonts — the suggestions were simply unrelated to the board. A silent
   // catch-all cannot be distinguished from a working lookup.
   if (raw && process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
     console.warn(
       `[mood] no font pool for "${raw}" — falling back to ${DEFAULT_POOL}. ` +
       'Add it to SERVER_MOOD_ALIAS in utils/moodKey.ts.',

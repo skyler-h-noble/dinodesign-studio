@@ -4848,27 +4848,10 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('');
   
   // DEPRECATED (2026-03-03): Old Theme-Colors section - REMOVED
-  // This section was generating duplicate/incorrect theme CSS
-  // Now using template-based generation via generateThemeDataAttributesCSS()
-  if (false && jsonData.Theme && jsonData.Theme['Theme-Colors']) {
-    lines.push('[data-theme][data-theme=\"Default\"] {');
-    lines.push('  /* Theme Colors */');
-    const themeColors = jsonData.Theme['Theme-Colors'];
-    if (themeColors.Primary) {
-      if (themeColors.Primary.Color) lines.push(`  --Theme-Primary-Color: ${tokenToVar(themeColors.Primary.Color.value)};`);
-      if (themeColors.Primary.Text) lines.push(`  --Theme-Primary-Text: ${tokenToVar(themeColors.Primary.Text.value)};`);
-      if (themeColors.Primary.Background) lines.push(`  --Theme-Primary-Background: ${tokenToVar(themeColors.Primary.Background.value)};`);
-    }
-    if (themeColors.Secondary) {
-      if (themeColors.Secondary.Color) lines.push(`  --Theme-Secondary-Color: ${tokenToVar(themeColors.Secondary.Color.value)};`);
-      if (themeColors.Secondary.Background) lines.push(`  --Theme-Secondary-Background: ${tokenToVar(themeColors.Secondary.Background.value)};`);
-    }
-    if (themeColors.Tertiary) {
-      if (themeColors.Tertiary.Color) lines.push(`  --Theme-Tertiary-Color: ${tokenToVar(themeColors.Tertiary.Color.value)};`);
-      if (themeColors.Tertiary.Background) lines.push(`  --Theme-Tertiary-Background: ${tokenToVar(themeColors.Tertiary.Background.value)};`);
-    }
-    lines.push('}');
-  }
+  // NOTE: a theme-colours block guarded by `if (false && …)` sat here. Its
+  // own comment said it generated duplicate/incorrect theme CSS and that
+  // generateThemeDataAttributesCSS replaced it. Deleted rather than left
+  // disabled: `if (false)` is dead code that still reads as a live branch.
   lines.push('');
   // END of dead code block - never executes due to if (false...)
   

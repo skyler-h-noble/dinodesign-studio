@@ -126,7 +126,6 @@ export function normalizeMood(mood?: string | null): string {
   // here, so every design system ever generated got identical Google Sans Flex
   // axes. Nothing failed — 'Modern' is a real setting that renders.
   if (raw && process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
     console.warn(
       `[mood] no axis mapping for "${raw}" — falling back to Modern. ` +
       'Add it to SERVER_AXIS_MOOD in utils/moodAxes.ts.',

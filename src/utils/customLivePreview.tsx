@@ -69,7 +69,6 @@ export function CustomLivePreview({ code, scope, className, style }: LivePreview
         !RESERVED.has(k) && /^[A-Za-z_$][\w$]*$/.test(k),
       );
       const scopeValues = scopeKeys.map(k => scope[k]);
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
       const evalFn = new Function(...scopeKeys, transformed);
 
       const element = evalFn(...scopeValues) as React.ReactElement;
