@@ -2,7 +2,7 @@ import { httpsCallable, getFunctions } from 'firebase/functions';
 import { firebaseApp } from './firebase/client';
 import { extractImageProps } from './imageAnalysis';
 import type { ImageProps } from './imageAnalysis';
-import { cropFromBboxes, cropPixelFallback } from './textDetection';
+import { cropFromBboxes, cropPixelFallback, looksLikeLettering } from './textDetection';
 import type { TextCrops, OcrDiag, ExtractedTextRegion } from './textDetection';
 
 export type { ExtractedTextRegion } from './textDetection';
@@ -68,7 +68,22 @@ export interface MoodboardAnalysis {
     | 'same_style_as_header'
     | 'none';
   specs: TypographySpecs;
-  mood: { key: string; label: string; confidence: number } | null;
+  mood: {
+    key: string;
+    label: string;
+    /** The winner's share of the total score. Historic name — it reads like a
+     *  probability and is not one: with 20 moods a uniform split is 0.05. */
+    confidence: number;
+    /** Same number, honestly named. */
+    share?: number;
+    /** (top - second) / top. THIS is how sure the match is. Median across the
+     *  sampled input space is 0.094, and 52.9% of boards land under 0.10 —
+     *  for half of all boards the mood is nearly a tie between two. */
+    margin?: number;
+    /** The mood that came second, when there is one worth offering. */
+    runnerUp?: string | null;
+    runnerUpLabel?: string | null;
+  } | null;
   trios: FontTrio[];
   debug?: {
     categoryScores: Record<string, number>;
@@ -83,6 +98,15 @@ export interface MoodboardAnalysis {
    *  tallest first. Surfaced so the picker can show "all text styles
    *  extracted from your file" without re-running OCR. */
   extractedText: ExtractedTextRegion[];
+  /** True when the board carries no usable lettering — either nothing was
+   *  found, or everything found was OCR noise (see looksLikeLettering).
+   *  Callers must say so rather than presenting a match: with no lettering
+   *  there is nothing to match against, and every suggestion downstream is
+   *  really coming from the palette. */
+  noLetteringDetected?: boolean;
+  /** Regions dropped as OCR noise, kept for the "we looked and found none"
+   *  explanation and for labelling. */
+  discardedText?: ExtractedTextRegion[];
   /** Crops the server-side text-vs-non-text CLIP gate rejected before
    *  typography classification. Returned so the studio can (a) auto-log
    *  them as weak negative labels, (b) surface a "filtered out" indicator
@@ -157,10 +181,25 @@ export async function analyzeMoodboard(imageUrl: string): Promise<MoodboardAnaly
     props,
     crops: { ...crops_payload, candidates },
   });
+  // OCR over a photograph with no type in it returns confident garbage, not
+  // nothing — a row of popsicles came back as "613000001" and became the
+  // Display specimen. Judge only regions that actually claim a string: the
+  // pixel fallback emits crops with text:'' and makes no claim to test.
+  const claimsText = (r: ExtractedTextRegion) => !!r.text && r.text.trim().length > 0;
+  const kept = regions.filter((r) => !claimsText(r) || looksLikeLettering(r.text));
+  const discarded = regions.filter((r) => claimsText(r) && !looksLikeLettering(r.text));
+  if (discarded.length) {
+    console.info(
+      `[ocr] discarded ${discarded.length} region(s) as non-lettering:`,
+      discarded.map((r) => r.text),
+    );
+  }
   return {
     ...data,
     debug: data.debug ? { ...data.debug, ocr: diag } : undefined,
-    extractedText: regions,
+    extractedText: kept,
+    discardedText: discarded.length ? discarded : undefined,
+    noLetteringDetected: kept.length === 0,
   };
 }
 

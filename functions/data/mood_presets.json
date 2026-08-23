@@ -564,6 +564,199 @@
           "body": "Lato"
         }
       ]
+    },
+    "bright_cheerful": {
+      "label": "Bright / Cheerful",
+      "description": "Sunny saturated warmth \u2014 yellows, corals, optimistic and open. Friendly rather than childish.",
+      "detection": {
+        "brightness": "light",
+        "saturation": "high",
+        "dominant_colors": [
+          "yellow",
+          "orange",
+          "coral",
+          "pink"
+        ],
+        "background": "light_warm",
+        "contrast": "medium"
+      },
+      "trio": {
+        "header": "Poppins",
+        "decorative": "Pacifico",
+        "body": "Nunito"
+      },
+      "alternates": [
+        {
+          "header": "Quicksand",
+          "decorative": "Sacramento",
+          "body": "Karla"
+        },
+        {
+          "header": "Rubik",
+          "decorative": "Grandstander",
+          "body": "Rubik"
+        }
+      ]
+    },
+    "candy_pastel": {
+      "label": "Candy / Pastel",
+      "description": "Soft sweet colour \u2014 pinks, lilacs and mints at gentle saturation. Light, tender, unserious.",
+      "detection": {
+        "brightness": "very_light",
+        "saturation": "medium",
+        "dominant_colors": [
+          "pink",
+          "lilac",
+          "mint",
+          "pastel_multiple"
+        ],
+        "background": "pastel",
+        "contrast": "low"
+      },
+      "trio": {
+        "header": "Quicksand",
+        "decorative": "Sniglet",
+        "body": "Nunito"
+      },
+      "alternates": [
+        {
+          "header": "Comfortaa",
+          "decorative": "Grandstander",
+          "body": "Varela Round"
+        },
+        {
+          "header": "Baloo 2",
+          "decorative": "Sue Ellen Francisco",
+          "body": "Quicksand"
+        }
+      ]
+    },
+    "kids_primary": {
+      "label": "Kids / Primary",
+      "description": "Primary reds, blues and yellows at full strength. Bold, plain shapes, high contrast.",
+      "detection": {
+        "brightness": "medium",
+        "saturation": "very_high",
+        "dominant_colors": [
+          "red",
+          "blue",
+          "yellow",
+          "green"
+        ],
+        "background": "white",
+        "contrast": "very_high"
+      },
+      "trio": {
+        "header": "Fredoka",
+        "decorative": "Chewy",
+        "body": "Nunito"
+      },
+      "alternates": [
+        {
+          "header": "Baloo 2",
+          "decorative": "Bubblegum Sans",
+          "body": "Quicksand"
+        },
+        {
+          "header": "Luckiest Guy",
+          "decorative": "Boogaloo",
+          "body": "Rubik"
+        }
+      ]
+    },
+    "high_energy": {
+      "label": "High Energy",
+      "description": "Saturated and high-contrast in any hue. Momentum, noise, motion.",
+      "detection": {
+        "brightness": "medium",
+        "saturation": "very_high",
+        "dominant_colors": [
+          "mixed",
+          "electric"
+        ],
+        "background": "any",
+        "contrast": "very_high"
+      },
+      "trio": {
+        "header": "Archivo Black",
+        "decorative": "Bangers",
+        "body": "Archivo"
+      },
+      "alternates": [
+        {
+          "header": "Anton",
+          "decorative": "Rubik Dirt",
+          "body": "Barlow"
+        },
+        {
+          "header": "Oswald",
+          "decorative": "Titan One",
+          "body": "Roboto"
+        }
+      ]
+    },
+    "bold_graphic": {
+      "label": "Bold / Graphic",
+      "description": "Poster logic \u2014 maximum contrast, flat blocks of colour, nothing subtle.",
+      "detection": {
+        "brightness": "mixed",
+        "saturation": "high",
+        "dominant_colors": [
+          "flat_blocks",
+          "two_tone"
+        ],
+        "background": "solid",
+        "contrast": "very_high"
+      },
+      "trio": {
+        "header": "Anton",
+        "decorative": "Alfa Slab One",
+        "body": "Inter"
+      },
+      "alternates": [
+        {
+          "header": "Archivo Black",
+          "decorative": "Rubik Mono One",
+          "body": "Archivo"
+        },
+        {
+          "header": "Bebas Neue",
+          "decorative": "Bungee",
+          "body": "Work Sans"
+        }
+      ]
+    },
+    "sport_dynamic": {
+      "label": "Sport / Dynamic",
+      "description": "Team colour and speed \u2014 strong blues and reds, angular, high contrast.",
+      "detection": {
+        "brightness": "medium",
+        "saturation": "high",
+        "dominant_colors": [
+          "blue",
+          "red",
+          "orange"
+        ],
+        "background": "dark_or_white",
+        "contrast": "high"
+      },
+      "trio": {
+        "header": "Saira Condensed",
+        "decorative": "Teko",
+        "body": "Barlow"
+      },
+      "alternates": [
+        {
+          "header": "Oswald",
+          "decorative": "Bebas Neue",
+          "body": "Roboto Condensed"
+        },
+        {
+          "header": "Archivo",
+          "decorative": "Anton",
+          "body": "Inter"
+        }
+      ]
     }
   }
 }
