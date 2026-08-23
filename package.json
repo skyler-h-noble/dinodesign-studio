@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:fresh": "rm -rf node_modules/.vite && vite --force",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

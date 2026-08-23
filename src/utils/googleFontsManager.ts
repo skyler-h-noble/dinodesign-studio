@@ -382,6 +382,86 @@ async function fetchGoogleFonts(): Promise<GoogleFont[]> {
 }
 
 // Get fonts for a specific style category
+/**
+ * Does this family ship an italic?
+ *
+ * The Google Fonts API returns `variants` as a flat list of style names —
+ * `["regular", "italic", "700", "700italic"]` — so italic availability is
+ * already in the data the studio fetches. Nothing new to request.
+ *
+ * This is NOT the same question as "does it have an `ital` axis". None of the
+ * 102 families in googleFontAxes.json has one, because that file records
+ * VARIABLE axes and italic usually ships as a separate static face. So an axis
+ * lookup says no while the family does in fact have an italic.
+ *
+ * Matters for both targets. On the web `font-style: italic` would synthesise an
+ * oblique when no italic exists — shearing a script face that is already
+ * cursive. Figma refuses instead: a font there is `{ family, style }`, and
+ * loadFontAsync fails on a style the family does not ship. So the control has to
+ * be gated on this rather than offered unconditionally.
+ */
+/**
+ * Italic availability by family, from whatever the API cache holds.
+ *
+ * Returns `null` when the cache has not been populated yet — deliberately NOT
+ * `false`. The distinction matters: an italic gate that reads "no italic" from
+ * an empty cache would disable EVERY font, which is the opposite of the intent.
+ * A caller must treat null as "unknown, do not gate" rather than "none".
+ */
+export function italicAvailability(): Map<string, boolean> | null {
+  if (!googleFontsCache) return null;
+  const m = new Map<string, boolean>();
+  for (const f of googleFontsCache) m.set(f.family, fontHasItalic(f));
+  return m;
+}
+
+/** How many of `families` ship an italic, and how many do not. `null` when the
+ *  cache is cold, so the UI can say "checking" rather than a wrong number. */
+export function italicCoverage(families: string[]): { withItalic: number; without: number } | null {
+  const avail = italicAvailability();
+  if (!avail) return null;
+  let withItalic = 0, without = 0;
+  for (const f of families) {
+    // A family absent from the cache is unknown, not italic-less — count it as
+    // available so an incomplete cache cannot silently rule fonts out.
+    if (avail.get(f) !== false) withItalic++;
+    else without++;
+  }
+  return { withItalic, without };
+}
+
+export function fontHasItalic(font: { variants?: string[] } | null | undefined): boolean {
+  if (!font?.variants?.length) return false;
+  return font.variants.some(v => String(v).toLowerCase().includes('italic'));
+}
+
+/**
+ * The italic style names a family ships, e.g. ["italic", "700italic"].
+ * Empty when it has none.
+ */
+export function italicVariantsFor(font: { variants?: string[] } | null | undefined): string[] {
+  if (!font?.variants?.length) return [];
+  return font.variants.filter(v => String(v).toLowerCase().includes('italic'));
+}
+
+/**
+ * The Figma style name for a family's italic at a given weight — what
+ * `fontName.style` needs. Figma spells these "Italic" / "Bold Italic" /
+ * "600 Italic" depending on the family, so this returns the FAMILY's own
+ * spelling from `variants` rather than guessing; the plugin already enumerates
+ * every shipped style (code.ts:1341) and can match against it.
+ */
+export function italicWeightsFor(font: { variants?: string[] } | null | undefined): number[] {
+  return italicVariantsFor(font)
+    .map(v => {
+      const m = String(v).match(/^(\d+)italic$/i);
+      if (m) return parseInt(m[1], 10);
+      return /^italic$/i.test(String(v)) ? 400 : NaN;
+    })
+    .filter(n => Number.isFinite(n))
+    .sort((a, b) => a - b);
+}
+
 export async function getFontsForStyleCategory(
   category: string, 
   limit: number = 30,
@@ -531,4 +611,44 @@ export async function generateFontPairs(
   }
   
   return pairs;
+}
+/**
+ * Load font families ADDITIVELY, for UI that browses many faces at once.
+ *
+ * loadGoogleFonts() removes every `data-typography-fonts` link before adding
+ * its own, which is right for the export path — one final set, replacing the
+ * last. It is wrong for a picker: switching pool unloaded the faces the
+ * specimen and the already-rendered chips were still using.
+ *
+ * The picker never called either one, so every chip rendered its `Ag` in the
+ * fallback `sans-serif` and each face looked identical to the next — the one
+ * thing a font picker must not do.
+ *
+ * Families already requested are skipped, so this is cheap to call on every
+ * render of a changing list.
+ */
+const ensuredFamilies = new Set<string>();
+
+export function ensureGoogleFonts(fontFamilies: string[]): void {
+  const fresh = fontFamilies
+    .map((f) => (f || '').trim())
+    .filter((f) => f && !ensuredFamilies.has(f));
+  if (!fresh.length) return;
+  fresh.forEach((f) => ensuredFamilies.add(f));
+
+  // Batched to keep the css2 URL under length limits, same as loadGoogleFonts.
+  const BATCH = 10;
+  for (let i = 0; i < fresh.length; i += BATCH) {
+    const batch = fresh.slice(i, i + BATCH);
+    const fontString = batch
+      .map((family) => fontFamilyParam(family, [300, 400, 600, 700]).replace(/^family=/, ''))
+      .join('&family=');
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${fontString}&display=swap`;
+    // Deliberately NOT data-typography-fonts: that attribute is the set
+    // loadGoogleFonts() clears, and these must survive its next call.
+    link.setAttribute('data-picker-fonts', 'true');
+    document.head.appendChild(link);
+  }
 }
