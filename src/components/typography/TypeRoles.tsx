@@ -380,7 +380,11 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   Body: 'Reading copy and interface text.',
 };
 
-const ROLES = ['Display', 'Eyebrow', 'Header', 'Body'] as const;
+/* Render order. Body sits second and Eyebrow last: the panels wrap at roughly
+   three across, so whichever role is fourth falls below the fold — and Body is
+   the one people reach for. Only .map reads this, so the order is free to
+   change; the `ROLES` in App.tsx is a different constant (colour palettes). */
+const ROLES = ['Display', 'Body', 'Header', 'Eyebrow'] as const;
 export type RoleName = typeof ROLES[number];
 
 export interface RolePanelsProps {
