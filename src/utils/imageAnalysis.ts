@@ -146,11 +146,55 @@ export type HueFamily =
   | 'red' | 'orange' | 'amber' | 'yellow' | 'green'
   | 'cyan' | 'blue' | 'purple' | 'pink' | 'neutral';
 
+/**
+ * How colourful this image is, as the mean saturation of its most colourful
+ * quarter.
+ *
+ * NOT the mean over every pixel, which is what this used to be. That statistic
+ * is area-weighted, so a large flat background outvotes the subject: a board of
+ * vivid popsicles on pale peach measured 0.33 when the popsicles themselves are
+ * 0.78. The colours a person would describe the board by were averaged away by
+ * the colours they would not mention.
+ *
+ * That mattered because match_mood() weights this heavily in both directions —
+ * whimsical_playful scores s * 0.5 while editorial_modern scores (1 - s) * 0.4
+ * — so diluting it handed vivid boards to the mood that rewards being drab.
+ *
+ * The top quartile was chosen against alternatives (see below); it degrades
+ * gracefully as the colourful area shrinks, where the others cliff-edge:
+ *
+ *   vivid coverage:        30%    10%     5%    none
+ *   whole-image mean      0.32   0.19   0.15   0.12   <- outvoted by area
+ *   75th percentile       0.78   0.12   0.12   0.12   <- cliff at ~25%
+ *   saturated pixels only 0.78   0.78   0.78   0.00   <- one dot reads vivid
+ *   TOP QUARTILE MEAN     0.78   0.38   0.25   0.12   <- degrades smoothly
+ *
+ * A single vivid dot reads 0.25: noticeably colourful, not maximal. That is the
+ * intended behaviour — coverage should count for something, just not for
+ * everything.
+ */
+/** Exported for tests: the saturation statistic on its own. */
+export function saturationFromPixels(sats: Float64Array): number {
+  return topQuartileMeanSaturation(sats);
+}
+
+function topQuartileMeanSaturation(sats: Float64Array): number {
+  const n = sats.length;
+  if (!n) return 0;
+  const sorted = Array.from(sats).sort((a, b) => a - b);
+  const start = Math.floor(n * 0.75);
+  let sum = 0;
+  for (let i = start; i < n; i++) sum += sorted[i];
+  return sum / (n - start);
+}
+
 export interface ImageProps {
   brightness: number;
   saturation: number;
   contrast: number;
   hueFamily: HueFamily;
+  /** 0 = one hue, 1 = hues evenly spread (a rainbow). See circularHueStats. */
+  hueSpread: number;
 }
 
 /** RGB → HSV. Matches Python `colorsys.rgb_to_hsv` (h normalized to 0..1). */
@@ -171,7 +215,74 @@ function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
   return [h, s, v];
 }
 
+/**
+ * Mean of a set of hues, treating them as ANGLES.
+ *
+ * Hue wraps: 0.0 and 1.0 are the same red. The arithmetic mean does not know
+ * that, so it returns a value that can be nowhere near any input. Two red
+ * pixels at 0.02 and 0.98 averaged to 0.50 — cyan, the opposite colour. A
+ * rainbow board averaged to green. Every image whose colours straddle the
+ * red/pink wrap got a hue family that appeared nowhere in it, and that family
+ * then gated which moods could score at all.
+ *
+ * The circular mean is the correct statistic: convert each hue to a unit
+ * vector, average the vectors, take the angle of the result.
+ *
+ * A near-zero resultant means the hues cancel out — an evenly spread rainbow
+ * has no meaningful average direction. That is reported as 'neutral' via NaN
+ * rather than an arbitrary angle, because picking one of them would be a
+ * fiction the gating then acts on.
+ */
+export function circularMeanHue(hues: number[]): number {
+  return circularHueStats(hues).mean;
+}
+
+/**
+ * Circular mean AND how tightly the hues cluster around it.
+ *
+ * `spread` is 1 - R, where R is the length of the mean resultant vector:
+ *
+ *   spread 0.0  every sampled pixel is the same hue — a monochrome board
+ *   spread 0.5  colours favour one region of the wheel
+ *   spread 1.0  hues cancel out entirely — a rainbow, no dominant direction
+ *
+ * This costs nothing: R was already computed to decide when the mean is
+ * meaningless, and then discarded. Discarding it collapsed the whole image to
+ * ONE hue family, which is why a rainbow board and a monochrome board could
+ * look identical to the scorer — a board of eight vivid hues reported
+ * 'neutral', the same label a grey board gets, because their average direction
+ * is the same: none.
+ *
+ * "How many colours" is a mood signal in its own right. Kids' primaries and
+ * rainbows are high spread; editorial, Scandinavian and industrial palettes are
+ * low. Nothing else in ImageProps can express that distinction.
+ */
+export function circularHueStats(hues: number[]): { mean: number; spread: number } {
+  if (!hues.length) return { mean: NaN, spread: 0 };
+  let sx = 0;
+  let sy = 0;
+  for (const h of hues) {
+    const a = h * 2 * Math.PI;
+    sx += Math.cos(a);
+    sy += Math.sin(a);
+  }
+  const n = hues.length;
+  sx /= n;
+  sy /= n;
+  const R = Math.hypot(sx, sy);
+  const spread = Math.max(0, Math.min(1, 1 - R));
+  // Below this the mean direction is noise, so report no mean — but the SPREAD
+  // is still the finding, and is returned rather than thrown away.
+  if (R < 0.05) return { mean: NaN, spread };
+  const angle = Math.atan2(sy, sx) / (2 * Math.PI);
+  return { mean: (angle + 1) % 1, spread };
+}
+
 function hueToFamily(h: number): HueFamily {
+  // No meaningful mean direction (hues cancel out) — say neutral rather than
+  // invent a family. NaN fails every comparison below, so it must be caught
+  // explicitly or it would fall through to the final 'pink'.
+  if (!Number.isFinite(h)) return 'neutral';
   // Bin edges copied verbatim from the notebook's match_mood logic.
   if (h < 0.05 || h > 0.95) return 'red';
   if (h < 0.10)             return 'orange';
@@ -196,7 +307,7 @@ export async function extractImageProps(imageUrl: string): Promise<ImageProps> {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve({ brightness: 0.5, saturation: 0.3, contrast: 0.2, hueFamily: 'neutral' });
+        resolve({ brightness: 0.5, saturation: 0.3, contrast: 0.2, hueFamily: 'neutral', hueSpread: 0 });
         return;
       }
 
@@ -207,6 +318,7 @@ export async function extractImageProps(imageUrl: string): Promise<ImageProps> {
 
       const n = data.length / 4;
       const lum = new Float64Array(n);
+      const sats = new Float64Array(n);
       let sumLum = 0;
       let sumSat = 0;
       const satHues: number[] = [];
@@ -222,11 +334,12 @@ export async function extractImageProps(imageUrl: string): Promise<ImageProps> {
 
         const [h, s] = rgbToHsv(r, g, b);
         sumSat += s;
+        sats[i] = s;
         if (s > 0.2) satHues.push(h);
       }
 
       const brightness = sumLum / n;
-      const saturation = sumSat / n;
+      const saturation = topQuartileMeanSaturation(sats);
 
       let sqDev = 0;
       for (let i = 0; i < n; i++) {
@@ -236,16 +349,18 @@ export async function extractImageProps(imageUrl: string): Promise<ImageProps> {
       const contrast = Math.sqrt(sqDev / n);
 
       let hueFamily: HueFamily = 'neutral';
+      let hueSpread = 0;
       if (satHues.length > 10) {
-        const meanHue = satHues.reduce((a, b) => a + b, 0) / satHues.length;
-        hueFamily = hueToFamily(meanHue);
+        const stats = circularHueStats(satHues);
+        hueFamily = hueToFamily(stats.mean);
+        hueSpread = stats.spread;
       }
 
-      resolve({ brightness, saturation, contrast, hueFamily });
+      resolve({ brightness, saturation, contrast, hueFamily, hueSpread });
     };
 
     img.onerror = () => {
-      resolve({ brightness: 0.5, saturation: 0.3, contrast: 0.2, hueFamily: 'neutral' });
+      resolve({ brightness: 0.5, saturation: 0.3, contrast: 0.2, hueFamily: 'neutral', hueSpread: 0 });
     };
 
     img.src = imageUrl;

@@ -58,6 +58,45 @@ export const MOODS = Object.keys(MOOD_AXES);
  * — the moodboard classifier and the older colour-derived moods both feed in.
  * Anything unrecognised lands on Modern, which is the neutral setting.
  */
+/**
+ * matchMood()'s fourteen snake_case keys → the axis vocabulary.
+ *
+ * NONE of them matched before this: every one fell through to 'Modern', so
+ * every design system got byte-identical Google Sans Flex axes no matter what
+ * its board looked like. The mood was computed, scored and thresholded — then
+ * discarded at the last step.
+ *
+ * Second time this shape appeared: moodKeyFor() collapsed the same fourteen
+ * keys to a single font pool. A catch-all default hides a vocabulary mismatch,
+ * because the fallback is a real value that renders.
+ *
+ * Exported so moodAxes.test.ts can assert it stays exhaustive over the server's
+ * keys. 'Modern' is a legitimate destination, so coverage cannot be tested by
+ * comparing against the default — it has to be tested against this table.
+ */
+export const SERVER_AXIS_MOOD: Record<string, string> = {
+  whimsical_playful: 'Playful',
+  neon_cyberpunk: 'Tech',
+  warm_retro_vintage: 'Vintage',
+  boho_festival: 'Warm',
+  industrial_urban: 'Bold',
+  dark_romance_gothic: 'Elegant',
+  soft_romantic: 'Elegant',
+  luxury_editorial_black: 'Elegant',
+  modern_luxury_fashion: 'Elegant',
+  old_money: 'Professional',
+  clean_tech: 'Tech',
+  editorial_modern: 'Modern',
+  minimal_scandinavian: 'Modern',
+  natural_organic: 'Calm',
+  bright_cheerful: 'Warm',
+  candy_pastel: 'Playful',
+  kids_primary: 'Playful',
+  high_energy: 'Bold',
+  bold_graphic: 'Bold',
+  sport_dynamic: 'Tech',
+};
+
 const MOOD_ALIASES: Record<string, string> = {
   // colour-derived moods (TypographyStage v1)
   business: 'Professional', security: 'Professional', timeless: 'Professional',
@@ -71,6 +110,8 @@ const MOOD_ALIASES: Record<string, string> = {
   nostalgic: 'Vintage', retro: 'Vintage', heritage: 'Vintage',
   minimal: 'Modern', clean: 'Modern', bright: 'Professional',
   technical: 'Tech', futuristic: 'Tech', digital: 'Tech',
+
+  ...SERVER_AXIS_MOOD,
 };
 
 /** Any mood string → one of the nine the axes are defined for. */
@@ -79,7 +120,19 @@ export function normalizeMood(mood?: string | null): string {
   const raw = String(mood).replace(/-\d+$/, '').trim();
   const exact = MOODS.find((m) => m.toLowerCase() === raw.toLowerCase());
   if (exact) return exact;
-  return MOOD_ALIASES[raw.toLowerCase()] || 'Modern';
+  const hit = MOOD_ALIASES[raw.toLowerCase()];
+  if (hit) return hit;
+  // Same silent catch-all as moodKeyFor had: all fourteen server moods landed
+  // here, so every design system ever generated got identical Google Sans Flex
+  // axes. Nothing failed — 'Modern' is a real setting that renders.
+  if (raw && process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[mood] no axis mapping for "${raw}" — falling back to Modern. ` +
+      'Add it to SERVER_AXIS_MOOD in utils/moodAxes.ts.',
+    );
+  }
+  return 'Modern';
 }
 
 /** The studio's Branch labels → the branch names the axis rules read. */

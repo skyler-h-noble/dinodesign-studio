@@ -16,11 +16,33 @@
 // Lib-track: add to @dynodesign/components/src/components/FileInput/
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { regionFromDrawnBox, isUsableBox, type NormalisedBox } from '../utils/textDetection';
 import {
-  Button, ButtonGroup, H1, H2, H3, Body, BodySmall, Caption, OverlineSmall,
-  Card, VStack, HStack, Divider, Alert, Checkbox, Slider, Link,
-  AccordionGroup, Accordion, AccordionSummary, AccordionDetails,
+  Button,
+  ButtonGroup,
+  H1,
+  H2,
+  H3,
+  Body,
+  BodySmall,
+  Caption,
+  OverlineSmall,
+  Card,
+  VStack,
+  HStack,
+  Divider,
+  Alert,
+  Checkbox,
+  Slider,
+  Link,
+  AccordionGroup,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
   Modal,
+  Select,
+  Label,
+  Chip,
 } from '@dynodesign/components';
 import { useAuth } from '../contexts/AuthContext';
 import { analyzeMoodboard, warmAnalyzeMoodboard, getOrStartMoodboardAnalysis } from '../utils/analyzeMoodboardClient';
@@ -37,7 +59,10 @@ import {
   type DisplayRole, type HeaderRole, type EyebrowRole,
 } from './typography/TypeRoles';
 import { logGateFeedback, logGateRejections } from '../utils/textGateFeedback';
-import { moodFontMapping, type MoodName } from '../data/moodFontMapping';
+import { moodFontMapping } from '../data/moodFontMapping';
+import { moodKeyFor } from '../utils/moodKey';
+import { resolveDisplayPool, detectedPoolChoices, autoLabel, AUTO } from '../utils/displayPool';
+import { ensureGoogleFonts } from '../utils/googleFontsManager';
 import { loadHeaderFlexFace } from '../utils/googleFontsManager';
 import { useFontMatch } from '../hooks/useFontMatch';
 import { DEFAULT_DISPLAY_SIZE, DISPLAY_LEADING } from '../utils/typeScale';
@@ -174,12 +199,35 @@ function clampFamilyToCategory(
   detectedFamily: string,
   category: string | null,
   excludeFamily: string | null,
+  /** Pixel-similarity ranking, when it has resolved. Used to choose WITHIN the
+   *  category rather than taking whatever sits first in the pool array. */
+  ranked?: { family: string; score: number }[],
 ): string {
   if (!category) return detectedFamily;
   const pool = CATEGORY_FAMILY_POOLS[category];
   if (!pool || pool.length === 0) return detectedFamily;
   if (pool.includes(detectedFamily)) return detectedFamily;
-  return pool.find((f) => f !== excludeFamily) ?? pool[0];
+
+  const candidates = pool.filter((f) => f !== excludeFamily);
+  // Best-scoring member of the category, not the first one written down.
+  //
+  // This returned pool[0] regardless of score, so a board classified
+  // "Handwritten Script" always got Sacramento — 37% — while Yellowtail sat in
+  // the same pool at 55%. The ranking was computed, displayed as "Closest to
+  // your image", and then ignored by the thing that actually picks.
+  //
+  // The category still leads: this only reorders within the category the
+  // classifier chose, so a mis-classification is a separate problem and stays
+  // one. Falls back to pool order when the ranking has not resolved yet or
+  // scores nothing in this pool.
+  if (ranked?.length) {
+    const best = candidates
+      .map((f) => ({ f, score: ranked.find((r) => r.family === f)?.score ?? -1 }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)[0];
+    if (best) return best.f;
+  }
+  return candidates[0] ?? pool[0];
 }
 
 /** Resolve the family to render in trio card #index for one role.
@@ -266,7 +314,7 @@ function familyBranch(family: string): 'serif' | 'sans' | null {
  *    - script-ness (substantial text with very few clean vertical stems)
  *  Returns the corrected branch + style and a flag the caller can use to
  *  mark the description as pixel-corrected in the UI. */
-function effectiveBranchAndStyle(
+export function effectiveBranchAndStyle(
   clipBranch: string,
   clipStyle: string,
   region: ExtractedTextRegion | undefined,
@@ -274,15 +322,42 @@ function effectiveBranchAndStyle(
   if (!region) {
     return { branch: clipBranch, style: clipStyle, pixelOverride: false };
   }
-  // Script signal first — sparse stems mean cursive. Pixel can't tell
-  // formal calligraphy from casual cursive on its own; if CLIP landed
-  // on either Formal Script or Handwritten Script, trust CLIP's pick;
-  // otherwise default to Formal Script as the safe call (Dancing
-  // Script is a closer visual match for most ambiguous cases than
-  // Sacramento is).
+  // Script signal first — sparse stems mean cursive. If CLIP landed on either
+  // Formal Script or Handwritten Script, trust CLIP's pick; otherwise split on
+  // stroke weight, since a monoline heavy cursive is a marker rather than a nib.
   if (region.stroke.isLikelyScript) {
     if (clipBranch === 'Expressive' && clipStyle.includes('Script')) {
       return { branch: clipBranch, style: clipStyle, pixelOverride: false };
+    }
+    // Formal copperplate, or hand printing? SLANT decides.
+    //
+    // Measured across both pools: Great Vibes, Allura, Parisienne, Pinyon
+    // Script and Alex Brush land at 20-35 degrees; Caveat, Indie Flower,
+    // Patrick Hand, Architects Daughter and Shadows Into Light land at -5 to
+    // 20. A 25-degree cut gets 10 of those 11 families right (Tangerine, a
+    // copperplate measuring 20, is the miss).
+    //
+    // This used to default to Formal Script outright, which is why marker
+    // lettering kept coming back as copperplate. Two other signals were tried
+    // here first and neither separates the pools: stroke WEIGHT (the scan often
+    // finds too few stems on handwriting to measure it at all) and
+    // CONNECTEDNESS (half the joined faces break into one mark per letter,
+    // because their hairline connectors fall below the ink threshold).
+    //
+    // All-caps stays the fallback for when the slant cannot be measured — it is
+    // only a proxy for "printed rather than joined", and a poor one on
+    // mixed-case marker work.
+    const HAND_MAX_SLANT = 25;
+    const printed = region.stroke.slant != null
+      ? Math.abs(region.stroke.slant) < HAND_MAX_SLANT
+      : region.isAllCaps;
+    if (printed) {
+      // 'Hand', which is the pool key's own suffix. NOT 'Handwritten /
+      // Informal': that string matches no pool, and resolved to
+      // Expressive / Display — block display faces for marker lettering.
+      // The all-caps split that used to live here was invented; omni makes no
+      // such distinction once the slant has been measured.
+      return { branch: 'Expressive', style: 'Hand', pixelOverride: true };
     }
     return {
       branch: 'Expressive',
@@ -302,9 +377,16 @@ function effectiveBranchAndStyle(
     if (clipAlreadyHand) {
       return { branch: clipBranch, style: clipStyle, pixelOverride: false };
     }
+    // Prefer the measured slant; all-caps is only a proxy for "printed rather
+    // than joined", and a poor one on mixed-case marker work, so it stays the
+    // fallback for when the slant cannot be measured.
+    const HAND_MAX_SLANT = 25;
+    const handPrinted = region.stroke.slant != null
+      ? Math.abs(region.stroke.slant) < HAND_MAX_SLANT
+      : region.isAllCaps;
     return {
       branch: 'Expressive',
-      style: region.isAllCaps ? 'Handwritten / Informal' : 'Handwritten Script',
+      style: handPrinted ? 'Hand' : 'Handwritten Script',
       pixelOverride: true,
     };
   }
@@ -560,26 +642,9 @@ function useGoogleFonts(families: string[]) {
   }, [families.join('|')]);
 }
 
-/**
- * The classifier's mood → a key moodFontMapping actually has.
- *
- * The two vocabularies overlap but aren't identical (the classifier emits
- * Modern, Warm, Tech, Professional; the mapping has Business, Futuristic,
- * Stiff…), so an unmatched mood lands on Calm rather than an empty pool.
- */
-function moodKeyFor(mood?: string | null): MoodName {
-  const raw = String(mood ?? '').replace(/-\d+$/, '').trim();
-  const keys = Object.keys(moodFontMapping) as MoodName[];
-  const exact = keys.find((k) => k.toLowerCase() === raw.toLowerCase());
-  if (exact) return exact;
-  const alias: Record<string, MoodName> = {
-    modern: 'Business', professional: 'Business', tech: 'Futuristic',
-    warm: 'Happy', bold: 'Loud', minimal: 'Stiff', formal: 'Sophisticated',
-    romantic: 'Elegant', friendly: 'Happy', energetic: 'Excited',
-    nostalgic: 'Vintage', creative: 'Artistic', quiet: 'Calm',
-  };
-  return alias[raw.toLowerCase()] ?? 'Calm';
-}
+// moodKeyFor + SERVER_MOOD_ALIAS live in utils/moodKey.ts so the routing can
+// be tested without importing this module's whole component tree.
+
 
 /** Axes → a font-variation-settings string. wght is omitted: it is passed as
  *  font-weight, and declaring it twice lets the two disagree. */
@@ -687,12 +752,42 @@ export interface TypographyMeta {
    *  role (e.g. "Sans / Geometric"). Kept for designs saved before the Header
    *  became a Flex face; it no longer drives anything. */
   headerPresetCategory: string | null;
-  /** Lettering ignored; the Display is suggested from the palette mood. */
+  /** Lettering ignored; the Display is suggested from the image's mood. */
   ignoreTextDetection?: boolean;
   /** The category the user picked from the customize modal for the Decorative
    *  role. Drives the trio cycling + the Suggested / Customized label state.
    *  Null when no preset was picked. */
   decorativePresetCategory: string | null;
+  /**
+   * A SUMMARY of what was detected, so re-opening a saved system can show the
+   * analysis without re-running it.
+   *
+   * Deliberately not the analysis object. That carries a base64 dataURL per
+   * region and would bloat the stored design system; everything here is a
+   * number or a short string. The crop is redrawn from the bbox against the
+   * moodboard URL we already hold, and the recommended families are re-derived
+   * by detectedPoolChoices, which is pure — so the expensive half (CLIP) is
+   * what gets skipped, not the informative half.
+   */
+  detection?: {
+    /** Which extracted region the Display was measured from. */
+    regionIndex: number;
+    /** Region box in the SOURCE image's pixels, plus the image size, so the
+     *  crop can be re-rendered with CSS alone. */
+    bbox: { x0: number; y0: number; x1: number; y1: number };
+    imageWidth: number;
+    imageHeight: number;
+    /** What the crop read as, after the pixel correction. */
+    text: string;
+    branch: string;
+    style: string;
+    weight: string;
+    spacing: string;
+    allCaps: boolean;
+    /** The category the recommendations were drawn from, so the same list can
+     *  be rebuilt and the user's pick marked within it. */
+    poolCategory: string | null;
+  };
 }
 
 export default function TypographyTestPage({
@@ -717,6 +812,35 @@ export default function TypographyTestPage({
     for (const s of initialTypography ?? []) m[s.type] = s;
     return m;
   })();
+  // Editing a saved design system must NOT re-run the analysis.
+  //
+  // The stage-mode effect below fires getOrStartMoodboardAnalysis on every
+  // entry, which costs a CLIP call and — because the classifier keeps
+  // improving — can hand back a different verdict than the one the user
+  // accepted. Their typography then shifts under them for no reason they took.
+  //
+  // So a saved system opens on what was saved. Re-analysing is an action the
+  // user takes, and Reset puts back exactly what they had before they took it.
+  // The snapshot is captured once, at mount, from the props — after that the
+  // state is the user's and must not be snapped back to it.
+  // The moodboard's own pixel size. Needed to redraw a saved crop from its
+  // bbox — the box is in natural pixels, so without the image's dimensions
+  // there is no scale to render it at.
+  const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!preloadedMoodboardUrl) return;
+    let cancelled = false;
+    const el = new Image();
+    el.onload = () => { if (!cancelled) setImgSize({ w: el.naturalWidth, h: el.naturalHeight }); };
+    el.src = preloadedMoodboardUrl;
+    return () => { cancelled = true; };
+  }, [preloadedMoodboardUrl]);
+
+  const savedTypographyRef = useRef(initialTypography);
+  const hasSavedTypography = (initialTypography?.length ?? 0) > 0;
+  const [reanalysed, setReanalysed] = useState(false);
+  const skipAnalysis = hasSavedTypography && !reanalysed;
+
   const { user } = useAuth();
   const [preview, setPreview] = useState<string | null>(preloadedMoodboardUrl ?? null);
   const [status, setStatus] = useState<Status>('idle');
@@ -787,7 +911,33 @@ export default function TypographyTestPage({
   const [ignoreTextDetection, setIgnoreTextDetection] = useState(
     initialMeta?.ignoreTextDetection ?? false
   );
+  // A board with no lettering on it has nothing to match against, so the
+  // palette-mood path is the only honest source of a suggestion. Switch to it
+  // automatically the first time an analysis comes back empty — but only if
+  // the user has not already made this choice themselves, and only once, so
+  // re-enabling detection sticks.
+  const autoIgnoredRef = useRef(false);
+  useEffect(() => {
+    if (!result?.noLetteringDetected) return;
+    if (autoIgnoredRef.current) return;
+    if (initialMeta?.ignoreTextDetection !== undefined) return;
+    autoIgnoredRef.current = true;
+    setIgnoreTextDetection(true);
+  }, [result?.noLetteringDetected, initialMeta?.ignoreTextDetection]);
   const [regionPickerOpen, setRegionPickerOpen] = useState(false);
+  // The style the Display pool is drawn from, when the user overrules the
+  // match. 'auto' = follow the detection (or the mood, in ignore mode).
+  //
+  // NOT '' — the lib's Select computes `hasValue = currentValue !== ''`, so an
+  // empty-string value reads as "nothing chosen" and the trigger renders its
+  // "Select…" placeholder. The default option existed but could never appear
+  // selected. Encoded as
+  // 'cat:<Category>' or 'mood:<Mood>' so one control can offer both vocabularies
+  // — the thing being overridden is "where do the options come from", and that
+  // has two possible sources.
+  const [displayPoolOverride, setDisplayPoolOverride] = useState<string>(AUTO);
+  const [drawingBusy, setDrawingBusy] = useState(false);
+  const [drawError, setDrawError] = useState<string | null>(null);
   // Which role panel the pointer or focus is in. Drives the preview highlight
   // so a panel and the text it controls are visibly the same thing.
   const [activeRole, setActiveRole] = useState<RoleName | null>(null);
@@ -1044,11 +1194,24 @@ export default function TypographyTestPage({
   // is to be the quiet one. moodToAxes inverts the measured weight, flattens
   // against a serif, and gets out of the way entirely when the Decorative face
   // is script or hand-lettering.
+  // The EFFECTIVE category — the pixel-corrected verdict the Detection panel
+  // renders — not CLIP's raw label. When the stroke scan overrules CLIP,
+  // pixelOverride is set and CLIP's category is the label already judged wrong.
+  //
+  // This matters here as much as it does for the font pool: moodToAxes tunes
+  // the Header AGAINST the Display, and stands down entirely when the Display
+  // is script or hand-lettering. Handed CLIP's "Sans / Clean" for a hand-drawn
+  // cover, that rule never fires and the Header is opposed to a face that isn't
+  // there.
+  const effectiveDisplayCategory = sampledBranchStyle.pixelOverride
+    ? sampledBranchStyle.style
+    : (sampledClip.category ?? sampledBranchStyle.style);
+
   const headerAxisOptions = useMemo(() => ({
     displayWeight: sampledWeight,
-    displayBranch: normalizeBranch(sampledBranchStyle.branch, sampledClip.category ?? sampledBranchStyle.style),
-    displayCategory: sampledClip.category ?? sampledBranchStyle.style,
-  }), [sampledWeight, sampledBranchStyle.branch, sampledBranchStyle.style, sampledClip.category]);
+    displayBranch: normalizeBranch(sampledBranchStyle.branch, effectiveDisplayCategory),
+    displayCategory: effectiveDisplayCategory,
+  }), [sampledWeight, sampledBranchStyle.branch, effectiveDisplayCategory]);
 
   const suggestedHeaderAxes = useMemo(
     () => moodToAxes(result?.mood?.key ?? 'Modern', headerAxisOptions),
@@ -1111,62 +1274,64 @@ export default function TypographyTestPage({
   // and widens only to the rest of that branch — an Expressive detection offers
   // the other Expressive pools, never Serif or Sans.
   const displayChoices: FontChoice[] = useMemo(() => {
-    if (ignoreTextDetection) {
-      // Straight from the palette's mood. The mapping groups by its own type
-      // labels (Display/Decorative, Calligraphy, …), which become the headings.
-      const key = moodKeyFor(result?.mood?.key ?? result?.mood?.label);
-      const pool = moodFontMapping[key] ?? [];
-      return pool.slice(0, 20).map((f) => ({
-        family: f.name, category: `${key} · ${f.type}`, label: f.name,
-      }));
+    // Source order (explicit choice > mood > detected lettering) lives in
+    // resolveDisplayPool and is covered by displayPool.test.ts. The detection
+    // branch stays here as a thunk because it depends on this component's
+    // CLIP state; it only runs when the other two do not apply.
+    return resolveDisplayPool({
+      override: displayPoolOverride,
+      ignoreText: ignoreTextDetection,
+      mood: result?.mood?.key ?? result?.mood?.label,
+      categoryPools: CATEGORY_FAMILY_POOLS,
+      detected: () => detectedDisplayChoices(),
+    }).choices;
+    function detectedDisplayChoices(): FontChoice[] {
+      // The ordering rule lives in displayPool.ts so it can be tested — every
+      // wrong answer here is still a list of real fonts, so only a test tells
+      // a correct pool from a plausible one.
+      return detectedPoolChoices({
+        clipCategory: sampledClip.category,
+        branch: sampledBranchStyle.branch,
+        style: sampledBranchStyle.style,
+        pixelOverride: sampledBranchStyle.pixelOverride,
+        categoryPools: CATEGORY_FAMILY_POOLS,
+      });
     }
-    const detectedCategory = sampledClip.category ?? sampledBranchStyle.style ?? '';
-    // Branch vocabularies differ between the classifier ('Sans serif') and the
-    // pool keys ('Sans / …'), so match on the first word rather than the label.
-    const rawBranch = (detectedCategory.split('/')[0] || sampledBranchStyle.branch || '').trim();
-    const branchKey = /serif/i.test(rawBranch) && !/sans/i.test(rawBranch) ? 'Serif'
-      : /sans/i.test(rawBranch) ? 'Sans'
-        : /express|script|hand|display/i.test(rawBranch) ? 'Expressive'
-          : '';
+  }, [displayPoolOverride, ignoreTextDetection, result?.mood?.key, result?.mood?.label,
+      sampledClip.category, sampledBranchStyle.style, sampledBranchStyle.branch,
+      sampledBranchStyle.pixelOverride]);
+  // Every face the picker is about to render has to be FETCHED, not just named
+  // in a font-family. Without this each chip fell back to sans-serif and the
+  // whole list looked like one typeface — Moo Lah Lah indistinguishable from
+  // Rubik Bubbles. Additive on purpose: switching pool must not unload the
+  // faces the specimen above is still using.
+  useEffect(() => {
+    ensureGoogleFonts(displayChoices.map((c) => c.family));
+  }, [displayChoices]);
 
-    const allCategories = Object.keys(CATEGORY_FAMILY_POOLS);
-    const inBranch = branchKey
-      ? allCategories.filter((c) => c.startsWith(branchKey))
-      : allCategories;
-    // The detected category leads; its siblings follow. Anything unrecognised
-    // falls back to the whole set rather than showing nothing.
-    const exact = allCategories.find((c) => c.toLowerCase() === detectedCategory.toLowerCase());
-    const near = exact ?? inBranch.find((c) => {
-      const tail = detectedCategory.split('/').pop()?.trim().toLowerCase() ?? '';
-      return tail && c.toLowerCase().includes(tail.split(' ')[0]);
-    });
-    const ordered = [
-      ...(near ? [near] : []),
-      ...(inBranch.length ? inBranch : allCategories).filter((c) => c !== near),
-    ];
-
-    // Capped at 20, the detected category taken whole before its siblings are
-    // drawn on — the same budget omni uses. A branch's full pool ran to 30+,
-    // which turns a decision into a scroll.
-    const LIMIT = 20;
-    const out: FontChoice[] = [];
-    const seen = new Set<string>();
-    for (const category of ordered) {
-      if (out.length >= LIMIT) break;
-      for (const family of CATEGORY_FAMILY_POOLS[category] ?? []) {
-        if (out.length >= LIMIT) break;
-        if (seen.has(family)) continue;
-        seen.add(family);
-        out.push({ family, category, label: family });
-      }
-    }
-    return out;
-  }, [ignoreTextDetection, result?.mood?.key, result?.mood?.label,
-      sampledClip.category, sampledBranchStyle.style, sampledBranchStyle.branch]);
   const bodyChoices: FontChoice[] = useMemo(() => {
     const pool = bodyFamily === 'serif' ? BODY_SERIF_CHOICES : BODY_SANS_CHOICES;
-    return pool.map((f) => ({ family: f, category: bodyFamily === 'serif' ? 'Serif' : 'Sans serif', label: f }));
-  }, [bodyFamily]);
+    // The applied family must be IN the list, or the list can show nothing as
+    // selected while a font is plainly applied.
+    //
+    // That is what happened on Sans: currentBody falls back to trio.body — the
+    // server's suggestion — which is not constrained to these ten. Harvest's is
+    // Public Sans, Sage's is Poppins, and neither is in BODY_SANS_CHOICES, so
+    // no chip matched. Serif looked fine only by accident: BODY_SERIF_DEFAULT
+    // happens to be BODY_SERIF_CHOICES[0], so it always hit.
+    //
+    // Prepended rather than substituted — the suggestion is a real one and
+    // dropping it to force a pool member would throw away the recommendation.
+    const families = pool.includes(currentBody) ? pool : [currentBody, ...pool];
+    return families.map((f) => ({
+      family: f,
+      category: bodyFamily === 'serif' ? 'Serif' : 'Sans serif',
+      label: f,
+    }));
+  }, [bodyFamily, currentBody]);
+  useEffect(() => {
+    ensureGoogleFonts(bodyChoices.map((c) => c.family));
+  }, [bodyChoices]);
 
   // Rank the Display pool against the sampled crop — stroke fingerprint plus
   // ink overlay, both measured locally.
@@ -1183,6 +1348,14 @@ export default function TypographyTestPage({
     [displayChoices]
   );
   const match = useFontMatch(matchInput, displayFamilyPool);
+
+  // The ranking, once it has resolved, for choosing WITHIN a detected category.
+  // Memoised on the resolved list so it does not re-trigger the suggestion
+  // effect on every render — that effect already reruns on `result`.
+  const rankedForClamp = useMemo(
+    () => (match.status === 'done' ? match.ranked.map(r => ({ family: r.family, score: r.score })) : undefined),
+    [match.status, match.status === 'done' ? match.ranked : null],
+  );
 
   const headerAxisPresets = useMemo(
     () => headerPresets(result?.mood?.key ?? 'Modern', headerAxisOptions),
@@ -1275,7 +1448,7 @@ export default function TypographyTestPage({
       const familyAfterPixel = clampFamilyToPixelBranch(
         clipTrio.decorative, decorativeCrop, decorativePresetCategory, clipBranch, clipStyle,
       );
-      const family = clampFamilyToCategory(familyAfterPixel, decorativePresetCategory, decorativeOverride);
+      const family = clampFamilyToCategory(familyAfterPixel, decorativePresetCategory, decorativeOverride, rankedForClamp);
       // See header branch for rationale — categoryStr / description match
       // the modal's preset row format.
       const categoryStr = decorativePresetCategory ?? shortCategoryLabel(branch, style);
@@ -1303,7 +1476,7 @@ export default function TypographyTestPage({
     if (!decorativeCrop) {
       const moodTrio = result.trios.find((t) => t.type === 'mood_preset' || t.type === 'mood_alt');
       if (moodTrio && moodTrio.mood) {
-        const family = clampFamilyToCategory(moodTrio.decorative, decorativePresetCategory, decorativeOverride);
+        const family = clampFamilyToCategory(moodTrio.decorative, decorativePresetCategory, decorativeOverride, rankedForClamp);
         const wasClamped = family !== moodTrio.decorative;
         // Label nods to what the synthesis is based on — "From mood" when
         // there's no text at all; "Paired with header" when we have a
@@ -1326,7 +1499,11 @@ export default function TypographyTestPage({
       }
     }
     return out;
-  }, [result, headerCrop, decorativeCrop, decorativePresetCategory, decorativeOverride]);
+    // rankedForClamp is in the deps so the suggestion re-resolves once the
+    // ranking arrives — it is undefined on the first pass, and without this the
+    // suggestion would keep the pool-order pick that was made before scores
+    // existed.
+  }, [result, headerCrop, decorativeCrop, decorativePresetCategory, decorativeOverride, rankedForClamp]);
 
   // Every font the page might render — kept as one list so the Google Fonts
   // <link> rebuilds once per result rather than per tab click.
@@ -1470,6 +1647,7 @@ export default function TypographyTestPage({
 
     setPreview(URL.createObjectURL(file));
     setError(null);
+    setDisplayPoolOverride(AUTO);
     setResult(null);
     setStatus('uploading');
 
@@ -1508,6 +1686,8 @@ export default function TypographyTestPage({
   // moodboard.
   useEffect(() => {
     if (!preloadedMoodboardUrl) return;
+    // A saved system opens on what was saved; the analysis is opt-in.
+    if (skipAnalysis) { setStatus('done'); return; }
     let cancelled = false;
     setError(null);
     setResult(null);
@@ -1531,10 +1711,46 @@ export default function TypographyTestPage({
         setStatus('error');
       });
     return () => { cancelled = true; };
-  }, [preloadedMoodboardUrl]);
+  }, [preloadedMoodboardUrl, skipAnalysis]);
 
   // Stage mode: the create-flow wrapper provides its own page title / nav,
   // so the dev-page H1 and "Drop a moodboard" copy are suppressed.
+  /**
+   * Undo a re-analysis: put back exactly the faces the user had, and return to
+   * the saved view.
+   *
+   * Restores from the mount-time snapshot rather than from `initialTypography`
+   * directly — the prop can be re-supplied by the parent on any render, and
+   * reading it live would make Reset restore whatever the parent last pushed
+   * rather than what the user actually had when they arrived.
+   *
+   * Only the family overrides and the meta-backed choices are restored, because
+   * those are the whole of what the user picks. Everything else on this screen
+   * is derived from them.
+   */
+  const restoreSavedTypography = useCallback(() => {
+    const saved = savedTypographyRef.current ?? [];
+    const byType: Partial<Record<TypographyStyleOutput['type'], TypographyStyleOutput>> = {};
+    for (const t of saved) byType[t.type] = t;
+
+    setHeaderOverride(byType.header?.family ?? null);
+    setDecorativeOverride(byType.decorative?.family ?? null);
+    setBodyOverride(byType.body?.family ?? null);
+    setTrioIdx(initialMeta?.trioIndex ?? 0);
+    setHeaderPresetCategory(initialMeta?.headerPresetCategory ?? null);
+    setDecorativePresetCategory(initialMeta?.decorativePresetCategory ?? null);
+    setBodyFamily(initialMeta?.bodyFamily ?? 'sans');
+    setBodyFamilyTouched(initialMeta?.bodyFamilyTouched ?? false);
+    setDisplayPoolOverride(AUTO);
+    setIgnoreTextDetection(initialMeta?.ignoreTextDetection ?? false);
+
+    // Back to the saved view. The analysis result is dropped so the screen
+    // cannot go on showing suggestions the user just rejected.
+    setReanalysed(false);
+    setResult(null);
+    setStatus('done');
+  }, [initialMeta]);
+
   const inStageMode = !!onTypographyComplete;
 
   // Auto-sync the user's current picks back to the stage wrapper whenever
@@ -1605,11 +1821,32 @@ export default function TypographyTestPage({
       headerPresetCategory,
       decorativePresetCategory,
       ignoreTextDetection,
+      // Carried so a saved system can SHOW what was detected without paying to
+      // detect it again. Kept only while an analysis is in hand — on the saved
+      // view `result` is null and the summary already in initialMeta is the one
+      // to keep, so writing an empty one here would erase it on first render.
+      detection: sampledRegion
+        ? {
+          regionIndex: displayRegionIdx,
+          bbox: { ...sampledRegion.bbox },
+          imageWidth: imgSize?.w ?? 0,
+          imageHeight: imgSize?.h ?? 0,
+          text: sampledRegion.text ?? '',
+          branch: sampledBranchStyle.branch,
+          style: sampledBranchStyle.style,
+          weight: sampledWeight,
+          spacing: sampledRegion.spacing ?? 'normal',
+          allCaps: !!sampledRegion.isAllCaps,
+          poolCategory: sampledClip.category ?? null,
+        }
+        : initialMeta?.detection,
     });
   }, [
     onMetaChange,
     trioIdx, bodyFamily, bodyFamilyTouched,
     headerPresetCategory, decorativePresetCategory, ignoreTextDetection,
+    sampledRegion, displayRegionIdx, sampledBranchStyle.branch, sampledBranchStyle.style,
+    sampledWeight, sampledClip.category, initialMeta?.detection, imgSize,
   ]);
 
   // Mirror uploads back to the parent. Each role's record is null when no
@@ -1695,7 +1932,125 @@ export default function TypographyTestPage({
         {/* Stage-mode visible loading state. Without this, a blank page is
             all the user sees while we wait the 15-40s for the cloud
             functions to respond. */}
-        {inStageMode && !result && !error && (
+        {/* A saved system opens on what was saved — no analysis, no CLIP call,
+            nothing shifting under the user. The panels below show that
+            selection with every control live, so this is a one-line note
+            rather than a summary card: the controls ARE the summary, and a
+            read-only list above them would only say the same thing twice. */}
+        {inStageMode && skipAnalysis && !error && (() => {
+          const d = initialMeta?.detection;
+          // The crop is redrawn from the saved bbox with CSS — no canvas, no
+          // second fetch, and no stored dataURL. Scale the whole image so the
+          // box fills a fixed width, then offset it so the box is what shows.
+          const CROP_W = 260;
+          const boxW = d ? Math.max(1, d.bbox.x1 - d.bbox.x0) : 1;
+          const boxH = d ? Math.max(1, d.bbox.y1 - d.bbox.y0) : 1;
+          const k = CROP_W / boxW;
+          const savedFamily = (savedTypographyRef.current ?? [])
+            .find((t) => t.type === 'decorative')?.family;
+          const recommended = d
+            ? detectedPoolChoices({
+              clipCategory: d.poolCategory,
+              branch: d.branch,
+              style: d.style,
+              // The saved style IS the corrected verdict — it was written after
+              // effectiveBranchAndStyle ran — so it must not be re-corrected.
+              pixelOverride: true,
+              categoryPools: CATEGORY_FAMILY_POOLS,
+            }).slice(0, 8)
+            : [];
+
+          return (
+            <Card padding="medium">
+              <VStack spacing={2}>
+                <HStack spacing={2} alignItems="baseline">
+                  <H3>What was detected</H3>
+                  <Caption color="quiet">saved — the image has not been re-analysed</Caption>
+                </HStack>
+
+                {!d && (
+                  <Body color="quiet">
+                    This system was saved before detections were kept, so there is
+                    nothing to show here. Re-analyzing will record one.
+                  </Body>
+                )}
+
+                {d && (
+                  <HStack spacing={3} alignItems="flex-start" style={{ flexWrap: 'wrap' }}>
+                    {d.imageWidth > 0 && preloadedMoodboardUrl && (
+                      <div
+                        aria-label={`Detected region: ${d.text || 'lettering'}`}
+                        style={{
+                          width: CROP_W,
+                          height: Math.round(boxH * k),
+                          backgroundImage: `url(${preloadedMoodboardUrl})`,
+                          backgroundSize: `${Math.round(d.imageWidth * k)}px ${Math.round(d.imageHeight * k)}px`,
+                          backgroundPosition: `-${Math.round(d.bbox.x0 * k)}px -${Math.round(d.bbox.y0 * k)}px`,
+                          backgroundRepeat: 'no-repeat',
+                          borderRadius: 'var(--Style-Border-Radius)',
+                          border: '1px solid var(--Border-Variant)',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <VStack spacing={1} style={{ minWidth: 240, flex: 1 }}>
+                      {d.text && <Body>"{d.text}"</Body>}
+                      <Body color="quiet">
+                        {[d.branch, d.style].filter(Boolean).join(' · ')}
+                      </Body>
+                      <Caption color="quiet">
+                        {d.weight}{d.spacing ? ` · ${d.spacing} tracking` : ''}
+                        {d.allCaps ? ' · ALL CAPS' : ''}
+                      </Caption>
+                      {ignoreTextDetection && (
+                        <Caption color="quiet">
+                          Lettering ignored — the Display was suggested from the
+                          image's mood instead.
+                        </Caption>
+                      )}
+                      {!ignoreTextDetection && d.regionIndex > 0 && (
+                        <Caption color="quiet">
+                          You chose this region rather than the first one found.
+                        </Caption>
+                      )}
+                    </VStack>
+                  </HStack>
+                )}
+
+                {recommended.length > 0 && (
+                  <VStack spacing={1}>
+                    <Label>Recommended from that detection</Label>
+                    <HStack spacing={1} style={{ flexWrap: 'wrap' }}>
+                      {recommended.map((c) => {
+                        const picked = c.family === savedFamily;
+                        return (
+                          <Chip
+                            key={c.family}
+                            label={picked ? `${c.family} — your pick` : c.family}
+                            variant={picked ? 'primary' : 'default'}
+                          />
+                        );
+                      })}
+                    </HStack>
+                    {savedFamily && !recommended.some((c) => c.family === savedFamily) && (
+                      <Caption color="quiet">
+                        You chose <strong>{savedFamily}</strong> instead of any of these.
+                      </Caption>
+                    )}
+                  </VStack>
+                )}
+
+                <Caption color="quiet">
+                  Adjust anything below, or{' '}
+                  <Link onClick={() => setReanalysed(true)}>re-analyze the image</Link>
+                  {' '}for fresh suggestions.
+                </Caption>
+              </VStack>
+            </Card>
+          );
+        })()}
+
+        {inStageMode && !skipAnalysis && !result && !error && (
           <Card padding="large">
             <VStack spacing={1} alignItems="center">
               <H2>Analyzing your moodboard…</H2>
@@ -1708,10 +2063,21 @@ export default function TypographyTestPage({
           </Card>
         )}
 
+        {/* Reset is the undo for Re-analyze, and only exists once that has been
+            done — before it there is nothing to undo, and a reset button next
+            to untouched saved values would read as "discard my work". */}
+        {inStageMode && reanalysed && hasSavedTypography && (
+          <Alert severity="info">
+            Showing fresh suggestions from the image.
+            {' '}
+            <Link onClick={restoreSavedTypography}>Reset to the typography you had</Link>
+          </Alert>
+        )}
+
         {/* The specimen leads and stays put: it is the thing being decided,
             so it sits above the reasoning and the controls rather than beside
             them. */}
-        {result && (
+        {(result || skipAnalysis) && (
           // 72px clears the shell's 65px sticky top bar; at a smaller offset the
           // preview sticks BEHIND it and reads as not sticking at all.
           <div
@@ -1745,6 +2111,8 @@ export default function TypographyTestPage({
             notTextMarked={notTextMarked}
             sampledIdx={displayRegionIdx}
             onPickRegion={() => setRegionPickerOpen(true)}
+            poolOverride={displayPoolOverride}
+            onPoolOverrideChange={setDisplayPoolOverride}
             ignoreTextDetection={ignoreTextDetection}
             onIgnoreTextDetectionChange={setIgnoreTextDetection}
             onMarkNotText={(role, region) => {
@@ -1759,7 +2127,12 @@ export default function TypographyTestPage({
           />
         )}
 
-        {result && (
+        {/* Opens for the saved view too. Everything inside reads `result?.`
+            with a fallback, so with no analysis the panels show the SAVED
+            selection and stay fully adjustable — which is the point: coming
+            back to edit should land you on your own system with the controls
+            in reach, not on a read-only summary of it. */}
+        {(result || skipAnalysis) && (
           <>
             <Divider />
             {/* The four roles run side by side — Display first, because it is
@@ -1792,34 +2165,84 @@ export default function TypographyTestPage({
                 onBodyBranch={applyBodyBranch}
                 onBodyFont={applyBodyFont}
                 onActiveRole={setActiveRole}
-                stickTop={(() => {
-                  if (!previewH) return 0;
-                  const proposed = 72 + previewH + 8;
-                  // A sticky header only earns its keep if there is room to
-                  // scroll content underneath it. The preview's height tracks
-                  // the Display size, so at 72px it runs ~550px tall and this
-                  // lands ~630px down — most of the viewport. The header then
-                  // detaches almost immediately and floats in the middle of the
-                  // card, over the controls it is supposed to label.
-                  //
-                  // Past a third of the viewport, stay in normal flow instead.
-                  const maxUseful = typeof window !== 'undefined'
-                    ? window.innerHeight * 0.35
-                    : 260;
-                  return proposed <= maxUseful ? proposed : 0;
-                })()}
+                // Sticky panel headers are OFF.
+                //
+                // They were pinned below the sticky preview (72 + previewH + 8).
+                // The preview's height tracks the Display size, so at 72px it
+                // runs ~550px and the stick line lands ~630px down — the header
+                // detaches the moment its card scrolls at all and then floats
+                // over the controls it labels, at the same y in every column.
+                // The card keeps the header's flow space at its top, so the
+                // label reads as MISSING from the top and duplicated mid-card.
+                //
+                // A viewport-fraction guard was tried and does not hold: on a
+                // tall screen a third of the viewport IS ~630px, so the guard
+                // passes and the behaviour returns. The offset is only safe when
+                // it is small, and it cannot be small while it has to clear a
+                // preview that grows without bound.
+                //
+                // 0 keeps the header in normal flow, at the top of its card,
+                // which is where it reads as belonging. Restoring stickiness
+                // means capping the preview's height first.
+                stickTop={0}
               />
             </div>
           </>
         )}
       </VStack>
 
-      <RegionPickerModal
-        open={regionPickerOpen}
-        regions={regions}
-        currentIdx={displayRegionIdx}
-        onClose={() => setRegionPickerOpen(false)}
-        onPick={(i) => { setDisplayRegionIdx(i); setRegionPickerOpen(false); }}
+      {/* No image, nothing to draw on. Rendering it anyway passed null into an
+          <img src> and a crop that could only fail. */}
+      {/* No image, nothing to point at. */}
+      <RegionDrawModal
+        open={regionPickerOpen && !!(imageUrl ?? preloadedMoodboardUrl ?? preview)}
+        imageUrl={(imageUrl ?? preloadedMoodboardUrl ?? preview) ?? ''}
+        // Everything the detector found, including crops it rejected as
+        // non-lettering — those are exactly the ones a user may want to
+        // overrule, so hiding them would remove the point of the dialog.
+        regions={[...(result?.extractedText ?? []), ...(result?.discardedText ?? [])]}
+        currentBbox={regions[displayRegionIdx]?.bbox ?? null}
+        busy={drawingBusy}
+        error={drawError}
+        onClose={() => { setDrawError(null); setRegionPickerOpen(false); }}
+        onConfirm={async (bbox, text) => {
+          setDrawingBusy(true);
+          setDrawError(null);
+          try {
+            const src = imageUrl ?? preloadedMoodboardUrl ?? preview;
+            if (!src) throw new Error('no image to crop from');
+            const el = document.createElement('img');
+            // regionFromDrawnBox takes fractions; the picker works in natural
+            // pixels because that is what the detector reports. Convert once,
+            // here, rather than making either side guess the other's units.
+            const natural = await new Promise<{ w: number; h: number }>((res, rej) => {
+              el.crossOrigin = 'anonymous';
+              el.onload = () => res({ w: el.naturalWidth, h: el.naturalHeight });
+              el.onerror = () => rej(new Error('image load failed'));
+              el.src = src;
+            });
+            const region = await regionFromDrawnBox(src, {
+              x0: bbox.x0 / natural.w, y0: bbox.y0 / natural.h,
+              x1: bbox.x1 / natural.w, y1: bbox.y1 / natural.h,
+            });
+            // A clicked block carries OCR text; a drawn box does not. Keeping
+            // it feeds the all-caps and letter-count signals downstream.
+            const withText = text ? { ...region, text, isAllCaps: text === text.toUpperCase() && /[A-Z]/.test(text) } : region;
+            setResult((prev) => (prev ? {
+              ...prev,
+              extractedText: [withText, ...prev.extractedText],
+              noLetteringDetected: false,
+            } : prev));
+            setIgnoreTextDetection(false);
+            setDisplayRegionIdx(0);
+            setRegionPickerOpen(false);
+          } catch (err) {
+            console.error('[picker] region analysis failed', err);
+            setDrawError('Could not read that region. Try a larger box.');
+          } finally {
+            setDrawingBusy(false);
+          }
+        }}
       />
 
       <CustomizeModal
@@ -1851,6 +2274,7 @@ export default function TypographyTestPage({
 
 function DetectionDetails({
   preview, result, moodboardUrl: _moodboardUrl, notTextMarked, onMarkNotText,
+  poolOverride, onPoolOverrideChange,
   sampledIdx, onPickRegion, ignoreTextDetection, onIgnoreTextDetectionChange,
 }: {
   preview: string;
@@ -1861,9 +2285,15 @@ function DetectionDetails({
   /** Which detected block the Display is sampled from. */
   sampledIdx: number;
   onPickRegion: () => void;
-  /** Ignore the lettering and suggest from the palette mood instead. */
+  /** Ignore the lettering and suggest from the image's mood instead.
+   *  IMAGE, not palette: matchMood() scores the mood board's own brightness,
+   *  saturation, contrast and hue family. The design system's chosen colours
+   *  are not an input, so changing them does not move the mood. */
   ignoreTextDetection: boolean;
   onIgnoreTextDetectionChange: (v: boolean) => void;
+  /** '' = follow the detection; otherwise 'cat:<Category>' | 'mood:<Mood>'. */
+  poolOverride: string;
+  onPoolOverrideChange: (v: string) => void;
 }) {
   // ONE sample, not two. The second crop existed to pick a second family; the
   // Header is a Flex face now, so there is a single piece of lettering the
@@ -1887,10 +2317,35 @@ function DetectionDetails({
                   flexShrink: 0,
                 }}
               />
-              {ignoreTextDetection ? (
+              {result.noLetteringDetected ? (
+                // Say it plainly. The failure this replaces was silent: OCR
+                // read a row of popsicles as "613000001" and the UI presented
+                // it as a confident Display match, so the one thing the user
+                // could not tell was that nothing had been found.
+                <VStack spacing={1}>
+                  <Body>No lettering found on this board.</Body>
+                  <Caption color="quiet">
+                    {result.discardedText?.length
+                      ? `Text detection returned ${result.discardedText
+                          .map((r) => `"${r.text}"`)
+                          .join(', ')}, which is not lettering — usually a photograph read as
+                         characters. Nothing on the board describes a typeface, so the
+                         suggestions below come from the ${result.mood?.label ?? 'detected'} mood
+                         of your colours instead.`
+                      : `Nothing on the board describes a typeface, so the suggestions below come
+                         from the ${result.mood?.label ?? 'detected'} mood of your image instead.`}
+                  </Caption>
+                  {(result.discardedText?.length ?? 0) > 0 && (
+                    <Caption color="quiet">
+                      If one of those really is lettering, point at it with “Analyze a
+                      new text region in the image” and it will be used instead.
+                    </Caption>
+                  )}
+                </VStack>
+              ) : ignoreTextDetection ? (
                 <Caption color="quiet">
                   Lettering ignored — the type system is being suggested from the
-                  palette mood.
+                  mood of your image.
                 </Caption>
               ) : sampled && !notTextMarked.has('display') ? (
                 <CropDetail
@@ -1906,19 +2361,65 @@ function DetectionDetails({
                 <Caption color="quiet">Reported as not text — thanks!</Caption>
               )}
             </HStack>
-            {result.extractedText.length > 1 && !ignoreTextDetection && (
-              <Link onClick={onPickRegion}>Analyze a new text region in the image</Link>
-            )}
+            {/* Always offered. The old gate only showed this when the detector
+                had already found more than one block, which withheld it in the
+                two cases it is actually for: nothing found, or the one thing
+                found being wrong. */}
+            <Link onClick={onPickRegion}>Draw the text region to match against</Link>
+            <Divider />
+            {/* The escape hatch for a wrong match. The detector's answer is a
+                guess about a photograph; when it is wrong the user could
+                previously only accept it or switch the whole thing off, with
+                nothing in between. This changes WHICH pool the options come
+                from, so new families appear immediately. */}
+            <VStack spacing={1}>
+              <Label>Style to match</Label>
+              <Select
+                size="small"
+                fullWidth
+                value={poolOverride}
+                onChange={(val: string) => onPoolOverrideChange(val)}
+                options={[
+                  {
+                    // Spell out what "auto" currently resolves to. Showing a bare
+                    // "Follow the mood" left the user unable to tell WHICH style
+                    // was in effect — the question this control exists to answer.
+                    value: AUTO,
+                    label: autoLabel(
+                      ignoreTextDetection,
+                      result.mood?.label ?? result.mood?.key,
+                    ),
+                  },
+                  ...Object.keys(CATEGORY_FAMILY_POOLS).map((c) => ({
+                    value: `cat:${c}`, label: c,
+                  })),
+                  ...Object.keys(moodFontMapping).map((m) => ({
+                    value: `mood:${m}`, label: `Mood · ${m}`,
+                  })),
+                ]}
+              />
+              <Caption color="quiet">
+                {poolOverride && poolOverride !== AUTO
+                  ? 'Showing families from your choice instead of the match.'
+                  : (result.mood?.margin != null && result.mood.margin < 0.1 && result.mood.runnerUpLabel)
+                    // A near-tie is worth saying out loud. Half of all boards
+                    // land here, and presenting one of two near-equal moods as
+                    // the answer is what made the same board read Playful once
+                    // and Business the next time.
+                    ? `${result.mood.label} only just beat ${result.mood.runnerUpLabel} — either would fit. Pick a style if the other reads truer.`
+                    : 'Not right? Pick a style and the options below change to match it.'}
+              </Caption>
+            </VStack>
             <Divider />
             <Checkbox
               checked={ignoreTextDetection}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 onIgnoreTextDetectionChange(e?.target?.checked ?? !ignoreTextDetection)}
-              label="Ignore the lettering — suggest from the palette mood"
+              label="Ignore the lettering — suggest from the image's mood"
             />
             <Caption color="quiet">
               {ignoreTextDetection
-                ? `Suggestions come from the ${result.mood?.label ?? 'detected'} mood of your colours. Nothing is measured against the image, so there are no match scores.`
+                ? `Suggestions come from the ${result.mood?.label ?? 'detected'} mood of your mood board — its brightness, saturation and dominant hue. No lettering is measured, so there are no match scores.`
                 : 'Use this when the lettering on the board is incidental — a stock photo, a watermark, or type that has nothing to do with the brand.'}
             </Caption>
           </VStack>
@@ -1937,50 +2438,222 @@ function DetectionDetails({
  * board. This is the escape hatch, one click deep, rather than a permanent
  * grid of thumbnails competing with the controls.
  */
-function RegionPickerModal({
-  open, regions, currentIdx, onClose, onPick,
+// MISSING-LIB-COMPONENT: ImageRegionSelect
+// Needed for: choosing which lettering the Display is matched against — click a
+//   detected block, or drag a box around lettering the detector missed.
+// Proposed API: <ImageRegionSelect src regions currentBbox onPick minSize />
+// Lib-track: add to @dynodesign/components/src/components/ImageRegionSelect/
+/**
+ * Choose which lettering the Display is sampled from.
+ *
+ * Two ways to correct the automatic pick, in order of how often each is the
+ * answer:
+ *   1. Click a block the detector already found — the common case, one click.
+ *   2. Drag a box — the escape hatch for lettering it never saw. No OCR
+ *      involved, just the pixels the user pointed at.
+ *
+ * The list this replaces could only offer crops the detector had produced,
+ * shown as thumbnails divorced from the image: you could see the lettering but
+ * not where it came from, and anything OCR had missed could not be reached at
+ * all. Both failures matter here, because the two reasons to open this dialog
+ * are "it picked the wrong block" and "it never found the right one".
+ *
+ * Coordinates are NATURAL image pixels throughout, converted once from the
+ * rendered size via `scale`. The image is laid out responsively, so the scale
+ * is only known after layout and changes on resize — hence state, not a ref.
+ */
+function RegionDrawModal({
+  open, imageUrl, regions = [], currentBbox, onClose, onConfirm, busy, error,
 }: {
   open: boolean;
-  regions: ExtractedTextRegion[];
-  currentIdx: number;
+  imageUrl: string;
+  regions?: ExtractedTextRegion[];
+  currentBbox?: { x0: number; y0: number; x1: number; y1: number } | null;
   onClose: () => void;
-  onPick: (idx: number) => void;
+  onConfirm: (bbox: { x0: number; y0: number; x1: number; y1: number }, text?: string) => void;
+  busy: boolean;
+  error: string | null;
 }) {
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [rect, setRect] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [scale, setScale] = useState<{ x: number; y: number } | null>(null);
+
+  const measure = useCallback(() => {
+    const el = imgRef.current;
+    if (!el || !el.naturalWidth || !el.clientWidth) return;
+    setScale({ x: el.clientWidth / el.naturalWidth, y: el.clientHeight / el.naturalHeight });
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
+  // Reopening must not inherit the previous selection.
+  useEffect(() => { if (open) { setRect(null); setPicked(null); setDragging(false); } }, [open]);
+
   if (!open) return null;
+
+  const pointFor = (e: React.PointerEvent) => {
+    const r = imgRef.current?.getBoundingClientRect();
+    if (!r) return null;
+    return {
+      x: Math.max(0, Math.min(e.clientX - r.left, r.width)),
+      y: Math.max(0, Math.min(e.clientY - r.top, r.height)),
+    };
+  };
+
+  const w = rect ? Math.abs(rect.x1 - rect.x0) : 0;
+  const h = rect ? Math.abs(rect.y1 - rect.y0) : 0;
+  // A few px in either direction is a stray click, not a selection.
+  const drawn = w > 8 && h > 6;
+  const pickedRegion = picked == null ? null : regions[picked];
+  const usable = drawn || !!pickedRegion;
+  const boxes = scale ? regions.map((r, i) => ({ r, i })).filter((x) => x.r.bbox) : [];
+
+  const confirm = () => {
+    if (busy || !imgRef.current) return;
+    // A clicked block already carries a natural-space bbox AND its OCR text.
+    // Passing the text through is not cosmetic — it feeds the all-caps and
+    // letter-count signals the stroke measurement reads.
+    if (pickedRegion) return onConfirm(pickedRegion.bbox, pickedRegion.text);
+    if (drawn && rect) {
+      const el = imgRef.current;
+      const sx = el.naturalWidth / el.clientWidth;
+      const sy = el.naturalHeight / el.clientHeight;
+      return onConfirm({
+        x0: Math.round(Math.min(rect.x0, rect.x1) * sx),
+        y0: Math.round(Math.min(rect.y0, rect.y1) * sy),
+        x1: Math.round(Math.max(rect.x0, rect.x1) * sx),
+        y1: Math.round(Math.max(rect.y0, rect.y1) * sy),
+      });
+    }
+  };
+
   return (
-    <Modal open={open} onClose={onClose} title="Analyze a new text region">
-      <VStack spacing={2} style={{ maxWidth: 640 }}>
+    <Modal open={open} onClose={onClose} title="Select the text to sample">
+      <VStack spacing={2} style={{ maxWidth: 680 }}>
         <Caption color="quiet">
-          Every block of lettering the detector found. Pick the one the type system
-          should be matched against.
+          {boxes.length > 0
+            ? 'Click a highlighted block, or drag your own box around lettering that wasn\'t found.'
+            : 'Drag a rectangle around the lettering you want the Display font matched to.'}
         </Caption>
-        <VStack spacing={1} style={{ width: '100%' }}>
-          {regions.map((r, i) => (
-            <Card key={i} padding="small">
-              <HStack spacing={2} alignItems="center" justifyContent="space-between">
-                <img
-                  src={r.dataUrl}
-                  alt={r.text || `Detected lettering ${i + 1}`}
-                  style={{ height: 44, maxWidth: 260, objectFit: 'contain' }}
-                />
-                <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
-                  <BodySmall>{r.text || '(no text read)'}</BodySmall>
-                  <Caption color="quiet">
-                    {r.stroke.weight}{r.isAllCaps ? ' · all caps' : ''}
-                  </Caption>
-                </VStack>
-                <Button
-                  size="small"
-                  variant={i === currentIdx ? 'primary' : 'default-outline'}
-                  onClick={() => onPick(i)}
-                >
-                  {i === currentIdx ? 'Sampled' : 'Use this'}
-                </Button>
-              </HStack>
-            </Card>
+
+        <div
+          style={{
+            position: 'relative', width: '100%', userSelect: 'none', touchAction: 'none',
+            cursor: 'crosshair', overflow: 'hidden',
+            borderRadius: 'var(--Style-Border-Radius)', border: '1px solid var(--Border)',
+          }}
+          onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
+            const p = pointFor(e);
+            if (!p) return;
+            e.preventDefault();
+            // Capture, so dragging past the edge keeps tracking rather than
+            // silently ending the box part-way through.
+            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+            setPicked(null);            // drawing overrides a clicked block
+            setRect({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+            setDragging(true);
+          }}
+          onPointerMove={(e: React.PointerEvent<HTMLDivElement>) => {
+            if (!dragging) return;
+            const p = pointFor(e);
+            if (p) setRect((r) => (r ? { ...r, x1: p.x, y1: p.y } : r));
+          }}
+          onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
+        >
+          <img
+            ref={imgRef}
+            src={imageUrl}
+            alt="Mood board — click a block or drag a region"
+            draggable={false}
+            onLoad={measure}
+            style={{ display: 'block', width: '100%', height: 'auto', pointerEvents: 'none' }}
+          />
+
+          {scale && boxes.map(({ r, i }) => (
+            <button
+              key={i}
+              type="button"
+              title={r.text || `Block ${i + 1}`}
+              onPointerDown={(e) => {
+                // Do not let the stage read this as the start of a drag.
+                e.stopPropagation();
+                e.preventDefault();
+                setPicked(i);
+                setRect(null);
+              }}
+              style={{
+                position: 'absolute',
+                left: r.bbox.x0 * scale.x,
+                top: r.bbox.y0 * scale.y,
+                width: (r.bbox.x1 - r.bbox.x0) * scale.x,
+                height: (r.bbox.y1 - r.bbox.y0) * scale.y,
+                background: picked === i
+                  ? 'color-mix(in srgb, var(--Focus-Visible) 22%, transparent)'
+                  : 'transparent',
+                border: picked === i
+                  ? '2px solid var(--Focus-Visible)'
+                  : '1px dashed var(--Border)',
+                borderRadius: 2, padding: 0, cursor: 'pointer',
+              }}
+            />
           ))}
-        </VStack>
-        <Button variant="default-outline" size="small" onClick={onClose}>Close</Button>
+
+          {/* What is driving the Display right now, so the dialog opens
+              explaining itself rather than as a blank choice. */}
+          {scale && currentBbox && !rect && picked == null && (
+            <div style={{
+              position: 'absolute',
+              left: currentBbox.x0 * scale.x,
+              top: currentBbox.y0 * scale.y,
+              width: (currentBbox.x1 - currentBbox.x0) * scale.x,
+              height: (currentBbox.y1 - currentBbox.y0) * scale.y,
+              border: '2px solid var(--Focus-Visible)', pointerEvents: 'none', borderRadius: 2,
+            }}>
+              <span style={{
+                position: 'absolute', top: '100%', left: 0, whiteSpace: 'nowrap',
+                background: 'var(--Text)', color: 'var(--Background)',
+                fontSize: 10, padding: '1px 4px', borderRadius: 2,
+              }}>Current Display</span>
+            </div>
+          )}
+
+          {rect && (
+            <div style={{
+              position: 'absolute',
+              left: Math.min(rect.x0, rect.x1), top: Math.min(rect.y0, rect.y1),
+              width: w, height: h,
+              border: '2px solid var(--Focus-Visible)',
+              background: 'color-mix(in srgb, var(--Background) 25%, transparent)',
+              pointerEvents: 'none',
+            }} />
+          )}
+        </div>
+
+        <HStack spacing={1} justifyContent="space-between" alignItems="center">
+          {error ? <Caption color="error">{error}</Caption> : (
+            <Caption color="quiet">
+              {pickedRegion
+                ? `Selected "${pickedRegion.text || 'that block'}".`
+                : drawn
+                  ? `Selection ${Math.round(w)} x ${Math.round(h)} — tight to the letters works best.`
+                  : boxes.length > 0
+                    ? `${boxes.length} text ${boxes.length === 1 ? 'block' : 'blocks'} found — click one, or drag your own.`
+                    : 'Drag across the lettering to draw a box.'}
+            </Caption>
+          )}
+          <HStack spacing={1}>
+            <Button variant="default-outline" size="small" onClick={onClose} disabled={busy}>Cancel</Button>
+            <Button size="small" disabled={!usable || busy} onClick={confirm}>
+              {busy ? 'Analyzing…' : 'Use this region'}
+            </Button>
+          </HStack>
+        </HStack>
       </VStack>
     </Modal>
   );

@@ -44,6 +44,9 @@ export interface StrokeAnalysis {
    *  mean the weight / serif signals are noisy and shouldn't be trusted
    *  hard — fall back to CLIP. */
   strokeCount: number;
+  /** Dominant slant in degrees; negative leans right. null when unmeasurable.
+   *  The signal that separates formal copperplate from hand printing. */
+  slant: number | null;
   /** True when the region has substantial text but very few clean vertical
    *  stems — script and handwritten fonts curve/slant where regular fonts
    *  go straight up and down, so they leave few stems to count. Computed
@@ -80,6 +83,19 @@ export interface StrokeAnalysis {
 export interface ExtractedTextRegion {
   dataUrl: string;
   height: number;
+  /**
+   * Where this region sits in the ORIGINAL image, in natural pixels.
+   *
+   * Carried through so the picker can draw the block back onto the image and
+   * let the user click it. It used to be consumed to make `dataUrl` and then
+   * dropped, which meant the only way to choose a region was from a list of
+   * disembodied crops — you could see the lettering but not where it came
+   * from, and lettering OCR had missed could not be pointed at at all.
+   *
+   * Natural pixels, not fractions: the detector works in them, and the picker
+   * converts once using the rendered image's own scale.
+   */
+  bbox: { x0: number; y0: number; x1: number; y1: number };
   text: string;
   isAllCaps: boolean;
   /** Coarse letter-spacing classification from pixel density inside the
@@ -280,6 +296,10 @@ export async function cropFromBboxes(
       && (stroke.measurementFailed || stroke.weightRatio > 0.25);
     return {
       dataUrl: regionToDataUrl(img, region),
+      // Copied from the region that was just cropped, not restated from `b` —
+      // one set of four numbers, so the crop and the clickable overlay can
+      // never disagree about where the block is.
+      bbox: { ...region.bbox },
       // Use the polygon's short side for height so rotated text doesn't
       // win comparisons it shouldn't (downstream `r.height < header.height
       // * ratio` checks need a true letter-height, not a bbox-diagonal).
@@ -748,6 +768,117 @@ function regionToDataUrl(img: HTMLImageElement, region: TextRegion): string {
  *  pixels, and bins into tight / normal / wide. Headlines with tight
  *  tracking densely cover their bbox (>22% dark); tracked-out display
  *  text leaves lots of whitespace (<10% dark). Approximate. */
+/**
+ * Split a crop into ink and ground.
+ *
+ * NOT "dark pixels are ink", and NOT a fixed RGB threshold either — this file
+ * used both, and each fails on a different half of real artwork.
+ *
+ * Dark-is-ink inverts on light-on-dark lettering: the letters fail the test,
+ * the BACKGROUND passes it, and every measurement downstream describes the gaps
+ * between glyphs. Stroke ratio comes out near 1% and the heaviest face in the
+ * sample is reported `thin`.
+ *
+ * A fixed threshold (this was `< 120` on each RGB channel) fails on hue. The
+ * "Busyhead" cover is dark teal on yellow — roughly rgb(26, 95, 122) — where
+ * red and green clear the cut and BLUE misses it by two. The ink is then not
+ * ink, the scan measures noise, and a thin marker hand is reported heavy.
+ *
+ * Otsu puts the threshold wherever the split actually falls, whatever the hue.
+ * Which side is ink is read off the OUTER RING, not off which class is smaller:
+ * a tight box around heavy display caps is more than half ink, so the smaller
+ * class there is the ground. The ring is the honest sample — which is why
+ * analyzeStrokes pads the box before calling this.
+ *
+ * Ported from omni-type-studio's strokes.js; keep the two in step.
+ */
+function binarizeInk(data: Uint8ClampedArray, w: number, h: number): {
+  bin: Uint8Array; inkIsDark: boolean; threshold: number; inkFraction: number;
+} {
+  const n = w * h;
+  const lum = new Uint8Array(n);
+  const opaque = new Uint8Array(n);
+  const hist = new Uint32Array(256);
+  let total = 0;
+  for (let i = 0, p = 0; p < n; i += 4, p++) {
+    if (data[i + 3] === 0) continue; // transparent is never ink
+    const l = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
+    lum[p] = l; opaque[p] = 1; hist[l]++; total++;
+  }
+  const bin = new Uint8Array(n);
+  if (!total) return { bin, inkIsDark: true, threshold: 0, inkFraction: 0 };
+
+  // Otsu — the threshold maximising between-class variance.
+  let sum = 0;
+  for (let t = 0; t < 256; t++) sum += t * hist[t];
+  let sumB = 0, countB = 0, best = -1, threshold = 127;
+  for (let t = 0; t < 256; t++) {
+    countB += hist[t];
+    if (!countB) continue;
+    const countF = total - countB;
+    if (!countF) break;
+    sumB += t * hist[t];
+    const meanB = sumB / countB;
+    const meanF = (sum - sumB) / countF;
+    const between = countB * countF * (meanB - meanF) * (meanB - meanF);
+    if (between > best) { best = between; threshold = t; }
+  }
+
+  // Ground is whichever side of the threshold the border ring sits on.
+  let ringDark = 0, ringTotal = 0;
+  for (let y = 0; y < h; y++) {
+    const edgeRow = y === 0 || y === h - 1;
+    for (let x = 0; x < w; x++) {
+      if (!edgeRow && x !== 0 && x !== w - 1) continue;
+      const p = y * w + x;
+      if (!opaque[p]) continue;
+      ringTotal++;
+      if (lum[p] <= threshold) ringDark++;
+    }
+  }
+  let darkCount = 0;
+  for (let t = 0; t <= threshold; t++) darkCount += hist[t];
+  const ringDarkFraction = ringTotal ? ringDark / ringTotal : 0.5;
+  const inkIsDark = ringDarkFraction >= 0.55 ? false
+    : ringDarkFraction <= 0.45 ? true
+      // Ring says nothing — a box cropped flush against the lettering, or text
+      // running off the image edge. Fall back to the smaller class.
+      : darkCount <= total - darkCount;
+
+  let ink = 0;
+  for (let p = 0; p < n; p++) {
+    if (!opaque[p]) continue;
+    if ((lum[p] <= threshold) === inkIsDark) { bin[p] = 1; ink++; }
+  }
+  return { bin, inkIsDark, threshold, inkFraction: ink / total };
+}
+
+function measureSlant(bin: Uint8Array, w: number, h: number): number {
+  let best = 0;
+  let bestScore = -1;
+  const col = new Float64Array(w);
+  for (let deg = -35; deg <= 35; deg += 5) {
+    const t = Math.tan((deg * Math.PI) / 180);
+    col.fill(0);
+    for (let y = 0; y < h; y++) {
+      const shift = Math.round((y - h / 2) * t);
+      for (let x = 0; x < w; x++) {
+        if (!bin[y * w + x]) continue;
+        const nx = x + shift;
+        if (nx >= 0 && nx < w) col[nx]++;
+      }
+    }
+    let mean = 0;
+    for (let x = 0; x < w; x++) mean += col[x];
+    mean /= w;
+    let variance = 0;
+    for (let x = 0; x < w; x++) { const d = col[x] - mean; variance += d * d; }
+    if (variance > bestScore) { bestScore = variance; best = deg; }
+  }
+  return best;
+}
+
+
 function classifySpacingFromBbox(
   img: HTMLImageElement,
   bbox: { x0: number; y0: number; x1: number; y1: number },
@@ -768,19 +899,13 @@ function classifySpacingFromBbox(
 
   ctx.drawImage(img, bbox.x0, bbox.y0, w, h, 0, 0, cw, ch);
   const data = ctx.getImageData(0, 0, cw, ch).data;
-  const THRESHOLD = 120;
-  let darkCount = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    if (
-      data[i + 3] > 0
-      && data[i] < THRESHOLD
-      && data[i + 1] < THRESHOLD
-      && data[i + 2] < THRESHOLD
-    ) {
-      darkCount++;
-    }
-  }
-  const density = darkCount / (cw * ch);
+  // Ink density, not dark density. Counting dark pixels on light-on-dark
+  // lettering measures the GROUND, so a heavy face reads as sparse and the
+  // spacing verdict comes back `extended`. binarizeInk also picks the threshold
+  // by Otsu rather than a fixed RGB cut, which is what a mid-luminance hue
+  // (dark teal on yellow) needs.
+  const { inkFraction } = binarizeInk(data, cw, ch);
+  const density = inkFraction;
   if (density > 0.22) return 'tight';
   if (density < 0.10) return 'wide';
   return 'normal';
@@ -813,6 +938,7 @@ export function analyzeStrokes(
     weight: 'regular', weightRatio: 0,
     hasSerifFeet: false, serifFootRatio: 0,
     strokeCount: 0,
+    slant: null,
     isLikelyScript: false,
     isLikelyHand: false,
     measurementFailed: false,
@@ -827,9 +953,24 @@ export function analyzeStrokes(
   // that height, a thin is 2-4 px, a heavy is 12+ px). Never upscale more
   // than 2× — that just blurs pixels we don't have.
   const TARGET_H = 80;
+  // Scale comes off the ORIGINAL box, so the margin below costs no letter
+  // resolution.
   const scale = Math.min(TARGET_H / sourceH, 2);
-  const w = Math.max(1, Math.round(sourceW * scale));
-  const h = Math.max(1, Math.round(sourceH * scale));
+
+  // Take a margin of GROUND around the letters. binarizeInk decides which side
+  // of its threshold is ink by looking at the border of what it is handed, and
+  // a detected text box is flush against the lettering — with no margin the
+  // border IS letters, and a heavy face reads inside-out. The blank rows are
+  // trimmed off again below, so this costs nothing but pixels.
+  const margin = Math.max(2, Math.round(sourceH * 0.12));
+  const sx = Math.max(0, bbox.x0 - margin);
+  const sy = Math.max(0, bbox.y0 - margin);
+  const imgW = (img as any).naturalWidth ?? sourceW + margin * 2;
+  const imgH = (img as any).naturalHeight ?? sourceH + margin * 2;
+  const sw = Math.min(imgW - sx, sourceW + margin * 2);
+  const sh = Math.min(imgH - sy, sourceH + margin * 2);
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
 
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -837,16 +978,25 @@ export function analyzeStrokes(
   const ctx = canvas.getContext('2d');
   if (!ctx) return defaults;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, bbox.x0, bbox.y0, sourceW, sourceH, 0, 0, w, h);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
   const data = ctx.getImageData(0, 0, w, h).data;
 
-  const THRESHOLD = 120;
-  const bin = new Uint8Array(w * h);
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    if (data[i + 3] > 0 && data[i] < THRESHOLD && data[i + 1] < THRESHOLD && data[i + 2] < THRESHOLD) {
-      bin[p] = 1;
-    }
-  }
+  // Ink is the MINORITY class, not the dark one.
+  //
+  // This used to test `dark = ink` outright, which silently inverts on
+  // light-on-dark lettering: on a bright-yellow display face over a dark
+  // background, the letters fail the dark test and the BACKGROUND passes it, so
+  // every measurement below describes the gaps between letters instead of the
+  // letters. The stems come out hairline, weightRatio lands near 0.01, and the
+  // heaviest face in the sample is classified `thin`.
+  //
+  // It reads as a plausible answer rather than an error, which is why it
+  // survived: nothing is undefined, no branch throws, the crop just gets the
+  // wrong verdict. The high-side sanity gate below (weightRatio > 0.5) caught
+  // the OTHER failure — a binarizer clustering wide bands — but an inverted
+  // scan produces a LOW ratio, which sails through.
+  //
+  const { bin } = binarizeInk(data, w, h);
 
   // Trim whitespace rows so we measure relative to the actual letter
   // height, not the bbox padding.
@@ -915,7 +1065,12 @@ export function analyzeStrokes(
       stemStart = -1;
     }
   }
-  if (stems.length === 0) return defaults;
+  // Measured off the same mask every other signal uses, and carried on EVERY
+  // return path below — including the failure ones. A crop with no countable
+  // stems is exactly the cursive case where slant matters most, so returning
+  // `defaults` there would drop the one measurement that still works.
+  const slant = measureSlant(bin, w, h);
+  if (stems.length === 0) return { ...defaults, slant };
 
   // Median stroke width — robust to outliers like joined letterforms.
   const strokeWidths = stems.map((s) => s.xEnd - s.xStart + 1);
@@ -930,7 +1085,7 @@ export function analyzeStrokes(
   // into single "stems" (DREAM at 217%, etc.). Return the defaults so
   // downstream classifiers fall back to CLIP / spacing-derived proxies
   // instead of trusting a nonsense weight / serif verdict.
-  if (weightRatio > 0.5) return failed;
+  if (weightRatio > 0.5) return { ...failed, slant };
 
   let weight: VisualWeight = 'regular';
   if (weightRatio < 0.10) weight = 'thin';
@@ -1037,6 +1192,7 @@ export function analyzeStrokes(
     hasSerifFeet,
     serifFootRatio,
     strokeCount: stems.length,
+    slant,
     measurementFailed: false,
     isLikelyScript: false, // populated in cropFromBboxes once the text is known
     isLikelyHand: false,   // populated in cropFromBboxes alongside script
@@ -1066,6 +1222,7 @@ export async function cropPixelFallback(imageUrl: string): Promise<TextCrops> {
   console.info(`[pixel] fallback found ${detected.length} candidate regions`);
   const regions: ExtractedTextRegion[] = detected.map((r) => ({
     dataUrl: regionToDataUrl(img, r),
+    bbox: { ...r.bbox },
     height: r.bbox.y1 - r.bbox.y0,
     text: '',
     isAllCaps: false,
@@ -1221,4 +1378,85 @@ export async function detectTextRegions(
   _imageElement: HTMLImageElement
 ): Promise<{ regions: TextRegion[]; diag: OcrDiag }> {
   return { regions: [], diag: { wordCount: 0, elapsedMs: 0, error: 'detectTextRegions removed — GCV is now the only OCR path' } };
+}
+
+/**
+ * Does this OCR string look like real lettering?
+ *
+ * OCR run over a photograph with no type in it does not return nothing — it
+ * returns confident garbage. A row of nine popsicles came back as the string
+ * "613000001", which then drove the whole type system: it became the Display
+ * specimen, the CLIP crop, and the family match. Every stage downstream treated
+ * it as lettering because nothing upstream ever asked whether it was.
+ *
+ * The test is letters, not characters. Digits carry almost no typographic
+ * signal — no x-height relationship, no ascenders or descenders, no serif feet,
+ * and identical forms across most families — so a numeric run tells us nothing
+ * about a typeface even when the OCR is right. Requiring letters rejects the
+ * texture-misread case and the legitimate-but-useless case in one rule.
+ *
+ * Deliberately permissive about everything else: stylised lettering is exactly
+ * what we are hunting for, so mixed case, punctuation and short words all pass.
+ */
+export function looksLikeLettering(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const letters = (text.match(/\p{L}/gu) ?? []).length;
+  // One letter is an OCR speck, not a word. Two is the shortest real word.
+  if (letters < 2) return false;
+  // A stray letter inside a numeric run ("6130A0001") is still a numeric run.
+  const alphanumeric = (text.match(/[\p{L}\p{N}]/gu) ?? []).length;
+  return alphanumeric === 0 ? false : letters / alphanumeric >= 0.4;
+}
+
+/** A box the user drew, in fractions of the image's natural size (0–1). Kept
+ *  normalised rather than in pixels so it survives the preview being rendered
+ *  at any scale — the modal measures in CSS pixels, the crop happens against
+ *  the full-resolution image, and nothing has to agree on a display size. */
+export interface NormalisedBox { x0: number; y0: number; x1: number; y1: number }
+
+/** Smallest box worth analysing, as a fraction of the image. Anything under
+ *  this is a stray click rather than a selection. */
+export const MIN_DRAWN_BOX = 0.01;
+
+export function isUsableBox(b: NormalisedBox): boolean {
+  return Math.abs(b.x1 - b.x0) >= MIN_DRAWN_BOX && Math.abs(b.y1 - b.y0) >= MIN_DRAWN_BOX;
+}
+
+/**
+ * Build a region from a box the user drew.
+ *
+ * Deliberately produces the SAME shape the detector produces, through the same
+ * helpers (regionToDataUrl, classifySpacingFromBbox, analyzeStrokes), so a
+ * hand-drawn region and a detected one are indistinguishable downstream. If
+ * this built its own lighter-weight object, every consumer would need to know
+ * which kind it had — and the ones that forgot would fail only on hand-drawn
+ * input, which is the rarer path and so the last to be noticed.
+ *
+ * `text` is empty: nothing has read this box. That is the same signal the pixel
+ * fallback emits, and looksLikeLettering() treats an empty string as "no claim
+ * made" rather than "not lettering", so a drawn box is never filtered out as
+ * OCR noise.
+ */
+export async function regionFromDrawnBox(
+  imageUrl: string,
+  box: NormalisedBox,
+): Promise<ExtractedTextRegion> {
+  const img = await loadImage(imageUrl);
+  // Normalise ordering — dragging up or left gives x1 < x0.
+  const bbox = {
+    x0: Math.round(Math.min(box.x0, box.x1) * img.naturalWidth),
+    y0: Math.round(Math.min(box.y0, box.y1) * img.naturalHeight),
+    x1: Math.round(Math.max(box.x0, box.x1) * img.naturalWidth),
+    y1: Math.round(Math.max(box.y0, box.y1) * img.naturalHeight),
+  };
+  const region: TextRegion = { text: '', bbox, confidence: 100 };
+  return {
+    dataUrl: regionToDataUrl(img, region),
+    bbox: { ...bbox },
+    height: bbox.y1 - bbox.y0,
+    text: '',
+    isAllCaps: false,
+    spacing: classifySpacingFromBbox(img, bbox),
+    stroke: analyzeStrokes(img, bbox),
+  };
 }
