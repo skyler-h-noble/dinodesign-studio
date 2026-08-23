@@ -365,15 +365,20 @@ async function fetchGoogleFonts(): Promise<GoogleFont[]> {
     }
 
     const data = await response.json();
-    googleFontsCache = data.items.map((font: any) => ({
+    // Built into a local first, then cached. googleFontsCache is a module-level
+    // `let` typed GoogleFont[] | null, so a narrowing does not survive the
+    // assignment — reading .length straight off it afterwards is only sound by
+    // inspection, and the compiler is right not to take that on trust.
+    const fonts: GoogleFont[] = data.items.map((font: any) => ({
       family: font.family,
       category: font.category,
       variants: font.variants || ['400', '700'],
       subsets: font.subsets || ['latin']
     }));
+    googleFontsCache = fonts;
 
-    console.log(`✅ Fetched ${googleFontsCache.length} fonts from Google Fonts API`);
-    return googleFontsCache;
+    console.log(`✅ Fetched ${fonts.length} fonts from Google Fonts API`);
+    return fonts;
   } catch (error) {
     console.warn('⚠️ Google Fonts API unavailable, using curated lists');
     // Return empty array - will fall back to curated lists

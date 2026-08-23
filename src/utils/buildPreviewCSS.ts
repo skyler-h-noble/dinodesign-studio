@@ -533,6 +533,21 @@ export function buildPreviewCSS(input: BuildInput): string {
     }
   }
 
+  // Container-Low / Container-Lowest.
+  //
+  // Declared beside containerBg and never assigned in any branch, so the
+  // Brand-Nav-Bar scope emitted `--Container-Low: undefined` — an invalid
+  // declaration, which CSS drops without a word. The comment at the emit site
+  // says these exist so Cards inside the phone preview react to cardColoring;
+  // two of the five levels were not reacting to anything.
+  //
+  // Set flat, equal to Container. That is exactly what the real export does in
+  // light mode — elevation there comes from the drop shadow, not from tone —
+  // and it is the safe approximation in dark, where the export steps the tone
+  // instead. A preview that is flat where the export steps is a smaller error
+  // than a token that resolves to nothing.
+  containerLow = containerBg;
+
   // Tertiary container always uses its own palette — never white/black
   if (isDark) {
     tertiaryContainerBg = darkUsePrimary ? p(tertiary, 3) : p(tertiary, 3);
