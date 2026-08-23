@@ -86,11 +86,21 @@ export default function ColorAssignmentStage({
   };
 
   // Resolve the current surface palette and Color-N for nav color previews
-  const getSurfaceInfo = (): { palette: typeof palettes.primary; n: number } => {
+  // NonNullable, because `palettes` is colorScheme?.tonePalettes and the body
+  // already guards with `palettes?.primary || []`. Writing `typeof
+  // palettes.primary` in the annotation dereferenced the very value the body
+  // is careful not to.
+  const getSurfaceInfo = (): { palette: NonNullable<typeof palettes>['primary']; n: number } => {
     const p = palettes?.primary || [];
-    const neutral: typeof p = Array.from({ length: 12 }, (_, i) => ({
+    // The fallback ramp needs EVERY field a real palette entry has — tone,
+    // lightness, hex and colorNumber. It supplied two, so anything downstream
+    // reading .lightness or .colorNumber off a black or white background got
+    // undefined, and the switch below returns this array for both of those.
+    const neutral: NonNullable<typeof palettes>['primary'] = Array.from({ length: 12 }, (_, i) => ({
       hex: ['#050505','#1a1a1a','#2e2e2e','#434343','#585858','#8e8e8e','#a3a3a3','#b8b8b8','#cccccc','#e0e0e0','#f0f0f0','#fafafa'][i],
       tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
+      lightness: [1,10,19,28,37,58,71,81,90,95,98,99][i],
+      colorNumber: i + 1,
     }));
     switch (userSelections.background) {
       case 'black': return { palette: neutral, n: 1 };

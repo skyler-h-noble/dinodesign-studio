@@ -15,7 +15,12 @@ export interface AddOnSelection {
 }
 
 export interface PurchaseSelection {
-  tier: { key: string; name: string; count: number; price: number };
+  /** The tier object itself, so `key` keeps its literal 'single'. Restating the
+   *  shape inline widened key to `string`, and redirectToCheckout takes
+   *  'single' | 'bundle3' | 'bundle10' — so the one call that consumes this
+   *  could not be typed at all. (This page sells a single system; the bundle
+   *  tiers live in PricingModal, which has its own PurchaseSelection.) */
+  tier: typeof TIER;
   addOns: AddOnSelection;
   oneTimeTotal: number;
 }

@@ -25,6 +25,9 @@ export interface PurchaseSelection {
   oneTimeTotal: number;
 }
 
+// `as const` so each tier's `key` keeps its literal type. Without it the
+// element type widens and selection.tier.key reaches redirectToCheckout as a
+// bare string, where the parameter is 'single' | 'bundle3' | 'bundle10'.
 const TIERS = [
   {
     key: 'single' as const,
@@ -53,7 +56,7 @@ const TIERS = [
     popular: false,
     features: ['Everything in single', '33% savings per project', 'Best for agencies'],
   },
-];
+] as const;
 
 const HOSTING_PRICE = 19;
 
