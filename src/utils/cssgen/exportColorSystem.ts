@@ -145,9 +145,18 @@ interface ButtonsForBackground {
   'Error-Light': ButtonDetails;
 }
 
+/**
+ * Buttons.<Palette>.<Shade>.<token> — palette-keyed, with Light and Medium
+ * shades beneath each.
+ *
+ * NOT { Surfaces, Containers }, which is what this said. Measured on the real
+ * payload the top level is Primary, Secondary, Tertiary, Neutral, Info … and
+ * the level below is Light / Medium. Every other section in this file with a
+ * Surfaces/Containers split really has one, which is presumably how this
+ * acquired the shape by association.
+ */
 interface ButtonsSectionForMode {
-  Surfaces: { [backgroundKey: string]: ButtonsForBackground };
-  Containers: { [backgroundKey: string]: ButtonsForBackground };
+  [paletteKey: string]: { [shadeKey: string]: ButtonsForBackground };
 }
 
 /**
@@ -3583,11 +3592,10 @@ export function exportColorSystemToJSON(
         Tag: { Surfaces: {}, Containers: {} },
         Charts: { Surfaces: {}, Containers: {} },
         'Focus-Visible': generateFocusVisibleSection(false), // Light-Mode
-        // Seeded with the Surfaces/Containers pair every consumer indexes,
-        // as Header/Quiet/Border/Charts above already do. Starting these
-        // three as a bare {} meant the first read of .Surfaces on them was
-        // undefined until something happened to populate it.
-        Buttons: { Surfaces: {}, Containers: {} },
+        // Buttons is palette-keyed and gets replaced wholesale further down, so
+        // it seeds empty. Text and Tag above DO carry a Surfaces/Containers
+        // pair and are seeded with it.
+        Buttons: {},
         Themes: {} // Will be populated with all 30 themes
       },
       'Dark-Mode': {
@@ -3604,11 +3612,10 @@ export function exportColorSystemToJSON(
         Tag: { Surfaces: {}, Containers: {} },
         Charts: { Surfaces: {}, Containers: {} },
         'Focus-Visible': generateFocusVisibleSection(true), // Dark-Mode
-        // Seeded with the Surfaces/Containers pair every consumer indexes,
-        // as Header/Quiet/Border/Charts above already do. Starting these
-        // three as a bare {} meant the first read of .Surfaces on them was
-        // undefined until something happened to populate it.
-        Buttons: { Surfaces: {}, Containers: {} },
+        // Buttons is palette-keyed and gets replaced wholesale further down, so
+        // it seeds empty. Text and Tag above DO carry a Surfaces/Containers
+        // pair and are seeded with it.
+        Buttons: {},
         Themes: {} // Will be populated with all 30 themes
       }
     },
@@ -5901,34 +5908,14 @@ export function exportColorSystemToJSON(
     return buttonType;
   };
   
-  // Iterate through all button types in Dark-Mode
-  const darkModeButtons = colorSystem.Modes['Dark-Mode'].Buttons;
-  Object.keys(darkModeButtons).forEach(buttonType => {
-    const buttonData = darkModeButtons[buttonType];
-    const theme = getThemeForButtonType(buttonType);
-    
-    // Replace Surfaces/Background-Vibrant
-    if (buttonData.Surfaces && buttonData.Surfaces['Background-Vibrant']) {
-      const vibrantData = buttonData.Surfaces['Background-Vibrant'];
-      Object.keys(vibrantData).forEach(tokenKey => {
-        if (vibrantData[tokenKey].value) {
-          const hexValue = resolveTokenToHex(vibrantData[tokenKey].value, theme);
-          vibrantData[tokenKey].value = hexValue;
-        }
-      });
-    }
-    
-    // Replace Containers/Background-Vibrant
-    if (buttonData.Containers && buttonData.Containers['Background-Vibrant']) {
-      const vibrantData = buttonData.Containers['Background-Vibrant'];
-      Object.keys(vibrantData).forEach(tokenKey => {
-        if (vibrantData[tokenKey].value) {
-          const hexValue = resolveTokenToHex(vibrantData[tokenKey].value, theme);
-          vibrantData[tokenKey].value = hexValue;
-        }
-      });
-    }
-  });
+  // NOTE: the Dark-Mode Background-Vibrant resolution that sat here was removed.
+  //
+  // It read buttonData.Surfaces / .Containers off each entry of Buttons, but
+  // Buttons is palette-keyed — the level below a palette is Light / Medium, not
+  // Surfaces / Containers — so both guards were always false. And there is no
+  // Background-Vibrant key anywhere in Buttons to resolve even if there had
+  // been: measured across the whole section, zero occurrences.
+
   
   console.log('  ✓ [JSON Export] Dark-Mode Background-Vibrant replaced with hex values');
   
@@ -6632,22 +6619,17 @@ export function exportColorSystemToJSON(
     }
   });
   
-  // Add Color-Vibrant and Color-Variant to Quiet
-  themes.forEach(theme => {
-    if (colorSystem.Modes['Dark-Mode'].Quiet[theme]) {
-      const color11Value = colorSystem.Modes['Dark-Mode'].Quiet[theme]['Color-9']?.value;
-      if (color11Value) {
-        colorSystem.Modes['Dark-Mode'].Quiet[theme]['Color-Vibrant'] = {
-          value: color11Value,
-          type: 'color'
-        };
-        colorSystem.Modes['Dark-Mode'].Quiet[theme]['Color-Variant'] = {
-          value: color11Value,
-          type: 'color'
-        };
-      }
-    }
-  });
+  // NOTE: the Quiet block that used to sit here was removed.
+  //
+  // It indexed Quiet[theme] directly, but Quiet — like Header and Text, and
+  // unlike Hover and Pressed — is shaped { Surfaces, Containers }. So
+  // Quiet['Primary'] was undefined, the guard never passed, and the block had
+  // never run. Its two siblings above got the .Surfaces treatment; this one was
+  // left behind.
+  //
+  // Not restored, because there is nothing for it to do: Quiet's palettes
+  // already carry Color-Vibrant from the pass that works, and Color-Variant is
+  // referenced by nothing — not the payload, not the CSS, not the Figma export.
   
   // Add Color-Vibrant and Color-Variant to Hover
   themes.forEach(theme => {
