@@ -72,7 +72,7 @@ for token/theme details.)
 | Need | Use |
 | --- | --- |
 | Headings | `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `DisplayLarge`, `DisplaySmall` |
-| Body text | `Body`, `BodyLarge`, `BodySmall`, `Subtitle`, `SubtitleLarge` |
+| Body text | `Body`, `BodyLarge`, `BodySmall`, `Subtitle`, `SubtitleLarge` — Body has no bold; see [Body weights](#body-weights) |
 | Labels | `Label`, `Overline`, `Caption` |
 | Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`-light`/`ghost`/`text`), `ButtonGroup`, `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
@@ -91,33 +91,75 @@ ones it supports with DynoDesign theming wired in. Material icons
 
 ---
 
-## Known-broken components
+## Components with a documented gotcha
 
-A few lib components don't work standalone and have a documented workaround
-inside this repo. Treat these as the only sanctioned "don't use the lib"
-exceptions.
+A few lib components need more than their obvious usage — a required parent, a
+wrapper, or a workaround kept in this repo. Treat these as the only sanctioned
+"don't use the lib as-is" exceptions.
 
-### `Menu` / `MenuItem`
+Not all of them are broken. `Menu` works and was mislabelled here for months;
+check what an entry actually says before routing around a component.
 
-The lib's `Menu` is implemented against a private `Dropdown` React context.
-With no `<Dropdown>` ancestor (the common case for a dropdown anchored to an
-arbitrary button), `Menu` returns `null` and the dropdown silently doesn't
-render. **Pretend it doesn't exist.**
+### `Menu` / `MenuItem` — works, but only as a compound component
 
-Instead, use the portal-based pattern from `MyDesignsPage.tsx` (ellipsis menu)
-or `node_modules/@dynodesign/components/src/components/AvatarMenu/AvatarMenu.js`
-(account dropdown). Both anchor a panel to a real DOM element via
-`getBoundingClientRect`, render via `createPortal(document.body)`, and close
-on outside-click + Escape.
+**This entry previously said "pretend it doesn't exist." That was wrong**, and
+being wrong in a file every AI tool reads made it self-perpetuating — the lib
+had a working menu that nobody used for months.
 
-If you need this in a new file, tag it as
-`MISSING-LIB-COMPONENT: Popover` (the lib genuinely doesn't have a working
-portal-based popover yet).
+`Menu` is one part of a compound component. It needs its `<Dropdown>` root,
+which supplies the open state through context. Used as designed it works:
+opening, closing, keyboard navigation, Escape, item activation and the menu /
+menuitem roles are all covered by passing tests.
+
+```tsx
+<Dropdown>
+  <MenuButton>Actions</MenuButton>
+  <Menu>
+    <MenuItem onClick={…}>Profile</MenuItem>
+    <MenuDivider />
+    <MenuItem disabled>Settings</MenuItem>
+  </Menu>
+</Dropdown>
+```
+
+Always pass `<Dropdown>` as the root. `Menu` on its own reads the default
+context, whose `open` is `false`, so it returns `null` and renders nothing with
+no warning — which is exactly how the "it's broken" conclusion happened.
+
+**The one real limitation: it does not portal.** The panel is
+`position: absolute` inside the Dropdown wrapper. `z-index` does not let a
+positioned element escape an `overflow: hidden` or transformed ancestor, so
+inside a scrolling container or a clipped card the menu is cut off.
+
+So the choice is by situation, not by "the component is broken":
+
+| Anchoring a menu… | Use |
+| --- | --- |
+| in normal flow, nothing clipping it | `Dropdown` + `MenuButton` + `Menu` |
+| inside a scroll area, card, or clipped container | the portal pattern below |
+| to an arbitrary element you do not control | the portal pattern below |
+
+The portal pattern is in `MyDesignsPage.tsx` (ellipsis menu) and
+`node_modules/@dynodesign/components/src/components/AvatarMenu/AvatarMenu.js`
+(account dropdown). Both anchor a panel via `getBoundingClientRect`, render
+through `createPortal(document.body)`, and close on outside-click + Escape.
+
+If you need that in a new file, tag it `MISSING-LIB-COMPONENT: Popover` — the
+lib still has no portal-based popover, and that gap is real even though `Menu`
+is not broken.
+
+Its 18 failing ARIA tests are **test** bugs, not component bugs: they assert on
+`getByText('Actions')`, which returns the inner Typography `<p>`, while
+`aria-haspopup` / `aria-expanded` / `aria-controls` are correctly set on the
+ancestor `<button>`. Do not "fix" the component to satisfy them.
 
 ### `AvatarMenu` — fixed in lib
 
-If `@dynodesign/components`'s `AvatarMenu` ever silent-fails again, it's the
-same `Menu` bug. The fix is the inline-portal pattern; the rewrite lives at
+If `@dynodesign/components`'s `AvatarMenu` ever silent-fails again, the cause is
+a `Menu` rendered without its `<Dropdown>` root: the default context has
+`open: false`, so it returns `null` silently. That is a usage error rather than
+a component bug — see the `Menu` entry above. The fix is the inline-portal
+pattern; the rewrite lives at
 `/Users/lisenoble/Documents/dinodesign/src/components/AvatarMenu/AvatarMenu.js`.
 
 ### `ButtonGroup` — fixed via wrapper
@@ -187,6 +229,52 @@ function CustomPopover({ children }) {
 
 ---
 
+## Token facts that are easy to get wrong
+
+Four contracts established by debugging, each of which failed silently before it
+was pinned down. A wrong value here renders as a plausible design, not an error.
+
+**`--Button-Border-Width` is `1px`.** Emitted by the CSS export, the preview and
+the Figma payload, all from one constant. It is also load-bearing: Figma's
+`Button-Height`, `Sm/Lg-Button-Height` and the three `Button-Swatch` tokens are
+computed as `outer - (border x 2)`, so changing the width moves seven tokens,
+not one. Do not delete the variable to "simplify" it — it already ships to
+Figma, and a deleted Figma variable cannot be recovered by re-importing
+(invariant 8).
+
+**`--Dropdown-Frame-Radius` = `min(Input-Radius, Card-Radius, 16px)`.** The
+floating frame of a dropdown or menu panel. It follows the input it opens from,
+is never rounder than the cards it floats above, and caps at 16px because the
+panel scrolls with full-bleed rows — a larger corner clips the first and last
+item's hover highlight. Pixels, not a percent: a dropdown's height is
+content-driven, so a percent would make a long menu absurdly round.
+
+**Links do not change colour on hover.** The design system emits no hover tone
+for links; the underline thickens instead. Do not add one — any value would be
+invented rather than derived, on text carrying a 4.5:1 requirement. The lib's
+`Link` reads `--Link` / `--Link-Visited`, which nothing defines; it falls back
+to `--Hotlink` / `--Hotlink-Visited`, which is what the generator actually
+emits.
+
+**`foundations.css` no longer exists — the file is `foundation.css`.** The two
+disagreed on six values (`--Button-Radius` 4px vs 34px, and the whole bevel
+system), and the plural was missing `--Input-Radius`, which the
+`Dropdown-Frame-Radius` chain depends on.
+
+### A var() fallback only fires when the variable is UNDEFINED
+
+This caused three separate bugs in one session, so it is worth stating plainly.
+
+`var(--Font-Family-Display, var(--Set-Font-Family-Decorative, sans-serif))` does
+NOT mean "use Display, or fall back to Decorative". The lib defines
+`--Font-Family-Display` — to the HEADER family on Desktop — so the fallbacks are
+never reached, and the display font never appeared. The same shape hid the
+eyebrow rendering in the decorative face.
+
+So: **put the brand-owned token first**, and have the preview EMIT the token
+rather than hoping to fall through to it. If a value must be right, state it;
+do not arrange for it to be inherited.
+
 ## Tokens, never hex
 
 Read `node_modules/@dynodesign/components/CLAUDE.md` for the full token list.
@@ -247,6 +335,34 @@ agentic AI tools. Be exact about it — drift here teaches the wrong pattern.
 
 ---
 
+## Icon buttons: the button is named, the icon is not
+
+An icon-only `Button` needs an accessible name, and the icon inside it must not
+carry one. Give both and a screen reader announces the control twice — "Delete,
+Delete button". Give neither and it is announced as "button", which says
+nothing.
+
+```tsx
+// Right — the button owns the name, the icon is decoration
+<Button iconOnly aria-label="Delete item"><DeleteIcon /></Button>
+
+// Wrong — announced twice
+<Button iconOnly aria-label="Delete item">
+  <DeleteIcon titleAccess="Delete" />
+</Button>
+
+// Wrong — announced as just "button"
+<Button iconOnly><DeleteIcon /></Button>
+```
+
+Name the ACTION, not the glyph: `aria-label="Delete item"`, not
+`aria-label="trash"`.
+
+The lib's `<Icon>` is already `aria-hidden` unless you pass it an `aria-label`,
+so the ordinary case is correct by default. `Button` now dev-warns on both
+failure modes — they are invisible without a screen reader, which is how they
+survive.
+
 ## Don't override component colors
 
 Lib components apply their own colors from the design system. **Never pass
@@ -278,6 +394,27 @@ For muted body copy, use the lib's quiet variant (or `<Caption>`) — don't
 recolor `<Body>` by hand. If you find yourself reaching for `style={color}`
 on a typography or button component, the fix is one of: (a) wrong component
 for the job, (b) wrong variant, (c) lib gap — tag it and move on.
+
+### Body weights
+
+Body ships **standard and semibold only**. There is no bold Body style — for
+bold at body sizes use `Subtitle-Small`, `Subtitle-Medium` (the plain
+`<Subtitle>`), or `Subtitle-Large`. Subtitle *is* Body at 700: same face, same
+sizes, same leading.
+
+```tsx
+<Body>Normal body copy.</Body>
+<Typography variant="body-semibold">Semibold body copy.</Typography>
+<Subtitle color="standard">Bold body copy.</Subtitle>
+```
+
+Two traps: `variant="body-bold"` silently resolves to the *semibold* style (it
+is a back-compat alias, not a 700), and Subtitle defaults to `color="header"`
+while Body defaults to `color="standard"` — so pass `color="standard"` when you
+are using Subtitle purely to get weight, or the text changes colour too.
+
+Full rationale and the `--Body-Bold-Font-Weight` caveat: the lib's CLAUDE.md,
+*Body has two weights — Subtitle is the bold one*.
 
 ### Typography color prop reference
 
@@ -384,29 +521,76 @@ Two contracts that are invisible in the code and have each cost a debugging
 session. They belong with the invariants above because breaking them is easy
 and the failure is silent.
 
-**The output styles no bare elements.** No `body`, `html`, `p`, `h1` or `*`
-rule is emitted in any of the six files — only custom properties and opt-in
-`.typography-*` classes. A consumer who loads the CSS and expects text to look
-right gets nothing, and that is correct: a design system that restyled `body`
-on import would change pages nobody asked it to change. Do not "fix" this by
-adding an element rule to the generator. The consumer-side setup is documented
-in the lib's CLAUDE.md under *Page setup*.
+**The output gives bare elements no appearance.** No `body`, `html`, `p`, `h1`
+or `*` rule sets colour, background, or typography in any of the six files —
+only custom properties and opt-in `.typography-*` classes. A consumer who loads
+the CSS and expects text to look right gets nothing, and that is correct: a
+design system that restyled `body` on import would change pages nobody asked it
+to change. Do not "fix" this by adding an appearance rule to the generator. The
+consumer-side setup is documented in the lib's CLAUDE.md under *Page setup*.
 
-**Eyebrow and Overline are one concept under two names.** Eyebrow is the FACE
-and the COLOUR role (`--Eyebrow`, `--Font-Family-Eyebrow`,
-`--Font-Weight-Eyebrow`); Overline is the TYPE STYLE, and it owns the sizes
-(`--Overline-{Small,Medium,Large}-Font-Size`, `-Letter-Spacing`).
-`--Eyebrow-Font-Size` does not exist. The split is deliberate — the colour role
-and the type style vary on different axes, and `Overline` is the lib's
-component name — but a consumer will reach for `--Eyebrow-Font-Size` and get a
-silent fallback. If you ever collapse the two names, alias rather than rename:
-the CSS is frozen per design system in Storage, so an old system loaded against
-new consumer code has to keep resolving.
+The one bare-element rule that IS emitted is `body { margin: 0 }`, in both mode
+sheets (`exportToCSS.ts:3334`). It is a reset, not appearance, and it is the
+whole of the exception.
+
+This rule previously read "no bare element rule is emitted", which was already
+false when written — the `margin: 0` had been shipping in every export. An
+absolute claim that the code contradicts is worse than no claim: it gets
+believed, and then the first counter-example is used to argue the rule never
+held. The line that matters is APPEARANCE, so that is where the line is drawn.
+
+**Eyebrow and Overline are one concept under two names, and Eyebrow is the
+name.** The type style publishes `--Eyebrow-{Small,Medium,Large}-Font-Size`,
+`-Letter-Spacing`, `-Text-Transform`, alongside the face and colour role
+(`--Eyebrow`, `--Font-Family-Eyebrow`, `--Font-Weight-Eyebrow`).
+
+`--Overline-*` is still emitted, and must stay emitted: a design system's CSS is
+frozen per system in Storage and cannot be regenerated, so an old system loaded
+against new consumer code has to keep resolving. It is an ALIAS, not a rename.
+
+**The alias reads Overline → Eyebrow, and the direction is load-bearing.** The
+canonical name holds the literal and the back-compat name reads it:
+
+```css
+--Eyebrow-Medium-Font-Size: 13px;
+--Overline-Medium-Font-Size: var(--Eyebrow-Medium-Font-Size);
+```
+
+Pointing it the other way also "cannot drift", so both directions look correct
+in a diff — but it makes Overline canonical again and quietly undoes the rename.
+`src/__tests__/eyebrowAlias.test.ts` asserts the direction in both directions
+(contains one, not the other) for exactly that reason.
+
+Note there is no step-less `--Eyebrow-Font-Size` — the sizes are always
+`-Small` / `-Medium` / `-Large`, and reaching for the bare name gets a silent
+fallback.
 
 `--Eyebrow` is a ROTATION off the surface's palette (Primary→Secondary,
 Secondary→Tertiary, Tertiary/Neutral→Primary, states→BW), encoded in the
 `Eyebrows` table. It is not a muted `--Text`, and anything that substitutes
 `--Quiet` for it discards the rotation.
+
+## `tsc -p .` typechecks NOTHING here
+
+The root `tsconfig.json` is `"files": []` with only project references, so:
+
+```
+npx tsc --noEmit -p .   ->  0 errors     (checks no files at all)
+npx tsc -b              ->  366 errors   (the real number)
+```
+
+Use `npm run typecheck` (`tsc -b`). Never `-p .` — it reports a clean pass on a
+codebase that does not compile, which is worse than no check, because the clean
+output is taken as evidence.
+
+This is not hypothetical: `<Select>` and `<Label>` were added to
+`TypographyTestPage.tsx` with no import and shipped as "typecheck clean". The
+error was `TS2304: Cannot find name 'Select'` — a first-line failure that `-p .`
+never looked for.
+
+The 366 errors are pre-existing (mostly `TS6133` unused locals and missing lib
+type exports). You cannot gate on zero yet, so gate on **no worse than
+baseline**: run `npm run typecheck` before and after, and compare counts.
 
 ## Audit
 
