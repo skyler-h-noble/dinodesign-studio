@@ -60,7 +60,7 @@ export default function SettingsPage() {
                         // Input control: onChange forwards a DOM event (e.target.checked).
                         <SwitchInput
                           checked={toggles[n.id as keyof typeof toggles]}
-                          onChange={(e) => setToggles((t) => ({ ...t, [n.id]: e.target.checked }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setToggles((t) => ({ ...t, [n.id]: e.target.checked }))}
                         />
                       }
                     >

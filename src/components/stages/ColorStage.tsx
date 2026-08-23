@@ -1046,6 +1046,12 @@ export default function ColorStage({
 
   // ─── Step 1: Color Extraction ───
   if (step === 'extraction') {
+    // colorData cannot be null here — the guard near the top of this component
+    // returns early for exactly (!colorData && step === 'extraction'). But that
+    // is two conditions in two places, which TypeScript cannot connect, so the
+    // four dereferences below were sound only by inspection. Stated once here
+    // instead of assumed four times.
+    if (!colorData) return null;
     return (
       <VStack spacing={4} alignItems="center" style={{ padding: '40px 24px' }}>
         <H2 style={{ textAlign: 'center' }}>Color Extraction</H2>

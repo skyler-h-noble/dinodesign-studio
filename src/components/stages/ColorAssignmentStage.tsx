@@ -282,7 +282,7 @@ export default function ColorAssignmentStage({
           <Checkbox
             label="Sync Status, App & Navigation bars"
             checked={syncNav}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               const on = (e.target as HTMLInputElement).checked;
               setSyncNav(on);
               // Turning sync on unifies all three to the Status Bar's value.

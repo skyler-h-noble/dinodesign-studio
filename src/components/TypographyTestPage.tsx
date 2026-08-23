@@ -2871,7 +2871,7 @@ function InlineAdjuster({
           <Checkbox
             label="All caps"
             checked={!!allCaps}
-            onChange={(e) => onAllCapsChange((e.target as HTMLInputElement).checked)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => onAllCapsChange((e.target as HTMLInputElement).checked)}
           />
         )}
       </VStack>
@@ -3010,7 +3010,7 @@ function CustomizeModal({
               <Checkbox
                 label="All caps"
                 checked={modalCase === 'uppercase'}
-                onChange={(e) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setModalCase((e.target as HTMLInputElement).checked ? 'uppercase' : 'normal')
                 }
               />
@@ -3023,17 +3023,17 @@ function CustomizeModal({
               <Checkbox
                 label="Sans serif"
                 checked={branchFilter.sans}
-                onChange={(e) => setFlag('sans', (e.target as HTMLInputElement).checked)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFlag('sans', (e.target as HTMLInputElement).checked)}
               />
               <Checkbox
                 label="Serif"
                 checked={branchFilter.serif}
-                onChange={(e) => setFlag('serif', (e.target as HTMLInputElement).checked)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFlag('serif', (e.target as HTMLInputElement).checked)}
               />
               <Checkbox
                 label="Script / Handwritten"
                 checked={branchFilter.expressive}
-                onChange={(e) => setFlag('expressive', (e.target as HTMLInputElement).checked)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFlag('expressive', (e.target as HTMLInputElement).checked)}
               />
             </HStack>
           </VStack>

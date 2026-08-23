@@ -15,7 +15,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, addDoc, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
-import { getPublicFileUrl } from '../utils/firebase/storage';
+import { getPublicFileUrl, uploadDesignSystemFile } from '../utils/firebase/storage';
 import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
@@ -108,6 +108,12 @@ interface VersionRecord {
 type Status = 'loading' | 'ready' | 'not-found';
 type Inner = 'use' | 'settings' | 'history';
 
+/* Where the overlay tool lives. It ships inside the portfolio rather than this
+   app, so it is a whole address, not a route. Overridable per environment for
+   local work against a portfolio preview on another port. */
+const OVERLAY_TOOL_URL =
+  import.meta.env.VITE_OVERLAY_TOOL_URL || 'https://lisenoble.com/experiments/text-over-image/';
+
 export default function DesignSystemDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -124,6 +130,7 @@ export default function DesignSystemDetail() {
   const [regenerateOpen, setRegenerateOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<VersionRecord | null>(null);
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -715,6 +722,51 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
 }
 
 function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record: Record; onOpenFigmaImport: () => void }) {
+  /* Text-over-image default. The overlay tool at /experiments/text-over-image/
+     already READS design-systems/{id}/text-over-image.json on ?ds= and applies
+     it — nothing ever wrote the file, so every system opened on its hero image
+     and the black-on-white starting point. The tool's Code tab now emits the
+     file; this is where it gets stored, because writing needs the owner's
+     session and the portfolio is public. */
+  const [overlayJson, setOverlayJson] = useState('');
+  const [overlayState, setOverlayState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [overlayError, setOverlayError] = useState('');
+  const [overlayHasDefault, setOverlayHasDefault] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let live = true;
+    // A 404 is the ordinary answer, not a failure — most systems have no
+    // default. Only used to label the card, so any error reads as "none".
+    fetch(getPublicFileUrl(id, 'text-over-image.json'), { cache: 'no-store' })
+      .then((r) => { if (live) setOverlayHasDefault(r.ok); })
+      .catch(() => { if (live) setOverlayHasDefault(false); });
+    return () => { live = false; };
+  }, [id]);
+
+  async function saveOverlayDefault() {
+    if (!id) return;
+    setOverlayState('saving');
+    setOverlayError('');
+    try {
+      // Parsed before upload, not after: a truncated paste that reached Storage
+      // would make every future visit fetch it, fail to parse and silently fall
+      // back — a bug with no symptom at the point it was introduced.
+      const parsed = JSON.parse(overlayJson);
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.settings !== 'object') {
+        throw new Error('Expected an object with a "settings" key — copy the whole block from the tool.');
+      }
+      await uploadDesignSystemFile(
+        id, 'text-over-image.json', JSON.stringify(parsed), 'application/json',
+      );
+      setOverlayState('saved');
+      setOverlayHasDefault(true);
+    } catch (e) {
+      setOverlayState('error');
+      setOverlayError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedClaude, setCopiedClaude] = useState(false);
   const copyTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
@@ -849,6 +901,61 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           >
             Open Accessibility Report
           </Button>
+        </VStack>
+      </Card>
+
+      <Card padding="medium" sx={{ gridColumn: '1 / -1' }}>
+        <VStack spacing={2}>
+          <HStack spacing={1} style={{ alignItems: 'center' }}>
+            <H3 style={{ fontSize: '1.1rem', margin: 0 }}>Text over image default</H3>
+            {overlayHasDefault !== null && (
+              <Chip color={overlayHasDefault ? 'success' : 'default'} size="small">
+                {overlayHasDefault ? 'Set' : 'Not set'}
+              </Chip>
+            )}
+          </HStack>
+          <BodySmall style={{ color: 'var(--Quiet)' }}>
+            Where the Accessible Text Overlay tool starts when someone opens it wearing this design
+            system. Compose it in the tool, copy the <code>text-over-image.json</code> block from its
+            Code tab, and paste it here.
+          </BodySmall>
+          <Button
+            variant="primary-outline"
+            style={{ width: '100%' }}
+            onClick={() => window.open(
+              `${OVERLAY_TOOL_URL}?ds=${encodeURIComponent(id || '')}`, '_blank', 'noopener',
+            )}
+          >
+            Open the overlay tool with this system
+          </Button>
+          <TextField
+            label="text-over-image.json"
+            multiline
+            minRows={4}
+            value={overlayJson}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              setOverlayJson(e.target.value);
+              if (overlayState !== 'idle') setOverlayState('idle');
+            }}
+            placeholder={'{\n  "image": "hero.png",\n  "settings": { … }\n}'}
+          />
+          <Button
+            variant="primary"
+            style={{ width: '100%' }}
+            disabled={!overlayJson.trim() || overlayState === 'saving'}
+            onClick={saveOverlayDefault}
+          >
+            {overlayState === 'saving' ? 'Saving…' : overlayState === 'saved' ? 'Saved ✓' : 'Save as this system’s default'}
+          </Button>
+          {overlayState === 'error' && (
+            <BodySmall style={{ color: 'var(--Text-Error)' }}>{overlayError}</BodySmall>
+          )}
+          <BodySmall style={{ color: 'var(--Quiet)' }}>
+            When the composition sits on this system’s own <code>hero.png</code> or
+            <code> moodboard.png</code>, the file just names it and there is no picture to upload.
+            A picture from your machine has to be uploaded separately as
+            <code> text-over-image.png</code> — the tool says so when that applies.
+          </BodySmall>
         </VStack>
       </Card>
 

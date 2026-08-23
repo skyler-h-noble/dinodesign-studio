@@ -2774,7 +2774,13 @@ function generatePrimaryButtonsCSS(modeData: any): string {
 /**
  * Generate complete CSS file content for a single mode
  */
-function generateModeCSS(modeName: string, modeData: any): string {
+/* NOTE: superseded by generateModeCSSFromSingleMode, which is what
+   generateCSSFiles actually calls. This and its only caller,
+   generateModeCSSFile, have no callers anywhere in the app — which is how the
+   fullJsonData reference below rotted without anyone noticing. Kept and
+   corrected rather than deleted, since generateModeCSSFile is exported; delete
+   both if nothing outside this repo imports it. */
+function generateModeCSS(modeName: string, modeData: any, fullJsonData?: any): string {
   const lines: string[] = [];
   const funcMarker = 'generateModeCSS_v1';
   const CHARTS_IN_MODE_CSS_V1 = true; // Marker for this function
@@ -3431,7 +3437,11 @@ export function generateModeCSSFile(jsonData: DesignSystem, modeName: string): s
     return null;
   }
   
-  return generateModeCSS(modeName, jsonData.Modes[modeName]);
+  // Third argument was referenced inside generateModeCSS but never passed or
+  // declared — a plain ReferenceError had anything called this. It picks the
+  // Metadata block, falling back to the mode's own, so passing the whole
+  // document is what was meant.
+  return generateModeCSS(modeName, jsonData.Modes[modeName], jsonData);
 }
 
 /**
