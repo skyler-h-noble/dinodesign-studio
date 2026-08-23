@@ -230,12 +230,6 @@ export default function ComponentStyleStage({
           {/* Preview */}
           {(() => {
             const radii = computeRadii(custom);
-            // Padding tokens derive from the medium button radius in pixels
-            // (kept consistent with generateFigmaJSON.ts).
-            const btnR = radii.buttonRadius;
-            const buttonPadding = btnR > 8 ? Math.round(btnR / 2) : 4;
-            const smButtonPadding = btnR >= 8 ? 8 : btnR;
-            const lgButtonPadding = btnR > 32 ? Math.round((btnR * 2) / 3) : 16;
             return (
             <div
               style={{
@@ -251,18 +245,22 @@ export default function ComponentStyleStage({
                 '--Button-Height': `${custom.buttonHeight}px`,
                 '--Small-Button-Height': `${custom.smallButtonHeight}px`,
                 '--Large-Button-Height': `${custom.largeButtonHeight}px`,
-                '--Min-Button-Width': `${custom.minButtonWidth}px`,
+                // --Button-Min-Width, not --Min-Button-Width: the reversed name
+                // matched nothing, so this panel's preview never showed the floor.
+                '--Button-Min-Width': `${custom.minButtonWidth}px`,
+                '--Lg-Button-Min-Width': `${custom.minButtonWidth + 40}px`,
                 '--Input-Radius': `${radii.inputRadius}px`,
                 '--Input-Padding': `${custom.inputPadding}px`,
                 '--Modal-Padding': `${radii.modalPadding}px`,
                 '--Modal-Radius': `${radii.modalRadius}px`,
-                '--Button-Padding': `${buttonPadding}px`,
-                '--Sm-Button-Padding': `${smButtonPadding}px`,
-                '--Large-Button-Padding': `${lgButtonPadding}px`,
+                '--Button-Padding': '8px',
+                '--Sm-Button-Padding': 'var(--Button-Padding)',
+                '--Lg-Button-Padding': '16px',
+                '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
                 '--Button-Border-Width': '2px',
                 // Inject the user's bevel settings so the live preview matches
                 // the exported CSS exactly. Without these, the lib's Button
-                // falls back to its static --Button-Bevel: 11% (foundations.css)
+                // falls back to its static --Button-Bevel (foundation.css)
                 // and --Button-Bevel-Opacity: 0.5 — which doesn't reflect what
                 // ships with the design system.
                 '--Button-Bevel': custom.bevel,

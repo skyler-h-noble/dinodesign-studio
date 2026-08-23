@@ -556,6 +556,96 @@ All typography components (H1–H6, Body, BodySmall, Caption, Label, etc.) accep
 
 ---
 
+## Colour Balance — the 60/30/10 pass
+
+Your system ships three brand palettes. A page built entirely from Primary is
+correct, and it looks monotonous. After the markup is right, do a second pass
+for BALANCE:
+
+| share | palette | where it goes |
+|---|---|---|
+| ~60% | **Primary** | the dominant sections and the default surface |
+| ~30% | **Secondary** | one or two whole sections, switched with \`data-theme\` |
+| ~10% | **Tertiary** | accents only — avatars, a left border, a lone stat card |
+
+The ratio is of **visual area**, not element count. One full-bleed Secondary
+section outweighs twenty Tertiary avatars — which is the point. Tertiary is a
+seasoning; it should never be a section background.
+
+### Scanning a page
+
+Read it as blocks of area, top to bottom:
+
+1. List every region that sets \`data-theme\` and note its rough height. That
+   is the 60/30 split, and it is the only part that moves the ratio much.
+2. If everything is one theme, convert ONE mid-page section to Secondary.
+   Prefer a section that is already a conceptual break — testimonials, stats,
+   a pricing band — over splitting a continuous narrative.
+3. Then place Tertiary in the small stuff, with the two moves below.
+
+Don't chase exact percentages. "Mostly one, a clear second, a glint of a third"
+reads correctly.
+
+### Tertiary move 1 — avatars
+
+Avatars are the best Tertiary slot on most pages: they repeat, they're small,
+and they already sit apart from the text around them.
+
+\`\`\`jsx
+<Avatar initials="LN" alt="Lise Noble" color="tertiary" />
+\`\`\`
+
+Pass the \`color\` prop — don't restyle it. The component owns its size,
+shape and contrast.
+
+### Tertiary move 2 — a left border on NON-CLICKABLE cards
+
+A clickable card already earns emphasis from hover: it lifts, it shadows, its
+border brightens. A colour bar competes with that and reads as a second
+affordance. An informational card has no such signal, so it's the right place
+for a Tertiary edge:
+
+\`\`\`css
+.stat {
+  background: var(--Container);
+  border: 1px solid var(--Border-Variant);
+  /* AFTER the shorthand, so it only replaces the left edge. */
+  border-left: 4px solid var(--Tertiary-Color-8);
+  border-radius: var(--Card-Radius);
+}
+\`\`\`
+
+Two easy mistakes:
+
+- **Order matters.** \`border-left\` must come after the \`border\`
+  shorthand, or the shorthand overwrites it and the accent silently disappears.
+- **Clickable cards get nothing.** If the card has an \`onClick\`, an
+  \`<a>\` wrapper, or a hover transform, leave its border alone.
+
+### Which cards get the accent
+
+Not every card in a grid. Repeating the accent across a uniform set turns a 10%
+detail into a 30% one and flattens the hierarchy it was meant to create. Use it
+on cards that are already different from their neighbours:
+
+- a lone card that isn't part of a set
+- a summary or total sitting apart from the rows above it
+- the one card in a group that differs in kind
+
+If *every* card in a region would qualify, that region doesn't need the accent —
+switch the whole region's \`data-theme\` and let the surface carry it.
+
+### What not to reach for
+
+- **Don't** paint a section \`data-theme="Tertiary"\` to hit the 10%. That
+  makes it 30%+ and leaves no palette for accents.
+- **Don't** use \`color="tertiary"\` on body text. Text carries a 4.5:1
+  requirement and recoloured paragraphs read as links.
+- **Don't** hand-write a hex to balance a page. Every share of the ratio is an
+  existing token; if the colour you want isn't one, the ratio isn't the problem.
+
+---
+
 ## Dark Mode
 
 Dark mode is applied via theme suffixes: \`Primary-Dark\`, \`Secondary-Dark\`, \`Tertiary-Dark\`, \`Neutral-Dark\`.

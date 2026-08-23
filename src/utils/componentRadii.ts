@@ -69,6 +69,10 @@ export interface ComputedRadii {
   // Modal
   modalPadding: number;
   modalRadius: number;
+
+  /** The floating frame of a dropdown / menu panel. Pixels, not a percent —
+   *  see the derivation note in computeRadii(). */
+  dropdownFrameRadius: number;
   modalInnerRadius: number;
   modalFocusRadius: number;
 }
@@ -142,6 +146,29 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   const modalPadding = Math.round(cardPadding * 1.5);
   const modalRadius = Math.min(cardCornerBase + modalPadding, CARD_RADIUS_MAX);
 
+  // Dropdown / menu frame.
+  //
+  // Derived rather than authored, from three bounds in priority order:
+  //   1. Input-Radius — a menu is visually a continuation of the field it
+  //      opens from, so at ordinary radii the two should agree. This is why it
+  //      keys off the input and not the card.
+  //   2. Card-Radius — the same rule modals already follow above: a floating
+  //      surface must not be rounder than the cards it sits on top of.
+  //   3. A hard 16px ceiling. The panel scrolls (overflow-y: auto) with
+  //      full-bleed rows, so a large corner clips the first and last item's
+  //      hover highlight into a visible crescent.
+  //
+  // PIXELS, deliberately, unlike buttonRadius / inputRadius. The percent model
+  // works for those because their heights are fixed and known. A dropdown's
+  // height is content-driven up to DROPDOWN_MAX_HEIGHT, so the same percent
+  // would make a long menu absurdly round and a short one nearly square.
+  const DROPDOWN_FRAME_RADIUS_MAX = 16;
+  const dropdownFrameRadius = Math.min(
+    inputRadius,
+    cardRadius,
+    DROPDOWN_FRAME_RADIUS_MAX,
+  );
+
   return {
     buttonRadius,
     smButtonRadius,
@@ -180,6 +207,7 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
 
     modalPadding,
     modalRadius,
+    dropdownFrameRadius,
     modalInnerRadius: inner(modalRadius),
     modalFocusRadius: focus(modalRadius),
   };

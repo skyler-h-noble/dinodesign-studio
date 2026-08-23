@@ -203,9 +203,13 @@ export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
 
   lines.push('/* ── Text over image ─────────────────────────────────────────');
   lines.push(' *');
-  lines.push(' * --Overlay-Scrim: the minimum overlay opacity that keeps EVERY foreground');
-  lines.push(' * this theme can put on an image — --Text, --Header, --Eyebrow, --Quiet —');
-  lines.push(' * at its required ratio over ANY image. The strictest one sets the value.');
+  lines.push(' * --Overlay-Scrim: the minimum overlay opacity that keeps --Text,');
+  lines.push(' * --Header and --Eyebrow at their required ratios over ANY image.');
+  lines.push(' * The strictest of the three sets the value.');
+  lines.push(' *');
+  lines.push(' * --Quiet is NOT covered. It is the lowest-contrast text in the system and');
+  lines.push(' * would push this to ~0.87, hiding the photograph, to protect a role a');
+  lines.push(' * hero does not use. Putting quiet copy on an image needs its own scrim.');
   lines.push(' *');
   lines.push(' * This is a FLOOR for the worst possible photograph, not a recommendation.');
   lines.push(' * Most images need considerably less; measure against the real image and');
@@ -227,17 +231,77 @@ export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
     lines.push(`}`);
   }
 
-  // One utility so the tokens are usable without the consumer reinventing the
-  // stacking context every time.
+  // ── The component ──────────────────────────────────────────────────────
+  //
+  // Structure and class names match dino-overlay's export, so a layout proven
+  // in the tool drops straight in. What is NOT carried over is its theme block:
+  //
+  //   .overlay-figure[data-theme="Primary"] { --Background: #261626; ... }
+  //
+  // The tool emits literal hexes there because it has no design system behind
+  // it. In a generated bundle those would OVERRIDE the brand with the tool's own
+  // colours on every theme — so the rules are dropped and `data-theme` resolves
+  // through the design system exactly as it does everywhere else.
   lines.push('');
-  lines.push('.text-over-image { position: relative; isolation: isolate; }');
-  lines.push('.text-over-image > img { display: block; width: 100%; height: 100%; object-fit: cover; }');
-  lines.push('.text-over-image::after {');
-  lines.push('  content: ""; position: absolute; inset: 0;');
+  lines.push('/* Text-over-image component. Put data-theme on the figure to');
+  lines.push('   choose its scrim and text pair; both resolve from the system. */');
+  lines.push('.overlay-figure {');
+  lines.push('  position: relative;');
+  lines.push('  margin: 0;');
+  lines.push('  width: 100%;');
+  lines.push('  aspect-ratio: 16 / 9;');
+  lines.push('  overflow: hidden;');
+  lines.push('  background: var(--Background);');
+  lines.push('  /* Type below sizes in cqw, so the figure has to be the query');
+  lines.push('     container — without this the clamps read the viewport and a');
+  lines.push('     figure in a narrow column gets full-page-sized text. */');
+  lines.push('  container-type: inline-size;');
+  lines.push('  border-radius: var(--Card-Radius, 0);');
+  lines.push('}');
+  lines.push('.overlay-figure > img {');
+  lines.push('  position: absolute; inset: 0;');
+  lines.push('  width: 100%; height: 100%;');
+  lines.push('  object-fit: cover; display: block;');
+  lines.push('}');
+  lines.push('/* The scrim. Opacity comes from --Overlay-Scrim above, which is');
+  lines.push('   solved per theme for the worst possible image. */');
+  lines.push('.overlay-figure > .overlay,');
+  lines.push('.overlay-figure > .overlay-scrim {');
+  lines.push('  position: absolute; inset: 0;');
   lines.push('  background: var(--Overlay-Scrim-Paint, transparent);');
   lines.push('  pointer-events: none;');
   lines.push('}');
-  lines.push('.text-over-image > .text-over-image-content { position: relative; color: var(--Text); }');
+  lines.push('.overlay-figure > .overlay-text {');
+  lines.push('  position: absolute;');
+  lines.push('  left: 6%; bottom: 8%; width: 74%;');
+  lines.push('  display: flex; flex-direction: column;');
+  lines.push('  gap: 8px; align-items: flex-start;');
+  lines.push('  text-align: left;');
+  lines.push('  color: var(--Text);');
+  lines.push('}');
+  lines.push('/* Eyebrow: the FACE and COLOUR come from Eyebrow, the SIZE and');
+  lines.push('   TRACKING from Overline. One concept, two token families. */');
+  lines.push('.overlay-figure .t-eyebrow {');
+  lines.push('  margin: 0;');
+  lines.push('  color: var(--Eyebrow, var(--Quiet));');
+  lines.push('  font-family: var(--Font-Family-Eyebrow, sans-serif);');
+  lines.push('  font-weight: var(--Font-Weight-Eyebrow, 600);');
+  lines.push('  letter-spacing: var(--Overline-Medium-Letter-Spacing, 0.1em);');
+  lines.push('  text-transform: var(--Overline-Medium-Text-Transform, uppercase);');
+  lines.push('  font-size: clamp(11px, 2.2cqw, var(--Overline-Large-Font-Size, 18px));');
+  lines.push('  line-height: 1.5;');
+  lines.push('}');
+  lines.push('/* Title takes the DISPLAY face — this is a hero, which is the one');
+  lines.push('   place the expressive face belongs. */');
+  lines.push('.overlay-figure .t-title {');
+  lines.push('  margin: 0;');
+  lines.push('  color: var(--Header, var(--Text));');
+  lines.push('  font-family: var(--Font-Family-Display, var(--Font-Family-Header, sans-serif));');
+  lines.push('  font-weight: var(--Set-Font-Family-Decorative-Weight, 400);');
+  lines.push('  text-transform: var(--Display-Small-Text-Transform, none);');
+  lines.push('  font-size: clamp(20px, 5cqw, var(--Display-Small-Font-Size, 40px));');
+  lines.push('  line-height: 1.2;');
+  lines.push('}');
 
   return lines.join('\n');
 }

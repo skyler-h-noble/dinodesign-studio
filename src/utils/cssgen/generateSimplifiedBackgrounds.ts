@@ -8,6 +8,14 @@ export interface SimplifiedSurfacesAndContainers {
     Surface: { value: string; type: string };
     'Surface-Dim': { value: string; type: string };
     'Surface-Bright': { value: string; type: string };
+    // The two ends. They used to be read off OTHER Background-N rows
+    // (Dimmest from Background-(N-2), Brightest from Background-11/12), which
+    // works in light mode only because Background-N is 1:1 with Color-N there.
+    // Dark mode is not 1:1 — all five levels collapse into tones 1-5 — so the
+    // ends need their own entries or they land on whatever another row happens
+    // to hold. See addSurfaceEnds.
+    'Surface-Dimmest': { value: string; type: string };
+    'Surface-Brightest': { value: string; type: string };
   };
   Containers: {
     Container: { value: string; type: string };
@@ -22,14 +30,21 @@ export interface SimplifiedSurfacesAndContainers {
  * Generate SIMPLIFIED Light Mode backgrounds - ONLY surface/container colors
  * This is a unified function that replaces both Tonal and Professional variants
  */
-export function generateSimplifiedLightModeBackgrounds(
+/** What the generators below build: everything except the two ends, which
+ *  addSurfaceEnds fills in for both modes from one rule. */
+type SurfacesWithoutEnds = Omit<SimplifiedSurfacesAndContainers, 'Surfaces'> & {
+  Surfaces: Omit<SimplifiedSurfacesAndContainers['Surfaces'], 'Surface-Dimmest' | 'Surface-Brightest'>
+    & Partial<Pick<SimplifiedSurfacesAndContainers['Surfaces'], 'Surface-Dimmest' | 'Surface-Brightest'>>;
+};
+
+function lightModeBackgroundsBase(
   baseColor: string,
   tone: number,
   palette: { tone: number; color: string }[],
   isChromatic: boolean = false,
   paletteName?: string,
   containerStyle: 'tonal' | 'professional' | 'black' = 'tonal'
-): SimplifiedSurfacesAndContainers {
+): SurfacesWithoutEnds {
   // CRITICAL: Validate inputs
   if (!palette || palette.length === 0) {
     console.error('❌ generateSimplifiedLightModeBackgrounds: palette is empty or undefined!');
@@ -240,7 +255,10 @@ export function generateSimplifiedLightModeBackgrounds(
     // That put containers on tones the foreground tables were never keyed for,
     // which is what broke Quiet/Text/Header contrast on tonal themes.
     const backgroundIsLight = surfaceBaseTone >= 5;
-    const tonalContainerTone = backgroundIsLight ? 11 : 2;
+    // Color-10, not 11. A tonal container is meant to read as a distinct card
+    // ON the surface; at Color-11 against a Color-10/11 surface the edge only
+    // showed up through the shadow, and on the lightest surfaces it vanished.
+    const tonalContainerTone = backgroundIsLight ? 10 : 2;
     console.log(`🎨 [TONAL MODE] Palette: ${paletteName}, Tone: ${tone} — containers flat at Color-${tonalContainerTone}`);
 
     return {
@@ -260,7 +278,7 @@ export function generateSimplifiedLightModeBackgrounds(
       },
       Containers: {
         // Flat across all five levels — elevation comes from drop shadows in
-        // light mode, not tone. Color-11 on a light background, Color-2 on a
+        // light mode, not tone. Color-10 on a light background, Color-2 on a
         // dark one. Emitted as a token ref so it stays linked to the palette.
         'Container-Lowest': {
           value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
@@ -343,12 +361,12 @@ export function generateSimplifiedLightModeTonalBackgrounds(
 /**
  * Generate SIMPLIFIED Dark Mode backgrounds - ONLY surface/container colors
  */
-export function generateSimplifiedDarkModeBackgrounds(
+function darkModeBackgroundsBase(
   baseColor: string,
   tone: number,
   palette: { tone: number; color: string }[],
   paletteName?: string
-): SimplifiedSurfacesAndContainers {
+): SurfacesWithoutEnds {
   // CRITICAL: Validate inputs
   if (!palette || palette.length === 0) {
     console.error('❌ generateSimplifiedDarkModeBackgrounds: palette is empty or undefined!');
@@ -431,11 +449,21 @@ export function generateSimplifiedDarkModeBackgrounds(
   // brand color family instead of falling out to a desaturated black/white blend.
   const dimColorNumber = Math.max(surfaceColorNumber - 1, 1);
   const brightColorNumber = Math.min(surfaceColorNumber + 1, 12);
-  // Dim bottoms out at TRUE BLACK as a literal. Now that Color-1 is L3 there is
-  // somewhere darker to go, and no tone in the ramp is black any more — so this
-  // cannot be a token reference.
-  const surfaceDimToken = '#000000';
-  void dimColorNumber;
+  // Dim is ONE TONE BELOW the surface, not black.
+  //
+  // It used to be pinned to the literal #000000, on the reasoning that Dim
+  // "bottoms out at true black". That was right when Dim WAS the floor. It no
+  // longer is: Surface-Dimmest owns the floor now, so pinning Dim to black put
+  // it BELOW Dimmest and inverted the pair in every non-Neutral theme — dark
+  // Primary read Dimmest L12, Dim L0, and the level names stopped meaning
+  // anything. Measured across all nine themes, 7 of 8 resolvable ones were
+  // inverted this way and none were clean.
+  //
+  // dimColorNumber was already computed here and then discarded with a void,
+  // which is why the fix is to USE it rather than to derive anything new.
+  const surfaceDimToken = paletteName
+    ? `{Colors.${paletteName}.Color-${dimColorNumber}}`
+    : surfaceDimColor;
   const surfaceBrightToken = paletteName ? `{Colors.${paletteName}.Color-${brightColorNumber}}` : surfaceBrightColor;
 
   if (paletteName) {
@@ -532,4 +560,86 @@ export function generateSimplifiedDarkModeBackgrounds(
       }
     }
   };
+}
+
+/**
+ * The five surface levels, in order. Dimmest and Brightest are computed HERE
+ * rather than inside each of the generators' several return branches, so one
+ * rule covers every branch and the two modes cannot drift apart.
+ *
+ * LIGHT keeps the historical derivation, which is why light mode is unchanged:
+ * Background-N is 1:1 with Color-N there, so Dimmest is two tones down and
+ * Brightest is the tone the retired <Palette>-Light themes used.
+ *
+ * DARK puts all five levels on tones 1-5 regardless of N. The dark ramp is only
+ * dark at its bottom (L 3, 5, 12, 18, 24 for Color-1..5; Color-9 is already
+ * L76), so a theme's light-mode tone cannot simply carry over — that is what
+ * left every theme with a mid-grey Surface-Bright and a near-white Brightest.
+ * Five levels, five genuinely dark tones, ascending.
+ */
+function addSurfaceEnds(
+  out: SurfacesWithoutEnds,
+  _mode: 'light' | 'dark',
+  n: number,
+  paletteName?: string,
+): SimplifiedSurfacesAndContainers {
+  const ref = (tone: number) =>
+    paletteName ? `{Colors.${paletteName}.Color-${tone}}` : out.Surfaces.Surface.value;
+
+  // NOTE: dark mode does NOT yet remap the five levels onto tones 1-5.
+  //
+  // Doing so was implemented and reverted, because the tone INDEX is the key for
+  // every foreground table — Text, Quiet, Border, Eyebrow and the BlackWhite
+  // button face all read Color-<N> — and the theme layer is MODE-INDEPENDENT, so
+  // that index is one value shared by light and dark. Moving the dark surface off
+  // tone N while the index stays N unpairs every foreground from the backdrop it
+  // was computed against. It surfaced immediately as a black button on a dark
+  // surface (tokenParity, olive/dark/Primary: surface #1e2117, fill #0b0b0b).
+  //
+  // The ends still get their own entries below, which is a prerequisite for any
+  // future remap: without them Dimmest and Brightest read OTHER rows' Surface.
+
+  // Light: unchanged from what the theme layer used to assemble by hand.
+  const dimmestN = Math.max(n - 2, 1);
+  const brightN = Math.min(n + 1, 12);
+  const brightestN = brightN >= 11 ? 12 : 11;
+  out.Surfaces['Surface-Dimmest'] = n > 2
+    ? { value: ref(dimmestN), type: 'color' }
+    : { value: '#000000', type: 'color' };
+  out.Surfaces['Surface-Brightest'] = brightN >= 12
+    ? { value: '#ffffff', type: 'color' }
+    : { value: ref(brightestN), type: 'color' };
+  return out as SimplifiedSurfacesAndContainers;
+}
+
+/** Background-N's tone index, matched to the closest palette entry. */
+function toneIndexFor(tone: number, palette: { tone: number; color: string }[]): number {
+  let best = 0, bestDiff = Math.abs((palette[0]?.tone ?? 0) - tone);
+  for (let i = 1; i < palette.length; i++) {
+    const d = Math.abs((palette[i]?.tone ?? 0) - tone);
+    if (d < bestDiff) { bestDiff = d; best = i; }
+  }
+  return Math.min(best, 11) + 1;
+}
+
+export function generateSimplifiedLightModeBackgrounds(
+  baseColor: string,
+  tone: number,
+  palette: { tone: number; color: string }[],
+  isChromatic: boolean = false,
+  paletteName?: string,
+  containerStyle: 'tonal' | 'professional' | 'black' = 'tonal',
+): SimplifiedSurfacesAndContainers {
+  const out = lightModeBackgroundsBase(baseColor, tone, palette, isChromatic, paletteName, containerStyle);
+  return addSurfaceEnds(out, 'light', toneIndexFor(tone, palette), paletteName);
+}
+
+export function generateSimplifiedDarkModeBackgrounds(
+  baseColor: string,
+  tone: number,
+  palette: { tone: number; color: string }[],
+  paletteName?: string,
+): SimplifiedSurfacesAndContainers {
+  const out = darkModeBackgroundsBase(baseColor, tone, palette, paletteName);
+  return addSurfaceEnds(out, 'dark', toneIndexFor(tone, palette), paletteName);
 }

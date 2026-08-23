@@ -545,15 +545,19 @@ CONVERSION RULES:
     Secondary/Primary palette. In practice this is rare — most copy in
     a design just uses the default text color.
 
-    HEADERS & DISPLAY — ALWAYS omit the color prop. <H1>–<H6>, <DisplayLarge>,
-    <DisplaySmall> default to var(--Header), which is the correct header color.
+    HEADERS & DISPLAY — ALWAYS omit the color prop. <DisplayLarge>,
+    <DisplaySmall> and <H1>–<H3> default to var(--Header); <H4>–<H6> default to
+    var(--Text), because at those sizes the type sits inline with body copy and
+    a second tone reads as an inconsistency rather than a level. Either way the
+    component already resolves the right token.
     NEVER pass a color prop to a Header or Display (not "primary", not "header",
     not anything) — even if the Figma header fill looks like a brand color, it
     is the header token and the component already resolves it. Adding a color
-    overrides var(--Header) and is wrong.
+    overrides the default and is wrong.
 
     RULES OF THUMB:
-      - Headers (H1–H6) and Display              → NO color prop → var(--Header)
+      - Display and H1–H3                        → NO color prop → var(--Header)
+      - H4–H6                                    → NO color prop → var(--Text)
       - Standard body text, titles               → no color prop (omit it)
       - De-emphasized / muted / supporting       → color="quiet"
       - Errors / failures                        → color="error"

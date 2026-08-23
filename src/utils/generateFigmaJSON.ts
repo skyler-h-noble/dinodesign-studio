@@ -1670,9 +1670,6 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // this only kicks in defensively for restored designs or hand-edited input.
     const bevelPct = csRaw.bevel ?? 0;
     // Padding tokens derived from the computed medium button radius.
-    const buttonPadding = r.buttonRadius > 8 ? Math.round(r.buttonRadius / 2) : 4;
-    const smButtonPadding = r.buttonRadius >= 8 ? 8 : r.buttonRadius;
-    const largeButtonPadding = r.buttonRadius > 32 ? Math.round((r.buttonRadius * 2) / 3) : 16;
     // Single source of truth for border width — referenced by both the
     // emitted Button-Border-Width token and the height calculations
     // (inner height = outer - border × 2).
@@ -1684,7 +1681,12 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // nobody varies: it already ships to Figma, and a deleted Figma variable
     // cannot be recovered by re-importing — a recreated variable gets a new id,
     // so every layer bound to the old one stays unbound (invariant 8).
-    const BUTTON_BORDER_WIDTH = 1;
+    /** Button padding. Small and standard share one value; large has its own.
+ *  Mirrors BUTTON_PADDING / LG_BUTTON_PADDING in exportToCSS.ts. */
+const FIGMA_BUTTON_PADDING = 8;
+const FIGMA_LG_BUTTON_PADDING = 16;
+
+const BUTTON_BORDER_WIDTH = 1;
     figma.Components = {
       Button: {
         'Button-Radius': r.buttonRadius,
@@ -1735,9 +1737,12 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         // second number to keep in sync.
         'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
         'Button-Border-Width': BUTTON_BORDER_WIDTH,
-        'Button-Padding': buttonPadding,
-        'Sm-Button-Padding': smButtonPadding,
-        'Lg-Button-Padding': largeButtonPadding,
+        // TWO paddings: small and standard share one, large has its own.
+        // Sm- is still not emitted — it equals Button-Padding, so it would be a
+        // duplicate with nothing selecting between the copies. Lg- IS emitted,
+        // because 16 is a different number and something does select it.
+        'Button-Padding': FIGMA_BUTTON_PADDING,
+        'Lg-Button-Padding': FIGMA_LG_BUTTON_PADDING,
         // Bevel geometry, small and large. These heights don't vary by
         // platform, so they live here; MEDIUM's live in the Platform
         // collection because its height does.
@@ -1995,6 +2000,14 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   // NOTE: this is the only reference into Button-Lowlight in the whole payload;
   // nothing else aliases the four flat Button-* sections. If those are ever
   // dropped to reclaim variables, this line has to move with them.
+  // The black face carries the SAME bevel alpha as the white one, which arrives
+  // through {Button-Lowlight.Neutral.Color-12} with the opacity already baked in.
+  // Derived from bevelOpacity rather than written as a literal 80: a hardcoded
+  // alpha matches at the default 50% and silently splits the moment that slider
+  // moves, leaving black's shadow a different strength from white's.
+  const bwBevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
+  const bwBevelAlphaHex = Math.round(bwBevelOpacity * 255 / 100).toString(16).padStart(2, '0');
+
   const BW_LOWLIGHT_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.Lowlight\}$/;
   const BW_BLACK_FROM_TONE = 6;   // Color-1..5 paint white, 6..12 paint black
   let bwLowlightResolved = 0, bwLowlightBlack = 0;
@@ -2004,7 +2017,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       const m = n.value.match(BW_LOWLIGHT_REF);
       if (m) {
         const tone = Number(m[1]);
-        if (tone >= BW_BLACK_FROM_TONE) { n.value = '#000000'; bwLowlightBlack++; }
+        if (tone >= BW_BLACK_FROM_TONE) { n.value = `#000000${bwBevelAlphaHex}`; bwLowlightBlack++; }
         else n.value = '{Button-Lowlight.Neutral.Color-12}';
         bwLowlightResolved++;
       }
@@ -2018,6 +2031,48 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     `\u26AB [Figma] BlackWhite Lowlight resolved without a Modes variable: ` +
     `${bwLowlightResolved} (${bwLowlightBlack} black -> #000000, ` +
     `${bwLowlightResolved - bwLowlightBlack} white -> Neutral Color-12)`,
+  );
+
+  // ── Outline-Text is NOT a per-theme token in Figma ──────────────────────
+  //
+  // The colour an outline button's label takes is the surface's own
+  // Text-<Palette>. In CSS that resolves through the cascade, so the export
+  // writes one value per theme x surface x palette and lets the surface it
+  // lands on decide — which is why the CSS side still carries it.
+  //
+  // Figma expresses the same thing far more cheaply. The Buttons collection has
+  // a mode PER PALETTE, so Outline-Text is ONE variable there whose Primary
+  // mode aliases Surface/Text-Primary, Secondary mode aliases
+  // Surface/Text-Secondary, and so on. The palette that a per-theme token
+  // encodes in its NAME is already the mode you are in.
+  //
+  // Emitting the per-theme copies as well is not merely redundant, it actively
+  // fights the file: the importer only ever upserts, so every regenerate would
+  // recreate the variables that were deliberately removed, in a Modes
+  // collection already at its ceiling.
+  //
+  // This is a deliberate CSS/Figma divergence — the two describe one rule in
+  // the shape each medium can express — so it is stated here rather than left
+  // to be discovered as a parity failure.
+  let outlineTextStripped = 0;
+  const stripOutlineText = (n: any, d: number) => {
+    if (!n || typeof n !== 'object' || d > 12) return;
+    if (typeof n.value === 'string') return;
+    for (const k of Object.keys(n)) {
+      const child = n[k];
+      if (k === 'Outline-Text' && child && typeof child === 'object' && 'value' in child) {
+        delete n[k];
+        outlineTextStripped++;
+        continue;
+      }
+      stripOutlineText(child, d + 1);
+    }
+  };
+  stripOutlineText(figma.Themes, 0);
+  stripOutlineText(figma.SurfacesContainers, 0);
+  console.log(
+    `\u25AD [Figma] Outline-Text removed from the Theme collection (${outlineTextStripped} tokens) — ` +
+    `it lives in Buttons, one variable with a mode per palette.`,
   );
 
   // Page canvas background — precomputed hex so the Figma plugin sets it from

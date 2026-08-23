@@ -5162,7 +5162,48 @@ export function exportColorSystemToJSON(
     Error: 'BW',
   };
 
-  const buildEyebrows = (textStructure: any): any => {
+  // Eyebrows own their tones now, instead of borrowing Text's.
+  //
+  // They used to be pure references into Text.<scope>.<role>.<Color-N>, which
+  // guaranteed they could never fail contrast — but it also meant they inherited
+  // a decision made for BODY COPY. Text is deliberately restrained: a paragraph
+  // set in a vivid brand colour is tiring over a large field, so the Text table
+  // picks tone 1-3, essentially near-black. Measured on two shipped systems the
+  // Surface eyebrow came out at chroma 0.02-0.13 — indistinguishable from body
+  // text, which is exactly what an eyebrow must not be.
+  //
+  // The two roles want opposite things from the same ramp, so they get separate
+  // answers. An eyebrow is a 13px tracked label of two or three words; it can
+  // carry chroma a paragraph cannot.
+  //
+  // The cost of decoupling is that contrast is no longer inherited, so it is
+  // computed here explicitly and the candidate is REJECTED if it does not clear
+  // 4.5:1. When nothing in the rotated ramp clears it, the Text reference is
+  // kept — that is a real constraint of some palettes (an olive background whose
+  // rotation lands on a light rose has no passing vivid tone) and forcing one
+  // would be shipping a failure to satisfy a preference.
+  /** Every palette a themed zone might paint behind an eyebrow. The solve has
+   *  to clear all of them, because the report checks all of them. */
+  const EYEBROW_BACKDROP_PALETTES = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
+
+  const eyebrowRamp = (mode: 'light' | 'dark', paletteName: string) => {
+    const src = mode === 'light' ? tonePalettes : darkModeTonePalettes;
+    const key = paletteName.toLowerCase() as keyof typeof src;
+    return (src as any)[key] as { tone: number; color: string }[] | undefined;
+  };
+
+  /** HSV chroma — how much colour a tone carries. A proxy for "pop", and the
+   *  thing being maximised subject to the contrast floor. */
+  const popOf = (hex: string): number => {
+    const m = /^#?([0-9a-f]{6})/i.exec(hex);
+    if (!m) return 0;
+    const n = parseInt(m[1], 16);
+    const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    return max === 0 ? 0 : ((max - min) / max) * max;
+  };
+
+  const buildEyebrows = (textStructure: any, mode: 'light' | 'dark'): any => {
     const eyebrows: any = { Surfaces: {}, Containers: {} };
     for (const scope of ['Surfaces', 'Containers']) {
       const src = textStructure?.[scope];
@@ -5175,8 +5216,55 @@ export function exportColorSystemToJSON(
         eyebrows[scope][background] = {};
         for (const colorKey of Object.keys(src[background])) {
           if (!src[role][colorKey]) continue;
+          // The background this eyebrow sits on: the BACKGROUND palette at the
+          // tone this key names. colorKey is the background's tone, not the
+          // eyebrow's — that is what Text.<role>.<Color-N> has always meant.
+          // Color-N is the ARRAY POSITION, not the `tone` field: `tone` holds
+          // the lightness value (3, 5, 12, 18 …), so matching on it finds
+          // almost nothing and would emit names like Color-58. palette[11] is
+          // Color-12 throughout this file; index + 1 is the convention.
+          const toneN = parseInt(colorKey.replace('Color-', ''), 10);
+          const fgRamp = eyebrowRamp(mode, role);
+
+          // The eyebrow must clear 4.5:1 against EVERY palette's background at
+          // this tone, not just the one this entry is filed under.
+          //
+          // A themed zone can put any palette's eyebrow on any surface, and the
+          // accessibility report checks exactly that — all eight entries against
+          // each real surface. Solving against a single assumed background
+          // produced 285 failures: an eyebrow tuned for Neutral tone-7 was then
+          // measured on a Secondary tone-7 surface, which is a different colour
+          // entirely.
+          //
+          // This is also why Text's answer is so dark. Near-black is not
+          // over-caution — it is the only thing that clears eight different
+          // backgrounds at once.
+          const bgHexes = Number.isFinite(toneN)
+            ? EYEBROW_BACKDROP_PALETTES
+                .map((bp) => eyebrowRamp(mode, bp)?.[toneN - 1]?.color)
+                .filter((h): h is string => !!h)
+            : [];
+
+          let pickedIdx = -1;
+          if (bgHexes.length && fgRamp) {
+            let bestPop = -1;
+            fgRamp.forEach((t, i) => {
+              // 4.5:1 — an eyebrow is small text, so it gets the text
+              // threshold, not the 3:1 large-text one.
+              if (bgHexes.some((bg) => getContrastRatio(bg, t.color) < 4.5)) return;
+              // Most chroma among the tones that pass — NOT the highest
+              // contrast. Maximising contrast is what produced near-black.
+              const pop = popOf(t.color);
+              if (pop > bestPop) { bestPop = pop; pickedIdx = i; }
+            });
+          }
+
           eyebrows[scope][background][colorKey] = {
-            value: `{Text.${scope}.${role}.${colorKey}}`,
+            value: pickedIdx >= 0
+              ? `{Colors.${role}.Color-${pickedIdx + 1}}`
+              // Nothing in the rotation clears 4.5:1 against this background.
+              // Keep Text's answer rather than ship a failing one.
+              : `{Text.${scope}.${role}.${colorKey}}`,
             type: 'color',
           };
         }
@@ -5185,13 +5273,13 @@ export function exportColorSystemToJSON(
     return eyebrows;
   };
 
-  colorSystem.Modes['Light-Mode'].Eyebrows = buildEyebrows(lightModeTextFixed);
-  colorSystem.Modes['Dark-Mode'].Eyebrows = buildEyebrows(darkModeTextFixed);
+  colorSystem.Modes['Light-Mode'].Eyebrows = buildEyebrows(lightModeTextFixed, 'light');
+  colorSystem.Modes['Dark-Mode'].Eyebrows = buildEyebrows(darkModeTextFixed, 'dark');
   {
     const eb = colorSystem.Modes['Light-Mode'].Eyebrows;
     const n = Object.values(eb.Surfaces).reduce((t: number, p: any) => t + Object.keys(p).length, 0)
             + Object.values(eb.Containers).reduce((t: number, p: any) => t + Object.keys(p).length, 0);
-    console.log(`  ├─ [JSON Export] Eyebrows built from Text (${n} tokens per mode, ${Object.keys(eb.Surfaces).length} backgrounds)`);
+    console.log(`  ├─ [JSON Export] Eyebrows solved for chroma (${n} tokens per mode, ${Object.keys(eb.Surfaces).length} backgrounds)`);
   }
   console.log(`      ✓ Text applied: ${Object.keys(darkModeTextFixed).length} sections (Surfaces, Containers)`);
   console.log(`      ✓ Text.Surfaces.Neutral.Color-1 = ${darkModeTextFixed.Surfaces.Neutral['Color-1'].value}`);
@@ -5746,7 +5834,20 @@ export function exportColorSystemToJSON(
       const newS = clamp(sPct * satMultiplier, 0, 100);
       // Floor at 40% of original lightness so dark colors don't collapse to near-black
       const minL = Math.max(8, lPct * 0.4);
-      const newL = clamp(lPct + lightOffset, minL, 92);
+      let newL = clamp(lPct + lightOffset, minL, 92);
+      // A lowlight must never be LIGHTER than its fill, nor a highlight darker.
+      //
+      // The floor and ceiling above stop mid-tones collapsing, but at the ends
+      // of the scale they overshoot past the fill and invert the bevel: a black
+      // button (L 1.6) got a lowlight at the floor of L 8 — a shadow lighter
+      // than the thing casting it — and a white button (L 100) a highlight at
+      // the ceiling of 92, darker than its fill.
+      //
+      // Clamping to the fill means the edge with no room simply disappears
+      // rather than reversing. That is correct: black has no darker shade, so a
+      // black button is lit from above only.
+      if (lightOffset < 0) newL = Math.min(newL, lPct);
+      else if (lightOffset > 0) newL = Math.max(newL, lPct);
       // HSL → RGB
       const s2 = newS / 100, l2 = newL / 100, h2 = hDeg / 360;
       let sr: number, sg: number, sb: number;
@@ -7635,6 +7736,167 @@ export function exportColorSystemToJSON(
     }
   }
   console.log(`👁️  [JSON Export] Theme-level Eyebrow added (${eyebrowTokens} tokens across both modes)`);
+
+  // ── Text-BW ───────────────────────────────────────────────────────────
+  //
+  // Black or white text for this exact background, on every theme and every
+  // surface/container. Not a brand tone and not a tinted near-black: the two
+  // extremes, picked by the background's own tone.
+  //
+  // It reads Default-Button-Border.<scope>.BlackWhite.<Color-N>, which already
+  // encodes that decision — white at Color-1..5, black from Color-6 up — and is
+  // the same map the BlackWhite button face uses. Referencing it rather than
+  // restating the threshold means a change to that rule moves the text with the
+  // buttons instead of leaving the two disagreeing about where the flip is.
+  //
+  // The background's tone is read out of a sibling role's reference, the same
+  // technique the BW eyebrow above uses. A section with no Text-Primary is not
+  // a painted surface and is skipped rather than guessed at.
+  let textBwTokens = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
+    if (!themes) continue;
+    for (const theme of Object.values<any>(themes)) {
+      for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
+        if (!section || typeof section !== 'object' || !section['Text-Primary']) continue;
+        const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
+        const tone = String(section['Text-Primary'].value || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
+        if (tone) {
+          section['Text-BW'] = {
+            value: `{Default-Button-Border.${scope}.BlackWhite.${tone}}`,
+            type: 'color',
+          };
+          textBwTokens++;
+          continue;
+        }
+        // No tone in the sibling reference means this is the Default theme,
+        // whose foregrounds route through Default-Background instead: its
+        // background depends on the user's selection AND differs per mode,
+        // while the Theme layer is mode-independent.
+        //
+        // Skipping it here is not harmless. The plugin builds its variable list
+        // from the FIRST theme, so a role missing from Default never gets a
+        // Figma variable created for ANY theme — which is why only
+        // Surface-Dimmest and Containers imported: those two carry real tones,
+        // the other three route through the indirection.
+        const DEFAULT_BG_PREFIX: Record<string, string> = {
+          Surfaces: '',
+          'Surfaces-Dim': 'Surface-Dim-',
+          'Surfaces-Bright': 'Surface-Bright-',
+          Containers: 'Container-',
+        };
+        const prefix = DEFAULT_BG_PREFIX[sectionName];
+        if (prefix === undefined) continue;
+        section['Text-BW'] = {
+          value: `{Default-Background.${prefix}Text-BW}`,
+          type: 'color',
+        };
+        textBwTokens++;
+      }
+    }
+  }
+  console.log(`⬛ [JSON Export] Theme-level Text-BW added (${textBwTokens} tokens across both modes)`);
+
+  // ── Outline-Text ──────────────────────────────────────────────────────
+  //
+  // The text colour of an OUTLINE or GHOST button — the variants with no fill.
+  //
+  // Those have no token of their own today: the lib's outlineStyles() sets
+  // `color: var(--Text)`, the surface's body-text colour. So an outline Primary
+  // button is not primary in any visible way — only its border carries the
+  // palette, and the label reads exactly like the paragraph beside it.
+  //
+  // A filled button's label is Buttons.<Pal>.Text, which is the colour that sits
+  // ON the fill (white on a solid primary). Reusing that here would be wrong in
+  // the other direction: white on the surface, not on a fill.
+  //
+  // What an outline button wants is the palette's TEXT role for this surface —
+  // Text.Surfaces.<Pal>.<Color-N> — which is already solved for 4.5:1 against
+  // this exact background. The surface's tone is read out of the sibling Border
+  // reference rather than recomputed, so the two cannot disagree about which
+  // surface they are on.
+  const OUTLINE_TEXT_PALETTES = new Set(
+    ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'],
+  );
+  let outlineTextTokens = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
+    if (!themes) continue;
+    for (const theme of Object.values<any>(themes)) {
+      for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
+        const buttons = section?.Buttons;
+        if (!buttons || typeof buttons !== 'object') continue;
+        const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
+        for (const [pal, entry] of Object.entries<any>(buttons)) {
+          if (!entry || typeof entry !== 'object') continue;
+          // The surface tone this button is drawn on.
+          const tone = String(entry.Border?.value || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
+          if (!tone) continue;
+          // Default has no Text palette of its own — it is whichever palette the
+          // user picked — so it takes the surface's own text colour, which is
+          // what a default outline button should read as anyway.
+          // BlackWhite maps to the BW text table.
+          const target = OUTLINE_TEXT_PALETTES.has(pal) ? pal
+            : pal === 'BlackWhite' ? 'BW'
+            : null;
+          entry['Outline-Text'] = target
+            ? { value: `{Text.${scope}.${target}.${tone}}`, type: 'color' }
+            : { value: section.Text?.value ?? `{Text.${scope}.Neutral.${tone}}`, type: 'color' };
+          outlineTextTokens++;
+        }
+      }
+    }
+  }
+  console.log(`▭ [JSON Export] Buttons Outline-Text added (${outlineTextTokens} tokens across both modes)`);
+
+  // ── State backgrounds only offer their own button ─────────────────────
+  //
+  // On an Info / Success / Warning / Error surface, every button palette other
+  // than the state's own, Neutral and BlackWhite is redirected to the state's
+  // button.
+  //
+  // The point is to make the wrong choice unavailable rather than merely
+  // discouraged: a Primary button on a warning banner is a miscommunication —
+  // it competes with the message the surface exists to deliver — and a designer
+  // reaching for the Primary variable in Figma had no signal that it was wrong.
+  // Redirecting means the variable still exists (so nothing unbinds) but
+  // resolves to the state button, and picking "wrong" produces the right result.
+  //
+  // Neutral and BlackWhite survive because they are the two neutral voices: a
+  // quiet secondary action and a high-contrast one, neither of which competes
+  // with the state's colour. Default already resolved to the state's button
+  // before this pass — it is the theme's own default, so it needs no redirect.
+  //
+  // The WHOLE entry is copied, not just the fill. Copying Button alone would
+  // leave the border, hover, pressed, bevel and Outline-Text on the old palette,
+  // producing a button that is Info-coloured with a Primary edge — worse than
+  // either, and the kind of mismatch that reads as a rendering bug.
+  const STATE_THEMES = ['Info', 'Success', 'Warning', 'Error'];
+  const ALWAYS_ALLOWED = new Set(['Neutral', 'BlackWhite', 'Default']);
+  let redirectedButtons = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
+    if (!themes) continue;
+    for (const [themeName, theme] of Object.entries<any>(themes)) {
+      // Info and Info-Light are both Info surfaces.
+      const state = STATE_THEMES.find((st) => themeName === st || themeName === `${st}-Light`);
+      if (!state) continue;
+      for (const section of Object.values<any>(theme ?? {})) {
+        const buttons = section?.Buttons;
+        if (!buttons || typeof buttons !== 'object') continue;
+        const own = buttons[state];
+        // No entry for the state's own button means the shape changed; skip
+        // rather than redirect everything at an undefined.
+        if (!own || typeof own !== 'object') continue;
+        for (const pal of Object.keys(buttons)) {
+          if (pal === state || ALWAYS_ALLOWED.has(pal)) continue;
+          buttons[pal] = JSON.parse(JSON.stringify(own));
+          redirectedButtons++;
+        }
+      }
+    }
+  }
+  console.log(`🚦 [JSON Export] State backgrounds: ${redirectedButtons} button palettes redirected to their own state`);
 
   console.log('✅ [JSON Export] Color system export complete!');
   return colorSystem;

@@ -722,15 +722,16 @@ function MainApp() {
   // it — every small Button in the studio renders with zero side padding (the
   // cramped Light/Dark segmented control). Same derivation the export and
   // generateFigmaJSON use, so studio chrome matches what ships.
-  const buttonPaddingPx = buttonRadiusPx > 8 ? Math.round(buttonRadiusPx / 2) : 4;
-  const smButtonPaddingPx = buttonRadiusPx >= 8 ? 8 : buttonRadiusPx;
-  const lgButtonPaddingPx = buttonRadiusPx > 32 ? Math.round((buttonRadiusPx * 2) / 3) : 16;
 
   const styleVars = {
     '--Style-Border-Radius': `${buttonRadiusPx}px`,
-    '--Button-Padding': `${buttonPaddingPx}px`,
-    '--Sm-Button-Padding': `${smButtonPaddingPx}px`,
-    '--Large-Button-Padding': `${lgButtonPaddingPx}px`,
+    // One padding at every size (8px). The two size-specific names remain as
+    // aliases because the lib's Button reads them with no fallback — see
+    // BUTTON_PADDING in exportToCSS.ts.
+    '--Button-Padding': '8px',
+    '--Sm-Button-Padding': 'var(--Button-Padding)',
+    '--Lg-Button-Padding': '16px',
+    '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
     '--Button-Radius': `${buttonRadiusPx}px`,
     '--Sm-Button-Radius': `${smButtonRadiusPx}px`,
     '--Lg-Button-Radius': `${lgButtonRadiusPx}px`,
@@ -742,6 +743,10 @@ function MainApp() {
     '--Small-Button-Height': `${smallButtonHeight}px`,
     '--Large-Button-Height': `${largeButtonHeight}px`,
     '--Button-Min-Width': `${minButtonWidth}px`,
+    // Large's floor is the standard floor + 40, the same relationship the
+    // CSS export and the Figma payload emit. The preview omitted it, so a
+    // large button read at the standard minimum here and wider once exported.
+    '--Lg-Button-Min-Width': `${minButtonWidth + 40}px`,
     '--Card-Radius': `${cardRadius}px`,
     '--Card-Padding': `${cardRadius >= 16 ? 20 : 16}px`,
     ...(applyBrand && headerFont ? (() => {

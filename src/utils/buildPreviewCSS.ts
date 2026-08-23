@@ -10,7 +10,7 @@ import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } f
 // convert to CSS var() form below.
 import { getFixedTextToken, getFixedHeaderToken } from './cssgen/exportColorSystem';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
-import { resolveRoles } from './typeScale';
+import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
 
 /** Convert a `{Colors.Palette.Color-N}` token reference (returned by
  *  getFixedTextToken / getFixedHeaderToken) into a CSS `var(--Palette-Color-N)`
@@ -1485,6 +1485,31 @@ ${(() => {
   --Set-Font-Family-Header: ${headerFamily};
   --Set-Font-Family-Header-Weight: ${headerWeight};
   --Set-Font-Family-Decorative: ${decorativeFamily};
+  /* Display MUST be stated by the brand, not left to fall through.
+   *
+   * The lib defines --Font-Family-Display itself, and on Desktop it maps to
+   * --Platform-Font-Families-HEADER (typography-tokens.css:17) while on
+   * IOS-Mobile it maps to Decorative. So a consumer that omitted it did not
+   * get "no value" and fall back — it got the HEADER face, and the picked
+   * display font never appeared. A var() fallback cannot rescue this: the
+   * fallback only applies when the variable is UNDEFINED, and it is defined. */
+  --Set-Font-Family-Display: ${decorativeFamily};
+  --Font-Family-Display: ${decorativeFamily};
+  /* Eyebrow is a FIXED face — the OS UI stack — not a picked one, and not a
+   * relative of the decorative face. The preview emitted neither token, and the
+   * lib's core.css falls back to var(--Decorative-Font-Family), so the eyebrow
+   * rendered in the display font. Same shape as the Display bug above: the
+   * fallback chain does not fail loudly, it lands somewhere plausible. */
+  --Set-Font-Family-Eyebrow: ${SYSTEM_UI_STACK};
+  --Font-Family-Eyebrow: ${SYSTEM_UI_STACK};
+  /* Eyebrow is ALWAYS uppercase. The export states this; the preview did not,
+   * and only came out right because the consumer happened to inline
+   * "uppercase" as a var() fallback. That works until something defines the
+   * token — at which point the fallback stops applying and the casing changes
+   * with nothing to explain it. State it in both places instead. */
+  --Overline-Small-Text-Transform: uppercase;
+  --Overline-Medium-Text-Transform: uppercase;
+  --Overline-Large-Text-Transform: uppercase;
   --Set-Font-Family-Body: ${bodyFamily};
   --Set-Font-Family-Body-Weight: ${bodyWeight};
   --Font-Family-Header: ${headerFamily};
@@ -1576,6 +1601,7 @@ ${(() => {
   --Card-Padding: ${r.cardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;
+  --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
   --Accordion-Radius: ${cappedAccordionRadius}px;
   --Input-Radius: ${r.inputRadius}px;
   --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;

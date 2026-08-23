@@ -1,5 +1,7 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
 import { toneToColorNumber, generateSemanticLightModeScale, findClosestColorN } from '../colorScale';
+import { neutralSurfaceWindow } from '../surfaceWindow';
+import type { SurfaceLevel } from '../surfaceWindow';
 // Text and Header roles reference the Text.*/Header.* families directly rather
 // than the getFixed* helpers. Those helpers return a raw {Colors.Palette.Color-N}
 // swatch, which is identical on every surface and in both modes — so an accent
@@ -429,6 +431,42 @@ function generateSingleTheme(config: ThemeConfig): any {
   const dimmestN = Math.max(config.n - 2, 1);
   const brightN = Math.min(config.n + 1, 12);
 
+  // Neutral's window is LOCKED, not derived: black / 9 / 10 / 11 / white. It is
+  // the theme that replaced White, Light-Gray and Black, so it has to span the
+  // whole scale instead of sitting in a four-tone band.
+  //
+  // This wiring is what was missing. neutralSurfaceWindow() and its tests
+  // shipped, but nothing in the generator called them, so Neutral fell through
+  // to the derived rule above and Surface-Dimmest painted Color-8 - a mid grey -
+  // while navSelectionToSource already mapped the retired Black theme onto it.
+  // Reading the module here rather than restating black/white keeps ONE
+  // definition of the lock; a second copy is how the two drift apart again.
+  // themeName, NOT theme. `theme` is the PALETTE, and Default sets it to the
+  // Neutral palette on any grey system - keying off it locked Default's ends to
+  // black and white too, which is a different theme entirely.
+  const locked = config.themeName === 'Neutral' ? neutralSurfaceWindow() : null;
+  const lockStep = (level: SurfaceLevel) => locked?.find((s) => s.level === level) ?? null;
+
+  // A locked end paints the anchor outright; every foreground table is still
+  // keyed by toneIndex (1 for black, 12 for white), which is what keeps Text,
+  // Quiet, Border and Eyebrow resolving on a surface that has no tone of its own.
+  const dimmestLock = lockStep('Surface-Dimmest');
+
+  // Only the DARK end is pinned to a literal. The two ends are not symmetric:
+  //
+  //   Dimmest  - no tone is true black (Color-1 is L1 in light mode, L3 in dark),
+  //              so black can only come from a literal. The darkest surface being
+  //              black in BOTH modes is what the retired Black theme did anyway.
+  //   Brightest - Neutral's Color-12 IS pure white, so the tone reference already
+  //              paints white in light mode AND keeps aliasing into Modes, which a
+  //              literal would break. A hard #ffffff would force a blinding white
+  //              surface in DARK mode, where Background-12 correctly resolves to
+  //              the dark ramp's top instead.
+  //
+  // So neutralSurfaceWindow's whiteStep is honoured through the tone it indexes
+  // (12) rather than through its paint. Same colour in light mode, still mode-
+  // aware in dark.
+
   // Base Surface — reference Backgrounds structure for Light/Dark mode adaptation
   theme.Surfaces = {
     'Background': {
@@ -450,10 +488,12 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Surface-Dimmest
   theme['Surfaces-Dimmest'] = {
     'Background': {
-      value: config.n > 2 ? `{Backgrounds.${config.theme}.Background-${dimmestN}.Surfaces.Surface}` : '#000000',
+      value: dimmestLock?.paint.kind === 'black' || config.n <= 2
+        ? '#000000'
+        : `{Backgrounds.${config.theme}.Background-${dimmestLock ? dimmestLock.toneIndex : dimmestN}.Surfaces.Surface}`,
       type: 'color'
     },
-    ...buildSurfaceTokens(config, dimmestN)
+    ...buildSurfaceTokens(config, dimmestLock ? dimmestLock.toneIndex : dimmestN)
   };
 
   // Surface-Bright
@@ -463,6 +503,26 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     ...buildSurfaceTokens(config, brightN)
+  };
+
+  // Surface-Brightest
+  //
+  // The light counterpart of Surface-Dimmest, and the level that absorbs
+  // <Palette>-Light: that theme's Surface was tone 11, so landing here makes
+  // the replacement the same colour rather than an approximation of it.
+  //
+  // 11 unless Bright has already taken it (Surface at 10), in which case 12.
+  // Above that the ramp is exhausted and it paints white outright — the same
+  // shape as Dimmest falling through to black when the tone runs out below.
+  const brightestN = brightN >= 11 ? 12 : 11;
+  theme['Surfaces-Brightest'] = {
+    'Background': {
+      value: brightN >= 12
+        ? '#ffffff'
+        : `{Backgrounds.${config.theme}.Background-${brightestN}.Surfaces.Surface}`,
+      type: 'color'
+    },
+    ...buildSurfaceTokens(config, brightestN)
   };
 
   // Containers Section — reference Modes/Containers for Light/Dark mode adaptation
@@ -973,6 +1033,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   overrideSurface('Surfaces', 'Surface', '');
   overrideSurface('Surfaces-Dim', 'Surface-Dim', 'Surface-Dim-');
   overrideSurface('Surfaces-Bright', 'Surface-Bright', 'Surface-Bright-');
+  overrideSurface('Surfaces-Brightest', 'Surface-Brightest', 'Surface-Brightest-');
   // Surfaces-Dimmest is deliberately NOT routed through Default-Background.
   //
   // Surface-Dim and Surface-Bright are tone-relative to the theme's own
@@ -1037,15 +1098,38 @@ export function generateAllThemesWithSurfacesAndContainers(
   
   // 2-4. Nav component themes — alias the user's chosen theme
   // Maps user selection → existing theme name
-  function navSelectionToThemeName(selection: string): string {
+  /**
+   * A nav selection resolves to a surviving theme AND the surface level that
+   * carries the colour it used to name.
+   *
+   * `white`, `black` and `primary-light` were themes; they are now levels.
+   * Mapping only the theme would silently change the colour — 'primary-light'
+   * would land on Primary's Surface (tone 6) instead of the tone 11 it means —
+   * so the level travels with it and is promoted to Surfaces on the copy.
+   */
+  function navSelectionToSource(selection: string): { theme: string; level: string } {
     const sel = selection?.toLowerCase?.() || '';
     switch (sel) {
-      case 'primary-light': return 'Primary-Light';
-      case 'primary': return 'Primary';
-      case 'white': return 'White';
-      case 'black': return 'Black';
-      default: return selection || 'Primary-Light'; // Pass through already-formatted names
+      case 'primary-light':        return { theme: 'Primary', level: 'Surfaces-Brightest' };
+      case 'primary-light-bright': return { theme: 'Primary', level: 'Surfaces-Brightest' };
+      case 'primary-light-dim':    return { theme: 'Primary', level: 'Surfaces-Bright' };
+      case 'primary':              return { theme: 'Primary', level: 'Surfaces' };
+      case 'primary-bright':       return { theme: 'Primary', level: 'Surfaces-Bright' };
+      case 'primary-dim':          return { theme: 'Primary', level: 'Surfaces-Dim' };
+      case 'white':                return { theme: 'Neutral', level: 'Surfaces-Brightest' };
+      case 'black':                return { theme: 'Neutral', level: 'Surfaces-Dimmest' };
+      default:                     return { theme: selection || 'Primary', level: 'Surfaces' };
     }
+  }
+
+  /** Copy a theme, promoting one of its surface levels to be its Surface. */
+  function navThemeFrom(src: { theme: string; level: string }): any | null {
+    const base = themes[src.theme];
+    if (!base) return null;
+    const copy = JSON.parse(JSON.stringify(base));
+    const level = base[src.level];
+    if (level && src.level !== 'Surfaces') copy.Surfaces = JSON.parse(JSON.stringify(level));
+    return copy;
   }
 
   // SimplifiedDefaultConfig stores nav selections as separate `<x>Theme` +
@@ -1054,9 +1138,9 @@ export function generateAllThemesWithSurfacesAndContainers(
   // win — so the AppBar was tinted Primary-Light regardless of what the
   // user picked in Assign Colors. Pull the raw selection from
   // userSelections.* instead, which is where the studio writes it.
-  const appBarSource = navSelectionToThemeName(userSelections?.appBar as string);
-  const navBarSource = navSelectionToThemeName(userSelections?.navBar as string);
-  const statusSource = navSelectionToThemeName(userSelections?.status as string);
+  const appBarSource = navSelectionToSource(userSelections?.appBar as string);
+  const navBarSource = navSelectionToSource(userSelections?.navBar as string);
+  const statusSource = navSelectionToSource(userSelections?.status as string);
 
   // 5-7. Primary, Secondary, Tertiary Themes (use extracted PC/SC/TC converted to Color-N)
   // PC/SC/TC = closest Color-N to the original extracted color's lightness
@@ -1108,35 +1192,53 @@ export function generateAllThemesWithSurfacesAndContainers(
   themes.Secondary = generateSingleTheme(makeConfig('Secondary', 'Secondary', SC));
   themes.Tertiary = generateSingleTheme(makeConfig('Tertiary', 'Tertiary', TC));
 
-  // Primary-Light, Secondary-Light, Tertiary-Light — N = 11
-  themes['Primary-Light'] = generateSingleTheme(makeConfig('Primary-Light', 'Primary', 11));
-  themes['Secondary-Light'] = generateSingleTheme(makeConfig('Secondary-Light', 'Secondary', 11));
-  themes['Tertiary-Light'] = generateSingleTheme(makeConfig('Tertiary-Light', 'Tertiary', 11));
+  // Primary-Light, Secondary-Light, Tertiary-Light, White, Black and Light-Gray
+  // are RETIRED — they are surface levels now, not themes.
+  //
+  // Each was one palette viewed through a fixed window, which is a theme per
+  // window rather than per palette. Measured across shipped systems all seven
+  // `-Light` themes held the identical tone window (9-10-11-12), so nothing
+  // selected between them — the palette already did. Their Surface was tone 11,
+  // which is exactly where Surface-Brightest lands, so the colour survives:
+  //
+  //   Primary-Light  ->  theme="Primary"  surface="Surface-Brightest"
+  //   White          ->  theme="Neutral"  surface="Surface-Brightest"
+  //   Black          ->  theme="Neutral"  surface="Surface-Dimmest"
+  //   Light-Gray     ->  theme="Neutral"  surface="Surface"
+  //
+  // Retiring them is what makes the set fit: Figma caps a collection at ten
+  // modes, and eighteen themes meant nine could not import at all.
 
-  // White, Black, and Light-Gray
-  themes.White = generateSingleTheme(makeConfig('White', 'Neutral', 12));
-  themes.Black = generateSingleTheme(makeConfig('Black', 'Neutral', 1));
-  themes['Light-Gray'] = generateSingleTheme(makeConfig('Light-Gray', 'Neutral', 10));
+  // Neutral — the theme that replaces White / Light-Gray / Black.
+  //
+  // Those three are one palette viewed through three windows, which is a theme
+  // per window rather than per palette. At tone 10 the derived window already
+  // gives Dim 9, Surface 10 and Bright 11 — three of the five levels the
+  // replacement needs. The two ends are locked rather than derived (Dimmest
+  // black, Brightest white) so the theme spans the whole scale, and that comes
+  // with the surfaceWindow wiring.
+  //
+  // Replaces White, Light-Gray and Black outright: those three were one palette
+  // at three windows, and Neutral spans all of them across its five levels.
+  themes.Neutral = generateSingleTheme(makeConfig('Neutral', 'Neutral', 10));
 
   // Info, Success, Warning, Error — N = OB
   ['Info', 'Success', 'Warning', 'Error'].forEach(themeName => {
     themes[themeName] = generateSingleTheme(makeConfig(themeName, themeName, OB));
   });
 
-  // Info-Light, Success-Light, Warning-Light, Error-Light — N = 11
-  ['Info', 'Success', 'Warning', 'Error'].forEach(themeName => {
-    themes[`${themeName}-Light`] = generateSingleTheme(makeConfig(`${themeName}-Light`, themeName, 11));
-  });
+  // Info-Light etc. are retired for the same reason — Surface-Brightest on the
+  // state theme is the same tone 11 they were.
   
-  // Nav component themes — alias the user's chosen theme
-  console.log(`  Available theme keys:`, Object.keys(themes).join(', '));
-  console.log(`  Looking for App-Bar source: "${appBarSource}" → exists: ${!!themes[appBarSource]}`);
-  console.log(`  Looking for Nav-Bar source: "${navBarSource}" → exists: ${!!themes[navBarSource]}`);
-  if (themes[appBarSource]) themes['App-Bar'] = JSON.parse(JSON.stringify(themes[appBarSource]));
-  else console.error(`  ❌ App-Bar source "${appBarSource}" NOT FOUND in themes!`);
-  if (themes[navBarSource]) themes['Nav-Bar'] = JSON.parse(JSON.stringify(themes[navBarSource]));
-  else console.error(`  ❌ Nav-Bar source "${navBarSource}" NOT FOUND in themes!`);
-  if (themes[statusSource]) themes['Status'] = JSON.parse(JSON.stringify(themes[statusSource]));
+  // Nav component themes — the chosen theme, at the chosen surface level.
+  const navPairs: Array<[string, { theme: string; level: string }]> = [
+    ['App-Bar', appBarSource], ['Nav-Bar', navBarSource], ['Status', statusSource],
+  ];
+  for (const [name, src] of navPairs) {
+    const built = navThemeFrom(src);
+    if (built) themes[name] = built;
+    else console.error(`  ❌ ${name} source "${src.theme}" NOT FOUND in themes!`);
+  }
 
   console.log(`  ✓ Generated ${Object.keys(themes).length} complete themes with Surfaces and Containers for ${mode}`);
 

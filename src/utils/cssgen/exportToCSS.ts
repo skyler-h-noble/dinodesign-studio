@@ -1288,6 +1288,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
       tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${contColorN}}`;
     }
+    tokenLookup['Default-Background.Container-Text-BW'] =
+      `{Default-Button-Border.Containers.BlackWhite.${contColorN}}`;
     // Focus-Visible uses a flat path (no palette nesting) AND is keyed by
     // Background-N, not Color-N. Using colorN here produced
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the
@@ -1350,6 +1352,10 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       { prefix: '', tone: defN },
       { prefix: 'Surface-Dim-', tone: Math.max(defN - 1, 1) },
       { prefix: 'Surface-Bright-', tone: Math.min(defN + 1, 12) },
+      // Surface-Brightest: 11, or 12 once Bright has taken 11. Must match
+      // generateCompleteThemes' brightestN or Default's brightest surface
+      // pairs its foregrounds with a different tone than it paints.
+      { prefix: 'Surface-Brightest-', tone: Math.min(defN + 1, 12) >= 11 ? 12 : 11 },
     ];
 
     for (const { prefix, tone } of surfaceScopes) {
@@ -1358,6 +1364,12 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       for (const prop of props) {
         tokenLookup[`Default-Background.${prefix}${prop}`] = `{${prop}.Surfaces.${defPal}.${vColorN}}`;
       }
+      // Text-BW is black or white for this surface's tone. It resolves through
+      // the BlackWhite map rather than a palette family, so it cannot ride the
+      // props loop above — but it is still a role, and this indirection has to
+      // cover EVERY role or Default keeps a hardcoded light-mode value.
+      tokenLookup[`Default-Background.${prefix}Text-BW`] =
+        `{Default-Button-Border.Surfaces.BlackWhite.${vColorN}}`;
       // Accents resolve from their OWN palette at the surface's tone.
       for (const pal of accentPalettes) {
         tokenLookup[`Default-Background.${prefix}Text-${pal}`] = `{Text.Surfaces.${pal}.${vColorN}}`;
@@ -1648,6 +1660,10 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       {
         key: 'Surfaces-Bright',
         selector: `[data-theme="${themeName}"] [data-surface="Surface-Bright"],\n[data-theme="${themeName}"][data-surface="Surface-Bright"]`
+      },
+      {
+        key: 'Surfaces-Brightest',
+        selector: `[data-theme="${themeName}"] [data-surface="Surface-Brightest"],\n[data-theme="${themeName}"][data-surface="Surface-Brightest"]`
       }
     ];
 
@@ -3096,10 +3112,17 @@ function buildTextOverImageCSS(jsonData: any): string {
   // Solving only Text was the original defect — a poster whose title is
   // --Header and whose eyebrow is --Eyebrow got a scrim tuned for neither.
   const ROLES: { role: string; key: string; target: number }[] = [
+    // --Text is in because H4-H6 use it: a poster title is --Header on H1-H3
+    // and --Text below that, so the scrim has to hold whichever the consumer
+    // reaches for. Header owes 3:1 (large text), Text and Eyebrow owe 4.5.
     { role: '--Text', key: 'Text', target: 4.5 },
-    { role: '--Quiet', key: 'Quiet', target: 4.5 },
     { role: '--Eyebrow', key: 'Eyebrow', target: 4.5 },
     { role: '--Header', key: 'Header', target: 3 },
+    // --Quiet is deliberately OUT. It is the lowest-contrast text the system
+    // ships and it drove the scrim to 0.87 average — near-opaque, hiding the
+    // photograph — while being the one role a poster never puts on an image.
+    // Body copy or a quiet caption over an image is the exceptional case and
+    // should carry its own heavier scrim rather than every hero paying for it.
   ];
 
   const pairs: Record<string, { background: string; foregrounds: any[] }> = {};
@@ -3121,6 +3144,37 @@ function buildTextOverImageCSS(jsonData: any): string {
   if (!Object.keys(pairs).length) return '';
   return generateTextOverImageCSS(solveThemeScrims(pairs));
 }
+
+/** How much wider a large button's minimum width is than the standard one.
+ *  Mirrored in generateFigmaJSON.ts, which emits the same pair to Figma. */
+const LG_BUTTON_MIN_WIDTH_OFFSET = 40;
+
+/**
+ * Button padding is TWO numbers, not three and not one.
+ *
+ * It used to be three, all derived from the button radius (standard radius/2,
+ * small 8, large radius*2/3). Nothing selected between them by intent — they
+ * drifted apart as a side effect of the radius, so a playful preset at radius
+ * 100 handed a large button 67px of padding.
+ *
+ * Now: small and standard share one value, and LARGE has its own. A large
+ * button is the one size where 8px reads cramped against the taller box.
+ *
+ * --Sm-Button-Padding is emitted as an alias of --Button-Padding, and
+ * --Large-Button-Padding as an alias of --Lg-Button-Padding. Neither can simply
+ * be dropped: the lib's Button reads them by name with NO fallback
+ * (`padding: 0 var(--Sm-Button-Padding)`), a design system's CSS is frozen per
+ * system in Storage, and consumers upgrade the lib on their own schedule — so
+ * newly generated brand CSS meets an older Button routinely. An undefined var
+ * there collapses the padding to nothing, silently.
+ *
+ * --Lg-Button-Padding is the canonical large name, matching Sm-/Lg- as used by
+ * --Lg-Button-Min-Width, --Lg-Input-Radius and --Lg-Button-Swatch.
+ * --Large-Button-Padding was the CSS's own spelling while Figma always emitted
+ * Lg-; the two now agree, with the old spelling kept as the alias.
+ */
+const BUTTON_PADDING = 8;
+const LG_BUTTON_PADDING = 16;
 
 export function generateCSSFiles(jsonData: any): { [filename: string]: string } {
   const cssFiles: { [filename: string]: string } = {}; 
@@ -3415,7 +3469,7 @@ export function downloadAllCSSFiles(jsonData: DesignSystem): void {
 /**
  * CSS files that contain per-design-system values (brand colors, fonts).
  * Regenerated on every export. Everything else in the lib's public/styles/
- * (core.css, foundation.css, foundations.css, styles.css, typography-tokens.css)
+ * (core.css, foundation.css, styles.css, typography-tokens.css)
  * is lib-owned STATIC content that must not be overwritten.
  * See `DinoDesign/public/styles/README.md` for details.
  */
@@ -3556,10 +3610,11 @@ function generateStyleCSS(jsonData: any): string {
       props.push(`${indent}--Card-Radius: ${cappedCard}px;`);
       props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
       // Button & Input tokens derived from --Button-Radius.
-      props.push(`${indent}--Button-Border-Width: 2px;`);
-      props.push(`${indent}--Button-Padding: ${borderRadius > 8 ? borderRadius / 2 : 4}px;`);
-      props.push(`${indent}--Sm-Button-Padding: ${borderRadius >= 8 ? 8 : borderRadius}px;`);
-      props.push(`${indent}--Large-Button-Padding: ${borderRadius > 32 ? Math.round((borderRadius * 2) / 3) : 16}px;`);
+      props.push(`${indent}--Button-Border-Width: 1px;`);
+      props.push(`${indent}--Button-Padding: ${BUTTON_PADDING}px;`);
+      props.push(`${indent}--Sm-Button-Padding: var(--Button-Padding);`);
+      props.push(`${indent}--Lg-Button-Padding: ${LG_BUTTON_PADDING}px;`);
+      props.push(`${indent}--Large-Button-Padding: var(--Lg-Button-Padding);`);
       props.push(`${indent}--Input-Radius: ${Math.min(borderRadius, 8)}px;`);
       props.push(`${indent}--Input-Padding: ${borderRadius >= 8 ? 4 : 2}px;`);
     }
@@ -4818,9 +4873,6 @@ export function generateBaseCSS(jsonData: any): string {
     });
     const r = computeRadii(cs);
     const btnR = r.buttonRadius;
-    const buttonPadding = btnR > 8 ? Math.round(btnR / 2) : 4;
-    const smButtonPadding = btnR >= 8 ? 8 : btnR;
-    const largeButtonPadding = btnR > 32 ? Math.round((btnR * 2) / 3) : 16;
     // Cap card-shaped radii at the standard button height so large
     // surfaces (cards, image thumbnails, modals) don't go stadium-shaped
     // under playful brand presets where buttonRadius is 100. Mirrors the
@@ -4878,6 +4930,8 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Modal-Radius: ${cappedModalRadius}px;`);
     lines.push(`  --Modal-Inner-Radius: ${r.modalInnerRadius}px;`);
     lines.push(`  --Modal-Focus-Radius: ${r.modalFocusRadius}px;`);
+    // Dropdown / menu frame: min(Input-Radius, Card-Radius, 16).
+    lines.push(`  --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;`);
     lines.push(`  --Input-Radius: ${r.inputRadius}px;`);
     lines.push(`  --Sm-Input-Radius: ${r.smInputRadius}px;`);
     lines.push(`  --Lg-Input-Radius: ${r.lgInputRadius}px;`);
@@ -4891,10 +4945,21 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;`);
     lines.push(`  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;`);
     lines.push(`  --Input-Padding: ${csRaw.inputPadding ?? (btnR >= 8 ? 4 : 2)}px;`);
-    lines.push(`  --Button-Border-Width: 2px;`);
-    lines.push(`  --Button-Padding: ${buttonPadding}px;`);
-    lines.push(`  --Sm-Button-Padding: ${smButtonPadding}px;`);
-    lines.push(`  --Large-Button-Padding: ${largeButtonPadding}px;`);
+    lines.push(`  --Button-Border-Width: 1px;`);
+    // Minimum button width — the floor the label box cannot shrink below, so a
+    // one-word button ("OK") still reads as a button rather than a chip.
+    //
+    // Large's floor is the standard floor plus 40px, DERIVED rather than stored
+    // as a second number: two literals for one relationship is how they drift.
+    // The same pair ships to Figma from generateFigmaJSON (Components/Button),
+    // and the +40 is stated in both places — tokenParity covers the agreement.
+    const minButtonWidth = csRaw.minButtonWidth ?? 60;
+    lines.push(`  --Button-Min-Width: ${minButtonWidth}px;`);
+    lines.push(`  --Lg-Button-Min-Width: ${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px;`);
+    lines.push(`  --Button-Padding: ${BUTTON_PADDING}px;`);
+    lines.push(`  --Sm-Button-Padding: var(--Button-Padding);`);
+    lines.push(`  --Lg-Button-Padding: ${LG_BUTTON_PADDING}px;`);
+    lines.push(`  --Large-Button-Padding: var(--Lg-Button-Padding);`);
     // Bevel tokens — used by the lib Button to render its 3D inset shadow.
     // Live here (not in foundation.css) so they push to the lib's base.css
     // via LIB_DYNAMIC_CSS_FILES. --_bevel = Button-Bevel% × height / 100.

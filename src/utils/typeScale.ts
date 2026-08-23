@@ -294,10 +294,15 @@ export const SUBTITLE_WEIGHT = 700;
  *  spelled two ways depending on which property you were setting. The tokens
  *  are Eyebrow now; --Overline-* is still emitted as an alias so design systems
  *  and lib versions from before the rename keep resolving. */
+/** Tracking DECREASES as the type grows, and that direction is the rule, not a
+ *  coincidence: an eyebrow is set in caps, and tight spacing is what makes small
+ *  caps hard to read, so the smallest step needs the most air. The ramp was
+ *  loosened wholesale from 0.12/0.10/0.08 — keep the ordering when retuning it,
+ *  or Medium ends up airier than Small and the steps stop reading as a scale. */
 export const EYEBROW_STEPS = [
-  { token: 'Eyebrow-Small', step: 'Small', size: 12, letterSpacing: '0.12em' },
-  { token: 'Eyebrow-Medium', step: 'Medium', size: 13, letterSpacing: '0.1em' },
-  { token: 'Eyebrow-Large', step: 'Large', size: 15, letterSpacing: '0.08em' },
+  { token: 'Eyebrow-Small', step: 'Small', size: 12, letterSpacing: '0.06em' },
+  { token: 'Eyebrow-Medium', step: 'Medium', size: 13, letterSpacing: '0.05em' },
+  { token: 'Eyebrow-Large', step: 'Large', size: 15, letterSpacing: '0.04em' },
 ];
 
 /** The pre-rename token names, kept so the CSS export can emit aliases. */
