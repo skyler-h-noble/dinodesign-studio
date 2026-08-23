@@ -355,11 +355,22 @@ interface ModeSection {
     Surfaces: { [backgroundKey: string]: any };
     Containers: { [backgroundKey: string]: any };
   };
-  'Primary-Buttons': PrimaryButtonsSectionForMode;
+  /* 'Primary-Buttons' was declared here and is not produced: the generation
+     section was deleted (see "REMOVED: Primary-Buttons generation section - no
+     longer in Modes" further down) and the payload carries no such key. It was
+     the last thing standing between the mode initialisers and their own type,
+     and it required a section nothing builds. */
   /** Written a few thousand lines below, and previously undeclared. */
   Themes: { [themeKey: string]: any };
-  'Default-Button': { [key: string]: any };
-  'Default-Button-Border': { [key: string]: any };
+  /**
+   * OPTIONAL, because they genuinely are absent until that later pass runs —
+   * and seeding them as {} in the mode initialiser is not a harmless
+   * equivalent. Tried: two tests went red immediately, so something downstream
+   * branches on the key being missing rather than on it being empty. Marked
+   * optional to describe that, instead of changing behaviour to satisfy a type.
+   */
+  'Default-Button'?: { [key: string]: any };
+  'Default-Button-Border'?: { [key: string]: any };
   'Focus-Visible'?: FocusVisibleSection;
   /* `Theme` (singular) was declared here and is written only inside a block
      comment — a section that has not existed for as long as that comment has
@@ -517,7 +528,13 @@ interface ColorSystemExport {
   Style: StyleSection;
   Spacing: SpacingSection;
   Typography: TypographySection;
-  Charts: {
+  /* Charts, Effects and SurfacesContainers are REAL and are all filled in
+     after this object is constructed, so they are optional at construction
+     and present on the finished export. Seeding them empty here is NOT a
+     harmless equivalent: the same move on Default-Button turned two tests
+     red, because code downstream branches on a key being absent rather than
+     on it being empty. */
+  Charts?: {
     'Chart-BG': { value: string; type: 'color' };
     'Chart-Lines': { value: string; type: 'color' };
     Solids: {
@@ -545,7 +562,7 @@ interface ColorSystemExport {
       'Chart-10': { value: string; type: 'color' };
     };
   };
-  Effects: {
+  Effects?: {
     'Level-0': { value: string; type: 'boxShadow' };
     'Level-1': { value: string; type: 'boxShadow' };
     'Level-2': { value: string; type: 'boxShadow' };
@@ -553,9 +570,12 @@ interface ColorSystemExport {
     'Level-4': { value: string; type: 'boxShadow' };
     'Level-5': { value: string; type: 'boxShadow' };
   };
-  'Primary-Buttons': any;
-  Themes: any;
-  SurfacesContainers: {
+  /* 'Primary-Buttons' and a top-level 'Themes' were required here and neither
+     is produced: the Primary-Buttons generator was deleted (see "REMOVED:
+     Primary-Buttons generation section" below) and Themes lives per-mode,
+     under Modes.<Mode>.Themes. Measured on the real export, both keys are
+     absent from the top level. */
+  SurfacesContainers?: {
     Surface: {
       Background: ColorToken;
     };
