@@ -1298,6 +1298,25 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         }
       }
 
+      // Surface-Brightest's own background value.
+      //
+      // The loop above copies whatever the Backgrounds ROW carries — Surface,
+      // Surface-Dim, Surface-Bright — and Brightest is not one of them: it is a
+      // different Background-N entirely (11, or 12 once Bright has taken 11).
+      // So the key was never written while the Theme collection referenced it,
+      // leaving {Default-Background.Surface-Brightest} pointing at nothing. The
+      // CSS had the same gap from the same cause; this is the Figma half.
+      //
+      // Same rule as generateCompleteThemes and the tokenLookup in exportToCSS.
+      // If the three disagree, Default's brightest surface pairs foregrounds
+      // solved for one tone with a background painted at another.
+      {
+        const brightN = Math.min(bgN + 1, 12);
+        const brightestN = brightN >= 11 ? 12 : 11;
+        const hex = modeColors?.[bgPalette]?.[`Color-${brightestN}`]?.value;
+        if (hex) defBg['Surface-Brightest'] = { value: hex, type: 'color' };
+      }
+
       // Container variants — use the appropriate container N
       const contBgKey = `Background-${contN}`;
       const contBgData = modeData.Backgrounds?.[contPalette]?.[contBgKey];
@@ -1326,7 +1345,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // written. It is handled separately after this loop.
       const textSections = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
       for (const section of textSections) {
-        const sectionData = modeData[section];
+        // Border-Variant is COMPUTED in this file (border at 20% opacity) and
+        // is absent from the source colorSystem, so the source alone yields
+        // nothing for it and the role is skipped.
+        const sectionData = modeData[section] ?? figma.Modes[modeName]?.[section];
         if (!sectionData?.Surfaces?.[bgPalette]?.[surfaceColorN]) continue;
         const token = sectionData.Surfaces[bgPalette][surfaceColorN];
         let hex = token?.value;
@@ -1379,7 +1401,14 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
       /** Resolve one role at a given background tone, or null. */
       const resolveRoleAt = (role: typeof ROLE_SOURCES[number], tone: number): string | null => {
-        const sectionData = modeData[role.section];
+        // Falls back to modeSection, the payload being BUILT, because some
+        // sections exist only there. Border-Variant is computed in this file —
+        // the border colour at 20% opacity — and never appears in the source
+        // colorSystem, so reading modeData alone returned null for it, the role
+        // was skipped, and every {Default-Background.*Border-Variant} reference
+        // the Theme collection emits pointed at a variable that was never
+        // written. Five of them, in both modes.
+        const sectionData = modeData[role.section] ?? figma.Modes[modeName]?.[role.section];
         if (!sectionData) return null;
         const token = role.byBackground
           ? sectionData.Surfaces?.[`Background-${tone}`]
@@ -1543,7 +1572,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // Container properties — Text, Header, Quiet, Border for containers
       const contColorN = `Color-${contN}`;
       for (const section of textSections) {
-        const sectionData = modeData[section];
+        // Same fallback as the surface loop above — Container-Border-Variant
+        // was the last {Default-Background.*} reference with nothing behind it.
+        const sectionData = modeData[section] ?? figma.Modes[modeName]?.[section];
         if (!sectionData?.Containers?.[contPalette]?.[contColorN]) continue;
         const token = sectionData.Containers[contPalette][contColorN];
         let hex = token?.value;

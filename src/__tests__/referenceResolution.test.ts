@@ -197,3 +197,51 @@ describe('every reference resolves', () => {
     });
   }
 });
+
+describe('the Figma payload resolves too', () => {
+  // Same class as the CSS check, other target. The Theme collection reaches the
+  // Default theme's roles through {Default-Background.*}; every one of those
+  // has to exist in the Modes section that generateFigmaJSON builds.
+  //
+  // Three were missing when this was written, all from one cause: the role
+  // loops read only the SOURCE colorSystem, while Border-Variant is COMPUTED in
+  // generateFigmaJSON (the border colour at 20% opacity) and never appears in
+  // the source at all. Surface-Brightest was missing for a different reason —
+  // it is not a variant of the Backgrounds row like Dim and Bright, but a
+  // different Background-N, so the copy loop had nothing to copy.
+  //
+  // In Figma an alias to a variable that does not exist does not error either:
+  // the binding is simply absent and the layer keeps its own colour.
+  for (const background of ['primary', 'white', 'black'] as const) {
+    it(`has no dangling Default-Background alias with background="${background}"`, () => {
+      const sel = { background, button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never;
+      const { json } = buildAll(SCHEME, sel, 'light') as any;
+      const j = JSON.parse(JSON.stringify(json));
+      j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100, cardPadding: 24,
+        buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, bevel: 17 };
+      const f: any = figmaGen(j);
+
+      for (const mode of ['Light-Mode', 'Dark-Mode'] as const) {
+        const keys = Object.keys(f.Modes[mode]['Default-Background'] || {});
+        const used = new Set<string>();
+        const walk = (n: any, d: number) => {
+          if (!n || typeof n !== 'object' || d > 14) return;
+          if (typeof n.value === 'string') {
+            if (n.value.startsWith('{Default-Background.')) {
+              used.add(n.value.slice(1, -1).replace('Default-Background.', ''));
+            }
+            return;
+          }
+          for (const k of Object.keys(n)) if (k !== 'type') walk(n[k], d + 1);
+        };
+        walk(f, 0);
+
+        expect(used.size, `${mode}: nothing referenced Default-Background at all`).toBeGreaterThan(0);
+        expect(
+          [...used].filter((u) => !keys.includes(u)),
+          `${mode} references Default-Background keys that are never written`,
+        ).toEqual([]);
+      }
+    });
+  }
+});
