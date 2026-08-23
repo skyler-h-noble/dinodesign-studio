@@ -844,11 +844,24 @@ export function generateAllThemesWithSurfacesAndContainers(
   surfaceStyle: 'light-tonal' | 'grey-professional' | 'dark-professional',
   schemeType: 'monochromatic' | 'analogous' | 'complementary' | 'triadic' | 'split-complementary' | 'tetradic',
   userSelections?: {
-    background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base' | 'primary-dark' | 'neutral-light' | 'neutral-dark'; // CRITICAL FIX: Match completeSimplifiedSystem.ts
+    // Fifth declaration of this union in the chain, after exportColorSystem
+    // (twice), completeSimplifiedSystem (twice) and here. The comment it
+    // replaced already said "Match completeSimplifiedSystem.ts" — and it had
+    // stopped matching, missing 'primary-medium'.
+    background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
+      | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
     appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
     status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
+    /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
+     *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
+     *  Declaring only the family form described an input this code was never
+     *  written to receive. */
+    button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white'
+      | 'primary-adaptive' | 'primary-fixed'
+      | 'secondary-adaptive' | 'secondary-fixed'
+      | 'tonal-adaptive' | 'tonal-fixed'
+      | 'laddered-adaptive' | 'laddered-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black'; // CRITICAL FIX: Added to pass card coloring selection to generateModesThemes
   }
