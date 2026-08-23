@@ -58,7 +58,14 @@ export function calculateDefaultThemeSettings(
   secondaryColorTone: number, // SC - HCT tone value (0-100) of the Secondary color
   surfaceStyle: SurfaceStyle,
   schemeType: ColorSchemeType,
-  buttonStyle?: 'primary-adaptive' | 'primary-fixed' | 'black-white',
+  /** The full set callers pass. This listed only the primary and black-white
+   *  members, so every secondary / tonal / laddered system was a type error at
+   *  the call site — and silently so in behaviour, because this parameter is
+   *  accepted and never read in the body. */
+  buttonStyle?: 'primary-adaptive' | 'primary-fixed' | 'black-white'
+    | 'secondary-adaptive' | 'secondary-fixed'
+    | 'tonal-adaptive' | 'tonal-fixed'
+    | 'laddered-adaptive' | 'laddered-fixed',
   userSelections?: {
     defaultTheme?: 'light' | 'dark';
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';

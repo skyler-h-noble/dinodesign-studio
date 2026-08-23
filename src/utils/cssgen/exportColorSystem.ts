@@ -53,6 +53,26 @@ interface ColorToken {
   type: string;
 }
 
+/**
+ * Colors is a MIXED map: Primary, Neutral, Secondary … are 13-tone palettes,
+ * while White, Image-Overlay and Transparent are standalone tokens sitting in
+ * the same object.
+ *
+ * TypeScript cannot express "these three keys hold a different shape" alongside
+ * an index signature without forcing every palette read — Colors.Primary
+ * ['Color-9'], of which there are hundreds — to narrow a union first. So the
+ * three exceptions are written through here, where the cast is named, explained
+ * and confined to six call sites, instead of the map being typed loosely enough
+ * to accept anything anywhere.
+ */
+function setStandaloneColor(
+  colors: { [paletteKey: string]: { [colorKey: string]: ColorToken } },
+  key: 'White' | 'Image-Overlay' | 'Transparent',
+  token: ColorToken,
+): void {
+  (colors as unknown as Record<string, ColorToken>)[key] = token;
+}
+
 interface SurfacesDetails {
   Surface: ColorToken;
   'Surface-Dim': ColorToken;
@@ -440,7 +460,10 @@ interface ColorSystemExport {
       Tertiary: { value: number; type: 'number' };
     };
     'Button-Config'?: {
-      DefaultButtonType: { value: 'primary' | 'secondary' | 'tonal' | 'black-white'; type: 'string' };
+      /** 'laddered' was missing, and the generator emits it — buttonStyle
+       *  .startsWith('laddered') is checked directly below. A laddered system
+       *  therefore wrote a value its own type said could not occur. */
+      DefaultButtonType: { value: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white'; type: 'string' };
       ButtonBehavior: { value: 'adaptive' | 'fixed'; type: 'string' };
     };
     'Default-Settings'?: {
@@ -4704,38 +4727,20 @@ export function exportColorSystemToJSON(
   console.log('🎨 [JSON Export] Adding utility colors to all modes...');
   
   // Light Mode utility colors
-  colorSystem.Modes['Light-Mode'].Colors['White'] = {
-    value: '#ffffff',  // Pure white in light mode (no transparency)
-    type: 'color'
-  };
-  colorSystem.Modes['Light-Mode'].Colors['Image-Overlay'] = {
-    value: '#00000000',
-    type: 'color'
-  };
-  colorSystem.Modes['Light-Mode'].Colors['Transparent'] = {
-    value: '#ffffff00',
-    type: 'color'
-  };
+  setStandaloneColor(colorSystem.Modes['Light-Mode'].Colors, 'White', { value: '#ffffff', type: 'color' });  // Pure white in light mode (no transparency)
+  setStandaloneColor(colorSystem.Modes['Light-Mode'].Colors, 'Image-Overlay', { value: '#00000000', type: 'color' });
+  setStandaloneColor(colorSystem.Modes['Light-Mode'].Colors, 'Transparent', { value: '#ffffff00', type: 'color' });
   
   // Dark Mode utility colors — white at 70% opacity. Used as the canonical
   // "white" reference for text and any UI that needs a softened white
   // against dark backgrounds (full #ffffff against #0d0d0d reads as harsh).
   // 0xB3 / 255 ≈ 0.702.
-  colorSystem.Modes['Dark-Mode'].Colors['White'] = {
-    value: '#ffffffb3',
-    type: 'color'
-  };
+  setStandaloneColor(colorSystem.Modes['Dark-Mode'].Colors, 'White', { value: '#ffffffb3', type: 'color' });
   // 30% black overlay for images in dark mode (#0000004D = 0x4D / 255 ≈ 0.30).
   // Light mode stays fully transparent — overlay is only applied when the
   // image needs to be visually muted against a darker UI.
-  colorSystem.Modes['Dark-Mode'].Colors['Image-Overlay'] = {
-    value: '#0000004D',
-    type: 'color'
-  };
-  colorSystem.Modes['Dark-Mode'].Colors['Transparent'] = {
-    value: '#00000000',
-    type: 'color'
-  };
+  setStandaloneColor(colorSystem.Modes['Dark-Mode'].Colors, 'Image-Overlay', { value: '#0000004D', type: 'color' });
+  setStandaloneColor(colorSystem.Modes['Dark-Mode'].Colors, 'Transparent', { value: '#00000000', type: 'color' });
   
   console.log('  ✓ [JSON Export] Utility colors added (White, Image-Overlay, Transparent)');
 
