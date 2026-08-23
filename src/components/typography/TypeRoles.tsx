@@ -15,6 +15,7 @@ import { AXES, HEADER_FAMILY, type AxisValues } from '../../utils/moodAxes';
 import type { FontMatchState } from '../../hooks/useFontMatch';
 import type { FontScore } from '../../utils/fontMatch';
 import { FontChip } from './FontChip';
+import { italicAvailability } from '../../utils/googleFontsManager';
 import { NOISE_FILTER_ID, noiseParams, bounceChars, SYSTEM_UI_STACK, displayLeadingFor, displayLineHeight } from '../../utils/typeScale';
 
 export type TextCase = 'normal' | 'uppercase';
@@ -33,6 +34,10 @@ export interface DisplayRole {
   weight: string;
   letterSpacing: string;
   allCaps: boolean;
+  /** Render the Display in its italic face. Only meaningful when the family
+   *  ships one — Figma has no synthetic oblique, and on the web a synthesised
+   *  one shears a script face that is already cursive. Gated on availability. */
+  italic?: boolean;
   /** 0–100 grain. A font file can't be roughened, so it renders as SVG turbulence. */
   noise: number;
   /** 0–100 hand-lettering rise and fall. Web only — see the note in the panel. */
@@ -214,13 +219,26 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
  * measured locally from the crop — stroke fingerprint and ink overlay — so a
  * ranking can be argued with rather than taken on faith.
  */
+/** True when Italic is on AND this family is known to lack one. Unknown
+ *  families (cache cold, or absent from it) are NOT disabled — an italic gate
+ *  reading an empty cache would grey out every font, which looks like a bug
+ *  rather than a limit. */
+function italicBlocks(family: string, italicOn: boolean | undefined): boolean {
+  if (!italicOn) return false;
+  const avail = italicAvailability();
+  if (!avail) return false;
+  return avail.get(family) === false;
+}
+
 function ClosestMatches({
-  match, current, categoryOf, onApply,
+  match, current, categoryOf, onApply, italicOn,
 }: {
   match: FontMatchState;
   current: string;
   categoryOf: Record<string, string>;
   onApply: (family: string, category: string) => void;
+  /** When on, families with no italic render disabled rather than vanishing. */
+  italicOn?: boolean;
 }) {
   if (match.status === 'working') {
     return (
@@ -245,6 +263,7 @@ function ClosestMatches({
               meta={pct(m.score)}
               best={m.rank === 0}
               selected={m.family === current}
+              disabled={italicBlocks(m.family, italicOn)}
               title={`${m.family} — ${pct(m.score)} match${m.metric != null ? ` · strokes ${pct(m.metric)}` : ''}${m.overlay != null ? ` · shape ${pct(m.overlay)}` : ''}`}
               onClick={() => onApply(m.family, categoryOf[m.family] ?? '')}
             />
@@ -392,6 +411,23 @@ export interface RolePanelsProps {
   stickTop?: number;
 }
 
+/**
+ * What Italic costs, in families.
+ *
+ * Returns null-safe copy: when the Google Fonts cache has not resolved yet
+ * italicAvailability() gives null, and saying "0 unavailable" then would be a
+ * confident lie. Say it is still checking instead.
+ */
+function italicNote(match: FontMatchState | undefined): string {
+  const avail = italicAvailability();
+  if (!avail) return 'Checking which families ship an italic…';
+  const families = match?.status === 'done' ? match.ranked.map(m => m.family) : [];
+  if (!families.length) return 'Families without an italic are shown but cannot be picked.';
+  const without = families.filter(f => avail.get(f) === false).length;
+  if (!without) return 'Every suggested family ships an italic.';
+  return `${without} of ${families.length} suggested families have no italic and are disabled.`;
+}
+
 export function RolePanels(p: RolePanelsProps) {
   const { system: s } = p;
 
@@ -463,10 +499,28 @@ export function RolePanels(p: RolePanelsProps) {
                 {/* The toggle sits WITH the label it controls, not hugging the
                     card's right edge — at column width the two ended up an
                     inch apart with the specimen stranded between them. */}
-                <Body style={{ fontWeight: 700, margin: 0, flexShrink: 0 }}>{role}</Body>
-                <Caption color="quiet" style={{ flexShrink: 0, marginLeft: -2 }}>
+                <Body style={{ fontWeight: 700, margin: 0, flexShrink: 0, lineHeight: 1 }}>{role}</Body>
+                {/* The +/- sits on the SAME optical line as the label. As a
+                    Caption it rendered at caption size with its own line-height,
+                    so it read as a stray character floating beside the heading
+                    rather than a control belonging to it. Fixed box, centred both
+                    ways, and large enough to be an obvious target. */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    flexShrink: 0,
+                    width: 18,
+                    height: 18,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    lineHeight: 1,
+                    color: 'var(--Quiet)',
+                  }}
+                >
                   {isOpen ? '\u2212' : '+'}
-                </Caption>
+                </span>
                 <div style={{
                   ...roleCss(role, s, role === 'Body' ? 14 : 20),
                   flex: 1,
@@ -535,7 +589,22 @@ export function RolePanels(p: RolePanelsProps) {
                           p.onDisplayChange({ allCaps: e?.target?.checked ?? !s.display.allCaps })}
                         label="All caps"
                       />
+                      <Checkbox
+                        checked={!!s.display.italic}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          p.onDisplayChange({ italic: e?.target?.checked ?? !s.display.italic })}
+                        label="Italic"
+                      />
+                      {/* Names the cost rather than quietly shrinking the list.
+                          Families without an italic stay VISIBLE and disabled, so
+                          the count and the greyed chips say the same thing. */}
+                      {s.display.italic && (
+                        <Caption color="quiet">
+                          {italicNote(p.match)}
+                        </Caption>
+                      )}
                       <ClosestMatches
+                        italicOn={s.display.italic}
                         match={p.match}
                         current={s.display.family}
                         categoryOf={Object.fromEntries(p.displayChoices.map((c) => [c.family, c.category]))}

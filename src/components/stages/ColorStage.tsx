@@ -26,6 +26,20 @@ export interface ColorEdits {
   darkChromaPerColor?: number[];
   /** Map of topColors index → exact hex the user locked. */
   lockedColorMap?: Record<number, string>;
+  /**
+   * The three below used to be local-only state, so every one of them was
+   * lost the moment this stage unmounted — walk forward to Assign Colors and
+   * back and the core colours returned to their pre-edit values with nothing
+   * reporting it.
+   *
+   * anchorColors cannot be recovered from savedTopColors: the two diverge on
+   * purpose (see the note on the anchorColors state below), so re-seeding
+   * anchors from topColors silently promotes whatever tone was last clicked
+   * into the anchor slot.
+   */
+  anchorColors?: ExtractedColor[];
+  hueOverridesByTop?: Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>;
+  primaryIndex?: number;
 }
 
 interface Props extends StageProps {
@@ -103,9 +117,13 @@ export default function ColorStage({
   // Anchor colors = the original extracted hexes used for palette generation.
   // topColors[i].hex may shift when the user clicks a different tone, but
   // anchorColors[i] stays put so the generated palette remains stable.
-  const [anchorColors, setAnchorColors] = useState<ExtractedColor[]>(seededFromScheme);
+  const [anchorColors, setAnchorColors] = useState<ExtractedColor[]>(
+    () => (savedColorEdits?.anchorColors?.length
+      ? savedColorEdits.anchorColors
+      : seededFromScheme()),
+  );
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
-  const [primaryIndex, setPrimaryIndex] = useState(0);
+  const [primaryIndex, setPrimaryIndex] = useState(savedColorEdits?.primaryIndex ?? 0);
   const [schemes, setSchemes] = useState<ColorScheme[]>(savedSchemes || []);
   const [showChromaSettings, setShowChromaSettings] = useState(false);
   const [chromaPerColor, setChromaPerColor] = useState<number[]>(
@@ -139,7 +157,9 @@ export default function ColorStage({
 
   // Hue easing overrides per topColors index (separate light/dark mode)
   // hueOverridesByTop[colorIdx] = { light: { darkHue?, lightHue? }, dark: { ... } }
-  const [hueOverridesByTop, setHueOverridesByTop] = useState<Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>>({});
+  const [hueOverridesByTop, setHueOverridesByTop] = useState<Record<number, { light?: { darkHue?: number; lightHue?: number }; dark?: { darkHue?: number; lightHue?: number } }>>(
+    savedColorEdits?.hueOverridesByTop || {},
+  );
 
   // Track narrow viewport for responsive swatch sizing
   const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
@@ -326,9 +346,12 @@ export default function ColorStage({
       chromaPerColor,
       darkChromaPerColor,
       lockedColorMap,
+      anchorColors,
+      hueOverridesByTop,
+      primaryIndex,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chromaPerColor, darkChromaPerColor, lockedColorMap]);
+  }, [chromaPerColor, darkChromaPerColor, lockedColorMap, anchorColors, hueOverridesByTop, primaryIndex]);
 
   // Fire onTopColorsExtracted whenever topColors changes — covers both the
   // initial image extraction AND inline hex edits via the modal — so the
@@ -344,6 +367,18 @@ export default function ColorStage({
     // Edit flow: skip image re-analysis. Colors are seeded from the saved
     // scheme's originalColors and the user is locked to the theme step.
     if (editMode) {
+      setIsLoading(false);
+      return;
+    }
+    // Returning to this stage is NOT a fresh start. This effect overwrites
+    // topColors, anchorColors and both chroma arrays with whatever the image
+    // yields, so re-running it on a remount threw away every edit made here —
+    // walk forward to Assign Colors and back and the core colours were the
+    // originals again. savedTopColors is the "we have been here" signal: it is
+    // populated by the [topColors] effect above on the first pass, so its
+    // presence means extraction already ran and its result has since been
+    // edited. Re-extracting would only reproduce the pre-edit state.
+    if (savedTopColors?.length) {
       setIsLoading(false);
       return;
     }
@@ -1645,6 +1680,18 @@ export default function ColorStage({
                                       e.stopPropagation();
                                       const newColors = [...scheme.colors] as [string, string, string];
                                       newColors[roleIdx] = tc.hex;
+                                      // Chroma is keyed by the colour's index in
+                                      // topColors, NOT by the role slot. Reading
+                                      // chromaPerColor[roleIdx] meant assigning
+                                      // topColors[4] to Primary generated its ramp
+                                      // at topColors[0]'s peak — the wrong colour's
+                                      // saturation, the same mismatch that made the
+                                      // Core Colors ramps disagree with the swatches.
+                                      const peakFor = (hex: string, dark: boolean) => {
+                                        const i = topColors.findIndex(c => c.hex === hex);
+                                        const table = dark ? darkChromaPerColor : chromaPerColor;
+                                        return i >= 0 ? table[i] : undefined;
+                                      };
                                       const updated: ColorScheme = {
                                         ...scheme,
                                         colors: newColors,
@@ -1654,18 +1701,27 @@ export default function ColorStage({
                                           tertiary: getLightness(newColors[2]),
                                         },
                                         tonePalettes: {
-                                          primary: generateSemanticLightModeScale(newColors[0], chromaPerColor[0]),
-                                          secondary: generateSemanticLightModeScale(newColors[1], chromaPerColor[1]),
-                                          tertiary: generateSemanticLightModeScale(newColors[2], chromaPerColor[2]),
+                                          primary: generateSemanticLightModeScale(newColors[0], peakFor(newColors[0], false)),
+                                          secondary: generateSemanticLightModeScale(newColors[1], peakFor(newColors[1], false)),
+                                          tertiary: generateSemanticLightModeScale(newColors[2], peakFor(newColors[2], false)),
                                         },
                                         darkModeTonePalettes: {
-                                          primary: generateSemanticDarkModeScale(newColors[0], darkChromaPerColor[0]),
-                                          secondary: generateSemanticDarkModeScale(newColors[1], darkChromaPerColor[1]),
-                                          tertiary: generateSemanticDarkModeScale(newColors[2], darkChromaPerColor[2]),
+                                          primary: generateSemanticDarkModeScale(newColors[0], peakFor(newColors[0], true)),
+                                          secondary: generateSemanticDarkModeScale(newColors[1], peakFor(newColors[1], true)),
+                                          tertiary: generateSemanticDarkModeScale(newColors[2], peakFor(newColors[2], true)),
                                         },
                                       };
                                       onSchemeSelected(updated);
-                                      setSchemes(prev => prev.map(s => s.name === 'Custom' ? updated : s));
+                                      // Persist upward as well as locally. setSchemes
+                                      // alone updates component state that is thrown
+                                      // away on unmount; savedSchemes is what the next
+                                      // mount seeds from, so without this the Custom
+                                      // scheme reverted the moment you went forward and
+                                      // came back. regenerateSchemes does both — this
+                                      // path only did half.
+                                      const nextSchemes = schemes.map(s => s.name === 'Custom' ? updated : s);
+                                      setSchemes(nextSchemes);
+                                      onSchemesGenerated?.(nextSchemes);
                                     }}
                                     style={{
                                       flex: 1,

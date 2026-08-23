@@ -6,6 +6,10 @@ declare module '@dynodesign/components' {
     themeURL?: string;
     foundationCSS?: string;
     coreCSS?: string;
+    /** The brand's type ramp. Loads between core and the mode sheets;
+     *  without it the lib's bundled typography-tokens.css wins and replaces
+     *  the design system's ramp. */
+    typographyCSS?: string;
     lightModeCSS?: string;
     darkModeCSS?: string;
     baseCSS?: string;
@@ -172,4 +176,21 @@ declare module '@dynodesign/components' {
   export type DynoTheme = string;
   export type DynoSurface = string;
   export type DynoStyle = string;
+
+  // Components that exist in the lib and are documented in CLAUDE.md, but
+  // were never declared here. The lib ships no .d.ts of its own (package.json
+  // points `types` at dist/index.d.ts, which rollup does not emit), so this
+  // hand-written shim IS the type surface — and it silently drifts behind the
+  // lib every time a component is added.
+  export const Section: FC<any>;
+  export const Icon: FC<any>;
+  export const DisplaySmall: FC<any>;
+  export const AccordionGroup: FC<any>;
+  export const AccordionSummary: FC<any>;
+  export const AccordionDetails: FC<any>;
+  export const TextArea: FC<any>;
+  export const OverlineSmall: FC<any>;
+  export const ListItem: FC<any>;
+  export const EmailTextField: FC<any>;
+  export const BreadcrumbItem: FC<any>;
 }

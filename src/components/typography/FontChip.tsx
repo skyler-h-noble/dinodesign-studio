@@ -26,16 +26,21 @@ export interface FontChipProps {
   /** Marks the single best match so the ranking reads at a glance. */
   best?: boolean;
   title?: string;
+  /** Unavailable, but still SHOWN. Used when Italic is on and this family ships
+   *  no italic: removing it would hide the cost of the choice, so the chip stays
+   *  visible and inert and the user can see what the toggle rules out. */
+  disabled?: boolean;
   onClick: () => void;
 }
 
 export function FontChip({
-  preview, label, meta, selected = false, best = false, title, onClick,
+  preview, label, meta, selected = false, best = false, title, disabled = false, onClick,
 }: FontChipProps) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       title={title ?? label}
       aria-pressed={selected}
       style={{
@@ -48,10 +53,20 @@ export function FontChip({
         // Fixed 8px for the same reason as the highlight: a playful brand sets
         // --Style-Border-Radius to 100 and the chips become stadiums.
         borderRadius: 8,
-        border: `1px solid ${selected ? 'var(--Buttons-Primary-Button)' : 'var(--Border)'}`,
-        background: selected ? 'var(--Hover)' : 'var(--Background)',
-        color: 'var(--Text)',
-        cursor: 'pointer',
+        opacity: disabled ? 0.38 : 1,
+        // Selected reads as a FILLED default button; the rest as outlines. The
+        // selected chip previously differed only by a tinted --Hover background
+        // and a coloured edge, which is the same weight as a hover state and did
+        // not survive a glance down a list of ten.
+        //
+        // The fill uses the Default button tokens, so the chosen face is shown
+        // in the brand's own primary action colour rather than a UI grey.
+        border: `1px solid ${selected
+          ? 'var(--Buttons-Default-Border, var(--Buttons-Default-Button))'
+          : 'var(--Border)'}`,
+        background: selected ? 'var(--Buttons-Default-Button)' : 'transparent',
+        color: selected ? 'var(--Buttons-Default-Text)' : 'var(--Text)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         textAlign: 'left',
         font: 'inherit',
       }}

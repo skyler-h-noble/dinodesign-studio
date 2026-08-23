@@ -86,7 +86,21 @@ export default function TypographyStageV2({
     }
     // Path 2: blob URL from UploadStage. Upload the File to Storage and
     // surface the public URL so the matcher can fetch it server-side.
-    if (!moodBoardFile) return;
+    //
+    // With neither a usable URL nor a File there is nothing to upload and
+    // nothing to wait for. Returning quietly here left uploading=false,
+    // publicUrl=null and uploadError=null — so the render fell through to
+    // "Preparing your moodboard…" and stayed there permanently, with no error
+    // and no timeout. It happens on re-entry, once the blob URL has been
+    // revoked and the File is no longer in memory.
+    if (!moodBoardFile) {
+      setUploadError(
+        moodBoardUrl
+          ? 'The moodboard link expired when you navigated away.'
+          : 'No moodboard was provided.',
+      );
+      return;
+    }
     let cancelled = false;
     setUploading(true);
     setUploadError(null);
@@ -120,14 +134,16 @@ export default function TypographyStageV2({
 
   if (uploading || !publicUrl) {
     return (
-      <Card padding="large">
-        <VStack spacing={1} alignItems="center">
-          <H2>Preparing your moodboard…</H2>
-          <Body color="quiet">
-            Uploading the moodboard for typography analysis. Just a moment.
-          </Body>
-        </VStack>
-      </Card>
+      <div style={{ margin: '32px auto', maxWidth: 520, width: '100%' }}>
+        <Card padding="large">
+          <VStack spacing={1} alignItems="center">
+            <H2>Analyzing your moodboard…</H2>
+            <Body color="quiet">
+              Reading the colours and lettering to match your typography.
+            </Body>
+          </VStack>
+        </Card>
+      </div>
     );
   }
 

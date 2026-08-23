@@ -90,11 +90,41 @@ export default function PhonePreview({
           color: 'var(--Text)',
           scrollbarWidth: 'none',
         }}>
+          {/* The hero line sits tight to the app bar — a display heading is the
+              start of the page, not a block floating in the middle of it. The
+              16px container gap plus its own leading left an obvious hole. */}
           {/* Welcome heading */}
+          {/* The page's one expressive moment, so it takes the DISPLAY face —
+              the whole point of the Display role is a hero line, and rendering it
+              in the Header face meant the picked display font never appeared in
+              the preview at all. */}
           <h2 style={{
-            fontFamily: 'var(--Font-Family-Header, var(--Set-Font-Family-Header, Arial, sans-serif))',
-            fontWeight: 'var(--Set-Font-Family-Header-Weight, 700)' as any,
-            fontSize: 24, color: 'var(--Header)', lineHeight: 1.2, margin: 0,
+            /* Brand-owned tokens FIRST. --Font-Family-Display is defined by the
+               lib (to the HEADER family on Desktop), so putting it first meant
+               its fallbacks never ran and this line rendered in the header face
+               — the exact bug the comment above says was already fixed once. */
+            fontFamily: 'var(--Set-Font-Family-Display, var(--Set-Font-Family-Decorative, var(--Font-Family-Display, Arial, sans-serif)))',
+            // Every value comes from the Display-Large step, so the preview
+            // shows the step it claims to. Mixing the face's own weight and
+            // letter-spacing with a different step's size is how "Welcome"
+            // ended up sized from Display-SMALL while everything else was Large.
+            fontWeight: 'var(--Display-Large-Font-Weight, var(--Set-Font-Family-Decorative-Weight, 400))' as any,
+            letterSpacing: 'var(--Display-Large-Letter-Spacing, var(--Set-Font-Family-Decorative-Letter-Spacing, 0em))',
+            // Capped for the phone. Display-Large is sized for a desktop hero;
+            // dropped into a ~320px mock at full size it filled a third of the
+            // screen and pushed the cards below the fold. min() keeps every
+            // OTHER Display-Large property — face, weight, tracking, casing —
+            // so the step is still the one being previewed, and only the size
+            // is answerable to the surface it is drawn on.
+            fontSize: 'min(var(--Display-Large-Font-Size, 34px), 30px)' as any,
+            // Tighter than the token's own leading, for the same reason: a
+            // display line set for a desktop measure is over-leaded at 30px.
+            lineHeight: 1.1,
+            // All-caps is a per-style token the scale already emits. The preview
+            // simply never read it, so ticking "All caps" changed the type panel
+            // and nothing else — the one place a user goes to check.
+            textTransform: 'var(--Display-Large-Text-Transform, none)' as any,
+            color: 'var(--Header)', margin: '-4px 0 -4px 0',
           }}>Welcome</h2>
 
           {/* Mood board banner */}
@@ -109,14 +139,20 @@ export default function PhonePreview({
             <VStack spacing={3}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <H3 style={{ fontSize: 18, whiteSpace: 'nowrap' }}>{designSystemName}</H3>
+                  {/* Eyebrow ABOVE the heading — that is what an eyebrow is: a
+                      small label introducing the line beneath it. It was below,
+                      reading as a subtitle. And it takes the Eyebrow/Overline
+                      tokens, not Decorative: the sizes live under Overline while
+                      the face and colour live under Eyebrow. */}
                   <span style={{
-                    fontFamily: 'var(--Set-Font-Family-Decorative, "Allura", cursive)',
-                    fontWeight: 'var(--Set-Font-Family-Decorative-Weight, 400)' as any,
-                    letterSpacing: 'var(--Set-Font-Family-Decorative-Letter-Spacing, 0em)',
-                    textTransform: 'var(--Set-Font-Family-Decorative-Text-Transform, none)' as any,
-                    fontSize: 14, color: 'var(--Quiet)',
+                    fontFamily: 'var(--Font-Family-Eyebrow, var(--Set-Font-Family-Eyebrow, sans-serif))',
+                    fontWeight: 'var(--Font-Weight-Eyebrow, 600)' as any,
+                    letterSpacing: 'var(--Eyebrow-Medium-Letter-Spacing, var(--Overline-Medium-Letter-Spacing, 0.1em))',
+                    textTransform: 'var(--Eyebrow-Medium-Text-Transform, var(--Overline-Medium-Text-Transform, uppercase))' as any,
+                    fontSize: 'var(--Eyebrow-Medium-Font-Size, var(--Overline-Medium-Font-Size, 13px))' as any,
+                    color: 'var(--Eyebrow, var(--Quiet))',
                   }}>Adaptive &amp; Accessible</span>
+                  <H3 style={{ fontSize: 18, whiteSpace: 'nowrap' }}>{designSystemName}</H3>
                 </div>
                 <Button variant="secondary" size="small" style={{
                   width: 40, height: 40, minWidth: 'auto', borderRadius: 40, padding: 0, flexShrink: 0,
@@ -142,14 +178,16 @@ export default function PhonePreview({
               <VStack spacing={2}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <H3 style={{ fontSize: 16 }}>Next Steps</H3>
+                    {/* Eyebrow above the heading — see the note on the main card. */}
                     <span style={{
-                      fontFamily: 'var(--Set-Font-Family-Decorative, "Allura", cursive)',
-                      fontWeight: 'var(--Set-Font-Family-Decorative-Weight, 400)' as any,
-                      letterSpacing: 'var(--Set-Font-Family-Decorative-Letter-Spacing, 0em)',
-                      textTransform: 'var(--Set-Font-Family-Decorative-Text-Transform, none)' as any,
-                      fontSize: 12, color: 'var(--Quiet)',
+                      fontFamily: 'var(--Font-Family-Eyebrow, var(--Set-Font-Family-Eyebrow, sans-serif))',
+                      fontWeight: 'var(--Font-Weight-Eyebrow, 600)' as any,
+                      letterSpacing: 'var(--Eyebrow-Medium-Letter-Spacing, var(--Overline-Medium-Letter-Spacing, 0.1em))',
+                      textTransform: 'var(--Eyebrow-Medium-Text-Transform, var(--Overline-Medium-Text-Transform, uppercase))' as any,
+                      fontSize: 'var(--Eyebrow-Medium-Font-Size, var(--Overline-Medium-Font-Size, 13px))' as any,
+                      color: 'var(--Eyebrow, var(--Quiet))',
                     }}>Explore</span>
+                    <H3 style={{ fontSize: 16 }}>Next Steps</H3>
                   </div>
                   <Button variant="secondary" size="small" style={{
                     width: 36, height: 36, minWidth: 'auto', borderRadius: 36, padding: 0, flexShrink: 0,
