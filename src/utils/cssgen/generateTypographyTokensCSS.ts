@@ -164,9 +164,16 @@ export function typographyDeclarations(typography: TypographyStyle[] | null | un
   // matches the Figma variable exactly — the two must agree or they drift.
   {
     const picked = Number(roles.header.weight) || 400;
-    const wanted = Math.max(picked, HEADER_CLAMPED_WEIGHT_FLOOR);
-    const snapped = nearestAvailableWeight(roles.header.family, wanted) ?? wanted;
-    out.push(`  --Header-Clamped-Weight: ${snapped};`);
+    // Only ever RAISES. At or above the floor the brand's weight passes through
+    // untouched — not even snapped, because snapping a value we are not
+    // changing can move it: a face without a 700 cut would answer 900, and
+    // H4-H6 would come out heavier than H1-H3 for a brand that asked for
+    // neither. Snap only the value we actually substitute.
+    const clamped = picked >= HEADER_CLAMPED_WEIGHT_FLOOR
+      ? picked
+      : (nearestAvailableWeight(roles.header.family, HEADER_CLAMPED_WEIGHT_FLOOR)
+         ?? HEADER_CLAMPED_WEIGHT_FLOOR);
+    out.push(`  --Header-Clamped-Weight: ${clamped};`);
   }
 
   // One variable per axis per face, then a font-variation-settings value built

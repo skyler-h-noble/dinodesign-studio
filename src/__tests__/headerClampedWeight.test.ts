@@ -61,6 +61,28 @@ describe('--Header-Clamped-Weight', () => {
       .toBe(`face=${face} clamped=${clamped} distinct=true`);
   });
 
+  // The property that defines this token: it RAISES or it does nothing. At or
+  // above the floor the brand's value must pass through byte-identical — not
+  // snapped, since snapping a value we are not changing can move it.
+  it('is a no-op at or above the floor, on every face', () => {
+    for (const family of ['Inter', 'Anton', 'Caveat', 'Public Sans']) {
+      for (const w of ['500', '600', '700', '800', '900']) {
+        const text = css(w, family);
+        expect(`${family}/${w} -> ${read(text, 'Header-Clamped-Weight')}`)
+          .toBe(`${family}/${w} -> ${w}`);
+      }
+    }
+  });
+
+  it('raises every weight below the floor, on every face', () => {
+    for (const family of ['Inter', 'Anton', 'Caveat']) {
+      for (const w of ['100', '200', '250', '300', '400']) {
+        const v = Number(read(css(w, family), 'Header-Clamped-Weight'));
+        expect(`${family}/${w} raised=${v > Number(w)}`).toBe(`${family}/${w} raised=true`);
+      }
+    }
+  });
+
   it('never emits a weight outside the CSS range', () => {
     for (const w of ['1', '100', '250', '400', '700', '900', '1000']) {
       const v = Number(read(css(w), 'Header-Clamped-Weight'));
