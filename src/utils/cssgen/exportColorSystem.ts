@@ -7160,6 +7160,18 @@ export function exportColorSystemToJSON(
   // The value is COPIED from the mapped role already present in the same
   // block, so an eyebrow is the same hex as its text role by construction, not
   // by a parallel calculation that could drift.
+  /** Which BACKGROUND palette a theme paints, so the Eyebrows table can be
+   *  indexed. Mirrors EYEBROW_ROLE_BY_THEME's grouping — Default is treated as
+   *  Primary-backed there and is treated the same way here. */
+  const EYEBROW_BACKGROUND_BY_THEME = (theme: string): string => {
+    const base = theme.replace(/-Light$/, '');
+    if (['Info', 'Success', 'Warning', 'Error'].includes(base)) return base;
+    if (base === 'Secondary') return 'Secondary';
+    if (base === 'Tertiary') return 'Tertiary';
+    if (base === 'Primary' || base === 'Default') return 'Primary';
+    return 'Neutral';   // White, Black, Light-Gray, Neutral
+  };
+
   const EYEBROW_ROLE_BY_THEME = (theme: string): string => {
     const base = theme.replace(/-Light$/, '');
     if (['Info', 'Success', 'Warning', 'Error'].includes(base)) return 'BW';
@@ -7173,12 +7185,37 @@ export function exportColorSystemToJSON(
   for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
     const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
     if (!themes) continue;
+    const eyebrowTable: any = (colorSystem.Modes[modeName] as any)?.Eyebrows;
     for (const [themeName, theme] of Object.entries<any>(themes)) {
       const role = EYEBROW_ROLE_BY_THEME(themeName);
+      const bgPalette = EYEBROW_BACKGROUND_BY_THEME(themeName);
       for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
         if (!section || typeof section !== 'object' || !section['Text-Primary']) continue;
         const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
 
+        // Prefer the Eyebrows TABLE, which is where the eyebrow's own decisions
+        // live — the rotation, the 4.5:1 solve, and the dark-mode Color-Vibrant
+        // rule for backgrounds at tone 1-5.
+        //
+        // This used to copy the mapped text role's value outright. That made an
+        // eyebrow the same hex as body copy by construction, and it silently
+        // bypassed Modes/Eyebrows entirely: the table was built, emitted as
+        // --Eyebrows-* variables, and then nothing read it. Which is why
+        // Color-Vibrant never appeared on a dark surface or container however
+        // correct the rule was.
+        const toneKey = String(section['Text-Primary'].value || '')
+          .match(/\.(Color-[\w-]+)\}$/)?.[1];
+        if (toneKey && eyebrowTable?.[scope]?.[bgPalette]?.[toneKey]) {
+          section.Eyebrow = {
+            value: `{Eyebrows.${scope}.${bgPalette}.${toneKey}}`,
+            type: 'color',
+          };
+          eyebrowTokens++;
+          continue;
+        }
+
+        // No table entry — fall back to the previous behaviour rather than
+        // leaving the theme without an eyebrow at all.
         if (role !== 'BW') {
           const source = section[role];
           if (!source?.value) continue;
