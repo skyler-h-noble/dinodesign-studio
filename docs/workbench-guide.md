@@ -146,6 +146,14 @@ that render as something entirely plausible:
 | **Text missing** | Copy in the frame that never made it into the code. |
 | **Instance unmapped** | A Figma component instance with no counterpart in the output. |
 
+Each finding names the component it came from and where it sits — *"List:
+variant Orientation…"*, *"in List Slot > List Item"*. That matters more than it
+sounds: `Orientation = Vertical` is unactionable in a frame with four Dividers.
+
+It also catches things in the design itself. The `Orientation = Vertica` above is
+not a conversion bug — the List component's variant is misspelled in Figma, and
+the report is the first place anyone noticed.
+
 The count on the tab is **errors only**. Warnings and "to check" are frequently
 legitimate — text is often bound to a prop rather than inlined, and a designer's
 layer name need not survive into code — so a badge counting those would never be
