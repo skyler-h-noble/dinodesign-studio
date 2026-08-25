@@ -973,7 +973,34 @@ ${JSON.stringify(frameJson, null, 2)}`;
   });
 
   if (!res.ok) {
-    throw new Error(`Anthropic API ${res.status}: ${await res.text().catch(() => 'unknown')}`);
+    // Surface the API's own sentence rather than the raw envelope. These three
+    // are the ones that actually happen here and they are easy to misread as
+    // each other: a 401 is usually the WRONG VALUE pasted (a Design ID rather
+    // than a key), not an expired key, and a 400 about credit is not a code
+    // problem at all. Dumping the JSON blob made every one of them look like a
+    // bug in the workbench.
+    const raw = await res.text().catch(() => '');
+    let detail = raw;
+    try {
+      const parsed = JSON.parse(raw) as { error?: { message?: string; type?: string } };
+      if (parsed.error?.message) detail = parsed.error.message;
+    } catch { /* not JSON — keep the body as-is */ }
+
+    if (res.status === 401) {
+      throw new Error(
+        `Anthropic rejected the API key. Check it starts with sk-ant- and was copied whole. (${detail})`,
+      );
+    }
+    if (res.status === 400 && /credit balance/i.test(detail)) {
+      throw new Error(
+        'Anthropic account is out of credit — add credits under Plans & Billing at console.anthropic.com. '
+        + 'The key itself is fine; nothing here needs changing.',
+      );
+    }
+    if (res.status === 429) {
+      throw new Error(`Anthropic rate limit hit — wait a moment and convert again. (${detail})`);
+    }
+    throw new Error(`Anthropic API ${res.status}: ${detail || 'unknown'}`);
   }
 
   const data = await res.json();
