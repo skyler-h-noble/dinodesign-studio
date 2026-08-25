@@ -50,6 +50,7 @@ import {
   fetchFigmaVariables,
 } from '../utils/figmaApi';
 import { convertFigmaToCode } from '../utils/figmaToCode';
+import { computeDrift, driftSummary } from '../utils/conversionDrift';
 import {
   logConversionAttempt,
   logConversionVerdict,
@@ -166,7 +167,10 @@ export default function AaidWorkbenchPage() {
   const [missingComponents, setMissingComponents] = useState<string[]>([]);
   const [conversionId, setConversionId] = useState<string | null>(null);
 
-  const [rightView, setRightView] = useState<'code' | 'preview'>('code');
+  const [rightView, setRightView] = useState<'code' | 'preview' | 'drift'>('code');
+  // The frame is kept so drift can be recomputed without re-fetching. It is the
+  // half of the comparison the preview cannot show you.
+  const [frame, setFrame] = useState<unknown | null>(null);
   // Opens on Settings when the keys are not usable, so a first run — or an
   // expired key — lands on the thing that needs fixing rather than on a Convert
   // button that cannot fire. Read once: flipping the tab out from under someone
@@ -280,6 +284,14 @@ export default function AaidWorkbenchPage() {
 
   const urlParts = useMemo(() => parseFigmaUrl(figmaUrl.trim()), [figmaUrl]);
 
+  // Errors only in the tab badge. Warnings and info are frequently legitimate —
+  // text bound to a prop, a layer name that need not survive — and a badge that
+  // is never zero is a badge nobody reads.
+  const driftCount = useMemo(
+    () => computeDrift(frame, jsx).filter(f => f.severity === 'error').length,
+    [frame, jsx],
+  );
+
   // Enabled once the pasted URL parses and both keys are set.
   const canConvert = Boolean(urlParts && tokensSet);
 
@@ -341,6 +353,7 @@ export default function AaidWorkbenchPage() {
       }
 
       if (image) setImgUrl(image);
+      setFrame(frameJson);
 
       // Debug: expose the raw Figma frame JSON so we can inspect what the API
       // returns (e.g. explicitVariableModes / boundVariables for Theme/Surface/
@@ -554,20 +567,18 @@ export default function AaidWorkbenchPage() {
             <Card padding="medium">
               <VStack gap="var(--Sizing-1)">
                 <HStack gap="var(--Sizing-1)" justifyContent="space-between" alignItems="center" style={{ width: '100%' }}>
-                  <H3>{rightView === 'code' ? 'Generated JSX' : 'Live preview'}</H3>
-                  <HStack gap="var(--Sizing-1)">
-                    <ButtonGroup
-                      value={rightView}
-                      onChange={(v: 'code' | 'preview') => setRightView(v)}
-                      size="small"
-                    >
-                      <Button value="code" size="small">Code</Button>
-                      <Button value="preview" size="small">Preview</Button>
-                    </ButtonGroup>
-                    {jsx && rightView === 'code' && (
-                      <Button size="small" variant="primary-outline" onClick={copyJsx}>Copy</Button>
-                    )}
-                  </HStack>
+                  <Tabs value={rightView} onChange={(v: 'code' | 'preview' | 'drift') => setRightView(v)}>
+                    <TabList aria-label="Conversion output">
+                      <Tab value="code">Code</Tab>
+                      <Tab value="preview">Preview</Tab>
+                      <Tab value="drift">
+                        Drift{driftCount > 0 ? ` (${driftCount})` : ''}
+                      </Tab>
+                    </TabList>
+                  </Tabs>
+                  {jsx && rightView === 'code' && (
+                    <Button size="small" variant="primary-outline" onClick={copyJsx}>Copy</Button>
+                  )}
                 </HStack>
 
                 {rightView === 'code' && (
@@ -577,6 +588,10 @@ export default function AaidWorkbenchPage() {
                     maxHeight={600}
                     wrap
                   />
+                )}
+
+                {rightView === 'drift' && (
+                  <DriftPanel frameJson={frame} jsx={jsx} />
                 )}
 
                 {rightView === 'preview' && (
@@ -918,6 +933,64 @@ function CodeToDesignPanel() {
           </VStack>
         </Card>
       )}
+    </VStack>
+  );
+}
+
+/**
+ * Drift — differences between the frame and the code, computed not guessed.
+ *
+ * The preview catches drift you can see. This catches the rest: a hardcoded hex
+ * renders identically to the token it should have used, a dropped variant gives
+ * you the component's default, and a row that Figma hid just looks like a row.
+ *
+ * Findings are signals. Warnings and info are often legitimate — text bound to a
+ * prop, a layer name that need not survive into code — so they are shown plainly
+ * rather than as failures, and only errors reach the tab badge.
+ */
+function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
+  const findings = useMemo(() => computeDrift(frameJson, jsx), [frameJson, jsx]);
+  const counts = useMemo(() => driftSummary(findings), [findings]);
+
+  if (!jsx.trim()) {
+    return <Body color="quiet">Convert a frame to compare it against the code.</Body>;
+  }
+
+  if (findings.length === 0) {
+    return (
+      <Alert severity="success">
+        No drift found. No hardcoded colours, no hidden layers rendered, every
+        variant and string accounted for.
+      </Alert>
+    );
+  }
+
+  const tone = (s: string) =>
+    s === 'error' ? 'error' : s === 'warning' ? 'warning' : 'info';
+
+  return (
+    <VStack gap="var(--Sizing-2)">
+      <HStack gap="var(--Sizing-Half)" style={{ flexWrap: 'wrap' }}>
+        {counts.errors > 0 && <Chip label={`${counts.errors} error`} size="small" />}
+        {counts.warnings > 0 && <Chip label={`${counts.warnings} warning`} size="small" />}
+        {counts.info > 0 && <Chip label={`${counts.info} to check`} size="small" />}
+      </HStack>
+
+      <VStack gap="var(--Sizing-1)">
+        {findings.map((f, i) => (
+          <Alert key={`${f.kind}-${i}`} severity={tone(f.severity) as 'error'}>
+            <VStack gap="var(--Sizing-Half)">
+              <BodySmall>{f.message}</BodySmall>
+              {f.detail && <Caption color="quiet">{f.detail}</Caption>}
+            </VStack>
+          </Alert>
+        ))}
+      </VStack>
+
+      <Caption color="quiet">
+        Errors are always wrong. Warnings and “to check” often are not — text is
+        frequently bound to a prop, and a layer name need not survive into code.
+      </Caption>
     </VStack>
   );
 }
