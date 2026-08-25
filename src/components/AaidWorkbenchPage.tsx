@@ -123,8 +123,14 @@ export default function AaidWorkbenchPage() {
   }, [user]);
 
   // Persist tokens + dinoId to localStorage so the user only pastes once.
-  useEffect(() => { localStorage.setItem(LS_FIGMA_TOKEN, figmaToken); }, [figmaToken]);
-  useEffect(() => { localStorage.setItem(LS_ANTHROPIC_KEY, anthropicKey); }, [anthropicKey]);
+  // Stored TRIMMED. Both keys are validated with .trim() but used to be sent
+  // raw, so a trailing newline — which is what you get copying a key out of a
+  // console — reached the header and came back as
+  // `authentication_error: invalid x-api-key`. The error names the key, so the
+  // obvious read is that the key is wrong rather than that it has whitespace on
+  // the end.
+  useEffect(() => { localStorage.setItem(LS_FIGMA_TOKEN, figmaToken.trim()); }, [figmaToken]);
+  useEffect(() => { localStorage.setItem(LS_ANTHROPIC_KEY, anthropicKey.trim()); }, [anthropicKey]);
   useEffect(() => { localStorage.setItem(LS_DINO_ID, dinoId); }, [dinoId]);
 
   // Brand CSS injection. When a Design ID is provided, inject the design
@@ -230,8 +236,8 @@ export default function AaidWorkbenchPage() {
 
         if (frameJson === null) {
           const [fetchedFrame, fetchedImage] = await Promise.all([
-            fetchFigmaNode(urlParts.fileKey, urlParts.nodeId, figmaToken),
-            fetchFigmaImage(urlParts.fileKey, urlParts.nodeId, figmaToken).catch(() => null),
+            fetchFigmaNode(urlParts.fileKey, urlParts.nodeId, figmaToken.trim()),
+            fetchFigmaImage(urlParts.fileKey, urlParts.nodeId, figmaToken.trim()).catch(() => null),
           ]);
           frameJson = fetchedFrame;
           image = fetchedImage;
@@ -266,7 +272,7 @@ export default function AaidWorkbenchPage() {
       const { jsx: generatedJsx, missingComponents: missing } = await convertFigmaToCode(
         frameJson,
         {},  // variables omitted — endpoint requires file_variables scope
-        anthropicKey,
+        anthropicKey.trim(),
         brandMeta ?? undefined,
       );
       setJsx(generatedJsx);
@@ -345,7 +351,11 @@ export default function AaidWorkbenchPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', padding: 32, maxWidth: 1400, margin: '0 auto' }}>
+    <div
+      data-theme="Brand"
+      data-surface="Surface"
+      style={{ minHeight: '100vh', padding: 32, maxWidth: 1400, margin: '0 auto', background: 'var(--Background)' }}
+    >
       <VStack gap="var(--Sizing-3)">
         <VStack gap="var(--Sizing-Half)">
           <H2>AAID workbench</H2>
@@ -530,19 +540,12 @@ export default function AaidWorkbenchPage() {
                 </HStack>
 
                 {rightView === 'code' && (
-                  <pre data-surface="Container" style={{
-                    background: 'var(--Background)',
-                    padding: 12,
-                    borderRadius: 8,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    maxHeight: 600,
-                    overflow: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-                  }}>
-                    <code>{jsx || (busy ? 'Generating…' : '(awaiting conversion)')}</code>
-                  </pre>
+                  <CodeBlock
+                    code={jsx || (busy ? 'Generating…' : '(awaiting conversion)')}
+                    language="JSX"
+                    maxHeight={600}
+                    wrap
+                  />
                 )}
 
                 {rightView === 'preview' && (
@@ -671,20 +674,9 @@ function LivePreviewPanel({ jsx, busy, frameWidth }: { jsx: string; busy: boolea
         <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--Quiet)' }}>
           Transformed code (what the preview is parsing)
         </summary>
-        <pre data-surface="Container" style={{
-          background: 'var(--Background)',
-          padding: 12,
-          borderRadius: 8,
-          fontSize: 11,
-          lineHeight: 1.5,
-          maxHeight: 300,
-          overflow: 'auto',
-          whiteSpace: 'pre-wrap',
-          fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-          marginTop: 6,
-        }}>
-          <code>{prepared.code}</code>
-        </pre>
+        <div style={{ marginTop: 6 }}>
+          <CodeBlock code={prepared.code} language="JSX" maxHeight={300} wrap />
+        </div>
       </details>
     </>
   );
