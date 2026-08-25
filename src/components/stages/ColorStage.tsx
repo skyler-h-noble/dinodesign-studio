@@ -543,7 +543,27 @@ export default function ColorStage({
     const authored = customColorsRef.current;
     const withCustom = authored
       ? generated.map(sc => (sc.name === 'Custom'
-        ? { ...sc, colors: [...authored] as [string, string, string], originalColors: [...authored] }
+        ? {
+          ...sc,
+          colors: [...authored] as [string, string, string],
+          originalColors: [...authored],
+          // extractedTones must be recomputed from the AUTHORED colours.
+          //
+          // It is calculated inside generateColorSchemes from `reordered` —
+          // the Core Colors in radio order — so leaving it alone gave Custom
+          // authored colours with somebody else's tones. Downstream that is
+          // not cosmetic: buildPreviewCSS derives
+          // `PC = toneToColorNumber(extractedTones.primary)` and uses it as the
+          // nav's tone index, so changing the Core Colors radio slid the app
+          // bar up and down the ramp while Custom's palette sat still. The
+          // colours looked stable and the chrome moved, which is why it read
+          // as "the tones are changing".
+          extractedTones: {
+            primary: chroma(authored[0]).lch()[0],
+            secondary: chroma(authored[1]).lch()[0],
+            tertiary: chroma(authored[2]).lch()[0],
+          },
+        }
         : sc))
       : generated;
 
