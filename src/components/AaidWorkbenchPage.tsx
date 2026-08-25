@@ -69,7 +69,59 @@ const LS_DINO_ID = 'aaid-workbench:dino-id';
 // against the real hosted brand. Filenames MUST match what the generator
 // writes to design-systems/<uuid>/ in hosted Storage — the old tokens-*.css
 // names 404'd, which silently fell back to the local default theme.
-const BRAND_CSS_FILES = ['foundation.css', 'core.css', 'Light-Mode.css', 'base.css', 'styles.css'];
+// Same list, and the same ORDER, that main.tsx loads for the studio's own skin.
+// typography-tokens.css was missing, so the brand's type ramp never applied and
+// the workbench kept the studio's faces while claiming to show the brand.
+const BRAND_CSS_FILES = [
+  'foundation.css',
+  'core.css',
+  'typography-tokens.css',
+  'Light-Mode.css',
+  'base.css',
+  'styles.css',
+];
+
+/** The studio's own skin, injected by applyStudioDesignSystem. */
+const STUDIO_STYLE_ID = 'omni-studio-design-system';
+
+/**
+ * Make the workbench wear the pasted design system instead of the studio's.
+ *
+ * Ordering alone does not do it. applyStudioDesignSystem is ASYNC — it fetches,
+ * then appends its <style> to <head> — while these <link>s are appended
+ * synchronously when the effect runs. With an id already in localStorage the
+ * studio's sheet lands AFTER the brand's and wins on equal specificity, so the
+ * workbench showed the studio's colours and claimed to show the brand's. Which
+ * one won depended on network timing, which is the worst kind of bug to chase.
+ *
+ * So the studio's sheet is disabled outright while a brand is active, and
+ * re-enabled when the field is cleared or the page unmounts.
+ */
+function setStudioSkinEnabled(enabled: boolean) {
+  const el = document.getElementById(STUDIO_STYLE_ID) as HTMLStyleElement | null;
+  if (el) el.disabled = !enabled;
+}
+
+/**
+ * Keep the studio's sheet disabled even if it has not been injected yet.
+ *
+ * Disabling it once is not enough: applyStudioDesignSystem fetches six files
+ * before appending, so on a cold load the element does not exist when this
+ * effect runs and `getElementById` returns null — the call is a silent no-op
+ * and the studio's skin wins as soon as it lands. Watching <head> closes that
+ * window regardless of how long the fetch takes.
+ *
+ * Returns a stop function.
+ */
+function suppressStudioSkin(): () => void {
+  setStudioSkinEnabled(false);
+  const observer = new MutationObserver(() => setStudioSkinEnabled(false));
+  observer.observe(document.head, { childList: true });
+  return () => {
+    observer.disconnect();
+    setStudioSkinEnabled(true);
+  };
+}
 
 interface BrandMeta {
   designSystemName?: string;
@@ -144,6 +196,7 @@ export default function AaidWorkbenchPage() {
     if (!trimmed) {
       // Remove any previously injected brand <link> tags.
       document.querySelectorAll('link[data-aaid-brand]').forEach(n => n.remove());
+      setStudioSkinEnabled(true);
       setBrandMeta(null);
       setBrandError(null);
       return;
@@ -161,6 +214,10 @@ export default function AaidWorkbenchPage() {
       link.setAttribute('data-aaid-brand', trimmed);
       document.head.appendChild(link);
     }
+    // The studio's sheet is appended asynchronously and would otherwise land
+    // last. Suppress it while this brand is on screen; the cleanup below
+    // brings it back.
+    const restoreStudioSkin = suppressStudioSkin();
 
     // Fetch brand metadata for the prompt.
     (async () => {
@@ -189,6 +246,9 @@ export default function AaidWorkbenchPage() {
     // brand styles into other studio pages.
     return () => {
       document.querySelectorAll(`link[data-aaid-brand="${trimmed}"]`).forEach(n => n.remove());
+      // Give the studio its own skin back, or every page visited after this one
+      // keeps rendering in the pasted brand.
+      restoreStudioSkin();
     };
   }, [dinoId]);
 
@@ -352,7 +412,13 @@ export default function AaidWorkbenchPage() {
 
   return (
     <div
-      data-theme="Brand"
+      // "Default" — NOT "Brand". Brand is a preview-only theme name that
+      // buildPreviewCSS emits; published design-system CSS never defines it, so
+      // data-theme="Brand" matched no rule in the loaded brand sheets and every
+      // token fell back. The card painted from one theme and its text from
+      // another, which reads as a contrast bug rather than a missing selector.
+      // Default is the theme that mirrors the brand's chosen background.
+      data-theme="Default"
       data-surface="Surface"
       style={{ minHeight: '100vh', padding: 32, maxWidth: 1400, margin: '0 auto', background: 'var(--Background)' }}
     >
