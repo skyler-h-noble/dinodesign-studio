@@ -888,7 +888,7 @@ function CodeToDesignPanel() {
               ))}
             </HStack>
             {unknown.length > 0 && (
-              <Alert severity="warning" data-theme="Warning" data-surface="Surface-Brightest">
+              <Alert severity="warning" color="warning" data-theme="Warning" data-surface="Surface-Brightest">
                 Not exported by the library: {unknown.join(', ')}. A frame cannot
                 be built for these — swap them for library components first.
               </Alert>
@@ -901,7 +901,7 @@ function CodeToDesignPanel() {
         <Card padding="medium">
           <VStack gap="var(--Sizing-2)">
             <H3>Build payload</H3>
-            <Alert severity="info" data-theme="Info" data-surface="Surface-Brightest">
+            <Alert severity="info" color="info" data-theme="Info" data-surface="Surface-Brightest">
               Figma's REST API cannot create frames — only a plugin can. This
               hands the payload to the paired plugin, which owns the
               <code> figma.createFrame()</code> call.
@@ -958,7 +958,7 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
 
   if (findings.length === 0) {
     return (
-      <Alert severity="success" data-theme="Success" data-surface="Surface-Brightest">
+      <Alert severity="success" color="success" data-theme="Success" data-surface="Surface-Brightest">
         No drift found. No hardcoded colours, no hidden layers rendered, every
         variant and string accounted for.
       </Alert>
@@ -969,17 +969,24 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
     s === 'error' ? 'error' : s === 'warning' ? 'warning' : 'info';
 
   /**
-   * Each severity carries its own theme, and the pair is what makes the card
-   * legible — data-theme picks the palette, data-surface="Surface-Brightest"
-   * picks the lightest step in it, and --Text/--Border come along already tuned
-   * for that tone. Painting a background without the pair is what left these
-   * cards white on a dark page.
+   * Alert takes its palette from `color`, NOT from `severity`.
+   *
+   * Inside the component: `const C = cap(color); const dataTheme = ... : C`,
+   * and that lands on the inner element that actually paints. Passing
+   * severity="warning" without a color left the inner on the default — so the
+   * outer said data-theme="Warning" while the card rendered Error-Color-11, and
+   * the two disagreed in devtools with the inner winning.
+   *
+   * So the palette goes through `color` and the data attributes on the outer
+   * match it, rather than fighting it from the outside.
    *
    * "Surface-Brightest", not "Surface-Lightest" — the latter does not exist,
    * and a data-surface that matches nothing resolves to nothing.
    */
   const themeFor = (s: string) =>
     s === 'error' ? 'Error' : s === 'warning' ? 'Warning' : 'Info';
+  const colorFor = (s: string) =>
+    s === 'error' ? 'error' : s === 'warning' ? 'warning' : 'info';
 
   return (
     <VStack gap="var(--Sizing-2)">
@@ -994,6 +1001,7 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
           <Alert
             key={`${f.kind}-${i}`}
             severity={tone(f.severity) as 'error'}
+            color={colorFor(f.severity)}
             data-theme={themeFor(f.severity)}
             data-surface="Surface-Brightest"
           >
