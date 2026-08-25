@@ -11,6 +11,7 @@
 // everything else is set against.
 
 import { Body, Caption, Card, Checkbox, Button, Link, VStack, HStack, Slider, Divider } from '@omni-design/components';
+import { weightsFor, nearestAvailableWeight } from '../../utils/googleFontWeights';
 import { AXES, HEADER_FAMILY, type AxisValues } from '../../utils/moodAxes';
 import type { FontMatchState } from '../../hooks/useFontMatch';
 import type { FontScore } from '../../utils/fontMatch';
@@ -192,10 +193,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function RangeField({
-  label, value, min, max, step = 1, onChange,
+  label, value, min, max, step = 1, onChange, snap, marks,
 }: {
   label: string; value: number; min: number; max: number; step?: number;
   onChange: (v: number) => void;
+  /** Land the value on something real — see WeightField. */
+  snap?: (v: number) => number;
+  marks?: { value: number }[];
 }) {
   return (
     <Field label={label}>
@@ -204,11 +208,52 @@ function RangeField({
         min={min}
         max={max}
         step={step}
+        marks={marks}
         size="small"
         aria-label={label}
-        onChange={(_e: unknown, v: number | number[]) => onChange(Array.isArray(v) ? v[0] : v)}
+        onChange={(_e: unknown, v: number | number[]) => {
+          const next = Array.isArray(v) ? v[0] : v;
+          onChange(snap ? snap(next) : next);
+        }}
       />
     </Field>
+  );
+}
+
+/**
+ * A weight slider that can only land on weights the face actually ships.
+ *
+ * Not a nicety. A weight a family does not have makes the Google Fonts request
+ * FAIL — `Zilla+Slab:wght@200` is answered with a 400 and the whole css2 URL is
+ * rejected — so the face never downloads and the browser substitutes silently.
+ * The design system then looks correct in every file and renders in the wrong
+ * font. Snapping here means that state is unreachable rather than merely
+ * corrected later by the export.
+ *
+ * Marks show what the face has, so a static two-weight family reads as two
+ * stops rather than a continuous track that mysteriously jumps.
+ *
+ * A family we have no metadata for passes through unsnapped — unknown is not
+ * the same as weightless, and refusing to move would be worse than allowing a
+ * weight that might work.
+ */
+function WeightField({
+  label, value, family, onChange,
+}: {
+  label: string; value: number; family: string; onChange: (v: number) => void;
+}) {
+  const available = weightsFor(family);
+  return (
+    <RangeField
+      label={label}
+      value={value}
+      min={100}
+      max={900}
+      step={available.length ? null as unknown as number : 100}
+      marks={available.length ? available.map((w) => ({ value: w })) : undefined}
+      snap={(v) => nearestAvailableWeight(family, v) ?? v}
+      onChange={onChange}
+    />
   );
 }
 
@@ -557,9 +602,10 @@ export function RolePanels(p: RolePanelsProps) {
                         value={s.display.size} min={32} max={120} step={4}
                         onChange={(v) => p.onDisplayChange({ size: v })}
                       />
-                      <RangeField
+                      <WeightField
                         label={`Weight (${s.display.weight})${s.display.detectedWeight ? ` · measured ${s.display.detectedWeight}` : ''}`}
-                        value={Number(s.display.weight)} min={100} max={900} step={100}
+                        value={Number(s.display.weight)}
+                        family={s.display.family}
                         onChange={(v) => p.onDisplayChange({ weight: String(v) })}
                       />
                       <RangeField
@@ -629,6 +675,10 @@ export function RolePanels(p: RolePanelsProps) {
 
                   {role === 'Eyebrow' && (
                     <VStack spacing={2} style={{ width: '100%' }}>
+                      {/* Plain steps, not WeightField: the eyebrow face is the
+                          fixed OS UI stack rather than a picked family, so
+                          there is no weight list to snap to. Guessing one would
+                          be worse than the honest 100s. */}
                       <RangeField
                         label={`Weight (${s.eyebrow.weight})`}
                         value={Number(s.eyebrow.weight)} min={100} max={900} step={100}
