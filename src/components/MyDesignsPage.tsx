@@ -254,7 +254,7 @@ export default function MyDesignsPage() {
         ) : (
           <div style={{
             display: 'grid',
-            gap: 16,
+            gap: 24,
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           }}>
             {sortedDesigns.map(ds => (
@@ -335,7 +335,17 @@ function DesignSystemCard({
   const swatches = (ds.colors.length ? ds.colors : ['#666', '#999', '#ccc']).slice(0, 3);
 
   return (
-    <Card padding="small">
+    // clickable gives the lib's own affordances — pointer, a raised shadow and
+    // translateY(-1px) on hover, settling on press. Opting in beats restating
+    // them here, where they would drift from every other clickable card.
+    //
+    // The ellipsis menu and the buttons inside stop propagation, so the card
+    // being clickable does not hijack them.
+    <Card
+      padding="small"
+      clickable
+      onClick={() => { window.location.href = `/my-designs/${ds.id}`; }}
+    >
       <VStack spacing={2}>
         {/* Hero — mood board, or color swatch fallback */}
         {showHero ? (
