@@ -703,6 +703,7 @@ function LivePreviewPanel({ jsx, busy, frameWidth }: { jsx: string; busy: boolea
  */
 function CodeToDesignPanel() {
   const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
 
   /** Which library components the pasted code instantiates, and how often. */
   const used = useMemo(() => {
@@ -777,9 +778,33 @@ function CodeToDesignPanel() {
           <VStack gap="var(--Sizing-2)">
             <H3>Build payload</H3>
             <Alert severity="info">
-              Figma's REST API cannot create frames — only a plugin can. Run this
-              payload from the paired plugin once it handles `build-frame`.
+              Figma's REST API cannot create frames — only a plugin can. This
+              hands the payload to the paired plugin, which owns the
+              <code> figma.createFrame()</code> call.
             </Alert>
+            <HStack gap="var(--Sizing-1)" alignItems="center">
+              <Button
+                variant="primary"
+                disabled={unknown.length > 0}
+                onClick={async () => {
+                  await navigator.clipboard.writeText(payload);
+                  setSent(true);
+                  window.setTimeout(() => setSent(false), 2500);
+                }}
+              >
+                {sent ? 'Copied' : 'Send to Figma plugin'}
+              </Button>
+              {unknown.length > 0 && (
+                <Caption color="quiet">
+                  Resolve the unknown components first.
+                </Caption>
+              )}
+              {sent && (
+                <Caption color="quiet">
+                  Payload copied — paste it into the plugin to build the frame.
+                </Caption>
+              )}
+            </HStack>
             <CodeBlock code={payload} language="JSON" maxHeight={320} />
           </VStack>
         </Card>
