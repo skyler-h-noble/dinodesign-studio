@@ -3201,6 +3201,31 @@ const LG_BUTTON_MIN_WIDTH_OFFSET = 40;
 const BUTTON_PADDING = 8;
 const LG_BUTTON_PADDING = 16;
 
+/**
+ * `--Text-Quiet` as an alias of `--Quiet`.
+ *
+ * The lib reads --Text-Quiet 364 times — it is what `<Body color="quiet">` and
+ * every Caption resolve — and the export emitted it ZERO times. Nine sibling
+ * roles ship (--Text-Primary, --Text-Error, …); quiet was simply missing, so
+ * the colour declaration was invalid at computed-value time and the text
+ * silently inherited whatever was around it. Intermittent-looking, because
+ * whether it read correctly depended on the ancestor it happened to sit under.
+ *
+ * --Quiet is the CANONICAL name and holds the literal; --Text-Quiet reads it.
+ * The direction is load-bearing, exactly as with Eyebrow/Overline: pointing it
+ * the other way also "cannot drift" and looks identical in a diff, but it makes
+ * the back-compat name the source of truth and quietly undoes the rename.
+ *
+ * Emitted beside every --Quiet declaration, so the alias inherits the same
+ * surface scoping and can never resolve to a different surface's value.
+ */
+function aliasTextQuiet(css: string): string {
+  return css.replace(
+    /^(\s*)--Quiet:\s*([^;]+);/gm,
+    (line, indent, value) => `${line}\n${indent}--Text-Quiet: var(--Quiet, ${value.trim()});`,
+  );
+}
+
 export function generateCSSFiles(jsonData: any): { [filename: string]: string } {
   const cssFiles: { [filename: string]: string } = {}; 
   
@@ -3274,7 +3299,12 @@ img {
       console.log('✅ Generated text-over-image.css');
     }
 
-    return cssFiles;
+    // Every sheet gets the alias, so a consumer that loads only one still resolves.
+  for (const name of Object.keys(cssFiles)) {
+    if (name.endsWith('.css')) cssFiles[name] = aliasTextQuiet(cssFiles[name]);
+  }
+
+  return cssFiles;
   }
   
   // Check if this is a multi-mode structure (has mode names as keys) (structure 2)
@@ -4041,14 +4071,36 @@ function generateGoogleFontsImports(jsonData: any): string {
   const typography = jsonData.Typography;
   const fontFamilies = new Set<string>();
 
-  // Extract font family names
-  const headerFamily = typography['Set-Font-Family-Header']?.value;
-  const bodyFamily = typography['Set-Font-Family-Body']?.value;
-  const decorativeFamily = typography['Set-Font-Family-Decorative']?.value;
+  /* EVERY face the design publishes, found by shape rather than by name.
+   *
+   * This used to read exactly three keys — Header, Body, Decorative — and
+   * `Set-Font-Family-Display` was not one of them. Display happens to hold the
+   * same family as Decorative today, so the missing import was invisible: the
+   * face arrived under the other role's request. The moment a design gives
+   * Display its own family, that family ships in the CSS with nothing fetching
+   * it, and the consumer silently renders a fallback.
+   *
+   * Reading the keys by pattern means a face added later is imported without
+   * anyone remembering to extend a list here. */
+  const familyOf = (raw: unknown): string | undefined => {
+    if (typeof raw !== 'string') return undefined;
+    // Values may be a bare name or a whole stack ("'Caveat', sans-serif").
+    const first = raw.split(',')[0].replace(/["']/g, '').trim();
+    return first || undefined;
+  };
+  const roleFamilies = new Map<string, string>();
+  for (const key of Object.keys(typography)) {
+    const m = key.match(/^Set-Font-Family-(.+)$/);
+    if (!m) continue;
+    const fam = familyOf(typography[key]?.value);
+    if (fam) roleFamilies.set(m[1], fam);
+  }
 
-  console.log('  ├─ Header font:', headerFamily);
-  console.log('  ├─ Body font:', bodyFamily);
-  console.log('  └─ Decorative font:', decorativeFamily);
+  const headerFamily = roleFamilies.get('Header');
+  const bodyFamily = roleFamilies.get('Body');
+  const decorativeFamily = roleFamilies.get('Decorative');
+
+  for (const [role, fam] of roleFamilies) console.log(`  ├─ ${role} font:`, fam);
 
   // Collect every weight each family is actually declared at, so the Google
   // Fonts request downloads the real weight files. A family-only import ships
@@ -4064,16 +4116,20 @@ function generateGoogleFontsImports(jsonData: any): string {
     if (!familyWeights.has(family)) familyWeights.set(family, new Set());
     familyWeights.get(family)!.add(w);
   };
-  addWeight(headerFamily, typography['Set-Header-Font-Weight']?.value);
-  addWeight(bodyFamily, typography['Set-Body-Font-Weight']?.value);
-  addWeight(bodyFamily, typography['Set-Body-Semibold-Font-Weight']?.value);
-  addWeight(bodyFamily, typography['Set-Body-Bold-Font-Weight']?.value);
-  addWeight(decorativeFamily, typography['Set-Decorative-Font-Weight']?.value);
+  // Every weight declared for a role lands on that role's family. Matched by
+  // shape for the same reason as the families above — Body alone publishes
+  // three (regular, semibold, bold) and a fourth would otherwise be missed.
+  for (const [role, fam] of roleFamilies) {
+    for (const key of Object.keys(typography)) {
+      if (!key.endsWith('Font-Weight')) continue;
+      if (key === `Set-${role}-Font-Weight` || key.startsWith(`Set-${role}-`)) {
+        addWeight(fam, typography[key]?.value);
+      }
+    }
+  }
 
-  // Add to set (automatically handles duplicates)
-  if (headerFamily) fontFamilies.add(headerFamily);
-  if (bodyFamily) fontFamilies.add(bodyFamily);
-  if (decorativeFamily) fontFamilies.add(decorativeFamily);
+  // Add every family; the Set dedupes roles that share one.
+  for (const fam of roleFamilies.values()) fontFamilies.add(fam);
   
   // List of system fonts that shouldn't be imported from Google Fonts
   const systemFonts = [

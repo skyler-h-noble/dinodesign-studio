@@ -29,6 +29,28 @@ export function weightsFor(family: string): number[] {
 }
 
 /**
+ * Snap a weight to one the family actually ships.
+ *
+ * A slider can land on a step a face does not have — Zilla Slab ships
+ * [300..700] and a Display set to 200 produced `family=Zilla+Slab:wght@200`,
+ * which Google answers with a 400. The whole request fails, so the face never
+ * downloads and the browser silently substitutes: the design system looked
+ * correct in every file and rendered in the wrong font.
+ *
+ * Nearest rather than clamped-to-range, so 250 goes to 300 and 850 to 700
+ * instead of both collapsing to an end stop. Unknown families pass through —
+ * a family absent from the metadata is unknown, not weightless, and refusing
+ * to emit a weight for it would be worse than asking for one that might work.
+ */
+export function nearestAvailableWeight(family: string, weight: number | string): number | null {
+  const w = typeof weight === 'number' ? weight : parseInt(String(weight), 10);
+  if (!Number.isFinite(w)) return null;
+  const avail = weightsFor(family);
+  if (!avail.length || avail.includes(w)) return w;
+  return avail.reduce((best, c) => (Math.abs(c - w) < Math.abs(best - w) ? c : best), avail[0]);
+}
+
+/**
  * Build a css2 `family=Name[:wght@…]` param that requests only weights the font
  * has. `desired` limits the request to the weights you actually render (falling
  * back to 400 if none of them are available); omit it to load every available

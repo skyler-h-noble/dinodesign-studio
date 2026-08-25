@@ -67,16 +67,57 @@ export async function uploadDesignSystemFile(
   } else {
     data = content;
   }
+
+  /* Gzip text before it leaves the browser.
+   *
+   * Firebase Storage does not compress on the fly — it serves exactly the bytes
+   * it was given, with no content-encoding, even when the client asks for gzip.
+   * A design system's Light-Mode.css is 512KB of highly repetitive custom
+   * properties and gzips to 21KB: FOUR PERCENT. Across the eight files a
+   * consumer loads, ~1.0MB becomes ~45KB, and that cost was being paid on every
+   * navigation because these files also revalidate every time (see below).
+   *
+   * Storing pre-compressed bytes plus `contentEncoding: 'gzip'` is the standard
+   * way to do this on Storage: the header rides with the object, and every
+   * client — fetch(), <link rel=stylesheet>, XHR — decompresses transparently.
+   * No consumer changes.
+   *
+   * Only text is worth compressing; PNGs and JPEGs are already compressed and
+   * would grow. CompressionStream is guarded because it is unavailable in older
+   * Safari and in jsdom under test — falling back to the raw bytes is correct
+   * there, just larger. */
+  let contentEncoding: string | undefined;
+  const isText = typeof content === 'string'
+    && /\b(css|json|javascript|html|xml|markdown|plain)\b/.test(contentType || 'text/plain');
+  if (isText && typeof CompressionStream !== 'undefined' && data instanceof Blob && data.size > 1024) {
+    try {
+      const stream = data.stream().pipeThrough(new CompressionStream('gzip'));
+      const gzipped = await new Response(stream).blob();
+      // Guard against a pathological case where compression makes it bigger.
+      if (gzipped.size < data.size) {
+        data = gzipped;
+        contentEncoding = 'gzip';
+      }
+    } catch {
+      /* Keep the uncompressed bytes — a larger file still serves correctly. */
+    }
+  }
+
   const metadata = {
     cacheControl: 'no-cache, max-age=0, must-revalidate',
     ...(contentType ? { contentType } : {}),
+    ...(contentEncoding ? { contentEncoding } : {}),
   };
   await uploadBytes(fileRef, data, metadata);
   // Per-file confirmation so the console shows which uploads landed on
   // which paths with which cache headers. Helps diagnose stale-CSS
   // problems where the playground keeps showing old content after a
   // regenerate.
-  console.log(`📤 [Storage] uploaded ${ROOT}/${uuid}/${filename} (cache-control: ${metadata.cacheControl})`);
+  console.log(
+    `📤 [Storage] uploaded ${ROOT}/${uuid}/${filename}`
+    + ` (${(data instanceof Blob ? data.size : data.byteLength)} bytes`
+    + `${contentEncoding ? ', gzip' : ''}, cache-control: ${metadata.cacheControl})`,
+  );
 }
 
 /**

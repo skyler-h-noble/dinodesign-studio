@@ -6,12 +6,12 @@
 [data-platform="Desktop"] {
 
   /* Display */
-  --Font-Family-Display: var(--Platform-Font-Families-Header);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     42px;
   --Display-Small-Font-Weight:   600;
   --Display-Small-Line-Height:   52px;
   --Display-Small-Letter-Spacing: 0px;
-  --Font-Family-Display: var(--Platform-Font-Families-Header);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Large-Font-Size:     48px;
   --Display-Large-Font-Weight:   600;
   --Display-Large-Line-Height:   60px;
@@ -178,12 +178,12 @@
 [data-platform="IOS-Mobile"] {
 
   /* Display */
-  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     28px;
   --Display-Small-Font-Weight:   600;
   --Display-Small-Line-Height:   28px;
   --Display-Small-Letter-Spacing: 0px;
-  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Large-Font-Size:     28px;
   --Display-Large-Font-Weight:   600;
   --Display-Large-Line-Height:   28px;
@@ -350,12 +350,12 @@
 [data-platform="IOS-Tablet"] {
 
   /* Display */
-  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     28px;
   --Display-Small-Font-Weight:   600;
   --Display-Small-Line-Height:   28px;
   --Display-Small-Letter-Spacing: 0px;
-  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Large-Font-Size:     28px;
   --Display-Large-Font-Weight:   600;
   --Display-Large-Line-Height:   28px;
@@ -522,12 +522,12 @@
 [data-platform="Android"] {
 
   /* Display */
-  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     28px;
   --Display-Small-Font-Weight:   600;
   --Display-Small-Line-Height:   28px;
   --Display-Small-Letter-Spacing: 0px;
-  --Font-Family-Display: var(--Platform-Font-Families-Decorative);
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Large-Font-Size:     28px;
   --Display-Large-Font-Weight:   600;
   --Display-Large-Line-Height:   28px;

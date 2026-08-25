@@ -81,7 +81,7 @@ export function RenameDesignSystemModal({
           <Alert variant="light" color="error" size="small">{error}</Alert>
         )}
         <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary-outline" size="small" onClick={onClose} disabled={saving}>
+          <Button variant="default-outline" size="small" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button variant="default" size="small" onClick={handleSave} disabled={!canSave}>
@@ -169,7 +169,7 @@ export function DeleteDesignSystemModal({
           <Alert variant="light" color="error" size="small">{error}</Alert>
         )}
         <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary-outline" size="small" onClick={onClose} disabled={deleting}>
+          <Button variant="default-outline" size="small" onClick={onClose} disabled={deleting}>
             Cancel
           </Button>
           <Button
@@ -284,10 +284,10 @@ export function RegenerateDesignSystemModal({
           <Alert variant="light" color="error" size="small">{error}</Alert>
         )}
         <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary-outline" size="small" onClick={onClose} disabled={regenerating}>
+          <Button variant="default-outline" size="small" onClick={onClose} disabled={regenerating}>
             Cancel
           </Button>
-          <Button variant="primary" size="small" onClick={handleRegenerate} disabled={regenerating}>
+          <Button variant="default" size="small" onClick={handleRegenerate} disabled={regenerating}>
             {regenerating ? 'Regenerating…' : 'Regenerate'}
           </Button>
         </HStack>

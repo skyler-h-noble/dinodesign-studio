@@ -1761,8 +1761,19 @@ export default function TypographyTestPage({
   // an effect, not on click.
   useEffect(() => {
     if (!onTypographyComplete) return;
-    if (!result) return;
+    // A saved system never has a `result` — the analysis is opt-in when
+    // editing, so skipAnalysis leaves it null on purpose. Bailing on !result
+    // meant every pick on this screen (body family most visibly) updated the
+    // local specimen and NOTHING else: App's typographyStyles never changed,
+    // so brandCSS never regenerated and the chrome kept rendering the font the
+    // user had just replaced. The screen looked like it had applied the change.
+    if (!result && !skipAnalysis) return;
     if (!currentHeader && !currentDecorative && !currentBody) return;
+    // The one value that genuinely needed `result`. Same shape as every other
+    // field here — `result?.` with a fallback — with the SAVED body as the
+    // fallback so an untouched weight/spacing survives a round-trip instead of
+    // being reset to the generic default.
+    const savedBody = (savedTypographyRef.current ?? []).find((t) => t.type === 'body');
     onTypographyComplete([
       {
         type: 'header',
@@ -1796,13 +1807,14 @@ export default function TypographyTestPage({
       {
         type: 'body',
         family: currentBody,
-        weight: bodyWeightOverride ?? result.specs.body.regular.weight,
-        letterSpacing: bodySpacingOverride ?? result.specs.body.regular.letter_spacing,
+        weight: bodyWeightOverride ?? result?.specs.body.regular.weight ?? savedBody?.weight ?? '400',
+        letterSpacing: bodySpacingOverride
+          ?? result?.specs.body.regular.letter_spacing ?? savedBody?.letterSpacing ?? '0em',
         allCaps: false,
       },
     ]);
   }, [
-    onTypographyComplete, result,
+    onTypographyComplete, result, skipAnalysis,
     currentHeader, currentHeaderAxes, currentHeaderSpacing, headerAllCaps,
     currentDecorative, currentDecorativeWeight, currentDecorativeSpacing, displayAllCaps,
     displaySize, displayLeading, displayNoise, displayBounce, eyebrowWeight, eyebrowSpacing,

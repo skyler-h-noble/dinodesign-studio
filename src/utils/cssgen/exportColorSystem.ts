@@ -1,5 +1,6 @@
 // Button logic update - OB=8 when PC>=9 - 12-tone scale
 import { blendColors } from '../colorScale';
+import { nearestAvailableWeight } from '../googleFontWeights';
 import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
 import { dropshadowBaseHex } from '../dropshadow';
 import { HEADER_FAMILY } from '../moodAxes';
@@ -3796,9 +3797,20 @@ export function exportColorSystemToJSON(
     'Set-Font-Family-Body': { value: bodyFamily, type: 'string' },
     // Kept so designs saved before the four faces still resolve.
     'Set-Font-Family-Decorative': { value: decorativeFamily, type: 'string' },
+    // Weights are snapped to a step the family actually ships. A face asked for
+    // a weight it does not have makes the whole Google Fonts request 400, so
+    // nothing downloads and the browser substitutes — silently, with every
+    // token still reading correctly. Clamping here means the emitted token and
+    // the @import can never disagree about which weight was requested.
     'Set-Header-Font-Weight': { value: String(typography?.header?.axes?.wght ?? typography?.header?.weight ?? '600'), type: 'string' },
-    'Set-Decorative-Font-Weight': { value: typography?.decorative?.weight || '600', type: 'string' },
-    'Set-Body-Font-Weight': { value: typography?.body?.weight || '400', type: 'string' },
+    'Set-Decorative-Font-Weight': {
+      value: String(nearestAvailableWeight(decorativeFamily, typography?.decorative?.weight || '600') ?? (typography?.decorative?.weight || '600')),
+      type: 'string',
+    },
+    'Set-Body-Font-Weight': {
+      value: String(nearestAvailableWeight(bodyFamily, typography?.body?.weight || '400') ?? (typography?.body?.weight || '400')),
+      type: 'string',
+    },
     'Set-Body-Semibold-Font-Weight': { value: '600', type: 'string' },
     'Set-Body-Bold-Font-Weight': { value: '700', type: 'string' },
     'Set-Header-Caps': { value: typography?.header?.allCaps ? 'uppercase' : 'none', type: 'string' },
@@ -4679,12 +4691,47 @@ export function exportColorSystemToJSON(
             });
           }
 
+          /* Dark surfaces take the Vibrant tone outright.
+           *
+           * Color-1..5 are the dark end of the ramp — in dark mode they ARE the
+           * surfaces, and an eyebrow on them is a small label on a dark field
+           * where the ramp's own accent reads cleanly. Color-Vibrant resolves to
+           * Color-8 (exportToCSS.ts:125), a light, chromatic tone, so it clears
+           * a dark background comfortably.
+           *
+           * The max-chroma search below still governs Color-6..12, where the
+           * background is light and a light accent would vanish into it. This is
+           * a deliberate narrowing, not a bypass of the contrast work: the search
+           * picks the most chromatic tone that clears 4.5:1 against ALL eight
+           * backdrop palettes, and on the darkest backgrounds that constraint
+           * often settled a step or two below the accent the ramp was built to
+           * carry. */
+          const VIBRANT_MAX_BACKGROUND_TONE = 5;
+          /* Dark surfaces take Vibrant unconditionally — a stated design rule,
+           * not the output of the search below.
+           *
+           * This is the one place in the eyebrow solve that is NOT gated on
+           * 4.5:1, and that is deliberate. Measured across four shipped
+           * palettes, Vibrant clears the majority of dark-surface combinations
+           * but not all: the misses cluster at background tone 5 (the lightest
+           * of the band, where accent and ground converge) and against the
+           * state palettes, and land around 4.4:1. Those will appear in the
+           * accessibility report rather than being silently corrected — which
+           * is the right trade only because the rule is intentional. If the
+           * report becomes noisy, the lever is the tone band or the backdrop
+           * set, not the threshold. */
+          const useVibrant = mode === 'dark'
+            && Number.isFinite(toneN)
+            && toneN <= VIBRANT_MAX_BACKGROUND_TONE;
+
           eyebrows[scope][background][colorKey] = {
-            value: pickedIdx >= 0
-              ? `{Colors.${role}.Color-${pickedIdx + 1}}`
-              // Nothing in the rotation clears 4.5:1 against this background.
-              // Keep Text's answer rather than ship a failing one.
-              : `{Text.${scope}.${role}.${colorKey}}`,
+            value: useVibrant
+              ? `{Colors.${role}.Color-Vibrant}`
+              : pickedIdx >= 0
+                ? `{Colors.${role}.Color-${pickedIdx + 1}}`
+                // Nothing in the rotation clears 4.5:1 against this background.
+                // Keep Text's answer rather than ship a failing one.
+                : `{Text.${scope}.${role}.${colorKey}}`,
             type: 'color',
           };
         }

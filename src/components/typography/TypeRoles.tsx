@@ -364,6 +364,10 @@ function HeaderPresets({
 
 /** One line on what each role is FOR, shown on the preview highlight so the
  *  connection between a panel and the text it moves is never a guess. */
+/* Height reserved under every specimen for its role label. 11px type in a
+   2px/6px chip, plus a little air between the chip and the line above it. */
+const LABEL_SPACE = 22;
+
 const ROLE_TOOLTIPS: Record<string, string> = {
   Display: 'hero and section openers',
   Eyebrow: 'small label above a heading',
@@ -772,6 +776,12 @@ export function TypeSpecimen({
         onMouseLeave={() => onHoverRole?.(null)}
         style={{
           position: 'relative',
+          /* Room for the role label to sit in. The label hangs below the line,
+             and with nothing reserved for it it landed on whatever came next —
+             on Header that is the Body paragraph, which it struck straight
+             through. Reserved ALWAYS rather than only while active, so showing
+             the label cannot reflow the preview under the pointer. */
+          paddingBottom: LABEL_SPACE,
           // Outline rather than border so the highlight never reflows the text.
           outline: active ? '2px solid var(--Buttons-Primary-Button)' : '2px solid transparent',
           outlineOffset: 4,
@@ -786,9 +796,9 @@ export function TypeSpecimen({
           <span
             style={{
               position: 'absolute',
-              bottom: -10,
+              // Inside the reserved band rather than hanging past it.
+              bottom: 0,
               left: 0,
-              transform: 'translateY(100%)',
               padding: '2px 6px',
               borderRadius: 4,
               background: 'var(--Buttons-Primary-Button)',

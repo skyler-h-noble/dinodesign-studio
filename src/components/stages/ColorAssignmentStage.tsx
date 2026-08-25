@@ -7,10 +7,14 @@ import { toneToColorNumber } from '../../utils/colorScale';
 import PhonePreview from '../PhonePreview';
 import '../../styles/assign-colors.css';
 
-import type { StageProps, UserSelections, ColorScheme } from '../../types';
+import type { StageProps, UserSelections, ColorScheme, TypographyStyle } from '../../types';
 
 interface Props extends StageProps {
   colorScheme: ColorScheme | null;
+  /** The picked faces. Without them the phone preview renders the Display in
+   *  a fallback face — ReviewStage passed these and this stage did not, so the
+   *  same system showed Anton on one screen and a plain sans on the other. */
+  typographyStyles?: TypographyStyle[];
   onSelectionsChanged: (selections: UserSelections) => void;
   onColorsReordered: (colors: [string, string, string]) => void;
   userSelections: UserSelections;
@@ -64,6 +68,7 @@ export default function ColorAssignmentStage({
   userSelections,
   moodBoardUrl,
   designSystemName,
+  typographyStyles,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'preview' | 'customize'>('customize');
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
@@ -189,6 +194,7 @@ export default function ColorAssignmentStage({
                 mode={previewMode}
                 moodBoardUrl={moodBoardUrl}
                 designSystemName={designSystemName}
+                typographyStyles={typographyStyles}
               />
             </div>
           </div>

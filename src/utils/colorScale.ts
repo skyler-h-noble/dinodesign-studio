@@ -310,10 +310,38 @@ function generateScaledTones(
   // recognisably the chosen colour — and the change is recorded so the UI can
   // tell the user their colour was adjusted and why.
   if (lockedHex) {
-    const [lockedL, lockedC, lockedH] = chroma(lockedHex).lch();
+    const [lockedL, lockedCRaw, lockedH] = chroma(lockedHex).lch();
 
     let placedHex = lockedHex;
     let adjustment: ToneStep['adjusted'];
+
+    /* The chroma cap applies to the placed colour too.
+     *
+     * This block guarded the dead zone and guarded contrast, but never chroma —
+     * `maxChroma` was in scope and simply not consulted. So a pick above the cap
+     * was written into the ramp verbatim: a #fcf00c at chroma 91.8 landed in a
+     * ramp capped at 70, producing a tone that broke an otherwise monotonic
+     * curve (…63.1, 69.8, 52.9, 31.6, 91.8, 11.3…). The cap described the
+     * generated tones only, which is not what a cap means.
+     *
+     * Clamped rather than refused, and the same shape as the dead-zone nudge
+     * below: lightness and hue are kept, so it stays recognisably the chosen
+     * colour, and the change is RECORDED so the UI can say it moved. A pick
+     * silently altered is the failure mode that rule exists to prevent. */
+    let lockedC = lockedCRaw;
+    if (maxChroma !== undefined && lockedCRaw > maxChroma) {
+      lockedC = maxChroma;
+      placedHex = chroma.lch(lockedL, lockedC, lockedH).hex();
+      adjustment = {
+        from: lockedHex,
+        to: placedHex,
+        reason: `${lockedHex} is more saturated (chroma ${lockedCRaw.toFixed(0)}) `
+          + `than this palette's maximum of ${maxChroma.toFixed(0)}. Leaving it as `
+          + `picked would put one tone well outside the ramp's own curve, so we `
+          + `reduced its saturation to ${placedHex}, keeping the same hue and `
+          + `lightness.`,
+      };
+    }
 
     // Only adjust a colour that ACTUALLY fails.
     //
@@ -398,6 +426,9 @@ function generateScaledTones(
       placedHex = chroma.lch(target, lockedC, lockedH).hex();
       const direction = target < lockedL ? 'darkened' : 'lightened';
       adjustment = {
+        // `from` is the ORIGINAL pick even if chroma was already clamped above —
+        // the user cares what happened to the colour they chose, not to an
+        // intermediate.
         from: lockedHex,
         to: placedHex,
         reason: `${lockedHex} sits in the middle of the lightness range `

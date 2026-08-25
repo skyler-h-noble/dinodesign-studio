@@ -60,11 +60,20 @@ function mapButtonStyle(button: string): string {
   }
 }
 
+/* Where the hosted playground lives.
+ *
+ * This URL is written into the generated DINO-TOKENS.md / CLAUDE.md that
+ * customers hand to an AI tool, so it outlives this app — a stale host keeps
+ * being quoted in files already distributed. It was hardcoded in four places
+ * across three files and pointed at an older deploy, hence one exported
+ * constant. */
+export const SHOWCASE_BASE = 'https://omni-design.netlify.app';
+
 // ─── DINO-TOKENS.md ───
 function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
   const colors = input.colorScheme.colors;
   const radii = BORDER_RADII[input.componentStyle];
-  const showcaseBase = 'https://designology.netlify.app';
+  const showcaseBase = SHOWCASE_BASE;
 
   const styleName = input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1);
 
@@ -1438,6 +1447,37 @@ ${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
     if (!alreadyPushed.has(name)) {
       uploadFiles.push({ name, content, type: 'text/css' });
     }
+  }
+
+  /* Every CSS file carries the font imports, not just base + the mode sheets.
+   *
+   * A consumer picks which files to load, and the imports only lived in
+   * base.css / Light-Mode.css / Dark-Mode.css. An app loading, say, foundation
+   * + core got the whole token system and NOT ONE FACE — --Font-Family-Display
+   * resolved to a real family that nothing had fetched, so the browser
+   * substituted silently. That is what happened in a real consumer: two sheets
+   * loaded, zero Google requests, Display resolving to 'Raleway' and rendering
+   * as something else.
+   *
+   * Duplicating the @import lines is deliberate and cheap: identical URLs are
+   * deduped by the browser, so N files cost one request. The alternative —
+   * documenting "you must also load base.css" — is a rule consumers cannot see
+   * themselves breaking.
+   *
+   * @import must precede every other rule in a sheet, so these go at the very
+   * top, ahead of the leading comment block. */
+  const fontImportBlock = (() => {
+    const withImports = uploadFiles.find(f => f.name === 'base.css')?.content ?? '';
+    const lines = withImports.split('\n').filter(l => l.trim().startsWith('@import'));
+    return lines.join('\n');
+  })();
+  if (fontImportBlock) {
+    for (const file of uploadFiles) {
+      if (!file.name.endsWith('.css')) continue;
+      if (file.content.includes('@import')) continue;   // base + the mode sheets
+      file.content = `${fontImportBlock}\n\n${file.content}`;
+    }
+    console.log(`Font imports added to every CSS file (${fontImportBlock.split('\n').length} families)`);
   }
 
   // 7. Upload mood board image if available

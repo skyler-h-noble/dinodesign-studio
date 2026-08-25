@@ -9,7 +9,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../../types';
-import { generateAndUploadDesignSystem } from '../../utils/generateDesignSystem';
+import { generateAndUploadDesignSystem, SHOWCASE_BASE } from '../../utils/generateDesignSystem';
 import { LIB_DYNAMIC_CSS_FILES } from '../../utils/cssgen/exportToCSS';
 import { getPublicFileUrl } from '../../utils/firebase/storage';
 import { FigmaImportModal } from '../FigmaImportModal';
@@ -340,7 +340,7 @@ export default function ExportStage({
   }, [pendingReExport, dinoId, colorScheme, user]);
 
   const uniqueId = dinoId || 'generating...';
-  const showcaseBase = 'https://designology.netlify.app';
+  const showcaseBase = SHOWCASE_BASE;
   const playgroundUrl = `${showcaseBase}/?user=${dinoId || ''}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${dinoId || ''}/md`;
   const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${dinoId || ''}`;

@@ -25,6 +25,8 @@ import { assessImageStyle } from './utils/imageAnalysis';
 import { autoAssignColors } from './utils/autoAssignColors';
 import { suggestComponentStyle } from './utils/autoSuggestStyle';
 import { buildPreviewCSS } from './utils/buildPreviewCSS';
+import { loadGoogleFonts } from './utils/googleFontsManager';
+import { componentStyleVars } from './utils/componentStyleVars';
 
 import AppHeader from './components/AppHeader';
 import { CreationTopBar, CreationBottomBar } from './components/CreationNav';
@@ -520,6 +522,7 @@ function MainApp() {
             onNext={goNext}
             onBack={goBack}
             colorScheme={selectedColorScheme}
+            typographyStyles={typographyStyles}
             userSelections={userSelections}
             onSelectionsChanged={setUserSelections}
             moodBoardUrl={moodBoardUrl}
@@ -653,9 +656,14 @@ function MainApp() {
     return true;
   })();
 
-  // Component style radii — from saved customizations or defaults
-  const cardRadius = savedStyleCustomizations?.[componentStyle]?.radius ?? { professional: 4, modern: 8, bold: 16, playful: 24 }[componentStyle];
-  const buttonRadius = savedStyleCustomizations?.[componentStyle]?.buttonRadius ?? { professional: 6, modern: 12, bold: 25, playful: 100 }[componentStyle];
+  // Component style variables — button/card radii, heights, padding, bevel.
+  // Derived by the shared helper so this page and the design-system detail
+  // page cannot disagree about the same system's buttons (they did: the
+  // detail page emitted none of these and fell back to the lib's defaults).
+  const componentVars = componentStyleVars(
+    componentStyle as ComponentStyle,
+    savedStyleCustomizations?.[componentStyle],
+  );
 
   // Apply brand tokens after color-assignment stage. When the user is
   // editing an existing design system (pendingReExport === true), the
@@ -667,6 +675,24 @@ function MainApp() {
 
   // Build full brand CSS from the same logic as the phone preview
   // Post-process to add !important so it overrides DynoDesignProvider's theme
+  /* Load every picked face, once, for the whole flow.
+   *
+   * Individual stages were doing this themselves — Component Style, Review and
+   * the detail page each called loadGoogleFonts — which meant a stage that
+   * forgot simply rendered in a fallback face. Assign Colors was one: its phone
+   * preview names the Display family, so the preview asked for Caveat while
+   * nothing had fetched it, and the browser quietly substituted. Doing it here
+   * covers every stage from one place, including ones added later.
+   *
+   * The eyebrow deliberately has no family (it is the OS UI stack), so the
+   * empty string is filtered out rather than requested. */
+  useEffect(() => {
+    const families = [...new Set(
+      typographyStyles.map(t => t.family).filter((f): f is string => !!f && f.trim().length > 0),
+    )];
+    if (families.length) loadGoogleFonts(families).catch(() => {});
+  }, [typographyStyles]);
+
   const brandCSS = useMemo(() => {
     if (!applyBrand || !selectedColorScheme) return '';
     console.log('🎨 [brandCSS] Regenerating. Background:', userSelections.background, 'AppBar:', userSelections.appBar, 'NavBar:', userSelections.navBar);
@@ -689,66 +715,12 @@ function MainApp() {
   const decorativeFont = typographyStyles.find(t => t.type === 'decorative');
   const bodyFont = typographyStyles.find(t => t.type === 'body');
 
-  const bevel = savedStyleCustomizations?.[componentStyle]?.bevel ?? 0;
-  const bevelOpacity = savedStyleCustomizations?.[componentStyle]?.bevelOpacity ?? 50;
-  const buttonHeight = savedStyleCustomizations?.[componentStyle]?.buttonHeight ?? 32;
-  const smallButtonHeight = savedStyleCustomizations?.[componentStyle]?.smallButtonHeight ?? 24;
-  const largeButtonHeight = savedStyleCustomizations?.[componentStyle]?.largeButtonHeight ?? 56;
-  const minButtonWidth = savedStyleCustomizations?.[componentStyle]?.minButtonWidth ?? 60;
-  const iconButtonRadius = savedStyleCustomizations?.[componentStyle]?.iconButtonRadius ?? buttonRadius;
-
-  const bevelPx = Math.round(buttonHeight * bevel / 100);
-
-  // buttonRadius / iconButtonRadius are PERCENTS (0–100) of the button height.
-  // Convert to px (capped at the large button height, mirroring computeRadii /
-  // buildPreviewCSS) so studio chrome — e.g. the bottom-nav Continue button —
-  // matches the preview. These were previously emitted as `${percent}px`, which
-  // made every chrome button far more rounded than the design's actual radius.
-  const buttonRadiusPx = Math.min(Math.round(buttonHeight * buttonRadius / 100), largeButtonHeight);
-  const iconButtonRadiusPx = Math.min(Math.round(buttonHeight * iconButtonRadius / 100), largeButtonHeight);
-  // Small and large need their OWN radius, measured against their OWN height —
-  // that is what computeRadii does (pct(buttonRadius, smallButtonHeight) etc).
-  // Emitting only --Button-Radius left --Sm-Button-Radius and --Lg-Button-Radius
-  // undefined, so every large Button in the studio chrome — the bottom-nav
-  // Continue button most visibly — fell back to the lib's default and rendered
-  // under-rounded next to the preview's fully-pill Large. Same failure as the
-  // padding note below: a var the lib reads with no fallback.
-  const smButtonRadiusPx = Math.min(Math.round(smallButtonHeight * buttonRadius / 100), smallButtonHeight);
-  const lgButtonRadiusPx = Math.min(Math.round(largeButtonHeight * buttonRadius / 100), largeButtonHeight);
-
-  // Horizontal button padding. The lib's Button sets
-  // `padding: 0 var(--Sm-Button-Padding)` with NO fallback, so when the shell
-  // doesn't define these the whole shorthand is invalid and the browser drops
-  // it — every small Button in the studio renders with zero side padding (the
-  // cramped Light/Dark segmented control). Same derivation the export and
-  // generateFigmaJSON use, so studio chrome matches what ships.
-
+  // All of the above now come from componentStyleVars() — see the shared
+  // helper. The typography spreads below stay here because they depend on
+  // applyBrand and the picked faces, which the detail page derives its own
+  // way (from a saved snapshot rather than live stage state).
   const styleVars = {
-    '--Style-Border-Radius': `${buttonRadiusPx}px`,
-    // One padding at every size (8px). The two size-specific names remain as
-    // aliases because the lib's Button reads them with no fallback — see
-    // BUTTON_PADDING in exportToCSS.ts.
-    '--Button-Padding': '8px',
-    '--Sm-Button-Padding': 'var(--Button-Padding)',
-    '--Lg-Button-Padding': '16px',
-    '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
-    '--Button-Radius': `${buttonRadiusPx}px`,
-    '--Sm-Button-Radius': `${smButtonRadiusPx}px`,
-    '--Lg-Button-Radius': `${lgButtonRadiusPx}px`,
-    '--Button-Icon-Radius': `${iconButtonRadiusPx}px`,
-    '--Button-Bevel': `${bevel}`,
-    '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
-    '--Button-Bevel-Px': `${bevelPx}px`,
-    '--Button-Height': `${buttonHeight}px`,
-    '--Small-Button-Height': `${smallButtonHeight}px`,
-    '--Large-Button-Height': `${largeButtonHeight}px`,
-    '--Button-Min-Width': `${minButtonWidth}px`,
-    // Large's floor is the standard floor + 40, the same relationship the
-    // CSS export and the Figma payload emit. The preview omitted it, so a
-    // large button read at the standard minimum here and wider once exported.
-    '--Lg-Button-Min-Width': `${minButtonWidth + 40}px`,
-    '--Card-Radius': `${cardRadius}px`,
-    '--Card-Padding': `${cardRadius >= 16 ? 20 : 16}px`,
+    ...componentVars,
     ...(applyBrand && headerFont ? (() => {
       const headerTT = headerFont.allCaps ? 'uppercase' : 'none';
       const headerLS = headerFont.letterSpacing || '0em';

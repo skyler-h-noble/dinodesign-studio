@@ -20,7 +20,8 @@ import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
-import { generateAndUploadDesignSystem } from '../utils/generateDesignSystem';
+import { componentStyleCSS } from '../utils/componentStyleVars';
+import { generateAndUploadDesignSystem, SHOWCASE_BASE } from '../utils/generateDesignSystem';
 import AppHeader from './AppHeader';
 import { FigmaImportModal } from './FigmaImportModal';
 import {
@@ -112,7 +113,7 @@ type Inner = 'use' | 'settings' | 'history';
    app, so it is a whole address, not a route. Overridable per environment for
    local work against a portfolio preview on another port. */
 const OVERLAY_TOOL_URL =
-  import.meta.env.VITE_OVERLAY_TOOL_URL || 'https://lisenoble.com/experiments/text-over-image/';
+  import.meta.env.VITE_OVERLAY_TOOL_URL || 'https://www.lisewnoble.com/experiments/text-over-image/';
 
 export default function DesignSystemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -473,13 +474,23 @@ function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
   const css = useMemo(() => {
     if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) return '';
     try {
-      return buildPreviewCSS({
-        colorScheme: snapshot.colorScheme,
-        userSelections: snapshot.userSelections,
-        componentStyle: snapshot.componentStyle || 'modern',
-        mode: 'light',
-        typographyStyles: snapshot.typographyStyles,
-      });
+      const style = snapshot.componentStyle || 'modern';
+      // buildPreviewCSS covers colour and typography ONLY. The button/card
+      // sliders live in snapshot.styleCustomizations and were never emitted
+      // here, so this page rendered every system's buttons at the lib's
+      // default radius while the create flow rendered the user's actual
+      // choice — a system saved at 86% radius showed near-pills in one place
+      // and 4px corners in the other.
+      return [
+        buildPreviewCSS({
+          colorScheme: snapshot.colorScheme,
+          userSelections: snapshot.userSelections,
+          componentStyle: style,
+          mode: 'light',
+          typographyStyles: snapshot.typographyStyles,
+        }),
+        componentStyleCSS(style, snapshot.styleCustomizations),
+      ].join('\n\n');
     } catch (err) {
       console.error('Failed to build brand CSS for detail page:', err);
       return '';
@@ -778,7 +789,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
     copyTimers.current.add(t);
   };
 
-  const showcaseBase = 'https://designology.netlify.app';
+  const showcaseBase = SHOWCASE_BASE;
   const playgroundUrl = `${showcaseBase}/?user=${id}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${id}/md`;
   const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${id}`;
@@ -1121,7 +1132,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
           <HStack spacing={2} style={{ padding: '6px 0', alignItems: 'baseline' }}>
             <BodySmall style={{ color: 'var(--Quiet)', width: 130, flexShrink: 0 }}>Playground URL</BodySmall>
             <a
-              href={`https://designology.netlify.app/?user=${id}`}
+              href={`${SHOWCASE_BASE}/?user=${id}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -1132,7 +1143,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
                 fontFamily: 'inherit',
               }}
             >
-              {`https://designology.netlify.app/?user=${id}`}
+              {`${SHOWCASE_BASE}/?user=${id}`}
             </a>
           </HStack>
         </VStack>

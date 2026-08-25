@@ -17,8 +17,19 @@ import '@dynodesign/components/public/styles/styles.css';
 // set on <html> below — without that attribute the tokens stay undefined and
 // Typography components fall back to inherited defaults.
 import '@dynodesign/components/public/styles/typography-tokens.css';
+import { applyStudioDesignSystem } from './utils/studioDesignSystem';
 
 document.documentElement.setAttribute('data-platform', 'Desktop');
+
+/* OmniDesign wearing one of its own design systems.
+ *
+ * The imports above are the LIB's defaults — the fallback skin. This layers
+ * "Omni" (09c2d308…) over them so the studio is dressed in something it made
+ * itself. Fire-and-forget on purpose: the bundled sheets already style the app
+ * from the first frame, so a slow or failed fetch costs the brand, never the
+ * UI. */
+export const STUDIO_DESIGN_SYSTEM_ID = '09c2d308-27c8-47b1-8117-0fad4f027b48';
+applyStudioDesignSystem(STUDIO_DESIGN_SYSTEM_ID).catch(() => {});
 
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';

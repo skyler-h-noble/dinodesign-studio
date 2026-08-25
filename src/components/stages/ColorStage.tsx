@@ -125,6 +125,29 @@ export default function ColorStage({
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [primaryIndex, setPrimaryIndex] = useState(savedColorEdits?.primaryIndex ?? 0);
   const [schemes, setSchemes] = useState<ColorScheme[]>(savedSchemes || []);
+  /**
+   * The Custom scheme's AUTHORED colours.
+   *
+   * Custom is the one scheme that is not derived. The other five are rebuilt
+   * from topColors on every regenerate — correct, because they are pure
+   * functions of it — and Custom was rebuilt the same way, as the first three
+   * swatches. So the user's role picks survived in memory but were discarded
+   * the moment anything triggered a regenerate, which on the edit flow is the
+   * restore effect at mount. The picks saved to Firestore correctly; reopening
+   * the editor is what threw them away, which is why this looked like "not
+   * saved" from the outside.
+   *
+   * A ref rather than state on purpose: regenerateSchemes reads it, and making
+   * it a dependency of that callback would rebuild the callback on every pick
+   * and re-fire the effects that depend on it.
+   */
+  const customColorsRef = useRef<[string, string, string] | null>(
+    (() => {
+      const saved = (savedSchemes || []).find(sc => sc.name === 'Custom')
+        ?? (selectedScheme?.name === 'Custom' ? selectedScheme : undefined);
+      return saved?.colors ? ([...saved.colors] as [string, string, string]) : null;
+    })(),
+  );
   const [showChromaSettings, setShowChromaSettings] = useState(false);
   const [chromaPerColor, setChromaPerColor] = useState<number[]>(
     savedColorEdits?.chromaPerColor && savedColorEdits.chromaPerColor.length
@@ -485,13 +508,25 @@ export default function ColorStage({
     });
     const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
 
+    // Restore the authored Custom triple. generateColorSchemes always builds
+    // Custom as [c1, c2, c3] — the default first three swatches — which is only
+    // right before the user has picked roles. `refined` below regenerates the
+    // tone palettes per role colour, so substituting here (not after) means the
+    // ramps are built for the colours actually chosen.
+    const authored = customColorsRef.current;
+    const withCustom = authored
+      ? generated.map(sc => (sc.name === 'Custom'
+        ? { ...sc, colors: [...authored] as [string, string, string], originalColors: [...authored] }
+        : sc))
+      : generated;
+
     // Post-process: regenerate each scheme's tonePalettes/darkModeTonePalettes
     // from anchorColors[topIdx] + chromaPerColor[topIdx] + per-color hue easing —
     // exactly the inputs the Settings panel uses to render its tone palettes.
     // Otherwise the same maxChroma (primary's) gets applied to all 3 roles, and
     // the picked-tone hex (which may have shifted away from anchor) drives
     // hue/chroma toward saturated palettes that don't match the visible tones.
-    const refined = generated.map(scheme => {
+    const refined = withCustom.map(scheme => {
       const roles = scheme.colors.map(colorHex => {
         const topIdx = tops.findIndex(t => t.hex === colorHex);
         // A scheme colour is not always one of the user's Core Colors.
@@ -1698,9 +1733,19 @@ export default function ColorStage({
                                         const table = dark ? darkChromaPerColor : chromaPerColor;
                                         return i >= 0 ? table[i] : undefined;
                                       };
+                                      // Record the pick so a later regenerate
+                                      // rebuilds Custom from it instead of from
+                                      // the default first-three swatches.
+                                      customColorsRef.current = [...newColors] as [string, string, string];
                                       const updated: ColorScheme = {
                                         ...scheme,
                                         colors: newColors,
+                                        // Kept in step with `colors`. Leaving it
+                                        // stale left the two permanently
+                                        // disagreeing, and edit-mode seeds the
+                                        // swatch list from originalColors when a
+                                        // system has no saved topColors.
+                                        originalColors: [...newColors],
                                         extractedTones: {
                                           primary: getLightness(newColors[0]),
                                           secondary: getLightness(newColors[1]),

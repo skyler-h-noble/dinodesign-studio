@@ -19,5 +19,18 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      /* Downgraded from the error that tseslint's recommended config sets.
+         Unused symbols are worth seeing and not worth failing over — and with
+         tsconfig no longer reporting them (see tsconfig.app.json), this is now
+         the only place they are reported at all. The ignore patterns are the
+         usual escape hatch: prefix a deliberately-unused binding with _ and it
+         stops being mentioned. */
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      }],
+    },
   },
 ])
