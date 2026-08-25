@@ -300,9 +300,13 @@ export const SUBTITLE_WEIGHT = 700;
  *  loosened wholesale from 0.12/0.10/0.08 — keep the ordering when retuning it,
  *  or Medium ends up airier than Small and the steps stop reading as a scale. */
 export const EYEBROW_STEPS = [
+  // Sizes match the Figma type styles: 12 / 16 / 18. Code had 12 / 13 / 15, so
+  // Small agreed and the two larger steps drifted — a Medium eyebrow rendered
+  // three points smaller than the design, which reads as "slightly off" rather
+  // than as a mismatch, and survives exactly because of that.
   { token: 'Eyebrow-Small', step: 'Small', size: 12, letterSpacing: '0.06em' },
-  { token: 'Eyebrow-Medium', step: 'Medium', size: 13, letterSpacing: '0.05em' },
-  { token: 'Eyebrow-Large', step: 'Large', size: 15, letterSpacing: '0.04em' },
+  { token: 'Eyebrow-Medium', step: 'Medium', size: 16, letterSpacing: '0.05em' },
+  { token: 'Eyebrow-Large', step: 'Large', size: 18, letterSpacing: '0.04em' },
 ];
 
 /** The pre-rename token names, kept so the CSS export can emit aliases. */
