@@ -15,11 +15,11 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@omni-design/components": "^0.7.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
+    "@omni-design/components": "^0.7.1",
     "@stripe/stripe-js": "^9.1.0",
     "@tensorflow/tfjs": "^4.22.0",
     "chroma-js": "^3.2.0",
