@@ -81,6 +81,21 @@ const BRAND_CSS_FILES = [
   'styles.css',
 ];
 
+/**
+ * Shape checks for the two credentials.
+ *
+ * Both fields are password-masked and sit next to a Design ID field, so pasting
+ * the wrong thing is easy and invisible. A UUID in the Anthropic box comes back
+ * as `authentication_error: invalid x-api-key` — which reads as "your key
+ * expired" rather than "that is not a key", and sends you off to rotate a
+ * perfectly good key.
+ */
+const looksLikeAnthropicKey = (v: string) => v.startsWith('sk-ant-');
+const looksLikeFigmaToken = (v: string) => v.startsWith('figd_') || v.startsWith('figu_');
+/** 8-4-4-4-12 — i.e. someone pasted a Design ID. */
+const looksLikeUuid = (v: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
 /** The studio's own skin, injected by applyStudioDesignSystem. */
 const STUDIO_STYLE_ID = 'omni-studio-design-system';
 
@@ -159,7 +174,10 @@ export default function AaidWorkbenchPage() {
   const [correction, setCorrection] = useState('');
   const [verdictSaved, setVerdictSaved] = useState(false);
 
-  const tokensSet = figmaToken.trim() !== '' && anthropicKey.trim() !== '';
+  // Shape-checked, not just non-empty: a Design ID in the Anthropic box used to
+  // sail through this and fail as a 401 after the Figma fetch had already run.
+  const tokensSet =
+    looksLikeFigmaToken(figmaToken.trim()) && looksLikeAnthropicKey(anthropicKey.trim());
 
   // Admin check — mirrors AdminProposals pattern.
   useEffect(() => {
@@ -442,7 +460,12 @@ export default function AaidWorkbenchPage() {
               </BodySmall>
               <TextField
                 label="Figma personal access token"
-                helperText="Generate at figma.com/developers/api#access-tokens — needs file_read scope."
+                error={figmaToken.trim() !== '' && !looksLikeFigmaToken(figmaToken.trim())}
+                helperText={
+                  figmaToken.trim() === '' || looksLikeFigmaToken(figmaToken.trim())
+                    ? 'Generate at figma.com/developers/api#access-tokens — needs file_read scope.'
+                    : 'Does not look like a Figma token — they start with figd_.'
+                }
                 value={figmaToken}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFigmaToken(e.target.value)}
                 type="password"
@@ -450,7 +473,14 @@ export default function AaidWorkbenchPage() {
               />
               <TextField
                 label="Anthropic API key"
-                helperText="Generate at console.anthropic.com. Workbench-only — never shipped to customers."
+                error={anthropicKey.trim() !== '' && !looksLikeAnthropicKey(anthropicKey.trim())}
+                helperText={
+                  anthropicKey.trim() === '' || looksLikeAnthropicKey(anthropicKey.trim())
+                    ? 'Generate at console.anthropic.com. Workbench-only — never shipped to customers.'
+                    : looksLikeUuid(anthropicKey.trim())
+                      ? 'That is a UUID — looks like a Design ID. An Anthropic key starts with sk-ant-.'
+                      : 'Does not look like an Anthropic key — they start with sk-ant-.'
+                }
                 value={anthropicKey}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAnthropicKey(e.target.value)}
                 type="password"
