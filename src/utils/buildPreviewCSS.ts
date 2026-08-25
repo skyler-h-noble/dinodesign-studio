@@ -342,6 +342,48 @@ export function buildPreviewCSS(input: BuildInput): string {
   const vTertiary = isDark ? tertiaryDark : tertiaryLight;
 
   const p = (arr: typeof primary, n: number) => arr[n - 1]?.hex || '#888';
+
+  /**
+   * Color-Vibrant — the palette's accent, and the token the dark-mode eyebrow
+   * takes. It is LIGHT-mode Color-8 in BOTH modes, which is why it reads as an
+   * accent on a dark surface instead of sinking into it.
+   *
+   * The export emits these (12 of them); the preview emitted none, so anything
+   * referencing var(--X-Color-Vibrant) here resolved to nothing and fell back —
+   * for the eyebrow, all the way to --Quiet, i.e. body-copy grey.
+   */
+  /**
+   * --Eyebrow: the accent, ROTATED off the surface's own palette.
+   *
+   * Neutral -> Primary, Primary -> Secondary, Secondary -> Tertiary,
+   * Tertiary -> Primary. It is not a muted --Text: substituting --Quiet for it
+   * discards the rotation, which is exactly what the preview was doing — it
+   * never emitted --Eyebrow at all, so every eyebrow fell through
+   * `var(--Eyebrow, var(--Quiet))` to body-copy grey.
+   *
+   * On a DARK background (tone 1-5 in dark mode) it takes Color-Vibrant
+   * outright — light-mode Color-8 — which is what makes it read as an accent
+   * rather than sinking into the surface.
+   */
+  const EYEBROW_ROTATION: Record<string, string> = {
+    Neutral: 'Primary', Primary: 'Secondary', Secondary: 'Tertiary', Tertiary: 'Primary',
+  };
+  const eyebrowFor = (paletteName: string, bgHex: string, toneN: number): string => {
+    const rot = EYEBROW_ROTATION[paletteName] ?? 'Primary';
+    if (isDark && toneN <= 5) return `var(--${rot}-Color-Vibrant)`;
+    const ramp = rot === 'Primary' ? primaryLight
+      : rot === 'Secondary' ? secondaryLight
+      : rot === 'Tertiary' ? tertiaryLight
+      : (NEUTRAL.map(h => ({ hex: h })) as typeof primary);
+    return `var(--${rot}-Color-${getAccessibleTones(bgHex, toneN, ramp).text})`;
+  };
+
+  const vibrantLines = () => [
+    `  --Primary-Color-Vibrant: ${primaryLight[7]?.hex ?? '#888'};`,
+    `  --Secondary-Color-Vibrant: ${secondaryLight[7]?.hex ?? '#888'};`,
+    `  --Tertiary-Color-Vibrant: ${tertiaryLight[7]?.hex ?? '#888'};`,
+    `  --Neutral-Color-Vibrant: ${NEUTRAL_LIGHT[7] ?? '#888'};`,
+  ].join('\n');
   const neutral = (n: number) => NEUTRAL[n - 1] || '#888';
 
   const PC = toneToColorNumber(colorScheme.extractedTones?.primary || 60);
@@ -1045,6 +1087,7 @@ ${primaryLight.map((t, i) => `  --Primary-Color-${i + 1}: ${t.hex};`).join('\n')
 ${secondaryLight.map((t, i) => `  --Secondary-Color-${i + 1}: ${t.hex};`).join('\n')}
 ${tertiaryLight.map((t, i) => `  --Tertiary-Color-${i + 1}: ${t.hex};`).join('\n')}
 ${NEUTRAL.map((h, i) => `  --Neutral-Color-${i + 1}: ${h};`).join('\n')}
+${vibrantLines()}
 }
 
 /* ══ Status Bar ══ */
@@ -1121,6 +1164,7 @@ ${primaryLight.map((c, i) => `  --Primary-Color-${i + 1}: ${c.hex};`).join('\n')
 ${secondaryLight.map((c, i) => `  --Secondary-Color-${i + 1}: ${c.hex};`).join('\n')}
 ${tertiaryLight.map((c, i) => `  --Tertiary-Color-${i + 1}: ${c.hex};`).join('\n')}
 ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
+${vibrantLines()}
 
   --Background: var(--${surfacePaletteName}-Color-${surfaceN});
   --Surface: var(--${surfacePaletteName}-Color-${surfaceN});
@@ -1136,6 +1180,7 @@ ${emitDropshadowLevelLines(surfaceBg)}
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
+  --Eyebrow: ${eyebrowFor(surfacePaletteName, surfaceBg, surfaceN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}33` : `${surfaceBorder}33`};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
@@ -1296,6 +1341,7 @@ ${emitDropshadowLevelLines(containerBg)}
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
+  --Eyebrow: ${eyebrowFor(containerPaletteName, containerBg, containerN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
   --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}33` : `${containerBorder}33`};
   --Hover: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).hover};

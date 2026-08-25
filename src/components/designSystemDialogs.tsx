@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  Body, BodySmall, VStack, HStack, Button,
-  Modal, TextField, Alert,
+  Body,
+  BodySmall,
+  VStack,
+  HStack,
+  Button,
+  Modal,
+  TextInput,
+  Alert,
 } from '@omni-design/components';
 import {
   collection, doc, deleteDoc, updateDoc, getDocs, writeBatch,
@@ -69,7 +75,7 @@ export function RenameDesignSystemModal({
   return (
     <Modal open={!!target} onClose={onClose} title="Rename design system">
       <VStack spacing={3} style={{ minWidth: 360 }}>
-        <TextField
+        <TextInput
           label="Design system name"
           value={name}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
@@ -157,7 +163,7 @@ export function DeleteDesignSystemModal({
         <BodySmall color="quiet">
           To confirm, type the name of the design system below.
         </BodySmall>
-        <TextField
+        <TextInput
           label={target.name}
           value={confirmText}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmText(e.target.value)}

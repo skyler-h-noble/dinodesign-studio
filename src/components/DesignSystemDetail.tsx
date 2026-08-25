@@ -3,9 +3,23 @@ import { useParams } from 'react-router';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, TextField,
-  Breadcrumbs, BreadcrumbItem,
-  Modal, Chip, CodeBlock,
+  Button,
+  H2,
+  H3,
+  Body,
+  BodySmall,
+  VStack,
+  HStack,
+  Card,
+  Tabs,
+  TabList,
+  Tab,
+  TextInput,
+  Breadcrumbs,
+  BreadcrumbItem,
+  Modal,
+  Chip,
+  CodeBlock,
 } from '@omni-design/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
@@ -721,11 +735,11 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
         <HStack spacing={1} style={{ alignItems: 'center' }}>
           <BodySmall color="quiet" style={{ flexShrink: 0, width: 24 }}>ID:</BodySmall>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <TextField
+            <TextInput
               value={id || ''}
               size="small"
               fullWidth
-              InputProps={{ readOnly: true }}
+              inputProps={{ readOnly: true }}
               onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
               endAdornment={
                 <Button
@@ -935,7 +949,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           >
             Open the overlay tool with this system
           </Button>
-          <TextField
+          <TextInput
             label="text-over-image.json"
             multiline
             minRows={4}

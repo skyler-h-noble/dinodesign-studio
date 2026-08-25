@@ -28,7 +28,7 @@ import {
   H3,
   Button,
   ButtonGroup,
-  TextField,
+  TextInput,
   TextArea,
   Alert,
   Chip,
@@ -485,7 +485,7 @@ export default function AaidWorkbenchPage() {
         <Card padding="medium">
           <VStack gap="var(--Sizing-2)">
             <HStack gap="var(--Sizing-1)" alignItems="flex-end">
-              <TextField
+              <TextInput
                 label="Figma frame URL"
                 placeholder="https://www.figma.com/design/.../?node-id=123-456"
                 value={figmaUrl}
@@ -664,29 +664,31 @@ export default function AaidWorkbenchPage() {
               <BodySmall>
                 Stored in browser localStorage. Used only by this dev tool.
               </BodySmall>
-              <TextField
+              <TextInput
                 label="Figma personal access token"
-                error={figmaToken.trim() !== '' && !looksLikeFigmaToken(figmaToken.trim())}
-                helperText={
-                  figmaToken.trim() === '' || looksLikeFigmaToken(figmaToken.trim())
-                    ? 'Generate at figma.com/developers/api#access-tokens — needs file_read scope.'
-                    : 'Does not look like a Figma token — they start with figd_.'
+                validation={
+                  figmaToken.trim() !== '' && !looksLikeFigmaToken(figmaToken.trim())
+                    ? 'error' : undefined
                 }
+                validationMessage="Does not look like a Figma token — they start with figd_."
+                helperText="Generate at figma.com/developers/api#access-tokens — needs file_read scope."
                 value={figmaToken}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFigmaToken(e.target.value)}
                 type="password"
                 fullWidth
               />
-              <TextField
+              <TextInput
                 label="Anthropic API key"
-                error={anthropicKey.trim() !== '' && !looksLikeAnthropicKey(anthropicKey.trim())}
-                helperText={
-                  anthropicKey.trim() === '' || looksLikeAnthropicKey(anthropicKey.trim())
-                    ? 'Generate at console.anthropic.com. Workbench-only — never shipped to customers.'
-                    : looksLikeUuid(anthropicKey.trim())
-                      ? 'That is a UUID — looks like a Design ID. An Anthropic key starts with sk-ant-.'
-                      : 'Does not look like an Anthropic key — they start with sk-ant-.'
+                validation={
+                  anthropicKey.trim() !== '' && !looksLikeAnthropicKey(anthropicKey.trim())
+                    ? 'error' : undefined
                 }
+                validationMessage={
+                  looksLikeUuid(anthropicKey.trim())
+                    ? 'That is a UUID — looks like a Design ID. An Anthropic key starts with sk-ant-.'
+                    : 'Does not look like an Anthropic key — they start with sk-ant-.'
+                }
+                helperText="Generate at console.anthropic.com. Workbench-only — never shipped to customers."
                 value={anthropicKey}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAnthropicKey(e.target.value)}
                 type="password"
@@ -705,7 +707,7 @@ export default function AaidWorkbenchPage() {
               brand-aware suggestions. Leaving this blank converts against
               the default-theme tokens only.
             </BodySmall>
-            <TextField
+            <TextInput
               label="Design ID"
               placeholder="e.g. 618ab9a8-879e-44fa-8432-4000a2eb66f5"
               value={dinoId}

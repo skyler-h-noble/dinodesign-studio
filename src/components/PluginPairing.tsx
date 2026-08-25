@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import {
-  Card, VStack, HStack, Body, BodySmall, Button, TextField, Alert,
+  Card,
+  VStack,
+  HStack,
+  Body,
+  BodySmall,
+  Button,
+  TextInput,
+  Alert,
 } from '@omni-design/components';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { firebaseApp } from '../utils/firebase/client';
@@ -62,7 +69,7 @@ export default function PluginPairing() {
 
         <HStack spacing={2} style={{ width: '100%', alignItems: 'flex-end' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <TextField
+            <TextInput
               label="Pairing code"
               value={code}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>

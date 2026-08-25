@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
-import { OmniDesignProvider, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Button, TextField, Alert, Badge, Divider } from '@omni-design/components';
+import {
+  OmniDesignProvider,
+  H1,
+  H2,
+  H3,
+  Body,
+  BodySmall,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  TextInput,
+  Alert,
+  Badge,
+  Divider,
+} from '@omni-design/components';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
@@ -135,27 +150,27 @@ export default function Playground() {
               Plain inputs:
             </BodySmall>
             <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
-              <TextField label="Email" style={{ flex: 1, minWidth: 200 }} />
-              <TextField label="Password" style={{ flex: 1, minWidth: 200 }} />
+              <TextInput label="Email" style={{ flex: 1, minWidth: 200 }} />
+              <TextInput label="Password" style={{ flex: 1, minWidth: 200 }} />
             </HStack>
 
             <BodySmall color="quiet">
               With <code>startAdornment</code> / <code>endAdornment</code> — drop in any icon or icon-button to mark the field's purpose or attach an action:
             </BodySmall>
             <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
-              <TextField
+              <TextInput
                 label="Search"
                 placeholder="Search..."
                 style={{ flex: 1, minWidth: 200 }}
                 startAdornment={<SearchIcon style={{ fontSize: 18, color: 'var(--Quiet)' }} />}
               />
-              <TextField
+              <TextInput
                 label="Amount"
                 placeholder="0.00"
                 style={{ flex: 1, minWidth: 200 }}
                 startAdornment={<AttachMoneyIcon style={{ fontSize: 18, color: 'var(--Quiet)' }} />}
               />
-              <TextField
+              <TextInput
                 label="Email"
                 placeholder="you@example.com"
                 style={{ flex: 1, minWidth: 200 }}
@@ -164,7 +179,7 @@ export default function Playground() {
             </HStack>
 
             <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
-              <TextField
+              <TextInput
                 label="Search"
                 placeholder="With clear button"
                 style={{ flex: 1, minWidth: 200 }}
@@ -175,7 +190,7 @@ export default function Playground() {
                   </Button>
                 }
               />
-              <TextField
+              <TextInput
                 label="Password"
                 type="password"
                 placeholder="••••••••"
@@ -186,11 +201,11 @@ export default function Playground() {
                   </Button>
                 }
               />
-              <TextField
+              <TextInput
                 label="Design system ID"
                 value="efa30f2c-fafc-4f1d-ad8e-d9d67c9c397d"
                 style={{ flex: 1, minWidth: 200 }}
-                InputProps={{ readOnly: true }}
+                inputProps={{ readOnly: true }}
                 endAdornment={
                   <Button variant="ghost" size="small" sx={{ minWidth: 0, padding: '2px 8px' }}>
                     Copy

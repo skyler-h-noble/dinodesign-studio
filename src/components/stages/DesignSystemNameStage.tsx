@@ -1,4 +1,14 @@
-import { Alert, Button, H2, Body, BodySmall, VStack, HStack, TextField, Card } from '@omni-design/components';
+import {
+  Alert,
+  Button,
+  H2,
+  Body,
+  BodySmall,
+  VStack,
+  HStack,
+  TextInput,
+  Card,
+} from '@omni-design/components';
 import { useEffect, useState } from 'react';
 import type { StageProps } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -69,7 +79,7 @@ export default function DesignSystemNameStage({ onNext, onBack, onSubmit }: Prop
 
       <Card padding="large" style={{ maxWidth: 480, width: '100%' }}>
         <VStack spacing={3}>
-          <TextField
+          <TextInput
             label="Design System Name"
             value={name}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}

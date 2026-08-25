@@ -1,6 +1,23 @@
 import {
-  Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card,
-  CircularProgress, Checkbox, Divider, Link, Radio, Modal, TextField, Alert, SliderInput, Icon,
+  Button,
+  ButtonGroup,
+  H2,
+  H3,
+  Body,
+  BodySmall,
+  VStack,
+  HStack,
+  Card,
+  CircularProgress,
+  Checkbox,
+  Divider,
+  Link,
+  Radio,
+  Modal,
+  TextInput,
+  Alert,
+  SliderInput,
+  Icon,
 } from '@omni-design/components';
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
@@ -1277,7 +1294,7 @@ export default function ColorStage({
             }} />
 
             {/* Hex input */}
-            <TextField
+            <TextInput
               label="Hex Color"
               value={hexEditValue}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

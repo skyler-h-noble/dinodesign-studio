@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Modal, Button, Body, BodySmall, VStack, HStack, TextField, Alert } from '@omni-design/components';
+import {
+  Modal,
+  Button,
+  Body,
+  BodySmall,
+  VStack,
+  HStack,
+  TextInput,
+  Alert,
+} from '@omni-design/components';
 import { isDesignNameTaken } from '../utils/designSystemNames';
 
 interface Props {
@@ -66,7 +75,7 @@ export default function RenameDesignModal({ open, currentName, userId, excludeId
           You already have a design system named “{currentName}”. Pick a different
           name for this one to keep them separate.
         </Body>
-        <TextField
+        <TextInput
           label="Design System Name"
           value={name}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}

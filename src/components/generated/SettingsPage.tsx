@@ -2,9 +2,24 @@
 // "A settings page with Profile and Notifications tabs."
 import { useState } from 'react';
 import {
-  Section, Container, VStack, HStack, Card, Divider,
-  H2, Body, Tabs, TabList, Tab, TabPanel,
-  List, ListItem, SwitchInput, TextField, EmailTextField, Button, Avatar,
+  Section,
+  Container,
+  VStack,
+  HStack,
+  Card,
+  Divider,
+  H2,
+  Body,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanel,
+  List,
+  ListItem,
+  SwitchInput,
+  TextInput,
+  Button,
+  Avatar,
 } from '@omni-design/components';
 
 const NOTIFICATIONS = [
@@ -40,8 +55,8 @@ export default function SettingsPage() {
                     <Avatar size="large" initials="LN" />
                     <Button variant="default-outline" size="small">Change photo</Button>
                   </HStack>
-                  <TextField label="Full name" defaultValue="Lise Noble" fullWidth />
-                  <EmailTextField label="Email" defaultValue="lise@dino.design" fullWidth />
+                  <TextInput label="Full name" defaultValue="Lise Noble" fullWidth />
+                  <TextInput type="email" label="Email" defaultValue="lise@dino.design" fullWidth />
                   <Divider />
                   <Button variant="primary" style={{ alignSelf: 'flex-start' }}>Save changes</Button>
                 </VStack>
