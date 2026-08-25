@@ -888,7 +888,7 @@ function CodeToDesignPanel() {
               ))}
             </HStack>
             {unknown.length > 0 && (
-              <Alert severity="warning">
+              <Alert severity="warning" data-theme="Warning" data-surface="Surface-Brightest">
                 Not exported by the library: {unknown.join(', ')}. A frame cannot
                 be built for these — swap them for library components first.
               </Alert>
@@ -901,7 +901,7 @@ function CodeToDesignPanel() {
         <Card padding="medium">
           <VStack gap="var(--Sizing-2)">
             <H3>Build payload</H3>
-            <Alert severity="info">
+            <Alert severity="info" data-theme="Info" data-surface="Surface-Brightest">
               Figma's REST API cannot create frames — only a plugin can. This
               hands the payload to the paired plugin, which owns the
               <code> figma.createFrame()</code> call.
@@ -958,7 +958,7 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
 
   if (findings.length === 0) {
     return (
-      <Alert severity="success">
+      <Alert severity="success" data-theme="Success" data-surface="Surface-Brightest">
         No drift found. No hardcoded colours, no hidden layers rendered, every
         variant and string accounted for.
       </Alert>
@@ -967,6 +967,19 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
 
   const tone = (s: string) =>
     s === 'error' ? 'error' : s === 'warning' ? 'warning' : 'info';
+
+  /**
+   * Each severity carries its own theme, and the pair is what makes the card
+   * legible — data-theme picks the palette, data-surface="Surface-Brightest"
+   * picks the lightest step in it, and --Text/--Border come along already tuned
+   * for that tone. Painting a background without the pair is what left these
+   * cards white on a dark page.
+   *
+   * "Surface-Brightest", not "Surface-Lightest" — the latter does not exist,
+   * and a data-surface that matches nothing resolves to nothing.
+   */
+  const themeFor = (s: string) =>
+    s === 'error' ? 'Error' : s === 'warning' ? 'Warning' : 'Info';
 
   return (
     <VStack gap="var(--Sizing-2)">
@@ -978,7 +991,12 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
 
       <VStack gap="var(--Sizing-1)">
         {findings.map((f, i) => (
-          <Alert key={`${f.kind}-${i}`} severity={tone(f.severity) as 'error'}>
+          <Alert
+            key={`${f.kind}-${i}`}
+            severity={tone(f.severity) as 'error'}
+            data-theme={themeFor(f.severity)}
+            data-surface="Surface-Brightest"
+          >
             <VStack gap="var(--Sizing-Half)">
               <BodySmall>{f.message}</BodySmall>
               {f.detail && <Caption color="quiet">{f.detail}</Caption>}
