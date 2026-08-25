@@ -68,6 +68,30 @@ function FigmaGlyph() {
   );
 }
 
+/**
+ * Clipboard fallback for when navigator.clipboard is unavailable.
+ *
+ * execCommand('copy') is deprecated but still works in the cases the async API
+ * refuses — an insecure origin, or a document that lost focus. Returns whether
+ * it actually copied, so the label can tell the truth either way.
+ */
+function copyViaSelection(text: string): boolean {
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.setAttribute('readonly', '');
+  el.style.position = 'fixed';
+  el.style.opacity = '0';
+  document.body.appendChild(el);
+  try {
+    el.select();
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(el);
+  }
+}
+
 export default function MyDesignsPage() {
   const { user } = useAuth();
   const [designSystems, setDesignSystems] = useState<DesignSystem[]>([]);
@@ -279,6 +303,7 @@ function DesignSystemCard({
   // renders. Inline a small portal-positioned dropdown instead — anchored to
   // the button via getBoundingClientRect so it escapes the Card's overflow.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -408,6 +433,37 @@ function DesignSystemCard({
                 color: 'var(--Text)',
               }}
             >
+              <MenuButton
+                onClick={() => { window.location.href = `/create?id=${ds.id}`; }}
+              >
+                Edit
+              </MenuButton>
+              <MenuButton
+                onClick={async () => {
+                  // navigator.clipboard rejects outside a secure context, when
+                  // the document is not focused, or when permission is refused —
+                  // and an unhandled rejection here means the label never
+                  // changes and the click looks like it did nothing at all.
+                  let ok = true;
+                  try {
+                    await navigator.clipboard.writeText(ds.id);
+                  } catch {
+                    ok = copyViaSelection(ds.id);
+                  }
+                  setCopyState(ok ? 'copied' : 'failed');
+                  // Kept open, and the label confirms in place. Closing on copy
+                  // gives no feedback at all — you cannot tell a successful copy
+                  // from a misclick that dismissed the menu.
+                  window.setTimeout(() => {
+                    setCopyState('idle');
+                    if (ok) setMenuOpen(false);
+                  }, 1400);
+                }}
+              >
+                {copyState === 'copied' ? 'Copied'
+                  : copyState === 'failed' ? 'Copy failed — select it manually'
+                  : 'Copy design ID'}
+              </MenuButton>
               <MenuButton
                 onClick={() => { setMenuOpen(false); onRegenerate(); }}
               >
