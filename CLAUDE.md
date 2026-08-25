@@ -507,11 +507,6 @@ ladders, and the traps: [docs/container-logic.md](docs/container-logic.md).
 The page background is a theme + surface level, not a string:
 [docs/background-selection.md](docs/background-selection.md).
 
-The AAID workbench has a user guide — keys, the convert loop, and how to read
-Code / Preview / Drift: [docs/workbench-guide.md](docs/workbench-guide.md).
-[docs/build-your-own-design-to-code.md](docs/build-your-own-design-to-code.md)
-is the shareable version, written against a library that is not ours.
-
 Each rule below has already been broken once. The consequence is stated so it
 can't be reasoned away.
 
