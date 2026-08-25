@@ -84,7 +84,7 @@ export default function DesignSystemNameStage({ onNext, onBack, onSubmit }: Prop
               You already have a design system with this name. Pick a different name.
             </Alert>
           )}
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Created: {date}
           </BodySmall>
         </VStack>

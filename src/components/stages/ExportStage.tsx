@@ -377,8 +377,8 @@ export default function ExportStage({
       <div className="export-page">
         <VStack spacing={4} style={{ maxWidth: 800, margin: '0 auto', alignItems: 'center', paddingTop: 80 }}>
           <H2>Generation Failed</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>{genError}</Body>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <Body color="quiet">{genError}</Body>
+          <BodySmall color="quiet">
             Make sure the Supabase storage bucket &quot;design-systems&quot; exists and allows public uploads.
           </BodySmall>
           <Button variant="primary-outline" onClick={onBack}>Back</Button>
@@ -417,7 +417,7 @@ export default function ExportStage({
                 <ComputerIcon />
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Hosted Design System</H3>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 View your complete design system with all 49 components rendered with your brand tokens. Share the playground link with your team.
               </BodySmall>
               <Button variant="primary" style={{ width: '100%' }} disabled={!hasId} onClick={() => window.open(playgroundUrl, '_blank')}>
@@ -438,7 +438,7 @@ export default function ExportStage({
                 </svg>
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Get a full Figma design system with your brand tokens applied
                 to every component, style, and variable.
               </BodySmall>
@@ -460,7 +460,7 @@ export default function ExportStage({
                 <CodeIcon />
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Install the OmniDesign component library and connect your design system to your React project.
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
@@ -482,7 +482,7 @@ export default function ExportStage({
                 <GridViewIcon />
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Start Using in AI</H3>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Connect your design system to Cursor, Claude Code, or any AI coding assistant.
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
@@ -503,7 +503,7 @@ export default function ExportStage({
                 <CheckCircleOutlineIcon />
               </div>
               <H3 style={{ fontSize: '1.1rem' }}>Accessibility Report</H3>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
               </BodySmall>
               <Button
@@ -563,7 +563,7 @@ export default function ExportStage({
           <Card padding="medium" sx={{ width: '100%' }}>
             <VStack spacing={2}>
               <BodySmall style={{ fontWeight: 600 }}>Export to OmniDesign</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Writes the 3 dynamic CSS files (<code>base.css</code>, <code>Light-Mode.css</code>, <code>Dark-Mode.css</code>) to your OmniDesign folder. First time you'll pick the folder; after that the studio remembers it and writes directly. Static lib files are left alone. Chrome/Edge only.
               </BodySmall>
               <Button

@@ -466,6 +466,10 @@ itself).
 These are about **generating** tokens (`src/utils/cssgen/`,
 `generateFigmaJSON.ts`, `buildPreviewCSS.ts`), not about using components.
 Full reasoning and measurements: [docs/design-system-architecture.md](docs/design-system-architecture.md).
+Container colours have their own write-up — the five levels, the opacity
+ladders, and the traps: [docs/container-logic.md](docs/container-logic.md).
+The page background is a theme + surface level, not a string:
+[docs/background-selection.md](docs/background-selection.md).
 
 Each rule below has already been broken once. The consequence is stated so it
 can't be reasoned away.
@@ -500,7 +504,15 @@ can't be reasoned away.
 
 5. **The preview is a separate implementation from the export.** They diverge
    silently — an unresolved `var()` paints nothing and reports nothing. Change
-   both, and cover it in `src/__tests__/tokenParity.test.ts`.
+   both, and cover it in `src/__tests__/tokenParity.test.ts` (or a focused
+   sibling such as `containerTone.test.ts`).
+
+   Divergence does not require a broken value on either side. The tonal
+   container was keyed on light/dark MODE in the preview and on the
+   background's LIGHTNESS in the export; both were self-consistent, so a black
+   background in light mode drew a near-white card in the preview and a
+   near-black one in the published CSS, and every test passed. Assert the token
+   a surface actually resolves to, not just that both sides emit something.
 
 6. **Assert per-theme, not only at Brand scope.** Tonal and primary produce the
    same button at Brand scope and different ones on every themed surface. That
@@ -576,8 +588,13 @@ The root `tsconfig.json` is `"files": []` with only project references, so:
 
 ```
 npx tsc --noEmit -p .   ->  0 errors     (checks no files at all)
-npx tsc -b              ->  366 errors   (the real number)
+npx tsc -b              ->  0 errors     (the real number, verified 2026-08-25)
 ```
+
+Both read `0` today, and they mean opposite things: `-b` compiled every file and
+found nothing; `-p .` never opened one. Do not take the matching numbers as
+proof the flags are interchangeable — `--listFiles` on `-p .` still returns no
+project file at all.
 
 Use `npm run typecheck` (`tsc -b`). Never `-p .` — it reports a clean pass on a
 codebase that does not compile, which is worse than no check, because the clean
@@ -588,9 +605,14 @@ This is not hypothetical: `<Select>` and `<Label>` were added to
 error was `TS2304: Cannot find name 'Select'` — a first-line failure that `-p .`
 never looked for.
 
-The 366 errors are pre-existing (mostly `TS6133` unused locals and missing lib
-type exports). You cannot gate on zero yet, so gate on **no worse than
-baseline**: run `npm run typecheck` before and after, and compare counts.
+The baseline used to be 366 pre-existing errors (mostly `TS6133` unused locals
+and missing lib type exports) with the instruction to gate on *no worse than
+baseline*. Those have since been cleared: `npx tsc -b --force` is clean, so the
+gate is now simply **zero**. If you see a non-zero count, it is yours.
+
+Re-measure with `--force` before trusting a `0`. `tsc -b` is incremental and
+will happily report a clean pass from a stale build cache on a tree that does
+not compile — the same failure mode as `-p .`, one layer down.
 
 ## Audit
 

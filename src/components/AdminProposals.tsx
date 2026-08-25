@@ -115,7 +115,7 @@ export default function AdminProposals() {
       <>
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
-          <Body style={{ color: 'var(--Quiet)' }}>Checking access…</Body>
+          <Body color="quiet">Checking access…</Body>
         </VStack>
       </>
     );
@@ -127,7 +127,7 @@ export default function AdminProposals() {
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>Not authorized</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>
+          <Body color="quiet">
             This page is restricted to OmniDesign admins.
           </Body>
         </VStack>
@@ -141,7 +141,7 @@ export default function AdminProposals() {
       <VStack spacing={4} style={{ padding: '32px 24px', maxWidth: 1100, margin: '0 auto' }}>
         <VStack spacing={0}>
           <H2 style={{ margin: 0 }}>Component Proposals</H2>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Submissions from `@dynodesign/components` consumers via `/ShareComponent`.
           </BodySmall>
         </VStack>
@@ -168,10 +168,10 @@ export default function AdminProposals() {
         {error && <Alert variant="light" color="error" size="small">{error}</Alert>}
 
         {loading ? (
-          <Body style={{ color: 'var(--Quiet)' }}>Loading…</Body>
+          <Body color="quiet">Loading…</Body>
         ) : filtered.length === 0 ? (
           <Card padding="medium">
-            <Body style={{ color: 'var(--Quiet)' }}>
+            <Body color="quiet">
               No {filter === 'all' ? '' : filter + ' '}proposals.
             </Body>
           </Card>
@@ -232,7 +232,7 @@ function ProposalCard({
           />
         </HStack>
 
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet">
           {proposal.submittedAt?.toLocaleString() || 'Unknown date'}
           {proposal.libVersion ? ` · v${proposal.libVersion}` : ''}
           {proposal.sourceFilePath ? ` · ${proposal.sourceFilePath}` : ''}
@@ -306,7 +306,7 @@ function FigmaTemplateUploader() {
     <Card padding="medium">
       <VStack spacing={2}>
         <H4 style={{ margin: 0 }}>Figma template</H4>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet">
           The master .fig file every user downloads from their dashboard.
           Overwrites <code>figma-templates/{FIGMA_TEMPLATE_FILENAME}</code> in Storage.
         </BodySmall>

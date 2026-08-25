@@ -441,7 +441,7 @@ describe('Surface-Brightest', () => {
   // Asserted in BOTH targets. The CSS emits a token reference and the Figma
   // payload emits the resolved hex, so a divergence here reads as two correct
   // looking values rather than as an error.
-  it('puts tonal containers on Color-10, in the CSS and in Figma alike', () => {
+  it('ramps tonal containers up to Color-10, in the CSS and in Figma alike', () => {
     const THEMES = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
     const css = generateCSSFiles(json)['Light-Mode.css'] || '';
     let checked = 0;
@@ -449,8 +449,15 @@ describe('Surface-Brightest', () => {
       const sel = (blk.split('{')[0] || '').replace(/\s+/g, ' ');
       const t = (sel.match(/Theme: ([\w-]+) - Containers/) || [])[1];
       if (!t || !THEMES.includes(t)) continue;
-      const raw = (((blk.split('{')[1] || '').match(/--Container:\s*([^;]+);/)) || [])[1] || '';
-      expect(raw.trim(), `${t} container`).toBe(`var(--${t}-Color-10)`);
+      const body = blk.split('{')[1] || '';
+      const g = (n: string) => ((body.match(new RegExp(`--${n}:\\s*([^;]+);`)) || [])[1] || '').trim();
+      // The five levels are one tone at five opacities over the background, so
+      // only the top level is a palette colour and can stay a token reference.
+      expect(g('Container-Highest'), `${t} container top`).toBe(`var(--${t}-Color-10)`);
+      // The rest are blends, so they are hex — a token ref here would put the
+      // ramp on two different curves (the dark-mode non-monotonic bug).
+      expect(g('Container'), `${t} container`).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(g('Container-Lowest'), `${t} container floor`).toMatch(/^#[0-9a-f]{6}$/i);
       checked++;
     }
     expect(checked, 'every theme must declare a container').toBe(THEMES.length);
@@ -459,9 +466,15 @@ describe('Surface-Brightest', () => {
     // rather than restating the colour.
     const lm = (withStyle() as any).Modes['Light-Mode'];
     const expected = lm.Colors.Primary['Color-10'].value;
-    for (const row of ['Background-8', 'Background-10', 'Background-12']) {
-      expect(lm.Backgrounds.Primary[row]?.Containers?.Container?.value, `${row}`).toBe(expected);
+    // The ramp tops out at Color-10 on every light background EXCEPT
+    // Background-10, where the surface IS Color-10: blending a colour with
+    // itself makes the card vanish, so that one steps up to Color-11.
+    for (const row of ['Background-8', 'Background-12']) {
+      expect(lm.Backgrounds.Primary[row]?.Containers?.['Container-Highest']?.value, `${row}`)
+        .toBe(expected);
     }
+    expect(lm.Backgrounds.Primary['Background-10']?.Containers?.['Container-Highest']?.value)
+      .toBe(lm.Colors.Primary['Color-11'].value);
     // and NOT the tone it used to be
     expect(expected).not.toBe(lm.Colors.Primary['Color-11'].value);
   });

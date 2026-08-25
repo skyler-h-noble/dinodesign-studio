@@ -506,7 +506,17 @@ export default function ColorStage({
         hueOverridesForScheme[schemeIdx] = hOverrides[origIdx];
       }
     });
-    const generated = generateColorSchemes(reordered, lc[pIdx], dc[pIdx], locked, hueOverridesForScheme);
+    /* No global cap here — every colour keeps its own.
+     *
+     * This passed lc[pIdx] / dc[pIdx]: the PRIMARY's chroma, applied as the cap
+     * for all three roles of every scheme. Selecting a different Core Color as
+     * Primary therefore rebuilt every other colour under a cap belonging to a
+     * colour it has nothing to do with, and the tones visibly moved.
+     *
+     * Undefined lets each colour derive its own peak from its own hue and
+     * lightness. `refined` below then applies the per-colour ceiling from that
+     * colour's own chromaPerColor entry — which is where a cap belongs. */
+    const generated = generateColorSchemes(reordered, undefined, undefined, locked, hueOverridesForScheme);
 
     // Restore the authored Custom triple. generateColorSchemes always builds
     // Custom as [c1, c2, c3] — the default first three swatches — which is only
@@ -820,13 +830,13 @@ export default function ColorStage({
 
         return (
           <VStack spacing={3} style={{ minWidth: 380, maxWidth: 480 }}>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Adjust the lightest and darkest hues to correct perceived color shifts
               (yellows turning green when dark, navy turning purple when light).
               The user&apos;s exact color stays fixed; hues interpolate from the endpoints toward it.
             </BodySmall>
 
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Editing <strong>{toneMode}</strong> mode (switch above to edit the other mode)
             </BodySmall>
 
@@ -893,7 +903,7 @@ export default function ColorStage({
                   );
                 })}
               </div>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Dashed = your extracted color
               </BodySmall>
             </VStack>
@@ -937,11 +947,11 @@ export default function ColorStage({
                     ]}
                   />
                   {isLocked ? (
-                    <BodySmall style={{ color: 'var(--Quiet)' }}>
+                    <BodySmall color="quiet">
                       Chroma is locked because this color is locked to its exact hex.
                     </BodySmall>
                   ) : sliderMax < 70 ? (
-                    <BodySmall style={{ color: 'var(--Quiet)' }}>
+                    <BodySmall color="quiet">
                       This color's gamut peaks at {sliderMax}.{' '}
                       <Link
                         style={{ cursor: 'pointer' }}
@@ -1116,9 +1126,9 @@ export default function ColorStage({
               </BodySmall>
             </HStack>
             <VStack spacing={0}>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Colors sorted by dominance (most to least)</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Color swatches are prioritized</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>Click to edit hex · Double-click to select for swap</BodySmall>
+              <BodySmall color="quiet">Colors sorted by dominance (most to least)</BodySmall>
+              <BodySmall color="quiet">Color swatches are prioritized</BodySmall>
+              <BodySmall color="quiet">Click to edit hex · Double-click to select for swap</BodySmall>
             </VStack>
 
             <div style={{ display: 'flex', gap: 16, width: '100%', alignItems: 'flex-start' }}>
@@ -1204,7 +1214,7 @@ export default function ColorStage({
                   ({colorData.additionalColors.length} available)
                 </BodySmall>
               </HStack>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Click any color above, then select from these to swap
               </BodySmall>
               <div style={{
@@ -1284,7 +1294,7 @@ export default function ColorStage({
             {hexEditValue.match(/^#[0-9a-fA-F]{6}$/) && (() => {
               const [l, c, h] = chroma(hexEditValue).lch();
               return (
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
+                <BodySmall color="quiet">
                   L: {l.toFixed(0)} · C: {c.toFixed(0)} · H: {(h || 0).toFixed(0)}°
                 </BodySmall>
               );
@@ -1326,7 +1336,7 @@ export default function ColorStage({
                             width: 32, height: 32, borderRadius: 'var(--Style-Border-Radius)',
                             backgroundColor: validation.suggested, border: '1px solid var(--Border)', flexShrink: 0,
                           }} />
-                          <BodySmall style={{ color: 'var(--Quiet)' }}>Suggested: {validation.suggested}</BodySmall>
+                          <BodySmall color="quiet">Suggested: {validation.suggested}</BodySmall>
                           <Button size="small" variant="primary-outline" onClick={() => setHexEditValue(validation.suggested!)}>
                             Use
                           </Button>
@@ -1387,7 +1397,7 @@ export default function ColorStage({
         <VStack spacing={3}>
           <VStack spacing={1}>
             <BodySmall style={{ fontWeight: 600 }}>Core Colors</BodySmall>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               <strong>Click</strong> a colour to swap it for another.
               {' '}<strong>Double-click</strong> to type an exact hex or lock it.
             </BodySmall>

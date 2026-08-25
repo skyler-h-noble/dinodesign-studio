@@ -2687,11 +2687,12 @@ function CropDetail({
         <img
           src={region.dataUrl}
           alt={region.text || 'detected crop'}
+          data-surface="Container"
           style={{
             width: '100%',
             height: 120,
             objectFit: 'contain',
-            background: 'var(--Container)',
+            background: 'var(--Background)',
             borderRadius: 'var(--Style-Border-Radius)',
           }}
         />

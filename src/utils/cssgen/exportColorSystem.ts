@@ -2825,10 +2825,13 @@ function generateModesThemes(
       // Primary or Primary-Light → Primary-2 in Dark Mode
       defaultConfig = { theme: 'Primary', n: 2 };
       console.log(`🎨 [Default Theme] DARK MODE Background=Primary/Primary-Light → Primary Color-2`);
-    } else if (userSelections?.backgroundN !== undefined && userSelections?.backgroundTheme) {
-      // Use explicit user selections if provided
-      defaultConfig = { theme: userSelections.backgroundTheme, n: userSelections.backgroundN };
-      console.log(`🎨 [Default Theme] DARK MODE Using userSelections → ${userSelections.backgroundTheme} Color-${userSelections.backgroundN}`);
+    } else if (userSelections?.backgroundTheme) {
+      // The THEME carries over into dark mode; the tone does not. backgroundN
+      // is a LIGHT-mode position — a Surface-Brightest pick is Color-11, and
+      // honouring that here would paint a near-white page in dark mode. Every
+      // legacy branch above lands on Color-2, so grid selections do too.
+      defaultConfig = { theme: userSelections.backgroundTheme, n: 2 };
+      console.log(`🎨 [Default Theme] DARK MODE Using userSelections → ${userSelections.backgroundTheme} Color-2`);
     } else {
       // Default for Dark Mode: Primary-2
       defaultConfig = { theme: 'Primary', n: 2 };
@@ -4048,6 +4051,21 @@ export function exportColorSystemToJSON(
         throw error;
       }
 
+      // The card style the user picked decides which ramp every Background-N
+      // row carries. It used to be hardcoded to 'tonal', with white cards faked
+      // by a special case on the lightest Neutral row — which meant the
+      // 'professional' and 'black' branches were unreachable and white cards
+      // came out flat.
+      //
+      // There is no conflict in generating every row for one style: the theme
+      // layer points white cards at Neutral/Background-12 and black cards at
+      // Neutral/Background-1 (see getContainerVars), so only those rows are
+      // read back, and an export only ever has ONE cardColoring.
+      const containerStyleForBackgrounds =
+        userSelections?.cardColoring === 'white' ? 'professional' as const
+        : userSelections?.cardColoring === 'black' ? 'black' as const
+        : 'tonal' as const;
+
       // Light Mode - SIMPLIFIED Backgrounds (ONLY surfaces and containers)
       console.log(`      ├─ [JSON Export] Light-Mode/${paletteName}: Generating 14 SIMPLIFIED backgrounds (surfaces/containers only)`);
       lightModeBackgroundTones.forEach((tone, index) => {
@@ -4059,7 +4077,7 @@ export function exportColorSystemToJSON(
           palette,
           paletteKey !== 'neutral',
           paletteName, // ✅ Pass palette name to generate token references instead of hex colors
-          'tonal' // ✅ Always use tonal mode - Neutral-14 will be handled as special case inside function
+          containerStyleForBackgrounds,
         );
         
         // CRITICAL: Check if the function returned a valid result
@@ -4130,8 +4148,15 @@ export function exportColorSystemToJSON(
         const nestedBackground = {
           Surfaces: {
             Surface: surfacesAndContainers.Surfaces.Surface,
+            // The ENDS are carried through too. addSurfaceEnds computes both and
+            // this copy listed only three keys, so Surface-Dimmest and
+            // Surface-Brightest were generated and then dropped before they
+            // reached Backgrounds — which is also why the accessibility report
+            // could not grade them: it looked them up here and found nothing.
+            'Surface-Dimmest': surfacesAndContainers.Surfaces['Surface-Dimmest'],
             'Surface-Dim': surfacesAndContainers.Surfaces['Surface-Dim'],
             'Surface-Bright': surfacesAndContainers.Surfaces['Surface-Bright'],
+            'Surface-Brightest': surfacesAndContainers.Surfaces['Surface-Brightest'],
           },
           Containers: {
             Container: surfacesAndContainers.Containers.Container,
@@ -4181,7 +4206,7 @@ export function exportColorSystemToJSON(
         palette,
         paletteKey !== 'neutral',
         paletteName, // ✅ Pass palette name to generate token references instead of hex colors
-        'tonal' // ✅ Always use tonal mode - Neutral-14 will be handled as special case inside function
+        containerStyleForBackgrounds,
       );
       
       // CRITICAL: Check if the function returned a valid result
@@ -4223,8 +4248,10 @@ export function exportColorSystemToJSON(
       const nestedVibrantLMT = {
         Surfaces: {
           Surface: vibrantLMTSurfacesAndContainers.Surfaces.Surface,
+          'Surface-Dimmest': vibrantLMTSurfacesAndContainers.Surfaces['Surface-Dimmest'],
           'Surface-Dim': vibrantLMTSurfacesAndContainers.Surfaces['Surface-Dim'],
           'Surface-Bright': vibrantLMTSurfacesAndContainers.Surfaces['Surface-Bright'],
+          'Surface-Brightest': vibrantLMTSurfacesAndContainers.Surfaces['Surface-Brightest'],
         },
         Containers: {
           Container: vibrantLMTSurfacesAndContainers.Containers.Container,
@@ -4362,8 +4389,11 @@ export function exportColorSystemToJSON(
           const nestedBackgroundDark = {
             Surfaces: {
               Surface: surfacesAndContainers.Surfaces.Surface,
+              // Ends carried through, same as light mode.
+              'Surface-Dimmest': surfacesAndContainers.Surfaces['Surface-Dimmest'],
               'Surface-Dim': surfacesAndContainers.Surfaces['Surface-Dim'],
               'Surface-Bright': surfacesAndContainers.Surfaces['Surface-Bright'],
+              'Surface-Brightest': surfacesAndContainers.Surfaces['Surface-Brightest'],
             },
             Containers: {
               Container: surfacesAndContainers.Containers.Container,

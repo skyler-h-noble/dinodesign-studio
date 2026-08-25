@@ -266,7 +266,7 @@ export default function DesignSystemDetail() {
       <>
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
-          <Body style={{ color: 'var(--Quiet)' }}>Loading design system…</Body>
+          <Body color="quiet">Loading design system…</Body>
         </VStack>
       </>
     );
@@ -530,7 +530,7 @@ function FigmaUpdateModal({ open, onClose, hasLinkedFile }: { open: boolean; onC
           </VStack>
         </Card>
         {!hasLinkedFile && (
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Once the plugin finishes the import, your Figma file will appear in
             the Settings tab under "Linked Figma files."
           </BodySmall>
@@ -608,7 +608,7 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
           </HStack>
           <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ ...headerStyle, margin: 0, fontSize: '1.6rem', fontWeight: 700 }}>{record.name}</h2>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               {record.componentStyle} · v{record.version} · created {record.createdAt?.toLocaleDateString() || 'unknown'}
             </BodySmall>
           </VStack>
@@ -652,13 +652,19 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
               <div
                 ref={menuRef}
                 role="menu"
+                /* Portalled to document.body, so it inherits no data-theme —
+                   it has to declare its own. Background is --Background, which
+                   data-surface resolves; the panel never names a surface token
+                   directly. */
+                data-theme="Brand"
+                data-surface="Container"
                 style={{
                   position: 'absolute',
                   top: menuPos.top,
                   right: menuPos.right,
                   minWidth: 160,
-                  background: 'var(--Container, #fff)',
-                  border: '1px solid var(--Border, #d4d4d4)',
+                  background: 'var(--Background)',
+                  border: '1px solid var(--Border)',
                   borderRadius: 'var(--Style-Border-Radius, 6px)',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
                   padding: '4px 0',
@@ -681,10 +687,10 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
           </HStack>
         </HStack>
         {pending > 0 && (
-          <HStack spacing={2} style={{
+          <HStack spacing={2} data-theme="Warning" data-surface="Container" style={{
             padding: '8px 12px', borderRadius: 6,
-            background: 'var(--Warning-Color-11, #fff8e1)',
-            border: '1px solid var(--Buttons-Warning-Border, #ffd54f)',
+            background: 'var(--Background)',
+            border: '1px solid var(--Border)',
             fontSize: 12,
             alignItems: 'center',
           }}>
@@ -705,7 +711,7 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
           </HStack>
         )}
         <HStack spacing={1} style={{ alignItems: 'center' }}>
-          <BodySmall style={{ color: 'var(--Quiet)', flexShrink: 0, width: 24 }}>ID:</BodySmall>
+          <BodySmall color="quiet" style={{ flexShrink: 0, width: 24 }}>ID:</BodySmall>
           <div style={{ flex: 1, minWidth: 0 }}>
             <TextField
               value={id || ''}
@@ -803,7 +809,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             <ComputerIcon />
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Hosted Design System</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             View your complete design system with all components rendered with your brand tokens.
           </BodySmall>
           <Button variant="primary" style={{ width: '100%' }} onClick={() => window.open(playgroundUrl, '_blank')}>
@@ -826,7 +832,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
           {record.linkedFigmaFiles.length > 0 ? (
             <>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Your design system is live in Figma. Jump straight to the file.
               </BodySmall>
               <Button
@@ -839,7 +845,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             </>
           ) : (
             <>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Get a full Figma design system with your brand tokens applied to every component, style, and variable.
               </BodySmall>
               <Button
@@ -860,7 +866,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             <CodeIcon />
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Install the OmniDesign component library and connect your design system to your React project.
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
@@ -881,7 +887,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             <GridViewIcon />
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Start Using in AI</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Connect your design system to Cursor, Claude Code, or any AI coding assistant.
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
@@ -902,7 +908,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             <CheckCircleOutlineIcon />
           </div>
           <H3 style={{ fontSize: '1.1rem' }}>Accessibility Report</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Detailed contrast report for every background, surface, and container.
           </BodySmall>
           <Button
@@ -925,7 +931,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
               </Chip>
             )}
           </HStack>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Where the Accessible Text Overlay tool starts when someone opens it wearing this design
             system. Compose it in the tool, copy the <code>text-over-image.json</code> block from its
             Code tab, and paste it here.
@@ -961,7 +967,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           {overlayState === 'error' && (
             <BodySmall style={{ color: 'var(--Text-Error)' }}>{overlayError}</BodySmall>
           )}
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             When the composition sits on this system’s own <code>hero.png</code> or
             <code> moodboard.png</code>, the file just names it and there is no picture to upload.
             A picture from your machine has to be uploaded separately as
@@ -1155,7 +1161,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
             Linked Figma files
           </BodySmall>
           {record.linkedFigmaFiles.length === 0 ? (
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               No Figma files linked yet. Pair the OmniDesign plugin from your Account
               page, then run an import — the file you imported into will show up here.
             </BodySmall>
@@ -1199,7 +1205,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
             Add-Ons
           </BodySmall>
           {addOns.length === 0 ? (
-            <BodySmall style={{ color: 'var(--Quiet)' }}>None</BodySmall>
+            <BodySmall color="quiet">None</BodySmall>
           ) : (
             <BodySmall>{addOns.join(' · ')}</BodySmall>
           )}
@@ -1212,7 +1218,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
             Payment Details
           </BodySmall>
           {payments.length === 0 ? (
-            <BodySmall style={{ color: 'var(--Quiet)' }}>No payments on file</BodySmall>
+            <BodySmall color="quiet">No payments on file</BodySmall>
           ) : (
             <VStack spacing={0}>
               {payments.slice(0, 6).map(p => (
@@ -1245,7 +1251,7 @@ function VersionsTab({
           <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
             Versions
           </BodySmall>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             No version snapshots yet. Every time you reprocess this design
             system, a new version snapshot gets stored here so you can
             restore it later.

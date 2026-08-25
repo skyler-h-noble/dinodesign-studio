@@ -83,14 +83,14 @@ export function FigmaImportModal({
             In the plugin, paste in your unique OmniDesign ID:
           </BodySmall>
           <HStack spacing={1} style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <code style={{
+            <code data-surface="Container" style={{
               flex: 1,
               minWidth: 0,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
               fontSize: '0.85em',
               padding: '6px 10px',
               borderRadius: 4,
-              background: 'var(--Container)',
+              background: 'var(--Background)',
               border: '1px solid var(--Border)',
               wordBreak: 'break-all',
             }}>{id}</code>
@@ -138,7 +138,7 @@ function FigmaStep({ n, title, body, children }: { n: number; title: string; bod
       }}>{n}</div>
       <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
         <BodySmall style={{ fontWeight: 600 }}>Step {n} — {title}</BodySmall>
-        {body && <BodySmall style={{ color: 'var(--Quiet)' }}>{body}</BodySmall>}
+        {body && <BodySmall color="quiet">{body}</BodySmall>}
         {children}
       </VStack>
     </HStack>

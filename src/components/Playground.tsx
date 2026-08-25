@@ -74,7 +74,7 @@ export default function Playground() {
         <VStack spacing={6} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1}>
             <H1>Component Playground</H1>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>Design System ID: {uuid}</BodySmall>
+            <BodySmall color="quiet">Design System ID: {uuid}</BodySmall>
           </VStack>
 
           <Divider />
@@ -131,7 +131,7 @@ export default function Playground() {
           {/* Inputs */}
           <VStack spacing={3}>
             <H2>Inputs</H2>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Plain inputs:
             </BodySmall>
             <HStack spacing={3} style={{ flexWrap: 'wrap' }}>
@@ -139,7 +139,7 @@ export default function Playground() {
               <TextField label="Password" style={{ flex: 1, minWidth: 200 }} />
             </HStack>
 
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               With <code>startAdornment</code> / <code>endAdornment</code> — drop in any icon or icon-button to mark the field's purpose or attach an action:
             </BodySmall>
             <HStack spacing={3} style={{ flexWrap: 'wrap' }}>

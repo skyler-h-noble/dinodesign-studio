@@ -245,7 +245,7 @@ export default function PricingPage({ onCheckout }: Props) {
             </Body>
           </HStack>
           <HStack spacing={2} style={{ justifyContent: 'space-between' }}>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               {isAnnual ? 'Then annually' : 'Then monthly'}
             </BodySmall>
             <BodySmall style={{ color: 'var(--Text-Primary)', fontWeight: 600 }}>

@@ -92,7 +92,7 @@ export default function CheckoutSuccess() {
             Your payment was received but credits are still being processed.
             This can take up to a minute.
           </Body>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Session: {sessionId}
           </BodySmall>
           <Body>

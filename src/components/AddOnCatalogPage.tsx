@@ -71,7 +71,7 @@ export default function AddOnCatalogPage() {
                       {addon.available ? formatPrice(addon.priceUsdCents) + ' / design system' : 'Coming soon'}
                     </BodySmall>
                   </HStack>
-                  <BodySmall style={{ color: 'var(--Quiet)' }}>{addon.description}</BodySmall>
+                  <BodySmall color="quiet">{addon.description}</BodySmall>
                   {addon.available && (
                     <Button
                       variant="primary"
@@ -175,7 +175,7 @@ function AddOnPurchaseModal({
   return (
     <Modal open onClose={onClose} title={`Add "${addOn.title}" to a design system`} size="medium">
       <VStack spacing={3}>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet">
           {addOn.description}
         </BodySmall>
         <BodySmall style={{ fontWeight: 600 }}>
@@ -185,7 +185,7 @@ function AddOnPurchaseModal({
         {error && <Body style={{ color: 'var(--Buttons-Error-Button, #b00)' }}>{error}</Body>}
 
         {systems === null ? (
-          <Body style={{ color: 'var(--Quiet)' }}>Loading your design systems…</Body>
+          <Body color="quiet">Loading your design systems…</Body>
         ) : systems.length === 0 ? (
           <VStack spacing={2}>
             <Body>You don't have any design systems yet.</Body>

@@ -79,13 +79,18 @@ export default function AvatarDropdown({ user, onSignOut }: AvatarDropdownProps)
         <div
           ref={panelRef}
           role="menu"
+          /* Portalled to document.body, so it inherits no data-theme and has to
+             declare its own. Background comes from --Background, which
+             data-surface resolves; the panel never names a surface token. */
+          data-theme="Brand"
+          data-surface="Container"
           style={{
             position: 'absolute',
             top: anchorRect.bottom + window.scrollY + 4,
             right: window.innerWidth - anchorRect.right - window.scrollX,
             minWidth: 180,
-            background: 'var(--Container, #fff)',
-            border: '1px solid var(--Border, #d4d4d4)',
+            background: 'var(--Background)',
+            border: '1px solid var(--Border)',
             borderRadius: 'var(--Style-Border-Radius, 6px)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
             padding: '4px 0',

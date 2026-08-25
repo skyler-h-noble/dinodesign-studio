@@ -118,7 +118,7 @@ export default function AccountPage() {
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>Account</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>Sign in to view your account.</Body>
+          <Body color="quiet">Sign in to view your account.</Body>
         </VStack>
       </>
     );
@@ -129,7 +129,7 @@ export default function AccountPage() {
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>Account</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>Loading…</Body>
+          <Body color="quiet">Loading…</Body>
         </VStack>
       </>
     );
@@ -172,7 +172,7 @@ export default function AccountPage() {
                 <H3 style={{ margin: 0, fontSize: '1.1rem' }}>
                   {user.displayName || user.email?.split('@')[0] || 'You'}
                 </H3>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>{user.email}</BodySmall>
+                <BodySmall color="quiet">{user.email}</BodySmall>
               </VStack>
               <Button
                 variant="primary-outline"
@@ -217,7 +217,7 @@ export default function AccountPage() {
                     Payment history
                   </BodySmall>
                   {payments.length === 0 ? (
-                    <BodySmall style={{ color: 'var(--Quiet)' }}>No purchases yet.</BodySmall>
+                    <BodySmall color="quiet">No purchases yet.</BodySmall>
                   ) : (
                     <VStack spacing={0}>
                       <HStack spacing={2} style={{ paddingBottom: 8, borderBottom: '1px solid var(--Border)' }}>
@@ -313,14 +313,14 @@ function DesignSystemPanel({
                 <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
                   Add-ons
                 </BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
+                <BodySmall color="quiet">
                   {ds.addOns.length} of {ADD_ONS.length} active
                 </BodySmall>
               </HStack>
             </AccordionSummary>
             <AccordionDetails>
               <VStack spacing={1}>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
+                <BodySmall color="quiet">
                   Each add-on is purchased per design system. Add items to your cart and check out at any time.
                 </BodySmall>
                 <VStack spacing={2} style={{ paddingTop: 8 }}>
@@ -354,7 +354,7 @@ function DesignSystemPanel({
           <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
             Hosting preferences
           </BodySmall>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet">
             Turn on hosted views for this design system. Billed monthly when enabled.
           </BodySmall>
           <VStack spacing={2} style={{ paddingTop: 8 }}>
@@ -482,7 +482,7 @@ function HostingToggle({
       />
       <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
         <BodySmall style={{ fontWeight: 600 }}>{label}</BodySmall>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>{description}</BodySmall>
+        <BodySmall color="quiet">{description}</BodySmall>
       </VStack>
     </HStack>
   );

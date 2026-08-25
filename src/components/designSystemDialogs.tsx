@@ -154,7 +154,7 @@ export function DeleteDesignSystemModal({
           This will permanently delete <strong>{target.name}</strong>, its hosted
           files, the Figma export, and all history. This action cannot be undone.
         </Body>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet">
           To confirm, type the name of the design system below.
         </BodySmall>
         <TextField
@@ -276,7 +276,7 @@ export function RegenerateDesignSystemModal({
           this is for picking up generator improvements (new tokens, fixes,
           etc.) without walking through the edit flow.
         </Body>
-        <BodySmall style={{ color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet">
           The version number bumps by 1 and a new history entry is added. The
           previous files are overwritten in place.
         </BodySmall>

@@ -63,7 +63,7 @@ function CartModal({ totalCents, onClose }: { totalCents: number; onClose: () =>
     <Modal open onClose={onClose} title="Cart" size="medium">
       <VStack spacing={3}>
         {items.length === 0 ? (
-          <Body style={{ color: 'var(--Quiet)' }}>Your cart is empty.</Body>
+          <Body color="quiet">Your cart is empty.</Body>
         ) : (
           <VStack spacing={2}>
             {items.map(item => {
@@ -77,7 +77,7 @@ function CartModal({ totalCents, onClose }: { totalCents: number; onClose: () =>
                 >
                   <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
                     <BodySmall style={{ fontWeight: 600 }}>{addon.title}</BodySmall>
-                    <BodySmall style={{ color: 'var(--Quiet)' }}>
+                    <BodySmall color="quiet">
                       For: {item.designSystemName}
                     </BodySmall>
                   </VStack>

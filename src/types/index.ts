@@ -83,7 +83,9 @@ export interface ColorScheme {
 export interface UserSelections {
   defaultTheme: 'light' | 'dark';
   background: string;
-  backgroundTheme: 'Primary' | 'Neutral';
+  /** Any palette can back the page now, not just Primary/Neutral — see
+   *  src/utils/backgroundSelection.ts for the theme x surface grid. */
+  backgroundTheme: 'Primary' | 'Secondary' | 'Tertiary' | 'Neutral';
   backgroundN: number;
   appBar: 'primary-light' | 'primary' | 'white' | 'black';
   navBar: 'primary-light' | 'primary' | 'white' | 'black';

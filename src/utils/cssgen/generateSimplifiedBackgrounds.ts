@@ -1,4 +1,18 @@
-import { blendColors } from '../colorScale';
+import { blendColors, generateSemanticLightModeScale } from '../colorScale';
+
+/**
+ * The Neutral ramp, from the same seed the export builds it from
+ * (SEMANTIC_SEEDS.neutral in generateFullPalettes). White and black cards are
+ * always NEUTRAL — Color-12 and Color-1 — regardless of which palette's
+ * Background-N row they are being generated into, so their blends need the
+ * neutral hexes even when `palette` is Primary or Success.
+ *
+ * Deriving it rather than hardcoding keeps it in step with the palette the
+ * token references actually resolve against.
+ */
+const NEUTRAL_TONES = generateSemanticLightModeScale('#808080').map((t) => t.hex);
+const NEUTRAL_WHITE = NEUTRAL_TONES[11];   // Color-12
+const NEUTRAL_BLACK = NEUTRAL_TONES[0];    // Color-1
 
 /**
  * Type definition for simplified surfaces and containers
@@ -107,53 +121,39 @@ function lightModeBackgroundsBase(
   }
   
   if (paletteName) {
-    // SPECIAL CASE: Neutral-14 always has white containers (regardless of containerStyle)
-    // This is the only background where ALL containers should be white
-    if (paletteName === 'Neutral' && tone === 99) { // Background-14
-      console.log(`      🎨 [NEUTRAL-14 SPECIAL] All containers → {White}`);
-      return {
-        Surfaces: {
-          'Surface': {
-            value: `{Colors.${paletteName}.Color-${surfaceColorNumber}}`,
-            type: 'color'
-          },
-          'Surface-Dim': {
-            value: surfaceDimToken,
-            type: 'color'
-          },
-          'Surface-Bright': {
-            value: surfaceBrightToken,
-            type: 'color'
-          }
-        },
-        Containers: {
-          'Container': {
-            value: '{White}',
-            type: 'color'
-          },
-          'Container-Lowest': {
-            value: '{White}',
-            type: 'color'
-          },
-          'Container-Low': {
-            value: '{White}',
-            type: 'color'
-          },
-          'Container-High': {
-            value: '{White}',
-            type: 'color'
-          },
-          'Container-Highest': {
-            value: '{White}',
-            type: 'color'
-          }
-        }
-      };
-    }
+    // The lightest-Neutral override is GONE.
+    //
+    // It forced all five containers to {White} whenever paletteName was Neutral
+    // and tone was 99, ignoring containerStyle entirely. Its comment called that
+    // row "Background-14" — a leftover from the 14-tone scale, where tone 99 was
+    // a separate near-white step above the container tones. On the 12-tone scale
+    // tone 99 IS Color-12, the ordinary white background, so it fired for every
+    // white-background system.
+    //
+    // It existed because the caller hardcoded 'tonal', which made the
+    // professional branch unreachable and left this as the only way white cards
+    // could be white. The caller now passes the real card style through, so each
+    // style has its own ramp and this hack has nothing left to do. It is also
+    // what produced `--Container: #ffffff` in Cocktail Hour, Surf's Up,
+    // Chocolated and Omni Design.
 
-    // Professional mode: White cards - all containers link to {White}
-    // NOTE: This should only be used when the USER explicitly selects "professional" container style
+    // Professional mode: WHITE cards, as an elevation ramp rather than five
+    // identical whites. Same idea as the tonal ramp below and as dark mode —
+    // one colour at five opacities over the background — but the opacities sit
+    // much higher, because white cards are meant to read as white: the lower
+    // levels only let a little of the page through.
+    //
+    //   Container-Lowest  = 92% Neutral Color-12 over the background
+    //   Container-Low     = 94%
+    //   Container         = 97%
+    //   Container-High    = 98%
+    //   Container-Highest = Neutral Color-12
+    //
+    // Only the top level is a real colour, so only it keeps a token reference;
+    // the rest are blends and stay hex. Mixing refs and blends is what made the
+    // dark-mode ramp non-monotonic.
     if (containerStyle === 'professional') {
+      const atWhite = (a: number) => blendColors(NEUTRAL_WHITE, surfaceColor, a);
       return {
         Surfaces: {
           'Surface': {
@@ -171,31 +171,43 @@ function lightModeBackgroundsBase(
         },
         Containers: {
           'Container': {
-            value: '{White}',
+            value: atWhite(0.97),
             type: 'color'
           },
           'Container-Lowest': {
-            value: '{White}',
+            value: atWhite(0.92),
             type: 'color'
           },
           'Container-Low': {
-            value: '{White}',
+            value: atWhite(0.94),
             type: 'color'
           },
           'Container-High': {
-            value: '{White}',
+            value: atWhite(0.98),
             type: 'color'
           },
           'Container-Highest': {
-            value: '{White}',
+            value: '{Colors.Neutral.Color-12}',
             type: 'color'
           }
         }
       };
     }
 
-    // Black mode: Black cards - all containers link to {Colors.Neutral.Color-2}
+    // Black mode: BLACK cards, as an elevation ramp. This one runs the OTHER
+    // way: the floor is the pure colour and the higher levels let a little of
+    // the page bleed through, so a raised card lightens against a light page.
+    //
+    //   Container-Lowest  = Neutral Color-1 (100%)
+    //   Container-Low     = 96% Neutral Color-1 over the background
+    //   Container         = 94%
+    //   Container-High    = 92%
+    //   Container-Highest = 90%
+    //
+    // So the pure level — the one that keeps a token reference — is Lowest
+    // here, not Highest. Everything else is a blend and stays hex.
     if (containerStyle === 'black') {
+      const atBlack = (a: number) => blendColors(NEUTRAL_BLACK, surfaceColor, a);
       return {
         Surfaces: {
           'Surface': {
@@ -213,23 +225,23 @@ function lightModeBackgroundsBase(
         },
         Containers: {
           'Container': {
-            value: '{Colors.Neutral.Color-2}',
+            value: atBlack(0.94),
             type: 'color'
           },
           'Container-Lowest': {
-            value: '{Colors.Neutral.Color-2}',
+            value: '{Colors.Neutral.Color-1}',
             type: 'color'
           },
           'Container-Low': {
-            value: '{Colors.Neutral.Color-2}',
+            value: atBlack(0.96),
             type: 'color'
           },
           'Container-High': {
-            value: '{Colors.Neutral.Color-2}',
+            value: atBlack(0.92),
             type: 'color'
           },
           'Container-Highest': {
-            value: '{Colors.Neutral.Color-2}',
+            value: atBlack(0.90),
             type: 'color'
           }
         }
@@ -241,11 +253,23 @@ function lightModeBackgroundsBase(
     // step — unlike dark mode, where shadows don't read and the tone steps
     // Color-2 → Color-4 instead (see generateSimplifiedDarkModeBackgrounds).
     //
-    // Which tone depends on the background it sits on. A light background takes
-    // Color-11 (a near-white card). A DARK background must not: a near-white
-    // card on a near-black page is wrong, and the theme's foreground tokens are
-    // keyed for a dark card, so it would put dark text on a light container.
-    // Dark backgrounds therefore keep a near-black card at Color-2.
+    // Which tone depends on the background it sits on — on its LIGHTNESS, not
+    // on the mode. A light background takes Color-10. A DARK background must
+    // not: a near-white card on a near-black page is wrong, and the theme's
+    // foreground tokens are keyed for a dark card, so it would put dark text on
+    // a light container. Dark backgrounds therefore keep a near-black card at
+    // Color-2.
+    //
+    // A black background in LIGHT mode is still a dark background. Keying this
+    // on the mode instead is precisely the bug buildPreviewCSS carried: it
+    // painted a near-white Color-10 card on a black page while this side
+    // emitted Color-2, and nothing failed because each side was internally
+    // consistent. src/__tests__/containerTone.test.ts is the detector.
+    //
+    // Color-10 rather than 11: a tonal container should read as a distinct card
+    // ON the surface, and at Color-11 against a Color-10/11 surface the edge
+    // only showed up through the drop shadow — on the lightest surfaces it
+    // vanished entirely.
     //
     // Tones 1-5 are the dark half of the ramp and 6-12 the light half, so the
     // split sits at surfaceBaseTone (0-based) >= 5.
@@ -255,11 +279,52 @@ function lightModeBackgroundsBase(
     // That put containers on tones the foreground tables were never keyed for,
     // which is what broke Quiet/Text/Header contrast on tonal themes.
     const backgroundIsLight = surfaceBaseTone >= 5;
-    // Color-10, not 11. A tonal container is meant to read as a distinct card
-    // ON the surface; at Color-11 against a Color-10/11 surface the edge only
-    // showed up through the shadow, and on the lightest surfaces it vanished.
     const tonalContainerTone = backgroundIsLight ? 10 : 2;
-    console.log(`🎨 [TONAL MODE] Palette: ${paletteName}, Tone: ${tone} — containers flat at Color-${tonalContainerTone}`);
+
+    // Elevation ramp — the same shape dark mode uses (see
+    // darkModeBackgroundsBase): ONE tone at five opacities rather than five
+    // different tones, so every level is unmistakably the same material and the
+    // steps can sit closer together than whole tones allow.
+    //
+    // Here the backing is the BACKGROUND itself, so a less elevated container
+    // sinks toward the page and a more elevated one comes fully forward:
+    //
+    //   Container-Lowest  = 65% of the tone over the background (blends most)
+    //   Container-Low     = 75%
+    //   Container         = 85%
+    //   Container-High    = 90%
+    //   Container-Highest = no blend — the tone itself (Color-10 / Color-2)
+    //
+    // Only Container-Highest is a palette colour, so only it can be a token
+    // reference. Emitting refs for the others is what produced a NON-MONOTONIC
+    // ramp in dark mode: the refs resolved to whole tones while the neighbours
+    // resolved to blends, so the levels came off two different curves.
+    //
+    // This is NOT the per-level 0.12 → 0.22 blend that was reverted. That one
+    // moved every level off the tone the foreground tables are keyed to
+    // (config.contN), including Container itself, which is what broke
+    // Quiet/Text/Header contrast on tonal themes. Here the anchor tone is still
+    // in the ramp and the blend runs toward the background — away from the
+    // text, which is chosen to contrast the container — so each step gains
+    // contrast against the keyed foreground rather than losing it.
+    // Collision: on Background-10 (light) and Background-2 (dark) the surface IS
+    // the container tone, so every opacity blends Color-N with Color-N and the
+    // card disappears into the page — no elevation, no edge, at all five
+    // levels. Measured across a full export that was 16 of 103 Background-N
+    // combos, i.e. every palette's Background-2 and Background-10.
+    //
+    // Step one tone AWAY from the page in that case: a raised card catches more
+    // light, so Color-11 on a Color-10 surface and Color-3 on a Color-2 one.
+    const faceTone = surfaceColorNumber === tonalContainerTone
+      ? (backgroundIsLight ? 11 : 3)
+      : tonalContainerTone;
+    const containerFace = palette[faceTone - 1]?.color || surfaceColor;
+    const atOpacity = (a: number) => blendColors(containerFace, surfaceColor, a);
+    const containerLowestColor = atOpacity(0.65);
+    const containerLowColor = atOpacity(0.75);
+    const containerColor = atOpacity(0.85);
+    const containerHighColor = atOpacity(0.90);
+    console.log(`🎨 [TONAL MODE] Palette: ${paletteName}, Tone: ${tone} — containers ramp to Color-${tonalContainerTone}`);
 
     return {
       Surfaces: {
@@ -277,27 +342,27 @@ function lightModeBackgroundsBase(
         }
       },
       Containers: {
-        // Flat across all five levels — elevation comes from drop shadows in
-        // light mode, not tone. Color-10 on a light background, Color-2 on a
-        // dark one. Emitted as a token ref so it stays linked to the palette.
+        // Four blends and one pure tone — see the ramp comment above. The
+        // blends have no token to point at, so they stay hex; only the top
+        // level stays linked to the palette.
         'Container-Lowest': {
-          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
+          value: containerLowestColor,
           type: 'color'
         },
         'Container-Low': {
-          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
+          value: containerLowColor,
           type: 'color'
         },
         'Container': {
-          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
+          value: containerColor,
           type: 'color'
         },
         'Container-High': {
-          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
+          value: containerHighColor,
           type: 'color'
         },
         'Container-Highest': {
-          value: `{Colors.${paletteName}.Color-${tonalContainerTone}}`,
+          value: `{Colors.${paletteName}.Color-${faceTone}}`,
           type: 'color'
         }
       }

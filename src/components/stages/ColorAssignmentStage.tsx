@@ -4,6 +4,10 @@ import {
 import chroma from 'chroma-js';
 import { useState, useRef } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';
+import {
+  BACKGROUND_THEMES, SURFACE_LEVELS, parseBackground, formatBackground,
+  legacyName, toneFor, type BackgroundSelection,
+} from '../../utils/backgroundSelection';
 import PhonePreview from '../PhonePreview';
 import '../../styles/assign-colors.css';
 
@@ -41,12 +45,15 @@ const BUTTON_MODES: { value: ButtonMode; label: string }[] = [
   { value: 'black-white', label: 'Black/White' },
 ];
 
-const BG_OPTIONS = [
-  { value: 'primary-light', label: 'Primary Light' },
-  { value: 'white', label: 'White' },
-  { value: 'primary-base', label: 'Primary' },
-  { value: 'black', label: 'Black' },
-];
+/** Short labels for the surface row. The stored names are long enough that
+ *  five of them do not fit across the card. */
+const SURFACE_LABEL: Record<string, string> = {
+  'Surface-Dimmest': 'Dimmest',
+  'Surface-Dim': 'Dim',
+  'Surface': 'Base',
+  'Surface-Bright': 'Bright',
+  'Surface-Brightest': 'Brightest',
+};
 
 const CARD_OPTIONS = [
   { value: 'tonal' as const, label: 'Tonal' },
@@ -88,6 +95,29 @@ export default function ColorAssignmentStage({
 
   const update = (partial: Partial<UserSelections>) => {
     onSelectionsChanged({ ...userSelections, ...partial });
+  };
+
+  /** The page background, read back as theme + surface whichever form it was
+   *  stored in. The four legacy strings resolve to the same tones they always
+   *  did, so an existing system opens on the pair it was saved as. */
+  const bgSelection = parseBackground(userSelections.background);
+
+  /**
+   * Write a background choice.
+   *
+   * Keeps storing the LEGACY string for the four combinations that have one, so
+   * a system saved today still opens in an older build and the ~40 consumers
+   * that branch on 'white' / 'black' / 'primary-base' / 'primary-light' keep
+   * matching. The other sixteen store the `Theme/Surface` form, which every
+   * consumer already handles through the backgroundTheme + backgroundN
+   * fallback.
+   */
+  const setBackground = (sel: BackgroundSelection) => {
+    update({
+      background: legacyName(sel) ?? formatBackground(sel),
+      backgroundTheme: sel.theme,
+      backgroundN: toneFor(sel.theme, sel.surface, PC),
+    });
   };
 
   // Resolve the current surface palette and Color-N for nav color previews
@@ -209,7 +239,7 @@ export default function ColorAssignmentStage({
       <Card padding="medium" style={cardStyle}>
         <VStack spacing={2}>
           <H3 style={{ fontSize: '1rem' }}>Theme Order</H3>
-          <BodySmall style={{ color: 'var(--Quiet)' }}>Drag to reorder theme colors</BodySmall>
+          <BodySmall color="quiet">Drag to reorder theme colors</BodySmall>
           <div className="assign-theme-order-row">
             {['Primary', 'Secondary', 'Tertiary'].map((label, i) => (
               <Card
@@ -312,20 +342,31 @@ export default function ColorAssignmentStage({
       <Card padding="medium" style={cardStyle}>
         <VStack spacing={2}>
           <H3 style={{ fontSize: '1rem' }}>Background</H3>
+          <BodySmall color="quiet">Theme</BodySmall>
           <div className="assign-bg-buttons">
-            {BG_OPTIONS.map(opt => (
+            {BACKGROUND_THEMES.map(t => (
               <Button
-                key={opt.value}
-                variant={userSelections.background === opt.value ? 'default' : 'outline'}
+                key={t}
+                variant={bgSelection.theme === t ? 'default' : 'outline'}
                 size="small"
-                onClick={() => {
-                  const bgTheme = (opt.value === 'white' || opt.value === 'black') ? 'Neutral' as const : 'Primary' as const;
-                  const bgN = opt.value === 'white' ? 12 : opt.value === 'black' ? 1 : opt.value === 'primary-light' ? 11 : PC;
-                  update({ background: opt.value, backgroundTheme: bgTheme, backgroundN: bgN });
-                }}
+                onClick={() => setBackground({ theme: t, surface: bgSelection.surface })}
                 style={{ flex: 1 }}
               >
-                {opt.label}
+                {t}
+              </Button>
+            ))}
+          </div>
+          <BodySmall color="quiet">Surface</BodySmall>
+          <div className="assign-bg-buttons">
+            {SURFACE_LEVELS.map(level => (
+              <Button
+                key={level}
+                variant={bgSelection.surface === level ? 'default' : 'outline'}
+                size="small"
+                onClick={() => setBackground({ theme: bgSelection.theme, surface: level })}
+                style={{ flex: 1 }}
+              >
+                {SURFACE_LABEL[level]}
               </Button>
             ))}
           </div>
@@ -401,31 +442,31 @@ export default function ColorAssignmentStage({
         <VStack spacing={3} style={{ maxWidth: 520 }}>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Primary</H3>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Buttons use your primary theme color. On primary-tinted backgrounds, the border tone is used instead to maintain contrast.
             </BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Secondary</H3>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Buttons use your secondary theme color, creating a complementary accent against primary surfaces and navigation.
             </BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Tonal</H3>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Buttons use the primary border tone — a mid-range shade from your palette that has verified 3:1 contrast against the surface background.
             </BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Laddered</H3>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Primary actions use the secondary color, secondary actions use tertiary, and so on — creating a visual hierarchy that cascades through your palette.
             </BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Black/White</H3>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               Buttons are pure black on light backgrounds and pure white on dark backgrounds. In dark mode, this automatically switches to Laddered to preserve usability.
             </BodySmall>
           </VStack>

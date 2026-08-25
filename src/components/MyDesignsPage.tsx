@@ -171,7 +171,7 @@ export default function MyDesignsPage() {
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>My Designs</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>Sign in to see your design systems.</Body>
+          <Body color="quiet">Sign in to see your design systems.</Body>
         </VStack>
       </>
     );
@@ -182,7 +182,7 @@ export default function MyDesignsPage() {
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>My Designs</H2>
-          <Body style={{ color: 'var(--Quiet)' }}>Loading…</Body>
+          <Body color="quiet">Loading…</Body>
         </VStack>
       </>
     );
@@ -195,7 +195,7 @@ export default function MyDesignsPage() {
         <HStack spacing={2} style={{ alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <VStack spacing={0} style={{ flex: 1, minWidth: 220 }}>
             <H2 style={{ margin: 0 }}>My Designs</H2>
-            <BodySmall style={{ color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet">
               {designSystems.length === 0
                 ? 'No design systems yet — create your first one.'
                 : `${designSystems.length} design${designSystems.length === 1 ? '' : 's'}`}
@@ -218,8 +218,8 @@ export default function MyDesignsPage() {
         {designSystems.length === 0 ? (
           <Card padding="medium">
             <VStack spacing={2} alignItems="center">
-              <Body style={{ color: 'var(--Quiet)' }}>No design systems yet</Body>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <Body color="quiet">No design systems yet</Body>
+              <BodySmall color="quiet">
                 Upload a mood board to extract colors and generate a complete design system.
               </BodySmall>
               <Button variant="default" size="small" onClick={() => window.location.href = '/create'}>
@@ -314,13 +314,13 @@ function DesignSystemCard({
       <VStack spacing={2}>
         {/* Hero — mood board, or color swatch fallback */}
         {showHero ? (
-          <div style={{
+          <div data-surface="Container-Lowest" style={{
             position: 'relative',
             width: '100%',
             aspectRatio: '16 / 10',
             borderRadius: 6,
             overflow: 'hidden',
-            background: 'var(--Container-Lowest, #f5f5f5)',
+            background: 'var(--Background)',
             border: '1px solid var(--Border)',
           }}>
             <img
@@ -391,13 +391,16 @@ function DesignSystemCard({
             <div
               ref={menuRef}
               role="menu"
+              /* Portalled — declares its own theme, see AvatarDropdown. */
+              data-theme="Brand"
+              data-surface="Container"
               style={{
                 position: 'absolute',
                 top: menuPos.top,
                 right: menuPos.right,
                 minWidth: 140,
-                background: 'var(--Container, #fff)',
-                border: '1px solid var(--Border, #d4d4d4)',
+                background: 'var(--Background)',
+                border: '1px solid var(--Border)',
                 borderRadius: 'var(--Style-Border-Radius, 6px)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
                 padding: '4px 0',

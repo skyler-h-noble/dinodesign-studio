@@ -464,8 +464,8 @@ function generateScaledTones(
 
 /**
  * Generate a 12-tone light mode scale from a hex color.
- * When maxChroma is provided, it is used directly as the peak.
- * When undefined, peak is derived from the extracted color's position on the bell curve.
+ * maxChroma is a CEILING. The peak is always derived from the colour's own
+ * position on the bell curve; the cap only lowers it, never raises it.
  * Per-tone chroma is always gamut-clipped by step.chroma in generateScaledTones.
  */
 export function generateSemanticLightModeScale(
@@ -474,40 +474,48 @@ export function generateSemanticLightModeScale(
   lockedHex?: string,
   hueEasing?: HueEasing
 ): ToneStep[] {
-  let peakChroma: number;
-  if (maxChroma !== undefined) {
-    peakChroma = maxChroma;
-  } else {
-    const [l, c, h] = chroma(hex).lch();
-    const colorNumber = toneToColorNumber(l);
-    const bellCurve = getChromaBellCurve(h);
-    const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
-    peakChroma = multiplierAtTone > 0 ? c / multiplierAtTone : c;
-  }
+  /* maxChroma is a CEILING, not a target.
+   *
+   * It used to replace the peak outright, so a slider value did not cap a
+   * colour — it RESHAPED it, pulling a quiet colour UP to the cap as readily as
+   * pulling a loud one down. Every colour built under one number came out at
+   * that number, which is why swapping which swatch is Primary visibly moved
+   * the others: they were all being rebuilt to the primary's peak.
+   *
+   * Each colour now derives its own peak from where it sits on the bell curve,
+   * exactly as an uncapped colour always did, and the cap only ever lowers it.
+   * No colour or tone goes above the maximum; nothing is dragged up to it. */
+  const [l, c, h] = chroma(hex).lch();
+  const colorNumber = toneToColorNumber(l);
+  const bellCurve = getChromaBellCurve(h);
+  const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
+  const naturalPeak = multiplierAtTone > 0 ? c / multiplierAtTone : c;
+  const peakChroma = maxChroma !== undefined
+    ? Math.min(naturalPeak, maxChroma)
+    : naturalPeak;
 
   return generateScaledTones(hex, peakChroma, undefined, false, lockedHex, hueEasing);
 }
 
 /**
  * Generate a 12-tone dark mode scale from a hex color.
- * When maxChroma is provided, it is used directly as the peak.
- * When undefined, peak is derived from the extracted color's position on the bell curve.
+ * maxChroma is a CEILING. The peak is always derived from the colour's own
+ * position on the bell curve; the cap only lowers it, never raises it.
  */
 export function generateSemanticDarkModeScale(
   hex: string,
   maxChroma?: number,
   hueEasing?: HueEasing
 ): ToneStep[] {
-  let peakChroma: number;
-  if (maxChroma !== undefined) {
-    peakChroma = maxChroma;
-  } else {
-    const [l, c, h] = chroma(hex).lch();
-    const colorNumber = toneToColorNumber(l);
-    const bellCurve = getChromaBellCurve(h, true);
-    const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
-    peakChroma = multiplierAtTone > 0 ? c / multiplierAtTone : c;
-  }
+  /* Ceiling, not target — see the light-mode note above. */
+  const [l, c, h] = chroma(hex).lch();
+  const colorNumber = toneToColorNumber(l);
+  const bellCurve = getChromaBellCurve(h, true);
+  const multiplierAtTone = bellCurve[colorNumber - 1] || 1;
+  const naturalPeak = multiplierAtTone > 0 ? c / multiplierAtTone : c;
+  const peakChroma = maxChroma !== undefined
+    ? Math.min(naturalPeak, maxChroma)
+    : naturalPeak;
 
   return generateScaledTones(hex, peakChroma, DARK_TONE_SCALE, true, undefined, hueEasing);
 }

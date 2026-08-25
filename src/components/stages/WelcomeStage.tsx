@@ -27,7 +27,7 @@ export default function WelcomeStage({ onNext, onLoadSystem }: Props) {
             <AddIcon style={{ color: 'var(--Icons-Primary)' }} />
             <VStack spacing={0}>
               <Body style={{ fontWeight: 600 }}>Create New Design System</Body>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Upload a mood board to generate colors, typography, and components
               </BodySmall>
             </VStack>
@@ -44,7 +44,7 @@ export default function WelcomeStage({ onNext, onLoadSystem }: Props) {
             <FolderOpenIcon style={{ color: 'var(--Icons-Secondary)' }} />
             <VStack spacing={0}>
               <Body style={{ fontWeight: 600 }}>Load Existing System</Body>
-              <BodySmall style={{ color: 'var(--Quiet)' }}>
+              <BodySmall color="quiet">
                 Continue working on a saved design system
               </BodySmall>
             </VStack>

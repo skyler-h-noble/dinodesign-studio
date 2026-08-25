@@ -884,6 +884,39 @@ function attachAaidNotes(node: any): void {
   }
 }
 
+/**
+ * Drop nodes Figma has hidden, before the model ever sees them.
+ *
+ * Rule 0b already tells the model that visible:false means NOT rendered, and it
+ * was still emitting hidden rows — a ListItem with three rows, two hidden, came
+ * back with two. Asking a model to ignore data you handed it is a weaker
+ * guarantee than not handing it over: the rule competes with everything else in
+ * a long prompt, and a hidden row looks exactly like a real one.
+ *
+ * Both flags are checked. `node.visible` is Figma's own; `_aaid.visible` is what
+ * the plugin resolves after applying boolean variant properties, so a row turned
+ * off by a component prop is caught too. Either being false is enough.
+ *
+ * The root is never pruned — a hidden root means the caller selected a hidden
+ * frame, and returning an empty payload would be a worse answer than converting
+ * what they pointed at.
+ */
+function pruneHiddenNodes(node: any): number {
+  if (!node || typeof node !== 'object') return 0;
+  let removed = 0;
+  const kids = node.children;
+  if (Array.isArray(kids)) {
+    const keep = kids.filter((c: any) => {
+      const hidden = c?.visible === false || c?._aaid?.visible === false;
+      if (hidden) removed += 1;
+      return !hidden;
+    });
+    if (keep.length !== kids.length) node.children = keep;
+    for (const c of keep) removed += pruneHiddenNodes(c);
+  }
+  return removed;
+}
+
 export async function convertFigmaToCode(
   frameJson: unknown,
   variables: Record<string, unknown>,
@@ -893,6 +926,12 @@ export async function convertFigmaToCode(
   // Lift the plugin's resolved-mode notes into a clean `_aaid` per node, so the
   // prompt uses real modes (theme/surface/effect/sizing) instead of guessing.
   try { attachAaidNotes(frameJson as any); } catch { /* noop */ }
+  // AFTER attachAaidNotes, so `_aaid.visible` — the plugin's resolved answer
+  // once boolean variant props are applied — is present to check.
+  try {
+    const dropped = pruneHiddenNodes(frameJson as any);
+    if (dropped) console.log(`🙈 [figmaToCode] pruned ${dropped} hidden node(s) before conversion`);
+  } catch { /* noop */ }
   // Brand context block — included in the user message when a Design ID is
   // attached. Helps the AAID produce brand-appropriate code (e.g. choosing
   // a DisplayLarge vs DisplaySmall variant when the header font is a

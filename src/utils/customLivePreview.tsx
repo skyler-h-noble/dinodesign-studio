@@ -109,11 +109,12 @@ export function CustomLivePreview({ code, scope, className, style }: LivePreview
       />
       {error && (
         <div
+          data-surface="Container"
           style={{
             margin: '8px 0 0',
             padding: 12,
             borderRadius: 8,
-            background: 'var(--Container)',
+            background: 'var(--Background)',
             color: 'var(--Error-Color-5)',
             fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
             fontSize: 12,

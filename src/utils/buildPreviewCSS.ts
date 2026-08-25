@@ -1,7 +1,8 @@
 import chroma from 'chroma-js';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
-import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale } from './colorScale';
+import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { parseBackground, toneFor } from './backgroundSelection';
 import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
 // lib's defaults for these resolve to {palette}-Color-9 regardless of the
@@ -401,12 +402,18 @@ export function buildPreviewCSS(input: BuildInput): string {
     surfacePaletteName = darkUsePrimary ? 'Primary' : 'Neutral';
     surfaceN = 2;
   } else {
-    switch (sel.background) {
-      case 'black': surfacePalette = neutralPaletteArr; surfacePaletteName = 'Neutral'; surfaceN = 1; break;
-      case 'primary-base': surfacePalette = primary; surfacePaletteName = 'Primary'; surfaceN = PC; break;
-      case 'primary-light': surfacePalette = primary; surfacePaletteName = 'Primary'; surfaceN = 11; break;
-      default: surfacePalette = neutralPaletteArr; surfacePaletteName = 'Neutral'; surfaceN = 12; break;
-    }
+    // Theme x surface, resolved through the same table the export uses. The
+    // switch this replaces had a case per legacy string and a `default:` that
+    // fell to white — so any of the sixteen new combinations painted a white
+    // page in the preview while the export painted the real one.
+    const bg = parseBackground(sel.background);
+    surfacePaletteName = bg.theme;
+    surfacePalette =
+      bg.theme === 'Primary' ? primary
+      : bg.theme === 'Secondary' ? secondary
+      : bg.theme === 'Tertiary' ? tertiary
+      : neutralPaletteArr;
+    surfaceN = toneFor(bg.theme, bg.surface, PC);
   }
 
   // Hover/Pressed calculation (per spec):
@@ -518,6 +525,15 @@ export function buildPreviewCSS(input: BuildInput): string {
     : sel.cardColoring;
   const effectiveTextColoring = sel.textColoring;
 
+  // A tonal container's tone follows the BACKGROUND's lightness, not the mode.
+  // The export asks `surfaceBaseTone >= 5` (0-based) in
+  // generateSimplifiedBackgrounds; surfaceN here is 1-based, so the same split
+  // is `>= 6`. Keying this on `isDark` instead — which is what it used to do —
+  // put a near-white Color-10 card on a black background in light mode, because
+  // a black background and dark MODE are not the same thing.
+  const tonalIsLight = surfaceN >= 6;
+  const tonalContainerN = tonalIsLight ? 10 : 2;
+
   // White/Black card coloring ONLY applies to Default theme containers
   // Tertiary (and other themed containers) always keep their palette color
   if (effectiveCardColoring === 'white') {
@@ -529,7 +545,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     if (isDark) {
       containerBg = darkUsePrimary ? p(primary, 3) : neutral(3);
     } else {
-      containerBg = p(primary, 10);
+      containerBg = p(surfacePalette, tonalContainerN);
     }
   }
 
@@ -548,6 +564,54 @@ export function buildPreviewCSS(input: BuildInput): string {
   // than a token that resolves to nothing.
   containerLow = containerBg;
 
+  // Elevation ramp for TONAL cards in light mode — mirrors the export's
+  // Containers block in generateSimplifiedBackgrounds and dark mode's
+  // opacity ladder: one tone at five opacities over the BACKGROUND, so the
+  // least elevated level sinks toward the page and the top level is the pure
+  // tone. White/black cards and dark mode keep their existing flat values.
+  let containerLowest = containerBg;
+  let containerHigh = containerBg;
+  let containerHighest = containerBg;
+  if (!isDark && effectiveCardColoring === 'tonal') {
+    // Same collision rule as the export: when the surface IS the container tone
+    // (Background-10 light / Background-2 dark) every opacity blends a colour
+    // with itself and the card vanishes. Step one tone away from the page.
+    const faceTone = surfaceN === tonalContainerN ? (tonalIsLight ? 11 : 3) : tonalContainerN;
+    const face = p(surfacePalette, faceTone);
+    // Blend against the colour --Surface actually RESOLVES to, not surfaceBg.
+    // For a black background those differ (surfaceBg is #1a1a1a, the token is
+    // Neutral-Color-1), which put the ramp on a different base than the page
+    // and made the first step move the wrong way.
+    const at = (a: number) => blendColors(face, p(surfacePalette, surfaceN), a);
+    containerLowest = at(0.65);
+    containerLow = at(0.75);
+    containerBg = at(0.85);
+    containerHigh = at(0.90);
+    containerHighest = face;
+  } else if (!isDark && effectiveCardColoring === 'black') {
+    // Black cards ramp the other way: the floor is the pure tone and the higher
+    // levels let the page bleed through, so a raised card lightens.
+    //
+    // The face is Neutral Color-1, matching the export. The preview used to use
+    // Color-3 while the export emitted a flat Color-2 — a silent divergence in
+    // the flat value, invisible because both looked like a plausible dark card.
+    const at = (a: number) => blendColors(neutral(1), p(surfacePalette, surfaceN), a);
+    containerLowest = neutral(1);
+    containerLow = at(0.96);
+    containerBg = at(0.94);
+    containerHigh = at(0.92);
+    containerHighest = at(0.90);
+  } else if (!isDark && effectiveCardColoring === 'white') {
+    // White cards ramp too, at much higher opacities — they must still read as
+    // white, so the lower levels only let a little of the page through.
+    const at = (a: number) => blendColors(neutral(12), p(surfacePalette, surfaceN), a);
+    containerLowest = at(0.92);
+    containerLow = at(0.94);
+    containerBg = at(0.97);
+    containerHigh = at(0.98);
+    containerHighest = neutral(12);
+  }
+
   // Tertiary container always uses its own palette — never white/black
   if (isDark) {
     tertiaryContainerBg = darkUsePrimary ? p(tertiary, 3) : p(tertiary, 3);
@@ -560,7 +624,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // containerN must match the actual container background, not the mode
   const containerN = effectiveCardColoring === 'white' ? 12
     : effectiveCardColoring === 'black' ? 3
-    : isDark ? 3 : 10;
+    : isDark ? 3 : tonalContainerN;
   const tertiaryContainerN = isDark ? 3 : 10;
 
   let surfaceText: string;
@@ -578,10 +642,13 @@ export function buildPreviewCSS(input: BuildInput): string {
   const containerTones = getAccessibleTones(containerBg, containerN, textPalette);
 
   // Container palette name for CSS var references
-  // Tonal always uses Primary palette for the tint; White/Black use Neutral
+  // Tonal follows the SURFACE palette in light mode (the export does the same),
+  // so a Neutral background yields a Neutral card rather than a Primary tint.
+  // White/Black use Neutral.
   const containerPaletteName = effectiveCardColoring === 'white' ? 'Neutral'
     : effectiveCardColoring === 'black' ? 'Neutral'
-    : 'Primary';
+    : isDark ? 'Primary'
+    : surfacePaletteName;
 
   if (effectiveTextColoring === 'tonal') {
     surfaceText = p(textPalette, surfaceTones.text);
@@ -1059,7 +1126,11 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
   --Surface: var(--${surfacePaletteName}-Color-${surfaceN});
   --Surface-Dim: var(--${surfacePaletteName}-Color-${Math.max(surfaceN - 1, 1)});
   --Surface-Bright: var(--${surfacePaletteName}-Color-${Math.min(surfaceN + 1, 12)});
-  --Container: var(--${containerPaletteName}-Color-${containerN});
+  --Container-Lowest: ${containerLowest};
+  --Container-Low: ${containerLow};
+  --Container: ${containerBg};
+  --Container-High: ${containerHigh};
+  --Container-Highest: ${containerHighest};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg))};
 ${emitDropshadowLevelLines(surfaceBg)}
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
@@ -1130,10 +1201,10 @@ ${(() => {
 ${emitTagTextTokens()}
 
   --Container: ${containerBg};
-  --Container-Low: ${containerBg};
-  --Container-Lowest: ${containerBg};
-  --Container-High: ${containerBg};
-  --Container-Highest: ${containerBg};
+  --Container-Low: ${containerLow};
+  --Container-Lowest: ${containerLowest};
+  --Container-High: ${containerHigh};
+  --Container-Highest: ${containerHighest};
   --Container-Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg))};
   --Container-Text: ${containerText};
   --Container-Header: ${containerHeader};
@@ -1420,9 +1491,9 @@ ${emitDropshadowLevelLines(navBarBg)}
      computed earlier from the user's cardColoring selection. */
   --Container: ${containerBg};
   --Container-Low: ${containerLow};
-  --Container-Lowest: ${containerLow};
-  --Container-High: ${containerBg};
-  --Container-Highest: ${containerBg};
+  --Container-Lowest: ${containerLowest};
+  --Container-High: ${containerHigh};
+  --Container-Highest: ${containerHighest};
   --Buttons-Primary-Button: ${btnBg};
   --Buttons-Primary-Text: ${btnText};
   --Buttons-Primary-Border: ${effectiveButton === 'black-white' ? btnBg : navBtnBorder};

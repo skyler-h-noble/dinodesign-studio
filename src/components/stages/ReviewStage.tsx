@@ -198,7 +198,7 @@ export default function ReviewStage({
                       ))}
                     </ul>
                   ) : (
-                    <BodySmall style={{ color: 'var(--Quiet)' }}>
+                    <BodySmall color="quiet">
                       No changes detected since your last export. You can still reprocess to refresh the published files.
                     </BodySmall>
                   )}
@@ -267,9 +267,9 @@ export default function ReviewStage({
             <Card padding="medium">
               <VStack spacing={2} alignItems="center" style={{ textAlign: 'center' }}>
                 <BodySmall style={{ fontWeight: 600 }}>Share Preview</BodySmall>
-                <div style={{
+                <div data-surface="Container-Low" style={{
                   width: 120, height: 120,
-                  background: 'var(--Container-Low, #f0f0f0)', borderRadius: 8,
+                  background: 'var(--Background)', borderRadius: 8,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   border: '1px solid var(--Border)',
                 }}>
@@ -287,7 +287,7 @@ export default function ReviewStage({
             <Card padding="medium">
               <VStack spacing={2}>
                 <H3 style={{ fontSize: '1rem' }}>Ready to use your design system?</H3>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>
+                <BodySmall color="quiet">
                   Get your hosted playground, Figma integration, and code package.
                 </BodySmall>
                 <Button
@@ -324,8 +324,8 @@ export default function ReviewStage({
                     />
                   ))}
                 </HStack>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>Theme: {colorScheme?.name || 'Custom'}</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>Style: {STYLE_LABELS[componentStyle]}</BodySmall>
+                <BodySmall color="quiet">Theme: {colorScheme?.name || 'Custom'}</BodySmall>
+                <BodySmall color="quiet">Style: {STYLE_LABELS[componentStyle]}</BodySmall>
               </VStack>
             </Card>
 
@@ -347,9 +347,9 @@ export default function ReviewStage({
             <Card padding="medium">
               <VStack spacing={1}>
                 <BodySmall style={{ fontWeight: 600 }}>Settings</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>Background: {userSelections.background}</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>Cards: {userSelections.cardColoring} &bull; Text: {userSelections.textColoring}</BodySmall>
-                <BodySmall style={{ color: 'var(--Quiet)' }}>Buttons: {userSelections.button}</BodySmall>
+                <BodySmall color="quiet">Background: {userSelections.background}</BodySmall>
+                <BodySmall color="quiet">Cards: {userSelections.cardColoring} &bull; Text: {userSelections.textColoring}</BodySmall>
+                <BodySmall color="quiet">Buttons: {userSelections.button}</BodySmall>
               </VStack>
             </Card>
           </div>

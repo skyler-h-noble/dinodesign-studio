@@ -574,12 +574,13 @@ export default function AaidWorkbenchPage() {
                     <img
                       src={imgUrl}
                       alt="Figma frame"
+                      data-surface="Container"
                       style={{
                         width: frameWidth ? `${Math.round(frameWidth * 1.12)}px` : 'auto',
                         height: 'auto',
                         flexShrink: 0,
                         borderRadius: 8,
-                        background: 'var(--Container)',
+                        background: 'var(--Background)',
                       }}
                     />
                   </div>
@@ -610,8 +611,8 @@ export default function AaidWorkbenchPage() {
                 </HStack>
 
                 {rightView === 'code' && (
-                  <pre style={{
-                    background: 'var(--Container)',
+                  <pre data-surface="Container" style={{
+                    background: 'var(--Background)',
                     padding: 12,
                     borderRadius: 8,
                     fontSize: 12,
@@ -746,8 +747,8 @@ function LivePreviewPanel({ jsx, busy, frameWidth }: { jsx: string; busy: boolea
         <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--Quiet)' }}>
           Transformed code (what the preview is parsing)
         </summary>
-        <pre style={{
-          background: 'var(--Container)',
+        <pre data-surface="Container" style={{
+          background: 'var(--Background)',
           padding: 12,
           borderRadius: 8,
           fontSize: 11,

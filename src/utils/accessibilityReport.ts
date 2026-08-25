@@ -207,11 +207,20 @@ const BACKGROUND_CHOICES: BackgroundChoice[] = [
   { label: 'Primary Vibrant', palette: 'Primary', bgKey: 'Background-Vibrant', colorN: 'Vibrant' },
 ];
 
-/** Eight surface levels the token system emits per background. */
+/**
+ * The TEN surface levels the token system emits per background.
+ *
+ * This said "eight" and listed eight — Surface-Dimmest and Surface-Brightest
+ * were missing. `addSurfaceEnds` has emitted both for a while, so two levels
+ * shipped ungraded: the ends are the extremes of the ramp, which is where a
+ * foreground is most likely to run out of contrast.
+ */
 const SURFACE_LEVELS: Array<{ label: string; group: 'Surfaces' | 'Containers'; key: string }> = [
   { label: 'Surface',           group: 'Surfaces',   key: 'Surface' },
+  { label: 'Surface-Dimmest',   group: 'Surfaces',   key: 'Surface-Dimmest' },
   { label: 'Surface-Dim',       group: 'Surfaces',   key: 'Surface-Dim' },
   { label: 'Surface-Bright',    group: 'Surfaces',   key: 'Surface-Bright' },
+  { label: 'Surface-Brightest', group: 'Surfaces',   key: 'Surface-Brightest' },
   { label: 'Container',         group: 'Containers', key: 'Container' },
   { label: 'Container-Low',     group: 'Containers', key: 'Container-Low' },
   { label: 'Container-Lowest',  group: 'Containers', key: 'Container-Lowest' },
