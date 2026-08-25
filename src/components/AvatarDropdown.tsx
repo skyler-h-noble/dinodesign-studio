@@ -81,8 +81,15 @@ export default function AvatarDropdown({ user, onSignOut }: AvatarDropdownProps)
           role="menu"
           /* Portalled to document.body, so it inherits no data-theme and has to
              declare its own. Background comes from --Background, which
-             data-surface resolves; the panel never names a surface token. */
-          data-theme="Brand"
+             data-surface resolves; the panel never names a surface token.
+
+             "Default", NOT "Brand". Brand is a preview-only theme that
+             buildPreviewCSS emits for the phone mock; published design-system
+             CSS never defines it. With Brand here the selector matched nothing,
+             var(--Background) resolved to nothing, and the panel rendered fully
+             transparent — which reads as a z-index bug, because the content
+             behind it shows through the menu. */
+          data-theme="Default"
           data-surface="Container"
           style={{
             position: 'absolute',

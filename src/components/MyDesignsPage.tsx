@@ -392,7 +392,7 @@ function DesignSystemCard({
               ref={menuRef}
               role="menu"
               /* Portalled — declares its own theme, see AvatarDropdown. */
-              data-theme="Brand"
+              data-theme="Default"
               data-surface="Container"
               style={{
                 position: 'absolute',

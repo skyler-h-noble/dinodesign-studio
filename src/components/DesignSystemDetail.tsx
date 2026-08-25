@@ -293,7 +293,7 @@ export default function DesignSystemDetail() {
   return (
     <>
       <BrandCSSInjector snapshot={record.snapshot} />
-      <main data-theme="Brand" data-surface="Surface" style={{ minHeight: '100vh', background: 'var(--Background)' }}>
+      <main data-theme="Default" data-surface="Surface" style={{ minHeight: '100vh', background: 'var(--Background)' }}>
       <AppHeader />
       <VStack spacing={4} style={{ padding: '32px 24px', maxWidth: 1100, margin: '0 auto' }}>
         <Breadcrumbs size="small">
@@ -656,7 +656,7 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
                    it has to declare its own. Background is --Background, which
                    data-surface resolves; the panel never names a surface token
                    directly. */
-                data-theme="Brand"
+                data-theme="Default"
                 data-surface="Container"
                 style={{
                   position: 'absolute',
