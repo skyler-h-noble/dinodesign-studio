@@ -71,12 +71,24 @@ Leave it blank to convert against default-theme tokens.
 
 ## Converting a frame
 
-Copy a frame URL from Figma — select the frame, right-click → **Copy link to
-selection**. It looks like:
+Select the frame in Figma, right-click → **Copy link to selection** (⌘L).
+
+![Figma right-click menu with Copy link to selection highlighted](images/06-copy-link-figma.png)
+
+Select it in the **Layers panel** rather than on the canvas — clicking the canvas
+often selects a child, and you get a link to that layer instead of the frame.
+The link looks like:
 
 ```
 https://www.figma.com/design/<fileKey>/<name>?node-id=7391-23254
 ```
+
+The `node-id` is the part that matters. A plain file URL with no `node-id` will
+not parse — the tool has no way to know which frame you meant.
+
+**Copy** (⌘C) and **Copy as PNG** in that same menu are not what you want: one
+puts Figma's own clipboard payload on your clipboard, the other an image. Only
+**Copy link to selection** produces a URL.
 
 Paste it and press **Convert**.
 
