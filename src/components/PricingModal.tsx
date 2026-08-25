@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Modal, Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Checkbox, Divider,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 

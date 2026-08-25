@@ -5,7 +5,7 @@ the studio preview. Read this before changing anything in `src/utils/cssgen/`,
 `src/utils/generateFigmaJSON.ts`, or the Figma plugin.
 
 For component usage rules see [CLAUDE.md](../CLAUDE.md). For the consumer-facing
-token list see `node_modules/@dynodesign/components/docs/token-system.md`.
+token list see `node_modules/@omni-design/components/docs/token-system.md`.
 
 ---
 

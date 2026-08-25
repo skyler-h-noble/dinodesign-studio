@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import {
   AppBar, Button, H1, H2, H3, Body, BodySmall, Caption, VStack, HStack, Card,
   Tabs, TabList, Tab, Section, Footer, Icon, Chip, Divider, Link,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SpeedIcon from '@mui/icons-material/Speed';
 import PaletteIcon from '@mui/icons-material/Palette';

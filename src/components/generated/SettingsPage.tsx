@@ -5,7 +5,7 @@ import {
   Section, Container, VStack, HStack, Card, Divider,
   H2, Body, Tabs, TabList, Tab, TabPanel,
   List, ListItem, SwitchInput, TextField, EmailTextField, Button, Avatar,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 
 const NOTIFICATIONS = [
   { id: 'product',  title: 'Product updates',  desc: 'News about features and improvements.' },

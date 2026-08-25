@@ -1,7 +1,7 @@
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card,
   CircularProgress, Checkbox, Divider, Link, Radio, Modal, TextField, Alert, SliderInput, Icon,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';

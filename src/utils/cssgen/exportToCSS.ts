@@ -3536,7 +3536,7 @@ export const LIB_DYNAMIC_CSS_FILES = ['base.css', 'Light-Mode.css', 'Dark-Mode.c
 
 /**
  * Generate ONLY the dynamic CSS files — for syncing into the lib repo.
- * Use this when updating @dynodesign/components/public/styles/ to avoid
+ * Use this when updating @omni-design/components/public/styles/ to avoid
  * clobbering the static lib-owned files.
  */
 export function generateLibSyncCSSFiles(jsonData: DesignSystem): { [filename: string]: string } {

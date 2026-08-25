@@ -5,7 +5,7 @@
  * Two data sources:
  *  - Configurable: button heights per platform, pulled from tokens.json's
  *    Platform.{Platform}.Button-Height.
- *  - Library defaults: intrinsic component sizes set inside @dynodesign/components
+ *  - Library defaults: intrinsic component sizes set inside @omni-design/components
  *    that aren't individually tokenized. These rows are informational —
  *    the report flags whether the default meets 24x24 so designers can
  *    confirm they haven't customized below it.

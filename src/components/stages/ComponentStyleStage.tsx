@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
   TextInput, SearchField, Select,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';

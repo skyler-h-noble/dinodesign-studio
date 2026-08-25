@@ -10,7 +10,7 @@
 //   Lora
 // </Button>  — content left, meta right, truncating label, selected state via
 //   the border + a tint of the button colour.
-// Lib-track: add to @dynodesign/components/src/components/Button/ as a variant,
+// Lib-track: add to @omni-design/components/src/components/Button/ as a variant,
 //   or a dedicated Chip-style component if Button's API can't carry `meta`.
 
 import type { ReactNode } from 'react';

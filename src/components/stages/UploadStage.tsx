@@ -1,4 +1,4 @@
-import { Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Radio } from '@dynodesign/components';
+import { Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Radio } from '@omni-design/components';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import TuneIcon from '@mui/icons-material/Tune';
 import BoltIcon from '@mui/icons-material/Bolt';

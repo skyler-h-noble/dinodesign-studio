@@ -7,7 +7,7 @@
 /** Lib catalog + conversion rules. This is the "AAID" document referenced
  *  in the patent (claims 62–72) — keep it in sync with CLAUDE.md. */
 const LIB_CATALOG = `
-@dynodesign/components — exported component names with their semantic role:
+@omni-design/components — exported component names with their semantic role:
 
 LAYOUT:
   - <VStack gap={token|number}> — vertical flex with gap; gap accepts CSS
@@ -810,13 +810,13 @@ CONVERSION RULES:
        // MISSING-LIB-COMPONENT: <ProposedName>
        // Needed for: <one-line use case>
        // Proposed API: <props sketch>
-       // Lib-track: add to @dynodesign/components/src/components/<Name>/
+       // Lib-track: add to @omni-design/components/src/components/<Name>/
      Then INLINE a minimal lib-component-only placeholder (using <Box>,
      <HStack>, <VStack>, etc.) so the page renders. NEVER reference the
      missing component name in the JSX — only mention it in the comment.
 
 7. Output JUST the JSX file content — no markdown fences, no explanation.
-   Include necessary imports from "@dynodesign/components" and React only.
+   Include necessary imports from "@omni-design/components" and React only.
 
 7a. IMPORT EVERY COMPONENT YOU REFERENCE.
 
@@ -829,13 +829,13 @@ CONVERSION RULES:
 
     WRONG (Box used in JSX, missing from imports):
       import { Container, VStack, HStack, Avatar, Body, Caption, Checkbox,
-        Divider, List } from "@dynodesign/components";
+        Divider, List } from "@omni-design/components";
       ...
       <Box ... />
 
     RIGHT:
       import { Container, VStack, HStack, Box, Avatar, Body, Caption,
-        Checkbox, Divider, List } from "@dynodesign/components";
+        Checkbox, Divider, List } from "@omni-design/components";
 
 8. List ALL MISSING-LIB-COMPONENT tags as a comment block at the top of
    the file so a future reviewer can see lib gaps at a glance.
@@ -845,7 +845,7 @@ CONVERSION RULES:
    so the workbench can find it.
 `;
 
-const SYSTEM_PROMPT = `You are a Figma-to-React converter for the OmniDesign component system. Given a Figma frame's JSON tree, produce a single React component file using only @dynodesign/components and design tokens.
+const SYSTEM_PROMPT = `You are a Figma-to-React converter for the OmniDesign component system. Given a Figma frame's JSON tree, produce a single React component file using only @omni-design/components and design tokens.
 
 ${LIB_CATALOG}
 

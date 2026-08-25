@@ -1,4 +1,4 @@
-import { AppBar, ThemedZone } from '@dynodesign/components';
+import { AppBar, ThemedZone } from '@omni-design/components';
 
 interface TopNavProps {
   designSystemName?: string;

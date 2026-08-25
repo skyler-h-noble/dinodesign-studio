@@ -1,9 +1,9 @@
 // Preview harness for #1 output: renders generated OmniDesign screens inside a
 // brand's hosted tokens. Visit /preview?user=<dinoId>&screen=pricing|settings.
-// Same DynoDesignProvider wiring as Playground.tsx.
+// Same OmniDesignProvider wiring as Playground.tsx.
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
-import { DynoDesignProvider, H2, Body, Button, HStack, VStack } from '@dynodesign/components';
+import { OmniDesignProvider, H2, Body, Button, HStack, VStack } from '@omni-design/components';
 import { getPublicFileUrl } from '../utils/firebase/storage';
 import PricingSection from './generated/PricingSection';
 import SettingsPage from './generated/SettingsPage';
@@ -53,7 +53,7 @@ export default function GeneratedPreview() {
   const Screen = SCREENS[screen as keyof typeof SCREENS] || PricingSection;
 
   return (
-    <DynoDesignProvider
+    <OmniDesignProvider
       foundationCSS={getPublicFileUrl(uuid, 'foundation.css')}
       coreCSS={getPublicFileUrl(uuid, 'core.css')}
       lightModeCSS={getPublicFileUrl(uuid, 'Light-Mode.css')}
@@ -82,6 +82,6 @@ export default function GeneratedPreview() {
         </VStack>
         <Screen />
       </main>
-    </DynoDesignProvider>
+    </OmniDesignProvider>
   );
 }

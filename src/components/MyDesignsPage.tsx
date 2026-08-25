@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   H2, Body, BodySmall, VStack, HStack, Card, Button, Select,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { collection, query, where, getDocs } from 'firebase/firestore';

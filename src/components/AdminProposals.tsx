@@ -1,11 +1,11 @@
 // MISSING-LIB-COMPONENT: FileInput
 // Needed for: admin upload of the master .fig template
 // Proposed API: <FileInput accept=".fig" onChange={file => ...} />
-// Lib-track: add to @dynodesign/components/src/components/FileInput/
+// Lib-track: add to @omni-design/components/src/components/FileInput/
 import { useEffect, useRef, useState } from 'react';
 import {
   H2, H3, H4, Body, BodySmall, VStack, HStack, Card, Button, Chip, Alert, Divider,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import {
   collection, query, where, getDocs, orderBy, doc, getDoc, updateDoc,
 } from 'firebase/firestore';
@@ -142,7 +142,7 @@ export default function AdminProposals() {
         <VStack spacing={0}>
           <H2 style={{ margin: 0 }}>Component Proposals</H2>
           <BodySmall color="quiet">
-            Submissions from `@dynodesign/components` consumers via `/ShareComponent`.
+            Submissions from `@omni-design/components` consumers via `/ShareComponent`.
           </BodySmall>
         </VStack>
 

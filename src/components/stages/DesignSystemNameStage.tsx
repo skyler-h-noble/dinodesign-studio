@@ -1,4 +1,4 @@
-import { Alert, Button, H2, Body, BodySmall, VStack, HStack, TextField, Card } from '@dynodesign/components';
+import { Alert, Button, H2, Body, BodySmall, VStack, HStack, TextField, Card } from '@omni-design/components';
 import { useEffect, useState } from 'react';
 import type { StageProps } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';

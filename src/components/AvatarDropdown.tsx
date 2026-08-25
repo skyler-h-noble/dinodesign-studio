@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Avatar, Body } from '@dynodesign/components';
+import { Avatar, Body } from '@omni-design/components';
 
 // MISSING-LIB-COMPONENT: AvatarMenu
 // Needed for: top-nav account dropdown (Account / My Designs / Sign Out)

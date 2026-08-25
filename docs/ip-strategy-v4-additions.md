@@ -60,7 +60,7 @@ We have tried to streamline every step, thinking about the end user — how they
 
 ### Built With Its Own Output
 
-Dino Design Studio (the creation tool) and the Hosted Playground (the delivery channel) are both built using `@dynodesign/components` — the same React component library that customers receive. The same 49 components, the same CSS custom property token architecture, the same `data-theme` / `data-surface` cascade, the same platform and cognitive accessibility overrides.
+Dino Design Studio (the creation tool) and the Hosted Playground (the delivery channel) are both built using `@omni-design/components` — the same React component library that customers receive. The same 49 components, the same CSS custom property token architecture, the same `data-theme` / `data-surface` cascade, the same platform and cognitive accessibility overrides.
 
 This is not incidental. It is a deliberate architectural decision with three consequences:
 
@@ -96,7 +96,7 @@ The result: accessibility is not a sprint-end gate, not a backlog item, not an e
 
 What Dino does eliminate are the **most common and most systemic accessibility failures**: color contrast violations and touch target sizing. These two categories account for the majority of automated accessibility audit findings across the industry — and they are precisely the failures that a design system can prevent structurally.
 
-Every component in `@dynodesign/components` ships with correct ARIA attributes built in — `role`, `aria-expanded`, `aria-selected`, `aria-haspopup`, `aria-disabled`, and all required state attributes are implemented in the component code. A developer using `<Select>` gets the correct `role="combobox"`, `aria-expanded`, and keyboard handling without writing a single ARIA attribute.
+Every component in `@omni-design/components` ships with correct ARIA attributes built in — `role`, `aria-expanded`, `aria-selected`, `aria-haspopup`, `aria-disabled`, and all required state attributes are implemented in the component code. A developer using `<Select>` gets the correct `role="combobox"`, `aria-expanded`, and keyboard handling without writing a single ARIA attribute.
 
 However, content-specific ARIA values — `aria-label`, `aria-describedby`, `alt` text — must be set by the developer or AI to match the actual content. A `<Button>` has the correct `role="button"` automatically, but its `aria-label` depends on what the button does in context. If an AI generates `<Button>Click here</Button>`, the ARIA structure is correct but the label is meaningless for screen readers.
 
@@ -519,7 +519,7 @@ Because Dino hosts the design system template and controls both the component li
 
 **In Figma:** The Dino plugin adds new components directly into the customer's template file. Because the plugin controls the variable binding, new components are bound to the customer's existing variable collections at insertion time. The component adopts the customer's brand tokens automatically — it was never in a "foreign" token context.
 
-**In code:** New components are added to the `@dynodesign/components` package. Because all components in the package consume the same CSS custom property names (the closed 12-tone vocabulary), a new component added to the package immediately works with the customer's existing CSS token files. No re-generation, no re-mapping, no adapter layer. The component uses `var(--Text)`, `var(--Border)`, `var(--Buttons-Primary-Button)` — the same variables every other component uses.
+**In code:** New components are added to the `@omni-design/components` package. Because all components in the package consume the same CSS custom property names (the closed 12-tone vocabulary), a new component added to the package immediately works with the customer's existing CSS token files. No re-generation, no re-mapping, no adapter layer. The component uses `var(--Text)`, `var(--Border)`, `var(--Buttons-Primary-Button)` — the same variables every other component uses.
 
 **In the hosted playground:** New components appear automatically because the playground renders the latest component library against the customer's stored tokens.
 
@@ -731,7 +731,7 @@ All interactive components verified against WCAG 2.5.8, platform-adjusted:
 
 #### 10.2.4 ARIA Validation
 
-Every component in `@dynodesign/components` is tested for proper ARIA tagging:
+Every component in `@omni-design/components` is tested for proper ARIA tagging:
 
 | Check | What It Validates |
 |-------|------------------|

@@ -3,7 +3,7 @@ import {
   H2, H3, Body, BodySmall, VStack, HStack, Card, Button, Avatar, Divider,
   Tabs, TabList, Tab, TabPanel, SwitchInput,
   Accordion, AccordionGroup, AccordionSummary, AccordionDetails, Link,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';

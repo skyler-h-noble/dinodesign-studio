@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Modal, Button, H3, Body, BodySmall, VStack, HStack, TextInput, Alert, Divider, Link,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../contexts/AuthContext';
 

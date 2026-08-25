@@ -24,7 +24,7 @@
 //     inside the first line's descenders.
 //
 // Token NAMES stay on the studio/lib spelling (--H1-Font-Size, not
-// --Header-H1-Font-Size) so @dynodesign/components keeps resolving them
+// --Header-H1-Font-Size) so @omni-design/components keeps resolving them
 // untouched. Only the values and the generation logic come from omni.
 
 import type { TypographyStyle } from '../types';

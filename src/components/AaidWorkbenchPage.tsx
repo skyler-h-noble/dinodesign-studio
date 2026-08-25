@@ -15,7 +15,7 @@
 // AI provider on our infrastructure).
 
 import React, { useEffect, useMemo, useState } from 'react';
-import * as DynoComponents from '@dynodesign/components';
+import * as DynoComponents from '@omni-design/components';
 import { CustomLivePreview } from '../utils/customLivePreview';
 import {
   Card,
@@ -34,7 +34,7 @@ import {
   Chip,
   CircularProgress,
   Link,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { getPublicFileUrl } from '../utils/firebase/storage';

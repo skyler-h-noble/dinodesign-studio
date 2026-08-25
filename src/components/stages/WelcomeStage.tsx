@@ -1,4 +1,4 @@
-import { H1, Body, BodySmall, VStack, Card, HStack } from '@dynodesign/components';
+import { H1, Body, BodySmall, VStack, Card, HStack } from '@omni-design/components';
 import AddIcon from '@mui/icons-material/Add';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import type { StageProps } from '../../types';

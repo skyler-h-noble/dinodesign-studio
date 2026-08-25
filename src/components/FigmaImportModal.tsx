@@ -3,7 +3,7 @@
 // edit view) can present the same 7-step walkthrough.
 
 import { useState } from 'react';
-import { Modal, VStack, HStack, BodySmall, Button } from '@dynodesign/components';
+import { Modal, VStack, HStack, BodySmall, Button } from '@omni-design/components';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { getFigmaTemplateUrl } from '../utils/firebase/storage';

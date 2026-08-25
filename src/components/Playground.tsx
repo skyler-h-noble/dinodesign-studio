@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
-import { DynoDesignProvider, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Button, TextField, Alert, Badge, Divider } from '@dynodesign/components';
+import { OmniDesignProvider, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Button, TextField, Alert, Badge, Divider } from '@omni-design/components';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
@@ -59,7 +59,7 @@ export default function Playground() {
   // Provider's loadCSSSource runs, it adopts the existing <link>s by id
   // instead of re-fetching.
   return (
-    <DynoDesignProvider
+    <OmniDesignProvider
       foundationCSS={getPublicFileUrl(uuid, 'foundation.css')}
       coreCSS={getPublicFileUrl(uuid, 'core.css')}
       lightModeCSS={getPublicFileUrl(uuid, 'Light-Mode.css')}
@@ -219,6 +219,6 @@ export default function Playground() {
           </BodySmall>
         </VStack>
       </main>
-    </DynoDesignProvider>
+    </OmniDesignProvider>
   );
 }

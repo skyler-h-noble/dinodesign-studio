@@ -16,7 +16,7 @@ import TypographyTestPage, {
 } from '../TypographyTestPage';
 import { warmAnalyzeMoodboard } from '../../utils/analyzeMoodboardClient';
 import { uploadDesignSystemFile, getPublicFileUrl } from '../../utils/firebase/storage';
-import { Alert, Card, VStack, H2, Body } from '@dynodesign/components';
+import { Alert, Card, VStack, H2, Body } from '@omni-design/components';
 
 interface Props extends StageProps {
   colorScheme: ColorScheme | null;

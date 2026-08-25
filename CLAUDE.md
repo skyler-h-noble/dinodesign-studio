@@ -3,15 +3,24 @@
 Guidance for AI coding tools (Claude Code, Cursor, Copilot) working in this repo.
 
 This file is the studio app's contract. The component library it consumes
-(`@dynodesign/components`) has its own CLAUDE.md inside `node_modules/...` —
+(`@omni-design/components`) has its own CLAUDE.md inside `node_modules/...` —
 read that for token names and theme rules. This file is about how the **studio**
 uses the lib.
+
+**The package was renamed.** It used to be `@dynodesign/components`; from 0.7.0
+it is `@omni-design/components`, and the provider went from `DynoDesignProvider`
+to `OmniDesignProvider`. The old package stays published — several experiments
+pin `^0.4.1` / `^0.5.0` / `^0.6.0` and keep resolving against it — so BOTH names
+are live on npm and neither is a typo. In this repo, only the Omni name is
+correct. The one deliberate exception is `src/utils/generateDesignSystem.ts`,
+which writes a CLAUDE.md for END USERS: what it emits has to match whatever
+version they install, so change it only alongside a release.
 
 ---
 
 ## The one rule
 
-**Every UI element in this app must come from `@dynodesign/components`.**
+**Every UI element in this app must come from `@omni-design/components`.**
 
 If you can render it with a lib component, do. No raw `<button>`, `<input>`,
 `<select>`, `<h1>`–`<h6>`, `<p>`, or `<a href>`; no `@mui/material` imports;
@@ -40,7 +49,7 @@ later:
 // MISSING-LIB-COMPONENT: <ComponentName>
 // Needed for: <one line on the use case in this file>
 // Proposed API: <props sketch>
-// Lib-track: add to @dynodesign/components/src/components/<ComponentName>/
+// Lib-track: add to @omni-design/components/src/components/<ComponentName>/
 ```
 
 Then either:
@@ -66,7 +75,7 @@ grep -rn "MISSING-LIB-COMPONENT" src/
 
 ## Available lib components
 
-Imported from `@dynodesign/components`. (See `node_modules/@dynodesign/components/CLAUDE.md`
+Imported from `@omni-design/components`. (See `node_modules/@omni-design/components/CLAUDE.md`
 for token/theme details.)
 
 | Need | Use |
@@ -83,10 +92,11 @@ for token/theme details.)
 | Disclosure | `Accordion`, `Drawer`, `Modal`, `Dialog`, `Tooltip`, `Popover` (via `Dropdown` — see below) |
 | Feedback | `Alert`, `Snackbar`, `CircularProgress`, `LinearProgress`, `Badge` |
 | Data | `Chip`, `Avatar`, `AvatarGroup`, `Table`, `List`, `Skeleton` |
+| Code | `CodeBlock`, `CopyButton` — see [Code blocks](#code-blocks) |
 | Links | `Link` |
 
 **Do not** import any of these from `@mui/material`. The lib re-exports the
-ones it supports with DynoDesign theming wired in. Material icons
+ones it supports with OmniDesign theming wired in. Material icons
 (`@mui/icons-material`) are fine — the lib doesn't ship icons.
 
 ---
@@ -140,7 +150,7 @@ So the choice is by situation, not by "the component is broken":
 | to an arbitrary element you do not control | the portal pattern below |
 
 The portal pattern is in `MyDesignsPage.tsx` (ellipsis menu) and
-`node_modules/@dynodesign/components/src/components/AvatarMenu/AvatarMenu.js`
+`node_modules/@omni-design/components/src/components/AvatarMenu/AvatarMenu.js`
 (account dropdown). Both anchor a panel via `getBoundingClientRect`, render
 through `createPortal(document.body)`, and close on outside-click + Escape.
 
@@ -155,7 +165,7 @@ ancestor `<button>`. Do not "fix" the component to satisfy them.
 
 ### `AvatarMenu` — fixed in lib
 
-If `@dynodesign/components`'s `AvatarMenu` ever silent-fails again, the cause is
+If `@omni-design/components`'s `AvatarMenu` ever silent-fails again, the cause is
 a `Menu` rendered without its `<Dropdown>` root: the default context has
 `open: false`, so it returns `null` silently. That is a usage error rather than
 a component bug — see the `Menu` entry above. The fix is the inline-portal
@@ -184,16 +194,42 @@ children manually is wrong — that's what re-introduces the double-border.
 
 Used through a small wrapper that fixes (a) the trigger's invalid `border: 1px
 solid inherit` and (b) the color-mode swatch reading `value` instead of
-`color`. Import from `@dynodesign/components` like any other lib component;
+`color`. Import from `@omni-design/components` like any other lib component;
 the wrapper is the default export.
 
 ---
+
+## Code blocks
+
+Any block of code, a shell command, or a copyable URL uses `CodeBlock`. Do not
+hand-roll a `<pre>`/`<code>` panel with its own copy button — that is what this
+replaces, and there were four such panels in this repo alone.
+
+```tsx
+<CodeBlock code={installCmd} language="bash" />
+```
+
+| Prop | Meaning |
+| --- | --- |
+| `code` | the text shown and copied |
+| `language` | header label — `"bash"`, `"JSX"`, `"CSS"`, `"URL"` |
+| `showCopy` / `showHeader` | default true |
+| `maxHeight` | cap the code area and scroll past it |
+| `wrap` | wrap long lines instead of scrolling |
+
+It brings its own copy button, confirmation and timer, so the surrounding
+component should not keep a `copied` flag.
+
+**Its dark region is not a hardcoded colour.** The wrapper declares
+`data-theme="Neutral"` + `data-surface="Surface-Dimmest"`, so it follows the
+brand's own neutrals rather than everyone's `#1e1e1e`, and stays legible in both
+modes. Do not override its background.
 
 ## Right vs. wrong
 
 ```tsx
 // ✅ Right
-import { Button, H2, Body, Card, VStack, Divider, Link } from '@dynodesign/components';
+import { Button, H2, Body, Card, VStack, Divider, Link } from '@omni-design/components';
 
 <Card padding="medium">
   <VStack spacing={2}>
@@ -277,7 +313,7 @@ do not arrange for it to be inherited.
 
 ## Tokens, never hex
 
-Read `node_modules/@dynodesign/components/CLAUDE.md` for the full token list.
+Read `node_modules/@omni-design/components/CLAUDE.md` for the full token list.
 The rule that matters here: never write a hex color or hard-coded radius. Use
 `var(--Text)`, `var(--Border)`, `var(--Style-Border-Radius)`, etc. Brand CSS
 in `src/utils/buildPreviewCSS.ts` defines the user-specific values; component

@@ -1,8 +1,8 @@
-declare module '@dynodesign/components' {
+declare module '@omni-design/components' {
   import { FC, ReactNode, CSSProperties } from 'react';
 
   // Provider
-  export const DynoDesignProvider: FC<{
+  export const OmniDesignProvider: FC<{
     themeURL?: string;
     foundationCSS?: string;
     coreCSS?: string;
@@ -102,6 +102,28 @@ declare module '@dynodesign/components' {
 
   // Chips
   export const Chip: FC<any>;
+
+  // Code
+  //
+  // Typed properly rather than FC<any>, because the props are the whole API and
+  // this file OVERRIDES the package's own .d.ts — anything missing here is
+  // missing full stop, however correct the published types are.
+  export const CodeBlock: FC<{
+    /** The code to display and copy. */
+    code?: string;
+    /** Header label, e.g. "bash", "JSX", "CSS". */
+    language?: string;
+    /** Show the copy button. */
+    showCopy?: boolean;
+    /** Show the header row at all. */
+    showHeader?: boolean;
+    /** Cap the code area's height and scroll past it. */
+    maxHeight?: number | string;
+    /** Wrap long lines instead of scrolling horizontally. */
+    wrap?: boolean;
+    sx?: Record<string, unknown>;
+  }>;
+  export const CopyButton: FC<{ code: string; label?: string }>;
 
   // Layout
   export const Stack: FC<any>;

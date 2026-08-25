@@ -13,7 +13,7 @@
 // Needed for: the moodboard picker + the "Upload a font" affordances on the
 // Header / Decorative / Body tabs.
 // Proposed API: <FileInput accept="image/*" onSelect={(file) => …} children={<Button>Pick file</Button>} />
-// Lib-track: add to @dynodesign/components/src/components/FileInput/
+// Lib-track: add to @omni-design/components/src/components/FileInput/
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { regionFromDrawnBox, isUsableBox, type NormalisedBox } from '../utils/textDetection';
@@ -43,7 +43,7 @@ import {
   Select,
   Label,
   Chip,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import { useAuth } from '../contexts/AuthContext';
 import { analyzeMoodboard, warmAnalyzeMoodboard, getOrStartMoodboardAnalysis } from '../utils/analyzeMoodboardClient';
 import type { MoodboardAnalysis, ExtractedTextRegion } from '../utils/analyzeMoodboardClient';
@@ -2454,7 +2454,7 @@ function DetectionDetails({
 // Needed for: choosing which lettering the Display is matched against — click a
 //   detected block, or drag a box around lettering the detector missed.
 // Proposed API: <ImageRegionSelect src regions currentBbox onPick minSize />
-// Lib-track: add to @dynodesign/components/src/components/ImageRegionSelect/
+// Lib-track: add to @omni-design/components/src/components/ImageRegionSelect/
 /**
  * Choose which lettering the Display is sampled from.
  *

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Body, BodySmall, VStack, HStack, Button,
   Modal, TextField, Alert,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import {
   collection, doc, deleteDoc, updateDoc, getDocs, writeBatch,
   getDoc, setDoc, addDoc, serverTimestamp,
@@ -300,7 +300,7 @@ export function RegenerateDesignSystemModal({
  *  Needed for: ellipsis dropdown anchored to a trigger button — used by the
  *  card on MyDesignsPage and the header on DesignSystemDetail.
  *  Proposed API: <Popover anchorEl={el} open onClose>{children}</Popover>
- *  Lib-track: add to @dynodesign/components/src/components/Popover/
+ *  Lib-track: add to @omni-design/components/src/components/Popover/
  *
  *  Until the lib ships one, this is a small portal-positioned dropdown
  *  anchored via getBoundingClientRect, closes on outside-click + Escape. */

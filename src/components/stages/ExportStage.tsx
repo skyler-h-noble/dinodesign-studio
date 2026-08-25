@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card,
-} from '@dynodesign/components';
+  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, CodeBlock,
+} from '@omni-design/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -60,8 +60,6 @@ export default function ExportStage({
 }: Props) {
   const { user } = useAuth();
   const [copiedId, setCopiedId] = useState(false);
-  const [copiedInstall, setCopiedInstall] = useState(false);
-  const [copiedClaude, setCopiedClaude] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   // Rotating progress copy while the upload runs. The actual export step
@@ -343,7 +341,7 @@ export default function ExportStage({
   const showcaseBase = SHOWCASE_BASE;
   const playgroundUrl = `${showcaseBase}/?user=${dinoId || ''}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${dinoId || ''}/md`;
-  const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${dinoId || ''}`;
+  const installCmd = `npm install @omni-design/components && npx @dynodesign/init ${dinoId || ''}`;
   const hasId = !!dinoId;
   const copyTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
@@ -465,12 +463,7 @@ export default function ExportStage({
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
                 <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
-                <div className="export-code-block">
-                  <code>{installCmd}</code>
-                  <Button variant="primary-outline" size="small" onClick={() => handleCopy(installCmd, setCopiedInstall)} style={{ flexShrink: 0 }}>
-                    {copiedInstall ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
+                <CodeBlock code={installCmd} language="bash" />
               </VStack>
             </VStack>
           </Card>
@@ -487,12 +480,7 @@ export default function ExportStage({
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
                 <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
-                <div className="export-code-block">
-                  <code>{claudeMdUrl}</code>
-                  <Button variant="primary-outline" size="small" onClick={() => handleCopy(claudeMdUrl, setCopiedClaude)} style={{ flexShrink: 0 }}>
-                    {copiedClaude ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
+                <CodeBlock code={claudeMdUrl} language="URL" />
               </VStack>
             </VStack>
           </Card>

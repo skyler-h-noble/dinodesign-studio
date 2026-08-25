@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Card, VStack, HStack, Body, BodySmall, Button, TextField, Alert,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { firebaseApp } from '../utils/firebase/client';
 

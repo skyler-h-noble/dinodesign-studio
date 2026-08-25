@@ -1,6 +1,6 @@
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack, Card, ButtonGroup, Select, Link, Modal, Checkbox,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import chroma from 'chroma-js';
 import { useState, useRef } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';

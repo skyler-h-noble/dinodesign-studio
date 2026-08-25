@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Button, Body, BodySmall, VStack, HStack, TextField, Alert } from '@dynodesign/components';
+import { Modal, Button, Body, BodySmall, VStack, HStack, TextField, Alert } from '@omni-design/components';
 import { isDesignNameTaken } from '../utils/designSystemNames';
 
 interface Props {

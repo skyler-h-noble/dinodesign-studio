@@ -22,7 +22,7 @@ extracted here, separated from the Figma-reading machinery.
 
 ## 1. Use lib components — never raw HTML  **[FIX]**
 
-Every UI element comes from `@dynodesign/components`. No `<button>`, `<input>`,
+Every UI element comes from `@omni-design/components`. No `<button>`, `<input>`,
 `<select>`, `<h1>`–`<h6>`, `<p>`, `<a href>`; no `@mui/material` imports; no
 `<div>` styled to imitate a Card / Modal / Divider / Alert / Chip.
 
@@ -76,7 +76,7 @@ the lib source). Prefer these over guessing a prop.
   `<Grid item xs={12} md={4}>` children (3-across = `md={4}`; same `Grid`
   component, `container`/`item` boolean props). **There is NO `columns` prop.**
   NOTE: helper exports (`ThirdWidthGrid`, `GridItem`, `ColumnGrid`, …) exist in
-  the lib SOURCE but are **NOT exported** from the published `@dynodesign/components`
+  the lib SOURCE but are **NOT exported** from the published `@omni-design/components`
   — only `Grid` ships. Import `Grid` only. (Rule: author against the *published*
   package, not the source — verify the export exists.)
 - `<Container>` centers + max-widths a page region.
@@ -159,7 +159,7 @@ Sanctioned workarounds — do NOT use the naive form:
   `value=` on each child). Do NOT set `variant="default"`/`"outline"` on children
   manually — that re-introduces a double-border.
 - **`Select`** — use the lib's default-export wrapper (fixes an invalid trigger
-  border + the color swatch). Import from `@dynodesign/components` as normal.
+  border + the color swatch). Import from `@omni-design/components` as normal.
 
 ---
 
@@ -357,7 +357,7 @@ never a `<Box>` with hard-coded width/height. No real image URL → `<Ratio plac
 ## 16. Output discipline  **[FIX]**
 
 - **Import every component referenced.** Scan the output; every lib name used
-  must appear in the `@dynodesign/components` import. Missing imports are a hard
+  must appear in the `@omni-design/components` import. Missing imports are a hard
   fail in a real project.
 - For anything with no lib equivalent, emit the `MISSING-LIB-COMPONENT` comment
   block and inline a minimal lib-only placeholder — never reference the missing

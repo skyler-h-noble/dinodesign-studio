@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { H2, Body, BodySmall, VStack, Link } from '@dynodesign/components';
+import { H2, Body, BodySmall, VStack, Link } from '@omni-design/components';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';

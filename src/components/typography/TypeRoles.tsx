@@ -10,7 +10,7 @@
 // Roles in the order omni shows them — Display first because it is the decision
 // everything else is set against.
 
-import { Body, Caption, Card, Checkbox, Button, Link, VStack, HStack, Slider, Divider } from '@dynodesign/components';
+import { Body, Caption, Card, Checkbox, Button, Link, VStack, HStack, Slider, Divider } from '@omni-design/components';
 import { AXES, HEADER_FAMILY, type AxisValues } from '../../utils/moodAxes';
 import type { FontMatchState } from '../../hooks/useFontMatch';
 import type { FontScore } from '../../utils/fontMatch';

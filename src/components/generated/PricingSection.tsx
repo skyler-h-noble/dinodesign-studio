@@ -5,7 +5,7 @@ import {
   Section, Container, VStack, HStack, Grid,
   DisplaySmall, H3, Body, BodyLarge, Overline,
   Button, ButtonGroup, Card, Divider, Icon,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import CheckIcon from '@mui/icons-material/Check';
 
 const TIERS = [

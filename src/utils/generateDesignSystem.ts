@@ -90,7 +90,7 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
 ### Install in Your Project
 
 \`\`\`bash
-npm install @dynodesign/components
+npm install @omni-design/components
 npx @dynodesign/init ${uuid}
 \`\`\`
 
@@ -107,7 +107,7 @@ This downloads the CSS token files into your project and sets up the provider.
 5. **Use \`data-surface\`** for surface levels: \`Surface\`, \`Surface-Dim\`, \`Surface-Bright\`, \`Container\`, \`Container-Low\`, \`Container-High\`.
 6. **Use \`<Alert variant="error|success|warning|info">\`** for status messages — never manually color error text.
 7. **Use design system layout components**: \`<Card>\`, \`<TextField>\`, \`<TextArea>\`, \`<Select>\`, \`<VStack>\`, \`<HStack>\`, \`<Tabs>\`, \`<Dialog>\`, \`<Modal>\`.
-8. **All components** are imported from \`'@dynodesign/components'\`.
+8. **All components** are imported from \`'@omni-design/components'\`.
 9. **The design system is the source of truth** — treat it as a requirement, not a suggestion.
 
 ---
@@ -129,7 +129,7 @@ Each brand color generates a 12-tone LCH palette (Color-1 = darkest, Color-12 = 
 ## Provider Setup
 
 \`\`\`jsx
-import { DynoDesignProvider } from '@dynodesign/components';
+import { OmniDesignProvider } from '@omni-design/components';
 
 // Firebase Storage URL pattern. Each file is at:
 // https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2F{filename}?alt=media
@@ -138,7 +138,7 @@ const tokenUrl = (file) => TOKEN_BASE + encodeURIComponent(file) + '?alt=media';
 
 function App() {
   return (
-    <DynoDesignProvider
+    <OmniDesignProvider
       foundationCSS={tokenUrl('foundation.css')}
       coreCSS={tokenUrl('core.css')}
       lightModeCSS={tokenUrl('Light-Mode.css')}
@@ -150,7 +150,7 @@ function App() {
       defaultSurface="Surface"
     >
       {/* Your app */}
-    </DynoDesignProvider>
+    </OmniDesignProvider>
   );
 }
 \`\`\`
@@ -398,7 +398,7 @@ ${input.typographyStyles.map(t => `| ${t.type} | ${t.family} | ${t.weight} |`).j
 
 ## Component Usage
 
-Import from \`@dynodesign/components\`:
+Import from \`@omni-design/components\`:
 
 \`\`\`jsx
 import {
@@ -425,7 +425,7 @@ import {
 
   // Data
   Table, List, Accordion,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 \`\`\`
 
 ### Button

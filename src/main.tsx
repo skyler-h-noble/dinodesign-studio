@@ -7,16 +7,16 @@ import { createRoot } from 'react-dom/client';
 // whole bevel system on vs off — so which one you imported silently decided
 // whether buttons were flat squares or bevelled pills. It was also missing
 // --Input-Radius, which the Dropdown-Frame-Radius chain reads.
-import '@dynodesign/components/public/styles/foundation.css';
-import '@dynodesign/components/public/styles/core.css';
-import '@dynodesign/components/public/styles/Light-Mode.css';
-import '@dynodesign/components/public/styles/base.css';
-import '@dynodesign/components/public/styles/styles.css';
+import '@omni-design/components/public/styles/foundation.css';
+import '@omni-design/components/public/styles/core.css';
+import '@omni-design/components/public/styles/Light-Mode.css';
+import '@omni-design/components/public/styles/base.css';
+import '@omni-design/components/public/styles/styles.css';
 // Per-platform typography sizing tokens (Button-Small-Font-Size,
 // Body-Small-Line-Height, etc.). Gated on [data-platform="Desktop"] which we
 // set on <html> below — without that attribute the tokens stay undefined and
 // Typography components fall back to inherited defaults.
-import '@dynodesign/components/public/styles/typography-tokens.css';
+import '@omni-design/components/public/styles/typography-tokens.css';
 import { applyStudioDesignSystem } from './utils/studioDesignSystem';
 
 document.documentElement.setAttribute('data-platform', 'Desktop');

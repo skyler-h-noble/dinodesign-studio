@@ -4,7 +4,7 @@ import {
   Section, Container, VStack, HStack, Grid,
   AppBar, Card, Overline, DisplaySmall, H2, Body, Caption,
   Table, Chip, Alert, Icon,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 const STATS = [

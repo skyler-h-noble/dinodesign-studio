@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import {
   AppBar, Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, Section, Footer, Icon,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SpeedIcon from '@mui/icons-material/Speed';
 import EnergySavingsLeafIcon from '@mui/icons-material/EnergySavingsLeaf';

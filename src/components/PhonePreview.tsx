@@ -1,6 +1,6 @@
 import {
   Button, H3, Body, BodySmall, VStack, Card, Chip,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import type { ColorScheme, UserSelections, ComponentStyle, TypographyStyle } from '../types';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { useMemo } from 'react';

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router';
-import { DynoDesignProvider } from '@dynodesign/components';
+import { OmniDesignProvider } from '@omni-design/components';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { useAuth } from './contexts/AuthContext';
@@ -674,7 +674,7 @@ function MainApp() {
     || ['color-assignment', 'typography', 'component-style', 'review', 'export'].includes(stage);
 
   // Build full brand CSS from the same logic as the phone preview
-  // Post-process to add !important so it overrides DynoDesignProvider's theme
+  // Post-process to add !important so it overrides OmniDesignProvider's theme
   /* Load every picked face, once, for the whole flow.
    *
    * Individual stages were doing this themselves — Component Style, Review and
@@ -825,7 +825,7 @@ function MainApp() {
           --Effect-Level-5: 0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13);
         }
       `}} />
-      {/* `@dynodesign/components`'s Button has no "default" in its color list,
+      {/* `@omni-design/components`'s Button has no "default" in its color list,
           so variant="default" silently falls through to the Primary styles and
           reads --Buttons-Primary-*. Redirect those reads to --Buttons-Default-*
           on any .btn-default so the button actually renders with the Default
@@ -839,7 +839,7 @@ function MainApp() {
           --Buttons-Primary-Pressed: var(--Buttons-Default-Pressed);
         }
       `}} />
-      {/* Canonical @dynodesign/components 0.1.8 doesn't render the swatch
+      {/* Canonical @omni-design/components 0.1.8 doesn't render the swatch
           fill (the `swatch`/`swatchColor` props pass through as DOM
           attributes). Studio-side workaround: the consumer sets
           `--swatch-color` inline on each swatch Button and these rules paint
@@ -1039,7 +1039,7 @@ function MainApp() {
 
 function App() {
   return (
-    <DynoDesignProvider
+    <OmniDesignProvider
       defaultTheme="Default"
       defaultStyle="Modern"
       defaultSurface="Surface"
@@ -1064,7 +1064,7 @@ function App() {
         <Route path="/admin/aaid-workbench" element={<AaidWorkbenchPage />} />
       </Routes>
     </BrowserRouter>
-    </DynoDesignProvider>
+    </OmniDesignProvider>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   AppBar, Button, H1, H2, Body, BodySmall, VStack, HStack, Card, Modal,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { useAuth } from '../contexts/AuthContext';

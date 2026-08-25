@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Button, H2, H3, BodySmall, Overline, VStack, HStack,
   ButtonGroup, Card, Divider,
-} from '@dynodesign/components';
+} from '@omni-design/components';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
 import PhonePreview from '../PhonePreview';

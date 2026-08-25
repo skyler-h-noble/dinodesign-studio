@@ -5,8 +5,8 @@ import JSZip from 'jszip';
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, TextField,
   Breadcrumbs, BreadcrumbItem,
-  Modal, Chip,
-} from '@dynodesign/components';
+  Modal, Chip, CodeBlock,
+} from '@omni-design/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CodeIcon from '@mui/icons-material/Code';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -784,21 +784,13 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
     }
   }
 
-  const [copiedInstall, setCopiedInstall] = useState(false);
-  const [copiedClaude, setCopiedClaude] = useState(false);
-  const copyTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
-  useEffect(() => () => { copyTimers.current.forEach(clearTimeout); }, []);
-  const handleCopy = (text: string, setter: (v: boolean) => void) => {
-    navigator.clipboard.writeText(text);
-    setter(true);
-    const t = setTimeout(() => { setter(false); copyTimers.current.delete(t); }, 2000);
-    copyTimers.current.add(t);
-  };
+  // Copying is CodeBlock's job now — it owns the button, the confirmation
+  // and the timer that used to live here.
 
   const showcaseBase = SHOWCASE_BASE;
   const playgroundUrl = `${showcaseBase}/?user=${id}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${id}/md`;
-  const installCmd = `npm install @dynodesign/components && npx @dynodesign/init ${id}`;
+  const installCmd = `npm install @omni-design/components && npx @dynodesign/init ${id}`;
 
   return (
     <VStack spacing={5}>
@@ -871,12 +863,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
-            <div className="export-code-block">
-              <code>{installCmd}</code>
-              <Button variant="primary-outline" size="small" onClick={() => handleCopy(installCmd, setCopiedInstall)} style={{ flexShrink: 0 }}>
-                {copiedInstall ? 'Copied' : 'Copy'}
-              </Button>
-            </div>
+            <CodeBlock code={installCmd} language="bash" />
           </VStack>
         </VStack>
       </Card>
@@ -892,12 +879,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
-            <div className="export-code-block">
-              <code>{claudeMdUrl}</code>
-              <Button variant="primary-outline" size="small" onClick={() => handleCopy(claudeMdUrl, setCopiedClaude)} style={{ flexShrink: 0 }}>
-                {copiedClaude ? 'Copied' : 'Copy'}
-              </Button>
-            </div>
+            <CodeBlock code={claudeMdUrl} language="URL" />
           </VStack>
         </VStack>
       </Card>

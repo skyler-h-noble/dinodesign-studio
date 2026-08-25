@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Body, BodySmall, Button, HStack, Modal, VStack } from '@dynodesign/components';
+import { Body, BodySmall, Button, HStack, Modal, VStack } from '@omni-design/components';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import CloseIcon from '@mui/icons-material/Close';
 import { useCart } from '../contexts/CartContext';

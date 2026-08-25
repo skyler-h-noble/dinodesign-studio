@@ -73,29 +73,6 @@
   font-size: 0.8rem;
 }
 
-.export-code-block {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--Container-Lowest);
-  border: 1px solid var(--Border);
-  border-radius: var(--Style-Border-Radius);
-  font-family: monospace;
-  font-size: 0.75rem;
-  color: var(--Text);
-  overflow-x: auto;
-  box-sizing: border-box;
-}
-
-.export-code-block code {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 @media (max-width: 700px) {
   .export-cards-grid {
     grid-template-columns: 1fr;
