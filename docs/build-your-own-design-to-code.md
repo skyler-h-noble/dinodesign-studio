@@ -49,6 +49,7 @@ Figma frame URL
       │       → LLM
       ▼
 4. Render     compile the returned JSX in-browser and show it beside the frame
+              Code | Preview | Drift — the third is the one that scales
 ```
 
 Steps 1 and 4 are plumbing. **Steps 2 and 3 are the product.**
@@ -209,6 +210,55 @@ looking at a rendered diff, not from reading code.
 
 ---
 
+## 4b. Show the drift the preview cannot
+
+Side-by-side catches drift you can **see**. It does not catch the drift that
+renders as something entirely plausible, and that is most of it:
+
+- a hardcoded `#3794ff` renders identically to `var(--vscode-focusBorder)` —
+  until someone switches to a light theme
+- a dropped variant gives you the component's default, which looks *nearly*
+  right
+- a layer the designer hid, rendered anyway, just looks like an extra row
+
+So add a third view beside Code and Preview: **Drift**. Compare the frame JSON
+against the emitted code and list the differences.
+
+Every check is deterministic — no second model call. That matters for three
+reasons: it is free, it is instant, and the answer cannot drift on its own the
+way a model's opinion of its own output would.
+
+The checks worth having, most to least actionable:
+
+| Check | How |
+| --- | --- |
+| Hardcoded colour | regex the code for `#hex`, `rgb()`, `hsl()` — strip comments first |
+| Hidden layer rendered | walk nodes with `visible === false`; look for their **content** in the code |
+| Variant dropped | for each instance's `componentProperties`, check the value appears as a prop |
+| Text missing | frame `characters` strings absent from the code |
+| Instance unmapped | `type === 'INSTANCE'` names with no matching JSX tag |
+
+Two details that decide whether this is useful or noise:
+
+**Check the layer's CONTENT, not its name.** A hidden second row leaks into the
+output as its text — `"Second row"` — while the layer is called `"Row 2"`.
+Checking the name alone finds nothing and the row still renders. This is the
+single most valuable check in the list and it is easy to build wrong.
+
+**Badge errors only.** A hardcoded colour is always wrong. A missing string
+usually is not — text is often bound to a prop, and a layer name need not
+survive into code. If the badge counts warnings it will never read zero, and a
+badge that never reads zero is a badge nobody looks at.
+
+Ignore short strings (`"OK"`, `"1"`) and default-ish variant values
+(`Default`, `None`, `False`) — both generate noise that buries the real
+findings.
+
+Treat every finding as a signal, not a verdict. The value is putting the
+differences in front of a person in one second rather than thirty.
+
+---
+
 ## 5. Close the loop
 
 Add two buttons — 👍 / 👎 — and a free-text box: *"what was wrong, or what would
@@ -230,6 +280,7 @@ Smaller than it sounds:
 | Pruning | ~80 lines |
 | Prompt assembly | ~200 lines, mostly the catalogue |
 | Live preview | ~100 lines |
+| Drift checks | ~150 lines |
 | Feedback logging | ~60 lines |
 
 The prompt is the part you will iterate on for weeks. Everything else you write
