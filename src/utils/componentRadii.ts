@@ -84,13 +84,38 @@ const inner = (r: number) => Math.max(0, r - 1);
 const focus = (r: number) => r + 3;
 
 export function computeRadii(cs: RadiiInput): ComputedRadii {
+  /**
+   * One radius for every size — EXCEPT when the base is asking for a pill.
+   *
+   * Two rules, because a single one is wrong at one end or the other:
+   *
+   *   a constant corner   8px on a 48px button and on a 112px button are the
+   *                       same shape, which is what "same radius" means and
+   *                       what proportional scaling got wrong.
+   *
+   *   a pill is a ratio   a pill is height/2 BY DEFINITION. Hand a 112px
+   *                       button the base's 20px and it is a rounded
+   *                       rectangle, not a pill.
+   *
+   * The base's own pill point is the switch. Below it the value is a corner and
+   * copies across unchanged; at or above it the value is an intent — "fully
+   * round" — and each size resolves that against its own height.
+   *
+   * Sm/Lg stay as tokens rather than being deleted: they already ship to Figma,
+   * and a deleted Figma variable cannot be recovered by re-importing, because a
+   * recreated variable gets a new id and every layer bound to the old one stays
+   * unbound (invariant 8).
+   */
+  const sized = (basePx: number, height: number, baseHeight: number) =>
+    basePx >= baseHeight / 2 ? Math.round(height / 2) : basePx;
+
   const buttonRadius = pct(cs.buttonRadius, cs.buttonHeight);
-  const smButtonRadius = pct(cs.buttonRadius, cs.smallButtonHeight);
-  const lgButtonRadius = pct(cs.buttonRadius, cs.largeButtonHeight);
+  const smButtonRadius = sized(buttonRadius, cs.smallButtonHeight, cs.buttonHeight);
+  const lgButtonRadius = sized(buttonRadius, cs.largeButtonHeight, cs.buttonHeight);
 
   const iconButtonRadius = pct(cs.iconButtonRadius, cs.buttonHeight);
-  const smIconButtonRadius = pct(cs.iconButtonRadius, cs.smallButtonHeight);
-  const lgIconButtonRadius = pct(cs.iconButtonRadius, cs.largeButtonHeight);
+  const smIconButtonRadius = sized(iconButtonRadius, cs.smallButtonHeight, cs.buttonHeight);
+  const lgIconButtonRadius = sized(iconButtonRadius, cs.largeButtonHeight, cs.buttonHeight);
 
   const inputRadius = pct(cs.inputRadius, cs.buttonHeight);
   const smInputRadius = pct(cs.inputRadius, cs.smallButtonHeight);
