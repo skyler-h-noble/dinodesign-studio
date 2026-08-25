@@ -522,7 +522,7 @@ function DesignSystemCard({
           style={{ width: '100%' }}
           onClick={() => window.location.href = `/my-designs/${ds.id}`}
         >
-          Open
+          Design System Summary
         </Button>
 
         {/* Pending changes — content-sized pill, centered, so the tag
