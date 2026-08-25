@@ -126,6 +126,11 @@ export interface TypeStyle {
    *  face's wght axis drives them; Subtitle 700, Label 600 and the rest keep
    *  their own number. */
   weightFromFace?: boolean;
+  /** A step that reads a DIFFERENT weight variable than its face's.
+   *  H4-H6 use --Header-Clamped-Weight so small headers can carry more weight
+   *  than the brand's display pick without changing H1-H3. Matches the Figma
+   *  variable of the same name — the two have to agree or they drift. */
+  weightVar?: string;
   /** Variable-font axes, when the role's family is variable. */
   axes?: Record<string, number>;
   /** Display only — 0–100 grain amount rendered as SVG turbulence. */
@@ -255,6 +260,17 @@ export function displaySteps(largeSize = DEFAULT_DISPLAY_SIZE, leading?: number)
 
 /** The default ramp, for callers that don't have a design in hand. */
 export const DISPLAY_STEPS = displaySteps();
+
+/** The floor for small headers.
+ *
+ *  A 250 that reads elegant at 48px reads washed out at 18px, so H4-H6 take
+ *  max(brand's pick, this) while H1-H3 keep the brand's weight untouched. A
+ *  FLOOR, not a fixed value: a brand that picked 700 keeps 700 rather than
+ *  being lightened by a rule meant to strengthen it. */
+export const HEADER_CLAMPED_WEIGHT_FLOOR = 500;
+
+/** Steps that read --Header-Clamped-Weight instead of --Font-Weight-Header. */
+export const CLAMPED_HEADER_STEPS = ['H4', 'H5', 'H6'];
 
 export const HEADER_STEPS = [
   { token: 'H1', step: 'H1', size: H1_SIZE, lineHeight: 56 },
@@ -506,6 +522,9 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
     push({
       token: step.token, name: `Header/${step.step}`, group: 'Header', step: step.step,
       familyRole: 'header', weightFromFace: true,
+      ...(CLAMPED_HEADER_STEPS.includes(step.token)
+        ? { weightVar: 'Header-Clamped-Weight' }
+        : {}),
       size: step.size, weight: roles.header.weight, lineHeight: step.lineHeight,
       letterSpacing: roles.header.letterSpacing,
       textTransform: roles.header.textTransform,

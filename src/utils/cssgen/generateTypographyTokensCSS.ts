@@ -23,7 +23,9 @@ import {
   SYSTEM_UI_STACK,
   type TypeStyle,
   type FamilyRole,
+  HEADER_CLAMPED_WEIGHT_FLOOR,
 } from '../typeScale';
+import { nearestAvailableWeight } from '../googleFontWeights';
 import type { TypographyStyle } from '../../types';
 
 /**
@@ -85,7 +87,12 @@ function styleBlock(s: TypeStyle): string {
   }
   lines.push(
     `  --${s.token}-Font-Size:     ${px(s.size)};`,
-    `  --${s.token}-Font-Weight:   ${s.weightFromFace ? `var(--${weightToken(s.familyRole)})` : s.weight};`,
+    // A step may read a DIFFERENT weight variable than its face's — H4-H6 link
+    // to --Header-Clamped-Weight so small headers can be heavier than the
+    // brand's display pick without touching H1-H3.
+    `  --${s.token}-Font-Weight:   ${s.weightVar
+      ? `var(--${s.weightVar})`
+      : s.weightFromFace ? `var(--${weightToken(s.familyRole)})` : s.weight};`,
     `  --${s.token}-Line-Height:   ${px(s.lineHeight)};`,
     `  --${s.token}-Letter-Spacing: ${s.letterSpacing};`,
     `  --${s.token}-Text-Transform: ${s.textTransform};`,
@@ -144,6 +151,22 @@ export function typographyDeclarations(typography: TypographyStyle[] | null | un
   out.push('  /* Face weights */');
   for (const face of FACES) {
     out.push(`  --${weightToken(face)}: ${roles[face].weight};`);
+  }
+
+  // --Header-Clamped-Weight: the floor H4-H6 read instead of the header face's
+  // own weight. A 250 that reads elegant at 48px reads washed out at 18px.
+  //
+  // max(), not a fixed value — a brand that picked 700 keeps 700, because this
+  // rule exists to STRENGTHEN small headers, not to lighten bold ones.
+  //
+  // Snapped to a weight the face actually ships: asking a static 400/700 face
+  // for 500 silently gives 400 on some platforms and 700 on others. The name
+  // matches the Figma variable exactly — the two must agree or they drift.
+  {
+    const picked = Number(roles.header.weight) || 400;
+    const wanted = Math.max(picked, HEADER_CLAMPED_WEIGHT_FLOOR);
+    const snapped = nearestAvailableWeight(roles.header.family, wanted) ?? wanted;
+    out.push(`  --Header-Clamped-Weight: ${snapped};`);
   }
 
   // One variable per axis per face, then a font-variation-settings value built
