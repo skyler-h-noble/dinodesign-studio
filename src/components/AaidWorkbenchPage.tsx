@@ -57,7 +57,7 @@ import {
 import { prepareLiveCode } from '../utils/prepareLiveCode';
 
 /** Which direction the workbench is running in. */
-type WorkbenchMode = 'design-to-code' | 'code-to-design';
+type WorkbenchMode = 'design-to-code' | 'code-to-design' | 'settings';
 
 const LS_FIGMA_TOKEN = 'aaid-workbench:figma-token';
 const LS_ANTHROPIC_KEY = 'aaid-workbench:anthropic-key';
@@ -167,7 +167,15 @@ export default function AaidWorkbenchPage() {
   const [conversionId, setConversionId] = useState<string | null>(null);
 
   const [rightView, setRightView] = useState<'code' | 'preview'>('code');
-  const [mode, setMode] = useState<WorkbenchMode>('design-to-code');
+  // Opens on Settings when the keys are not usable, so a first run — or an
+  // expired key — lands on the thing that needs fixing rather than on a Convert
+  // button that cannot fire. Read once: flipping the tab out from under someone
+  // mid-edit would be worse than the wrong default.
+  const [mode, setMode] = useState<WorkbenchMode>(() =>
+    looksLikeFigmaToken(localStorage.getItem(LS_FIGMA_TOKEN)?.trim() ?? '')
+    && looksLikeAnthropicKey(localStorage.getItem(LS_ANTHROPIC_KEY)?.trim() ?? '')
+      ? 'design-to-code'
+      : 'settings');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verdict, setVerdict] = useState<'good' | 'bad' | null>(null);
@@ -451,88 +459,15 @@ export default function AaidWorkbenchPage() {
           </BodySmall>
         </VStack>
 
-        {!tokensSet && (
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-2)">
-              <H3>One-time setup</H3>
-              <BodySmall>
-                Stored in browser localStorage. Used only by this dev tool.
-              </BodySmall>
-              <TextField
-                label="Figma personal access token"
-                error={figmaToken.trim() !== '' && !looksLikeFigmaToken(figmaToken.trim())}
-                helperText={
-                  figmaToken.trim() === '' || looksLikeFigmaToken(figmaToken.trim())
-                    ? 'Generate at figma.com/developers/api#access-tokens — needs file_read scope.'
-                    : 'Does not look like a Figma token — they start with figd_.'
-                }
-                value={figmaToken}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFigmaToken(e.target.value)}
-                type="password"
-                fullWidth
-              />
-              <TextField
-                label="Anthropic API key"
-                error={anthropicKey.trim() !== '' && !looksLikeAnthropicKey(anthropicKey.trim())}
-                helperText={
-                  anthropicKey.trim() === '' || looksLikeAnthropicKey(anthropicKey.trim())
-                    ? 'Generate at console.anthropic.com. Workbench-only — never shipped to customers.'
-                    : looksLikeUuid(anthropicKey.trim())
-                      ? 'That is a UUID — looks like a Design ID. An Anthropic key starts with sk-ant-.'
-                      : 'Does not look like an Anthropic key — they start with sk-ant-.'
-                }
-                value={anthropicKey}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAnthropicKey(e.target.value)}
-                type="password"
-                fullWidth
-              />
-            </VStack>
-          </Card>
-        )}
-
         <Tabs value={mode} onChange={(v: WorkbenchMode) => setMode(v)}>
           <TabList aria-label="Workbench direction">
             <Tab value="design-to-code">Design → Code</Tab>
             <Tab value="code-to-design">Code → Design</Tab>
+            <Tab value="settings">Settings{tokensSet ? '' : ' •'}</Tab>
           </TabList>
         </Tabs>
 
         {mode === 'design-to-code' && (<>
-        <Card padding="medium">
-          <VStack gap="var(--Sizing-1)">
-            <H3>Brand context (Design ID)</H3>
-            <BodySmall color="quiet">
-              Optional. Paste a Design ID (UUID) to load that brand's tokens
-              into the workbench. The generated code resolves universal token
-              names against this brand's CSS, and brand metadata (header font,
-              component style) is passed to the prompt so the AAID can make
-              brand-aware suggestions. Leaving this blank converts against
-              the default-theme tokens only.
-            </BodySmall>
-            <TextField
-              label="Design ID"
-              placeholder="e.g. 618ab9a8-879e-44fa-8432-4000a2eb66f5"
-              value={dinoId}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDinoId(e.target.value)}
-              fullWidth
-            />
-            {brandLoading && <Caption color="quiet">Loading brand…</Caption>}
-            {brandError && <Caption color="error">{brandError}</Caption>}
-            {brandMeta && !brandLoading && !brandError && (
-              <HStack gap="var(--Sizing-Half)" style={{ flexWrap: 'wrap' }}>
-                {brandMeta.designSystemName && (
-                  <Chip label={brandMeta.designSystemName} size="small" />
-                )}
-                {brandMeta.headerFontFamily && (
-                  <Chip label={`Header: ${brandMeta.headerFontFamily}`} size="small" />
-                )}
-                {brandMeta.componentStyle && (
-                  <Chip label={`Style: ${brandMeta.componentStyle}`} size="small" />
-                )}
-              </HStack>
-            )}
-          </VStack>
-        </Card>
 
         <Card padding="medium">
           <VStack gap="var(--Sizing-2)">
@@ -702,6 +637,84 @@ export default function AaidWorkbenchPage() {
 
         {mode === 'code-to-design' && (
           <CodeToDesignPanel />
+        )}
+
+        {mode === 'settings' && (
+          <VStack gap="var(--Sizing-2)">
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-2)">
+              <HStack gap="var(--Sizing-1)" alignItems="center" style={{ justifyContent: 'space-between' }}>
+                <H3>API keys</H3>
+              </HStack>
+              <BodySmall>
+                Stored in browser localStorage. Used only by this dev tool.
+              </BodySmall>
+              <TextField
+                label="Figma personal access token"
+                error={figmaToken.trim() !== '' && !looksLikeFigmaToken(figmaToken.trim())}
+                helperText={
+                  figmaToken.trim() === '' || looksLikeFigmaToken(figmaToken.trim())
+                    ? 'Generate at figma.com/developers/api#access-tokens — needs file_read scope.'
+                    : 'Does not look like a Figma token — they start with figd_.'
+                }
+                value={figmaToken}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFigmaToken(e.target.value)}
+                type="password"
+                fullWidth
+              />
+              <TextField
+                label="Anthropic API key"
+                error={anthropicKey.trim() !== '' && !looksLikeAnthropicKey(anthropicKey.trim())}
+                helperText={
+                  anthropicKey.trim() === '' || looksLikeAnthropicKey(anthropicKey.trim())
+                    ? 'Generate at console.anthropic.com. Workbench-only — never shipped to customers.'
+                    : looksLikeUuid(anthropicKey.trim())
+                      ? 'That is a UUID — looks like a Design ID. An Anthropic key starts with sk-ant-.'
+                      : 'Does not look like an Anthropic key — they start with sk-ant-.'
+                }
+                value={anthropicKey}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAnthropicKey(e.target.value)}
+                type="password"
+                fullWidth
+              />
+            </VStack>
+          </Card>
+        <Card padding="medium">
+          <VStack gap="var(--Sizing-1)">
+            <H3>Brand context (Design ID)</H3>
+            <BodySmall color="quiet">
+              Optional. Paste a Design ID (UUID) to load that brand's tokens
+              into the workbench. The generated code resolves universal token
+              names against this brand's CSS, and brand metadata (header font,
+              component style) is passed to the prompt so the AAID can make
+              brand-aware suggestions. Leaving this blank converts against
+              the default-theme tokens only.
+            </BodySmall>
+            <TextField
+              label="Design ID"
+              placeholder="e.g. 618ab9a8-879e-44fa-8432-4000a2eb66f5"
+              value={dinoId}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDinoId(e.target.value)}
+              fullWidth
+            />
+            {brandLoading && <Caption color="quiet">Loading brand…</Caption>}
+            {brandError && <Caption color="error">{brandError}</Caption>}
+            {brandMeta && !brandLoading && !brandError && (
+              <HStack gap="var(--Sizing-Half)" style={{ flexWrap: 'wrap' }}>
+                {brandMeta.designSystemName && (
+                  <Chip label={brandMeta.designSystemName} size="small" />
+                )}
+                {brandMeta.headerFontFamily && (
+                  <Chip label={`Header: ${brandMeta.headerFontFamily}`} size="small" />
+                )}
+                {brandMeta.componentStyle && (
+                  <Chip label={`Style: ${brandMeta.componentStyle}`} size="small" />
+                )}
+              </HStack>
+            )}
+          </VStack>
+        </Card>
+          </VStack>
         )}
       </VStack>
     </div>
