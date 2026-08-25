@@ -512,18 +512,30 @@ export function buildPreviewCSS(input: BuildInput): string {
     return { active, hover: mixHex(baseHex, active) };
   }
 
-  // Map nav option → { palette, n, theme, surface }
-  function resolveNavOption(opt: string): { palette: string; n: number; theme: string; surface: string } {
+  /**
+   * Map a nav option to the palette and tone it paints with.
+   *
+   * The `theme` and `surface` fields this used to carry are gone. They named
+   * themes generated CSS does not have — 'Primary-Light', 'White', 'Black' —
+   * and nothing read them: only `palette` and `n` are ever consumed. Keeping
+   * dead names that no sheet defines is how they end up copied somewhere that
+   * DOES use them, and then match nothing.
+   *
+   * A light tint is base theme + surface level now:
+   *   Primary-Light  ==  [data-theme="Primary"][data-surface="Surface-Brightest"]
+   *   Black          ==  [data-theme="Neutral"][data-surface="Surface-Dimmest"]
+   */
+  function resolveNavOption(opt: string): { palette: string; n: number } {
     switch (opt) {
-      case 'black': return { palette: 'Neutral', n: 1, theme: 'Black', surface: 'Surface' };
-      case 'white': return { palette: 'Neutral', n: 12, theme: 'White', surface: 'Surface' };
-      case 'primary-light': return { palette: 'Primary', n: 11, theme: 'Primary-Light', surface: 'Surface' };
-      case 'primary-light-bright': return { palette: 'Primary', n: 12, theme: 'Primary-Light', surface: 'Surface-Bright' };
-      case 'primary-light-dim': return { palette: 'Primary', n: 10, theme: 'Primary-Light', surface: 'Surface-Dim' };
-      case 'primary': return { palette: 'Primary', n: PC, theme: 'Primary', surface: 'Surface' };
-      case 'primary-bright': return { palette: 'Primary', n: Math.min(PC + 1, 12), theme: 'Primary', surface: 'Surface-Bright' };
-      case 'primary-dim': return { palette: 'Primary', n: Math.max(PC - 1, 1), theme: 'Primary', surface: 'Surface-Dim' };
-      default: return { palette: 'Neutral', n: 12, theme: 'White', surface: 'Surface' };
+      case 'black': return { palette: 'Neutral', n: 1 };
+      case 'white': return { palette: 'Neutral', n: 12 };
+      case 'primary-light': return { palette: 'Primary', n: 11 };
+      case 'primary-light-bright': return { palette: 'Primary', n: 12 };
+      case 'primary-light-dim': return { palette: 'Primary', n: 10 };
+      case 'primary': return { palette: 'Primary', n: PC };
+      case 'primary-bright': return { palette: 'Primary', n: Math.min(PC + 1, 12) };
+      case 'primary-dim': return { palette: 'Primary', n: Math.max(PC - 1, 1) };
+      default: return { palette: 'Neutral', n: 12 };
     }
   }
 
@@ -1788,5 +1800,42 @@ ${isDark ? `/* ══ Dark mode image treatment ══
 [data-theme="Brand"] [data-theme] img {
   filter: brightness(0.7);
 }
-` : ''}`;
+` : ''}
+
+/* The NEUTRAL theme's two ends.
+ *
+ * Published CSS defines [data-theme="Neutral"] and its surface levels; the
+ * preview defined no Neutral scope at all. CodeBlock declares
+ * data-theme="Neutral" + data-surface="Surface-Dimmest" — correct against a
+ * published system, where that pair resolves to #000000 on #ffffff — so on this
+ * side it matched nothing and the block rendered in whatever the parent card
+ * gave it, i.e. light.
+ *
+ * Values mirror the published output rather than inventing new ones, because
+ * the two sides have to agree (invariant 5).
+ *
+ * This is also what replaces the old *-Light themes: a tint is the base theme
+ * at a surface level, not a theme of its own. */
+[data-theme="Neutral"][data-surface="Surface-Dimmest"],
+[data-theme="Neutral"] [data-surface="Surface-Dimmest"] {
+  --Background: #000000;
+  --Surface: #000000;
+  --Text: #ffffff;
+  --Header: #ffffff;
+  --Quiet: var(--Neutral-Color-6);
+  --Text-Quiet: var(--Quiet, var(--Neutral-Color-6));
+  --Border: var(--Neutral-Color-6);
+}
+
+[data-theme="Neutral"][data-surface="Surface-Brightest"],
+[data-theme="Neutral"] [data-surface="Surface-Brightest"] {
+  --Background: #ffffff;
+  --Surface: #ffffff;
+  --Text: var(--Neutral-Color-1);
+  --Header: var(--Neutral-Color-1);
+  --Quiet: var(--Neutral-Color-5);
+  --Text-Quiet: var(--Quiet, var(--Neutral-Color-5));
+  --Border: var(--Neutral-Color-5);
+}
+`;
 }
