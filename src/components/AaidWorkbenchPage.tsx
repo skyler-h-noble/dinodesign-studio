@@ -34,6 +34,10 @@ import {
   Chip,
   CircularProgress,
   Link,
+  Tabs,
+  TabList,
+  Tab,
+  CodeBlock,
 } from '@omni-design/components';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
@@ -51,7 +55,9 @@ import {
   logConversionVerdict,
 } from '../utils/figmaConversionFeedback';
 import { prepareLiveCode } from '../utils/prepareLiveCode';
-import { FIXTURES, loadFixture, type FigmaFixture } from '../utils/figmaFixtures';
+
+/** Which direction the workbench is running in. */
+type WorkbenchMode = 'design-to-code' | 'code-to-design';
 
 const LS_FIGMA_TOKEN = 'aaid-workbench:figma-token';
 const LS_ANTHROPIC_KEY = 'aaid-workbench:anthropic-key';
@@ -94,12 +100,7 @@ export default function AaidWorkbenchPage() {
   const [conversionId, setConversionId] = useState<string | null>(null);
 
   const [rightView, setRightView] = useState<'code' | 'preview'>('code');
-  // Source mode for the frame input. 'live' = paste a Figma URL + fetch
-  // via REST PAT (rate-limited). 'fixture' = load a pre-saved JSON file
-  // from public/figma-fixtures/. Fixtures bypass Figma entirely — instant
-  // and durable across sessions.
-  const [sourceMode, setSourceMode] = useState<'live' | 'fixture'>('fixture');
-  const [fixtureId, setFixtureId] = useState<string>(FIXTURES[0]?.id ?? '');
+  const [mode, setMode] = useState<WorkbenchMode>('design-to-code');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verdict, setVerdict] = useState<'good' | 'bad' | null>(null);
@@ -187,17 +188,8 @@ export default function AaidWorkbenchPage() {
 
   const urlParts = useMemo(() => parseFigmaUrl(figmaUrl.trim()), [figmaUrl]);
 
-  const activeFixture: FigmaFixture | undefined = useMemo(
-    () => FIXTURES.find(f => f.id === fixtureId),
-    [fixtureId],
-  );
-
-  // The Convert button is enabled when:
-  //   - fixture mode: a fixture is selected and Anthropic key is set
-  //   - live mode: URL parses + both keys are set
-  const canConvert = sourceMode === 'fixture'
-    ? Boolean(activeFixture && anthropicKey.trim())
-    : Boolean(urlParts && tokensSet);
+  // Enabled once the pasted URL parses and both keys are set.
+  const canConvert = Boolean(urlParts && tokensSet);
 
   const handleConvert = async () => {
     if (!user || !canConvert) return;
@@ -213,30 +205,15 @@ export default function AaidWorkbenchPage() {
     setVerdictSaved(false);
 
     try {
-      // Two source modes:
-      //   - fixture: load a pre-saved JSON file from public/figma-fixtures.
-      //     Zero Figma API hits; durable across sessions; used as the
-      //     primary R&D path while tuning the AAID prompt.
-      //   - live: fetch frame + image from Figma REST API via the user's
-      //     PAT, with a 60-minute localStorage cache to limit re-fetches.
+      // Fetch the frame + image from the Figma REST API via the user's PAT,
+      // with a 60-minute localStorage cache to limit re-fetches.
       let frameJson: unknown | null = null;
       let image: string | null = null;
       let figmaUrlForLog = '';
       let fileKeyForLog = '';
       let nodeIdForLog = '';
 
-      if (sourceMode === 'fixture' && activeFixture) {
-        frameJson = await loadFixture(activeFixture);
-        // No screenshot for fixtures — would need to ship PNG alongside.
-        // Skipped for now; the live render is the visual feedback that
-        // matters during prompt tuning.
-        image = null;
-        figmaUrlForLog = activeFixture.sourceUrl ?? `fixture:${activeFixture.id}`;
-        // Synthesize ids from the fixture id so feedback logs partition
-        // cleanly between live and fixture conversions.
-        fileKeyForLog = `fixture:${activeFixture.id}`;
-        nodeIdForLog = (frameJson as { id?: string })?.id ?? activeFixture.id;
-      } else if (sourceMode === 'live' && urlParts) {
+      if (urlParts) {
         const cacheKey = `aaid-workbench:cache:${urlParts.fileKey}:${urlParts.nodeId}`;
         const cacheTtlMs = 60 * 60 * 1000;
         const now = Date.now();
@@ -268,7 +245,7 @@ export default function AaidWorkbenchPage() {
         fileKeyForLog = urlParts.fileKey;
         nodeIdForLog = urlParts.nodeId;
       } else {
-        throw new Error('No source selected — pick a fixture or paste a Figma URL.');
+        throw new Error('Paste a Figma frame URL first.');
       }
 
       if (image) setImgUrl(image);
@@ -407,6 +384,14 @@ export default function AaidWorkbenchPage() {
           </Card>
         )}
 
+        <Tabs value={mode} onChange={(v: WorkbenchMode) => setMode(v)}>
+          <TabList aria-label="Workbench direction">
+            <Tab value="design-to-code">Design → Code</Tab>
+            <Tab value="code-to-design">Code → Design</Tab>
+          </TabList>
+        </Tabs>
+
+        {mode === 'design-to-code' && (<>
         <Card padding="medium">
           <VStack gap="var(--Sizing-1)">
             <H3>Brand context (Design ID)</H3>
@@ -445,95 +430,29 @@ export default function AaidWorkbenchPage() {
 
         <Card padding="medium">
           <VStack gap="var(--Sizing-2)">
-            <HStack gap="var(--Sizing-1)" alignItems="center">
-              <Caption color="quiet">Source:</Caption>
-              <ButtonGroup
-                value={sourceMode}
-                onChange={(v: 'live' | 'fixture') => setSourceMode(v)}
-                size="small"
+            <HStack gap="var(--Sizing-1)" alignItems="flex-end">
+              <TextField
+                label="Figma frame URL"
+                placeholder="https://www.figma.com/design/.../?node-id=123-456"
+                value={figmaUrl}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFigmaUrl(e.target.value)}
+                fullWidth
+              />
+              <Button
+                variant="primary"
+                onClick={handleConvert}
+                disabled={!canConvert || busy}
               >
-                <Button value="fixture" size="small">Fixture</Button>
-                <Button value="live" size="small">Live URL (PAT)</Button>
-              </ButtonGroup>
-              {sourceMode === 'fixture' && (
-                <Caption color="quiet">
-                  · zero Figma calls, durable across sessions
-                </Caption>
-              )}
-              {sourceMode === 'live' && (
-                <Caption color="quiet">
-                  · counts against your PAT's rate limit (~30/min)
-                </Caption>
-              )}
+                {busy ? 'Converting…' : 'Convert'}
+              </Button>
             </HStack>
-
-            {sourceMode === 'fixture' && (
-              <HStack gap="var(--Sizing-1)" alignItems="flex-end">
-                <div style={{ flex: 1 }}>
-                  <Caption color="quiet">Fixture</Caption>
-                  <select
-                    value={fixtureId}
-                    onChange={(e) => setFixtureId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: '1px solid var(--Border)',
-                      background: 'var(--Background)',
-                      color: 'var(--Text)',
-                      fontFamily: 'inherit',
-                      fontSize: 14,
-                    }}
-                  >
-                    {FIXTURES.map(f => (
-                      <option key={f.id} value={f.id}>{f.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <Button
-                  variant="primary"
-                  onClick={handleConvert}
-                  disabled={!canConvert || busy}
-                >
-                  {busy ? 'Converting…' : 'Convert'}
-                </Button>
-              </HStack>
+            {figmaUrl && !urlParts && (
+              <Caption color="error">Could not parse URL — expected format /design/&lt;fileKey&gt;?node-id=&lt;id&gt;.</Caption>
             )}
-
-            {sourceMode === 'live' && (
-              <>
-                <HStack gap="var(--Sizing-1)" alignItems="flex-end">
-                  <TextField
-                    label="Figma frame URL"
-                    placeholder="https://www.figma.com/design/.../?node-id=123-456"
-                    value={figmaUrl}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFigmaUrl(e.target.value)}
-                    fullWidth
-                  />
-                  <Button
-                    variant="primary"
-                    onClick={handleConvert}
-                    disabled={!canConvert || busy}
-                  >
-                    {busy ? 'Converting…' : 'Convert'}
-                  </Button>
-                </HStack>
-                {figmaUrl && !urlParts && (
-                  <Caption color="error">Could not parse URL — expected format /design/&lt;fileKey&gt;?node-id=&lt;id&gt;.</Caption>
-                )}
-              </>
-            )}
-
-            {sourceMode === 'fixture' && activeFixture?.note && (
-              <Caption color="quiet">{activeFixture.note}</Caption>
-            )}
-            {sourceMode === 'fixture' && activeFixture?.sourceUrl && (
-              <Caption color="quiet">
-                Source: <Link href={activeFixture.sourceUrl} target="_blank" rel="noopener noreferrer">
-                  {activeFixture.sourceUrl}
-                </Link>
-              </Caption>
-            )}
+            <Caption color="quiet">
+              Fetched live through your PAT — counts against its rate limit (~30/min).
+              Frames are cached for an hour, so re-converting the same one is free.
+            </Caption>
           </VStack>
         </Card>
 
@@ -680,6 +599,11 @@ export default function AaidWorkbenchPage() {
             </VStack>
           </Card>
         )}
+        </>)}
+
+        {mode === 'code-to-design' && (
+          <CodeToDesignPanel />
+        )}
       </VStack>
     </div>
   );
@@ -763,5 +687,111 @@ function LivePreviewPanel({ jsx, busy, frameWidth }: { jsx: string; busy: boolea
         </pre>
       </details>
     </>
+  );
+}
+
+/**
+ * Code → Design.
+ *
+ * The direction that cannot be finished in the browser, and it is worth being
+ * precise about why: Figma's REST API is READ-ONLY for document content. There
+ * is no endpoint that creates a frame. Writing to a file is only possible from
+ * inside a Figma plugin, through the Plugin API.
+ *
+ * So this half does the part that IS a web app's job — read the pasted code,
+ * work out which library components and props it uses, and emit a build payload
+ * — and hands that to the plugin, which owns the `figma.createFrame()` call.
+ *
+ * The transport already exists: the studio pairs with the plugin (see
+ * PluginPairing) and the plugin polls for work. What is missing is a
+ * `build-frame` message on the plugin side; today it handles `analyze`,
+ * `apply`, `import-addon` and friends, but nothing that constructs a frame from
+ * a component tree. Until that lands, the payload is copyable so it can be run
+ * by hand.
+ */
+function CodeToDesignPanel() {
+  const [code, setCode] = useState('');
+
+  /** Which library components the pasted code instantiates, and how often. */
+  const used = useMemo(() => {
+    const counts = new Map<string, number>();
+    // JSX opening tags starting with a capital — the library's components are
+    // all PascalCase, host elements are not.
+    for (const m of code.matchAll(/<([A-Z][A-Za-z0-9]*)/g)) {
+      counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [code]);
+
+  /** Names that are not exported by the library — a frame cannot be built from
+   *  a component Figma has no counterpart for, so surface them up front. */
+  const unknown = useMemo(
+    () => used.filter(([name]) => !(name in DynoComponents)).map(([name]) => name),
+    [used],
+  );
+
+  const payload = useMemo(() => JSON.stringify({
+    type: 'build-frame',
+    components: used.map(([name, count]) => ({ name, count })),
+    source: code,
+  }, null, 2), [used, code]);
+
+  return (
+    <VStack gap="var(--Sizing-2)">
+      <Card padding="medium">
+        <VStack gap="var(--Sizing-2)">
+          <H3>Paste code</H3>
+          <BodySmall color="quiet">
+            JSX using library components. The frame is built from the components
+            it references, so anything the library does not export cannot be
+            placed.
+          </BodySmall>
+          <TextArea
+            label="Component code"
+            placeholder={'<Card padding="medium">\n  <VStack spacing={2}>\n    <H2>Title</H2>\n    <Button variant="primary">Save</Button>\n  </VStack>\n</Card>'}
+            value={code}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCode(e.target.value)}
+            rows={12}
+            fullWidth
+          />
+        </VStack>
+      </Card>
+
+      {used.length > 0 && (
+        <Card padding="medium">
+          <VStack gap="var(--Sizing-2)">
+            <H3>Components found</H3>
+            <HStack gap="var(--Sizing-Half)" style={{ flexWrap: 'wrap' }}>
+              {used.map(([name, count]) => (
+                <Chip
+                  key={name}
+                  label={count > 1 ? `${name} x${count}` : name}
+                  size="small"
+                />
+              ))}
+            </HStack>
+            {unknown.length > 0 && (
+              <Alert severity="warning">
+                Not exported by the library: {unknown.join(', ')}. A frame cannot
+                be built for these — swap them for library components first.
+              </Alert>
+            )}
+          </VStack>
+        </Card>
+      )}
+
+      {used.length > 0 && (
+        <Card padding="medium">
+          <VStack gap="var(--Sizing-2)">
+            <H3>Build payload</H3>
+            <Alert severity="info">
+              Figma's REST API cannot create frames — only a plugin can. Run this
+              payload from the paired plugin once it handles `build-frame`.
+            </Alert>
+            <CodeBlock code={payload} language="JSON" maxHeight={320} />
+          </VStack>
+        </Card>
+      )}
+    </VStack>
   );
 }
