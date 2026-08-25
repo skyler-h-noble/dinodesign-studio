@@ -27,6 +27,14 @@ export interface DriftFinding {
   message: string;
   /** The offending value, where there is one. */
   detail?: string;
+  /**
+   * The layer this came from, as a path — "List Item > Divider".
+   *
+   * Without it a finding like `Orientation = Vertical` is unactionable when a
+   * frame has five Dividers, and tracking one down meant digging through the
+   * cached frame JSON by hand.
+   */
+  where?: string;
 }
 
 interface FigmaNodeish {
@@ -38,12 +46,31 @@ interface FigmaNodeish {
   componentProperties?: Record<string, { value?: unknown; type?: string }>;
 }
 
+/** A node plus where it sits, so a finding can say which layer it came from. */
+interface Located { node: FigmaNodeish; where: string }
+
 /** Walk every node, including invisible ones — their absence is the point. */
-function walk(node: FigmaNodeish | null | undefined, out: FigmaNodeish[] = []): FigmaNodeish[] {
+function walk(
+  node: FigmaNodeish | null | undefined,
+  trail: string[] = [],
+  out: Located[] = [],
+  depth = 0,
+): Located[] {
   if (!node || typeof node !== 'object') return out;
-  out.push(node);
-  for (const child of node.children ?? []) walk(child, out);
+  const name = (node.name ?? node.type ?? '').trim();
+  // `trail` holds ancestor names EXCLUDING the root: every path would otherwise
+  // begin with the frame's own name, which locates nothing.
+  const where = depth === 0 ? '' : [...trail, name].join(' > ');
+  out.push({ node, where });
+  const childTrail = depth === 0 ? [] : [...trail, name];
+  for (const child of node.children ?? []) walk(child, childTrail, out, depth + 1);
   return out;
+}
+
+/** Last two crumbs — enough to locate a layer without printing the whole tree. */
+function shortPath(where: string): string {
+  const parts = where.split(' > ').filter(Boolean);
+  return parts.slice(-2).join(' > ');
 }
 
 /**
@@ -87,9 +114,9 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
 
   const code = codeWithoutStrings(jsx);
   const root = rootOf(frameJson);
-  const nodes = root ? walk(root) : [];
-  const visible = nodes.filter(n => n.visible !== false);
-  const hidden = nodes.filter(n => n.visible === false);
+  const located = root ? walk(root) : [];
+  const visible = located.filter(l => l.node.visible !== false);
+  const hidden = located.filter(l => l.node.visible === false);
 
   // ── Hardcoded colour ────────────────────────────────────────────────────
   // The rule the generated code most often breaks, and the one that is
@@ -110,7 +137,7 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
   // ── Hidden nodes that got rendered ──────────────────────────────────────
   // visible:false means the designer turned it off. Rendering it anyway just
   // looks like an extra row, which is why it survived so long.
-  for (const node of hidden) {
+  for (const { node, where } of hidden) {
     const name = (node.name ?? '').trim();
     // The CONTENT is the tell, not the layer name. A hidden second row leaks as
     // its text — "Second row" — while the layer is called "Row 2", so checking
@@ -127,7 +154,8 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
         severity: 'error',
         kind: 'hidden-rendered',
         message: 'Hidden in Figma but present in the code.',
-        detail: leakedText ? `${name || 'layer'} — "${chars}"` : name,
+        detail: leakedText ? `"${chars}"` : name,
+        where: shortPath(where) || name,
       });
     }
   }
@@ -136,13 +164,14 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
   // Dropping a variant gives you the component's default, which looks nearly
   // right — the worst kind of wrong.
   const seenVariants = new Set<string>();
-  for (const node of visible) {
+  for (const { node, where } of visible) {
+    const owner = (node.name ?? '').trim();
     for (const [prop, spec] of Object.entries(node.componentProperties ?? {})) {
       const value = spec?.value;
       if (typeof value !== 'string' || !value.trim()) continue;
       // Figma names variant props like "Size" or "Appearance#123:4".
       const cleanProp = prop.split('#')[0].trim();
-      const key = `${cleanProp}=${value}`;
+      const key = `${owner}|${cleanProp}=${value}`;
       if (seenVariants.has(key)) continue;
       seenVariants.add(key);
       // Default-ish values are not worth reporting when absent.
@@ -151,40 +180,42 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
         findings.push({
           severity: 'warning',
           kind: 'variant-dropped',
-          message: `Variant "${cleanProp}" is set in Figma but its value is not in the code.`,
+          message: `${owner || 'Instance'}: variant "${cleanProp}" is set in Figma but its value is not in the code.`,
           detail: `${cleanProp} = ${value}`,
+          where: shortPath(where) || owner,
         });
       }
     }
   }
 
   // ── Text present in the frame but not in the code ───────────────────────
-  const strings = new Set<string>();
-  for (const node of visible) {
+  const strings = new Map<string, string>();
+  for (const { node, where } of visible) {
     const chars = (node.characters ?? '').trim();
     // Very short strings produce noise — a "1" or "OK" matches accidentally.
     if (chars.length < 3) continue;
-    strings.add(chars);
+    if (!strings.has(chars)) strings.set(chars, where);
   }
-  for (const text of strings) {
+  for (const [text, where] of strings) {
     if (!jsx.includes(text)) {
       findings.push({
         severity: 'warning',
         kind: 'text-missing',
         message: 'Text in the frame does not appear in the code.',
         detail: text.length > 60 ? `${text.slice(0, 60)}…` : text,
+        where: shortPath(where),
       });
     }
   }
 
   // ── Component instances with no obvious counterpart ─────────────────────
-  const instanceNames = new Set<string>();
-  for (const node of visible) {
+  const instanceNames = new Map<string, string>();
+  for (const { node, where } of visible) {
     if (node.type !== 'INSTANCE') continue;
     const name = (node.name ?? '').split('/').pop()?.trim() ?? '';
-    if (name) instanceNames.add(name);
+    if (name && !instanceNames.has(name)) instanceNames.set(name, where);
   }
-  for (const name of instanceNames) {
+  for (const [name, where] of instanceNames) {
     const asTag = name.replace(/[^A-Za-z0-9]/g, '');
     if (!asTag) continue;
     if (!new RegExp(`<${asTag}\\b`, 'i').test(code)) {
@@ -193,6 +224,7 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
         kind: 'instance-unmapped',
         message: 'Figma instance has no matching component in the code.',
         detail: name,
+        where: shortPath(where),
       });
     }
   }

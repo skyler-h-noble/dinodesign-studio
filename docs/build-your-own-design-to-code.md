@@ -245,6 +245,11 @@ output as its text — `"Second row"` — while the layer is called `"Row 2"`.
 Checking the name alone finds nothing and the row still renders. This is the
 single most valuable check in the list and it is easy to build wrong.
 
+**Name the layer each finding came from.** `Orientation = Vertical` is
+unactionable in a frame with five Dividers. Carry the path while you walk the
+tree — `List > Divider` — and key duplicate findings on the owner as well as the
+value, or two instances with different values collapse into one.
+
 **Badge errors only.** A hardcoded colour is always wrong. A missing string
 usually is not — text is often bound to a prop, and a layer name need not
 survive into code. If the badge counts warnings it will never read zero, and a

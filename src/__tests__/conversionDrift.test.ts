@@ -40,7 +40,8 @@ describe('computeDrift', () => {
     const jsx = '<ListItem><Body>First row</Body><Body>Second row</Body></ListItem>';
     const hidden = computeDrift(f, jsx).filter(x => x.kind === 'hidden-rendered');
     expect(hidden).toHaveLength(1);
-    expect(hidden[0].detail).toBe('Row 2 — "Second row"');
+    expect(hidden[0].detail).toBe('"Second row"');
+    expect(hidden[0].where).toBe('Row 2');
     expect(hidden[0].severity).toBe('error');
   });
 
@@ -61,6 +62,9 @@ describe('computeDrift', () => {
     const jsx = '<Button>Save</Button>';
     const dropped = computeDrift(f, jsx).filter(x => x.kind === 'variant-dropped');
     expect(dropped.map(d => d.detail).sort()).toEqual(['Appearance = Secondary', 'Size = Small']);
+    // The message names the instance, so a frame with five Dividers is actionable.
+    expect(dropped.every(d => d.message.startsWith('Button:'))).toBe(true);
+    expect(dropped.every(d => d.where === 'Button')).toBe(true);
   });
 
   it('accepts a variant that reached the code, whatever the casing', () => {
@@ -117,6 +121,28 @@ describe('computeDrift', () => {
     const counts = driftSummary(findings);
     expect(counts.errors).toBeGreaterThan(0);
     expect(counts.warnings).toBeGreaterThan(0);
+  });
+
+  // Two instances of the same component with different variant values must
+  // both be reported — keying only on prop=value collapsed them into one.
+  it('reports the same variant separately per instance, and locates each', () => {
+    const f = {
+      document: {
+        name: 'Frame', type: 'FRAME', visible: true, children: [
+          { name: 'List', type: 'INSTANCE', visible: true,
+            componentProperties: { Orientation: { value: 'Vertica' } },
+            children: [
+              { name: 'Divider', type: 'INSTANCE', visible: true,
+                componentProperties: { Orientation: { value: 'Vertical' } } },
+            ] },
+        ],
+      },
+    };
+    const dropped = computeDrift(f, '<Box />').filter(x => x.kind === 'variant-dropped');
+    expect(dropped).toHaveLength(2);
+    const byOwner = Object.fromEntries(dropped.map(d => [d.where, d.detail]));
+    expect(byOwner.List).toBe('Orientation = Vertica');
+    expect(byOwner['List > Divider']).toBe('Orientation = Vertical');
   });
 
   it('does not mistake a hex inside a comment for code', () => {

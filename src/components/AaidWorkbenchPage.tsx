@@ -1000,6 +1000,7 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
             <VStack gap="var(--Sizing-Half)">
               <BodySmall>{f.message}</BodySmall>
               {f.detail && <Caption color="quiet">{f.detail}</Caption>}
+              {f.where && <Caption color="quiet">in {f.where}</Caption>}
             </VStack>
           </Alert>
         ))}
