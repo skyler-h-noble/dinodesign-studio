@@ -90,3 +90,23 @@ describe('--Header-Clamped-Weight', () => {
     }
   });
 });
+
+/**
+ * CSS/Figma parity for this token is NOT asserted here yet, deliberately.
+ *
+ * A first attempt looked promising and was measuring nothing: it read
+ * payload.Typography when the value is emitted into payload.Fonts, beside
+ * Header-Font-Weight, and skipped when the key was absent — so it passed while
+ * asserting zero.
+ *
+ * Fixing the path surfaced a genuine disagreement: for Anton the CSS side
+ * produced 500 and the Figma side 400. Anton ships only [400], so 400 is right.
+ * The cause is upstream of the token — resolveRoles returned family
+ * "Google Sans Flex" rather than the "Anton" the test passed, so the CSS path
+ * snapped against the wrong face.
+ *
+ * That is worth chasing on its own: if resolveRoles substitutes a family, then
+ * every weight snapped from roles.header.family is snapped against the wrong
+ * font, not just this one. Asserting parity before that is understood would
+ * pin whichever answer happens to fall out today.
+ */

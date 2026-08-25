@@ -13,7 +13,11 @@ import {
 } from './bevelGeometry';
 import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
 import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
-import { buildTypeScale, resolveRoles, type TypeStyle, type FamilyRole } from './typeScale';
+import {
+  buildTypeScale, resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR,
+  type TypeStyle, type FamilyRole,
+} from './typeScale';
+import { nearestAvailableWeight } from './googleFontWeights';
 import type { TypographyStyle } from '../types';
 
 interface ColorToken {
@@ -1634,6 +1638,22 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
       // ── Header ──
       'Header-Font-Weight': parseInt(typo['Set-Header-Font-Weight']?.value || '600'),
+      // The floor H4-H6 read instead of the header face's own weight — a 250
+      // that reads elegant at 48px reads washed out at 18px.
+      //
+      // RAISES or does nothing: at or above the floor the brand's weight passes
+      // through untouched, and it is snapped to a weight the face actually
+      // ships, because asking a static 400/700 face for 500 lands differently
+      // by platform. Same rule as the CSS side, and the name matches the Figma
+      // variable — if the two ever disagree, the CSS and the type styles stop
+      // describing the same thing while both still parse.
+      'Header-Clamped-Weight': (() => {
+        const picked = parseInt(typo['Set-Header-Font-Weight']?.value || '600', 10);
+        if (picked >= HEADER_CLAMPED_WEIGHT_FLOOR) return picked;
+        const family = typo['Set-Font-Family-Header']?.value || '';
+        return nearestAvailableWeight(family, HEADER_CLAMPED_WEIGHT_FLOOR)
+          ?? HEADER_CLAMPED_WEIGHT_FLOOR;
+      })(),
       'Header-Character-Spacing': emToPx(typo['Set-Header-Letter-Spacing']?.value),
       // The six Google Sans Flex axes. wght is the font weight above; the rest
       // are their own variables, plus the composed settings string.
