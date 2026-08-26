@@ -995,6 +995,34 @@ export interface ConvertResult {
   jsx: string;
   missingComponents: string[];
   rawResponse: string;
+  /** Plugin-note coverage for the frame that was converted. Zero notes means
+   *  the conversion ran on fill-colour guesses alone, which is worth SAYING
+   *  rather than leaving to be inferred from wrong output. */
+  notes: { nodes: number; withNote: number; modes: Record<string, string> };
+}
+
+/** Count nodes and how many carry an _aaid note, and collect the modes seen.
+ *
+ *  Existed as a console.log for the hidden-node prune only, which proved
+ *  nothing about the notes: Figma's REST returns `visible: false` natively, so
+ *  pruning works whether or not a single note arrived. Everything else the
+ *  notes carry — theme, surface, elevation — has a fill-colour or default
+ *  fallback, so a frame with NO notes converts to plausible, confident, wrong
+ *  output and looks like a converter bug. */
+function summariseAaid(node: any, acc: { nodes: number; withNote: number; modes: Record<string, string> }) {
+  if (!node || typeof node !== 'object') return acc;
+  acc.nodes += 1;
+  if (node._aaid) {
+    acc.withNote += 1;
+    const m = node._aaid.modes;
+    if (m && typeof m === 'object') {
+      for (const [k, v] of Object.entries(m)) {
+        if (typeof v === 'string' && !(k in acc.modes)) acc.modes[k] = v;
+      }
+    }
+  }
+  if (Array.isArray(node.children)) for (const c of node.children) summariseAaid(c, acc);
+  return acc;
 }
 
 /** Walk the Figma node tree and lift each node's shared-plugin "aaid" note
@@ -1055,6 +1083,19 @@ export async function convertFigmaToCode(
   // Lift the plugin's resolved-mode notes into a clean `_aaid` per node, so the
   // prompt uses real modes (theme/surface/effect/sizing) instead of guessing.
   try { attachAaidNotes(frameJson as any); } catch { /* noop */ }
+  const notes = summariseAaid(frameJson, { nodes: 0, withNote: 0, modes: {} });
+  if (notes.withNote === 0) {
+    console.warn(
+      '⚠️ [figmaToCode] NO plugin notes on any of ' + notes.nodes + ' nodes. ' +
+      'Theme, surface and elevation will be guessed. Run Export to Code in the ' +
+      'OmniDesign plugin, then re-convert with "Always refetch" on.',
+    );
+  } else {
+    console.log(
+      '📝 [figmaToCode] ' + notes.withNote + '/' + notes.nodes + ' nodes carry plugin notes; modes seen: ' +
+      (Object.keys(notes.modes).length ? JSON.stringify(notes.modes) : '(none)'),
+    );
+  }
   // AFTER attachAaidNotes, so `_aaid.visible` — the plugin's resolved answer
   // once boolean variant props are applied — is present to check.
   try {
@@ -1150,5 +1191,5 @@ ${JSON.stringify(frameJson, null, 2)}`;
     if (!missingComponents.includes(m[1])) missingComponents.push(m[1]);
   }
 
-  return { jsx, missingComponents, rawResponse: text };
+  return { jsx, missingComponents, rawResponse: text, notes };
 }

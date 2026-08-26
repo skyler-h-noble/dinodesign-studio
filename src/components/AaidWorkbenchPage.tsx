@@ -178,6 +178,13 @@ export default function AaidWorkbenchPage() {
   const [frameWidth, setFrameWidth] = useState<number | null>(null);
   // PNG width ÷ frame width. 1 means the export has no effect bleed.
   const [imgScale, setImgScale] = useState(1);
+  /* Plugin-note coverage for the last conversion.
+     Without this the only signal that Export to Code was never run is that the
+     OUTPUT is wrong — theme, surface and elevation all have fallbacks, so a
+     frame with no notes converts confidently and incorrectly. That cost most of
+     a day: an elevation kept coming back at the wrong level and every
+     hypothesis pointed at the converter, when the axis had never left Figma. */
+  const [notes, setNotes] = useState<{ nodes: number; withNote: number; modes: Record<string, string> } | null>(null);
   const [jsx, setJsx] = useState<string>('');
   const [missingComponents, setMissingComponents] = useState<string[]>([]);
   const [conversionId, setConversionId] = useState<string | null>(null);
@@ -320,6 +327,7 @@ export default function AaidWorkbenchPage() {
     // Reset with it: a frame with no shadow following one that had a big one
     // would otherwise inherit its bleed and render over-scaled.
     setImgScale(1);
+    setNotes(null);
     setMissingComponents([]);
     setConversionId(null);
     setVerdict(null);
@@ -404,7 +412,7 @@ export default function AaidWorkbenchPage() {
       setImgScale(Number.isFinite(ratio) && ratio >= 1 && ratio < 2 ? ratio : 1);
       setFrameWidth(typeof fw === 'number' && fw > 0 ? Math.round(fw) : null);
 
-      const { jsx: generatedJsx, missingComponents: missing } = await convertFigmaToCode(
+      const { jsx: generatedJsx, missingComponents: missing, notes: aaidNotes } = await convertFigmaToCode(
         frameJson,
         {},  // variables omitted — endpoint requires file_variables scope
         anthropicKey.trim(),
@@ -412,6 +420,7 @@ export default function AaidWorkbenchPage() {
       );
       setJsx(generatedJsx);
       setMissingComponents(missing);
+      setNotes(aaidNotes);
 
       // Log the attempt for the feedback loop. Includes dinoId so we can
       // later partition outputs by brand and see whether token-naming
@@ -555,6 +564,30 @@ export default function AaidWorkbenchPage() {
                 a re-export.
               </Caption>
             </HStack>
+            {notes && notes.withNote === 0 && (
+              <Alert severity="warning">
+                <VStack gap="var(--Sizing-1)">
+                  <Body>
+                    No plugin notes on any of the {notes.nodes} nodes — theme, surface
+                    and elevation were GUESSED.
+                  </Body>
+                  <Caption>
+                    Run <strong>Export to Code</strong> in the OmniDesign plugin on this
+                    frame, then convert again with Always refetch on. Everything the notes
+                    carry has a fallback, so without them the output looks confident and
+                    is wrong.
+                  </Caption>
+                </VStack>
+              </Alert>
+            )}
+            {notes && notes.withNote > 0 && (
+              <Caption color="quiet">
+                {notes.withNote} of {notes.nodes} nodes carry plugin notes
+                {Object.keys(notes.modes).length > 0
+                  ? ` — modes: ${Object.entries(notes.modes).map(([k, v]) => `${k}=${v}`).join(', ')}`
+                  : ' — but no modes were recorded on any of them'}
+              </Caption>
+            )}
             {cacheAge !== null && (
               <Caption color="warning">
                 Served from cache ({Math.max(1, Math.round(cacheAge / 60000))} min old) —
