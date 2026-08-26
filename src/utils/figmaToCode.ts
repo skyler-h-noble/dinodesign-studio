@@ -181,8 +181,9 @@ CONVERSION RULES:
        NOT emit data-theme="Primary-Light" (or any theme) — the frame is Default.
      - modes.Surface  → data-surface="<Surface>". ABSENT → Surface (the default) →
        OMIT (or data-surface="Surface"). Never guess a Container/other surface.
-     - elevation: take the design's level (variant.Level "Level N", or
-       modes.Effects "Level-N") and map the NUMBER STRAIGHT THROUGH:
+     - elevation: take the design's level from modes.Elevation (the Appearance
+       panel's Elevation row), or modes.Effects / variant.Level on older files,
+       and map the NUMBER STRAIGHT THROUGH:
            Level-0 → elevation={0} (none)   Level-2 → elevation={2}
            Level-1 → elevation={1}          Level-5 → elevation={5}
        The scale is ZERO-BASED and Level-0 is the flat one — the CSS export
@@ -859,8 +860,9 @@ CONVERSION RULES:
       - has an effect level N         → elevation={N}
 
     READ THE LEVEL FROM FIGMA — 1:1, NO off-by-one, NEVER guess. The elevation
-    is the NUMBER in the frame's Effects mode / Level variant, read from
-    _aaid.modes.Effects or _aaid.variant (e.g. "Level-5" or "Elevation-5"):
+    is the NUMBER in the frame's Elevation mode, read from _aaid.modes.Elevation
+    (or _aaid.modes.Effects / _aaid.variant on older files). Values look like
+    "Level-3", or "Auto (Level-0)" which means Level-0:
         Figma "Level-1" / "Elevation-1" → elevation={1}
         Figma "Level-5" / "Elevation-5" → elevation={5}
     Map the number straight through (Level-5 → elevation={5}, NOT 4). Only emit
@@ -879,6 +881,12 @@ CONVERSION RULES:
     on the same element that sets the surface, and NEVER set elevation={1} for
     a layer that has no shadow (that is the most common mistake — match the
     Figma effect exactly, including "none" → 0).
+
+    IF NO ELEVATION MODE IS RECORDED, OMIT THE PROP. Do not pick a level from
+    how the shadow looks in the image, and do not default to 1. An absent axis
+    means the note did not carry it — guessing produces a number that looks
+    deliberate and is wrong, which is exactly how a Level-3 card shipped as
+    elevation={1}. Omitting it makes the gap visible in Drift instead.
 
 5. OUTPUT FORMAT — STRICTLY plain JSX, NOT TypeScript.
    - DO NOT emit \`interface\`, \`type\`, or \`enum\` declarations.
