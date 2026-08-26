@@ -182,9 +182,14 @@ CONVERSION RULES:
      - modes.Surface  → data-surface="<Surface>". ABSENT → Surface (the default) →
        OMIT (or data-surface="Surface"). Never guess a Container/other surface.
      - elevation: take the design's level (variant.Level "Level N", or
-       modes.Effects "Level-N") and map the FLAT/no-shadow level to elevation={0},
-       each step up +1 (so a 1-based "Level 1" flat → elevation={0}; "Level 6"
-       → elevation={5}). See rule 4i.
+       modes.Effects "Level-N") and map the NUMBER STRAIGHT THROUGH:
+           Level-0 → elevation={0} (none)   Level-2 → elevation={2}
+           Level-1 → elevation={1}          Level-5 → elevation={5}
+       The scale is ZERO-BASED and Level-0 is the flat one — the CSS export
+       emits --Effect-Level-0: none through --Effect-Level-5. NEVER SUBTRACT.
+       Subtracting turns a Level-1 card into elevation={0} and drops its shadow
+       entirely, silently, because a card with no shadow still looks like a card.
+       See rule 4i, which says the same thing.
      - sizingH/sizingV: FIXED → width/height in px (from the bounding box);
        HUG → omit (size to content); FILL → fill the axis. See rule 2d — this
        applies to EVERY node, including list rows and media slots.

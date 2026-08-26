@@ -46,6 +46,17 @@ describe('SYSTEM_PROMPT integrity', () => {
     expect(instructed).toEqual([]);
   });
 
+  it('states ONE elevation mapping, and it is straight through', () => {
+    /* Rule 0 and rule 4i disagreed for a long time: 0 subtracted one from the
+       Figma level, 4i mapped it straight through. The scale is zero-based —
+       the CSS export emits --Effect-Level-0: none — so subtracting turned a
+       Level-1 card into elevation={0} and dropped its shadow. A card with no
+       shadow looks like a card, so nothing reported it. */
+    expect(SYSTEM_PROMPT).not.toMatch(/1-based/);
+    expect(SYSTEM_PROMPT).not.toMatch(/Level 6.{0,20}elevation=\{5\}/s);
+    expect(SYSTEM_PROMPT).toMatch(/Level-5\s*→\s*elevation=\{5\}/);
+  });
+
   it('does not tell the model to emit a removed Button shape', () => {
     expect(SYSTEM_PROMPT).not.toMatch(/->\s*variant="[a-z-]*-light"/);
   });
