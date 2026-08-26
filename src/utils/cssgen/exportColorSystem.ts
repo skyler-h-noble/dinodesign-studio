@@ -4547,9 +4547,19 @@ export function exportColorSystemToJSON(
     }
   });
 
-  // Add BW (Black/White) colors to Light-Mode
-  console.log('  ├─ [JSON Export] Adding BW (Black/White) palette to Light-Mode');
-  colorSystem.Modes['Light-Mode'].Colors['BW'] = {
+  /* BW (Black/White) goes in BOTH modes.
+     It was Light-Mode only, and Dark-Mode.css REFERENCES it — `--Eyebrow:
+     var(--BW-Color-8)` — so in dark mode that token resolved to nothing and the
+     eyebrow silently lost its colour. Anything else reading a BW tone in dark
+     mode failed the same way: a mesh gradient's solved text colour came back
+     undefined, `color` fell back to inherited, and light text landed on a light
+     mesh.
+     Black and white are not mode-dependent. The table is the same both sides —
+     white at 1-5, near-black at 6-12 — which is exactly why nothing selects
+     between two copies of it, and why one shared constant is correct rather
+     than two tables that could drift. */
+  console.log('  ├─ [JSON Export] Adding BW (Black/White) palette to both modes');
+  const bwPalette = {
     'Color-1': { value: '#ffffff', type: 'color' },
     'Color-2': { value: '#ffffff', type: 'color' },
     'Color-3': { value: '#ffffff', type: 'color' },
@@ -4564,7 +4574,21 @@ export function exportColorSystemToJSON(
     'Color-12': { value: '#040404', type: 'color' },
     'Color-Vibrant': { value: '#040404', type: 'color' }
   };
-  console.log('      ✓ BW palette added: 12 colors + Color-Vibrant');
+  colorSystem.Modes['Light-Mode'].Colors['BW'] = bwPalette;
+  // Dark mode MIRRORS it. BW is a "which of black or white reads here" ramp,
+  // not a lightness scale like Neutral (whose Color-1 is dark and Color-12
+  // light in BOTH modes). The tone a role picks — --Eyebrow takes BW-Color-8 —
+  // has to answer that question for the mode it is in, so the same index must
+  // give the opposite colour on a dark surface.
+  const bwDark = Object.fromEntries(
+    Object.entries(bwPalette).map(([k, v]) => [
+      k,
+      { ...(v as { value: string; type: string }),
+        value: (v as { value: string }).value === '#ffffff' ? '#040404' : '#ffffff' },
+    ]),
+  );
+  colorSystem.Modes['Dark-Mode'].Colors['BW'] = bwDark as typeof bwPalette;
+  console.log('      ✓ BW palette added to Light-Mode and Dark-Mode: 12 colors + Color-Vibrant');
 
   // Override all mode-specific structures with fixed structures
   console.log('🎨 [JSON Export] Applying all fixed structures...');
