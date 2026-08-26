@@ -32,11 +32,22 @@ export const SEED_MESH_GRADIENTS: Record<string, MeshGradient> = {
     color: 'var(--BW-Color-6)',
   },
 
+
+  // Chocolate — two stops. Authored deliberately sparse; the base colour repeats
+  // the first stop, so the field reads as one wash rather than a mesh of blobs.
+  'b36585cd-f290-4a74-9749-4ae99e1986c0': {
+    background:
+      'radial-gradient(circle at 20% 30%, var(--Primary-Color-3) 0%, transparent 50%), '
+      + 'radial-gradient(circle at 80% 70%, var(--Secondary-Color-4) 0%, transparent 45%), '
+      + 'var(--Primary-Color-3)',
+    color: 'var(--BW-Color-1)',
+  },
+
   // Surf's Up
   'a2d6e6cf-d16a-4a6b-b4f6-8d4c282fb4f2': {
     background:
       'radial-gradient(circle at 20% 30%, var(--Neutral-Color-12) 0%, transparent 50%), '
-      + 'radial-gradient(circle at 80% 31%, var(--Secondary-Color-9) 0%, transparent 45%), '
+      + 'radial-gradient(circle at 100% 54%, var(--Secondary-Color-9) 0%, transparent 48%), '
       + 'radial-gradient(circle at 0% 23%, var(--Tertiary-Color-7) 0%, transparent 45%), '
       + 'var(--Neutral-Color-12)',
     color: 'var(--BW-Color-6)',

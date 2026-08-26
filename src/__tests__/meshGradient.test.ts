@@ -81,7 +81,7 @@ const SURFS_UP = `.gradient-figure {
   width: 800px;
   height: 450px;
   max-width: 100%;
-  background: radial-gradient(circle at 20% 30%, var(--Neutral-Color-12) 0%, transparent 50%), radial-gradient(circle at 80% 31%, var(--Secondary-Color-9) 0%, transparent 45%), radial-gradient(circle at 0% 23%, var(--Tertiary-Color-7) 0%, transparent 45%), var(--Neutral-Color-12);
+  background: radial-gradient(circle at 20% 30%, var(--Neutral-Color-12) 0%, transparent 50%), radial-gradient(circle at 100% 54%, var(--Secondary-Color-9) 0%, transparent 48%), radial-gradient(circle at 0% 23%, var(--Tertiary-Color-7) 0%, transparent 45%), var(--Neutral-Color-12);
   color: var(--BW-Color-6);
 }
 .gradient-figure .gradient-text {
@@ -121,6 +121,20 @@ describe('a second system, pasted as the whole block', () => {
   });
 });
 
+
+// Chocolate — two stops, and the shortest authored mesh so far. Kept in the
+// same pasted-rule form as the others so the round-trip check below exercises
+// the same extraction path, not a pre-cleaned string.
+const CHOCOLATE = `.gradient-figure {
+  position: relative;
+  width: 800px;
+  height: 450px;
+  max-width: 100%;
+  background: radial-gradient(circle at 20% 30%, var(--Primary-Color-3) 0%, transparent 50%), radial-gradient(circle at 80% 70%, var(--Secondary-Color-4) 0%, transparent 45%), var(--Primary-Color-3);
+  color: var(--BW-Color-1);
+}
+`;
+
 describe('the seeded meshes match what was authored', () => {
   // The seed is transcribed from pasted CSS by hand, which is exactly the step
   // where a stop position or a token name gets mistyped — and a wrong stop
@@ -129,6 +143,7 @@ describe('the seeded meshes match what was authored', () => {
   const cases: Array<[string, string]> = [
     ['d7ad345c-33d7-43f6-8f30-41728bf395e6', PASTED],
     ['a2d6e6cf-d16a-4a6b-b4f6-8d4c282fb4f2', SURFS_UP],
+    ['b36585cd-f290-4a74-9749-4ae99e1986c0', CHOCOLATE],
   ];
 
   it('round-trips each pasted rule into its seed entry', () => {
