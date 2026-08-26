@@ -2,7 +2,7 @@
 import { blendColors } from '../colorScale';
 import { nearestAvailableWeight } from '../googleFontWeights';
 import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
-import { dropshadowBaseHex } from '../dropshadow';
+import { dropshadowBaseHex, effectLevelRecipe } from '../dropshadow';
 import { HEADER_FAMILY } from '../moodAxes';
 import type { TypographyStyle } from '../../types';
 import chroma from 'chroma-js';
@@ -6089,13 +6089,22 @@ export function exportColorSystemToJSON(
 
   // Add Effects section (box shadow levels)
   console.log('✨ [JSON Export] Generating Effects levels...');
+  /* Built from LEVEL_LAYERS, not restated.
+     These six were hardcoded here as a two-layer, straight-down recipe while
+     dropshadow.ts computed a different one — angled, N layers for level N, each
+     using its own --Dropshadow-Color-(i+1). Both reached the published CSS, both
+     at :root in base.css, and the correct one won only because it happened to be
+     emitted second. Reorder the generator and every shadow in every system
+     silently changes.
+     The preview already used effectLevelRecipe(); now the export does too, so
+     there is one definition of what a level IS. */
   colorSystem.Effects = {
     'Level-0': { value: 'none', type: 'boxShadow' },
-    'Level-1': { value: '0 1px 2px rgba(var(--Dropshadow-Color), 0.28)', type: 'boxShadow' },
-    'Level-2': { value: '0 2px 4px rgba(var(--Dropshadow-Color), 0.22), 0 1px 2px rgba(var(--Dropshadow-Color), 0.28)', type: 'boxShadow' },
-    'Level-3': { value: '0 4px 8px rgba(var(--Dropshadow-Color), 0.17), 0 2px 4px rgba(var(--Dropshadow-Color), 0.22)', type: 'boxShadow' },
-    'Level-4': { value: '0 8px 16px rgba(var(--Dropshadow-Color), 0.13), 0 4px 8px rgba(var(--Dropshadow-Color), 0.17)', type: 'boxShadow' },
-    'Level-5': { value: '0 16px 32px rgba(var(--Dropshadow-Color), 0.1), 0 8px 16px rgba(var(--Dropshadow-Color), 0.13)', type: 'boxShadow' }
+    'Level-1': { value: effectLevelRecipe(1), type: 'boxShadow' },
+    'Level-2': { value: effectLevelRecipe(2), type: 'boxShadow' },
+    'Level-3': { value: effectLevelRecipe(3), type: 'boxShadow' },
+    'Level-4': { value: effectLevelRecipe(4), type: 'boxShadow' },
+    'Level-5': { value: effectLevelRecipe(5), type: 'boxShadow' }
   };
   console.log('  ✓ [JSON Export] Effects levels generated');
 
