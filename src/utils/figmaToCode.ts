@@ -137,8 +137,12 @@ SPACING / SIZING (CSS variables):
   Negative: --Sizing-Negative-Quarter through --Sizing-Negative-2.
 
 BACKGROUNDS (always set via data-attributes, NEVER inline color):
-  - data-theme: "Brand", "Brand-App-Bar", "Brand-Nav-Bar", "Primary-Light",
-    "Primary", "Tertiary", "Default", and palette-by-name themes.
+  - data-theme: "Default", "Primary", "Secondary", "Tertiary", "Neutral",
+    "App-Bar", "Nav-Bar", "Status", "Error", "Info", "Success", "Warning".
+    THERE ARE NO "*-Light" THEMES. A tint is the base theme at a brighter
+    SURFACE — "Primary-Light" is data-theme="Primary" data-surface="Surface-Brightest".
+    Emitting a theme name no sheet defines matches no rule and paints nothing,
+    silently, which is the single most common way a conversion looks wrong.
   - data-surface: "Surface", "Surface-Dim", "Surface-Bright",
     "Container", "Container-High", "Container-Low", "Container-Highest",
     "Container-Lowest".
@@ -362,20 +366,24 @@ CONVERSION RULES:
    lost. (VStack/HStack/Box all paint var(--Background) from their surface, so
    the attributes alone produce the background — never add inline color.)
 
-   How to choose data-theme from a Figma fill:
-   - Mint / pale green / soft teal fills           → data-theme="Primary-Light"
-   - Cream / pale pink / soft warm fills           → data-theme="Tertiary"
-   - Pale blue / lavender / cool fills             → data-theme="Secondary-Light"
-   - Near-white off-white with hint of brand hue   → data-theme="Primary-Light"
-                                                      data-surface="Surface-Bright"
-   - White                                          → no data-theme needed
-   - Dark fills                                     → data-theme="<Palette>" data-surface="Surface"
+   How to choose data-theme + data-surface from a Figma fill. A TINT IS A
+   SURFACE LEVEL, NOT A THEME — pale means a brighter surface of the same
+   palette, so both attributes are always needed:
+   - Mint / pale green / soft teal fills   → data-theme="Primary"   data-surface="Surface-Brightest"
+   - Cream / pale pink / soft warm fills   → data-theme="Tertiary"  data-surface="Surface-Brightest"
+   - Pale blue / lavender / cool fills     → data-theme="Secondary" data-surface="Surface-Brightest"
+   - Off-white with a hint of brand hue    → data-theme="Primary"   data-surface="Surface-Bright"
+   - White                                  → no data-theme needed
+   - Dark fills                             → data-theme="<Palette>" data-surface="Surface"
 
-   WRONG (loses the mint brand background):
+   WRONG (a theme name nothing defines — paints nothing, reports nothing):
+     <Card padding="medium" data-theme="Primary-Light" data-surface="Surface">...</Card>
+
+   WRONG (loses the brand background entirely):
      <Card padding="medium">...</Card>
 
    RIGHT:
-     <Card padding="medium" data-theme="Primary-Light" data-surface="Surface">...</Card>
+     <Card padding="medium" data-theme="Primary" data-surface="Surface-Brightest">...</Card>
 
 3b. ANY frame with a background fill MUST map to a PAINTING container.
 
