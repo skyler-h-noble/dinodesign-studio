@@ -132,8 +132,20 @@ const isLibInternal = (where: string) =>
    "Let's Do It!" in the design and "Let's Do It!" in the code are the same
    string to a reader and different to includes(), so the text check reported
    a heading that was plainly present. */
+const HTML_ENTITY: Record<string, string> = {
+  '&apos;': "'", '&#39;': "'", '&lsquo;': "'", '&rsquo;': "'",
+  '&quot;': '"', '&ldquo;': '"', '&rdquo;': '"',
+  '&amp;': '&', '&nbsp;': ' ', '&ndash;': '-', '&mdash;': '-', '&hellip;': '...',
+};
+
 const normaliseText = (t: string) =>
-  t.replace(/[\u2018\u2019\u201B]/g, "'")
+  /* JSX escapes an apostrophe rather than sit under
+     react/no-unescaped-entities, so "Let's Do It!" is written Let&apos;s and no
+     amount of quote-shape normalising will match it against the design's
+     Let’s. Decode first, then normalise shape. */
+  Object.entries(HTML_ENTITY)
+    .reduce((acc, [ent, ch]) => acc.split(ent).join(ch), t)
+    .replace(/[\u2018\u2019\u201B]/g, "'")
    .replace(/[\u201C\u201D]/g, '"')
    .replace(/[\u2013\u2014]/g, '-')
    .replace(/\u2026/g, '...')

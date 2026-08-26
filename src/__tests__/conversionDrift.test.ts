@@ -353,3 +353,35 @@ describe('instance-unmapped ignores instances that ARE mapped', () => {
       .filter(f => f.kind === 'instance-unmapped')).toHaveLength(0);
   });
 });
+
+// The apostrophe survived three encodings before this matched: Figma stores a
+// typographic one, a code editor writes a straight one, and JSX escapes it as
+// an entity to satisfy react/no-unescaped-entities. All three are the same
+// heading to a reader.
+describe('text-missing tolerates how an apostrophe is written', () => {
+  const frame = (characters: string) => ({
+    document: {
+      name: 'Test New', type: 'FRAME', visible: true,
+      children: [{ name: 'Component Name', type: 'TEXT', visible: true, characters }],
+    },
+  });
+  const cases: Array<[string, string]> = [
+    ['curly in Figma, straight in code', `<DisplaySmall>Let's Do It!</DisplaySmall>`],
+    ['curly in Figma, entity in code', '<DisplaySmall>Let&apos;s Do It!</DisplaySmall>'],
+    ['curly in Figma, numeric entity', '<DisplaySmall>Let&#39;s Do It!</DisplaySmall>'],
+    ['curly in Figma, curly in code', '<DisplaySmall>Let’s Do It!</DisplaySmall>'],
+    ['curly in Figma, braced string', `<DisplaySmall>{"Let's Do It!"}</DisplaySmall>`],
+  ];
+  for (const [label, code] of cases) {
+    it(label, () => {
+      const found = computeDrift(frame('Let’s Do It!'), code)
+        .filter(f => f.kind === 'text-missing');
+      expect(`${label}: ${found.length}`).toBe(`${label}: 0`);
+    });
+  }
+
+  it('still reports text that is genuinely absent', () => {
+    expect(computeDrift(frame('Something Else Entirely'), '<DisplaySmall>Let&apos;s Do It!</DisplaySmall>')
+      .filter(f => f.kind === 'text-missing')).toHaveLength(1);
+  });
+});
