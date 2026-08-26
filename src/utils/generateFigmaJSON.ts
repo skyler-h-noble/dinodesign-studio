@@ -887,11 +887,27 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         }
       }
 
-      // Dropshadow-Color-1..5: per-elevation tinted shadow tokens. Both
-      // hue/saturation/lightness AND alpha vary per level (Comeau approach)
-      // so higher elevations read as more dramatic, not weaker. Math lives
-      // in src/utils/dropshadow.ts and is shared with the CSS exporter so
-      // the values are 1:1 across Figma and code.
+      /* Dropshadow-Color-1..5 — one per LAYER of a stacked shadow, not one per
+         elevation level.
+         Layer 1 is the tight contact shadow and carries the most alpha (20%);
+         each layer out is wider and fainter, down to 11% at layer 5. That is
+         what makes a shadow read as depth rather than a smear, and it is why
+         these tokens get MORE transparent as the number rises — expected, not
+         a fault.
+         Elevation is expressed by how many layers are stacked: Level-3 uses
+         layers 1-3, Level-5 uses all five. A higher elevation is more dramatic
+         because there is more shadow, not because any single layer darkens.
+         The COLOUR is level-independent and identical across all five —
+         dropshadowBaseHex says so in its own signature. It takes the surface's
+         hue, pulls saturation into a moderate band and multiplies lightness by
+         LIGHT_FACTOR (0.6), so the shadow is a darker version of what it falls
+         on. Darken, then apply the layer's alpha.
+         This comment previously claimed the opposite — "hue/saturation/
+         lightness AND alpha vary per level … higher elevations read as more
+         dramatic, not weaker" — which is false on both counts and is why the
+         decreasing alpha looked like a bug.
+         Math lives in src/utils/dropshadow.ts and is shared with the CSS
+         exporter, so the values are 1:1 across Figma and code. */
       for (const level of SHADOW_LEVELS) {
         const sectionName = `Dropshadow-Color-${level}`;
         modeSection[sectionName] = {};
@@ -938,6 +954,50 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           `\u26A0\uFE0F [Figma] ${THEMES.length} themes exceeds Figma's 10-mode cap; the tail will not import.`,
         );
       }
+
+      /* Emit Dropshadow-Color-1..5 for a group, from its Background sibling.
+       *
+       * Pulled out of processGroup because processGroup only ran it when the
+       * source group happened to contain a key literally named
+       * "Dropshadow-Color". The Default theme's groups do not, so Default got
+       * no shadow tokens at all — and SurfacesContainers mirrors Default, which
+       * is why the Figma SURFACE collection's Dropshadow-Color-* variables were
+       * never written by an import and had to be re-pointed by hand.
+       *
+       * A marker key is the wrong trigger. The background is what the shadow is
+       * derived from, so the presence of a Background is the condition. */
+      const emitDropshadowRefs = (bgToken: string | undefined, target: any) => {
+        if (!bgToken) return false;
+        if (bgToken.includes('Default-Background')) {
+          for (let i = 1; i <= 5; i++) {
+            target[`Dropshadow-Color-${i}`] = {
+              value: `{Default-Background.Dropshadow-Color-${i}}`, type: 'color',
+            };
+          }
+          return true;
+        }
+        const bgMatch = resolveToColorAlias(bgToken, lookup)
+          .match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
+        if (bgMatch) {
+          for (let i = 1; i <= 5; i++) {
+            target[`Dropshadow-Color-${i}`] = {
+              value: `{Dropshadow-Color-${i}.${bgMatch[1]}.${bgMatch[2]}}`, type: 'color',
+            };
+          }
+          return true;
+        }
+        // Neither a Default-Background nor a {Colors.…} reference: compute the
+        // tinted shadow straight from the resolved hex with the shared math, so
+        // it stays brand-tinted rather than falling back to flat black.
+        const hex = resolveToHex(bgToken, lookup, colors);
+        const surfaceHex = hex && hex.startsWith('#') ? hex : '#ffffff';
+        for (let i = 1; i <= 5; i++) {
+          target[`Dropshadow-Color-${i}`] = {
+            value: dropshadowHex8(surfaceHex, i as ShadowLevel), type: 'color',
+          };
+        }
+        return true;
+      };
 
       for (const themeName of THEMES) {
         const theme = themes[themeName];
@@ -1187,6 +1247,25 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           }
 
           processGroup(groupData, figmaGroup);
+
+          /* Backfill. A group whose source carried no "Dropshadow-Color" marker
+             still needs the tokens — every surface casts a shadow, and the
+             Background it is derived from is right here. This is what was
+             missing for Default. */
+          if (!figmaGroup['Dropshadow-Color-1']) {
+            /* Containers name their background "Container", not "Background" —
+               so looking only for a Background key found nothing and the
+               Container groups were skipped for the same reason Default was.
+               The base Container tone is used for all five levels here; the
+               Theme layer holds one Containers group, while the CSS emits a
+               shadow per level. That is a narrower gap than having none, and
+               worth revisiting when the Theme layer splits per level. */
+            const g = groupData as any;
+            emitDropshadowRefs(
+              g?.Background?.value || g?.Surface?.value || g?.Container?.value,
+              figmaGroup,
+            );
+          }
           figmaTheme[groupKey] = figmaGroup;
         }
 
