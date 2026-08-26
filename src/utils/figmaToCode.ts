@@ -698,7 +698,23 @@ CONVERSION RULES:
           initials = initials="JD"). Do NOT set the avatar's size or padding: the
           Button auto-sizes button-avatars per its size (small->16, medium->24,
           large->40) and adds the 2px side padding. Same for a Type=Avatar button.
-          Only emit a slot that is actually visible (rule 0b).
+          A SLOT THAT SURVIVED PRUNING MUST BE RENDERED. The rule cuts both
+          ways and only one half was written down. Hidden slots are already
+          gone from the tree you were given, so a "Start Slot" / "End Slot" you
+          can still SEE is one the design shows, with content inside it — emit
+          the decorator. Dropping it silently is the failure this paragraph
+          exists to prevent: a + icon vanished from a button and the result
+          looked like an ordinary text button.
+
+          IF THE ICON'S IDENTITY IS UNCLEAR, STILL RENDER ONE. The instance is
+          often just named "Icon", which says where it goes and not which glyph
+          it is. Take the glyph from the layer name, the component name, or the
+          button's own label when it implies one (an "Add"/"New"/"+" button
+          takes AddIcon), and emit e.g.
+              startIcon={<Icon><AddIcon /></Icon>}
+          A best-guess icon in the right slot is a small, visible, correctable
+          error. An omitted slot changes the component's shape and reads as
+          intentional.
       - HEIGHT: NEVER emit an inline height (or width) px on a Button -- it is the
         ONE exception to rule 2d. The brand sets button height per size via tokens
         (small floored at a 24x24 touch target); the size prop carries it. Width

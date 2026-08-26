@@ -208,6 +208,45 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
     }
   }
 
+  /* ── A visible slot whose decorator never made it into the code ──────────
+   *
+   * Hidden slots are pruned before the model sees them, so a Start/End Slot
+   * still in the tree is one the design shows AND has content in. It has to
+   * become startIcon / endIcon / startDecorator / endDecorator.
+   *
+   * Dropping one is quiet in a way the other checks miss: the component still
+   * renders, still carries its label, still looks like a button. A + that
+   * vanishes from "+ Button" leaves "Button", which is a perfectly ordinary
+   * thing to see. Nothing else here would flag it — the slot holds no text, so
+   * text-missing says nothing, and the instance inside is named "Icon", which
+   * instance-unmapped treats as mapped.
+   */
+  for (const { node, where } of visible) {
+    const name = (node.name ?? '').trim();
+    const m = /^(Start|End)\s*Slot$/i.exec(name);
+    if (!m) continue;
+    // An empty slot is a placeholder in the component, not content.
+    const hasContent = Array.isArray(node.children) && node.children.length > 0;
+    if (!hasContent) continue;
+
+    const side = m[1].toLowerCase();
+    const props = side === 'start'
+      ? ['startIcon', 'startDecorator']
+      : ['endIcon', 'endDecorator'];
+    if (props.some((prop) => jsx.includes(prop))) continue;
+
+    findings.push({
+      severity: 'error',
+      kind: 'slot-dropped',
+      message: `${name}: visible and has content, but the code sets no ${props.join(' / ')}.`,
+      detail: (node.children ?? [])
+        .map((c: any) => (c?.name ?? '').trim())
+        .filter(Boolean)
+        .join(', ') || name,
+      where: shortPath(where),
+    });
+  }
+
   // ── Component instances with no obvious counterpart ─────────────────────
   const instanceNames = new Map<string, string>();
   for (const { node, where } of visible) {

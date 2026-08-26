@@ -150,3 +150,74 @@ describe('computeDrift', () => {
     expect(computeDrift(frame([]), jsx).filter(f => f.kind === 'hardcoded-color')).toHaveLength(0);
   });
 });
+
+// ─── Dropped slots ────────────────────────────────────────────────────────────
+//
+// The failure that prompted this: a "+ Button" in Figma converted to a plain
+// <Button>Button</Button>. Nothing else here catches it — the slot holds no
+// text, so text-missing is silent, and the instance inside is named "Icon",
+// which instance-unmapped treats as mapped. The button still renders and still
+// reads as a button, which is exactly why it needs an assertion.
+describe('slot-dropped', () => {
+  const buttonWith = (slots: unknown[]) => ({
+    document: {
+      name: 'Frame', type: 'FRAME', visible: true,
+      children: [{ name: 'Button', type: 'INSTANCE', visible: true, children: slots }],
+    },
+  });
+
+  const startSlot = {
+    name: 'Start Slot', type: 'FRAME', visible: true,
+    children: [{ name: 'Icon', type: 'INSTANCE', visible: true }],
+  };
+
+  it('flags a visible start slot with content that the code ignores', () => {
+    const f = computeDrift(buttonWith([startSlot]), '<Button>Button</Button>')
+      .filter(x => x.kind === 'slot-dropped');
+    expect(f).toHaveLength(1);
+    expect(f[0].severity).toBe('error');
+    expect(f[0].detail).toBe('Icon');
+  });
+
+  it('accepts startIcon', () => {
+    expect(computeDrift(buttonWith([startSlot]),
+      '<Button startIcon={<Icon><AddIcon /></Icon>}>Button</Button>')
+      .filter(x => x.kind === 'slot-dropped')).toHaveLength(0);
+  });
+
+  it('accepts startDecorator', () => {
+    expect(computeDrift(buttonWith([startSlot]),
+      '<Button startDecorator={<Avatar />}>Button</Button>')
+      .filter(x => x.kind === 'slot-dropped')).toHaveLength(0);
+  });
+
+  // An empty slot is the component's placeholder, not content the design chose.
+  it('ignores a visible but EMPTY slot', () => {
+    const empty = { name: 'End Slot', type: 'FRAME', visible: true, children: [] };
+    expect(computeDrift(buttonWith([empty]), '<Button>Button</Button>')
+      .filter(x => x.kind === 'slot-dropped')).toHaveLength(0);
+  });
+
+  // Hidden slots never reach the model, so they must never be demanded of it.
+  it('ignores a hidden slot even when it has content', () => {
+    const hidden = {
+      name: 'End Slot', type: 'FRAME', visible: false,
+      children: [{ name: 'Icon', type: 'INSTANCE', visible: true }],
+    };
+    expect(computeDrift(buttonWith([hidden]), '<Button>Button</Button>')
+      .filter(x => x.kind === 'slot-dropped')).toHaveLength(0);
+  });
+
+  it('tells the two sides apart', () => {
+    const endSlot = {
+      name: 'End Slot', type: 'FRAME', visible: true,
+      children: [{ name: 'Icon', type: 'INSTANCE', visible: true }],
+    };
+    // startIcon set, end slot still dropped.
+    const f = computeDrift(buttonWith([startSlot, endSlot]),
+      '<Button startIcon={<Icon><AddIcon /></Icon>}>Button</Button>')
+      .filter(x => x.kind === 'slot-dropped');
+    expect(f).toHaveLength(1);
+    expect(f[0].message).toMatch(/^End Slot/);
+  });
+});
