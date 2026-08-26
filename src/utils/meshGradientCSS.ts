@@ -61,8 +61,46 @@ export function parseMeshGradient(input: string): MeshGradient | null {
  * wrong, and baking its font families in would override whatever typography
  * the system actually chose.
  */
+/**
+ * The BlackWhite ramp is a LIGHT-MODE-ONLY palette.
+ *
+ * Dark-Mode.css references --BW-Color-N (e.g. `--Eyebrow: var(--BW-Color-8)`)
+ * but never DEFINES one, so every BW token is undefined there. A mesh's text
+ * colour is solved as a BW tone, which meant the card read correctly in light
+ * mode and, in dark, resolved to nothing — `color` fell back to inherited, and
+ * on a dark page that is light text on a light mesh. Invisible, silent, and
+ * indistinguishable from a styling choice.
+ *
+ * The mesh itself does NOT have this problem: it is built from --Primary-Color-N
+ * and friends, which every mode defines, so the same mesh renders in both. Its
+ * text has to be equally mode-independent, and it can be — the composition is
+ * fixed, so the colour solved against it is a fixed answer.
+ *
+ * The token stays FIRST so the value tracks a system that does define it; the
+ * literal only fires when nothing does. BlackWhite is black and white, and the
+ * values are identical across every system checked, so the literal is a
+ * transcription rather than a guess.
+ *
+ * Fixing the palette itself would be better and is not possible here: a
+ * system's CSS is frozen per system in Storage and cannot be regenerated.
+ * mesh-gradient.css CAN be republished, which is why the repair lives here.
+ */
+const BW_LITERAL: Record<string, string> = {
+  '1': '#ffffff', '2': '#ffffff', '3': '#ffffff', '4': '#ffffff',
+  '5': '#040404', '6': '#040404', '7': '#040404', '8': '#040404',
+  '9': '#040404', '10': '#040404', '11': '#040404', '12': '#040404',
+};
+
+/** Give a bare `var(--BW-Color-N)` a literal fallback. Anything else passes through. */
+export function withBwFallback(value: string): string {
+  const m = /^var\(\s*--BW-Color-(\d+)\s*\)$/.exec(String(value).trim());
+  if (!m) return value;
+  const lit = BW_LITERAL[m[1]];
+  return lit ? `var(--BW-Color-${m[1]}, ${lit})` : value;
+}
+
 export function generateMeshGradientCSS(mesh: MeshGradient): string {
-  const color = mesh.color || 'var(--Text)';
+  const color = withBwFallback(mesh.color || 'var(--Text)');
   return `/* Mesh gradient — authored per design system, not derived.
    Consumers read --Mesh-Gradient rather than restating the stack, so the hero
    and the card cannot drift apart. */
