@@ -14,7 +14,16 @@ export type ShadowLevel = 1 | 2 | 3 | 4 | 5;
  *  old 2-layer curve because a level now stacks 3–8 layers that composite —
  *  higher levels use a touch less per-layer alpha so they don't go muddy.
  *  TUNABLE: bump these if shadows read too faint, drop them if too heavy. */
-const ALPHA = 0.16;
+/* One alpha, and it has to survive being stacked.
+   0.16 was set by eye from the old per-layer ladder's first step, which is the
+   wrong reference: that value only ever applied to ONE layer. Held constant
+   across a five-layer stack it compounds to ~58% where the layers overlap, and
+   a Level-5 card read far heavier than the same card in Figma.
+   Comeau's five-layer stack uses 0.075 and keeps it tight with negative spread
+   on the outer layers, which this geometry does not have — so it lands a little
+   above his, at ~41% compounded for Level-5 and a still-visible 10% for the
+   single layer of Level-1. TUNABLE. */
+const ALPHA = 0.10;
 const ALPHAS = [ALPHA, ALPHA, ALPHA, ALPHA, ALPHA];
 
 /* One alpha for EVERY layer of EVERY level.
