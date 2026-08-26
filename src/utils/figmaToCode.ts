@@ -190,14 +190,19 @@ CONVERSION RULES:
        button and a Primary one can be the identical component with a different
        mode applied. Map the mode name to the component's colour:
            modes.Buttons "Secondary" → <Button variant="secondary">
-                                       <Checkbox variant="secondary-outline">
+                                       <Checkbox variant="secondary">
                                        <Radio color="secondary">
        Valid modes: Default, Primary, Secondary, Tertiary, Neutral, Info,
-       Success, Warning, Error. ABSENT → Default → omit the prop (never emit
-       variant="primary" for an unmarked button; Default is the brand colour and
-       primary is a different one).
-       A Style/Appearance VARIANT property still selects the SHAPE — solid vs
-       -outline vs -light vs ghost vs text — and composes with the mode:
+       Success, Warning, Error, Black-White. ABSENT → Default → omit the prop
+       (never emit variant="primary" for an unmarked control; Default is the
+       brand colour and primary is a different one).
+       CHECKBOX AND RADIO HAVE NO SHAPE AXIS. Their `variant` is the colour and
+       nothing else — never emit variant="secondary-outline" or "error-light" on
+       a Checkbox. Those shapes were removed from the lib; they still resolve to
+       their colour but warn. The shape rule below applies to Button ONLY.
+       On a BUTTON, a Style/Appearance VARIANT property still selects the SHAPE
+       — solid vs -outline vs -light vs ghost vs text — and composes with the
+       mode:
            modes.Buttons "Error" + variant Style "Outline" → variant="error-outline"
        If a colour appears BOTH as a mode and as a variant property, the MODE
        wins: the variant property is the leftover of a component that has not
