@@ -8,16 +8,16 @@ const PASTED = `.gradient-figure {
   width: 800px;
   height: 450px;
   max-width: 100%;
-  background: radial-gradient(circle at 20% 30%, var(--Primary-Color-7) 0%, transparent 50%), radial-gradient(circle at 78% 64%, var(--Secondary-Color-7) 0%, transparent 45%), radial-gradient(circle at 30% 18%, var(--Primary-Color-9) 0%, transparent 45%), radial-gradient(circle at 21% 50%, var(--Tertiary-Color-6) 0%, transparent 45%), radial-gradient(circle at 0% 0%, var(--Primary-Color-9) 0%, transparent 45%), var(--Primary-Color-7);
+  background: radial-gradient(circle at 0% 0%, var(--Primary-Color-10) 0%, transparent 66%), radial-gradient(circle at 80% 100%, var(--Secondary-Color-8) 0%, transparent 36%), radial-gradient(circle at 26% 23%, var(--Primary-Color-7) 0%, transparent 45%), radial-gradient(circle at 2% 50%, var(--Tertiary-Color-9) 0%, transparent 45%), radial-gradient(circle at 100% 72%, var(--Primary-Color-9) 0%, transparent 55%), var(--Primary-Color-10);
   color: var(--BW-Color-6);
 }`;
 
 describe('parsing an authored mesh', () => {
   it('takes the background and colour out of a pasted rule', () => {
     const m = parseMeshGradient(PASTED)!;
-    expect(m.background.startsWith('radial-gradient(circle at 20% 30%')).toBe(true);
+    expect(m.background.startsWith('radial-gradient(circle at 0% 0%')).toBe(true);
     // the base colour after the last stack layer must survive
-    expect(m.background.endsWith('var(--Primary-Color-7)')).toBe(true);
+    expect(m.background.endsWith('var(--Primary-Color-10)')).toBe(true);
     expect(m.color).toBe('var(--BW-Color-6)');
   });
 
@@ -51,7 +51,13 @@ describe('the CSS a system publishes', () => {
   const css = generateMeshGradientCSS(parseMeshGradient(PASTED)!);
 
   it('declares the stack once and has every consumer read it', () => {
-    expect((css.match(/radial-gradient\(circle at 20% 30%/g) || []).length).toBe(1);
+    /* Derived from the fixture, not a literal position. Pinning the first
+       stop's coordinates coupled this assertion to whatever Popsicle's mesh
+       happened to be, so a re-author broke a test about STRUCTURE — the stack
+       appearing once — for a reason that had nothing to do with structure. */
+    const firstBlob = parseMeshGradient(PASTED)!.background.split('),')[0] + ')';
+    const occurrences = css.split(firstBlob).length - 1;
+    expect(`${firstBlob} x${occurrences}`).toBe(`${firstBlob} x1`);
     for (const sel of ['.mesh-gradient', '.gradient-figure', '.hero-mesh']) {
       expect(css).toContain(sel);
     }
@@ -117,7 +123,7 @@ describe('a second system, pasted as the whole block', () => {
     expect(m.background).not.toBe(popsicle.background);
     // Authored, not derived: same slot, different stops and different tokens.
     expect(m.background).toContain('--Neutral-Color-12');
-    expect(popsicle.background).toContain('--Primary-Color-7');
+    expect(popsicle.background).toContain('--Primary-Color-10');
   });
 });
 

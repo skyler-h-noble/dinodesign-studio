@@ -23,12 +23,12 @@ export const SEED_MESH_GRADIENTS: Record<string, MeshGradient> = {
   // Popsicle
   'd7ad345c-33d7-43f6-8f30-41728bf395e6': {
     background:
-      'radial-gradient(circle at 20% 30%, var(--Primary-Color-7) 0%, transparent 50%), '
-      + 'radial-gradient(circle at 78% 64%, var(--Secondary-Color-7) 0%, transparent 45%), '
-      + 'radial-gradient(circle at 30% 18%, var(--Primary-Color-9) 0%, transparent 45%), '
-      + 'radial-gradient(circle at 21% 50%, var(--Tertiary-Color-6) 0%, transparent 45%), '
-      + 'radial-gradient(circle at 0% 0%, var(--Primary-Color-9) 0%, transparent 45%), '
-      + 'var(--Primary-Color-7)',
+      'radial-gradient(circle at 0% 0%, var(--Primary-Color-10) 0%, transparent 66%), '
+      + 'radial-gradient(circle at 80% 100%, var(--Secondary-Color-8) 0%, transparent 36%), '
+      + 'radial-gradient(circle at 26% 23%, var(--Primary-Color-7) 0%, transparent 45%), '
+      + 'radial-gradient(circle at 2% 50%, var(--Tertiary-Color-9) 0%, transparent 45%), '
+      + 'radial-gradient(circle at 100% 72%, var(--Primary-Color-9) 0%, transparent 55%), '
+      + 'var(--Primary-Color-10)',
     color: 'var(--BW-Color-6)',
   },
 
@@ -55,10 +55,11 @@ export const SEED_MESH_GRADIENTS: Record<string, MeshGradient> = {
 
   'd1bd0ba4-4906-4801-93c3-49db251f10d2': {
     background:
-      'radial-gradient(circle at 20% 30%, var(--Neutral-Color-12) 0%, transparent 50%), '
-      + 'radial-gradient(circle at 99% 24%, var(--Secondary-Color-9) 0%, transparent 45%), '
-      + 'radial-gradient(circle at 11% 1%, var(--Primary-Color-6) 0%, transparent 32%), '
-      + 'var(--Neutral-Color-12)',
+      'radial-gradient(circle at 20% 30%, var(--Primary-Color-11) 0%, transparent 50%), '
+      + 'radial-gradient(circle at 100% 3%, var(--Secondary-Color-9) 0%, transparent 45%), '
+      + 'radial-gradient(circle at 0% 19%, var(--Primary-Color-7) 0%, transparent 45%), '
+      + 'radial-gradient(circle at 78% 100%, var(--Primary-Color-8) 0%, transparent 55%), '
+      + 'var(--Primary-Color-11)',
     color: 'var(--BW-Color-6)',
   },
 };
