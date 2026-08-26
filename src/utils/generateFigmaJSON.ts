@@ -1020,7 +1020,14 @@ export function generateFigmaJSON(designSystemJSON: any): any {
             for (const [key, val] of Object.entries(source)) {
               // Dropshadow-Color → link to Modes/Dropshadow-Color-{1-5} entries
               if (key === 'Dropshadow-Color') {
-                const bgToken = source['Background']?.value || source['Surface']?.value;
+                /* Containers name their background "Container".
+                   Looking only for Background/Surface found nothing on a
+                   Containers group, so this fell to the fallback, resolved to
+                   white, and emitted a flat grey — identical for every theme,
+                   which is why container shadows never took the brand's hue. */
+                const bgToken = source['Background']?.value
+                  || source['Surface']?.value
+                  || source['Container']?.value;
                 if (bgToken) {
                   // Check if it's a Default-Background reference
                   if (bgToken.includes('Default-Background')) {

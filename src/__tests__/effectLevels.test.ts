@@ -102,3 +102,46 @@ describe('the shadow colour deepens with elevation', () => {
     }
   });
 });
+
+// ─── Container shadows take the brand's hue ───────────────────────────────────
+//
+// A Containers group names its background "Container", not "Background". The
+// emitter looked only for Background/Surface, found nothing, fell through to a
+// white fallback and produced #858585 — the same flat grey for every theme. So
+// a card on a purple system cast the same shadow as one on a red system, and
+// it never looked wrong enough to chase.
+describe('container shadows follow their own background', () => {
+  const lum = (hex: string) => {
+    const h = hex.replace('#', '').slice(0, 6);
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const sat = (hex: string) => {
+    const h = hex.replace('#', '').slice(0, 6);
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    return mx === 0 ? 0 : (mx - mn) / mx;
+  };
+
+  // A chromatic container must not produce a grey shadow — that is the exact
+  // signature of the white fallback firing.
+  it('tints a chromatic container, and does not fall back to grey', () => {
+    for (const bg of ['#2b1a3d', '#201326', '#3d1a1a']) {
+      for (const n of [1, 5] as const) {
+        const s = sat(dropshadowBaseHex(bg, n));
+        expect(`${bg} L${n} chromatic: ${s > 0.05}`).toBe(`${bg} L${n} chromatic: true`);
+      }
+    }
+  });
+
+  // Achromatic containers SHOULD be grey — injecting a hue there paints a pink
+  // shadow under a white card.
+  it('keeps a neutral container neutral', () => {
+    expect(sat(dropshadowBaseHex('#f2f2f2', 3))).toBeLessThan(0.05);
+  });
+
+  it('deepens with the level, like every other surface', () => {
+    const l = [1, 2, 3, 4, 5].map((n) => lum(dropshadowBaseHex('#201326', n as 1)));
+    expect(l.every((v, i) => i === 0 || v <= l[i - 1])).toBe(true);
+  });
+});
