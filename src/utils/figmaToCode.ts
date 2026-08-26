@@ -586,6 +586,28 @@ CONVERSION RULES:
     (Overline → OverlineSmall, children → SubtitleLarge, secondary → Body),
     plus alignment, slot sizing, and accessibility.
 
+4e0. NEVER OVERRIDE A TYPOGRAPHY COMPONENT'S FONT SIZE INLINE.
+
+    style={{ fontSize: N }} on <H1>-<H6>, <Body>, <Subtitle>, <Caption> etc. is
+    always wrong, because size and LINE HEIGHT are published as a pair and an
+    inline size only replaces half of it. The component's rule still says
+        line-height: calc(var(--H2-Line-Height) * var(--Cognitive-Multiplier, 1))
+    so an <H2> forced to 18px keeps H2's 40px line height, and a two-line title
+    renders with a gaping hole between the lines. Nothing errors; it just looks
+    loose, which is easy to mistake for a spacing choice.
+
+    PICK THE STEP THAT ALREADY IS THAT SIZE. The scale publishes every size as a
+    matched pair — 18px is --H6-Font-Size with --H6-Line-Height 26px, and so on
+    down. Match the Figma text node's size to the nearest step and use that
+    component:
+        18px heading -> <H6>            not <H2 style={{ fontSize: 18 }}>
+        20px heading -> <H5>
+    Reaching for an inline fontSize is the signal that the COMPONENT is wrong,
+    not the size.
+
+    If a design genuinely uses a size the scale does not publish, set BOTH —
+    fontSize and lineHeight — and never one alone.
+
 4e. TYPOGRAPHY COLOR PROP — DEFAULT TO STANDARD TEXT.
 
     The typography components (<H1>...<H6>, <Body>, <Subtitle>,
