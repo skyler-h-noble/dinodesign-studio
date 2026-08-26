@@ -298,9 +298,42 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
     if (name && !instanceNames.has(name)) instanceNames.set(name, where);
   }
   for (const [name, where] of instanceNames) {
-    const asTag = name.replace(/[^A-Za-z0-9]/g, '');
-    if (!asTag) continue;
-    if (!new RegExp(`<${asTag}\\b`, 'i').test(code)) {
+    /* An "Icon" wrapper that contains its glyph reports nothing of its own.
+       The wrapper names WHERE the icon goes; the child names WHICH icon it is,
+       and the child is reported separately. Listing both turns one missing plus
+       sign into two findings that a reader has to work out are the same thing. */
+    if (/^icons?$/i.test(name) && instanceNames.size > 1) {
+      const hasChildGlyph = [...instanceNames.keys()].some(
+        (n) => n !== name && (instanceNames.get(n) ?? '').includes(`${name} >`),
+      );
+      if (hasChildGlyph) continue;
+    }
+    // The lib draws its own internals; those instances have no counterpart by
+    // design, so demanding one is noise. Same filter the variant check uses.
+    if (isLibInternal(where)) continue;
+
+    /* Match the BASE name as well as the whole thing.
+       A Figma instance carries its variant in its name — "Ratio - Fill
+       Vertical", "Button-Small" — and stripping punctuation gave
+       "RatioFillVertical" and "ButtonSmall", tags that exist nowhere. Both map
+       to a real component with a prop: <Ratio fit="height" />, <Button
+       size="small" />. Reporting them as unmapped was reporting correct code,
+       and every such line makes the one real finding harder to see. */
+    const full = name.replace(/[^A-Za-z0-9]/g, '');
+    const base = name.split(/[-–—/,(]/)[0].replace(/[^A-Za-z0-9]/g, '');
+    /* A glyph named the Material way is rendered under its React name:
+       "add" -> <AddIcon />, "chevron-right" -> <ChevronRightIcon />. Without
+       this the check reported a plus sign as missing while <AddIcon /> sat in
+       the code — the same transform rule 4d0 asks the converter to apply. */
+    const materialIcon = name
+      .trim()
+      .split(/[\s_-]+/)
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join('') + 'Icon';
+    const candidates = [full, base, materialIcon].filter(Boolean);
+    if (!candidates.length) continue;
+    if (!candidates.some((t) => new RegExp(`<${t}\\b`, 'i').test(code))) {
       findings.push({
         severity: 'info',
         kind: 'instance-unmapped',

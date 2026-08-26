@@ -297,3 +297,59 @@ describe('drift does not report correct code', () => {
       .filter(f => f.kind === 'text-missing')).toHaveLength(0);
   });
 });
+
+// ─── Unmapped instances ───────────────────────────────────────────────────────
+describe('instance-unmapped ignores instances that ARE mapped', () => {
+  const frameWith = (children: unknown[]) => ({
+    document: { name: 'Test New', type: 'FRAME', visible: true, children },
+  });
+  const inst = (name: string, extra: object = {}) =>
+    ({ name, type: 'INSTANCE', visible: true, ...extra });
+
+  // A Figma instance carries its variant in its NAME. Stripping punctuation
+  // turned these into tags that exist nowhere, and both map to a real
+  // component plus a prop.
+  it('matches "Ratio - Fill Vertical" to <Ratio>', () => {
+    expect(computeDrift(frameWith([inst('Ratio - Fill Vertical')]),
+      '<Ratio ratio="1:1" placeholder />')
+      .filter(f => f.kind === 'instance-unmapped')).toHaveLength(0);
+  });
+
+  it('matches "Button-Small" to <Button>', () => {
+    expect(computeDrift(frameWith([inst('Button-Small')]),
+      '<Button size="small">Button</Button>')
+      .filter(f => f.kind === 'instance-unmapped')).toHaveLength(0);
+  });
+
+  it('ignores instances inside a library-owned subtree', () => {
+    const frame = frameWith([
+      inst('Image Placeholder', {
+        children: [inst('Icon', { children: [inst('photo')] })],
+      }),
+    ]);
+    expect(computeDrift(frame, '<Ratio ratio="1:1" placeholder />')
+      .filter(f => f.kind === 'instance-unmapped')).toHaveLength(0);
+  });
+
+  // The one real finding on that frame, and the reason the rest had to go.
+  // One missing plus sign is ONE finding: the glyph. The "Icon" wrapper around
+  // it names where the icon goes, not which icon it is, so reporting both makes
+  // the reader work out they are the same thing.
+  it('still reports a glyph the code never rendered, once', () => {
+    const frame = frameWith([
+      inst('Button-Small', { children: [inst('Icon', { children: [inst('add')] })] }),
+    ]);
+    const found = computeDrift(frame, '<Button size="small">Button</Button>')
+      .filter(f => f.kind === 'instance-unmapped');
+    expect(found.map(f => f.detail)).toEqual(['add']);
+  });
+
+  it('is silent once the glyph is rendered', () => {
+    const frame = frameWith([
+      inst('Button-Small', { children: [inst('Icon', { children: [inst('add')] })] }),
+    ]);
+    expect(computeDrift(frame,
+      '<Button size="small" startIcon={<Icon><AddIcon /></Icon>}>Button</Button>')
+      .filter(f => f.kind === 'instance-unmapped')).toHaveLength(0);
+  });
+});
