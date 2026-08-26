@@ -12,7 +12,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import AppHeader from './AppHeader';
 import {
-  RenameDesignSystemModal, DeleteDesignSystemModal, RegenerateDesignSystemModal, MenuButton,
+  RenameDesignSystemModal, DeleteDesignSystemModal, RegenerateDesignSystemModal,
+  RegenerateAllDesignSystemsModal, MenuButton,
 } from './designSystemDialogs';
 
 interface LinkedFigmaFile {
@@ -99,6 +100,7 @@ export default function MyDesignsPage() {
   const [renameTarget, setRenameTarget] = useState<DesignSystem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DesignSystem | null>(null);
   const [regenerateTarget, setRegenerateTarget] = useState<DesignSystem | null>(null);
+  const [regenerateAllOpen, setRegenerateAllOpen] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('recent');
 
   const sortedDesigns = useMemo(() => {
@@ -225,18 +227,32 @@ export default function MyDesignsPage() {
                 : `${designSystems.length} design${designSystems.length === 1 ? '' : 's'}`}
             </BodySmall>
           </VStack>
-          {designSystems.length > 1 && (
-            <div style={{ minWidth: 180, flexShrink: 0 }}>
-              <Select
-                label="Sort by"
+          <HStack spacing={2} style={{ alignItems: 'flex-end', flexShrink: 0 }}>
+            {/* Rebuilds every system from its stored snapshot — the way to pick
+                up generator fixes across the whole library at once, rather than
+                opening nine menus. */}
+            {designSystems.length > 0 && (
+              <Button
+                variant="default-outline"
                 size="small"
-                fullWidth
-                value={sortBy}
-                onChange={(val: string) => setSortBy(val as SortKey)}
-                options={SORT_OPTIONS}
-              />
-            </div>
-          )}
+                onClick={() => setRegenerateAllOpen(true)}
+              >
+                Regenerate all
+              </Button>
+            )}
+            {designSystems.length > 1 && (
+              <div style={{ minWidth: 180 }}>
+                <Select
+                  label="Sort by"
+                  size="small"
+                  fullWidth
+                  value={sortBy}
+                  onChange={(val: string) => setSortBy(val as SortKey)}
+                  options={SORT_OPTIONS}
+                />
+              </div>
+            )}
+          </HStack>
         </HStack>
 
         {designSystems.length === 0 ? (
@@ -288,6 +304,18 @@ export default function MyDesignsPage() {
           // shows v + pending-changes derived from the doc, which updates
           // on next visit. Keep this lightweight to avoid a full reload.
           setRegenerateTarget(null);
+        }}
+      />
+      <RegenerateAllDesignSystemsModal
+        open={regenerateAllOpen}
+        targets={designSystems.map((d) => ({ id: d.id, name: d.name }))}
+        onClose={() => setRegenerateAllOpen(false)}
+        onDone={() => {
+          // Versions and pending-change counts are derived from the docs, which
+          // this run just bumped. Reload so the cards stop showing the numbers
+          // from before — the single-system modal can skip that because one
+          // stale card is obvious; nine are not.
+          window.location.reload();
         }}
       />
     </>

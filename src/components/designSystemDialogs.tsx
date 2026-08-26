@@ -8,6 +8,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  LinearProgress,
 } from '@omni-design/components';
 import {
   collection, doc, deleteDoc, updateDoc, getDocs, writeBatch,
@@ -192,6 +193,61 @@ export function DeleteDesignSystemModal({
   );
 }
 
+/**
+ * Regenerate ONE design system, in place.
+ *
+ * Pulled out of the modal so "Regenerate all" runs this exact path rather than
+ * a second copy of it. A duplicated version bump or history write stays correct
+ * for a month and then quietly stops matching — and this writes to Firestore,
+ * so a divergence is not something a refresh undoes.
+ *
+ * Throws on failure; the caller decides whether to stop or carry on.
+ */
+export async function regenerateDesignSystem(target: DesignSystemTarget): Promise<number> {
+  const t0 = performance.now();
+  console.log(`\u{1F504} [Regenerate] Starting for ${target.id} (${target.name})`);
+
+  const snap = await getDoc(doc(db, 'designSystems', target.id));
+  if (!snap.exists()) throw new Error('Design system not found.');
+  const data = snap.data() as any;
+  const snapshot = data.snapshot;
+  if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) {
+    throw new Error('No rehydration snapshot stored \u2014 re-export from the editor once to populate it.');
+  }
+
+  const nextVersion = Number(data.version || 0) + 1;
+
+  // Re-run the generator with the saved snapshot. Output overwrites the
+  // canonical files in design-systems/{id}/... \u2014 the same paths the hosted
+  // playground reads from.
+  await generateAndUploadDesignSystem({ ...snapshot, uuid: target.id, version: nextVersion });
+
+  await setDoc(doc(db, 'designSystems', target.id), {
+    updatedAt: serverTimestamp(),
+    version: nextVersion,
+  }, { merge: true });
+
+  await setDoc(doc(db, 'designSystems', target.id, 'versions', String(nextVersion)), {
+    version: nextVersion,
+    createdAt: serverTimestamp(),
+    name: data.name || target.name,
+    componentStyle: data.componentStyle || 'modern',
+    colors: Array.isArray(data.colors) ? data.colors : [],
+    headerFontFamily: data.headerFontFamily || null,
+    snapshot,
+  });
+
+  await addDoc(collection(db, 'designSystems', target.id, 'events'), {
+    kind: 'regenerated',
+    version: nextVersion,
+    at: serverTimestamp(),
+    summary: `Regenerated as v${nextVersion} (no setting changes)`,
+  });
+
+  console.log(`\u2705 [Regenerate] ${target.name} done in ${Math.round(performance.now() - t0)}ms; now at v${nextVersion}`);
+  return nextVersion;
+}
+
 export function RegenerateDesignSystemModal({
   target, onClose, onRegenerated,
 }: {
@@ -211,58 +267,8 @@ export function RegenerateDesignSystemModal({
   const handleRegenerate = async () => {
     setRegenerating(true);
     setError(null);
-    const t0 = performance.now();
-    console.log(`🔄 [Regenerate] Starting for ${target.id} (${target.name})`);
     try {
-      const snap = await getDoc(doc(db, 'designSystems', target.id));
-      if (!snap.exists()) throw new Error('Design system not found.');
-      const data = snap.data() as any;
-      const snapshot = data.snapshot;
-      console.log(`🔄 [Regenerate] Snapshot loaded; keys:`, snapshot ? Object.keys(snapshot) : 'NONE');
-      if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) {
-        throw new Error('No rehydration snapshot stored for this design — re-export from the editor once to populate it.');
-      }
-      const prevVersion = Number(data.version || 0);
-      const nextVersion = prevVersion + 1;
-      console.log(`🔄 [Regenerate] Bumping v${prevVersion} → v${nextVersion}`);
-      console.log(`🔄 [Regenerate] userSelections:`, snapshot.userSelections);
-
-      // Re-run the generator with the saved snapshot. Output overwrites the
-      // canonical files in design-systems/{id}/... — same paths the
-      // hosted playground reads from.
-      await generateAndUploadDesignSystem({
-        ...snapshot,
-        uuid: target.id,
-        version: nextVersion,
-      });
-      console.log(`🔄 [Regenerate] Generator finished in ${Math.round(performance.now() - t0)}ms`);
-
-      // Update the parent doc + write a new versions/{N} so this
-      // regenerate is itself an auditable history entry.
-      await setDoc(doc(db, 'designSystems', target.id), {
-        updatedAt: serverTimestamp(),
-        version: nextVersion,
-      }, { merge: true });
-
-      await setDoc(doc(db, 'designSystems', target.id, 'versions', String(nextVersion)), {
-        version: nextVersion,
-        createdAt: serverTimestamp(),
-        name: data.name || target.name,
-        componentStyle: data.componentStyle || 'modern',
-        colors: Array.isArray(data.colors) ? data.colors : [],
-        headerFontFamily: data.headerFontFamily || null,
-        snapshot,
-      });
-
-      await addDoc(collection(db, 'designSystems', target.id, 'events'), {
-        kind: 'regenerated',
-        version: nextVersion,
-        at: serverTimestamp(),
-        summary: `Regenerated as v${nextVersion} (no setting changes)`,
-      });
-
-      console.log(`✅ [Regenerate] Complete in ${Math.round(performance.now() - t0)}ms; now at v${nextVersion}`);
-      console.log(`   Verify in playground: Network tab → Light-Mode.css → Response Headers → cache-control should say "no-cache, max-age=0, must-revalidate"`);
+      const nextVersion = await regenerateDesignSystem(target);
       onRegenerated(target.id, nextVersion);
       onClose();
     } catch (err: any) {
@@ -333,5 +339,135 @@ export function MenuButton({
     >
       <Body component="span" style={{ display: 'block' }}>{children}</Body>
     </button>
+  );
+}
+
+
+/**
+ * Regenerate EVERY design system, one at a time.
+ *
+ * Sequential on purpose. Each run re-executes the whole generator and uploads a
+ * full set of files; firing nine at once would compete for the same Storage
+ * bucket and Firestore quota, and a rate-limit part-way through would leave an
+ * unknown subset regenerated. One at a time means the progress line is true and
+ * a failure names exactly where it stopped.
+ *
+ * A failure does NOT abort the run. Regenerating is idempotent — it reads the
+ * stored snapshot and bumps a version — so the useful outcome after one system
+ * fails is that the other eight are current, with the failure reported rather
+ * than blocking them. Systems with no rehydration snapshot are the common case
+ * there, and no amount of retrying fixes those.
+ */
+export function RegenerateAllDesignSystemsModal({
+  open, targets, onClose, onDone,
+}: {
+  open: boolean;
+  targets: DesignSystemTarget[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [running, setRunning] = useState(false);
+  const [doneCount, setDoneCount] = useState(0);
+  const [current, setCurrent] = useState<string | null>(null);
+  const [failures, setFailures] = useState<Array<{ name: string; message: string }>>([]);
+  const [finished, setFinished] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRunning(false); setDoneCount(0); setCurrent(null);
+      setFailures([]); setFinished(false);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const total = targets.length;
+
+  const runAll = async () => {
+    setRunning(true);
+    const failed: Array<{ name: string; message: string }> = [];
+    for (const [i, t] of targets.entries()) {
+      setCurrent(t.name);
+      setDoneCount(i);
+      try {
+        await regenerateDesignSystem(t);
+      } catch (err: any) {
+        console.error(`Regenerate failed for ${t.name}:`, err);
+        failed.push({ name: t.name, message: err?.message || 'Unknown error' });
+        setFailures([...failed]);
+      }
+    }
+    setDoneCount(total);
+    setCurrent(null);
+    setFinished(true);
+    setRunning(false);
+    onDone();
+  };
+
+  const succeeded = doneCount - failures.length;
+
+  return (
+    <Modal
+      open={open}
+      onClose={running ? () => {} : onClose}
+      title={finished ? 'Regenerate complete' : `Regenerate all ${total} design systems?`}
+    >
+      <VStack spacing={3} style={{ minWidth: 420, maxWidth: 520 }}>
+        {!running && !finished && (
+          <>
+            <Body>
+              This rebuilds every design system&rsquo;s hosted CSS, tokens and Figma
+              files from its stored snapshot. Settings stay the same &mdash; it is for
+              picking up generator improvements without walking through each edit flow.
+            </Body>
+            <BodySmall color="quiet">
+              Each system&rsquo;s version bumps by 1 and gains a history entry, and its
+              previous files are overwritten in place. They run one at a time, so this
+              takes a while. A system that fails is reported and the rest carry on.
+            </BodySmall>
+          </>
+        )}
+
+        {(running || finished) && (
+          <VStack spacing={2}>
+            {/* The lib's LinearProgress takes `value` alone — it has no
+                `variant` prop, and an unknown one would land on the DOM. */}
+            <LinearProgress value={total ? Math.round((doneCount / total) * 100) : 0} />
+            <BodySmall color="quiet">
+              {finished
+                ? `${succeeded} of ${total} regenerated${failures.length ? `, ${failures.length} failed` : ''}.`
+                : `${doneCount} of ${total} done${current ? ` \u2014 regenerating ${current}\u2026` : '\u2026'}`}
+            </BodySmall>
+          </VStack>
+        )}
+
+        {failures.length > 0 && (
+          <Alert variant="light" color="error" size="small">
+            <VStack spacing={1}>
+              {failures.map((f) => (
+                <BodySmall key={f.name}>
+                  <strong>{f.name}</strong>: {f.message}
+                </BodySmall>
+              ))}
+            </VStack>
+          </Alert>
+        )}
+
+        <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
+          {!finished && (
+            <Button variant="default-outline" size="small" onClick={onClose} disabled={running}>
+              Cancel
+            </Button>
+          )}
+          {finished ? (
+            <Button variant="default" size="small" onClick={onClose}>Close</Button>
+          ) : (
+            <Button variant="default" size="small" onClick={runAll} disabled={running || total === 0}>
+              {running ? 'Regenerating\u2026' : `Regenerate all ${total}`}
+            </Button>
+          )}
+        </HStack>
+      </VStack>
+    </Modal>
   );
 }
