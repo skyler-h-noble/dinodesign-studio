@@ -130,10 +130,10 @@ describe('computeDrift', () => {
       document: {
         name: 'Frame', type: 'FRAME', visible: true, children: [
           { name: 'List', type: 'INSTANCE', visible: true,
-            componentProperties: { Orientation: { value: 'Vertica' } },
+            componentProperties: { Orientation: { value: 'Slanted' } },
             children: [
               { name: 'Divider', type: 'INSTANCE', visible: true,
-                componentProperties: { Orientation: { value: 'Vertical' } } },
+                componentProperties: { Orientation: { value: 'Diagonal' } } },
             ] },
         ],
       },
@@ -141,8 +141,8 @@ describe('computeDrift', () => {
     const dropped = computeDrift(f, '<Box />').filter(x => x.kind === 'variant-dropped');
     expect(dropped).toHaveLength(2);
     const byOwner = Object.fromEntries(dropped.map(d => [d.where, d.detail]));
-    expect(byOwner.List).toBe('Orientation = Vertica');
-    expect(byOwner['List > Divider']).toBe('Orientation = Vertical');
+    expect(byOwner.List).toBe('Orientation = Slanted');
+    expect(byOwner['List > Divider']).toBe('Orientation = Diagonal');
   });
 
   it('does not mistake a hex inside a comment for code', () => {
@@ -219,5 +219,81 @@ describe('slot-dropped', () => {
       .filter(x => x.kind === 'slot-dropped');
     expect(f).toHaveLength(1);
     expect(f[0].message).toMatch(/^End Slot/);
+  });
+});
+
+// ─── Noise control ────────────────────────────────────────────────────────────
+//
+// One real frame produced twelve findings and eleven were wrong. A report that
+// is mostly wrong stops being read, and then the one real finding in it is lost
+// too — so suppressing these is not cosmetic.
+describe('drift does not report correct code', () => {
+  const inst = (name: string, props: Record<string, string>, extra: object = {}) => ({
+    document: {
+      name: 'Test New', type: 'FRAME', visible: true,
+      children: [{
+        name, type: 'INSTANCE', visible: true,
+        componentProperties: Object.fromEntries(
+          Object.entries(props).map(([k, v]) => [k, { value: v }]),
+        ),
+        ...extra,
+      }],
+    },
+  });
+
+  // Each of these is a variant whose value IS the component's default, so code
+  // that passes nothing is correct.
+  const defaults: Array<[string, string, string]> = [
+    ['Divider', 'Orientation', 'horizontal'],
+    ['List', 'Orientation', 'Vertical'],
+    ['List', 'Type', 'Non-Clickable List'],
+    ['List Item', 'State', 'Non-Clickable'],
+    ['Avatar', 'Style', 'Photo'],
+    ['Button-Small', 'Style', 'solid'],
+    ['Button-Small', 'Type', 'text'],
+    ['Icon', 'Style', 'Filled'],
+  ];
+  for (const [owner, prop, value] of defaults) {
+    it(`ignores ${owner} ${prop}="${value}" — that is the default`, () => {
+      const found = computeDrift(inst(owner, { [prop]: value }), '<Box />')
+        .filter(f => f.kind === 'variant-dropped');
+      expect(`${owner}.${prop}: ${found.length} findings`).toBe(`${owner}.${prop}: 0 findings`);
+    });
+  }
+
+  it('still reports a value that is NOT a default', () => {
+    expect(computeDrift(inst('Divider', { Orientation: 'Slanted' }), '<Box />')
+      .filter(f => f.kind === 'variant-dropped')).toHaveLength(1);
+  });
+
+  // A Ratio draws its own Image Placeholder; the icon inside it is the lib's,
+  // and no prop on the generated code can reach it.
+  it('ignores variants inside a library-owned subtree', () => {
+    const frame = {
+      document: {
+        name: 'Test New', type: 'FRAME', visible: true,
+        children: [{
+          name: 'Image Placeholder', type: 'INSTANCE', visible: true,
+          children: [{
+            name: 'Icon', type: 'INSTANCE', visible: true,
+            componentProperties: { Size: { value: 'Large' } },
+          }],
+        }],
+      },
+    };
+    expect(computeDrift(frame, '<Ratio ratio="1:1" placeholder />')
+      .filter(f => f.kind === 'variant-dropped')).toHaveLength(0);
+  });
+
+  // Figma stores a typographic apostrophe; the code has a straight one.
+  it('matches text across curly and straight punctuation', () => {
+    const frame = {
+      document: {
+        name: 'Test New', type: 'FRAME', visible: true,
+        children: [{ name: 'Component Name', type: 'TEXT', visible: true, characters: '‘Let’s Do It!’' }],
+      },
+    };
+    expect(computeDrift(frame, `<DisplaySmall>'Let's Do It!'</DisplaySmall>`)
+      .filter(f => f.kind === 'text-missing')).toHaveLength(0);
   });
 });

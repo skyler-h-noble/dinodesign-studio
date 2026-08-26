@@ -108,6 +108,38 @@ const RGB_HSL = /\b(?:rgba?|hsla?)\s*\([^)]*\)/gi;
  * Ordered most to least actionable: a hardcoded colour is always wrong, a
  * missing component is usually wrong, a missing string is often fine.
  */
+/* Values that mean "the default", beyond the literal word.
+   Each of these is a real variant value from the OmniDesign library whose
+   behaviour is what you get by passing nothing: a Divider is horizontal, a List
+   is vertical and non-clickable, an Avatar shows a photo, a Button is solid, an
+   Icon is filled. "text" is the Button TYPE meaning an ordinary labelled button
+   — the shape axis calls its borderless style "ghost", so this never collides. */
+const DEFAULTISH =
+  /^(default|none|false|off|horizontal|vertical|solid|filled|photo|text|(non[-\s]?clickable)(\s+list)?)$/i;
+
+/* Subtrees the library owns. */
+const LIB_INTERNAL = [
+  'Image Placeholder', 'Ratio Holder', 'Ratio Slot',
+  'Button-Container', 'Button-Fill', 'Button-Contents', 'Typography Holder',
+  'Focus-Visible',
+];
+const isLibInternal = (where: string) =>
+  LIB_INTERNAL.some((seg) => where.includes(seg)) ||
+  // A ListItem's own row rule, drawn from `bottomBorder`.
+  /List Item\s*>\s*Divider/i.test(where);
+
+/* Figma stores typographic punctuation; a code editor usually does not.
+   "Let's Do It!" in the design and "Let's Do It!" in the code are the same
+   string to a reader and different to includes(), so the text check reported
+   a heading that was plainly present. */
+const normaliseText = (t: string) =>
+  t.replace(/[\u2018\u2019\u201B]/g, "'")
+   .replace(/[\u201C\u201D]/g, '"')
+   .replace(/[\u2013\u2014]/g, '-')
+   .replace(/\u2026/g, '...')
+   .replace(/\s+/g, ' ')
+   .trim();
+
 export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
   const findings: DriftFinding[] = [];
   if (!jsx.trim()) return findings;
@@ -174,8 +206,18 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
       const key = `${owner}|${cleanProp}=${value}`;
       if (seenVariants.has(key)) continue;
       seenVariants.add(key);
-      // Default-ish values are not worth reporting when absent.
-      if (/^(default|none|false|off)$/i.test(value)) continue;
+      /* Default-ish values are not worth reporting when absent.
+         A variant set to its own default is the component's behaviour with no
+         prop at all, so the code omitting it is CORRECT — reporting it turns a
+         right answer into a warning. Eleven of the twelve findings on one frame
+         were this, which is how a drift report stops being read. */
+      if (DEFAULTISH.test(value)) continue;
+      /* Variants inside a component the LIBRARY renders for itself.
+         A Ratio draws its own Image Placeholder and the icon within it; a
+         ListItem draws its own Divider from `bottomBorder`. Their variants are
+         the lib's internals, not choices the generated code can express, so
+         asking for them is asking for a prop that does not exist. */
+      if (isLibInternal(where)) continue;
       if (!new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(code)) {
         findings.push({
           severity: 'warning',
@@ -196,8 +238,9 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
     if (chars.length < 3) continue;
     if (!strings.has(chars)) strings.set(chars, where);
   }
+  const normalisedJsx = normaliseText(jsx);
   for (const [text, where] of strings) {
-    if (!jsx.includes(text)) {
+    if (!normalisedJsx.includes(normaliseText(text))) {
       findings.push({
         severity: 'warning',
         kind: 'text-missing',
