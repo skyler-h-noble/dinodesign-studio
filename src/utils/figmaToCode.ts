@@ -196,7 +196,7 @@ CONVERSION RULES:
        Success, Warning, Error, Black-White. ABSENT → Default → omit the prop
        (never emit variant="primary" for an unmarked control; Default is the
        brand colour and primary is a different one).
-       CHECKBOX AND RADIO HAVE NO SHAPE AXIS. Their `variant` is the colour and
+       CHECKBOX AND RADIO HAVE NO SHAPE AXIS. Their "variant" prop is the colour and
        nothing else — never emit variant="secondary-outline" or "error-light" on
        a Checkbox. Those shapes were removed from the lib; they still resolve to
        their colour but warn. The shape rule below applies to Button ONLY.
