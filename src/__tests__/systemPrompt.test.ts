@@ -61,3 +61,30 @@ describe('SYSTEM_PROMPT integrity', () => {
     expect(SYSTEM_PROMPT).not.toMatch(/->\s*variant="[a-z-]*-light"/);
   });
 });
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+//
+// The prompt showed <Icon><AddIcon /></Icon> in one example and never said
+// where AddIcon comes from, how a Figma node becomes that name, or that
+// @mui/icons-material is the source. The model saw the glyph — Drift reported
+// it as "Icon > add" — and dropped it, because "Icon" says where it goes and
+// nothing said the CHILD says what it is.
+describe('SYSTEM_PROMPT icon rules', () => {
+  it('names the icon package', () => {
+    expect(SYSTEM_PROMPT).toContain('@mui/icons-material');
+  });
+
+  it('shows the name transform, not just one example', () => {
+    for (const pair of ['add', 'AddIcon', 'chevron-right', 'ChevronRightIcon']) {
+      expect(`${pair}: ${SYSTEM_PROMPT.includes(pair)}`).toBe(`${pair}: true`);
+    }
+  });
+
+  it('says the glyph is the CHILD of the Icon wrapper', () => {
+    expect(SYSTEM_PROMPT).toMatch(/Icon > add/);
+  });
+
+  it('still requires the lib wrapper rather than a bare MUI icon', () => {
+    expect(SYSTEM_PROMPT).toMatch(/<Icon><AddIcon \/><\/Icon>/);
+  });
+});

@@ -586,6 +586,40 @@ CONVERSION RULES:
     (Overline → OverlineSmall, children → SubtitleLarge, secondary → Body),
     plus alignment, slot sizing, and accessibility.
 
+4d0. ICONS — the glyph is a CHILD of the Icon instance, and it is named.
+
+    The design wraps every icon in a component called "Icon", and the actual
+    glyph sits inside it as an instance named after the Material icon:
+
+        Icon                  <- the wrapper, tells you WHERE, not WHICH
+          add                 <- the glyph. This is the name you need.
+
+    So a node path of "Icon > add" is a plus sign, and becomes:
+
+        <Icon><AddIcon /></Icon>
+
+    NAMING: the child's name is the Material icon in lower case, with words
+    separated by spaces, dashes or underscores. PascalCase it and append "Icon":
+        add            -> AddIcon
+        chevron-right  -> ChevronRightIcon
+        more_vert      -> MoreVertIcon
+    Import it from "@mui/icons-material" — that package IS allowed and is the
+    only place icons come from; the component library ships none.
+        import AddIcon from '@mui/icons-material/Add';
+
+    ALWAYS WRAP IT IN THE LIB'S <Icon>. A bare <AddIcon /> takes MUI's colour
+    and sizing rather than the brand's. <Icon> is aria-hidden by default, which
+    is what a decorative glyph inside a labelled control should be.
+
+    An icon inside a Start/End Slot becomes that slot's prop (rule 4f):
+        Icon > add, in a Button's Start Slot
+            -> <Button startIcon={<Icon><AddIcon /></Icon>}>Button</Button>
+
+    NEVER DROP A NAMED GLYPH. "Icon" alone says where it goes; the child says
+    what it is, and the child is always there. Emitting the button without its
+    icon because the wrapper's name was uninformative is the failure this rule
+    exists to prevent — a "+ Button" that renders as "Button".
+
 4e0. NEVER OVERRIDE A TYPOGRAPHY COMPONENT'S FONT SIZE INLINE.
 
     style={{ fontSize: N }} on <H1>-<H6>, <Body>, <Subtitle>, <Caption> etc. is
