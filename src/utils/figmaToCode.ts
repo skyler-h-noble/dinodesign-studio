@@ -482,7 +482,14 @@ CONVERSION RULES:
     the output MUST use <List> + <ListItem>. The text frame's three layers
     (Overline / Title / Body) become PROPS, not nested JSX:
 
+    EACH TEXT PROP APPEARS ONLY IF ITS LAYER IS VISIBLE. The example below
+    shows all three so you can see their names — it is NOT a template to fill
+    in. Copying its shape onto a row whose title and secondary layers are
+    hidden is the single most common failure here, and it renders the overline
+    twice.
+
       <List>
+        {/* All three text layers visible: */}
         <ListItem
           startDecorator={<Ratio ratio="1:1" placeholder style={{ width: 48, height: 48 }} />}
           endDecorator={<Checkbox variant="default" />}
@@ -491,8 +498,20 @@ CONVERSION RULES:
         >
           Subtitle Large title
         </ListItem>
-        {/* ...more <ListItem> rows */}
+
+        {/* ONLY the overline layer visible — the common case. No children, no
+            secondary, and the overline text is NOT repeated as the title: */}
+        <ListItem
+          startDecorator={<Avatar size="medium" />}
+          overline="Overline Small"
+        />
       </List>
+
+    NEVER INVENT TEXT. Every string in the output must come from a "characters"
+    value on a node that survived pruning. If a text layer was hidden it is not
+    in the tree you were given, so there is nothing to write — omit the prop.
+    Do not reuse a neighbouring row's text, and do not restate the overline in
+    title case.
 
     ROW SIZE — READ THE ROW'S FIXED HEIGHT/WIDTH (rule 2d applies to the row too).
     A <ListItem> is NOT exempt from rule 2d. Check the ROW node's own
