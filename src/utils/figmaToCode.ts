@@ -185,6 +185,23 @@ CONVERSION RULES:
        HUG → omit (size to content); FILL → fill the axis. See rule 2d — this
        applies to EVERY node, including list rows and media slots.
      - layout → auto-layout: gap, padding, and axis alignment per rule 2a.
+     - modes.Buttons → the COLOUR of Button, Checkbox and Radio. The design system
+       carries button colour as a MODE, not as a variant property, so a Secondary
+       button and a Primary one can be the identical component with a different
+       mode applied. Map the mode name to the component's colour:
+           modes.Buttons "Secondary" → <Button variant="secondary">
+                                       <Checkbox variant="secondary-outline">
+                                       <Radio color="secondary">
+       Valid modes: Default, Primary, Secondary, Tertiary, Neutral, Info,
+       Success, Warning, Error. ABSENT → Default → omit the prop (never emit
+       variant="primary" for an unmarked button; Default is the brand colour and
+       primary is a different one).
+       A Style/Appearance VARIANT property still selects the SHAPE — solid vs
+       -outline vs -light vs ghost vs text — and composes with the mode:
+           modes.Buttons "Error" + variant Style "Outline" → variant="error-outline"
+       If a colour appears BOTH as a mode and as a variant property, the MODE
+       wins: the variant property is the leftover of a component that has not
+       been migrated yet.
    NEVER guess theme/surface from fill color when _aaid.modes exists. The
    fill-color heuristic (rule 3a) is ONLY a fallback for nodes that have NO
    _aaid. Only emit attributes for axes _aaid explicitly lists (Auto is omitted).

@@ -1,4 +1,5 @@
 import chroma from 'chroma-js';
+import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
@@ -1028,9 +1029,17 @@ export function buildPreviewCSS(input: BuildInput): string {
     const borderVal = tonal
       ? `var(--${surfacePaletteName}-Color-${scopeTones.border})`
       : neutral(neutralBorderN);
-    const borderVariantVal = tonal
-      ? `${p(surfacePalette, scopeTones.border)}33`
-      : `${neutral(neutralBorderN)}33`;
+    // Border-Variant is Border at reduced alpha — the RGB must come from the
+    // SAME value --Border resolves to, and the alpha from the same rule the CSS
+    // export uses (variantHex8, adaptive + floored). Both sites previously hard
+    // coded `33`; a flat alpha measures a 27x spread in perceived weight across
+    // themes, which is why the export stopped doing it, and the preview kept a
+    // second, quieter answer to the same question.
+    const borderVariantVal = variantHex8(
+      tonal ? p(surfacePalette, scopeTones.border) : neutral(neutralBorderN),
+      BORDER_VARIANT_ALPHA,
+      scopeBg,
+    );
     // Hotlink / Link use the SAME tone number as Text (just the Info palette),
     // so the link tone tracks the text tone exactly. The lib's Link component
     // reads --Link / --Link-Hover / --Link-Visited (separate from --Hotlink) —
@@ -1194,7 +1203,7 @@ ${emitDropshadowLevelLines(surfaceBg)}
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
   --Eyebrow: ${eyebrowFor(surfacePaletteName, surfaceBg, surfaceN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
-  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, surfaceTones.border)}33` : `${surfaceBorder}33`};
+  --Border-Variant: ${variantHex8(surfaceBorder, BORDER_VARIANT_ALPHA, surfaceBg)};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
   --Pressed: ${activeAndHoverFor(surfacePalette, surfaceN).active};
   /* --Hotlink and friends share the contrast-tuned Info text mapping so
@@ -1355,7 +1364,7 @@ ${emitDropshadowLevelLines(containerBg)}
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
   --Eyebrow: ${eyebrowFor(containerPaletteName, containerBg, containerN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
-  --Border-Variant: ${effectiveTextColoring === 'tonal' ? `${p(surfacePalette, containerTones.border)}33` : `${containerBorder}33`};
+  --Border-Variant: ${variantHex8(containerBorder, BORDER_VARIANT_ALPHA, containerBg)};
   --Hover: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).hover};
   --Pressed: ${activeAndHoverFor(containerPaletteName === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : containerPaletteName === 'Primary' ? primaryLight : containerPaletteName === 'Secondary' ? secondaryLight : tertiaryLight, containerN).active};
   /* Hotlink / Link use the SAME getFixedTextToken('Info') call as Text-Info

@@ -30,6 +30,7 @@ import {
   ButtonGroup,
   TextInput,
   TextArea,
+  Checkbox,
   Alert,
   Chip,
   CircularProgress,
@@ -158,6 +159,18 @@ export default function AaidWorkbenchPage() {
   const [brandError, setBrandError] = useState<string | null>(null);
 
   const [figmaUrl, setFigmaUrl] = useState('');
+  // Re-pasting the same frame while iterating on it in Figma is the NORMAL
+  // workflow here, and the frame cache is keyed on fileKey:nodeId only — it does
+  // not change when the frame's plugin data does. So a user who exports fresh
+  // _aaid notes and re-converts silently gets the pre-export JSON back for an
+  // hour, and the output looks like a converter bug. Opt-out lives next to the
+  // Convert button, and the choice persists.
+  const [skipCache, setSkipCache] = useState(() => {
+    try { return localStorage.getItem('aaid-workbench:skipCache') === '1'; } catch { return false; }
+  });
+  // Age (ms) of the cache entry the last convert served, or null when it went to
+  // the network. Surfaced so "why didn't my change show up" is answerable.
+  const [cacheAge, setCacheAge] = useState<number | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   // Native width (CSS px) of the Figma frame, read from its absoluteBoundingBox.
   // Both panels render at this width so the side-by-side is a true 1:1 scale
@@ -321,13 +334,15 @@ export default function AaidWorkbenchPage() {
         const cacheKey = `aaid-workbench:cache:${urlParts.fileKey}:${urlParts.nodeId}`;
         const cacheTtlMs = 60 * 60 * 1000;
         const now = Date.now();
+        setCacheAge(null);
         try {
-          const raw = localStorage.getItem(cacheKey);
+          const raw = skipCache ? null : localStorage.getItem(cacheKey);
           if (raw) {
             const parsed = JSON.parse(raw) as { ts: number; frameJson: unknown; image: string | null };
             if (now - parsed.ts < cacheTtlMs) {
               frameJson = parsed.frameJson;
               image = parsed.image;
+              setCacheAge(now - parsed.ts);
             }
           }
         } catch { /* corrupt cache — fall through to network fetch */ }
@@ -503,9 +518,30 @@ export default function AaidWorkbenchPage() {
             {figmaUrl && !urlParts && (
               <Caption color="error">Could not parse URL — expected format /design/&lt;fileKey&gt;?node-id=&lt;id&gt;.</Caption>
             )}
+            <HStack gap="var(--Sizing-2)" alignItems="center">
+              <Checkbox
+                checked={skipCache}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const next = e.target.checked;
+                  setSkipCache(next);
+                  try { localStorage.setItem('aaid-workbench:skipCache', next ? '1' : '0'); } catch { /* private mode */ }
+                }}
+                label="Always refetch"
+              />
+              <Caption color="quiet">
+                Ignore the 1-hour cache. Turn this on while iterating on a frame in
+                Figma — the cache is keyed on the frame's id, so it does not notice
+                a re-export.
+              </Caption>
+            </HStack>
+            {cacheAge !== null && (
+              <Caption color="warning">
+                Served from cache ({Math.max(1, Math.round(cacheAge / 60000))} min old) —
+                any Figma edit or plugin re-export since then is not in this conversion.
+              </Caption>
+            )}
             <Caption color="quiet">
               Fetched live through your PAT — counts against its rate limit (~30/min).
-              Frames are cached for an hour, so re-converting the same one is free.
             </Caption>
           </VStack>
         </Card>
