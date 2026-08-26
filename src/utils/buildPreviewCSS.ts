@@ -1147,7 +1147,19 @@ ${(() => {
   // tokens. Keep this narrow — matching [data-theme="Brand"] descendants would
   // also catch sibling content inside shared-wrapper layouts (e.g. PhonePreview
   // wraps App-Bar and Brand-main under one Brand-Nav-Bar frame).
-  return `[data-theme="Brand-App-Bar"],
+  /* The BARE [data-theme="App-Bar"] has to be here too.
+     Every selector below was scoped inside a Brand-App-Bar wrapper, and that
+     wrapper only exists in the PhonePreview. The lib's AppBar sets a bare
+     data-theme="App-Bar" on its own root, so on a real page nothing matched:
+     --Background and --Text fell through to the page scope and the bar rendered
+     white with a wordmark in the page's text colour — unreadable, and looking
+     like a contrast bug rather than a missing selector.
+     The published CSS carries 12 bare [data-theme="App-Bar"] rules; the preview
+     carried none. This is the divergence invariant 5 is about. */
+  return `[data-theme="App-Bar"],
+  [data-theme="App-Bar"][data-surface="Surface"],
+  [data-theme="App-Bar"][data-surface="Surface-Bright"],
+  [data-theme="Brand-App-Bar"],
   [data-theme="Brand-App-Bar"][data-surface="Surface"],
   [data-theme="Brand-App-Bar"] [data-theme="App-Bar"],
   [data-theme="Brand-App-Bar"] [data-theme="App-Bar"][data-surface="Surface-Bright"] {
@@ -1538,7 +1550,13 @@ ${(() => {
   // band of colour with a label on it and no button shape at all.
   const navBtnBorder = p(navDefPal, getAccessibleTones(navBarBg, nc.n, navDefPal).border);
 
-  return `[data-theme="Brand-Nav-Bar"],
+  /* Bare [data-theme="Nav-Bar"] for the same reason as App-Bar above: the
+     lib's BottomNavigation and Sidebar set it on their own roots, outside any
+     Brand-Nav-Bar wrapper. */
+  return `[data-theme="Nav-Bar"],
+  [data-theme="Nav-Bar"][data-surface="Surface"],
+  [data-theme="Nav-Bar"][data-surface="Surface-Bright"],
+  [data-theme="Brand-Nav-Bar"],
   [data-theme="Brand-Nav-Bar"][data-surface="Surface"],
   [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"],
   [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"][data-surface="Surface-Bright"] {
