@@ -16,6 +16,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import * as DynoComponents from '@omni-design/components';
+import * as MuiIcons from '@mui/icons-material';
 import { CustomLivePreview } from '../utils/customLivePreview';
 import {
   Card,
@@ -844,15 +845,42 @@ function LivePreviewPanel({ jsx, busy, frameWidth }: { jsx: string; busy: boolea
   // Spread the whole lib so any component the AAID emitted is available
   // without us having to enumerate. `useState` / `useEffect` etc. are
   // surfaced from React for completeness.
-  const scope = useMemo(() => ({
-    React,
-    useState: React.useState,
-    useEffect: React.useEffect,
-    useRef: React.useRef,
-    useMemo: React.useMemo,
-    useCallback: React.useCallback,
-    ...DynoComponents,
-  }), []);
+  /* Material icons in the preview scope.
+     Converted code renders icons as <AddIcon />, and the scope had none — so as
+     soon as the converter started emitting them (correctly), every preview
+     containing one died with "AddIcon is not defined" and rendered nothing. The
+     Code tab looked right, which made it read as the preview breaking rather
+     than as a missing binding.
+
+     Imported statically, deliberately. A dynamic import looked like the careful
+     choice — ~2000 modules on a page that is a static route — but the bundler
+     pointed out that @omni-design/components already imports the package
+     statically, so the icons are in the bundle either way and splitting them
+     buys nothing. It would only add a window where the first render has no
+     icons and the preview fails for a moment. */
+  const scope = useMemo(() => {
+    /* MUI exports the glyph as `Add`; generated code writes `AddIcon`, which is
+       the convention rule 4d0 asks for and what a real file would import as.
+       Bind BOTH so either spelling resolves. */
+    const icons: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(MuiIcons)) {
+      if (!/^[A-Z]/.test(name)) continue;
+      icons[name] = value;
+      if (!name.endsWith('Icon')) icons[`${name}Icon`] = value;
+    }
+    return {
+      React,
+      useState: React.useState,
+      useEffect: React.useEffect,
+      useRef: React.useRef,
+      useMemo: React.useMemo,
+      useCallback: React.useCallback,
+      ...icons,
+      // Lib components last: an icon must never shadow a component of the same
+      // name, and both packages export an `Icon`.
+      ...DynoComponents,
+    };
+  }, []);
 
   if (busy) {
     return (
