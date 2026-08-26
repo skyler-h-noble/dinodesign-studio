@@ -12,7 +12,7 @@
  * shadow in every system with no diff to point at.
  */
 import { describe, it, expect } from 'vitest';
-import { effectLevelRecipe, shadowLayers } from '../utils/dropshadow';
+import { effectLevelRecipe, shadowLayers, dropshadowBaseHex, dropshadowAlpha } from '../utils/dropshadow';
 
 describe('effect level recipes', () => {
   it('emit one layer per level', () => {
@@ -22,16 +22,18 @@ describe('effect level recipes', () => {
     }
   });
 
-  it('give each layer its own numbered colour token', () => {
-    // The aggregate --Dropshadow-Color is a FALLBACK for consumers outside a
-    // themed scope; the recipe itself must name the per-layer tokens, or every
-    // layer renders the same colour and the stack flattens.
-    for (const level of [1, 3, 5] as const) {
+  /* N is the ELEVATION, not the layer.
+     Each layer used to take its own token by index, so the five tokens were
+     alpha steps of one colour and a Level-3 card was a Level-1 card with
+     extras. Comeau's stack uses ONE opacity for every layer — depth comes from
+     how many layers there are and how dark the colour is, not from fading each
+     layer out. So Level-3 draws three layers, all in Dropshadow-Color-3. */
+  it('use that level\'s colour token on every one of its layers', () => {
+    for (const level of [1, 2, 3, 4, 5] as const) {
       const recipe = effectLevelRecipe(level);
-      for (let i = 1; i <= level; i++) {
-        expect(`L${level} uses Color-${i}: ${recipe.includes(`--Dropshadow-Color-${i}`)}`)
-          .toBe(`L${level} uses Color-${i}: true`);
-      }
+      const uses = [...recipe.matchAll(/--Dropshadow-Color-(\d)/g)].map((m) => m[1]);
+      expect(`L${level}: ${[...new Set(uses)].join(',')} x${uses.length}`)
+        .toBe(`L${level}: ${level} x${level}`);
     }
   });
 
@@ -52,5 +54,51 @@ describe('effect level recipes', () => {
     expect(all).not.toContain('0 4px 8px');
     expect(all).not.toContain('0 2px 4px');
     expect(all).not.toContain('0 16px 32px');
+  });
+});
+
+// ─── Elevation lives in the colour ────────────────────────────────────────────
+//
+// The five tokens used to be one colour at five opacities, so a higher
+// elevation read as WEAKER — the opposite of what elevation means, and the
+// thing that sent us round in circles on a card whose shadow would not deepen.
+describe('the shadow colour deepens with elevation', () => {
+  const lum = (hex: string) => {
+    const h = hex.replace('#', '').slice(0, 6);
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  it('gets strictly darker from level 1 to 5', () => {
+    for (const surface of ['#a3b8fc', '#8a9a5b', '#f5f5f5', '#2b1a3d']) {
+      const l = [1, 2, 3, 4, 5].map((n) => lum(dropshadowBaseHex(surface, n as 1)));
+      const monotonic = l.every((v, i) => i === 0 || v <= l[i - 1]);
+      expect(`${surface}: ${monotonic}`).toBe(`${surface}: true`);
+      // And meaningfully, not by a rounding error.
+      expect(`${surface} span: ${l[0] - l[4] > 8}`).toBe(`${surface} span: true`);
+    }
+  });
+
+  it('keeps every level darker than the surface it falls on', () => {
+    for (const surface of ['#a3b8fc', '#8a9a5b', '#f5f5f5']) {
+      for (const n of [1, 2, 3, 4, 5] as const) {
+        const ok = lum(dropshadowBaseHex(surface, n)) < lum(surface);
+        expect(`${surface} L${n} darker: ${ok}`).toBe(`${surface} L${n} darker: true`);
+      }
+    }
+  });
+
+  it('uses ONE alpha for every layer, as Comeau does', () => {
+    const alphas = [1, 2, 3, 4, 5].map((n) => dropshadowAlpha(n as 1));
+    expect(new Set(alphas).size).toBe(1);
+  });
+
+  it('keeps the doubling geometry at every level', () => {
+    // Level 3's third layer was [3,6,6], breaking the 1/2/4/8/16 progression
+    // that levels 4 and 5 follow.
+    for (const level of [3, 4, 5] as const) {
+      const ys = shadowLayers(level).map(([, y]) => y);
+      expect(`L${level} y: ${ys.join(',')}`).toBe(`L${level} y: ${ys.map((_, i) => 2 * 2 ** i).join(',')}`);
+    }
   });
 });

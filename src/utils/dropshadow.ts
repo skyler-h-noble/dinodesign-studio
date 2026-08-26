@@ -14,7 +14,22 @@ export type ShadowLevel = 1 | 2 | 3 | 4 | 5;
  *  old 2-layer curve because a level now stacks 3–8 layers that composite —
  *  higher levels use a touch less per-layer alpha so they don't go muddy.
  *  TUNABLE: bump these if shadows read too faint, drop them if too heavy. */
-const ALPHAS = [0.20, 0.17, 0.15, 0.13, 0.11];
+const ALPHA = 0.16;
+const ALPHAS = [ALPHA, ALPHA, ALPHA, ALPHA, ALPHA];
+
+/* One alpha for EVERY layer of EVERY level.
+ *
+ * This was a per-layer ladder — 0.20, 0.17, 0.15, 0.13, 0.11 — which is not
+ * what Comeau does. His stack is five layers at an identical opacity:
+ *     0 1px 1px   hsl(0deg 0% 0% / 0.075),
+ *     0 2px 2px   hsl(0deg 0% 0% / 0.075), ... 0 16px 16px  ... / 0.075
+ * The ladder made every shadow read as FADING OUT as it spread, and made the
+ * five Dropshadow-Color tokens differ only in transparency — so a higher
+ * elevation looked weaker, which is the opposite of what elevation means.
+ *
+ * Depth now comes from two things instead, both of which increase with the
+ * level: how many layers stack, and how dark the colour is (LIGHT_FACTORS).
+ * TUNABLE: raise if shadows read too faint, lower if too heavy. */
 
 // ── Goldilocks shadow color (Comeau "Designing Beautiful Shadows") ──────────
 // Match the surface HUE; pull SATURATION into a moderate band (never grey,
@@ -32,7 +47,17 @@ const SAT_MAX = 70;
 // floor is kept very low (a hint of the hue, never pure black) so even
 // near-black surfaces still get a darker-than-surface shadow rather than
 // clamping up to a lighter grey.
-const LIGHT_FACTOR = 0.6;
+/* Lightness factor PER LEVEL — the shadow colour deepens as elevation rises.
+ *
+ * dropshadowBaseHex used one factor for every level and said so in its
+ * signature: "Level-independent: elevation is expressed through ALPHAS + the
+ * layered geometry, not color." With the alpha ladder gone, colour is where
+ * elevation now lives. Level 1 is a light contact shadow; level 5 is a deep
+ * one, and the same surface produces five genuinely different mixes.
+ * Index is level-1. TUNABLE. */
+const LIGHT_FACTORS = [0.62, 0.55, 0.48, 0.41, 0.34];
+/** Level 1's factor, for callers that ask for a base colour with no level. */
+const LIGHT_FACTOR = LIGHT_FACTORS[0];
 const LIGHT_MIN = 3;
 const LIGHT_MAX = 52;
 
@@ -101,7 +126,7 @@ function alphaToHex(a: number): string {
  *  non-washed-out shadow color from Comeau's article. Level-independent:
  *  elevation is expressed through ALPHAS + the layered geometry, not color.
  *  `level` is accepted for signature compatibility / future per-level tuning. */
-export function dropshadowBaseHex(surfaceHex: string, _level?: ShadowLevel): string {
+export function dropshadowBaseHex(surfaceHex: string, level?: ShadowLevel): string {
   const hsl = hexToHsl(surfaceHex);
   // Achromatic surfaces (white / grey / black) have no meaningful hue — their
   // hue defaults to 0 (red). Injecting SAT_BASE there paints a pink/red shadow
@@ -110,7 +135,8 @@ export function dropshadowBaseHex(surfaceHex: string, _level?: ShadowLevel): str
   const s = hsl.s < 6 ? 0 : clamp(SAT_SLOPE * hsl.s + SAT_BASE, SAT_MIN, SAT_MAX);
   // Always darken — lower the lightness regardless of the surface tone. (No
   // more lift-for-dark; the shadow is uniformly darker for every color.)
-  return hslToHex({ h: hsl.h, s, l: clamp(LIGHT_FACTOR * hsl.l, LIGHT_MIN, LIGHT_MAX) });
+  const factor = level ? LIGHT_FACTORS[level - 1] : LIGHT_FACTOR;
+  return hslToHex({ h: hsl.h, s, l: clamp(factor * hsl.l, LIGHT_MIN, LIGHT_MAX) });
 }
 
 /** Per-level alpha for the dropshadow token. */
@@ -139,7 +165,7 @@ export const SHADOW_LEVELS: ReadonlyArray<ShadowLevel> = [1, 2, 3, 4, 5];
 const LEVEL_LAYERS: Record<ShadowLevel, Array<[number, number, number]>> = {
   1: [[0.5, 1, 1]],
   2: [[1, 2, 2], [2, 4, 4]],
-  3: [[1, 2, 2], [2, 4, 4], [3, 6, 6]],
+  3: [[1, 2, 2], [2, 4, 4], [4, 8, 8]],
   4: [[1, 2, 2], [2, 4, 4], [4, 8, 8], [8, 16, 16]],
   5: [[1, 2, 2], [2, 4, 4], [4, 8, 8], [8, 16, 16], [16, 32, 32]],
 };
@@ -150,10 +176,16 @@ export function shadowLayers(level: ShadowLevel): Array<[number, number, number]
   return LEVEL_LAYERS[level];
 }
 
-/** Box-shadow recipe for `--Effect-Level-N`: the N layered drop shadows, each
- *  using its per-layer color token --Dropshadow-Color-(layerIndex+1). */
+/** Box-shadow recipe for `--Effect-Level-N`: the N layered drop shadows, ALL
+ *  using that LEVEL's colour token --Dropshadow-Color-N.
+ *
+ *  Each layer used to take its own token by layer index, which is why the five
+ *  tokens were alpha steps of one colour and why a Level-3 card looked like a
+ *  Level-1 card with extras. N is the ELEVATION: Level-3 draws three layers,
+ *  all in Dropshadow-Color-3, and Level-5 draws five in the darker
+ *  Dropshadow-Color-5. */
 export function effectLevelRecipe(level: ShadowLevel): string {
   return LEVEL_LAYERS[level]
-    .map(([x, y, blur], i) => `${x}px ${y}px ${blur}px var(--Dropshadow-Color-${i + 1})`)
+    .map(([x, y, blur]) => `${x}px ${y}px ${blur}px var(--Dropshadow-Color-${level})`)
     .join(', ');
 }
