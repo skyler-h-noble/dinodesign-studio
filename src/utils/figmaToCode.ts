@@ -604,31 +604,60 @@ CONVERSION RULES:
 
 4f. BUTTON VARIANT + COLOR — "default" is the default; NEVER emit "primary" unless asked.
 
-    Your Figma Button is SIX components (Button, Button-Small, Button-Large, and
-    their -Elevated forms) that all map to ONE code <Button>: the component NAME
-    carries size + elevation, the rest are variant properties.
+    ONE code <Button> covers every Figma Button. Size, Elevation and Type are
+    variant PROPERTIES; colour is a Buttons MODE. Older files split size and
+    elevation across six component NAMES (Button, Button-Small, Button-Large and
+    their -Elevated forms) — those names are still honoured as a fallback, but a
+    variant property always wins over the name.
 
     FULL VARIANT MAP — translate EVERY axis (read _aaid.component for the name,
     _aaid.variant for the rest):
-      - SIZE + ELEVATED (from the _aaid.component NAME, not a variant prop):
-          "Button"          -> size default (omit)
-          "Button-Small"    -> size="small"
-          "Button-Large"    -> size="large"
-          "...-Elevated"    -> add elevated  (e.g. "Button-Large-Elevated"
-                               -> size="large" elevated)
+      - SIZE (_aaid.variant "Size"):
+          Small  -> size="small"
+          Medium -> omit (the default)
+          Large  -> size="large"
+        LEGACY FALLBACK — older components carried size in the NAME instead:
+          "Button-Small" -> size="small"; "Button-Large" -> size="large".
+          Use the name ONLY when there is no Size variant property.
+      - ELEVATION (_aaid.variant "Elevation") -> the boolean "elevated":
+          Elevated       -> true  -> write the bare prop: elevated
+          Default / any
+          other value    -> false -> write NOTHING
+        The prop defaults to false, so omitting it IS false — do not write
+        elevated={false}. It is a BOOLEAN: never elevated="Elevated".
+        LEGACY FALLBACK — a component name ending "-Elevated" means the same.
       - TYPE (_aaid.variant "Type"):
-          Text             -> nothing (the label is the children)
-          Icon-Only        -> iconOnly
-          Number or Letter -> letterNumber
-          Avatar           -> avatar
-      - STYLE x COLOR -> ONE combined variant string (there is NO separate color prop):
-          Style=Default + Color=X -> variant="x"          (e.g. "primary", "default")
-          Style=Outline + Color=X -> variant="x-outline"
-          Style=Ghost (any Color) -> variant="ghost"      (ghost is COLOR-AGNOSTIC:
-                                     there is no "x-ghost"; the Color is dropped)
+          Text         -> nothing (the label is the children)
+          iconOnly     -> iconOnly
+          letterNumber -> letterNumber
+          Avatar       -> avatar
+        Copy these prop names EXACTLY. "letterNumber" is one word, letter first.
+        React silently drops an unknown attribute like "numberLetter" onto the
+        DOM, so the button renders as an ordinary text button at the wrong width
+        with nothing logged — sizing keys off the prop, not off the content.
+      - COLOR comes from modes.Buttons (rule 0), NOT from a variant property.
+        The design system carries button colour as a MODE. If the component also
+        has a Color variant property it is un-migrated; the MODE wins.
+      - STYLE = the SHAPE. Values: Solid | Outline | Ghost — there is no Text
+        style. It composes with the colour into ONE variant string (there is no
+        separate color prop):
+          Style=Solid   + Buttons mode X -> variant="x"          ("primary", "default")
+          Style=Outline + Buttons mode X -> variant="x-outline"
+          Style=Ghost (any mode)         -> variant="ghost"      (COLOR-AGNOSTIC:
+                                     there is no "x-ghost"; the mode is dropped)
+        "Text" appears on the TYPE axis, not this one, and means an ordinary
+        LABELLED button — emit nothing for it, the label is the children. Never
+        read Type=Text as a shape. The code alias variant="text" exists and is
+        identical to "ghost"; prefer "ghost", since that is the name the design
+        uses.
           palette X in default|primary|secondary|tertiary|neutral|info|success|
-          warning|error. Per the PALETTE rules below it is "default" UNLESS the
-          variant explicitly names a Color.
+          warning|error|black-white. Per the PALETTE rules below it is "default"
+          UNLESS a Buttons mode names another colour.
+        THERE IS NO "-light" SHAPE. variant="x-light" was removed from the lib;
+        it resolves to the solid button of that colour and warns. Never emit it.
+        NO Style PROPERTY AT ALL -> solid. Do not infer outline or ghost from a
+        transparent fill: say solid and let the Drift tab report the mismatch,
+        rather than guessing a shape the design never stated.
       - STATE (_aaid.variant "State"):
           Default                        -> nothing
           Disabled                       -> disabled
@@ -875,7 +904,7 @@ CONVERSION RULES:
    so the workbench can find it.
 `;
 
-const SYSTEM_PROMPT = `You are a Figma-to-React converter for the OmniDesign component system. Given a Figma frame's JSON tree, produce a single React component file using only @omni-design/components and design tokens.
+export const SYSTEM_PROMPT = `You are a Figma-to-React converter for the OmniDesign component system. Given a Figma frame's JSON tree, produce a single React component file using only @omni-design/components and design tokens.
 
 ${LIB_CATALOG}
 
