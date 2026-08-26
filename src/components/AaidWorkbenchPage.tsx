@@ -176,6 +176,8 @@ export default function AaidWorkbenchPage() {
   // Both panels render at this width so the side-by-side is a true 1:1 scale
   // comparison rather than the Figma image being stretched to fill its column.
   const [frameWidth, setFrameWidth] = useState<number | null>(null);
+  // PNG width ÷ frame width. 1 means the export has no effect bleed.
+  const [imgScale, setImgScale] = useState(1);
   const [jsx, setJsx] = useState<string>('');
   const [missingComponents, setMissingComponents] = useState<string[]>([]);
   const [conversionId, setConversionId] = useState<string | null>(null);
@@ -315,6 +317,9 @@ export default function AaidWorkbenchPage() {
     setJsx('');
     setImgUrl(null);
     setFrameWidth(null);
+    // Reset with it: a frame with no shadow following one that had a big one
+    // would otherwise inherit its bleed and render over-scaled.
+    setImgScale(1);
     setMissingComponents([]);
     setConversionId(null);
     setVerdict(null);
@@ -379,8 +384,24 @@ export default function AaidWorkbenchPage() {
 
       // Capture the frame's native width so both panels render at the same
       // scale. Figma node JSON exposes it on absoluteBoundingBox.
-      const fw = (frameJson as { absoluteBoundingBox?: { width?: number } })
-        ?.absoluteBoundingBox?.width;
+      const box = (frameJson as { absoluteBoundingBox?: { width?: number } })
+        ?.absoluteBoundingBox;
+      const fw = box?.width;
+
+      /* How much wider the exported PNG is than the frame itself.
+         Figma renders effects OUTSIDE the geometry, so a frame with a drop
+         shadow exports a bleed on every side and the image is wider than
+         absoluteBoundingBox. Scaling the <img> by that ratio lands its CONTENT
+         at the frame width, which is what the code panel beside it renders at.
+         absoluteRenderBounds IS the rendered extent including effects, so the
+         ratio is measured rather than assumed — a hardcoded 1.12 over-scaled
+         every frame whose shadow was smaller than that, which is most of them,
+         and the two panels never matched. Falls back to 1 (no bleed) when the
+         API omits render bounds, since equal beats guessed. */
+      const render = (frameJson as { absoluteRenderBounds?: { width?: number } })
+        ?.absoluteRenderBounds;
+      const ratio = box?.width && render?.width ? render.width / box.width : 1;
+      setImgScale(Number.isFinite(ratio) && ratio >= 1 && ratio < 2 ? ratio : 1);
       setFrameWidth(typeof fw === 'number' && fw > 0 ? Math.round(fw) : null);
 
       const { jsx: generatedJsx, missingComponents: missing } = await convertFigmaToCode(
@@ -566,11 +587,13 @@ export default function AaidWorkbenchPage() {
                   )}
                 </HStack>
                 {imgUrl ? (
-                  // Container is sized to the frame's true width (368). The PNG
-                  // includes the frame's drop-shadow bleed, so the image is a bit
-                  // wider (×1.12) to land the CONTENT at the frame width; overflow
-                  // is visible so the shadow spills out instead of being clipped
-                  // or widening the box. Layout width stays = the frame width.
+                  // Container is sized to the frame's true width. The PNG
+                  // includes the frame's effect bleed, so the image is scaled by
+                  // the MEASURED ratio (absoluteRenderBounds ÷ absoluteBoundingBox)
+                  // to land the CONTENT at the frame width; overflow is visible so
+                  // the shadow spills out instead of being clipped or widening the
+                  // box. Layout width stays = the frame width, so this panel and
+                  // the code panel beside it are the same size.
                   <div
                     style={{
                       width: frameWidth ? `${frameWidth}px` : '100%',
@@ -585,7 +608,7 @@ export default function AaidWorkbenchPage() {
                       alt="Figma frame"
                       data-surface="Container"
                       style={{
-                        width: frameWidth ? `${Math.round(frameWidth * 1.12)}px` : 'auto',
+                        width: frameWidth ? `${Math.round(frameWidth * imgScale)}px` : 'auto',
                         height: 'auto',
                         flexShrink: 0,
                         borderRadius: 8,
