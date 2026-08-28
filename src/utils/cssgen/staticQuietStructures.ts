@@ -71,21 +71,27 @@ export function getStaticQuietTokensForLightMode() {
       Warning: createQuietPaletteMapping('Warning'),
       Error: createQuietPaletteMapping('Error'),
       'Hotlink-Visited': createQuietPaletteMapping('Hotlink-Visited'),
-      BW: {
-        'Color-1': { value: '{Colors.Neutral.Color-6}', type: 'color' },
-        'Color-2': { value: '{Colors.Neutral.Color-6}', type: 'color' },
-        'Color-3': { value: '{Colors.Neutral.Color-7}', type: 'color' },
-        'Color-4': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-        'Color-5': { value: '{Colors.Neutral.Color-9}', type: 'color' },
-        'Color-6': { value: '{Colors.White}', type: 'color' },
-        'Color-7': { value: '{Colors.White}', type: 'color' },
-        'Color-8': { value: '{Colors.White}', type: 'color' },
-        'Color-9': { value: '{Colors.White}', type: 'color' },
-        'Color-10': { value: '{Colors.White}', type: 'color' },
-        'Color-11': { value: '{Colors.White}', type: 'color' },
-        'Color-12': { value: '{Colors.White}', type: 'color' },
-        'Color-Vibrant': { value: '{Colors.White}', type: 'color' }
-      }
+      /**
+       * BW — the quiet used when textColoring is 'black-white'.
+       *
+       * It is the NEUTRAL ladder, and it is indexed the way every other row
+       * here is: by the tone of the SURFACE the text sits on, not by the BW
+       * palette's own tone. Its sibling Text.Surfaces.BW reads the same way
+       * (Color-1 -> white text, because tone 1 is a DARK surface).
+       *
+       * Rows 1-5 always followed that ladder. Rows 6-12 did not: they were
+       * pinned to one extreme — {Colors.White} in light mode, Neutral Color-1
+       * in dark — which is the value TEXT takes, not a quiet. On a light
+       * surface that made light mode's quiet white-on-near-white, and dark
+       * mode's as loud as the body text it was meant to recede from.
+       *
+       * The result is byte-identical to the Neutral row, and that is not
+       * redundancy: textColoring selects between them, which is the test
+       * invariant 2 asks for. Black-white text mode wants the greyscale quiet,
+       * and Neutral IS the greyscale ramp — so the two agreeing is the
+       * correct answer, not a collapsed distinction.
+       */
+      BW: createQuietPaletteMapping('Neutral')
     };
 
   return {
@@ -121,21 +127,27 @@ export function getStaticQuietTokensForDarkMode() {
       Warning: createDarkModeQuietMapping('Warning', false),
       Error: createDarkModeQuietMapping('Error', false),
       'Hotlink-Visited': createDarkModeQuietMapping('Hotlink-Visited', false),
-      BW: {
-        'Color-1': { value: '{Colors.Neutral.Color-6}', type: 'color' },
-        'Color-2': { value: '{Colors.Neutral.Color-6}', type: 'color' },
-        'Color-3': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-        'Color-4': { value: '{Colors.Neutral.Color-8}', type: 'color' },
-        'Color-5': { value: '{Colors.Neutral.Color-10}', type: 'color' },
-        'Color-6': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-7': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-8': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-9': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-10': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-11': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-12': { value: '{Colors.Neutral.Color-1}', type: 'color' },
-        'Color-Vibrant': { value: '{Modes.Light-Mode.Colors.Neutral.Color-9}', type: 'color' }
-      }
+      /**
+       * BW — the quiet used when textColoring is 'black-white'.
+       *
+       * It is the NEUTRAL ladder, and it is indexed the way every other row
+       * here is: by the tone of the SURFACE the text sits on, not by the BW
+       * palette's own tone. Its sibling Text.Surfaces.BW reads the same way
+       * (Color-1 -> white text, because tone 1 is a DARK surface).
+       *
+       * Rows 1-5 always followed that ladder. Rows 6-12 did not: they were
+       * pinned to one extreme — {Colors.White} in light mode, Neutral Color-1
+       * in dark — which is the value TEXT takes, not a quiet. On a light
+       * surface that made light mode's quiet white-on-near-white, and dark
+       * mode's as loud as the body text it was meant to recede from.
+       *
+       * The result is byte-identical to the Neutral row, and that is not
+       * redundancy: textColoring selects between them, which is the test
+       * invariant 2 asks for. Black-white text mode wants the greyscale quiet,
+       * and Neutral IS the greyscale ramp — so the two agreeing is the
+       * correct answer, not a collapsed distinction.
+       */
+      BW: createDarkModeQuietMapping('Neutral', false)
     };
 
   return {

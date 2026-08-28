@@ -174,17 +174,17 @@ export function generateBaseButtons(
   // "{Text.Surfaces.BW-Button.Color-12}" into the Figma payload and the CSS,
   // so the black/white button's label had no colour in dark mode. Dark points
   // straight at the neutral ends instead.
-  // Quiet on a BW face reads the NEUTRAL rows, not Quiet.Surfaces.BW.
+  // Quiet on a BW face reads the NEUTRAL ladder directly.
   //
-  // Quiet.Surfaces.BW is the quiet for a BW SURFACE and is the wrong table
-  // here twice over: its Color-1 row is #8b8b8b, which is 3.41:1 on the white
-  // it is meant for, and its Color-12 row is pure white — identical to the
-  // label it is supposed to read quieter than. The Neutral rows are the same
-  // curated table every palette button reads, indexed the same way (by the
-  // tone of the background the text sits on), and unlike the BW rows they do
-  // not mirror between modes — the black face is dark in both, so it takes
-  // Color-1 in both. Measured: white face 7.23 / 11.55, black face 6.02 /
-  // 5.78 (light / dark).
+  // Quiet.Surfaces.BW now resolves to the same values (it IS the Neutral
+  // ladder), so this is a naming choice rather than a behavioural one — and
+  // Neutral is the clearer name here, because these rows are being indexed by
+  // the tone of the FACE, and reading a table called BW while ignoring the BW
+  // palette is how the index got inverted the first time.
+  //
+  // The black face is dark in BOTH modes and the white face light in both, so
+  // neither index mirrors the way the BW palette does. Measured: white face
+  // 7.04 / 8.67, black face 6.02 / 5.78 (light / dark).
   const blackFace = () => ({
     Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
     Text: { value: isDark ? '{Colors.White}' : '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },

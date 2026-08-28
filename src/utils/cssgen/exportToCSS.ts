@@ -4793,6 +4793,14 @@ export function generateBaseCSS(jsonData: any): string {
   // flattened into `--Quiet-...` variables, so the BW faces cannot point at it
   // by name the way they point at a palette. Read the row here and re-emit it
   // as the palette variable it already resolves to.
+  //
+  // NOTE THE INDEX. Quiet.Surfaces.BW is keyed by the tone of the SURFACE the
+  // text sits on — low tones are dark backgrounds — whereas the sibling
+  // Text.Surfaces.BW-Button table one line up is keyed by the BUTTON's fill,
+  // which runs the other way. Copying the Text line's index gives a quiet that
+  // is one full ladder away from correct: it put #8b8b8b on the white face,
+  // 3.41:1. So the WHITE face reads the light-surface row (12) and the BLACK
+  // face the dark-surface row (1).
   const bwQuietVar = (tone: number): string => {
     const row = jsonData?.Modes?.['Light-Mode']?.Quiet?.Surfaces?.BW?.[`Color-${tone}`]?.value
       ?? jsonData?.Quiet?.Surfaces?.BW?.[`Color-${tone}`]?.value;
@@ -4807,12 +4815,12 @@ export function generateBaseCSS(jsonData: any): string {
   // Black and White buttons (were BlackWhite.Light / .Medium)
   lines.push('  --Buttons-White-Button: var(--White);');
   lines.push('  --Buttons-White-Text: var(--Text-Surfaces-BW-Button-Color-1);');
-  lines.push(`  --Buttons-White-Quiet: ${bwQuietVar(1)};`);
+  lines.push(`  --Buttons-White-Quiet: ${bwQuietVar(12)};`);
   lines.push(`  --Buttons-White-Hover: ${hoverHex('Neutral', 12)};`);
   lines.push(`  --Buttons-White-Pressed: ${pressedHex('Neutral', 12)};`);
   lines.push('  --Buttons-Black-Button: var(--Neutral-Color-1);');
   lines.push('  --Buttons-Black-Text: var(--Text-Surfaces-BW-Button-Color-12);');
-  lines.push(`  --Buttons-Black-Quiet: ${bwQuietVar(12)};`);
+  lines.push(`  --Buttons-Black-Quiet: ${bwQuietVar(1)};`);
   lines.push(`  --Buttons-Black-Hover: ${hoverHex('Neutral', 1)};`);
   lines.push(`  --Buttons-Black-Pressed: ${pressedHex('Neutral', 1)};`);
   // Default button — border matches the palette that the Default button's
