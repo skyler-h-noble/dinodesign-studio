@@ -14,6 +14,7 @@ import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
 import { computeRadii, migrateLegacyRadii } from '../componentRadii';
+import { motionCSS, motionModeCSS } from '../motion';
 import { solveThemeScrims, generateTextOverImageCSS } from './generateTextOverImage';
 import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
@@ -2287,7 +2288,11 @@ function generateThemeCSS(modeData: any, fullJsonData?: any): string {
   
   // Button types
   const buttonTypes = ['Primary', 'Primary-Light', 'Secondary', 'Secondary-Light', 'Tertiary', 'Tertiary-Light', 'Neutral', 'Neutral-Light', 'Info', 'Info-Light', 'Success', 'Success-Light', 'Warning', 'Warning-Light', 'Error', 'Error-Light'];
-  const buttonProps = ['Button', 'Text', 'Border', 'Hover', 'Pressed', 'Highlight', 'Lowlight'];
+  /* 'Quiet' joins the slots: muted text ON the button fill, from the same
+     curated Quiet table the surfaces read, at the tone the button IS — so its
+     4.5:1 comes from the existing per-palette-per-tone guarantee rather than a
+     second contrast solver. */
+  const buttonProps = ['Button', 'Text', 'Border', 'Hover', 'Pressed', 'Highlight', 'Lowlight', 'Quiet'];
   
   // Icon types
   const iconTypes = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
@@ -4784,13 +4789,30 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push(`  --Buttons-Error-Light-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
   lines.push(`  --Buttons-Error-Light-Hover: ${hoverHex('Error', 12)};`);
   lines.push(`  --Buttons-Error-Light-Pressed: ${pressedHex('Error', 12)};`);
+  // The Quiet table is consumed by reference inside the JSON and never
+  // flattened into `--Quiet-...` variables, so the BW faces cannot point at it
+  // by name the way they point at a palette. Read the row here and re-emit it
+  // as the palette variable it already resolves to.
+  const bwQuietVar = (tone: number): string => {
+    const row = jsonData?.Modes?.['Light-Mode']?.Quiet?.Surfaces?.BW?.[`Color-${tone}`]?.value
+      ?? jsonData?.Quiet?.Surfaces?.BW?.[`Color-${tone}`]?.value;
+    const m = String(row ?? '').match(/^\{Colors\.(\w[\w-]*)\.(Color-[\w-]+)\}$/);
+    if (m) return `var(--${m[1]}-${m[2]})`;
+    if (String(row ?? '') === '{Colors.White}') return 'var(--White)';
+    // Nothing usable in the table — fall back to the surface's own quiet
+    // rather than emitting a name that resolves to nothing.
+    return 'var(--Quiet)';
+  };
+
   // Black and White buttons (were BlackWhite.Light / .Medium)
   lines.push('  --Buttons-White-Button: var(--White);');
   lines.push('  --Buttons-White-Text: var(--Text-Surfaces-BW-Button-Color-1);');
+  lines.push(`  --Buttons-White-Quiet: ${bwQuietVar(1)};`);
   lines.push(`  --Buttons-White-Hover: ${hoverHex('Neutral', 12)};`);
   lines.push(`  --Buttons-White-Pressed: ${pressedHex('Neutral', 12)};`);
   lines.push('  --Buttons-Black-Button: var(--Neutral-Color-1);');
   lines.push('  --Buttons-Black-Text: var(--Text-Surfaces-BW-Button-Color-12);');
+  lines.push(`  --Buttons-Black-Quiet: ${bwQuietVar(12)};`);
   lines.push(`  --Buttons-Black-Hover: ${hoverHex('Neutral', 1)};`);
   lines.push(`  --Buttons-Black-Pressed: ${pressedHex('Neutral', 1)};`);
   // Default button — border matches the palette that the Default button's
@@ -4812,6 +4834,7 @@ export function generateBaseCSS(jsonData: any): string {
   // so the Default button's 3D effect matches its body color.
   lines.push(`  --Buttons-Default-Highlight: var(--Buttons-${defaultBorderPalette}-Highlight);`);
   lines.push(`  --Buttons-Default-Lowlight: var(--Buttons-${defaultBorderPalette}-Lowlight);`);
+  lines.push(`  --Buttons-Default-Quiet: var(--Buttons-${defaultBorderPalette}-Quiet);`);
   // Resolve Default hover/active through the Buttons chain
   const defaultBtnData = jsonData?.Modes?.['Light-Mode']?.['Default-Button'] || jsonData?.['Default-Button'];
   const buttonsJsonData = jsonData?.Modes?.['Light-Mode']?.Buttons || jsonData?.Buttons;
@@ -4971,6 +4994,11 @@ export function generateBaseCSS(jsonData: any): string {
     // --Style-Border-Radius is what the lib's Card component consumes by
     // default. Emitting it explicitly here (the legacy export path stopped
     // writing it) ensures exported designs match the preview cap.
+    // Motion. Durations and easings come from src/utils/motion.ts so the CSS
+    // and the Figma export cannot drift apart. No overshoot curve is published:
+    // an easing token is an invitation to use it, and overshoot is out.
+    lines.push(`  /* Motion — durations by role, easings by where the motion starts and ends. */`);
+    lines.push(motionCSS('  '));
     lines.push(`  --Style-Border-Radius: ${cappedStyleRadius}px;`);
     lines.push(`  --Button-Radius: ${cappedButtonRadius}px;`);
     lines.push(`  --Sm-Button-Radius: ${cappedSmButtonRadius}px;`);
@@ -5053,6 +5081,10 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Effect-Level-4: ${effectLevelRecipe(4)};`);
     lines.push(`  --Effect-Level-5: ${effectLevelRecipe(5)};`);
     lines.push('}');
+    lines.push('');
+    // Motion mode, outside :root. data-motion="No-Motion" zeroes every
+    // duration; the OS preference is followed unless the attribute overrides it.
+    lines.push(motionModeCSS());
     lines.push('');
   }
   
@@ -5294,6 +5326,11 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Hover: var(--Surfaces-Hover);`);
     lines.push(`  --Pressed: var(--Surfaces-Pressed);`);
     lines.push(`  --Focus-Visible: var(--${prefix}-Focus-Visible);`);
+    /* Outline and ghost buttons have no fill — their text sits on the
+       SURFACE, so their muted tone is the surface's own --Quiet. One
+       alias rather than a per-palette token: there is nothing
+       palette-specific about it, and --Quiet already resolves per scope. */
+    lines.push(`  --Outline-Quiet: var(--Quiet);`);
     lines.push(`  --Effects: var(--${effects});`);
     lines.push(`  --Buttons-Primary-Button: var(--${prefix}-Buttons-Primary-Button);`);
     lines.push(`  --Buttons-Primary-Text: var(--${prefix}-Buttons-Primary-Text);`);
@@ -5302,6 +5339,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Primary-Pressed: var(--${prefix}-Buttons-Primary-Pressed);`);
     lines.push(`  --Buttons-Primary-Highlight: var(--${prefix}-Buttons-Primary-Highlight);`);
     lines.push(`  --Buttons-Primary-Lowlight: var(--${prefix}-Buttons-Primary-Lowlight);`);
+    lines.push(`  --Buttons-Primary-Quiet: var(--${prefix}-Buttons-Primary-Quiet);`);
     lines.push(`  --Buttons-Primary-Outline-Button: var(--${prefix}-Buttons-Primary-Outline-Button);`);
     lines.push(`  --Buttons-Primary-Outline-Text: var(--${prefix}-Buttons-Primary-Outline-Text);`);
     lines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
@@ -5319,6 +5357,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Secondary-Pressed: var(--${prefix}-Buttons-Secondary-Pressed);`);
     lines.push(`  --Buttons-Secondary-Highlight: var(--${prefix}-Buttons-Secondary-Highlight);`);
     lines.push(`  --Buttons-Secondary-Lowlight: var(--${prefix}-Buttons-Secondary-Lowlight);`);
+    lines.push(`  --Buttons-Secondary-Quiet: var(--${prefix}-Buttons-Secondary-Quiet);`);
     lines.push(`  --Buttons-Tertiary-Button: var(--${prefix}-Buttons-Tertiary-Button);`);
     lines.push(`  --Buttons-Tertiary-Text: var(--${prefix}-Buttons-Tertiary-Text);`);
     lines.push(`  --Buttons-Tertiary-Border: var(--${prefix}-Buttons-Tertiary-Border);`);
@@ -5326,6 +5365,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Tertiary-Pressed: var(--${prefix}-Buttons-Tertiary-Pressed);`);
     lines.push(`  --Buttons-Tertiary-Highlight: var(--${prefix}-Buttons-Tertiary-Highlight);`);
     lines.push(`  --Buttons-Tertiary-Lowlight: var(--${prefix}-Buttons-Tertiary-Lowlight);`);
+    lines.push(`  --Buttons-Tertiary-Quiet: var(--${prefix}-Buttons-Tertiary-Quiet);`);
     lines.push(`  --Buttons-Neutral-Button: var(--${prefix}-Buttons-Neutral-Button);`);
     lines.push(`  --Buttons-Neutral-Text: var(--${prefix}-Buttons-Neutral-Text);`);
     lines.push(`  --Buttons-Neutral-Border: var(--${prefix}-Buttons-Neutral-Border);`);
@@ -5333,6 +5373,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Neutral-Pressed: var(--${prefix}-Buttons-Neutral-Pressed);`);
     lines.push(`  --Buttons-Neutral-Highlight: var(--${prefix}-Buttons-Neutral-Highlight);`);
     lines.push(`  --Buttons-Neutral-Lowlight: var(--${prefix}-Buttons-Neutral-Lowlight);`);
+    lines.push(`  --Buttons-Neutral-Quiet: var(--${prefix}-Buttons-Neutral-Quiet);`);
     lines.push(`  --Buttons-Info-Button: var(--${prefix}-Buttons-Info-Button);`);
     lines.push(`  --Buttons-Info-Text: var(--${prefix}-Buttons-Info-Text);`);
     lines.push(`  --Buttons-Info-Border: var(--${prefix}-Buttons-Info-Border);`);
@@ -5340,6 +5381,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Info-Pressed: var(--${prefix}-Buttons-Info-Pressed);`);
     lines.push(`  --Buttons-Info-Highlight: var(--${prefix}-Buttons-Info-Highlight);`);
     lines.push(`  --Buttons-Info-Lowlight: var(--${prefix}-Buttons-Info-Lowlight);`);
+    lines.push(`  --Buttons-Info-Quiet: var(--${prefix}-Buttons-Info-Quiet);`);
     const successPrefix = prefix.startsWith('Surface') ? 'Containers' : prefix;
     lines.push(`  --Buttons-Success-Button: var(--${successPrefix}-Buttons-Success-Button);`);
     lines.push(`  --Buttons-Success-Text: var(--${prefix}-Buttons-Success-Text);`);
@@ -5348,6 +5390,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Success-Pressed: var(--${prefix}-Buttons-Success-Pressed);`);
     lines.push(`  --Buttons-Success-Highlight: var(--${prefix}-Buttons-Success-Highlight);`);
     lines.push(`  --Buttons-Success-Lowlight: var(--${prefix}-Buttons-Success-Lowlight);`);
+    lines.push(`  --Buttons-Success-Quiet: var(--${prefix}-Buttons-Success-Quiet);`);
     lines.push(`  --Buttons-Warning-Button: var(--${prefix}-Buttons-Warning-Button);`);
     lines.push(`  --Buttons-Warning-Text: var(--${prefix}-Buttons-Warning-Text);`);
     lines.push(`  --Buttons-Warning-Border: var(--${prefix}-Buttons-Warning-Border);`);
@@ -5355,6 +5398,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Warning-Pressed: var(--${prefix}-Buttons-Warning-Pressed);`);
     lines.push(`  --Buttons-Warning-Highlight: var(--${prefix}-Buttons-Warning-Highlight);`);
     lines.push(`  --Buttons-Warning-Lowlight: var(--${prefix}-Buttons-Warning-Lowlight);`);
+    lines.push(`  --Buttons-Warning-Quiet: var(--${prefix}-Buttons-Warning-Quiet);`);
     lines.push(`  --Buttons-Error-Button: var(--${prefix}-Buttons-Error-Button);`);
     lines.push(`  --Buttons-Error-Text: var(--${prefix}-Buttons-Error-Text);`);
     lines.push(`  --Buttons-Error-Border: var(--${prefix}-Buttons-Error-Border);`);
@@ -5362,6 +5406,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Error-Pressed: var(--${prefix}-Buttons-Error-Pressed);`);
     lines.push(`  --Buttons-Error-Highlight: var(--${prefix}-Buttons-Error-Highlight);`);
     lines.push(`  --Buttons-Error-Lowlight: var(--${prefix}-Buttons-Error-Lowlight);`);
+    lines.push(`  --Buttons-Error-Quiet: var(--${prefix}-Buttons-Error-Quiet);`);
     // Map Default icons to Neutral since Default palette is not generated
     lines.push(`  --Icons-Default: var(--${prefix}-Icons-Neutral);`);
     lines.push(`  --Icons-Default-Variant: var(--${prefix}-Icons-Neutral-Variant);`);

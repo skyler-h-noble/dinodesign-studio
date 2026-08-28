@@ -307,6 +307,20 @@ function getAccessibleTones(
   };
 }
 
+/**
+ * Give every scope that defines --Quiet a matching --Outline-Quiet.
+ *
+ * Mirrors the alias exportToCSS emits once per surface scope. Invariant 5:
+ * preview and export are separate implementations and drift silently, so the
+ * two have to be changed together.
+ */
+function withOutlineQuiet(css: string): string {
+  return css.replace(
+    /^([ \t]*)(--Quiet:[^;]+;)/gm,
+    (_m, indent: string, decl: string) => `${indent}${decl}\n${indent}--Outline-Quiet: var(--Quiet);`,
+  );
+}
+
 export function buildPreviewCSS(input: BuildInput): string {
   const { colorScheme, userSelections: sel, mode } = input;
   const isDark = mode === 'dark';
@@ -882,7 +896,8 @@ export function buildPreviewCSS(input: BuildInput): string {
   --Buttons-${name}-Hover: ${hover};
   --Buttons-${name}-Pressed: ${active};
   --Buttons-${name}-Highlight: ${highlightFor(bg)};
-  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};`;
+  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};
+  --Buttons-${name}-Quiet: ${p(pal, tones.quiet)};`;
     }).join('\n');
   };
 
@@ -959,8 +974,10 @@ export function buildPreviewCSS(input: BuildInput): string {
       };
     };
     const { hover, active } = isBW ? bwStates() : activeAndHoverFor(pal, n);
+    const quiet = isBW ? (isLight(bg) ? neutral(6) : WHITE_TEXT) : p(pal, tones.quiet);
     return `  --Buttons-Default-Button: ${bg};
   --Buttons-Default-Text: ${txt};
+  --Buttons-Default-Quiet: ${quiet};
   --Buttons-Default-Border: ${palBorder};
   --Buttons-Default-Hover: ${hover};
   --Buttons-Default-Pressed: ${active};
@@ -1089,8 +1106,12 @@ ${(() => {
     const { hover, active } = defIsBW
       ? (isLight(defBg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
       : activeAndHoverFor(defPal, defN);
+    const defQuiet = defIsBW
+      ? (isLight(defBg) ? neutral(6) : WHITE_TEXT)
+      : p(defPal, defTones.quiet);
     return `  --Buttons-Default-Button: ${defBg};
   --Buttons-Default-Text: ${defTxt};
+  --Buttons-Default-Quiet: ${defQuiet};
   --Buttons-Default-Hover: ${hover};
   --Buttons-Default-Pressed: ${active};
   --Buttons-Default-Highlight: ${highlightFor(defBg)};
@@ -1099,7 +1120,14 @@ ${(() => {
   }
 
   // ── Build CSS ──
-  return `
+  //
+  // --Outline-Quiet is attached below rather than written at each scope.
+  // Outline and ghost buttons have no fill, so their muted tone is the
+  // SURFACE's own --Quiet — and a custom property does not re-resolve when a
+  // descendant redefines what it points at, it inherits the computed value.
+  // So the alias has to repeat in every scope that sets --Quiet, and doing
+  // that by hand across ~40 scopes is how one gets missed.
+  return withOutlineQuiet(`
 /* ══ Palette Colors — always light (vibrant) palette ══ */
 /* Surfaces/containers use direct hex values from dark palette when in dark mode */
 /* Text, buttons, tags, icons reference these vibrant variables */
@@ -1179,6 +1207,7 @@ ${emitDropshadowLevelLines(appBarBg)}
   --Buttons-Primary-Pressed: ${abOldHoverHex};
   --Buttons-Default-Button: transparent;
   --Buttons-Default-Text: var(--${ac.palette}-Color-${tones.text});
+  --Buttons-Default-Quiet: var(--${ac.palette}-Color-${tones.quiet});
   --Buttons-Default-Border: var(--${ac.palette}-Color-${tones.border});
   --Buttons-Default-Highlight: ${highlightFor(btnBg)};
   --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
@@ -1254,7 +1283,8 @@ ${(() => {
   --Buttons-${name}-Hover: ${hover};
   --Buttons-${name}-Pressed: ${active};
   --Buttons-${name}-Highlight: ${highlightFor(bg)};
-  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};`;
+  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};
+  --Buttons-${name}-Quiet: ${p(pal, tones.quiet)};`;
     }).join('\n');
   })()}
 ${(() => {
@@ -1268,8 +1298,12 @@ ${(() => {
       default: defPal = bPrimary; defN = btnPC; break;
     }
     const { active: defActive, hover: defHover } = activeAndHoverFor(defPal, defN);
+    const defQuiet = effectiveButton === 'black-white'
+      ? (isLight(btnBg) ? neutral(6) : WHITE_TEXT)
+      : p(defPal, getAccessibleTones(btnBg, defN, defPal).quiet);
     return `  --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
+  --Buttons-Default-Quiet: ${defQuiet};
   --Buttons-Default-Border: ${btnBorder};
   --Buttons-Default-Highlight: ${highlightFor(btnBg)};
   --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
@@ -1308,8 +1342,12 @@ ${(() => {
     }
     const cpArr = cp === 'Secondary' ? secondaryLight : cp === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
     const { active: contActive, hover: contHover } = activeAndHoverFor(cpArr, cn);
+    const contQuietHex = cp === 'Neutral'
+      ? (isLight(btnBg) ? neutral(6) : WHITE_TEXT)
+      : p(cpArr, getAccessibleTones(btnBg, cn, cpArr).quiet);
     return `  --Container-Buttons-Default-Button: ${btnBg};
   --Container-Buttons-Default-Text: ${btnText};
+  --Container-Buttons-Default-Quiet: ${contQuietHex};
   --Container-Buttons-Default-Border: ${contBtnBorder};
   --Container-Buttons-Default-Highlight: ${highlightFor(btnBg)};
   --Container-Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
@@ -1353,6 +1391,13 @@ ${(() => {
   const contDefBorder = contIsBW ? contDefBg : buttonBorderCss;
   const contDefHover = contIsBW ? (isLight(contDefBg) ? '#e0e0e0' : '#1a1a1a') : contBtnHover;
   const contDefActive = contIsBW ? (isLight(contDefBg) ? '#cccccc' : '#2e2e2e') : contBtnActive;
+  // Quiet ON the Default button's own fill — the button-mode palette at the
+  // button's tone, same table and index its Text reads. BW mirrors the
+  // export's Quiet.Surfaces.BW row: grey on the white face, the text colour
+  // itself on the black face.
+  const contDefQuiet = contIsBW
+    ? (isLight(contDefBg) ? NEUTRAL[5] : '#ffffff')
+    : p(buttonModePalette, getAccessibleTones(contDefBg, buttonModeN, buttonModePalette).quiet);
   return `[data-theme="Brand"][data-surface="Container"],
 [data-theme="Brand"][data-surface="Container-High"],
 [data-theme="Brand"][data-surface="Container-Highest"],
@@ -1394,9 +1439,11 @@ ${buildTextPaletteLines(containerN, true)}
 ${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${contDefBg};
   --Buttons-Primary-Text: ${contDefText};
+  --Buttons-Primary-Quiet: ${contDefQuiet};
   --Buttons-Primary-Border: ${contDefBorder};
   --Buttons-Default-Button: ${contDefBg};
   --Buttons-Default-Text: ${contDefText};
+  --Buttons-Default-Quiet: ${contDefQuiet};
   --Buttons-Default-Border: ${contDefBorder};
   --Buttons-Default-Highlight: ${highlightFor(contDefBg)};
   --Buttons-Default-Lowlight: ${lowlightFor(contDefBg)};
@@ -1440,7 +1487,8 @@ ${(() => {
   --Buttons-${name}-Hover: ${hover};
   --Buttons-${name}-Pressed: ${active};
   --Buttons-${name}-Highlight: ${highlightFor(bg)};
-  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};`;
+  --Buttons-${name}-Lowlight: ${lowlightFor(bg)};
+  --Buttons-${name}-Quiet: ${p(pal, tones.quiet)};`;
     }).join('\n');
   })()}
 }`;
@@ -1864,5 +1912,5 @@ ${isDark ? `/* ══ Dark mode image treatment ══
   --Text-Quiet: var(--Quiet, var(--Neutral-Color-5));
   --Border: var(--Neutral-Color-5);
 }
-`;
+`);
 }

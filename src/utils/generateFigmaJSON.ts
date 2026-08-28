@@ -19,6 +19,7 @@ import {
 } from './typeScale';
 import { nearestAvailableWeight } from './googleFontWeights';
 import type { TypographyStyle } from '../types';
+import { motionJSON } from './motion';
 
 interface ColorToken {
   value: string;
@@ -1824,6 +1825,13 @@ const FIGMA_BUTTON_PADDING = 8;
 const FIGMA_LG_BUTTON_PADDING = 16;
 
 const BUTTON_BORDER_WIDTH = 1;
+    // Motion. Durations are FLOATs and are directly usable as Smart Animate
+    // durations; the easings can only be STRINGs, since Figma prototypes pick
+    // from their own presets — those ship as reference values a designer pastes
+    // into a Custom bezier. Both come from src/utils/motion.ts, so the Figma
+    // variables and the CSS custom properties cannot drift.
+    figma.Motion = motionJSON();
+
     figma.Components = {
       Button: {
         'Button-Radius': r.buttonRadius,
@@ -2170,7 +2178,7 @@ const BUTTON_BORDER_WIDTH = 1;
     `${bwLowlightResolved - bwLowlightBlack} white -> Neutral Color-12)`,
   );
 
-  // ── Outline-Text is NOT a per-theme token in Figma ──────────────────────
+  // ── Outline-Text and Outline-Quiet are NOT per-theme tokens in Figma ────
   //
   // The colour an outline button's label takes is the surface's own
   // Text-<Palette>. In CSS that resolves through the cascade, so the export
@@ -2188,6 +2196,12 @@ const BUTTON_BORDER_WIDTH = 1;
   // recreate the variables that were deliberately removed, in a Modes
   // collection already at its ceiling.
   //
+  // Outline-Quiet is stripped for a related but simpler reason: it does not
+  // vary by palette at all. It IS the surface's own Quiet — one value per
+  // theme x surface — so in Figma the outline and ghost variants bind to the
+  // Quiet variable that section already has. CSS still emits the name because
+  // a component reading `var(--Outline-Quiet)` should not have to know that.
+  //
   // This is a deliberate CSS/Figma divergence — the two describe one rule in
   // the shape each medium can express — so it is stated here rather than left
   // to be discovered as a parity failure.
@@ -2197,7 +2211,7 @@ const BUTTON_BORDER_WIDTH = 1;
     if (typeof n.value === 'string') return;
     for (const k of Object.keys(n)) {
       const child = n[k];
-      if (k === 'Outline-Text' && child && typeof child === 'object' && 'value' in child) {
+      if ((k === 'Outline-Text' || k === 'Outline-Quiet') && child && typeof child === 'object' && 'value' in child) {
         delete n[k];
         outlineTextStripped++;
         continue;
@@ -2208,8 +2222,9 @@ const BUTTON_BORDER_WIDTH = 1;
   stripOutlineText(figma.Themes, 0);
   stripOutlineText(figma.SurfacesContainers, 0);
   console.log(
-    `\u25AD [Figma] Outline-Text removed from the Theme collection (${outlineTextStripped} tokens) — ` +
-    `it lives in Buttons, one variable with a mode per palette.`,
+    `\u25AD [Figma] Outline-Text / Outline-Quiet removed from the Theme collection ` +
+    `(${outlineTextStripped} tokens) — Outline-Text lives in Buttons, one variable with a ` +
+    `mode per palette; Outline-Quiet is the section's own Quiet.`,
   );
 
   // Page canvas background — precomputed hex so the Figma plugin sets it from

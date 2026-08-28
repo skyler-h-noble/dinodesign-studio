@@ -241,6 +241,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
           return {
             'Button': { value: `{Buttons.${config.theme}.${shade}.Button}`, type: 'color' },
             'Text': { value: `{Buttons.${config.theme}.${shade}.Text}`, type: 'color' },
+            'Quiet': { value: `{Buttons.${config.theme}.${shade}.Quiet}`, type: 'color' },
             'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${shade}.Hover}`, type: 'color' },
             'Pressed': { value: `{Buttons.${config.theme}.${shade}.Pressed}`, type: 'color' },
@@ -271,6 +272,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         return {
           'Button': { value: `{${src}.Button}`, type: 'color' },
           'Text': { value: `{${src}.Text}`, type: 'color' },
+          'Quiet': { value: `{${src}.Quiet}`, type: 'color' },
           // A black or white button has no tonal ramp to step to for an edge,
           // so its border is its own fill — the face alone delineates it. The
           // BlackWhite table already stores Border that way.
@@ -286,6 +288,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Primary': {
         'Button': { value: `{Buttons.Primary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Primary.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Primary.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Primary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Primary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Primary.${shade}.Pressed}`, type: 'color' }
@@ -293,6 +296,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Secondary': {
         'Button': { value: `{Buttons.Secondary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Secondary.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Secondary.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Secondary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Secondary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Secondary.${shade}.Pressed}`, type: 'color' }
@@ -300,6 +304,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Tertiary': {
         'Button': { value: `{Buttons.Tertiary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Tertiary.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Tertiary.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Tertiary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Tertiary.${shade}.Pressed}`, type: 'color' }
@@ -312,6 +317,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'BlackWhite': {
         'Button': { value: `{Buttons.BlackWhite.Color-${n}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.BlackWhite.Color-${n}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.BlackWhite.Color-${n}.Quiet}`, type: 'color' },
         'Border': { value: `{Buttons.BlackWhite.Color-${n}.Border}`, type: 'color' },
         'Hover': { value: `{Buttons.BlackWhite.Color-${n}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.BlackWhite.Color-${n}.Pressed}`, type: 'color' },
@@ -321,6 +327,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Neutral.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Neutral.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Neutral.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Neutral.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Neutral.${shade}.Pressed}`, type: 'color' }
@@ -328,6 +335,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Info': {
         'Button': { value: `{Buttons.Info.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Info.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Info.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Info.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Info.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Info.${shade}.Pressed}`, type: 'color' }
@@ -335,6 +343,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Success': {
         'Button': { value: `{Buttons.Success.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Success.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Success.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Success.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Success.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Success.${shade}.Pressed}`, type: 'color' }
@@ -342,6 +351,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Warning': {
         'Button': { value: `{Buttons.Warning.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Warning.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Warning.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Warning.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Warning.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Warning.${shade}.Pressed}`, type: 'color' }
@@ -349,6 +359,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Error': {
         'Button': { value: `{Buttons.Error.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Error.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Error.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Error.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Error.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Error.${shade}.Pressed}`, type: 'color' }
@@ -677,6 +688,7 @@ function generateSingleTheme(config: ThemeConfig): any {
           return {
             'Button': { value: `{Buttons.${config.theme}.${config.cShade}.Button}`, type: 'color' },
             'Text': { value: `{Buttons.${config.theme}.${config.cShade}.Text}`, type: 'color' },
+            'Quiet': { value: `{Buttons.${config.theme}.${config.cShade}.Quiet}`, type: 'color' },
             'Border': { value: `{Border.Containers.${config.theme}.Color-${config.contN}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${config.cShade}.Hover}`, type: 'color' },
             'Pressed': { value: `{Buttons.${config.theme}.${config.cShade}.Pressed}`, type: 'color' },
@@ -693,6 +705,7 @@ function generateSingleTheme(config: ThemeConfig): any {
         return {
           'Button': { value: `{${cSrc}.Button}`, type: 'color' },
           'Text': { value: `{${cSrc}.Text}`, type: 'color' },
+          'Quiet': { value: `{${cSrc}.Quiet}`, type: 'color' },
           'Border': config.blackWhiteButton
             ? { value: `{${cSrc}.Border}`, type: 'color' }
             : { value: `{Border.Containers.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
@@ -705,6 +718,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Primary': {
         'Button': { value: `{Buttons.Primary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Primary.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Primary.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Primary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Primary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Primary.${config.cShade}.Pressed}`, type: 'color' }
@@ -712,6 +726,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Secondary': {
         'Button': { value: `{Buttons.Secondary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Secondary.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Secondary.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Secondary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Secondary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Secondary.${config.cShade}.Pressed}`, type: 'color' }
@@ -719,6 +734,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Tertiary': {
         'Button': { value: `{Buttons.Tertiary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Tertiary.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Tertiary.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Tertiary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Tertiary.${config.cShade}.Pressed}`, type: 'color' }
@@ -729,6 +745,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'BlackWhite': {
         'Button': { value: `{Buttons.BlackWhite.Color-${config.contN}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.BlackWhite.Color-${config.contN}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.BlackWhite.Color-${config.contN}.Quiet}`, type: 'color' },
         'Border': { value: `{Buttons.BlackWhite.Color-${config.contN}.Border}`, type: 'color' },
         'Hover': { value: `{Buttons.BlackWhite.Color-${config.contN}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.BlackWhite.Color-${config.contN}.Pressed}`, type: 'color' },
@@ -738,6 +755,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Neutral.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Neutral.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Neutral.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Neutral.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Neutral.${config.cShade}.Pressed}`, type: 'color' }
@@ -745,6 +763,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Info': {
         'Button': { value: `{Buttons.Info.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Info.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Info.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Info.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Info.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Info.${config.cShade}.Pressed}`, type: 'color' }
@@ -752,6 +771,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Success': {
         'Button': { value: `{Buttons.Success.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Success.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Success.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Success.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Success.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Success.${config.cShade}.Pressed}`, type: 'color' }
@@ -759,6 +779,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Warning': {
         'Button': { value: `{Buttons.Warning.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Warning.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Warning.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Warning.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Warning.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Warning.${config.cShade}.Pressed}`, type: 'color' }
@@ -766,6 +787,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Error': {
         'Button': { value: `{Buttons.Error.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Error.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Error.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Error.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Error.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Error.${config.cShade}.Pressed}`, type: 'color' }

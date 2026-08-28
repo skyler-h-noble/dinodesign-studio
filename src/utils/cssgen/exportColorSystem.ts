@@ -125,6 +125,9 @@ interface ButtonDetails {
   Border: ColorToken;
   Hover: ColorToken;
   Pressed: ColorToken;
+  /** Muted text ON the button fill — the partner to Text, from the same
+   *  curated Quiet table the surfaces read, at the tone the button IS. */
+  Quiet: ColorToken;
 }
 
 interface ButtonsForBackground {
@@ -1068,112 +1071,128 @@ function createThemeReference(
           Text: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Text'),
           Border: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Border'),
           Hover: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Hover'),
-          Pressed: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Pressed')
+          Pressed: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Pressed'),
+          Quiet: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Quiet')
         },
         'Primary-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Primary-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Primary-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Primary-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Primary-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Primary-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Primary-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Primary-Light.Quiet')
         },
         Secondary: {
           Button: createButtonReference('Surfaces', bgName, 'Secondary.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Secondary.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Secondary.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Secondary.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Secondary.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Secondary.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Secondary.Quiet')
         },
         'Secondary-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Secondary-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Secondary-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Secondary-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Secondary-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Secondary-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Secondary-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Secondary-Light.Quiet')
         },
         Tertiary: {
           Button: createButtonReference('Surfaces', bgName, 'Tertiary.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Tertiary.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Tertiary.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Tertiary.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Tertiary.Quiet')
         },
         'Tertiary-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Quiet')
         },
         Neutral: {
           Button: createButtonReference('Surfaces', bgName, 'Neutral.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Neutral.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Neutral.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Neutral.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Neutral.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Neutral.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Neutral.Quiet')
         },
         'Neutral-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Neutral-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Neutral-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Neutral-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Neutral-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Neutral-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Neutral-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Neutral-Light.Quiet')
         },
         Info: {
           Button: createButtonReference('Surfaces', bgName, 'Info.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Info.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Info.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Info.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Info.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Info.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Info.Quiet')
         },
         'Info-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Info-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Info-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Info-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Info-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Info-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Info-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Info-Light.Quiet')
         },
         Success: {
           Button: createButtonReference('Surfaces', bgName, 'Success.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Success.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Success.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Success.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Success.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Success.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Success.Quiet')
         },
         'Success-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Success-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Success-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Success-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Success-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Success-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Success-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Success-Light.Quiet')
         },
         Warning: {
           Button: createButtonReference('Surfaces', bgName, 'Warning.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Warning.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Warning.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Warning.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Warning.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Warning.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Warning.Quiet')
         },
         'Warning-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Warning-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Warning-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Warning-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Warning-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Warning-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Warning-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Warning-Light.Quiet')
         },
         Error: {
           Button: createButtonReference('Surfaces', bgName, 'Error.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Error.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Error.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Error.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Error.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Error.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Error.Quiet')
         },
         'Error-Light': {
           Button: createButtonReference('Surfaces', bgName, 'Error-Light.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Error-Light.Text'),
           Border: createButtonReference('Surfaces', bgName, 'Error-Light.Border'),
           Hover: createButtonReference('Surfaces', bgName, 'Error-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Error-Light.Pressed')
+          Pressed: createButtonReference('Surfaces', bgName, 'Error-Light.Pressed'),
+          Quiet: createButtonReference('Surfaces', bgName, 'Error-Light.Quiet')
         }
       },
       Icons: {
@@ -1253,112 +1272,128 @@ function createThemeReference(
           Text: createPrimaryButtonReference('Containers', bgName, 'Primary.Text'),
           Border: createPrimaryButtonReference('Containers', bgName, 'Primary.Border'),
           Hover: createPrimaryButtonReference('Containers', bgName, 'Primary.Hover'),
-          Pressed: createPrimaryButtonReference('Containers', bgName, 'Primary.Pressed')
+          Pressed: createPrimaryButtonReference('Containers', bgName, 'Primary.Pressed'),
+          Quiet: createPrimaryButtonReference('Containers', bgName, 'Primary.Quiet')
         },
         'Primary-Light': {
           Button: createButtonReference('Containers', bgName, 'Primary-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Primary-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Primary-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Primary-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Primary-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Primary-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Primary-Light.Quiet')
         },
         Secondary: {
           Button: createButtonReference('Containers', bgName, 'Secondary.Button'),
           Text: createButtonReference('Containers', bgName, 'Secondary.Text'),
           Border: createButtonReference('Containers', bgName, 'Secondary.Border'),
           Hover: createButtonReference('Containers', bgName, 'Secondary.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Secondary.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Secondary.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Secondary.Quiet')
         },
         'Secondary-Light': {
           Button: createButtonReference('Containers', bgName, 'Secondary-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Secondary-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Secondary-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Secondary-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Secondary-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Secondary-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Secondary-Light.Quiet')
         },
         Tertiary: {
           Button: createButtonReference('Containers', bgName, 'Tertiary.Button'),
           Text: createButtonReference('Containers', bgName, 'Tertiary.Text'),
           Border: createButtonReference('Containers', bgName, 'Tertiary.Border'),
           Hover: createButtonReference('Containers', bgName, 'Tertiary.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Tertiary.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Tertiary.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Tertiary.Quiet')
         },
         'Tertiary-Light': {
           Button: createButtonReference('Containers', bgName, 'Tertiary-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Tertiary-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Tertiary-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Tertiary-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Tertiary-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Tertiary-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Tertiary-Light.Quiet')
         },
         Neutral: {
           Button: createButtonReference('Containers', bgName, 'Neutral.Button'),
           Text: createButtonReference('Containers', bgName, 'Neutral.Text'),
           Border: createButtonReference('Containers', bgName, 'Neutral.Border'),
           Hover: createButtonReference('Containers', bgName, 'Neutral.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Neutral.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Neutral.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Neutral.Quiet')
         },
         'Neutral-Light': {
           Button: createButtonReference('Containers', bgName, 'Neutral-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Neutral-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Neutral-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Neutral-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Neutral-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Neutral-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Neutral-Light.Quiet')
         },
         Info: {
           Button: createButtonReference('Containers', bgName, 'Info.Button'),
           Text: createButtonReference('Containers', bgName, 'Info.Text'),
           Border: createButtonReference('Containers', bgName, 'Info.Border'),
           Hover: createButtonReference('Containers', bgName, 'Info.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Info.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Info.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Info.Quiet')
         },
         'Info-Light': {
           Button: createButtonReference('Containers', bgName, 'Info-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Info-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Info-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Info-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Info-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Info-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Info-Light.Quiet')
         },
         Success: {
           Button: createButtonReference('Containers', bgName, 'Success.Button'),
           Text: createButtonReference('Containers', bgName, 'Success.Text'),
           Border: createButtonReference('Containers', bgName, 'Success.Border'),
           Hover: createButtonReference('Containers', bgName, 'Success.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Success.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Success.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Success.Quiet')
         },
         'Success-Light': {
           Button: createButtonReference('Containers', bgName, 'Success-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Success-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Success-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Success-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Success-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Success-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Success-Light.Quiet')
         },
         Warning: {
           Button: createButtonReference('Containers', bgName, 'Warning.Button'),
           Text: createButtonReference('Containers', bgName, 'Warning.Text'),
           Border: createButtonReference('Containers', bgName, 'Warning.Border'),
           Hover: createButtonReference('Containers', bgName, 'Warning.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Warning.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Warning.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Warning.Quiet')
         },
         'Warning-Light': {
           Button: createButtonReference('Containers', bgName, 'Warning-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Warning-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Warning-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Warning-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Warning-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Warning-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Warning-Light.Quiet')
         },
         Error: {
           Button: createButtonReference('Containers', bgName, 'Error.Button'),
           Text: createButtonReference('Containers', bgName, 'Error.Text'),
           Border: createButtonReference('Containers', bgName, 'Error.Border'),
           Hover: createButtonReference('Containers', bgName, 'Error.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Error.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Error.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Error.Quiet')
         },
         'Error-Light': {
           Button: createButtonReference('Containers', bgName, 'Error-Light.Button'),
           Text: createButtonReference('Containers', bgName, 'Error-Light.Text'),
           Border: createButtonReference('Containers', bgName, 'Error-Light.Border'),
           Hover: createButtonReference('Containers', bgName, 'Error-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Error-Light.Pressed')
+          Pressed: createButtonReference('Containers', bgName, 'Error-Light.Pressed'),
+          Quiet: createButtonReference('Containers', bgName, 'Error-Light.Quiet')
         }
       },
       Icons: {
@@ -1461,7 +1496,13 @@ function generateButtonsForBackground(
       buttonText: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Text}`,
       buttonBorder: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Border}`,
       buttonHover: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Hover}`,
-      buttonActive: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Pressed}`
+      buttonActive: `{Primary-Button.Default.${surfaceOrContainer}.${bgName}.Pressed}`,
+      /* Quiet text ON the button fill. The Primary-Button table has no Quiet
+         slot, so this reads the same curated Quiet table every surface uses,
+         at the tone the primary button actually is. That table is tuned to
+         4.5:1 per palette per tone, so the contrast comes from the existing
+         guarantee rather than a second solver. */
+      buttonQuiet: `{Quiet.${surfaceOrContainer}.Primary.Color-${primaryN}}`
     };
   };
 
@@ -1472,7 +1513,10 @@ function generateButtonsForBackground(
       buttonText: `{Text.${surfaceOrContainer}.${paletteName}.Color-${colorN}}`,
       buttonBorder: `{Border.${surfaceOrContainer}.${paletteName}.${bgName}}`,
       buttonHover: `{Hover.${paletteName}.Color-${colorN}}`,
-      buttonActive: `{Pressed.${paletteName}.Color-${colorN}}`
+      buttonActive: `{Pressed.${paletteName}.Color-${colorN}}`,
+      // Same table and tone as buttonText, one row over — Quiet is what the
+      // system already publishes as the muted partner for this exact surface.
+      buttonQuiet: `{Quiet.${surfaceOrContainer}.${paletteName}.Color-${colorN}}`
     };
   };
 
@@ -1483,7 +1527,8 @@ function generateButtonsForBackground(
       buttonText: `{Text.${surfaceOrContainer}.${paletteName}.Color-9}`,
       buttonBorder: `{Border.${surfaceOrContainer}.${paletteName}.${bgName}}`,
       buttonHover: `{Hover.${paletteName}.Color-9}`,
-      buttonActive: `{Pressed.${paletteName}.Color-9}`
+      buttonActive: `{Pressed.${paletteName}.Color-9}`,
+      buttonQuiet: `{Quiet.${surfaceOrContainer}.${paletteName}.Color-9}`
     };
   };
 
@@ -1510,112 +1555,128 @@ function generateButtonsForBackground(
       Text: { value: primary.buttonText, type: 'color' },
       Border: { value: primary.buttonBorder, type: 'color' },
       Hover: { value: primary.buttonHover, type: 'color' },
-      Pressed: { value: primary.buttonActive, type: 'color' }
+      Pressed: { value: primary.buttonActive, type: 'color' },
+      Quiet: { value: primary.buttonQuiet, type: 'color' }
     },
     'Primary-Light': {
       Button: { value: primaryLight.buttonBg, type: 'color' },
       Text: { value: primaryLight.buttonText, type: 'color' },
       Border: { value: primaryLight.buttonBorder, type: 'color' },
       Hover: { value: primaryLight.buttonHover, type: 'color' },
-      Pressed: { value: primaryLight.buttonActive, type: 'color' }
+      Pressed: { value: primaryLight.buttonActive, type: 'color' },
+      Quiet: { value: primaryLight.buttonQuiet, type: 'color' }
     },
     Secondary: {
       Button: { value: secondary.buttonBg, type: 'color' },
       Text: { value: secondary.buttonText, type: 'color' },
       Border: { value: secondary.buttonBorder, type: 'color' },
       Hover: { value: secondary.buttonHover, type: 'color' },
-      Pressed: { value: secondary.buttonActive, type: 'color' }
+      Pressed: { value: secondary.buttonActive, type: 'color' },
+      Quiet: { value: secondary.buttonQuiet, type: 'color' }
     },
     'Secondary-Light': {
       Button: { value: secondaryLight.buttonBg, type: 'color' },
       Text: { value: secondaryLight.buttonText, type: 'color' },
       Border: { value: secondaryLight.buttonBorder, type: 'color' },
       Hover: { value: secondaryLight.buttonHover, type: 'color' },
-      Pressed: { value: secondaryLight.buttonActive, type: 'color' }
+      Pressed: { value: secondaryLight.buttonActive, type: 'color' },
+      Quiet: { value: secondaryLight.buttonQuiet, type: 'color' }
     },
     Tertiary: {
       Button: { value: tertiary.buttonBg, type: 'color' },
       Text: { value: tertiary.buttonText, type: 'color' },
       Border: { value: tertiary.buttonBorder, type: 'color' },
       Hover: { value: tertiary.buttonHover, type: 'color' },
-      Pressed: { value: tertiary.buttonActive, type: 'color' }
+      Pressed: { value: tertiary.buttonActive, type: 'color' },
+      Quiet: { value: tertiary.buttonQuiet, type: 'color' }
     },
     'Tertiary-Light': {
       Button: { value: tertiaryLight.buttonBg, type: 'color' },
       Text: { value: tertiaryLight.buttonText, type: 'color' },
       Border: { value: tertiaryLight.buttonBorder, type: 'color' },
       Hover: { value: tertiaryLight.buttonHover, type: 'color' },
-      Pressed: { value: tertiaryLight.buttonActive, type: 'color' }
+      Pressed: { value: tertiaryLight.buttonActive, type: 'color' },
+      Quiet: { value: tertiaryLight.buttonQuiet, type: 'color' }
     },
     Neutral: {
       Button: { value: neutral.buttonBg, type: 'color' },
       Text: { value: neutral.buttonText, type: 'color' },
       Border: { value: neutral.buttonBorder, type: 'color' },
       Hover: { value: neutral.buttonHover, type: 'color' },
-      Pressed: { value: neutral.buttonActive, type: 'color' }
+      Pressed: { value: neutral.buttonActive, type: 'color' },
+      Quiet: { value: neutral.buttonQuiet, type: 'color' }
     },
     'Neutral-Light': {
       Button: { value: neutralLight.buttonBg, type: 'color' },
       Text: { value: neutralLight.buttonText, type: 'color' },
       Border: { value: neutralLight.buttonBorder, type: 'color' },
       Hover: { value: neutralLight.buttonHover, type: 'color' },
-      Pressed: { value: neutralLight.buttonActive, type: 'color' }
+      Pressed: { value: neutralLight.buttonActive, type: 'color' },
+      Quiet: { value: neutralLight.buttonQuiet, type: 'color' }
     },
     Info: {
       Button: { value: info.buttonBg, type: 'color' },
       Text: { value: info.buttonText, type: 'color' },
       Border: { value: info.buttonBorder, type: 'color' },
       Hover: { value: info.buttonHover, type: 'color' },
-      Pressed: { value: info.buttonActive, type: 'color' }
+      Pressed: { value: info.buttonActive, type: 'color' },
+      Quiet: { value: info.buttonQuiet, type: 'color' }
     },
     'Info-Light': {
       Button: { value: infoLight.buttonBg, type: 'color' },
       Text: { value: infoLight.buttonText, type: 'color' },
       Border: { value: infoLight.buttonBorder, type: 'color' },
       Hover: { value: infoLight.buttonHover, type: 'color' },
-      Pressed: { value: infoLight.buttonActive, type: 'color' }
+      Pressed: { value: infoLight.buttonActive, type: 'color' },
+      Quiet: { value: infoLight.buttonQuiet, type: 'color' }
     },
     Success: {
       Button: { value: success.buttonBg, type: 'color' },
       Text: { value: success.buttonText, type: 'color' },
       Border: { value: success.buttonBorder, type: 'color' },
       Hover: { value: success.buttonHover, type: 'color' },
-      Pressed: { value: success.buttonActive, type: 'color' }
+      Pressed: { value: success.buttonActive, type: 'color' },
+      Quiet: { value: success.buttonQuiet, type: 'color' }
     },
     'Success-Light': {
       Button: { value: successLight.buttonBg, type: 'color' },
       Text: { value: successLight.buttonText, type: 'color' },
       Border: { value: successLight.buttonBorder, type: 'color' },
       Hover: { value: successLight.buttonHover, type: 'color' },
-      Pressed: { value: successLight.buttonActive, type: 'color' }
+      Pressed: { value: successLight.buttonActive, type: 'color' },
+      Quiet: { value: successLight.buttonQuiet, type: 'color' }
     },
     Warning: {
       Button: { value: warning.buttonBg, type: 'color' },
       Text: { value: warning.buttonText, type: 'color' },
       Border: { value: warning.buttonBorder, type: 'color' },
       Hover: { value: warning.buttonHover, type: 'color' },
-      Pressed: { value: warning.buttonActive, type: 'color' }
+      Pressed: { value: warning.buttonActive, type: 'color' },
+      Quiet: { value: warning.buttonQuiet, type: 'color' }
     },
     'Warning-Light': {
       Button: { value: warningLight.buttonBg, type: 'color' },
       Text: { value: warningLight.buttonText, type: 'color' },
       Border: { value: warningLight.buttonBorder, type: 'color' },
       Hover: { value: warningLight.buttonHover, type: 'color' },
-      Pressed: { value: warningLight.buttonActive, type: 'color' }
+      Pressed: { value: warningLight.buttonActive, type: 'color' },
+      Quiet: { value: warningLight.buttonQuiet, type: 'color' }
     },
     Error: {
       Button: { value: error.buttonBg, type: 'color' },
       Text: { value: error.buttonText, type: 'color' },
       Border: { value: error.buttonBorder, type: 'color' },
       Hover: { value: error.buttonHover, type: 'color' },
-      Pressed: { value: error.buttonActive, type: 'color' }
+      Pressed: { value: error.buttonActive, type: 'color' },
+      Quiet: { value: error.buttonQuiet, type: 'color' }
     },
     'Error-Light': {
       Button: { value: errorLight.buttonBg, type: 'color' },
       Text: { value: errorLight.buttonText, type: 'color' },
       Border: { value: errorLight.buttonBorder, type: 'color' },
       Hover: { value: errorLight.buttonHover, type: 'color' },
-      Pressed: { value: errorLight.buttonActive, type: 'color' }
+      Pressed: { value: errorLight.buttonActive, type: 'color' },
+      Quiet: { value: errorLight.buttonQuiet, type: 'color' }
     }
   };
 }
@@ -7108,6 +7169,7 @@ export function exportColorSystemToJSON(
         faces[faceName] = {
           Button: { value: fill, type: 'color' },
           Text: { value: resolveRef(modeData, src.Text), type: 'color' },
+          Quiet: { value: resolveRef(modeData, src.Quiet), type: 'color' },
           // A solid button's edge is its own fill.
           Border: { value: fill, type: 'color' },
           Hover: { value: resolveRef(modeData, src.Hover), type: 'color' },
@@ -7130,7 +7192,8 @@ export function exportColorSystemToJSON(
         if (!Number.isFinite(toneNumber)) continue;
         const face = toneNumber >= 6 ? faces.Black : faces.White;
         table[colorKey] = {
-          Button: { ...face.Button }, Text: { ...face.Text }, Border: { ...face.Border },
+          Button: { ...face.Button }, Text: { ...face.Text }, Quiet: { ...face.Quiet },
+          Border: { ...face.Border },
           Hover: { ...face.Hover }, Pressed: { ...face.Pressed },
           Highlight: { ...face.Highlight }, Lowlight: { ...face.Lowlight },
         };
@@ -7170,6 +7233,7 @@ export function exportColorSystemToJSON(
       const defaultFace = bgIsLight ? faces.Black : faces.White;
       table.Default = {
         Button: { ...defaultFace.Button }, Text: { ...defaultFace.Text },
+        Quiet: { ...defaultFace.Quiet },
         Border: { ...defaultFace.Border }, Hover: { ...defaultFace.Hover },
         Pressed: { ...defaultFace.Pressed }, Highlight: { ...defaultFace.Highlight },
         Lowlight: { ...defaultFace.Lowlight },
@@ -7381,6 +7445,42 @@ export function exportColorSystemToJSON(
     }
   }
   console.log(`▭ [JSON Export] Buttons Outline-Text added (${outlineTextTokens} tokens across both modes)`);
+
+  // ── Outline-Quiet ─────────────────────────────────────────────────────
+  //
+  // The muted counterpart of Outline-Text, on the same no-fill variants.
+  //
+  // An outline or ghost button sits ON the surface, so its quiet tone is the
+  // SURFACE's own Quiet — not the palette's, and not Quiet-on-the-fill (there
+  // is no fill). That makes it one value per section rather than one per
+  // palette, but it is still written onto every palette entry: the lib reads
+  // it as Buttons.<Pal>.Outline-Quiet, and a name nothing defines fails
+  // silently rather than falling back.
+  //
+  // Deliberately NOT reading the palette's Quiet.<scope>.<Pal>.<tone> row the
+  // way Outline-Text reads the Text row. Text at 4.5:1 in a palette hue still
+  // reads as that palette; the same row muted is what --Quiet already is, and
+  // a per-palette muted tone on a transparent button is a distinction with no
+  // visible difference — while costing eight tokens per section that each have
+  // to stay accessible independently.
+  let outlineQuietTokens = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
+    if (!themes) continue;
+    for (const theme of Object.values<any>(themes)) {
+      for (const section of Object.values<any>(theme ?? {})) {
+        const buttons = section?.Buttons;
+        if (!buttons || typeof buttons !== 'object') continue;
+        // The section's own Quiet, so the alias cannot disagree with the
+        // --Quiet a component beside the button reads.
+        const surfaceQuiet = section.Quiet?.value;
+        if (!surfaceQuiet) continue;
+        section['Outline-Quiet'] = { value: surfaceQuiet, type: 'color' };
+        outlineQuietTokens++;
+      }
+    }
+  }
+  console.log(`▭ [JSON Export] Buttons Outline-Quiet added (${outlineQuietTokens} tokens across both modes)`);
 
   // ── State backgrounds only offer their own button ─────────────────────
   //

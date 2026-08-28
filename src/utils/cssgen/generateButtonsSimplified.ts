@@ -129,6 +129,12 @@ export function generateBaseButtons(
     return {
       Button:  { value: `{${from}Colors.${palette}.Color-${tone}}`, type: 'color' },
       Text:    { value: `{${from}Text.Surfaces.${palette}.Color-${tone}}`, type: 'color' },
+      /* Muted label ON the fill — a caption or helper line inside a button,
+         and what an icon beside the label reads as. The Quiet table is indexed
+         the same way the Text table is (quiet text on Colors.<pal>.Color-N),
+         so reading it at the button's OWN tone gives the 4.5:1 the curated
+         table already guarantees, with no second contrast solver. */
+      Quiet:   { value: `{${from}Quiet.Surfaces.${palette}.Color-${tone}}`, type: 'color' },
       Hover:   { value: `{${from}Hover.${palette}.Color-${tone}}`, type: 'color' },
       Pressed: { value: `{${from}Pressed.${palette}.Color-${tone}}`, type: 'color' },
     };
@@ -168,15 +174,28 @@ export function generateBaseButtons(
   // "{Text.Surfaces.BW-Button.Color-12}" into the Figma payload and the CSS,
   // so the black/white button's label had no colour in dark mode. Dark points
   // straight at the neutral ends instead.
+  // Quiet on a BW face reads the NEUTRAL rows, not Quiet.Surfaces.BW.
+  //
+  // Quiet.Surfaces.BW is the quiet for a BW SURFACE and is the wrong table
+  // here twice over: its Color-1 row is #8b8b8b, which is 3.41:1 on the white
+  // it is meant for, and its Color-12 row is pure white — identical to the
+  // label it is supposed to read quieter than. The Neutral rows are the same
+  // curated table every palette button reads, indexed the same way (by the
+  // tone of the background the text sits on), and unlike the BW rows they do
+  // not mirror between modes — the black face is dark in both, so it takes
+  // Color-1 in both. Measured: white face 7.23 / 11.55, black face 6.02 /
+  // 5.78 (light / dark).
   const blackFace = () => ({
     Button: { value: '{Colors.Neutral.Color-1}', type: 'color' },
     Text: { value: isDark ? '{Colors.White}' : '{Text.Surfaces.BW-Button.Color-12}', type: 'color' },
+    Quiet: { value: '{Quiet.Surfaces.Neutral.Color-1}', type: 'color' },
     Hover: { value: isDark ? '{Hover.Neutral.Color-2}' : '{Hover.Neutral.Color-1}', type: 'color' },
     Pressed: { value: isDark ? '{Pressed.Neutral.Color-3}' : '{Pressed.Neutral.Color-1}', type: 'color' },
   });
   const whiteFace = () => ({
     Button: { value: '{White}', type: 'color' },
     Text: { value: isDark ? '{Colors.Neutral.Color-1}' : '{Text.Surfaces.BW-Button.Color-1}', type: 'color' },
+    Quiet: { value: '{Quiet.Surfaces.Neutral.Color-12}', type: 'color' },
     Hover: { value: '{Hover.Neutral.Color-11}', type: 'color' },
     Pressed: { value: isDark ? '{Pressed.Neutral.Color-10}' : '{Pressed.Neutral.Color-12}', type: 'color' },
   });
@@ -343,12 +362,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Default}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Default}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Default}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Default}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Default}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Default}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Default}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Default}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Default}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Default}.Medium.Pressed}`, type: 'color' }
     }
@@ -359,12 +380,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Primary}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Primary}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Primary}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Primary}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Primary}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Primary}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Primary}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Primary}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Primary}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Primary}.Medium.Pressed}`, type: 'color' }
     }
@@ -375,12 +398,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Secondary}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Secondary}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Secondary}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Secondary}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Secondary}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Secondary}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Secondary}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Secondary}.Medium.Pressed}`, type: 'color' }
     }
@@ -391,12 +416,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Tertiary}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Tertiary}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Tertiary}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Tertiary}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Tertiary}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Tertiary}.Medium.Pressed}`, type: 'color' }
     }
@@ -407,12 +434,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Neutral}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Neutral}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Neutral}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Neutral}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Neutral}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Neutral}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Neutral}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Neutral}.Medium.Pressed}`, type: 'color' }
     }
@@ -423,12 +452,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Info}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Info}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Info}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Info}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Info}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Info}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Info}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Info}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Info}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Info}.Medium.Pressed}`, type: 'color' }
     }
@@ -439,12 +470,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Success}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Success}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Success}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Success}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Success}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Success}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Success}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Success}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Success}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Success}.Medium.Pressed}`, type: 'color' }
     }
@@ -455,12 +488,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Warning}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Warning}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Warning}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Warning}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Warning}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Warning}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Warning}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Warning}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Warning}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Warning}.Medium.Pressed}`, type: 'color' }
     }
@@ -471,12 +506,14 @@ export function generateDefaultButton(
     Light: {
       Button: { value: `{Buttons.${buttonMappings.Error}.Light.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Error}.Light.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Error}.Light.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Error}.Light.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Error}.Light.Pressed}`, type: 'color' }
     },
     Medium: {
       Button: { value: `{Buttons.${buttonMappings.Error}.Medium.Button}`, type: 'color' },
       Text: { value: `{Buttons.${textMappings.Error}.Medium.Text}`, type: 'color' },
+      Quiet: { value: `{Buttons.${textMappings.Error}.Medium.Quiet}`, type: 'color' },
       Hover: { value: `{Buttons.${buttonMappings.Error}.Medium.Hover}`, type: 'color' },
       Pressed: { value: `{Buttons.${buttonMappings.Error}.Medium.Pressed}`, type: 'color' }
     }
