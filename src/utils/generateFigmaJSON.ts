@@ -512,28 +512,54 @@ export function generateFigmaJSON(designSystemJSON: any): any {
      INTENSITY moves the colour, not just the alpha, so this is not optional. */
   const shadowOpts = shadowOptionsFromStyle(designSystemJSON?._componentStyle);
 
-  /* Shadow — geometry and opacity per (level, layer), GLOBAL.
+  /* Elevation — geometry and opacity per (level, layer), GLOBAL.
      These depend only on the level, the layer index and the layer count, never
      on the surface, which is what lets one colour variable per surface serve
      every elevation. Ten slots per level regardless of how many are in use:
      the effect styles in Figma are built once at full width, and lowering
-     Resolution zeroes the tail rather than restructuring the style. */
-  figma.Shadow = {};
-  for (const level of SHADOW_LEVELS) {
-    const layers = shadowLayers(level as ShadowLevel, shadowOpts);
-    const alphas = dropshadowAlphas(level as ShadowLevel, shadowOpts);
+     Resolution zeroes the tail rather than restructuring the style.
+
+     NAMED TO MATCH THE EXISTING FIGMA COLLECTION, deliberately and exactly.
+     The payload key is the collection, its first level is the MODES, and the
+     rest of the path is the variable name — the same shape figma.Platform
+     uses. So this produces:
+
+         collection  Elevation
+         modes       Level-0 .. Level-5
+         variables   Shadow-<n>/offset-x, /offset-y, /blur-radius,
+                     /spread-radius, /opacity
+
+     It was previously emitted as `Shadow` / `Layer-<n>` / `X,Y,Blur,Spread`,
+     which matched no collection in the file — so the payload landed nowhere
+     and the Elevation numbers stayed hand-authored. Renaming the OUTPUT to
+     match the existing variables is what binds them; renaming the VARIABLES
+     would have given them new ids and unbound every layer using them
+     (invariant 8).
+
+     Level-0 is emitted as a full set of zeroed, zero-opacity slots rather than
+     omitted. The mode exists in the collection, and a mode with no values
+     inherits the previous one — an unstyled element would silently pick up
+     Level-1's shadow. */
+  figma.Elevation = {};
+  for (const level of [0, ...SHADOW_LEVELS]) {
+    const layers = level === 0 ? [] : shadowLayers(level as ShadowLevel, shadowOpts);
+    const alphas = level === 0 ? [] : dropshadowAlphas(level as ShadowLevel, shadowOpts);
     const slots: any = {};
     for (let i = 0; i < FIGMA_SHADOW_SLOTS; i++) {
       const on = i < layers.length;
-      slots[`Layer-${i + 1}`] = {
-        X: { value: on ? layers[i][0] : 0, type: 'number' },
-        Y: { value: on ? layers[i][1] : 0, type: 'number' },
-        Blur: { value: on ? layers[i][2] : 0, type: 'number' },
-        Spread: { value: on ? layers[i][3] : 0, type: 'number' },
-        Opacity: { value: on ? Math.round(alphas[i] * 1000) / 1000 : 0, type: 'number' },
+      slots[`Shadow-${i + 1}`] = {
+        'offset-x': { value: on ? layers[i][0] : 0, type: 'number' },
+        'offset-y': { value: on ? layers[i][1] : 0, type: 'number' },
+        'blur-radius': { value: on ? layers[i][2] : 0, type: 'number' },
+        'spread-radius': { value: on ? layers[i][3] : 0, type: 'number' },
+        // The marker for an unused slot. Zeroed GEOMETRY is not enough: a
+        // 0/0/0 shadow still paints the element's silhouette at full strength
+        // directly behind it, which is invisible only while the spread is
+        // also 0 and the element is opaque.
+        'opacity': { value: on ? Math.round(alphas[i] * 1000) / 1000 : 0, type: 'number' },
       };
     }
-    figma.Shadow[`Level-${level}`] = slots;
+    figma.Elevation[`Level-${level}`] = slots;
   }
 
   // Carry the brand's tone positions through to Figma. Same three values the

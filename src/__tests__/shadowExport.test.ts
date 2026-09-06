@@ -102,7 +102,7 @@ describe('Figma carries the per-layer geometry and opacity globally', () => {
 
   it('gives every level ten slots', () => {
     for (const l of SHADOW_LEVELS) {
-      const slots = Object.keys(figma.Shadow[`Level-${l}`]);
+      const slots = Object.keys(figma.Elevation[`Level-${l}`]);
       expect(`L${l}: ${slots.length}`).toBe(`L${l}: 10`);
     }
   });
@@ -114,8 +114,8 @@ describe('Figma carries the per-layer geometry and opacity globally', () => {
     for (const l of SHADOW_LEVELS) {
       const n = shadowLayerCount(l);
       for (let i = n; i < 10; i++) {
-        const s = figma.Shadow[`Level-${l}`][`Layer-${i + 1}`];
-        expect(`L${l} slot ${i + 1}: ${s.Opacity.value}/${s.X.value}/${s.Y.value}/${s.Blur.value}`)
+        const s = figma.Elevation[`Level-${l}`][`Shadow-${i + 1}`];
+        expect(`L${l} slot ${i + 1}: ${s['opacity'].value}/${s['offset-x'].value}/${s['offset-y'].value}/${s['blur-radius'].value}`)
           .toBe(`L${l} slot ${i + 1}: 0/0/0/0`);
       }
     }
@@ -126,8 +126,8 @@ describe('Figma carries the per-layer geometry and opacity globally', () => {
       const layers = shadowLayers(l);
       const alphas = dropshadowAlphas(l);
       layers.forEach(([x, y, blur, spread], i) => {
-        const s = figma.Shadow[`Level-${l}`][`Layer-${i + 1}`];
-        expect(`L${l}.${i + 1}: ${s.X.value}/${s.Y.value}/${s.Blur.value}/${s.Spread.value}/${s.Opacity.value}`)
+        const s = figma.Elevation[`Level-${l}`][`Shadow-${i + 1}`];
+        expect(`L${l}.${i + 1}: ${s['offset-x'].value}/${s['offset-y'].value}/${s['blur-radius'].value}/${s['spread-radius'].value}/${s['opacity'].value}`)
           .toBe(`L${l}.${i + 1}: ${x}/${y}/${blur}/${spread}/${Math.round(alphas[i] * 1000) / 1000}`);
       });
     }
@@ -144,8 +144,8 @@ describe('the user\'s Shadow controls actually reach the exports', () => {
     const alphas = dropshadowAlphas(5, o);
     expect(`slots: ${layers.length}`).not.toBe(`slots: ${shadowLayers(5).length}`);
     layers.forEach(([x, y, blur, spread], i) => {
-      const s = custom.Shadow['Level-5'][`Layer-${i + 1}`];
-      expect(`${s.X.value}/${s.Y.value}/${s.Blur.value}/${s.Spread.value}/${s.Opacity.value}`)
+      const s = custom.Elevation['Level-5'][`Shadow-${i + 1}`];
+      expect(`${s['offset-x'].value}/${s['offset-y'].value}/${s['blur-radius'].value}/${s['spread-radius'].value}/${s['opacity'].value}`)
         .toBe(`${x}/${y}/${blur}/${spread}/${Math.round(alphas[i] * 1000) / 1000}`);
     });
   });
@@ -375,5 +375,81 @@ describe('the Display\'s all-caps setting reaches the Figma text styles', () => 
     expect(display.length).toBeGreaterThan(0);
     expect(display.map((s) => `${s.step}:${s.textCase}`).join(' '))
       .toBe(display.map((s) => `${s.step}:ORIGINAL`).join(' '));
+  });
+});
+
+
+/**
+ * The payload's SHAPE must match the Elevation collection that exists in the
+ * Figma file, name for name.
+ *
+ * This is the failure that made the collection hand-authored in the first
+ * place: the generator emitted `Shadow / Level-N / Layer-M / {X,Y,Blur,Spread}`
+ * while the file has `Elevation / Level-0..5 / Shadow-M / {offset-x, offset-y,
+ * blur-radius, spread-radius}`. Nothing errored — the import simply had no
+ * collection to land in, so the numbers stayed frozen and drifted from the CSS.
+ *
+ * A mismatch here is invisible at every layer except the designer's file, which
+ * is why it is asserted rather than left to the next import to reveal.
+ */
+/** Every slot's value for one property, in Shadow-1..10 order. */
+const slotValues = (level: Record<string, Record<string, { value: number }>>, prop: string) =>
+  Array.from({ length: 10 }, (_, i) => level[`Shadow-${i + 1}`][prop].value);
+
+describe('the Elevation payload matches the Figma collection', () => {
+  const figma = buildFigma();
+
+  it('is keyed by the collection name Figma actually has', () => {
+    expect(figma.Elevation).toBeTruthy();
+    // The old key would create a second, parallel collection.
+    expect((figma as Record<string, unknown>).Shadow).toBeUndefined();
+  });
+
+  it('emits Level-0 through Level-5 as the modes', () => {
+    expect(Object.keys(figma.Elevation)).toEqual([
+      'Level-0', 'Level-1', 'Level-2', 'Level-3', 'Level-4', 'Level-5',
+    ]);
+  });
+
+  it('emits ten Shadow-N slots in every level', () => {
+    for (const level of Object.keys(figma.Elevation)) {
+      const slots = Object.keys(figma.Elevation[level]);
+      expect(slots, level).toHaveLength(10);
+      expect(slots[0]).toBe('Shadow-1');
+      expect(slots[9]).toBe('Shadow-10');
+    }
+  });
+
+  it('uses the collection\'s own property names', () => {
+    const slot = figma.Elevation['Level-3']['Shadow-1'];
+    expect(Object.keys(slot).sort()).toEqual(
+      ['blur-radius', 'offset-x', 'offset-y', 'opacity', 'spread-radius'],
+    );
+  });
+
+  it('Level-0 is fully off, so nothing inherits Level-1', () => {
+    for (let i = 1; i <= 10; i++) {
+      const s = figma.Elevation['Level-0'][`Shadow-${i}`];
+      expect(s['opacity'].value).toBe(0);
+      expect(s['offset-y'].value).toBe(0);
+      expect(s['blur-radius'].value).toBe(0);
+    }
+  });
+
+  it('marks unused slots with opacity 0, not just zeroed geometry', () => {
+    // A 0/0/0 shadow still paints the silhouette at full strength behind the
+    // element — invisible only while the spread is 0 and the element opaque.
+    const opacities = slotValues(figma.Elevation['Level-1'], 'opacity');
+    expect(opacities.filter((v) => v > 0).length).toBeGreaterThan(0);
+    expect(opacities.filter((v) => v === 0).length).toBeGreaterThan(0);
+    expect(opacities).toHaveLength(10);
+  });
+
+  it('reaches the depth the CSS does — not the old hand-authored 32px', () => {
+    // The collection topped out at y=32 while the generator reaches 74 at
+    // Level-5. If these ever agree again by accident, it means someone pinned
+    // the generator to the old numbers rather than the other way round.
+    expect(Math.max(...slotValues(figma.Elevation['Level-5'], 'offset-y')))
+      .toBeGreaterThan(60);
   });
 });
