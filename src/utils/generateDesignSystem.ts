@@ -364,11 +364,11 @@ var(--Container-Dropshadow-Color) /* shadow on containers */
 
 5-level elevation system. Use on the parent surface, not the element itself:
 \`\`\`css
-.level-1 { box-shadow: 0 1px 2px var(--Dropshadow-Color); }
-.level-2 { box-shadow: 0 2px 4px var(--Dropshadow-Color), 0 1px 2px var(--Dropshadow-Color); }
-.level-3 { box-shadow: 0 4px 8px var(--Dropshadow-Color), 0 2px 4px var(--Dropshadow-Color); }
-.level-4 { box-shadow: 0 8px 16px var(--Dropshadow-Color), 0 4px 8px var(--Dropshadow-Color); }
-.level-5 { box-shadow: 0 16px 32px var(--Dropshadow-Color), 0 8px 16px var(--Dropshadow-Color); }
+.level-1 { box-shadow: var(--Effect-Level-1); }
+.level-2 { box-shadow: var(--Effect-Level-2); }
+.level-3 { box-shadow: var(--Effect-Level-3); }
+.level-4 { box-shadow: var(--Effect-Level-4); }
+.level-5 { box-shadow: var(--Effect-Level-5); }
 \`\`\`
 
 ### Focus Tokens
@@ -383,7 +383,9 @@ var(--Focus-Visible)        /* focus ring color (used with :focus-visible) */
 var(--Font-Family-Header)   /* heading font */
 var(--Font-Family-Body)     /* body font */
 var(--Style-Border-Radius)  /* component border radius */
-var(--Card-Radius)          /* card border radius */
+var(--Card-Radius)          /* card border radius (medium) */
+var(--Sm-Card-Radius)       /* small card */
+var(--Lg-Card-Radius)       /* large card */
 \`\`\`
 
 ---
@@ -1022,7 +1024,10 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Style-Border-Radius: var(--Button-Radius);
 
   /* Card */
+  --Accordion-Radius: ${r.accordionRadius}px;
   --Card-Radius: ${r.cardRadius}px;
+  --Sm-Card-Radius: ${r.smCardRadius}px;
+  --Lg-Card-Radius: ${r.lgCardRadius}px;
   --Card-Inner-Radius: ${r.cardInnerRadius}px;
   --Card-Focus-Radius: ${r.cardFocusRadius}px;
   --Card-Padding: ${r.cardPadding}px;

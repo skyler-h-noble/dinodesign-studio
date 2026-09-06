@@ -6,6 +6,7 @@ export type Stage =
   | 'color-assignment'
   | 'typography'
   | 'component-style'
+  | 'shadow'
   | 'review'
   | 'export';
 
@@ -17,6 +18,7 @@ export const STAGE_ORDER: Stage[] = [
   'color-assignment',
   'typography',
   'component-style',
+  'shadow',
   'review',
   'export',
 ];

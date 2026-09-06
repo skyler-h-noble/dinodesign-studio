@@ -9,6 +9,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
 import { computeRadii, migrateLegacyRadii } from '../../utils/componentRadii';
+import { shadowOptionsFromStyle, type ShadowOptions } from '../../utils/dropshadow';
 import '../../styles/component-style.css';
 
 interface Props extends StageProps {
@@ -37,13 +38,27 @@ export interface StyleCustomizations {
   largeButtonHeight: number;
   minButtonWidth: number;
   inputPadding: number;
+  /* Shadow palette. Comeau's generator controls, driving every --Effect-Level
+     recipe and the Figma shadow variables. Maths in utils/dropshadow.ts;
+     shadowOptionsFrom() below is the only place these are read. */
+  shadowIntensity: number;
+  shadowCrispy: number;
+  shadowResolution: number;
+  shadowLightX: number;
+  shadowLightY: number;
+  shadowTint: boolean;
 }
 
+/** StyleCustomizations -> ShadowOptions. Thin wrapper over the shared mapper
+ *  in utils/dropshadow so the studio and every exporter agree. */
+export const shadowOptionsFrom = (c: Partial<StyleCustomizations> | undefined): ShadowOptions =>
+  shadowOptionsFromStyle(c as Record<string, unknown> | undefined);
+
 const STYLE_DEFAULTS: Record<ComponentStyle, { label: string; description: string } & StyleCustomizations> = {
-  professional: { label: 'Pro', description: 'Clean lines, minimal radius', cardPadding: 12, buttonRadius: 6, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 6, inputPadding: 8 },
-  modern: { label: 'Modern', description: 'Balanced curves, medium shadows', cardPadding: 16, buttonRadius: 12, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 12, inputPadding: 12 },
-  bold: { label: 'Bold', description: 'Strong elements, generous rounding', cardPadding: 20, buttonRadius: 25, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 25, inputPadding: 12 },
-  playful: { label: 'Playful', description: 'Maximum curves, dynamic feel', cardPadding: 24, buttonRadius: 100, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 100, inputPadding: 16 },
+  professional: { shadowIntensity: 0.30, shadowCrispy: 0.75, shadowResolution: 0.40, shadowLightX: -0.33, shadowLightY: -0.66, shadowTint: true, label: 'Pro', description: 'Clean lines, minimal radius', cardPadding: 12, buttonRadius: 12, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 12, inputPadding: 8 },
+  modern: { shadowIntensity: 0.41, shadowCrispy: 0.50, shadowResolution: 0.50, shadowLightX: -0.33, shadowLightY: -0.66, shadowTint: true, label: 'Modern', description: 'Balanced curves, medium shadows', cardPadding: 16, buttonRadius: 25, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 25, inputPadding: 12 },
+  bold: { shadowIntensity: 0.55, shadowCrispy: 0.45, shadowResolution: 0.65, shadowLightX: -0.33, shadowLightY: -0.66, shadowTint: true, label: 'Bold', description: 'Strong elements, generous rounding', cardPadding: 20, buttonRadius: 38, bevel: 0, bevelOpacity: 50, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 38, inputPadding: 12 },
+  playful: { shadowIntensity: 0.50, shadowCrispy: 0.25, shadowResolution: 0.80, shadowLightX: -0.33, shadowLightY: -0.66, shadowTint: true, label: 'Playful', description: 'Maximum curves, dynamic feel', cardPadding: 24, buttonRadius: 100, bevel: 10, bevelOpacity: 80, buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56, minButtonWidth: 60, iconButtonRadius: 100, inputRadius: 38, inputPadding: 16 },
 };
 
 const STYLE_KEYS: ComponentStyle[] = ['professional', 'modern', 'bold', 'playful'];
@@ -61,6 +76,12 @@ const DEFAULT_CUSTOMIZATIONS: Record<ComponentStyle, StyleCustomizations> = Obje
     iconButtonRadius: STYLE_DEFAULTS[k].iconButtonRadius,
     inputRadius: STYLE_DEFAULTS[k].inputRadius,
     inputPadding: STYLE_DEFAULTS[k].inputPadding,
+    shadowIntensity: STYLE_DEFAULTS[k].shadowIntensity,
+    shadowCrispy: STYLE_DEFAULTS[k].shadowCrispy,
+    shadowResolution: STYLE_DEFAULTS[k].shadowResolution,
+    shadowLightX: STYLE_DEFAULTS[k].shadowLightX,
+    shadowLightY: STYLE_DEFAULTS[k].shadowLightY,
+    shadowTint: STYLE_DEFAULTS[k].shadowTint,
   }])
 ) as Record<ComponentStyle, StyleCustomizations>;
 
