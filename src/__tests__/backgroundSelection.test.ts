@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseBackground, formatBackground, legacyName, toneFor,
-  BACKGROUND_THEMES, SURFACE_LEVELS,
+  BACKGROUND_THEMES, BAR_THEMES, ALL_THEMES, SURFACE_LEVELS,
 } from '../utils/backgroundSelection';
 
 describe('background selection', () => {
@@ -30,15 +30,29 @@ describe('background selection', () => {
   });
 
   it('round-trips the serialised form', () => {
-    for (const theme of BACKGROUND_THEMES) {
+    for (const theme of ALL_THEMES) {
       for (const surface of SURFACE_LEVELS) {
         expect(parseBackground(formatBackground({ theme, surface }))).toEqual({ theme, surface });
       }
     }
   });
 
-  it('offers 20 combinations', () => {
-    expect(BACKGROUND_THEMES.length * SURFACE_LEVELS.length).toBe(20);
+  // The BACKGROUND picker is Primary or Neutral only: the page is the surface
+  // every other colour is judged against, so it is the brand's colour or a
+  // neutral. Accents exist to be seen against it.
+  it('offers 10 background combinations, and 20 for bars', () => {
+    expect(BACKGROUND_THEMES).toEqual(['Primary', 'Neutral']);
+    expect(BACKGROUND_THEMES.length * SURFACE_LEVELS.length).toBe(10);
+    expect(BAR_THEMES.length * SURFACE_LEVELS.length).toBe(20);
+  });
+
+  // Narrowing the PICKER must not narrow the PARSER. Systems were published
+  // while Secondary and Tertiary were on offer, and a stored background that
+  // stopped resolving would repaint those brands white on reload.
+  it('still parses a background the picker no longer offers', () => {
+    for (const theme of ['Secondary', 'Tertiary'] as const) {
+      expect(parseBackground(`${theme}/Surface`)).toEqual({ theme, surface: 'Surface' });
+    }
   });
 
   // Surface-Brightest differs by theme ON PURPOSE — Color-12 on a chromatic

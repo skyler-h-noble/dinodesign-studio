@@ -3,7 +3,7 @@ import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
-import { parseBackground, toneFor } from './backgroundSelection';
+import { parseBackground, parseBar, toneFor } from './backgroundSelection';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
 // lib's defaults for these resolve to {palette}-Color-9 regardless of the
@@ -559,7 +559,19 @@ export function buildPreviewCSS(input: BuildInput): string {
    *   Primary-Light  ==  [data-theme="Primary"][data-surface="Surface-Brightest"]
    *   Black          ==  [data-theme="Neutral"][data-surface="Surface-Dimmest"]
    */
+  /**
+   * Core tone per theme, for `toneFor` — a chromatic theme's Surface level IS
+   * the brand's own core, so each palette anchors on its own.
+   */
+  const coreFor = (theme: string) =>
+    theme === 'Secondary' ? SC : theme === 'Tertiary' ? TC : PC;
+
   function resolveNavOption(opt: string): { palette: string; n: number } {
+    // The legacy strings keep their EXACT tones. Three of them (the -bright /
+    // -dim variants) land on tones the five-level vocabulary cannot name at
+    // all — Primary-12 is past Surface-Brightest, which caps chromatic themes
+    // at 11 to keep them tinted — so they cannot be re-expressed as
+    // theme + surface without moving a published brand's bar by a tone.
     switch (opt) {
       case 'black': return { palette: 'Neutral', n: 1 };
       case 'white': return { palette: 'Neutral', n: 12 };
@@ -569,12 +581,23 @@ export function buildPreviewCSS(input: BuildInput): string {
       case 'primary': return { palette: 'Primary', n: PC };
       case 'primary-bright': return { palette: 'Primary', n: Math.min(PC + 1, 12) };
       case 'primary-dim': return { palette: 'Primary', n: Math.max(PC - 1, 1) };
-      default: return { palette: 'Neutral', n: 12 };
+      default: break;
     }
+    // 'Secondary/Surface-Bright' — any theme at any surface level. This is what
+    // makes a Secondary app bar over a Primary page expressible; the four
+    // strings above could only ever say Primary or Neutral.
+    const sel = parseBar(opt);
+    return { palette: sel.theme, n: toneFor(sel.theme, sel.surface, coreFor(sel.theme)) };
   }
 
   function navColor(opt: string) {
     const { palette, n } = resolveNavOption(opt);
+    // Secondary and Tertiary bars read their OWN ramp. This used to fall
+    // through to `p(primary, n)` for every non-neutral palette, which was
+    // harmless while the picker could only say Primary — and would have
+    // silently painted a Secondary bar in Primary the moment it could not.
+    if (palette === 'Secondary') return p(secondary, n);
+    if (palette === 'Tertiary') return p(tertiary, n);
     if (palette === 'Neutral') {
       // In dark mode a neutral nav goes DARK, the same way the page background
       // does ('white' → neutral(2) above). Without this the light-mode ramp is

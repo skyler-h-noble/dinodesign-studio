@@ -89,9 +89,19 @@ export interface UserSelections {
    *  src/utils/backgroundSelection.ts for the theme x surface grid. */
   backgroundTheme: 'Primary' | 'Secondary' | 'Tertiary' | 'Neutral';
   backgroundN: number;
-  appBar: 'primary-light' | 'primary' | 'white' | 'black';
-  navBar: 'primary-light' | 'primary' | 'white' | 'black';
-  status: 'primary-light' | 'primary' | 'white' | 'black';
+  /**
+   * Status, App and Nav bars: a legacy string, or 'Theme/Surface-Level'.
+   *
+   * Typed as `string` rather than a union of 20 combinations x 8 legacy names.
+   * The union would be checked at every one of ~200 call sites and read by
+   * none of them — the value is decoded by parseBar / barPaletteAndTone in
+   * backgroundSelection.ts, which is the one place that knows the vocabulary.
+   * A union here would also have to be widened in lockstep with that file,
+   * which is how the four legacy strings ended up restated in nine places.
+   */
+  appBar: string;
+  navBar: string;
+  status: string;
   button: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
   cardColoring: 'tonal' | 'white' | 'black';
   textColoring: 'tonal' | 'black-white';

@@ -5,7 +5,8 @@ import chroma from 'chroma-js';
 import { useState, useRef } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';
 import {
-  BACKGROUND_THEMES, SURFACE_LEVELS, parseBackground, formatBackground,
+  BACKGROUND_THEMES, BAR_THEMES, SURFACE_LEVELS, parseBackground, formatBackground,
+  parseBar,
   legacyName, toneFor, type BackgroundSelection,
 } from '../../utils/backgroundSelection';
 import PhonePreview from '../PhonePreview';
@@ -26,16 +27,9 @@ interface Props extends StageProps {
   designSystemName?: string;
 }
 
-type NavOption = 'primary-light' | 'primary' | 'white' | 'black';
+/** A bar's stored value: a legacy string, or 'Theme/Surface-Level'. */
+type NavOption = string;
 type ButtonMode = 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
-
-// App Bar / Status: theme + Surface or Surface-Bright
-const NAV_OPTIONS: { value: NavOption; label: string }[] = [
-  { value: 'primary-light', label: 'Primary Light' },
-  { value: 'primary', label: 'Primary' },
-  { value: 'white', label: 'White' },
-  { value: 'black', label: 'Black' },
-];
 
 const BUTTON_MODES: { value: ButtonMode; label: string }[] = [
   { value: 'primary', label: 'Primary' },
@@ -54,6 +48,23 @@ const SURFACE_LABEL: Record<string, string> = {
   'Surface-Bright': 'Bright',
   'Surface-Brightest': 'Brightest',
 };
+
+/**
+ * Status, App and Nav bars: ANY theme at ANY surface level.
+ *
+ * The four strings this replaces could only say Primary or Neutral, so a
+ * Secondary app bar over a Primary page was not expressible at all. A bar is a
+ * band ON the page rather than the page itself, so an accent reads as intended
+ * there — it has the background to sit against. (The BACKGROUND picker takes
+ * the opposite view and stays Primary or Neutral; see backgroundSelection.ts.)
+ */
+const NAV_OPTIONS: { value: NavOption; label: string }[] =
+  BAR_THEMES.flatMap(theme =>
+    SURFACE_LEVELS.map(surface => ({
+      value: `${theme}/${surface}`,
+      label: `${theme} · ${SURFACE_LABEL[surface]}`,
+    })),
+  );
 
 const CARD_OPTIONS = [
   { value: 'tonal' as const, label: 'Tonal' },
@@ -83,6 +94,10 @@ export default function ColorAssignmentStage({
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
   const palettes = colorScheme?.tonePalettes;
   const PC = toneToColorNumber(colorScheme?.extractedTones?.primary || 60);
+  // Secondary and Tertiary anchor on their OWN core tone — a chromatic theme's
+  // Surface level IS the brand colour, so each ramp needs its own centre.
+  const SC = toneToColorNumber(colorScheme?.extractedTones?.secondary || 60);
+  const TC = toneToColorNumber(colorScheme?.extractedTones?.tertiary || 60);
   const mediumIndex = PC >= 11 ? 8 : 7;
 
   const dragItem = useRef<number | null>(null);
@@ -141,8 +156,14 @@ export default function ColorAssignmentStage({
       case 'black': return { palette: neutral, n: 1 };
       case 'primary-base': return { palette: p, n: PC };
       case 'primary-light': return { palette: p, n: 11 };
-      default: return { palette: neutral, n: 12 }; // white
+      default: break;
     }
+    // Only four of the ten background combinations have a legacy name; the
+    // rest are stored as 'Theme/Surface' and used to fall through to white
+    // here, so the stage previewed the wrong page colour for six of them.
+    const sel = parseBackground(userSelections.background);
+    const n = toneFor(sel.theme, sel.surface, PC);
+    return sel.theme === 'Neutral' ? { palette: neutral, n } : { palette: p, n };
   };
 
   const getNavColor = (opt: string) => {
@@ -157,8 +178,18 @@ export default function ColorAssignmentStage({
       case 'primary': return p[PC - 1]?.hex || '#ccc';             // Primary Color-PC
       case 'primary-bright': return p[Math.min(PC, 12) - 1]?.hex || '#ccc'; // Primary Color-PC+1
       case 'primary-dim': return p[Math.max(PC - 2, 0)]?.hex || '#ccc';     // Primary Color-PC-1
-      default: return '#ccc';
+      default: break;
     }
+    // 'Secondary/Surface-Bright'. Each chromatic theme anchors on its OWN core
+    // tone, the same way toneFor does for the background.
+    const sel = parseBar(opt);
+    const ramp = sel.theme === 'Secondary' ? (palettes?.secondary || [])
+      : sel.theme === 'Tertiary' ? (palettes?.tertiary || [])
+        : sel.theme === 'Neutral' ? null
+          : p;
+    const core = sel.theme === 'Secondary' ? SC : sel.theme === 'Tertiary' ? TC : PC;
+    const n = toneFor(sel.theme, sel.surface, core);
+    return ramp === null ? neutral(n) : (ramp[n - 1]?.hex || '#ccc');
   };
 
   const cardStyle = {
@@ -175,8 +206,10 @@ export default function ColorAssignmentStage({
       case 'black': return '#1a1a1a';
       case 'primary-base': return colors[0];
       case 'primary-light': return palettes?.primary?.[12]?.hex || '#f0f0f0';
-      default: return '#ffffff';
+      default: break;
     }
+    // Same gap as getSurfaceInfo: the six unnamed combinations previewed white.
+    return getNavColor(userSelections.background);
   };
 
   return (

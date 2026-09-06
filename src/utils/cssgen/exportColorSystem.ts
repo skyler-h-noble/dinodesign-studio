@@ -21,6 +21,7 @@ import { calculateDefaultThemeSettings, getSelectionName, applyUserSelections } 
 import { generateAllButtonsForMode } from './generateButtons';
 import { generateCompleteButtonSystem } from './generateButtonsSimplified';
 import { generateCompleteSimplifiedSystem } from './completeSimplifiedSystem';
+import { parseBar, toneFor } from '../backgroundSelection';
 
 // Helper function to convert tone value to Color-X number
 // 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
@@ -2859,8 +2860,19 @@ function generateModesThemes(
       case 'primary-dim':
         return { theme: 'Primary', n: Math.max(PC - 1, 1) };
       default:
-        return { theme: defaultTheme, n: defaultN };
+        break;
     }
+    // 'Secondary/Surface-Bright' — any theme at any surface level, the same
+    // vocabulary the background picker uses. Must stay in step with
+    // resolveNavOption in buildPreviewCSS.ts: the preview and the export are
+    // separate implementations of this mapping and diverge silently
+    // (invariant 5), which is what barScopes/tokenParity cover.
+    const parsed = parseBar(selection);
+    if (selection.includes('/')) {
+      const core = parsed.theme === 'Secondary' ? SC : parsed.theme === 'Tertiary' ? TC : PC;
+      return { theme: parsed.theme, n: toneFor(parsed.theme, parsed.surface, core) };
+    }
+    return { theme: defaultTheme, n: defaultN };
   };
 
   // NOTE: appBarConfig, navBarConfig, statusConfig are computed after defaultConfig below
