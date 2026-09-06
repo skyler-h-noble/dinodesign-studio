@@ -29,6 +29,7 @@ import {
 import { nearestAvailableWeight } from './googleFontWeights';
 import type { TypographyStyle } from '../types';
 import { motionJSON } from './motion';
+import { componentElevationFigma } from './componentElevation';
 
 interface ColorToken {
   value: string;
@@ -561,6 +562,14 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     }
     figma.Elevation[`Level-${level}`] = slots;
   }
+
+  /* Component-Elevations — which LEVEL each component sits at, per state.
+     Ten numbers replacing 150 geometry variables; see componentElevation.ts
+     for why the level is a number rather than an alias (a Figma alias cannot
+     pin a mode). Additive: the existing Shadow-N variables are left in place,
+     because renaming a Figma variable gives it a new id and unbinds every
+     layer using it. */
+  figma['Component-Elevations'] = componentElevationFigma();
 
   // Carry the brand's tone positions through to Figma. Same three values the
   // CSS emits as --DPT / --DST / --DTT, read from the same place so the two
