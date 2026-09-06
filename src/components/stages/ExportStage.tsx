@@ -463,7 +463,7 @@ export default function ExportStage({
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
                 <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
-                <CodeBlock code={installCmd} language="bash" />
+                <CodeBlock code={installCmd} language="bash" wrap />
               </VStack>
             </VStack>
           </Card>
@@ -480,7 +480,7 @@ export default function ExportStage({
               </BodySmall>
               <VStack spacing={1} style={{ width: '100%' }}>
                 <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
-                <CodeBlock code={claudeMdUrl} language="URL" />
+                <CodeBlock code={claudeMdUrl} language="URL" wrap />
               </VStack>
             </VStack>
           </Card>

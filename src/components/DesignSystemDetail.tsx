@@ -508,6 +508,10 @@ function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
           componentStyle: style,
           mode: 'light',
           typographyStyles: snapshot.typographyStyles,
+          // Same reason the componentStyleCSS line below exists: the sliders
+          // are not colour or typography, so they have to be handed over
+          // explicitly. The Shadow step's controls ride here.
+          styleCustomizations: snapshot.styleCustomizations,
         }),
         componentStyleCSS(style, snapshot.styleCustomizations),
       ].join('\n\n');
@@ -687,8 +691,13 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
                   minWidth: 160,
                   background: 'var(--Background)',
                   border: '1px solid var(--Border)',
-                  borderRadius: 'var(--Style-Border-Radius, 6px)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
+                  borderRadius: 'var(--Dropdown-Frame-Radius, var(--Style-Border-Radius, 6px))',
+                  /* Rows are full-bleed (the panel pads only vertically), so without
+                     this their hover highlight squares off the rounded corners and
+                     pokes out past the frame. Clipping is why Dropdown-Frame-Radius
+                     is capped at 16px in the first place. */
+                  overflow: 'hidden',
+                  boxShadow: 'var(--Effect-Level-3, 0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06))',
                   padding: '4px 0',
                   zIndex: 1300,
                   color: 'var(--Text)',
@@ -885,7 +894,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
-            <CodeBlock code={installCmd} language="bash" />
+            <CodeBlock code={installCmd} language="bash" wrap />
           </VStack>
         </VStack>
       </Card>
@@ -901,7 +910,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
-            <CodeBlock code={claudeMdUrl} language="URL" />
+            <CodeBlock code={claudeMdUrl} language="URL" wrap />
           </VStack>
         </VStack>
       </Card>
@@ -1303,8 +1312,19 @@ function VersionsTab({
                 <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
                   <HStack spacing={1} style={{ alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 700 }}>v{v.version}</BodySmall>
+                    {/* data-theme + data-surface, not a guessed colour: `-light` in this
+                        system means the palette's Surface-Brightest, and the lib's own
+                        `-light` chip fill is identical to its solid one. The attributes
+                        give the chip the paired --Background / --Text for that zone;
+                        libRadiusOverrideCSS points the chip at them. */}
                     {isCurrent && (
-                      <Chip variant="success-light" size="small" label="Current" />
+                      <Chip
+                        variant="success-light"
+                        size="small"
+                        label="Current"
+                        data-theme="Success"
+                        data-surface="Surface-Brightest"
+                      />
                     )}
                   </HStack>
                   <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>

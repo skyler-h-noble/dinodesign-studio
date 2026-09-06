@@ -98,8 +98,13 @@ export default function AvatarDropdown({ user, onSignOut }: AvatarDropdownProps)
             minWidth: 180,
             background: 'var(--Background)',
             border: '1px solid var(--Border)',
-            borderRadius: 'var(--Style-Border-Radius, 6px)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
+            borderRadius: 'var(--Dropdown-Frame-Radius, var(--Style-Border-Radius, 6px))',
+            /* Rows are full-bleed (the panel pads only vertically), so without
+               this their hover highlight squares off the rounded corners and
+               pokes out past the frame. Clipping is why Dropdown-Frame-Radius
+               is capped at 16px in the first place. */
+            overflow: 'hidden',
+            boxShadow: 'var(--Effect-Level-3, 0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06))',
             padding: '4px 0',
             zIndex: 1300,
             color: 'var(--Text)',
