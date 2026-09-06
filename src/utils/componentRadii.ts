@@ -62,8 +62,13 @@ export interface ComputedRadii {
 
   // Card
   cardPadding: number;
+  accordionRadius: number;
   cardRadius: number;
+  smCardRadius: number;
+  lgCardRadius: number;
   cardInnerRadius: number;
+  smCardInnerRadius: number;
+  lgCardInnerRadius: number;
   cardFocusRadius: number;
 
   // Modal
@@ -162,8 +167,35 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   //
   // Capping the total fixes both — above the cap the curve is flat, so the
   // cliff has nothing to fall off.
+  /* Accordion corner — follows the button radius, capped at half the summary's
+   * height so it cannot saturate into a stadium.
+   *
+   * An accordion summary is about one button tall, so a pill-able
+   * --Button-Radius rounds it into a lozenge; buttons are deliberately
+   * pill-able, accordions are not. Half the height is the point at which a
+   * corner stops being a corner, which makes it the right maximum.
+   *
+   * This lived inline in buildPreviewCSS, so --Accordion-Radius reached the
+   * studio preview and nothing else — not the CSS export, not Figma. The lib
+   * therefore fell back to --Button-Radius everywhere real, which is the pill
+   * the token exists to prevent. */
+  const accordionRadius = Math.min(buttonRadius, Math.floor(cs.buttonHeight / 2));
+
   const CARD_RADIUS_MAX = 24;
   const cardRadius = Math.min(cardCornerBase + cardPadding, CARD_RADIUS_MAX);
+
+  /* Small and large cards, scaled PROPORTIONALLY off the resolved medium.
+   *
+   * The obvious derivation — run the cardCornerBase + padding formula again
+   * with a smaller and larger padding — collapses: CARD_RADIUS_MAX already
+   * binds at anything above the Pro preset, so Modern would give 20/24/24 and
+   * Bold 24/24/24. Three names for one number.
+   *
+   * Scaling the resolved value keeps the three distinct and monotonic at every
+   * preset, and keeps the cap meaningful by applying it only to the large end.
+   * The 0.75 / 1.25 pair mirrors the modal's own 1.5x padding relationship. */
+  const smCardRadius = Math.max(2, Math.round(cardRadius * 0.75));
+  const lgCardRadius = Math.min(Math.round(cardRadius * 1.25), CARD_RADIUS_MAX + 8);
 
   // Modals take the same ceiling. Their padding is 1.5x a card's, so an uncapped
   // modal corner reached ~66px — and leaving it uncapped while the card is
@@ -226,8 +258,13 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
     lgInputSwatchRadius,
 
     cardPadding,
+    accordionRadius,
     cardRadius,
+    smCardRadius,
+    lgCardRadius,
     cardInnerRadius: inner(cardRadius),
+    smCardInnerRadius: inner(smCardRadius),
+    lgCardInnerRadius: inner(lgCardRadius),
     cardFocusRadius: focus(cardRadius),
 
     modalPadding,

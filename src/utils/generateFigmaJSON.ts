@@ -8,10 +8,19 @@
  */
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { buttonModeMetricFigma } from './buttonSizing';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
 } from './bevelGeometry';
-import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
+import {
+  dropshadowBaseHex, dropshadowAlphas, shadowLayers, shadowOptionsFromStyle,
+  SHADOW_LEVELS, type ShadowLevel,
+} from './dropshadow';
+
+/** Effect-style slots premade in Figma per elevation. Fixed at the maximum so
+ *  Resolution can change the layer count by zeroing the tail instead of
+ *  requiring the styles to be rebuilt. */
+const FIGMA_SHADOW_SLOTS = 10;
 import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
 import {
   buildTypeScale, resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR,
@@ -498,6 +507,35 @@ function buildFigmaTypeScale(typo: any): any {
 export function generateFigmaJSON(designSystemJSON: any): any {
   const figma: any = { Modes: {}, Themes: {}, SurfacesContainers: {} };
 
+  /* The user's Shadow controls. Same mapper the CSS exporter and the preview
+     use, so a surface's shadow colour cannot differ between the three —
+     INTENSITY moves the colour, not just the alpha, so this is not optional. */
+  const shadowOpts = shadowOptionsFromStyle(designSystemJSON?._componentStyle);
+
+  /* Shadow — geometry and opacity per (level, layer), GLOBAL.
+     These depend only on the level, the layer index and the layer count, never
+     on the surface, which is what lets one colour variable per surface serve
+     every elevation. Ten slots per level regardless of how many are in use:
+     the effect styles in Figma are built once at full width, and lowering
+     Resolution zeroes the tail rather than restructuring the style. */
+  figma.Shadow = {};
+  for (const level of SHADOW_LEVELS) {
+    const layers = shadowLayers(level as ShadowLevel, shadowOpts);
+    const alphas = dropshadowAlphas(level as ShadowLevel, shadowOpts);
+    const slots: any = {};
+    for (let i = 0; i < FIGMA_SHADOW_SLOTS; i++) {
+      const on = i < layers.length;
+      slots[`Layer-${i + 1}`] = {
+        X: { value: on ? layers[i][0] : 0, type: 'number' },
+        Y: { value: on ? layers[i][1] : 0, type: 'number' },
+        Blur: { value: on ? layers[i][2] : 0, type: 'number' },
+        Spread: { value: on ? layers[i][3] : 0, type: 'number' },
+        Opacity: { value: on ? Math.round(alphas[i] * 1000) / 1000 : 0, type: 'number' },
+      };
+    }
+    figma.Shadow[`Level-${level}`] = slots;
+  }
+
   // Carry the brand's tone positions through to Figma. Same three values the
   // CSS emits as --DPT / --DST / --DTT, read from the same place so the two
   // cannot drift.
@@ -888,41 +926,24 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         }
       }
 
-      /* Dropshadow-Color-1..5 — one per LAYER of a stacked shadow, not one per
-         elevation level.
-         Layer 1 is the tight contact shadow and carries the most alpha (20%);
-         each layer out is wider and fainter, down to 11% at layer 5. That is
-         what makes a shadow read as depth rather than a smear, and it is why
-         these tokens get MORE transparent as the number rises — expected, not
-         a fault.
-         Elevation is expressed by how many layers are stacked: Level-3 uses
-         layers 1-3, Level-5 uses all five. A higher elevation is more dramatic
-         because there is more shadow, not because any single layer darkens.
-         The COLOUR is level-independent and identical across all five —
-         dropshadowBaseHex says so in its own signature. It takes the surface's
-         hue, pulls saturation into a moderate band and multiplies lightness by
-         LIGHT_FACTOR (0.6), so the shadow is a darker version of what it falls
-         on. Darken, then apply the layer's alpha.
-         This comment previously claimed the opposite — "hue/saturation/
-         lightness AND alpha vary per level … higher elevations read as more
-         dramatic, not weaker" — which is false on both counts and is why the
-         decreasing alpha looked like a bug.
-         Math lives in src/utils/dropshadow.ts and is shared with the CSS
-         exporter, so the values are 1:1 across Figma and code. */
-      for (const level of SHADOW_LEVELS) {
-        const sectionName = `Dropshadow-Color-${level}`;
-        modeSection[sectionName] = {};
-        for (const palette of palettes) {
-          modeSection[sectionName][palette] = {};
-          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
-            const bgHex = (colorVal as any).value;
-            if (bgHex && bgHex.startsWith('#')) {
-              modeSection[sectionName][palette][colorKey] = {
-                value: dropshadowHex8(bgHex, level as ShadowLevel),
-                type: 'color',
-              };
-            }
+      /* Dropshadow-Color — ONE colour per surface.
+         This was Dropshadow-Color-1..5: five colours per palette per tone per
+         mode, from the model where each elevation had its own hex. Comeau's
+         generator uses a single colour and moves the OPACITY per layer, so the
+         five collapsed into one and the opacities moved to the Shadow
+         collection below, where they are global rather than per surface.
+         Emitted OPAQUE: the alpha lives on the effect layer, bound separately.
+         Math is shared with the CSS exporter via ../dropshadow. */
+      modeSection['Dropshadow-Color'] = {};
+      for (const palette of palettes) {
+        modeSection['Dropshadow-Color'][palette] = {};
+        for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
+          if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
+          const bgHex = (colorVal as any).value;
+          if (bgHex && bgHex.startsWith('#')) {
+            modeSection['Dropshadow-Color'][palette][colorKey] = {
+              value: dropshadowBaseHex(bgHex, shadowOpts), type: 'color',
+            };
           }
         }
       }
@@ -970,21 +991,17 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       const emitDropshadowRefs = (bgToken: string | undefined, target: any) => {
         if (!bgToken) return false;
         if (bgToken.includes('Default-Background')) {
-          for (let i = 1; i <= 5; i++) {
-            target[`Dropshadow-Color-${i}`] = {
-              value: `{Default-Background.Dropshadow-Color-${i}}`, type: 'color',
-            };
-          }
+          target['Dropshadow-Color'] = {
+            value: '{Default-Background.Dropshadow-Color}', type: 'color',
+          };
           return true;
         }
         const bgMatch = resolveToColorAlias(bgToken, lookup)
           .match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
         if (bgMatch) {
-          for (let i = 1; i <= 5; i++) {
-            target[`Dropshadow-Color-${i}`] = {
-              value: `{Dropshadow-Color-${i}.${bgMatch[1]}.${bgMatch[2]}}`, type: 'color',
-            };
-          }
+          target['Dropshadow-Color'] = {
+            value: `{Dropshadow-Color.${bgMatch[1]}.${bgMatch[2]}}`, type: 'color',
+          };
           return true;
         }
         // Neither a Default-Background nor a {Colors.…} reference: compute the
@@ -992,11 +1009,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         // it stays brand-tinted rather than falling back to flat black.
         const hex = resolveToHex(bgToken, lookup, colors);
         const surfaceHex = hex && hex.startsWith('#') ? hex : '#ffffff';
-        for (let i = 1; i <= 5; i++) {
-          target[`Dropshadow-Color-${i}`] = {
-            value: dropshadowHex8(surfaceHex, i as ShadowLevel), type: 'color',
-          };
-        }
+        target['Dropshadow-Color'] = {
+          value: dropshadowBaseHex(surfaceHex, shadowOpts), type: 'color',
+        };
         return true;
       };
 
@@ -1032,24 +1047,20 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                 if (bgToken) {
                   // Check if it's a Default-Background reference
                   if (bgToken.includes('Default-Background')) {
-                    for (let i = 1; i <= 5; i++) {
-                      target[`Dropshadow-Color-${i}`] = {
-                        value: `{Default-Background.Dropshadow-Color-${i}}`,
-                        type: 'color'
-                      };
-                    }
+                    target['Dropshadow-Color'] = {
+                      value: '{Default-Background.Dropshadow-Color}',
+                      type: 'color',
+                    };
                     continue;
                   }
                   // Extract palette and Color-N from the background ref
                   const bgAlias = resolveToColorAlias(bgToken, lookup);
                   const bgMatch = bgAlias.match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
                   if (bgMatch) {
-                    for (let i = 1; i <= 5; i++) {
-                      target[`Dropshadow-Color-${i}`] = {
-                        value: `{Dropshadow-Color-${i}.${bgMatch[1]}.${bgMatch[2]}}`,
-                        type: 'color'
-                      };
-                    }
+                    target['Dropshadow-Color'] = {
+                      value: `{Dropshadow-Color.${bgMatch[1]}.${bgMatch[2]}}`,
+                      type: 'color',
+                    };
                     continue;
                   }
                 }
@@ -1064,12 +1075,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                 const shadowSurfaceHex = fallbackBgHex && fallbackBgHex.startsWith('#')
                   ? fallbackBgHex
                   : '#ffffff';
-                for (let i = 0; i < 5; i++) {
-                  target[`Dropshadow-Color-${i + 1}`] = {
-                    value: dropshadowHex8(shadowSurfaceHex, (i + 1) as ShadowLevel),
-                    type: 'color',
-                  };
-                }
+                target['Dropshadow-Color'] = {
+                  value: dropshadowBaseHex(shadowSurfaceHex, shadowOpts),
+                  type: 'color',
+                };
                 continue;
               }
 
@@ -1111,8 +1120,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                     'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
-                    'Dropshadow-Color-1', 'Dropshadow-Color-2', 'Dropshadow-Color-3',
-                    'Dropshadow-Color-4', 'Dropshadow-Color-5',
+                    'Dropshadow-Color',
                     'Default-Background'];
 
                   // If the token already references a Modes group, keep it as-is
@@ -1260,7 +1268,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
              still needs the tokens — every surface casts a shadow, and the
              Background it is derived from is right here. This is what was
              missing for Default. */
-          if (!figmaGroup['Dropshadow-Color-1']) {
+          if (!figmaGroup['Dropshadow-Color']) {
             /* Containers name their background "Container", not "Background" —
                so looking only for a Background key found nothing and the
                Container groups were skipped for the same reason Default was.
@@ -1652,12 +1660,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // values designers see when the link resolves normally.
       const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value;
       if (bgHex) {
-        for (const level of SHADOW_LEVELS) {
-          defBg[`Dropshadow-Color-${level}`] = {
-            value: dropshadowHex8(bgHex, level as ShadowLevel),
-            type: 'color',
-          };
-        }
+        defBg['Dropshadow-Color'] = {
+          value: dropshadowBaseHex(bgHex, shadowOpts),
+          type: 'color',
+        };
       }
 
       // Container properties — Text, Header, Quiet, Border for containers
@@ -1834,6 +1840,8 @@ const BUTTON_BORDER_WIDTH = 1;
 
     figma.Components = {
       Button: {
+        // Mode-scoped metrics (medium / Sm- / Lg-). See buttonSizing.ts.
+        ...buttonModeMetricFigma(cs),
         'Button-Radius': r.buttonRadius,
         'Sm-Button-Radius': r.smButtonRadius,
         'Lg-Button-Radius': r.lgButtonRadius,
@@ -1897,8 +1905,21 @@ const BUTTON_BORDER_WIDTH = 1;
         ...bevelJSON('Sm-', cs.smallButtonHeight, bevelPct),
         ...bevelJSON('Lg-', cs.largeButtonHeight, bevelPct),
       },
+      Accordion: {
+        /* Follows Button-Radius, capped at half the summary height. Figma has
+           carried a hand-made "Other/Accordian-Radius" (sic) — this is the
+           generated one, correctly spelled. */
+        'Accordion-Radius': r.accordionRadius,
+      },
       Card: {
         'Card-Radius': r.cardRadius,
+        /* Sized cards. Scaled off the resolved medium rather than re-running
+           the corner+padding formula, which the 24px cap collapses to one
+           value at every preset above Pro. */
+        'Sm-Card-Radius': r.smCardRadius,
+        'Lg-Card-Radius': r.lgCardRadius,
+        'Sm-Card-Inner-Border-Radius': r.smCardInnerRadius,
+        'Lg-Card-Inner-Border-Radius': r.lgCardInnerRadius,
         'Card-Inner-Border-Radius': r.cardInnerRadius,
         'Card-Focus-Border-Radius': r.cardFocusRadius,
         'Card-Padding': r.cardPadding,

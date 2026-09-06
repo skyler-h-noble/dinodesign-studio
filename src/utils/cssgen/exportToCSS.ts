@@ -9,6 +9,7 @@
  */
 
 import chroma from 'chroma-js';
+import { buttonModeMetricCSS } from '../buttonSizing';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
@@ -16,7 +17,7 @@ import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGe
 import { computeRadii, migrateLegacyRadii } from '../componentRadii';
 import { motionCSS, motionModeCSS } from '../motion';
 import { solveThemeScrims, generateTextOverImageCSS } from './generateTextOverImage';
-import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from '../dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
   generateHeaderVariables,
@@ -343,20 +344,19 @@ function resolveHoverActiveToken(tokenValue: string, colorsData: any): string | 
 /** Emit `  --Dropshadow-Color-N: #RRGGBBAA;` lines for a given surface bg.
  *  Used alongside the legacy `--Dropshadow-Color` so Effect-Level recipes
  *  inside the scope can pull a per-elevation color tuned to the surface. */
-function dropshadowLevelLines(bgHex: string): string[] {
-  return SHADOW_LEVELS.map(
-    level => `  --Dropshadow-Color-${level}: ${dropshadowHex8(bgHex, level)};`,
-  );
-}
+
 
 /** Derive the aggregate `--Dropshadow-Color` RGB triple from a surface hex.
  *  Uses the SAME Comeau math as the per-level `--Dropshadow-Color-N` tokens
  *  (shared `dropshadowBaseHex` in ../dropshadow) so every shadow color in the
  *  system comes from one model. Level 2 = the standard card elevation; the
- *  per-`.level` opacity is applied by the consumer via rgba(). Returns "r, g, b". */
-function deriveShadowRGB(hex: string): string | null {
+ *  per-layer opacity is applied by the Effect-Level recipe. Returns "r, g, b" —
+ *  COMMA separated, for rgba(var(--Dropshadow-Color), <alpha>), which is what
+ *  the component lib consumes. A space triple is invalid inside rgba() and
+ *  paints nothing, silently. */
+function deriveShadowRGB(hex: string, o?: ShadowOptions): string | null {
   try {
-    const baseHex = dropshadowBaseHex(hex, 2);
+    const baseHex = dropshadowBaseHex(hex, o);
     const n = parseInt(baseHex.replace('#', '').slice(0, 6), 16);
     return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
   } catch { return null; }
@@ -1096,6 +1096,10 @@ function generateThemeColorsVariables(modeData: any): string {
  * Returns the CSS outside of :root block (to be appended after :root closes)
  */
 function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: string): string {
+  /* Shadow controls, resolved once per call. dropshadowBaseHex depends on
+     INTENSITY, so a surface's shadow hex is wrong — not missing, wrong — if
+     these are not passed down. */
+  const shadowOpts = shadowOptionsFromStyle(fullJsonData?._componentStyle);
   console.log('🎨 [generateThemesVariables] Called');
   console.log('  ├─ Has modeData?', !!modeData);
   console.log('  ├─ Has modeData.Themes?', !!modeData?.Themes);
@@ -1730,12 +1734,13 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
               }
             }
             if (bgHex) {
-              const rgb = deriveShadowRGB(bgHex);
+              /* ONE colour per surface. --Dropshadow-Color-1..5 used to be
+                 emitted alongside it — five colours per surface, from the model
+                 where each elevation had its own hex. The Effect-Level recipes
+                 now reference this single var with per-layer alpha literals, so
+                 those five were dead output on every surface of every theme. */
+              const rgb = deriveShadowRGB(bgHex, shadowOpts);
               if (rgb) surfaceLines.push(`  --Dropshadow-Color: ${rgb};`);
-              // Per-level 8-digit hex shadow tokens — matches Figma's
-              // model and lets Effect-Level recipes stack distinct colors
-              // per elevation instead of one tinted color at varying alpha.
-              surfaceLines.push(...dropshadowLevelLines(bgHex));
             }
           }
         }
@@ -1788,9 +1793,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
             }
           }
           if (contHex) {
-            const rgb = deriveShadowRGB(contHex);
+            const rgb = deriveShadowRGB(contHex, shadowOpts);
             if (rgb) containerLines.push(`  --Dropshadow-Color: ${rgb};`);
-            containerLines.push(...dropshadowLevelLines(contHex));
           }
         }
       }
@@ -3672,6 +3676,8 @@ function generateStyleCSS(jsonData: any): string {
       props.push(`${indent}--Button-Radius: ${borderRadius}px;`);
       props.push(`${indent}--Style-Border-Radius: ${cappedStyle}px;`);
       props.push(`${indent}--Card-Radius: ${cappedCard}px;`);
+      props.push(`${indent}--Sm-Card-Radius: ${Math.min(Math.round(cappedCard * 0.75), REFERENCE_BUTTON_HEIGHT)}px;`);
+      props.push(`${indent}--Lg-Card-Radius: ${Math.min(Math.round(cappedCard * 1.25), REFERENCE_BUTTON_HEIGHT)}px;`);
       props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
       // Button & Input tokens derived from --Button-Radius.
       props.push(`${indent}--Button-Border-Width: 1px;`);
@@ -3867,7 +3873,12 @@ function generateTypographyCSS(jsonData: any): string {
   lines.push(`  --Set-Body-Semibold-Font-Weight: ${typography['Set-Body-Semibold-Font-Weight']?.value || '600'};`);
   lines.push(`  --Set-Body-Bold-Font-Weight: ${typography['Set-Body-Bold-Font-Weight']?.value || '700'};`);
   lines.push(`  --Set-Header-Caps: ${typography['Set-Header-Caps']?.value || 'none'};`);
-  lines.push(`  --Set-Decorative-Caps: ${typography['Set-Decorative-Caps']?.value || 'uppercase'};`);
+  /* Default 'none', matching the Figma side. This read 'uppercase', so a
+     system whose token was missing came out UPPERCASE in the CSS and
+     textCase: ORIGINAL in figma.json — the same Display in caps on the web and
+     sentence case in Figma, from one absent value. The conservative default is
+     also the one that agrees with allCaps: false. */
+  lines.push(`  --Set-Decorative-Caps: ${typography['Set-Decorative-Caps']?.value || 'none'};`);
   lines.push(`  --Congative-Family-Body: ${congativeFont};`);
   lines.push('}');
   
@@ -5027,6 +5038,9 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Sm-Button-Icon-Focus-Radius: ${r.smIconButtonFocusRadius}px;`);
     lines.push(`  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;`);
     lines.push(`  --Card-Radius: ${cappedCardRadius}px;`);
+    lines.push(`  --Accordion-Radius: ${r.accordionRadius}px;`);
+    lines.push(`  --Sm-Card-Radius: ${Math.min(r.smCardRadius, buttonHeight)}px;`);
+    lines.push(`  --Lg-Card-Radius: ${Math.min(r.lgCardRadius, buttonHeight)}px;`);
     lines.push(`  --Card-Inner-Radius: ${r.cardInnerRadius}px;`);
     lines.push(`  --Card-Focus-Radius: ${r.cardFocusRadius}px;`);
     lines.push(`  --Card-Padding: ${r.cardPadding}px;`);
@@ -5062,6 +5076,8 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Lg-Button-Min-Width: ${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px;`);
     lines.push(`  --Button-Padding: ${BUTTON_PADDING}px;`);
     lines.push(`  --Sm-Button-Padding: var(--Button-Padding);`);
+    // Mode-scoped metrics (medium / --Sm- / --Lg-). See buttonSizing.ts.
+    buttonModeMetricCSS(cs, '  ').forEach(l => lines.push(l));
     lines.push(`  --Lg-Button-Padding: ${LG_BUTTON_PADDING}px;`);
     lines.push(`  --Large-Button-Padding: var(--Lg-Button-Padding);`);
     // Bevel tokens — used by the lib Button to render its 3D inset shadow.
@@ -5079,16 +5095,16 @@ export function generateBaseCSS(jsonData: any): string {
     // at the consuming element so themed values still apply even though
     // these are defined statically here.
     lines.push(`  --Effect-Level-0: none;`);
-    // Each level stacks its own atmospheric shadow on the previous level's
-    // contact shadow (Comeau's layered-shadow pattern). Per-level colors
-    // are 8-digit hex tokens emitted per surface scope — the recipes here
-    // just reference them so the alpha + tint come from the surface.
-    lines.push(`  --Effect-Level-1: ${effectLevelRecipe(1)};`);
-    lines.push(`  --Effect-Level-2: ${effectLevelRecipe(2)};`);
-    lines.push(`  --Effect-Level-3: ${effectLevelRecipe(3)};`);
-    lines.push(`  --Effect-Level-4: ${effectLevelRecipe(4)};`);
-    lines.push(`  --Effect-Level-5: ${effectLevelRecipe(5)};`);
+    /* One --Dropshadow-Color per surface with per-layer alpha literals, which
+       is Comeau's shape. The geometry and the alpha ramp both come from the
+       user's Shadow controls, so these recipes change when the sliders move. */
+    const effOpts = shadowOptionsFromStyle(csRaw);
+    for (const lvl of SHADOW_LEVELS) {
+      lines.push(`  --Effect-Level-${lvl}: ${effectLevelRecipe(lvl, effOpts)};`);
+    }
     lines.push('}');
+    lines.push('');
+    lines.push(libRadiusOverrideCSS());
     lines.push('');
     // Motion mode, outside :root. data-motion="No-Motion" zeroes every
     // duration; the OS preference is followed unless the attribute overrides it.

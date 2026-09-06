@@ -20,6 +20,7 @@
 // Reuse the shared union rather than restating it — a second copy here is the
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
+import { buttonModeMetricVars } from './buttonSizing';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -98,6 +99,7 @@ export function componentStyleVars(
     '--Style-Border-Radius': `${buttonRadiusPx}px`,
     '--Button-Padding': `${BUTTON_PADDING}px`,
     '--Sm-Button-Padding': 'var(--Button-Padding)',
+    ...buttonModeMetricVars({ buttonHeight, smallButtonHeight, largeButtonHeight }),
     '--Lg-Button-Padding': `${LG_BUTTON_PADDING}px`,
     '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
     '--Button-Radius': `${buttonRadiusPx}px`,

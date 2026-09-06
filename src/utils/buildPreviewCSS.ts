@@ -4,7 +4,7 @@ import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { parseBackground, toneFor } from './backgroundSelection';
-import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from './dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
 // lib's defaults for these resolve to {palette}-Color-9 regardless of the
 // surface tone, which fails WCAG on light surfaces. These helpers return
@@ -81,6 +81,12 @@ interface BuildInput {
     smallButtonHeight: number;
     largeButtonHeight: number;
     radius?: number; // legacy pixel-shaped card radius
+    shadowIntensity: number;
+    shadowCrispy: number;
+    shadowResolution: number;
+    shadowLightX: number;
+    shadowLightY: number;
+    shadowTint: boolean;
   }>;
   mode: 'light' | 'dark';
   typographyStyles?: import('../types').TypographyStyle[];
@@ -252,11 +258,11 @@ function mixHex(hex1: string, hex2: string): string {
 
 /** Aggregate `--Dropshadow-Color` tint. Uses the shared Comeau math
  *  (`dropshadowBaseHex`, level 2 = standard card elevation) so the live
- *  preview matches the CSS export and the per-level Dropshadow-Color-N tokens
+ *  preview matches the CSS export and the --Dropshadow-Color token
  *  exactly — one model for every shadow color. */
-function dropshadowFor(hex: string): string {
+function dropshadowFor(hex: string, shadowOpts?: ShadowOptions): string {
   try {
-    return dropshadowBaseHex(hex, 2);
+    return dropshadowBaseHex(hex, shadowOpts);
   } catch {
     return '#202020';
   }
@@ -264,21 +270,22 @@ function dropshadowFor(hex: string): string {
 function quietFor(hex: string) { return isLight(hex) ? '#777777' : '#aaaaaa'; }
 
 /** Convert hex to RGB triplet string for use in rgba() */
+/* COMMA-separated: --Dropshadow-Color is consumed as
+   rgba(var(--Dropshadow-Color), <alpha>), including by the component lib. A
+   space triple is invalid inside rgba() and paints nothing, silently. */
 function hexToRgb(hex: string): string {
   const c = hex.replace('#', '');
   const n = parseInt(c.substring(0, 6), 16);
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-/** Emit `  --Dropshadow-Color-N: #RRGGBBAA;` lines for a given surface
- *  background. Used at every scope that emits a `--Dropshadow-Color` so
- *  Effect-Level recipes inside that scope pick up the per-level colors
- *  derived from the surface's own hue. */
-function emitDropshadowLevelLines(bgHex: string): string {
-  return SHADOW_LEVELS
-    .map(level => `  --Dropshadow-Color-${level}: ${dropshadowHex8(bgHex, level)};`)
-    .join('\n');
-}
+/* --Dropshadow-Color-1..5 used to be emitted at every scope here, mirroring
+   the CSS export. Both sides dropped them together: the Effect-Level recipes
+   reference the single --Dropshadow-Color with per-layer alpha literals, so
+   the five per-surface colours were dead output on each of the six scopes
+   below. Removing them from only one side is the classic invariant-5 failure —
+   see src/__tests__/shadowExport.test.ts, which asserts neither side emits
+   them. */
 function borderFor(hex: string) { return isLight(hex) ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'; }
 
 /**
@@ -314,6 +321,13 @@ function getAccessibleTones(
  * preview and export are separate implementations and drift silently, so the
  * two have to be changed together.
  */
+function finalizePreviewCSS(css: string): string {
+  /* Appended at the single exit point both return paths funnel through, and
+     emitted by exportToCSS from the same helper, so the studio and the
+     published bundle cannot disagree (invariant 5). */
+  return `${withOutlineQuiet(css)}\n\n${libRadiusOverrideCSS()}\n`;
+}
+
 function withOutlineQuiet(css: string): string {
   return css.replace(
     /^([ \t]*)(--Quiet:[^;]+;)/gm,
@@ -323,6 +337,11 @@ function withOutlineQuiet(css: string): string {
 
 export function buildPreviewCSS(input: BuildInput): string {
   const { colorScheme, userSelections: sel, mode } = input;
+  /* The user's Shadow controls, resolved once. Both the Effect-Level recipes
+     and the per-surface --Dropshadow-Color depend on them — INTENSITY moves
+     the colour as well as the alpha, so a call site that skips these emits a
+     different hex from the CSS export for the same design system. */
+  const shadowOpts = shadowOptionsFromStyle(input.styleCustomizations as Record<string, unknown> | undefined);
   const isDark = mode === 'dark';
 
   // Neutral ramp for this mode — the export swaps ramps the same way.
@@ -1062,8 +1081,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     // reads --Link / --Link-Hover / --Link-Visited (separate from --Hotlink) —
     // those vars aren't defined in the lib's CSS, so we set both here.
     const hotlinkColorN = scopeTones.text;
-    return `  --Dropshadow-Color: ${hexToRgb(dropshadowFor(scopeBg))};
-${emitDropshadowLevelLines(scopeBg)}
+    return `  --Dropshadow-Color: ${hexToRgb(dropshadowFor(scopeBg, shadowOpts))};
   --Text: ${textVal};
   --Header: ${headerVal};
   --Quiet: ${quietVal};
@@ -1127,7 +1145,7 @@ ${(() => {
   // descendant redefines what it points at, it inherits the computed value.
   // So the alias has to repeat in every scope that sets --Quiet, and doing
   // that by hand across ~40 scopes is how one gets missed.
-  return withOutlineQuiet(`
+  return finalizePreviewCSS(`
 /* ══ Palette Colors — always light (vibrant) palette ══ */
 /* Surfaces/containers use direct hex values from dark palette when in dark mode */
 /* Text, buttons, tags, icons reference these vibrant variables */
@@ -1145,8 +1163,7 @@ ${(() => {
   const tones = getAccessibleTones(statusBg, sc.n, primaryLight);
   return `[data-theme="Brand-Status"] {
   --Background: ${statusBg};
-  --Dropshadow-Color: ${hexToRgb(dropshadowFor(statusBg))};
-${emitDropshadowLevelLines(statusBg)}
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(statusBg, shadowOpts))};
   --Text: var(--${sc.palette}-Color-${tones.text});
 }`;
 })()}
@@ -1192,8 +1209,7 @@ ${(() => {
   [data-theme="Brand-App-Bar"] [data-theme="App-Bar"],
   [data-theme="Brand-App-Bar"] [data-theme="App-Bar"][data-surface="Surface-Bright"] {
   --Background: ${appBarBg};
-  --Dropshadow-Color: ${hexToRgb(dropshadowFor(appBarBg))};
-${emitDropshadowLevelLines(appBarBg)}
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(appBarBg, shadowOpts))};
   --Text: var(--${ac.palette}-Color-${tones.text});
   --Header: var(--${ac.palette}-Color-${tones.header});
   --Quiet: var(--${ac.palette}-Color-${tones.quiet});
@@ -1237,8 +1253,7 @@ ${vibrantLines()}
   --Container: ${containerBg};
   --Container-High: ${containerHigh};
   --Container-Highest: ${containerHighest};
-  --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg))};
-${emitDropshadowLevelLines(surfaceBg)}
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
@@ -1259,11 +1274,7 @@ ${buildTextPaletteLines(surfaceN, false)}
 ${buildHeaderPaletteLines(surfaceN, false)}
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
-  --Effect-Level-1: ${effectLevelRecipe(1)};
-  --Effect-Level-2: ${effectLevelRecipe(2)};
-  --Effect-Level-3: ${effectLevelRecipe(3)};
-  --Effect-Level-4: ${effectLevelRecipe(4)};
-  --Effect-Level-5: ${effectLevelRecipe(5)};
+${SHADOW_LEVELS.map((l) => `  --Effect-Level-${l}: ${effectLevelRecipe(l, shadowOpts)};`).join('\n')}
 
 ${(() => {
     // Generate all button palette tokens
@@ -1317,7 +1328,7 @@ ${emitTagTextTokens()}
   --Container-Lowest: ${containerLowest};
   --Container-High: ${containerHigh};
   --Container-Highest: ${containerHighest};
-  --Container-Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg))};
+  --Container-Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Container-Text: ${containerText};
   --Container-Header: ${containerHeader};
   --Container-Quiet: ${containerQuiet};
@@ -1414,8 +1425,7 @@ ${(() => {
 [data-surface] [data-surface="Container-Low"],
 [data-surface] [data-surface="Container-Lowest"] {
   --Background: var(--${containerPaletteName}-Color-${containerN});
-  --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg))};
-${emitDropshadowLevelLines(containerBg)}
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
@@ -1609,8 +1619,7 @@ ${(() => {
   [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"],
   [data-theme="Brand-Nav-Bar"] [data-theme="Nav-Bar"][data-surface="Surface-Bright"] {
   --Background: ${navBarBg};
-  --Dropshadow-Color: ${hexToRgb(dropshadowFor(navBarBg))};
-${emitDropshadowLevelLines(navBarBg)}
+  --Dropshadow-Color: ${hexToRgb(dropshadowFor(navBarBg, shadowOpts))};
   --Text: ${p(primaryLight, tones.text)};
   --Header: ${p(primaryLight, tones.header)};
   --Quiet: ${p(primaryLight, tones.quiet)};
@@ -1802,7 +1811,7 @@ ${(() => {
   // accordions aren't. We can't lower --Style-Border-Radius without also
   // de-pilling buttons, so emit a dedicated --Accordion-Radius capped at
   // half the button height and override the lib's Accordion rule below.
-  const cappedAccordionRadius = Math.min(r.buttonRadius, Math.floor(buttonHeight / 2));
+  const cappedAccordionRadius = r.accordionRadius;
   // Button radius caps at the LARGE button height — beyond that CSS clamps a
   // pill anyway, and uncapped values (e.g. 100) over-round anything that reads
   // --Button-Radius (accordions, swatches). Mirrors the export cap.
@@ -1817,6 +1826,8 @@ ${(() => {
   --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
   --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;
   --Card-Radius: ${cappedCardRadius}px;
+  --Sm-Card-Radius: ${Math.min(r.smCardRadius, buttonHeight)}px;
+  --Lg-Card-Radius: ${Math.min(r.lgCardRadius, buttonHeight)}px;
   --Card-Padding: ${r.cardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;
@@ -1832,20 +1843,14 @@ ${(() => {
   --Lg-Checkbox-Radius: 4.8px;
 }
 
-/* Accordion radius override — see --Accordion-Radius rationale above.
-   The lib's Accordion.js inlines borderRadius: var(--Style-Border-Radius)
-   so we override via the MUI class selector (Accordion is the only common
-   wrapper that reads Style-Border-Radius today; if more components join
-   we'll extract this into a shared rule). */
-.accordion-group,
-.MuiAccordion-root {
-  border-radius: var(--Button-Radius) !important;
-}
-.accordion-group > *,
-.MuiAccordion-root .MuiAccordionSummary-root,
-.MuiAccordion-root .MuiAccordionDetails-root {
-  border-radius: calc(var(--Button-Radius) - 1px) !important;
-}`;
+/* The Accordion override is gone.
+   It forced .accordion-group to var(--Button-Radius) !important — the very
+   value --Accordion-Radius exists to avoid. Two comments above explain that an
+   accordion summary is about one button tall, so a pill-able --Button-Radius
+   saturates it into a stadium; --Accordion-Radius caps at half the height for
+   exactly that reason, and was then generated and consumed by nothing.
+   The lib now reads var(--Accordion-Radius, var(--Button-Radius)) itself, so
+   the token reaches the component and the override would only undo it. */`;
 })()}
 
 /* ══ Adaptive white token ══

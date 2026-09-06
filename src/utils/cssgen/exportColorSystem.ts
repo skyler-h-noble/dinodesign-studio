@@ -5447,7 +5447,9 @@ export function exportColorSystemToJSON(
   // darker the shadow — with NO "keep it light so dark colors don't collapse"
   // floor. (computeDropshadow above is kept ONLY for the bevel highlight/lowlight,
   // which legitimately need a lighter/additive offset.) Returns an "r, g, b"
-  // triple to match the rgba(var(--Dropshadow-Color), α) consumers.
+  // triple. COMMA separated, for rgba(var(--Dropshadow-Color), α) — which is
+  // what @omni-design/components consumes. A space triple is invalid inside
+  // rgba() and paints nothing, silently.
   const computeDropshadowRGB = (hex: string): string => {
     try {
       const c = dropshadowBaseHex(hex).replace('#', '');
