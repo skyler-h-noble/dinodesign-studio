@@ -424,7 +424,7 @@ export function dropshadowHex8(surfaceHex: string, level: ShadowLevel, layer = 0
  *  Two so far, both the same shape of gap: the component bakes a value in (or
  *  inherits MUI's) instead of reading the token the design system emits.
  *
- *  TextArea wraps MUI's TextField, so its corner comes from MUI's theme rather
+ *  TextArea wrapped MUI's TextField, so its corner came from MUI's theme rather
  *  than --Input-Radius. TextInput reads the token correctly, so a TextArea and
  *  a TextInput sitting next to each other had different corners. Targeting the
  *  outlined-input root covers every MUI-backed field in the lib at once, and
@@ -434,8 +434,27 @@ export function dropshadowHex8(surfaceHex: string, level: ShadowLevel, layer = 0
  *  Doubled class for the same reason as the shadow rules: MUI's own styles come
  *  from emotion, and a single class ties on specificity.
  *
- *  The real fix is for the lib to read the token; this is the override until it
- *  does. */
+ *  ── FIXED IN THE LIB, AND STILL SHIPPED HERE ────────────────────────────────
+ *
+ *  TextArea now delegates to Input, which sets borderRadius from
+ *  --Input-Radius, so the root cause is gone as of the lib release after 0.7.3.
+ *  This rule stays anyway, and deleting it early is the mistake to avoid:
+ *
+ *    A design system's CSS is FROZEN in Storage when it is generated and cannot
+ *    be regenerated. So the two versions move independently — a user who
+ *    generates a fresh system tomorrow while still on lib 0.7.3 or earlier gets
+ *    CSS without the override and a lib that still inherits MUI's corner. The
+ *    override is what makes those two combinations agree.
+ *
+ *    It is also harmless on a fixed lib: it sets the value the lib now sets
+ *    itself. Costing nothing and covering an old lib is the right trade.
+ *
+ *  Two conditions gate removal, and BOTH are needed:
+ *    1. the fixed lib is published, and
+ *    2. no supported design system can pair new CSS with a lib older than it.
+ *
+ *  The selector also covers every MUI-backed field, not only TextArea, so
+ *  audit the others before assuming one component's fix retires the rule. */
 export function libRadiusOverrideCSS(): string {
   /* Chip's `-light` variants are built as `{bg: --Buttons-{C}-Button, text:
      --Buttons-{C}-Text, border: 1px solid --Buttons-{C}-Border}` — the SAME
