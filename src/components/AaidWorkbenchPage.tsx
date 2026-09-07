@@ -53,6 +53,7 @@ import {
 } from '../utils/figmaApi';
 import { convertFigmaToCode } from '../utils/figmaToCode';
 import { computeDrift, driftSummary } from '../utils/conversionDrift';
+import { computeA11y, a11ySummary } from '../utils/conversionA11y';
 import {
   logConversionAttempt,
   logConversionVerdict,
@@ -190,7 +191,7 @@ export default function AaidWorkbenchPage() {
   const [missingComponents, setMissingComponents] = useState<string[]>([]);
   const [conversionId, setConversionId] = useState<string | null>(null);
 
-  const [rightView, setRightView] = useState<'code' | 'preview' | 'drift'>('code');
+  const [rightView, setRightView] = useState<'code' | 'preview' | 'drift' | 'a11y'>('code');
   // The frame is kept so drift can be recomputed without re-fetching. It is the
   // half of the comparison the preview cannot show you.
   const [frame, setFrame] = useState<unknown | null>(null);
@@ -310,6 +311,12 @@ export default function AaidWorkbenchPage() {
   // Errors only in the tab badge. Warnings and info are frequently legitimate —
   // text bound to a prop, a layer name that need not survive — and a badge that
   // is never zero is a badge nobody reads.
+  /* Errors only in the tab badge. Warnings and info are worth reading but not
+     worth a number that makes a clean conversion look dirty. */
+  const a11yCount = useMemo(
+    () => computeA11y(jsx).filter(f => f.severity === 'error').length,
+    [jsx],
+  );
   const driftCount = useMemo(
     () => computeDrift(frame, jsx).filter(f => f.severity === 'error').length,
     [frame, jsx],
@@ -660,12 +667,15 @@ export default function AaidWorkbenchPage() {
             <Card padding="medium">
               <VStack gap="var(--Sizing-1)">
                 <HStack gap="var(--Sizing-1)" justifyContent="space-between" alignItems="center" style={{ width: '100%' }}>
-                  <Tabs value={rightView} onChange={(v: 'code' | 'preview' | 'drift') => setRightView(v)}>
+                  <Tabs value={rightView} onChange={(v: 'code' | 'preview' | 'drift' | 'a11y') => setRightView(v)}>
                     <TabList aria-label="Conversion output">
                       <Tab value="code">Code</Tab>
                       <Tab value="preview">Preview</Tab>
                       <Tab value="drift">
                         Drift{driftCount > 0 ? ` (${driftCount})` : ''}
+                      </Tab>
+                      <Tab value="a11y">
+                        Accessibility{a11yCount > 0 ? ` (${a11yCount})` : ''}
                       </Tab>
                     </TabList>
                   </Tabs>
@@ -685,6 +695,10 @@ export default function AaidWorkbenchPage() {
 
                 {rightView === 'drift' && (
                   <DriftPanel frameJson={frame} jsx={jsx} />
+                )}
+
+                {rightView === 'a11y' && (
+                  <A11yPanel jsx={jsx} />
                 )}
 
                 {rightView === 'preview' && (
@@ -1070,6 +1084,78 @@ function CodeToDesignPanel() {
  * prop, a layer name that need not survive into code — so they are shown plainly
  * rather than as failures, and only errors reach the tab badge.
  */
+/**
+ * Accessibility findings for the converted frame.
+ *
+ * Mirrors DriftPanel deliberately — same finding shape, same Alert treatment —
+ * because the two answer neighbouring questions and switching between them
+ * should feel like one surface, not two tools.
+ *
+ * The difference worth knowing is in the closing note rather than the code:
+ * drift's warnings are often false alarms (text bound to a prop, a layer name
+ * that need not survive), while an error here is a control somebody cannot use.
+ * Almost nothing in this panel is visible in the preview, which is the whole
+ * reason it is a panel and not a review step.
+ */
+function A11yPanel({ jsx }: { jsx: string }) {
+  const findings = useMemo(() => computeA11y(jsx), [jsx]);
+  const counts = useMemo(() => a11ySummary(findings), [findings]);
+
+  if (!jsx.trim()) {
+    return <Body color="quiet">Convert a frame to check the generated markup.</Body>;
+  }
+
+  if (findings.length === 0) {
+    return (
+      <Alert severity="success" color="success" data-theme="Success" data-surface="Surface-Brightest">
+        Nothing to fix. Every control that renders no text carries a name, no
+        name is duplicated on an icon inside its button, and the heading order
+        has no gaps.
+      </Alert>
+    );
+  }
+
+  const themeFor = (s: string) =>
+    s === 'error' ? 'Error' : s === 'warning' ? 'Warning' : 'Info';
+  const colorFor = (s: string) =>
+    s === 'error' ? 'error' : s === 'warning' ? 'warning' : 'info';
+
+  return (
+    <VStack gap="var(--Sizing-2)">
+      <HStack gap="var(--Sizing-Half)" style={{ flexWrap: 'wrap' }}>
+        {counts.errors > 0 && <Chip label={`${counts.errors} error`} size="small" />}
+        {counts.warnings > 0 && <Chip label={`${counts.warnings} warning`} size="small" />}
+        {counts.info > 0 && <Chip label={`${counts.info} to confirm`} size="small" />}
+      </HStack>
+
+      <VStack gap="var(--Sizing-1)">
+        {findings.map((f, i) => (
+          <Alert
+            key={`${f.kind}-${i}`}
+            severity={(f.severity === 'error' ? 'error' : f.severity === 'warning' ? 'warning' : 'info') as 'error'}
+            color={colorFor(f.severity)}
+            data-theme={themeFor(f.severity)}
+            data-surface="Surface-Brightest"
+          >
+            <VStack gap="var(--Sizing-Half)">
+              <BodySmall>{f.message}</BodySmall>
+              {f.detail && <Caption color="quiet">{f.detail}</Caption>}
+              {f.where && <Caption color="quiet">in {f.where}</Caption>}
+            </VStack>
+          </Alert>
+        ))}
+      </VStack>
+
+      <Caption color="quiet">
+        None of this shows up in the preview — a button with no accessible name
+        renders perfectly. “To confirm” is a name the converter inferred rather
+        than read; it is usually right, but only you know whether that house
+        icon means Home or Dashboard.
+      </Caption>
+    </VStack>
+  );
+}
+
 function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
   const findings = useMemo(() => computeDrift(frameJson, jsx), [frameJson, jsx]);
   const counts = useMemo(() => driftSummary(findings), [findings]);

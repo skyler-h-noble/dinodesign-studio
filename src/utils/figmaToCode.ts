@@ -262,10 +262,57 @@ CONVERSION RULES:
       - State        → checked/selected/disabled/etc. ONLY if the instance is in
                        that state.
       - Booleans     → show/hide per rule 0b.
+      - aria-label   → DERIVED, not read from a property. See rule 0d.
     If you emit a component and leave a prop at its default while the instance's
     variant says otherwise, that is a bug. Enumerate _aaid.variant and translate
     each key. (The lib's own per-row typography, padding, etc. are handled by the
     component — your job is to pass the instance's variant props faithfully.)
+
+0d. NAME EVERY CONTROL THAT RENDERS NO READABLE TEXT.
+    Button Type of iconOnly, Avatar or letterNumber, and any icon-only control,
+    needs aria-label. Type "text" does NOT — its visible label is already the
+    accessible name, and adding aria-label there makes a screen reader announce
+    the control twice.
+
+    There is no Accessible Name property in the file. Derive it, in this order,
+    and take the first that yields something meaningful:
+
+      1. The INSTANCE'S LAYER NAME, when it reads like an action — "Profile",
+         "Search", "Add member". Skip it when it is generic or automatic:
+         "Button", "Button-Small", "Frame 12", "Ellipse 3", the component name,
+         or a bare number.
+      2. For iconOnly, the icon's MEANING as an action. SearchIcon → "Search",
+         NotificationsIcon → "Notifications". Where the glyph and the action
+         differ, the action wins: a home icon that opens a dashboard is
+         "Dashboard", not "Home".
+      3. For Avatar in a nav or app bar, the convention: "Your account".
+      4. For letterNumber, nothing derivable exists — the characters are the
+         CONTENT, not the name. "JD" is not a name; "3" is not a name. Use the
+         layer name if it is meaningful, otherwise describe the action you can
+         infer from context ("Notifications") and flag it.
+
+    NEVER use the glyph where it differs from the action, and NEVER use the
+    rendered content — aria-label="JD" and aria-label="3" pass every automated
+    check while telling the user nothing, which is worse than no label at all
+    because it silences the lib's own dev warning.
+
+    Do NOT also label the icon inside. The button owns the name; labelling both
+    makes a screen reader read it twice.
+
+    FLAG EVERY GUESS, in the comment block at the top, one line each, in
+    exactly this form so it can be picked up automatically:
+
+      // DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, inferred from
+      // the layer name "Dashboard link"
+
+    Emit one for every control whose name came from step 2, 3 or 4 — anything
+    you inferred rather than read. Not for step 1: a layer name the designer
+    wrote is authored, not guessed.
+
+    A wrong name is invisible in the render, passes every visual check, and is
+    only ever found with a screen reader. The designer is the one who knows
+    whether that house icon means Home or Dashboard, and this line is the only
+    thing that will ever ask them.
 
 1. Outermost frame for Mobile / Tab / Web → <Container>.
    Outermost frame for a component → <Card> or <Section> as appropriate.
