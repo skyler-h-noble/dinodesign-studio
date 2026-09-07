@@ -178,6 +178,9 @@ their own borders, leaving a 1.47:1 border on a light surface.
 | `State-Surface` | same | aliases into `State` |
 | `Buttons-ThemeBackgrounds` | the 10 roles | 7 slots, aliases into `Surface` |
 | `Buttons-StateBackgrounds` | the 10 roles | 7 slots, aliases into `State-Surface` |
+| `Drop-Colors` | none | `Level-<1-5>/Drop-Color` — 5 aliases into `Theme` |
+| `Elevation` | Level-0 … Level-5 | `Shadow-<n>/<geometry>` — the reference ladder |
+| `Component-Elevations` | Standard, Elevated | per-component geometry + a `Drop-Colors` alias |
 
 **mode = colour, variant = treatment and geometry.** A button binds the seven
 slots once; colour comes from the mode, while size, elevation and outline/ghost
@@ -194,6 +197,18 @@ reads as inherited, so it fails silently.
 
 Mode counts are plan-limited (Professional is 4 per collection; Enterprise far
 higher). `addMode` failures are logged rather than swallowed.
+
+`Drop-Colors` exists because Figma cannot express a shadow as "this colour at
+that opacity". A fill splits RGB from an opacity field; a shadow's colour is one
+RGBA, and no bindable field or alias can supply the alpha separately.
+
+An alias does CARRY an alpha, though — it just cannot apply one. So the mix is
+baked once at the `Modes` leaf (`Drop-Color/Level-<n>/<theme>`, 45 literals) and
+`Theme` and `Drop-Colors` alias upward — one colour per LEVEL, since the alpha is
+flat across a level's layers. Light/dark comes from
+`Modes`, the palette from `Theme`, both already set on every frame — so shadows
+re-tint dynamically and `Drop-Colors` needs no modes, meaning no second axis to
+keep in sync. Full reasoning: [shadow-elevation.md](shadow-elevation.md).
 
 ---
 
@@ -269,3 +284,19 @@ a real divergence survived a passing parity suite.
 
 Parity alone is not enough: assert the intended *shape* independently, or both
 sides can be wrong together and still agree.
+
+### An alpha must be the same number in both exports, not a close one
+
+A Figma colour is 8-bit; CSS alpha is a float. The same ramp value written
+naively lands on two different numbers — `0.35875` becomes byte 91 (`0.3569`) in
+Figma and `0.359` in CSS. Nothing visible turns on 0.002 of alpha, so the
+tempting repair is to allow one 8-bit step of slack in the parity test.
+
+Do not. A tolerance is exactly where a real divergence hides, and it defeats the
+rule above: assert the value a token *resolves to*, not that both sides are
+nearby. Both exports quantise through `quantizeAlpha()` at the emission boundary,
+so they hold the same number and the test demands equality.
+
+The ramp itself stays exact — `dropshadowAlphas()` peaks on INTENSITY on the
+nose, which two tests pin. The 8-bit constraint belongs at the edge where it
+actually exists, not in the model.

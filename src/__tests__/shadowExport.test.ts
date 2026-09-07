@@ -17,7 +17,7 @@ import { generateFigmaJSON } from '../utils/generateFigmaJSON';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 import {
-  dropshadowAlphas, shadowLayers, shadowLayerCount, dropshadowBaseHex,
+  dropshadowAlphas, quantizeAlpha, shadowLevelOpacities, shadowLayers, shadowLayerCount, dropshadowBaseHex,
   shadowOptionsFromStyle, SHADOW_LEVELS, SHADOW_DEFAULTS,
 } from '../utils/dropshadow';
 import type { ColorScheme } from '../types';
@@ -115,7 +115,7 @@ describe('Figma carries the per-layer geometry and opacity globally', () => {
       const n = shadowLayerCount(l);
       for (let i = n; i < 10; i++) {
         const s = figma.Elevation[`Level-${l}`][`Shadow-${i + 1}`];
-        expect(`L${l} slot ${i + 1}: ${s['opacity'].value}/${s['offset-x'].value}/${s['offset-y'].value}/${s['blur-radius'].value}`)
+        expect(`L${l} slot ${i + 1}: ${s['x'].value}/${s['y'].value}/${s['Blur'].value}/${s['Spread'].value}`)
           .toBe(`L${l} slot ${i + 1}: 0/0/0/0`);
       }
     }
@@ -123,12 +123,10 @@ describe('Figma carries the per-layer geometry and opacity globally', () => {
 
   it('matches the generator for the active slots', () => {
     for (const l of SHADOW_LEVELS) {
-      const layers = shadowLayers(l);
-      const alphas = dropshadowAlphas(l);
-      layers.forEach(([x, y, blur, spread], i) => {
+      shadowLayers(l).forEach(([x, y, blur, spread], i) => {
         const s = figma.Elevation[`Level-${l}`][`Shadow-${i + 1}`];
-        expect(`L${l}.${i + 1}: ${s['offset-x'].value}/${s['offset-y'].value}/${s['blur-radius'].value}/${s['spread-radius'].value}/${s['opacity'].value}`)
-          .toBe(`L${l}.${i + 1}: ${x}/${y}/${blur}/${spread}/${Math.round(alphas[i] * 1000) / 1000}`);
+        expect(`L${l}.${i + 1}: ${s['x'].value}/${s['y'].value}/${s['Blur'].value}/${s['Spread'].value}`)
+          .toBe(`L${l}.${i + 1}: ${x}/${y}/${blur}/${spread}`);
       });
     }
   });
@@ -137,17 +135,23 @@ describe('Figma carries the per-layer geometry and opacity globally', () => {
 describe('the user\'s Shadow controls actually reach the exports', () => {
   /* A hard-coded default would pass every assertion above. These force the
      non-default settings through the real pipeline. */
-  it('changes the Figma geometry and opacity', () => {
+  it('changes the Figma geometry, and the Drop-Colors opacity with it', () => {
     const custom = buildFigma(CUSTOM) as never as Record<string, any>;
     const o = shadowOptionsFromStyle(CUSTOM);
     const layers = shadowLayers(5, o);
-    const alphas = dropshadowAlphas(5, o);
     expect(`slots: ${layers.length}`).not.toBe(`slots: ${shadowLayers(5).length}`);
     layers.forEach(([x, y, blur, spread], i) => {
       const s = custom.Elevation['Level-5'][`Shadow-${i + 1}`];
-      expect(`${s['offset-x'].value}/${s['offset-y'].value}/${s['blur-radius'].value}/${s['spread-radius'].value}/${s['opacity'].value}`)
-        .toBe(`${x}/${y}/${blur}/${spread}/${Math.round(alphas[i] * 1000) / 1000}`);
+      expect(`${s['x'].value}/${s['y'].value}/${s['Blur'].value}/${s['Spread'].value}`)
+        .toBe(`${x}/${y}/${blur}/${spread}`);
     });
+    /* The alpha left Elevation for Drop-Colors, so a settings change has to
+       show up THERE now — this is the half that would otherwise stop being
+       covered when the opacity moved collections. */
+    const dc = custom['Drop-Colors'][Object.keys(custom['Drop-Colors'])[0]];
+    expect(dc['Level-5'].Opacity.value).toBe(shadowLevelOpacities(o)[4].percent);
+    expect(dc['Level-5'].Opacity.value)
+      .not.toBe(shadowLevelOpacities(SHADOW_DEFAULTS)[4].percent);
   });
 
   /* Intensity moves the COLOUR, not only the alpha. A call site that drops the
@@ -423,33 +427,144 @@ describe('the Elevation payload matches the Figma collection', () => {
   it('uses the collection\'s own property names', () => {
     const slot = figma.Elevation['Level-3']['Shadow-1'];
     expect(Object.keys(slot).sort()).toEqual(
-      ['blur-radius', 'offset-x', 'offset-y', 'opacity', 'spread-radius'],
+      ['Blur', 'Spread', 'x', 'y'],
     );
   });
 
   it('Level-0 is fully off, so nothing inherits Level-1', () => {
+    /* A mode with no values inherits the previous one, so an unstyled element
+       would silently pick up Level-1's shadow. Level-0 is emitted zeroed rather
+       than omitted. */
     for (let i = 1; i <= 10; i++) {
       const s = figma.Elevation['Level-0'][`Shadow-${i}`];
-      expect(s['opacity'].value).toBe(0);
-      expect(s['offset-y'].value).toBe(0);
-      expect(s['blur-radius'].value).toBe(0);
+      expect(s['x'].value).toBe(0);
+      expect(s['y'].value).toBe(0);
+      expect(s['Blur'].value).toBe(0);
+      expect(s['Spread'].value).toBe(0);
     }
   });
 
-  it('marks unused slots with opacity 0, not just zeroed geometry', () => {
-    // A 0/0/0 shadow still paints the silhouette at full strength behind the
-    // element — invisible only while the spread is 0 and the element opaque.
-    const opacities = slotValues(figma.Elevation['Level-1'], 'opacity');
-    expect(opacities.filter((v) => v > 0).length).toBeGreaterThan(0);
-    expect(opacities.filter((v) => v === 0).length).toBeGreaterThan(0);
-    expect(opacities).toHaveLength(10);
+  it('carries no opacity — that moved to Drop-Colors', () => {
+    /* The collection is 40 variables: 10 slots x 4 fields. An `opacity` here
+       would be a fifth field with no variable to land in, and a second place
+       for the same number to drift from — the alpha now lives on Drop-Colors as
+       a per-level Opacity that a Drop-Color's opacity binds to. */
+    for (const level of [0, ...SHADOW_LEVELS]) {
+      for (let i = 1; i <= 10; i++) {
+        const s = figma.Elevation[`Level-${level}`][`Shadow-${i}`];
+        expect(Object.keys(s).sort(), `Level-${level} Shadow-${i}`)
+          .toEqual(['Blur', 'Spread', 'x', 'y']);
+      }
+    }
   });
 
   it('reaches the depth the CSS does — not the old hand-authored 32px', () => {
-    // The collection topped out at y=32 while the generator reaches 74 at
-    // Level-5. If these ever agree again by accident, it means someone pinned
-    // the generator to the old numbers rather than the other way round.
-    expect(Math.max(...slotValues(figma.Elevation['Level-5'], 'offset-y')))
-      .toBeGreaterThan(60);
+    /* The hand-authored collection topped out at y=32. Level-5 now ends at 50,
+       which is his high tier measured off the captures (it was 74, from an
+       earlier reading). Still comfortably past the old ceiling, which is what
+       this guards: if the two ever agree again it means someone pinned the
+       generator to the old numbers rather than the other way round. */
+    const deepest = Math.max(...slotValues(figma.Elevation['Level-5'], 'y'));
+    expect(deepest).toBe(50);
+    expect(deepest).toBeGreaterThan(32);
+  });
+});
+
+/* ── Drop-Colors is hand-authored ───────────────────────────────────────────
+   Five variables in the file, `Level-<n>/Drop-Color`, each aliasing
+   Surface/Dropshadow-Color with that level's opacity applied in the UI. The
+   payload must NOT write them, and must not carry the generated chain that
+   briefly existed to have somewhere to bake the alpha. What it must still do is
+   reference them from Component-Elevations, and keep Modes/Dropshadow-Color —
+   the opaque base the whole Surface chain tints from. */
+describe('Drop-Colors: opacity written, colour left aliased', () => {
+  const figma = buildFigma() as never as Record<string, any>;
+  const LEVELS = [1, 2, 3, 4, 5] as const;
+
+  it('emits the per-level OPACITY and nothing else for Drop-Colors', () => {
+    /* The colour is aliased in Figma and must never be written from here: a
+       plugin cannot express "this alias, dimmed" (a variable value is one RGBA
+       or one pointer, no modifier field), but Figma can bind a colour's opacity
+       to a NUMBER variable — so the alias survives and the alpha rides in as a
+       plain float. If a Drop-Color key ever appears here, something is trying to
+       write the tint and will detach the alias. */
+    const dc = figma['Drop-Colors'];
+    expect(dc).toBeDefined();
+    expect(Object.keys(dc)).toHaveLength(1);   // the file's single unnamed mode
+    const section = dc[Object.keys(dc)[0]];
+    expect(Object.keys(section).sort()).toEqual(LEVELS.map((l) => `Level-${l}`).sort());
+    for (const level of LEVELS) {
+      expect(Object.keys(section[`Level-${level}`])).toEqual(['Opacity']);
+      const entry = section[`Level-${level}`].Opacity;
+      expect(entry.type).toBe('number');
+      /* A PERCENT, 0..100. A number variable bound to a colour's opacity is
+         rendered by appending "%", so a variable holding 0.345 displays as
+         "0.345%" and paints nothing. This assertion is the guard against that
+         off-by-100 coming back — it is invisible in a diff and near-invisible
+         on screen. */
+      expect(entry.value).toBeGreaterThan(1);
+      expect(entry.value).toBeLessThanOrEqual(100);
+      // Still the level's flat alpha, quantised the way the CSS quantises it.
+      expect(entry.value).toBe(
+        Math.round(quantizeAlpha(dropshadowAlphas(level, SHADOW_DEFAULTS)[0]) * 1000) / 10);
+    }
+  });
+
+  it('emits no generated chain in Modes or Theme', () => {
+    /* A 45-variable Modes leaf and 5 Theme aliases existed to hold the alpha,
+       because an alias carries one but cannot apply one. Aliasing
+       Surface/Dropshadow-Color in the UI does the same job with five
+       hand-authored variables and no generated ones, so the chain is gone. If
+       either reappears, two things are tinting the same shadow. */
+    for (const mode of ['Light-Mode', 'Dark-Mode'])
+      expect(figma.Modes[mode]['Drop-Color'], `${mode} leaf`).toBeUndefined();
+    for (const theme of Object.keys(figma.Themes || {}))
+      expect(figma.Themes[theme]['Drop-Color'], `Themes.${theme}`).toBeUndefined();
+  });
+
+  it('keeps Modes/Dropshadow-Color, opaque and per mode', () => {
+    /* The base the Surface chain resolves to. Opaque: the opacity is applied on
+       the Drop-Colors alias in Figma, so baking one here would apply it twice. */
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      const v = figma.Modes[mode]['Dropshadow-Color']?.Primary?.['Color-12']?.value;
+      expect(v, `${mode} Dropshadow-Color`).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+    // The tint is derived from each mode's own surface, so the two differ.
+    const light = figma.Modes['Light-Mode']['Dropshadow-Color'].Primary['Color-3'].value;
+    const dark = figma.Modes['Dark-Mode']['Dropshadow-Color'].Primary['Color-3'].value;
+    expect(light).not.toBe(dark);
+  });
+
+  it('points Component-Elevations at the five hand-authored variables', () => {
+    const ce = figma['Component-Elevations'];
+    const seen = new Set<string>();
+    for (const mode of ['Standard', 'Elevated'] as const) {
+      for (const [name, entry] of Object.entries<any>(ce[mode])) {
+        if (!name.endsWith('/Drop-Color')) continue;
+        const v = String(entry.value);
+        if (v.startsWith('{')) {
+          expect(v).toMatch(/^\{Drop-Colors\.Level-[1-5]\.Drop-Color\}$/);
+          seen.add(v);
+        } else {
+          // A spare slot at this Resolution.
+          expect(v).toBe('#00000000');
+        }
+      }
+    }
+    // Only the five exist to be referenced — never a per-slot name.
+    expect([...seen].sort()).toEqual(
+      LEVELS.map((l) => `{Drop-Colors.Level-${l}.Drop-Color}`).sort());
+  });
+
+  it('keeps the percent and the fraction in step', () => {
+    /* Two representations of one number: `alpha` is what the CSS paints, and
+       `percent` is what the Figma Opacity variable holds. One decimal, because
+       the levels differ by tenths — whole percent would collapse two of them. */
+    const rows = shadowLevelOpacities(SHADOW_DEFAULTS);
+    expect(rows).toHaveLength(5);
+    for (const { level, alpha, percent } of rows) {
+      expect(percent).toBe(Math.round(alpha * 1000) / 10);
+      expect(alpha).toBe(quantizeAlpha(dropshadowAlphas(level, SHADOW_DEFAULTS)[0]));
+    }
   });
 });

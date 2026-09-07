@@ -16,10 +16,9 @@ import {
 const SPEC: Array<[string, 'Default' | 'Hover', number, number]> = [
   ['Button, Outlined Cards',     'Default', 0, 1],
   ['Button, Outlined Cards',     'Hover',   1, 2],
-  ['Accordion',                  'Default', 1, 2],
-  ['Accordion',                  'Hover',   2, 3],
-  ['Card, Handle, Bottom Sheet', 'Default', 1, 2],
-  ['Card, Handle, Bottom Sheet', 'Hover',   2, 3],
+  ['Handle, Accordion',          'Default', 1, 2],
+  ['Card, Bottom Sheet',         'Default', 1, 2],
+  ['Card, Bottom Sheet',         'Hover',   2, 3],
   ['AppBar, Toolbars, Menus',    'Default', 2, 3],
   ['FAB',                        'Default', 3, 4],
   ['FAB',                        'Hover',   4, 5],
@@ -62,9 +61,9 @@ describe('which components have a Hover state', () => {
     ['AppBar, Toolbars, Menus', false],
     ['Dialog, Modal', false],
     ['Button, Outlined Cards', true],
-    ['Card, Handle, Bottom Sheet', true],
+    ['Card, Bottom Sheet', true],
     ['FAB', true],
-    ['Accordion', true],
+    ['Handle, Accordion', false],
   ])('%s hasHover=%s', (group, expected) => {
     expect(byGroup(group).hasHover).toBe(expected);
   });
@@ -77,10 +76,13 @@ describe('the Figma payload', () => {
     expect(Object.keys(payload)).toEqual(['Standard', 'Elevated']);
   });
 
-  it('emits exactly one variable per component/state — ten, not 150', () => {
+  it('emits exactly one variable per component/state — nine, not 150', () => {
+    /* Nine rows, not ten: Accordion lost its Hover child. An accordion lifts
+       when it OPENS, which is the Elevated mode, not a pointer state — the
+       Hover row invented an interaction the component does not have. */
     expect(Object.keys(payload.Standard)).toHaveLength(SPEC.length);
     expect(Object.keys(payload.Elevated)).toHaveLength(SPEC.length);
-    expect(SPEC.length).toBe(10);
+    expect(SPEC.length).toBe(9);
   });
 
   it('names variables the way the collection paths already read', () => {

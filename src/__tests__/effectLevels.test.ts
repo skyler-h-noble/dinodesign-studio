@@ -14,8 +14,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  effectLevelRecipe, shadowLayers, shadowLayerCount, dropshadowBaseHex,
-  dropshadowAlphas, dropshadowHex8, dropshadowRGB, SHADOW_LEVELS,
+  effectLevelRecipe, shadowLayers, shadowLayerCount, shadowStyleSplit, dropshadowBaseHex,
+  dropshadowAlphas, dropshadowHex8, dropshadowRGB, SHADOW_LEVELS, SHADOW_DEFAULTS,
 } from '../utils/dropshadow';
 
 const LEVELS = SHADOW_LEVELS;
@@ -53,16 +53,17 @@ describe('layer counts follow the resolution ramp', () => {
   });
 });
 
-describe('geometry — cubic inside a fixed envelope', () => {
+describe('geometry — exponential inside a fixed envelope', () => {
   /* THE property that makes resolution safe to expose as a slider: raising it
      subdivides the same envelope instead of growing the shadow. Comeau's
      captures at resolution 0 / 0.5 / 1 all start at 0.5px and end at the same
      max, which is what this pins. */
   it('starts at the contact offset and ends at the level\'s distance', () => {
-    // Anchored to Comeau's own tiers: his low 2.5px, medium 12.3px, high 73.7px
-    // land on levels 1, 3 and 5. The old 1/4/8/16/32 topped out below half his
-    // high tier, which is why Level 5 hugged its own edge.
-    const DISTANCE = { 1: 2.5, 2: 6, 3: 12.5, 4: 30, 5: 74 } as const;
+    /* MEASURED off ten captures of his generator, not inferred: his low,
+       medium and high tiers end at y = 2 / 10 / 50, and those land on levels
+       1, 3 and 5. Levels 2 and 4 are the geometric means. A previous reading
+       put them at 2.5 / 12.3 / 73.7 — same pass that got the alpha wrong. */
+    const DISTANCE = { 1: 2, 2: 4.5, 3: 10, 4: 22.4, 5: 50 } as const;
     for (const l of LEVELS) {
       const ys = shadowLayers(l).map(([, y]) => y);
       expect(`L${l} last: ${ys[ys.length - 1]}`).toBe(`L${l} last: ${DISTANCE[l]}`);
@@ -81,18 +82,33 @@ describe('geometry — cubic inside a fixed envelope', () => {
     }
   });
 
-  /* Negative spread is what stops a 10-layer stack reading as a grey slab.
-     It must never exceed the shadow it is shrinking — a flat 5px would erase
-     Level-1, whose whole envelope is 1px. */
-  it('tucks outer layers in without erasing small levels', () => {
+  /* Negative spread is what stops a stack reading as a grey slab. It runs
+     LINEARLY from 0 at the contact layer to the full spreadMax at the
+     outermost, on every level.
+
+     Two caps used to sit here — one against the level's own envelope, one
+     against each layer's blur — on the theory that a full spread would erase a
+     short level. His captures refute both: the low tier, whose whole envelope
+     is 2px, runs the spread to -2.5px, and its middle layer pairs blur 1px
+     with spread -1.2px. The caps only ever fired on the small levels, so they
+     silently made the bottom of the ladder differ in kind from the top. */
+  it('runs the spread linearly to the full tuck-in on every level', () => {
     for (const l of LEVELS) {
       const layers = shadowLayers(l);
       expect(`L${l} first spread: ${layers[0][3]}`).toBe(`L${l} first spread: 0`);
-      for (const [, , blur, spread] of layers) {
-        expect(`L${l} spread ${spread} vs blur ${blur}: ${Math.abs(spread) <= blur}`)
-          .toBe(`L${l} spread ${spread} vs blur ${blur}: true`);
-      }
+      const last = layers[layers.length - 1][3];
+      // Same outermost spread whatever the level's envelope — no cap.
+      expect(`L${l} last spread: ${last}`).toBe(`L${l} last spread: -2.5`);
     }
+  });
+
+  /* His low tier at 3 layers, verbatim from the capture at Oomph 0.5 /
+     Crispness 0.5. Written out longhand: a formula-derived expectation would
+     move with the formula and prove nothing. */
+  it('reproduces his low tier layer for layer', () => {
+    const rows = shadowLayers(1, { ...SHADOW_DEFAULTS, resolution: 1 })
+      .map(([x, y, b, sp]) => `${x} ${y} ${b} ${sp}`);
+    expect(rows).toEqual(['0.3 0.5 0.6 0', '0.4 0.8 1 -1.2', '1 2 2.5 -2.5']);
   });
 
   // The stale copy that used to live in exportColorSystem.ts. If any of these
@@ -105,7 +121,7 @@ describe('geometry — cubic inside a fixed envelope', () => {
   });
 });
 
-describe('one colour, alpha ramping down the stack', () => {
+describe('one colour, one flat alpha per level', () => {
   /* The whole point. Every layer of every level on a surface is the SAME
      colour; only the alpha moves. That is what lets a Figma effect style bind
      one colour variable per surface plus a set of per-layer opacities, and it
@@ -120,11 +136,16 @@ describe('one colour, alpha ramping down the stack', () => {
     }
   });
 
-  it('ramps the alpha DOWN from the contact layer outward', () => {
+  it('holds the alpha FLAT across a level\'s layers', () => {
+    /* Both of his models are flat: the article prints one alpha per tier, and
+       the generator prints the same value on every layer of a tier in all ten
+       captures. This file used to emit a descending ramp with the peak at
+       INTENSITY, on a note claiming his ten-layer stack ran 0.81 -> 0.08. The
+       captures show ten layers at a flat 0.27. */
     for (const l of LEVELS) {
       const a = dropshadowAlphas(l);
-      if (a.length === 1) continue;
-      expect(`L${l}: ${a.every((v, i) => i === 0 || v < a[i - 1])}`).toBe(`L${l}: true`);
+      expect(`L${l}: ${new Set(a).size} distinct of ${a.length}`)
+        .toBe(`L${l}: 1 distinct of ${a.length}`);
     }
   });
 
@@ -139,27 +160,94 @@ describe('one colour, alpha ramping down the stack', () => {
     }
   });
 
-  /* INTENSITY is the peak alpha and the stack ramps down linearly from it —
-     Comeau's model, where Oomph 1 gives a ten-layer stack running 0.81 -> 0.08.
-     This used to SOLVE the peak so every level composited to one total. That
-     read tidily but is not his, and it drove Level 5's outermost layer — the
-     one casting the large soft shadow — to 0.014 against his 0.08, which is
-     why our shadows came out so much tighter and weaker than his. */
-  it('uses INTENSITY as the peak alpha, on every level', () => {
-    for (const intensity of [0.3, 0.8]) {
+  /* THE law, from ten captures at Oomph 0.5 / Crispness 0.5:
+   *
+   *     alpha = TOTAL[level] / N,  flat across the layers
+   *
+   * with TOTAL 1.03 / 1.44 / 2.68 for his low / medium / high. Written out as
+   * the observed (tier, N, alpha) triples rather than derived from the
+   * constants, so a change to the constants cannot quietly redefine what "his
+   * shadows" means — the formula is asserted separately below.
+   *
+   * The consequence worth keeping in view: Resolution redistributes a level's
+   * opacity without changing its total, so the slider cannot make a shadow
+   * heavier or lighter. Elevation is carried by the TOTAL, which differs per
+   * level, and by the geometry. */
+  it('reproduces every alpha his generator prints', () => {
+    const OBSERVED: [1 | 3 | 5, number, number][] = [
+      [1, 2, 0.52], [1, 3, 0.34],
+      [3, 2, 0.72], [3, 3, 0.48], [3, 4, 0.36], [3, 5, 0.29],
+      [5, 3, 0.89], [5, 4, 0.67], [5, 5, 0.54], [5, 6, 0.45],
+      [5, 7, 0.38], [5, 8, 0.34], [5, 9, 0.30], [5, 10, 0.27],
+    ];
+    /* Figma renders at most eight shadows on one effect, so N=9 and N=10 are no
+       longer reachable through the ladder — see MAX_EFFECT_LAYERS. Those two
+       samples still pin the TOTAL, so they are checked against the law directly
+       rather than dropped: they are the two that most tightly bound the high
+       tier's 2.68 (a nine-layer stack at 0.30 and a ten at 0.27). */
+    const TOTALS: Record<number, number> = { 1: 1.03, 3: 1.44, 5: 2.68 };
+    for (const [level, n, alpha] of OBSERVED) {
+      // the Resolution that yields n layers for this level
+      let res = -1;
+      for (let r = 0; r <= 1.0001; r += 0.005) {
+        if (shadowLayerCount(level, { ...SHADOW_DEFAULTS, resolution: r }) === n) { res = r; break; }
+      }
+      if (res < 0) {
+        expect(`L${level} N=${n} (unreachable): ${(Math.round(TOTALS[level] / n * 100) / 100).toFixed(2)}`)
+          .toBe(`L${level} N=${n} (unreachable): ${alpha.toFixed(2)}`);
+        continue;
+      }
+      const ours = dropshadowAlphas(level, { ...SHADOW_DEFAULTS, resolution: res });
+      expect(`L${level} N=${n}: ${ours.length} @ ${(Math.round(ours[0] * 100) / 100).toFixed(2)}`)
+        .toBe(`L${level} N=${n}: ${n} @ ${alpha.toFixed(2)}`);
+    }
+  });
+
+  it('splits a long level across two effect styles, 8 then the rest', () => {
+    /* Figma renders at most eight shadows on ONE style, and Level-5 reaches
+       ten, so the file puts slots 9..10 on a second "+" style on a child frame.
+       Nothing is capped — the ladder still reaches ten — the layers are just
+       divided. Only Level 5 ever overflows, and only above Resolution ~0.79. */
+    for (const resolution of [0, 0.25, 0.5, 0.75, 0.79, 0.93, 1]) {
+      const o = { ...SHADOW_DEFAULTS, resolution };
       for (const l of LEVELS) {
-        expect(`L${l}@${intensity}: ${dropshadowAlphas(l, { intensity })[0].toFixed(3)}`)
-          .toBe(`L${l}@${intensity}: ${intensity.toFixed(3)}`);
+        const { primary, overflow } = shadowStyleSplit(l, o);
+        expect(`L${l}@${resolution} primary<=8: ${primary <= 8}`)
+          .toBe(`L${l}@${resolution} primary<=8: true`);
+        expect(`L${l}@${resolution} total: ${primary + overflow}`)
+          .toBe(`L${l}@${resolution} total: ${shadowLayerCount(l, o)}`);
+        if (l < 5) expect(`L${l}@${resolution} overflow: ${overflow}`)
+          .toBe(`L${l}@${resolution} overflow: 0`);
       }
     }
   });
 
-  it('ramps linearly to peak/N at the outermost layer', () => {
+  it('leaves the "+" style empty at the default Resolution', () => {
+    /* Worth pinning because it is easy to build the nested-frame workaround and
+       then wonder why it does nothing: at Resolution 0.75 Level-5 wants exactly
+       eight layers, so the overflow style carries nothing until 0.79. */
+    expect(shadowStyleSplit(5, SHADOW_DEFAULTS)).toEqual({ primary: 8, overflow: 0 });
+  });
+
+  it('keeps a level\'s total opacity constant as Resolution moves', () => {
     for (const l of LEVELS) {
-      const a = dropshadowAlphas(l, { intensity: 0.8 });
-      const n = a.length;
-      expect(`L${l}: ${a.map((v) => v.toFixed(3)).join(',')}`)
-        .toBe(`L${l}: ${Array.from({ length: n }, (_, i) => (0.8 * (n - i) / n).toFixed(3)).join(',')}`);
+      const totals = new Set<string>();
+      for (const resolution of [0, 0.25, 0.5, 0.75, 1]) {
+        const a = dropshadowAlphas(l, { ...SHADOW_DEFAULTS, resolution });
+        totals.add((a[0] * a.length).toFixed(2));
+      }
+      expect(`L${l}: ${totals.size} distinct totals`).toBe(`L${l}: 1 distinct totals`);
+    }
+  });
+
+  it('scales the total linearly with INTENSITY', () => {
+    for (const l of LEVELS) {
+      const at = (i: number) => {
+        const a = dropshadowAlphas(l, { ...SHADOW_DEFAULTS, intensity: i });
+        return a[0] * a.length;
+      };
+      // 0.5 is the Oomph the totals were measured at, so it is the unit.
+      expect(`L${l}: ${(at(0.25) / at(0.5)).toFixed(3)}`).toBe(`L${l}: 0.500`);
     }
   });
 

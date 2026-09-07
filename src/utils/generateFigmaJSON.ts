@@ -14,7 +14,7 @@ import {
 } from './bevelGeometry';
 import {
   dropshadowBaseHex, dropshadowAlphas, shadowLayers, shadowOptionsFromStyle,
-  SHADOW_LEVELS, type ShadowLevel,
+  quantizeAlpha, shadowLevelOpacities, SHADOW_LEVELS, type ShadowLevel,
 } from './dropshadow';
 
 /** Effect-style slots premade in Figma per elevation. Fixed at the maximum so
@@ -29,7 +29,7 @@ import {
 import { nearestAvailableWeight } from './googleFontWeights';
 import type { TypographyStyle } from '../types';
 import { motionJSON } from './motion';
-import { componentElevationFigma } from './componentElevation';
+import { componentElevationGeometryFigma } from './componentElevation';
 
 interface ColorToken {
   value: string;
@@ -513,6 +513,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
      INTENSITY moves the colour, not just the alpha, so this is not optional. */
   const shadowOpts = shadowOptionsFromStyle(designSystemJSON?._componentStyle);
 
+
   /* Elevation — geometry and opacity per (level, layer), GLOBAL.
      These depend only on the level, the layer index and the layer count, never
      on the surface, which is what lets one colour variable per surface serve
@@ -527,8 +528,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
          collection  Elevation
          modes       Level-0 .. Level-5
-         variables   Shadow-<n>/offset-x, /offset-y, /blur-radius,
-                     /spread-radius, /opacity
+         variables   Shadow-<n>/x, /y, /Blur, /Spread
 
      It was previously emitted as `Shadow` / `Layer-<n>` / `X,Y,Blur,Spread`,
      which matched no collection in the file — so the payload landed nowhere
@@ -549,15 +549,20 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     for (let i = 0; i < FIGMA_SHADOW_SLOTS; i++) {
       const on = i < layers.length;
       slots[`Shadow-${i + 1}`] = {
-        'offset-x': { value: on ? layers[i][0] : 0, type: 'number' },
-        'offset-y': { value: on ? layers[i][1] : 0, type: 'number' },
-        'blur-radius': { value: on ? layers[i][2] : 0, type: 'number' },
-        'spread-radius': { value: on ? layers[i][3] : 0, type: 'number' },
-        // The marker for an unused slot. Zeroed GEOMETRY is not enough: a
-        // 0/0/0 shadow still paints the element's silhouette at full strength
-        // directly behind it, which is invisible only while the spread is
-        // also 0 and the element is opaque.
-        'opacity': { value: on ? Math.round(alphas[i] * 1000) / 1000 : 0, type: 'number' },
+        /* x / y / Blur / Spread, matching Component-Elevations. Both collections
+           name the same four fields the same way now; they used to disagree
+           (offset-x / blur-radius here), which is a mismatch that lands the
+           payload nowhere while reporting success. */
+        'x': { value: on ? layers[i][0] : 0, type: 'number' },
+        'y': { value: on ? layers[i][1] : 0, type: 'number' },
+        'Blur': { value: on ? layers[i][2] : 0, type: 'number' },
+        'Spread': { value: on ? layers[i][3] : 0, type: 'number' },
+        /* No `opacity`. The collection is 40 variables — 10 slots x 4 fields —
+           and the alpha now lives on Drop-Colors as a per-level Opacity that a
+           Drop-Color's opacity binds to. An opacity here would be a fifth field
+           the file has no variable for, and a second place for the same number
+           to drift from. Unused slots are marked by zeroed geometry alone; the
+           transparent marker lives on Component-Elevations' Drop-Color. */
       };
     }
     figma.Elevation[`Level-${level}`] = slots;
@@ -569,7 +574,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
      pin a mode). Additive: the existing Shadow-N variables are left in place,
      because renaming a Figma variable gives it a new id and unbinds every
      layer using it. */
-  figma['Component-Elevations'] = componentElevationFigma();
+  figma['Component-Elevations'] = componentElevationGeometryFigma(shadowOpts);
 
   // Carry the brand's tone positions through to Figma. Same three values the
   // CSS emits as --DPT / --DST / --DTT, read from the same place so the two
@@ -1056,6 +1061,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
         const figmaTheme: any = {};
 
+
         for (const internalKey of SURFACE_GROUPS_INTERNAL) {
           const groupData = theme[internalKey];
           if (!groupData) continue;
@@ -1322,6 +1328,47 @@ export function generateFigmaJSON(designSystemJSON: any): any {
 
         figma.Themes[themeName] = figmaTheme;
       }
+    }
+  }
+
+  /* Drop-Colors -- the colour is aliased in Figma, the OPACITY is written here.
+   *
+   * Each Level group holds two variables:
+   *
+   *   Level-<n>/Drop-Color   COLOR, aliased to Surface/Dropshadow-Color
+   *   Level-<n>/Opacity      FLOAT, written by this payload
+   *
+   * and the Drop-Color's opacity is bound to its sibling Opacity variable.
+   *
+   * That split is what makes the whole thing work. A plugin cannot express
+   * "this alias, dimmed" -- checked against plugin-typings 1.138, a variable's
+   * value is `boolean | string | number | RGB | RGBA | MotionEasing |
+   * VariableAlias`, one or the other, with no field for a modifier. But Figma
+   * can BIND a colour's opacity to a number variable, and a number is something
+   * a plugin can write. So the colour keeps the alias (and with it the entire
+   * Modes -> Theme -> Surface chain, meaning a shadow follows theme, surface
+   * level AND light/dark for free) while the alpha arrives as a plain float.
+   *
+   * Nothing is generated for the tint. No `Modes/Drop-Color` leaf, no per-level
+   * Theme variables -- earlier attempts at this bolted on 50 variables purely to
+   * have somewhere to bake the alpha, and this needs none of them.
+   *
+   * ONE opacity per level, not per layer: the alpha is flat across a level's
+   * layers (dropshadow.ts -- it is TOTAL/N, the same on every layer). Which
+   * slots are LIVE at the current Resolution is recorded on Component-
+   * Elevations, whose spare slots carry a transparent literal.
+   *
+   * Emitted as a PERCENT (0..100), not a 0..1 fraction. A number variable bound
+   * to a colour's opacity is rendered by appending "%" to its value, so a
+   * variable holding 0.345 displays as "0.345%" and paints no shadow at all.
+   * Still quantised through the same quantizeAlpha() the CSS uses, so the value
+   * Figma holds and the alpha the CSS paints are one number rather than two
+   * that round apart. */
+  figma['Drop-Colors'] = { 'Mode 1': {} };
+  {
+    const dc = figma['Drop-Colors']['Mode 1'];
+    for (const { level, percent } of shadowLevelOpacities(shadowOpts)) {
+      dc[`Level-${level}`] = { Opacity: { value: percent, type: 'number' } };
     }
   }
 

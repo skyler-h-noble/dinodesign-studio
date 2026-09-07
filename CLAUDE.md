@@ -297,6 +297,31 @@ disagreed on six values (`--Button-Radius` 4px vs 34px, and the whole bevel
 system), and the plural was missing `--Input-Radius`, which the
 `Dropdown-Frame-Radius` chain depends on.
 
+**Shadow alpha is FLAT per level, not a ramp: `alpha = TOTAL[level] / N`.**
+Measured off ten captures of Comeau's generator (totals 1.03 / 1.44 / 2.68 for
+his low / medium / high, reproducing all fourteen samples exactly). Resolution
+therefore redistributes a level's opacity without changing it — the slider
+cannot make a shadow heavier. Elevation lives in the total and the geometry.
+This file previously emitted a descending ramp, along with a cubic offset curve,
+a 74px Level-5 and two spread caps, all from one earlier reverse-engineering
+pass; every one of them is wrong against the captures. Full table of what
+changed: [docs/shadow-elevation.md](docs/shadow-elevation.md).
+
+**A shadow's colour and its opacity are separate variables in Figma.** The
+Drop-Color is aliased to `Surface/Dropshadow-Color`; its opacity is bound to a
+sibling `Opacity` FLOAT that the payload writes. A plugin cannot set
+"alias + opacity" in one value — `VariableValue` is one RGBA or one
+`{type, id}` pointer, no modifier field — but it can write a number, and Figma
+can bind a colour's opacity to one.
+
+So nothing is generated for the shadow tint: the alias carries the whole
+`Modes → Theme → Surface` chain, and a shadow follows theme, surface level and
+light/dark for free. Five floats, one per level, quantised through
+`quantizeAlpha()` so the float Figma holds and the alpha the CSS paints are the
+same number. Never write the Drop-Color itself — that detaches the alias.
+
+Full write-up: [docs/shadow-elevation.md](docs/shadow-elevation.md).
+
 ### A var() fallback only fires when the variable is UNDEFINED
 
 This caused three separate bugs in one session, so it is worth stating plainly.

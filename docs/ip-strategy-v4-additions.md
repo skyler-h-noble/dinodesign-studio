@@ -843,6 +843,127 @@ A method for evaluating color contrast in a development environment wherein CSS 
 
 Note: These claims are provisional. The IP position is established regardless of shipping timeline.
 
+
+---
+
+## 13. Addendum to DYNO-IP-2025-015 — Bidirectional Channel Optimization (Shadow Tokens)
+
+**Document ref.** DYNO-IP-2025-015 (addendum)
+**Status:** Draft — Pending Formal Filing
+**Date:** September 2026
+
+### 15.7 The Optimization Runs Both Directions
+
+Section 15 establishes that Dino emits structurally different token
+representations per channel: **resolved hex for CSS** (one hop, no runtime
+indirection) and a **preserved indirection chain for Figma** (required for its
+variable mode system).
+
+Shadow tokens run the **opposite** direction, and for a reason that generalizes
+the claim: the direction is decided per token family by what the consuming
+channel can actually *compose at resolution time*, not by a fixed rule about
+which channel gets the simpler form.
+
+**CSS can compose colour and opacity; Figma cannot.**
+
+CSS keeps the composable form — one colour per background, alpha mixed per layer
+at use time:
+
+```css
+--Dropshadow-Color: 185, 143, 81;        /* r, g, b — no alpha */
+--Effect-Level-3:
+  0.3px 0.5px 0.7px 0px rgba(var(--Dropshadow-Color), 0.412),
+  0.3px 0.6px 0.8px -0.5px rgba(var(--Dropshadow-Color), 0.329), ...
+```
+
+Figma's shadow model has no such composition. In the Figma Plugin API a fill
+(`SolidPaint`) exposes `color` as RGB alongside a separate `opacity` field, so a
+fill can bind one colour variable and apply its own alpha. A shadow
+(`DropShadowEffect`) exposes `color` as a single RGBA — documented as "the color
+of the shadow, including its opacity" — and the set of variable-bindable effect
+fields is `color | radius | spread | offsetX | offsetY`. There is no opacity
+field to bind. A variable alias (`{ type, id }`) carries no modifier either, so
+aliasing one colour and reducing it is equally impossible.
+
+Figma therefore receives **pre-multiplied** values — the inverse of Section 15's
+arrangement, where Figma received the *more* indirect form:
+
+```
+Drop-Colors / Level-3 / Drop-Color-1 = #b98f5169
+                        Drop-Color-2 = #b98f5157
+                        Drop-Color-3 = #b98f5146
+```
+
+Single-source semantics are preserved without single-source representation: all
+31 values are regenerated from one `dropshadowBaseHex()` per background on every
+export, so changing a background moves every slot together.
+
+### 15.8 Cross-Channel Alpha Quantization
+
+A second, independent mechanism keeps the two channels numerically identical
+rather than merely close.
+
+A Figma colour channel is 8-bit; a CSS alpha is a float. The same generated ramp
+value written naively to both produces two different numbers — `0.35875` becomes
+byte 91 (`0.3569`) in Figma and the literal `0.359` in CSS. The divergence is
+sub-perceptual, which is what makes it dangerous: the natural remedy is to allow
+a tolerance in whatever test compares the channels, and a tolerance is precisely
+the condition under which a *real* divergence goes unnoticed.
+
+Dino instead quantizes at the **emission boundary**, leaving the generative model
+exact:
+
+- The alpha ramp remains mathematically exact — its peak is the user's INTENSITY
+  control on the nose.
+- Each channel emits through a shared quantizer that rounds to the finest value
+  the *most constrained* channel can hold (one 8-bit step), then formats for its
+  own syntax.
+- CSS emits `k/255` at three decimals, which provably parses back to byte `k`
+  (worst-case error 0.13 of a byte), so both channels hold the same number and
+  the cross-channel test asserts equality rather than proximity.
+
+### 15.9 Distinction from Prior Art
+
+Token pipelines (Style Dictionary, Theme Builder, Tokens Studio) transform one
+source into multiple outputs, but apply a **uniform** transform per platform —
+the platform determines the format, not the composition strategy. None select
+the representation per token family according to the target's *runtime
+composition capability*, and none reconcile numeric precision across targets by
+quantizing to the most constrained channel's resolution at the emission
+boundary while leaving the generative model exact.
+
+### 15.10 Patent Claims
+
+**CLAIM 05  Capability-Directed Bidirectional Channel Optimization   Confidence: HIGH**
+A design token export method comprising: for a first token family, emitting a
+resolved single-hop representation to a first channel and a multi-hop
+indirection chain to a second channel; and for a second token family, emitting a
+composable representation comprising a base value and a separately-applied
+modifier to the first channel and a pre-composed representation to the second
+channel — wherein the direction of the optimization is selected per token family
+according to whether the target channel supports composition of that value at
+resolution time, such that each channel receives the representation it is able
+to resolve rather than a uniform per-platform transform.
+
+**CLAIM 06  Pre-Multiplied Shadow Colour Set from a Single Derived Base   Confidence: MEDIUM-HIGH**
+A method of expressing a multi-layer elevation shadow in a design tool whose
+shadow primitive admits no opacity channel separable from its colour, comprising:
+deriving one shadow colour per background from that background's own hue and
+lightness; generating, per elevation level, a set of colour values each equal to
+that single derived colour with one layer's alpha pre-applied; sizing each level's
+set to the maximum layer count that level can use; and marking layers unused at
+the current layer-count setting with a zero alpha rather than omitting them or
+zeroing their geometry — such that a single source colour governs the entire set
+while remaining expressible in a tool that cannot compose colour with opacity.
+
+**CLAIM 07  Boundary Quantization for Cross-Channel Numeric Parity   Confidence: MEDIUM**
+A multi-channel token emission method wherein a generated numeric value is held
+at full precision in the generative model and quantized, at the point of emission
+to each channel, to the resolution of the most constrained consuming channel —
+such that every channel emits a value that resolves to an identical quantized
+number, permitting cross-channel verification by exact equality rather than by
+tolerance, while leaving the model's own contracts exact.
+
 ---
 
 ## 12. Updated IP Registry Table (Section 2)
@@ -854,6 +975,8 @@ Add these rows to the Document Ref table:
 | DYNO-IP-2025-012 | Adjacent-tone surface variant system with per-variant token resolution |
 | DYNO-IP-2025-013 | Dual-mode container elevation (shadow-based light, tone-stepped dark) |
 | DYNO-IP-2025-015 | Channel-optimized token resolution — resolved hex for CSS, indirection chain for Figma |
+| DYNO-IP-2025-015 (addendum) | Bidirectional channel optimization — composable in CSS, pre-multiplied in Figma, chosen per token family by the target's composition capability |
+| DYNO-IP-2025-015 (addendum) | Boundary alpha quantization for exact cross-channel numeric parity |
 | DYNO-IP-2025-010 (addendum) | Figma license tier bypass via pre-built template + constraint-optimized variable partitioning |
 | DYNO-IP-2025-011 (addendum) | Full-state, full-component accessibility verification including hover, focus, active, and min target area |
 | DYNO-IP-2025-011 (addendum) | AI coding assistant a11y validation via custom slash command |

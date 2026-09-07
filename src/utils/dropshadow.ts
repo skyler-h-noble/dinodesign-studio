@@ -58,10 +58,10 @@ export interface ShadowOptions {
 }
 
 export const SHADOW_DEFAULTS: Required<ShadowOptions> = {
-  /** THE weight knob for every shadow in the system. */
-  intensity: 0.41,
+  /** THE weight knob for every shadow in the system. His "Oomph" default. */
+  intensity: 0.5,
   crispy: 0.5,
-  resolution: 0.5,
+  resolution: 0.75,
   /* Up and to the left, giving x = y/2 — exactly the geometry this file used
      before the pad existed. Straight up (lightX 0) gives x = 0, which is what
      the current Figma effect styles are built with. */
@@ -80,8 +80,17 @@ const opts = (o?: ShadowOptions): Required<ShadowOptions> => ({ ...SHADOW_DEFAUL
  *      spread, last layer   0 -> -2.5 -> -5   (crisper = more tuck-in)
  *  Both are linear in crispy, which is what the two helpers below encode. */
 
-/** Blur as a multiple of the vertical offset. */
-const blurRatio = (crispy: number) => 1.8 - 0.9 * clamp(crispy, 0, 1);
+/** Blur as a multiple of the vertical offset.
+ *
+ *  The MIDPOINT is measured, the slope is not. Across the ten captures at
+ *  Crispness 0.5 his blur/offset-y is 1.257 (62.9/50, 44.9/35.7, 31.3/24.9,
+ *  21.3/16.9, 14.2/11.3 ... mean 1.257), so the intercept is set to land there
+ *  exactly. The -0.9 slope is carried over from an earlier reading of his
+ *  crispy 0 / 1 endpoints, which is NOT confirmed by these captures — they are
+ *  all at 0.5. That earlier reading also put the midpoint at 1.36, which these
+ *  contradict, and it came from the same pass that got the alpha ramp wrong.
+ *  Treat the endpoints as provisional until captured at crispy 0 and 1. */
+const blurRatio = (crispy: number) => 1.707 - 0.9 * clamp(crispy, 0, 1);
 
 /** Largest negative spread, at the outermost layer, in px. Negative spread is
  *  what keeps outer layers from smearing — without it, stacking 10 layers just
@@ -90,8 +99,11 @@ const spreadMaxPx = (crispy: number) => 5 * clamp(crispy, 0, 1);
 
 /** Layer count at RESOLUTION 0 and 1. Level N never drops below N layers, and
  *  the top level reaches 10. */
-const LAYERS_MIN: Record<ShadowLevel, number> = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
-const LAYERS_MAX: Record<ShadowLevel, number> = { 1: 3, 2: 4, 3: 6, 4: 8, 5: 10 };
+/* Read off ten captures of his tool across the Resolution slider. His three
+   tiers run low 2..3, medium 2..5, high 3..10; levels 2 and 4 interpolate.
+   `round(min + (max-min) * resolution)` reproduces every observed count. */
+const LAYERS_MIN: Record<ShadowLevel, number> = { 1: 2, 2: 2, 3: 2, 4: 3, 5: 3 };
+const LAYERS_MAX: Record<ShadowLevel, number> = { 1: 3, 2: 4, 3: 5, 4: 7, 5: 10 };
 
 /** The level's envelope: the vertical offset of its OUTERMOST layer. Unchanged
  *  from the previous geometry, so elevation still reads the same distance. */
@@ -100,10 +112,30 @@ const LAYERS_MAX: Record<ShadowLevel, number> = { 1: 3, 2: 4, 3: 6, 4: 8, 5: 10 
    and 5, with 2 and 4 interpolated. The old 1/4/8/16/32 ramp topped out at less
    than HALF his high tier, so even at full intensity a Level-5 card hugged its
    own edge instead of casting the spreading shadow his Fig. 3 shows. */
-const DISTANCE: Record<ShadowLevel, number> = { 1: 2.5, 2: 6, 3: 12.5, 4: 30, 5: 74 };
+/* His low/medium/high end at y = 2 / 10 / 50, measured off the same captures
+   (the outermost layer of each tier). Levels 2 and 4 are the geometric means,
+   so the ladder reads as even steps rather than a linear ramp that would
+   crowd the low end. Previously 2.5 / 12.5 / 74, from an earlier reading. */
+const DISTANCE: Record<ShadowLevel, number> = { 1: 2, 2: 4.5, 3: 10, 4: 22.4, 5: 50 };
 
-/** Vertical offset of the innermost (contact) layer. Comeau's constant. */
+/** Vertical offset of the innermost (contact) layer. Comeau's constant, and
+ *  visible in every capture: each tier's first layer is `0.3px 0.5px 0.7px`
+ *  with no spread, whatever the tier and whatever the Resolution. */
 const Y_MIN = 0.5;
+
+/** Base of the exponential that distributes layers between Y_MIN and the
+ *  level's DISTANCE:  y = Y_MIN + (yMax - Y_MIN) * (a^t - 1)/(a - 1).
+ *
+ *  Fitted to his high tier at 9 layers and his medium at 5 — two different
+ *  envelopes and two different layer counts, which normalise onto ONE curve
+ *  (u = 0.086 / 0.220 / 0.494 at t = 1/4, 1/2, 3/4 from both), so the curve is
+ *  a real shared distribution rather than a fit to one sample.
+ *
+ *  This was a CUBIC, `t^3`, which is 14x worse against the same data (RMS
+ *  0.0637 vs 0.0046) and crushes the inner layers: at 9 layers it put the
+ *  second layer at y=0.6 where his is 2.6, so the shadow hugged its own edge
+ *  and the spread between contact and cast was invented rather than measured. */
+const Y_CURVE = 12.14;
 
 // ─── Goldilocks shadow colour ───────────────────────────────────────────────
 // Match the surface HUE; pull SATURATION into a moderate band (never grey,
@@ -198,6 +230,26 @@ function alphaToHex(a: number): string {
   return Math.round(clamp(a, 0, 1) * 255).toString(16).padStart(2, '0');
 }
 
+/** An alpha as it will actually EXIST, in both targets: one 8-bit step.
+ *
+ *  A Figma colour is 8-bit, so a Drop-Color holds a byte and nothing finer.
+ *  CSS alpha is a float, so the same ramp written straight out lands between
+ *  two bytes and the two exports disagree in the last digit — 0.35875 becomes
+ *  the byte 91 (0.3569) in Figma and the literal 0.359 in CSS.
+ *
+ *  Nothing visible turns on 0.002 of alpha. What turns on it is being able to
+ *  assert that the two sides hold the SAME number, rather than two numbers a
+ *  tolerance apart — and a tolerance is where a real divergence hides.
+ *
+ *  So the RAMP stays exact (dropshadowAlphas peak is INTENSITY, on the nose,
+ *  which two tests pin) and the quantisation happens here, at the boundary
+ *  where the 8-bit constraint actually exists. Rounding the result to 3dp for
+ *  CSS is lossless in the direction that matters: the error is at most 0.0005,
+ *  or 0.13 of a byte, so it always parses back to the byte it came from. */
+export function quantizeAlpha(a: number): number {
+  return Math.round(Math.round(clamp(a, 0, 1) * 255) / 255 * 1000) / 1000;
+}
+
 /** The single (opaque) shadow colour for a surface: hue matched, saturation in
  *  a moderate band, lightness lowered. Takes NO level — there is one colour per
  *  surface, and elevation lives entirely in the alphas. */
@@ -231,11 +283,43 @@ export function dropshadowRGB(surfaceHex: string, o?: ShadowOptions): string {
 
 // ─── Layer count and geometry ───────────────────────────────────────────────
 
+/** Figma renders at most EIGHT drop shadows on ONE effect style, and Level-5
+ *  reaches ten. The ladder is NOT capped to eight, because the file splits a
+ *  long level across two styles: slots 1..8 on the component's own style, slots
+ *  9..10 on a second "+" style applied to a child frame (`FAB+`). The two
+ *  frames are coincident, so the split is invisible — a drop shadow is cast
+ *  from the frame's bounds, and the bounds are the same.
+ *
+ *  It is the OUTERMOST two that move out, not the contact layers, and that is
+ *  not arbitrary: they are the broad soft cast, the part least sensitive to
+ *  being cast by a slightly different box if the frames ever drift apart.
+ *
+ *  A cap here was briefly the answer, and it would have been wrong in a way
+ *  worth remembering: capping the Figma path alone would have the browser
+ *  painting ten layers at 0.268 while Figma painted eight at 0.335 above
+ *  Resolution ~0.79 — the same total, a different render, and nothing to catch
+ *  it (invariant 5). Any ceiling has to hold on both sides or on neither. */
+const SLOTS_PER_EFFECT_STYLE = 8;
+
 /** How many layers this level stacks at the current RESOLUTION. */
 export function shadowLayerCount(level: ShadowLevel, o?: ShadowOptions): number {
   const lo = LAYERS_MIN[level];
   const hi = LAYERS_MAX[level];
   return Math.max(1, Math.round(lo + (hi - lo) * clamp(opts(o).resolution, 0, 1)));
+}
+
+/** How a level's layers divide between its two effect styles.
+ *
+ *  `primary` is what fits on the component's own style; `overflow` is what has
+ *  to go on the "+" style on a child frame. `overflow` is 0 for every level
+ *  below 5, and 0 for Level-5 too until Resolution passes ~0.79. */
+export function shadowStyleSplit(level: ShadowLevel, o?: ShadowOptions):
+  { primary: number; overflow: number } {
+  const n = shadowLayerCount(level, o);
+  return {
+    primary: Math.min(n, SLOTS_PER_EFFECT_STYLE),
+    overflow: Math.max(0, n - SLOTS_PER_EFFECT_STYLE),
+  };
 }
 
 /** [offsetX, offsetY, blur, spread] for every layer of a level, innermost
@@ -244,12 +328,14 @@ export function shadowLayers(level: ShadowLevel, o?: ShadowOptions): Array<[numb
   const { crispy, lightX, lightY } = opts(o);
   const n = shadowLayerCount(level, o);
   const yMax = DISTANCE[level];
-  // Never let the spread exceed the shadow it is shrinking — a flat 5px would
-  // erase Level-1 entirely.
-  // Cap against the shadow being shrunk: a flat 5px would erase Level-1, whose
-  // whole envelope is 1px. Comeau does not need this — his smallest tier is
-  // 2.5px tall where ours is 1px.
-  const spreadMax = Math.min(spreadMaxPx(crispy), yMax * 0.5);
+  /* No cap. Two were here — one against the level's own envelope and one
+     against each layer's blur — added on the theory that a full spread would
+     erase a short level. His captures show otherwise: the low tier, whose whole
+     envelope is 2px, runs the spread all the way to -2.5px, and its middle
+     layer pairs blur 1px with spread -1.2px, which the blur cap forbade.
+     Both caps only ever fired on the levels they were meant to protect, so they
+     silently made the low end of the ladder differ in kind from the top. */
+  const spreadMax = spreadMaxPx(crispy);
   /* Shadow direction is opposite the light. Dividing by the vertical component
      keeps DISTANCE as the y-reach, so the pad steers the shadow without
      lengthening it; the floor stops a near-horizontal light producing an
@@ -261,38 +347,68 @@ export function shadowLayers(level: ShadowLevel, o?: ShadowOptions): Array<[numb
     // A single layer sits at the full distance, not at Y_MIN — otherwise a
     // level's elevation would vanish at RESOLUTION 0.
     const t = n === 1 ? 1 : i / (n - 1);
-    const y = Y_MIN + (yMax - Y_MIN) * Math.pow(t, 3);
+    const y = Y_MIN + (yMax - Y_MIN) * (Math.pow(Y_CURVE, t) - 1) / (Y_CURVE - 1);
     const blur = y * blurRatio(crispy);
-    /* Spread grows linearly while the offset grows cubically, so on the inner
-       layers the tuck-in outruns the shadow and swallows it: Level-2's middle
-       layer lands at y=0.9 with a -1 spread and renders NOTHING. Comeau's tool
-       has the same hole (his low tier pairs y=0.7 with spread=-2.5), but a dead
-       layer costs a real paint and a real Figma slot for nothing, so the spread
-       is capped against the layer's own blur — never tuck in further than the
-       blur can reach back out. */
-    const spread = Math.min(spreadMax * t, blur * 0.9);
+    // Linear in t, exactly as he emits it: 0 at the contact layer, the full
+    // spreadMax at the outermost.
+    const spread = spreadMax * t;
     out.push([r1(y * tanA), r1(y), r1(blur), r1(-spread)]);
   }
   return out;
 }
 
-// ─── Alpha ramp ─────────────────────────────────────────────────────────────
+// ─── Alpha ───────────────────────────────────────────────────────────────────
+//
+// FLAT within a level, and inversely proportional to the layer count:
+//
+//     alpha = TOTAL[level] / N
+//
+// This is his model, read off ten captures of the generator taken across the
+// Resolution slider at Oomph 0.5 / Crispness 0.5. Every layer of a tier prints
+// the same alpha, and alpha x N is constant per tier:
+//
+//     low     N=2 0.52   N=3 0.34                          -> 1.03
+//     medium  N=2 0.72   N=3 0.48  N=4 0.36  N=5 0.29       -> 1.44
+//     high    N=3 0.89   N=4 0.67  N=5 0.54  N=6 0.45
+//             N=7 0.38   N=8 0.34  N=9 0.30  N=10 0.27      -> 2.68
+//
+// Those three totals reproduce all fourteen samples exactly at his 2dp
+// printing, and the intervals they are consistent with — [1.030,1.035),
+// [1.430,1.450), [2.680,2.685) — pin them to within half a printed digit.
+//
+// So RESOLUTION genuinely does not change a shadow's weight: adding layers
+// subdivides the same envelope AND splits the same total opacity. Elevation is
+// carried by the total, which differs per tier, and by the geometry.
+//
+// This file previously emitted a descending ramp with the peak at INTENSITY,
+// on the theory that the generator ramped and only the article was flat. Both
+// are flat; the ramp was wrong, and it made every layer but the first too
+// faint. A note here claimed his ten-layer stack runs 0.81 -> 0.08 — the
+// captures show ten layers at a flat 0.27.
+//
+// Note what was NOT wrong: constant-total-per-tier is close to the model this
+// file used before the ramp, which solved the peak so a level composited to a
+// fixed total. That was right in shape and wrong only in normalising the total
+// across LEVELS as well, which flattened elevation out of the ladder.
 
-/** Per-layer alphas for a level, innermost first — the linear ramp
- *  `A * (N - i) / N`. These depend only on the level and the layer count, never
- *  on the surface, so they are identical on every background. */
+/** Total opacity a level's stack sums to, at REFERENCE_INTENSITY. Levels 1/3/5
+ *  are his low/medium/high; 2 and 4 are the geometric means, matching how
+ *  DISTANCE interpolates. */
+const LEVEL_TOTAL: Record<ShadowLevel, number> = {
+  1: 1.03, 2: 1.218, 3: 1.44, 4: 1.965, 5: 2.68,
+};
+
+/** The Oomph the totals above were measured at. INTENSITY scales them linearly,
+ *  so the default preset reproduces his output exactly. */
+const REFERENCE_INTENSITY = 0.5;
+
+/** Per-layer alpha for a level — the same value on every layer.
+ *  `TOTAL / N`, so Resolution redistributes the weight without changing it. */
 export function dropshadowAlphas(level: ShadowLevel, o?: ShadowOptions): number[] {
   const n = shadowLayerCount(level, o);
-  /* INTENSITY is the peak alpha — the contact layer — and the stack ramps down
-     linearly from it, which is what Comeau's generator emits: at Oomph 1 his
-     ten-layer stack runs 0.81 -> 0.08, i.e. A*(N-i)/N with A ~ 0.8.
-     This previously SOLVED A so every level composited to the same total. That
-     gave the tidy property that Resolution never changed a shadow's weight, but
-     it is not his model and it is why our shadows were so much weaker than his:
-     at Level 5 it drove A to 0.112 and the outermost layer — the one that
-     actually casts the large soft shadow — to 0.014 against his 0.08. */
-  const A = clamp(opts(o).intensity, 0, 1);
-  return Array.from({ length: n }, (_, i) => clamp((A * (n - i)) / n, 0, 1));
+  const total = LEVEL_TOTAL[level] * (clamp(opts(o).intensity, 0, 1) / REFERENCE_INTENSITY);
+  const a = clamp(total / n, 0, 1);
+  return Array.from({ length: n }, () => a);
 }
 
 /** 8-digit hex (`#RRGGBBAA`) for one LAYER of one level on one surface — the
@@ -399,6 +515,95 @@ export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions): string
   const alphas = dropshadowAlphas(level, o);
   return shadowLayers(level, o)
     .map(([x, y, blur, spread], i) =>
-      `${x}px ${y}px ${blur}px ${spread}px rgba(var(--Dropshadow-Color), ${Math.round(alphas[i] * 1000) / 1000})`)
+      `${x}px ${y}px ${blur}px ${spread}px rgba(var(--Dropshadow-Color), ${quantizeAlpha(alphas[i])})`)
     .join(', ');
+}
+
+// ─── Drop-Colors: the Figma collection ──────────────────────────────────────
+//
+// Figma cannot express "this colour, at that opacity" on a shadow. A fill can:
+// SolidPaint splits `color` (RGB) from `opacity`, so a fill binds one colour
+// variable and sets its own alpha. A shadow cannot — DropShadowEffect.color is
+// a single RGBA, "the color of the shadow, INCLUDING its opacity" — and a
+// variable alias is `{ type, id }` with no modifier, so aliasing cannot add an
+// alpha either.
+//
+// So the multiplication that would happen in Figma happens here instead: ONE
+// dropshadowBaseHex per background, times the level's alpha ramp, written out
+// as literal 8-digit values. The single source survives — all 31 slots are
+// regenerated from that one colour on every import — it is just resolved at
+// generation time rather than at resolution time.
+//
+// Sized to LAYERS_MAX, not to a flat ten: the collection in the file is
+// Level-1 x3, Level-2 x4, Level-3 x6, Level-4 x8, Level-5 x10, which is the
+// most layers each level can ever use (Resolution 1). Below that the tail slots
+// are UNUSED, and they are emitted at alpha 00 rather than skipped — a Figma
+// variable left unwritten keeps its previous value, so a slot dropped by a
+// lower Resolution would otherwise go on painting the shadow it held before.
+
+/** Slots per level in the Drop-Colors collection.
+ *
+ *  PINNED to the Component-Elevations collection that exists in the Figma file —
+ *  3 / 4 / 5 / 8 / 10 — rather than derived from LAYERS_MAX, which is
+ *  3 / 4 / 5 / 7 / 10 after the move to his measured layer counts. Level 4 is
+ *  the one that differs: the file has 8 slots where the ladder needs 7, so its
+ *  last slot is always spare. Every max fits inside its slot count, so the file
+ *  needs no rebuild.
+ *
+ *  Deriving this from LAYERS_MAX would shrink the collection by two variables
+ *  the next time the layer ladder moves, and a Figma variable cannot be deleted
+ *  and re-created without unbinding every layer using it (invariant 8). The
+ *  file's shape is the fixed point; the ladder has to fit inside it, and the
+ *  test asserts that it does. */
+export const DROP_COLOR_SLOTS: Record<ShadowLevel, number> = { 1: 3, 2: 4, 3: 5, 4: 8, 5: 10 };
+
+/** Every Drop-Colors value for one background.
+ *
+ *  Returns `{ 'Level-1': ['#rrggbbaa', ...], ... }`, each array DROP_COLOR_SLOTS
+ *  long, innermost layer first. Entries past the current Resolution's layer
+ *  count carry the surface's own shadow hue at alpha 00 — transparent, but the
+ *  right colour, so a slot that comes back into use at a higher Resolution is
+ *  never briefly the wrong hue. */
+export function dropColorTable(
+  surfaceHex: string,
+  o?: ShadowOptions,
+): Record<string, string[]> {
+  const base = dropshadowBaseHex(surfaceHex, o);
+  const out: Record<string, string[]> = {};
+  for (const level of SHADOW_LEVELS) {
+    const alphas = dropshadowAlphas(level, o);
+    out[`Level-${level}`] = Array.from(
+      { length: DROP_COLOR_SLOTS[level] },
+      (_, i) => `${base}${alphaToHex(i < alphas.length ? alphas[i] : 0)}`,
+    );
+  }
+  return out;
+}
+
+/** The five opacities to type into Drop-Colors in Figma, as percentages.
+ *
+ *  Drop-Colors is hand-authored: five variables, `Level-<n>/Drop-Color`, each
+ *  aliasing Surface/Dropshadow-Color with that level's opacity applied. Figma
+ *  can alias a colour or set an opacity, never both from a plugin — a variable
+ *  value is one RGBA or one `{type, id}` pointer, with no field for a modifier
+ *  — so these five are typed in the UI rather than written by the importer.
+ *
+ *  Which means they DO NOT follow the Intensity and Resolution controls. Change
+ *  either and the five values in Figma are stale until retyped. This function
+ *  is the single place to read the current ones off, so the number a designer
+ *  types and the number the CSS paints come from one definition. */
+export function shadowLevelOpacities(o?: ShadowOptions): Array<{ level: ShadowLevel; alpha: number; percent: number }> {
+  return SHADOW_LEVELS.map((level) => {
+    const alpha = quantizeAlpha(dropshadowAlphas(level, o)[0]);
+    /* PERCENT is what Figma's Opacity variable holds, not the 0..1 fraction.
+       A number variable bound to a colour's opacity is rendered by appending
+       "%" to its value: a variable holding 0.33 displays as "0.33%", which is a
+       thousandth of the intended shadow and reads as no shadow at all. So the
+       variable carries 34.5, not 0.345.
+
+       One decimal, because the levels differ by tenths — 34.5 / 30.6 / 36.1 /
+       32.9 / 33.3 — and rounding to whole percent would collapse two of them
+       onto the same value. */
+    return { level, alpha, percent: Math.round(alpha * 1000) / 10 };
+  });
 }
