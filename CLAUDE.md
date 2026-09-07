@@ -424,6 +424,34 @@ so the ordinary case is correct by default. `Button` now dev-warns on both
 failure modes — they are invisible without a screen reader, which is how they
 survive.
 
+### A bad accessible name is worse than none
+
+`aria-label="button"`, `aria-label="JD"`, `aria-label="3"` — a name that exists
+but says nothing passes every automated checker AND silences the lib's own dev
+warning. A MISSING name at least trips something. So `meaningless-name` is an
+error in the conversion's Accessibility tab, at the same severity as no name.
+
+Which Button Types need one is decided by Type, not by judgement:
+
+| Type | needs `aria-label` |
+| --- | --- |
+| `text` | **no** — the visible label is already the name; adding one announces twice |
+| `iconOnly`, `Avatar`, `letterNumber` | yes |
+
+There is deliberately **no Accessible Name property in Figma** — a required
+field gets filled badly, and its default would be the failure above. The
+converter derives the name (layer name → icon meaning → convention) and marks
+every guess in the emitted code:
+
+```
+// DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, from the layer name
+```
+
+Same convention as `MISSING-LIB-COMPONENT`, so it survives a copy/paste into a
+PR. Never name the glyph where it differs from the action, and never the
+rendered content. Full write-up:
+[docs/accessibility-coverage.md](docs/accessibility-coverage.md).
+
 ## Don't override component colors
 
 Lib components apply their own colors from the design system. **Never pass

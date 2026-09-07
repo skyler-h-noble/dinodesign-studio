@@ -966,6 +966,87 @@ tolerance, while leaving the model's own contracts exact.
 
 ---
 
+## 14. Addendum to DYNO-IP-2025-011 — Type-Gated Accessible Name Derivation
+
+**Document ref.** DYNO-IP-2025-011 (addendum)
+**Status:** Draft — Pending Formal Filing
+**Date:** September 2026
+
+### 11.x Deriving, Rather Than Collecting, Accessible Names
+
+Section 10 and its existing addenda claim accessibility verification moving
+upstream into the design tool. This extends that from *contrast* to *naming*,
+and the distinguishing choice is that the name is **not collected from the
+designer at all**.
+
+The obvious implementation is a text field on the component — "Accessible Name"
+— that a designer fills. Dino deliberately does not have one, for a reason that
+generalises: a required annotation field gets satisfied rather than answered,
+and any non-empty default it carries becomes the shipped value. The natural
+default, `button`, is the pathological case — a name that exists, passes every
+automated checker, and silences the component library's own runtime warning. A
+missing name is a defect that announces itself; a meaningless one is a defect
+that hides behind a passing check.
+
+Instead the name is **derived at conversion time**, gated on the component's own
+semantic variant:
+
+- The Type variant decides whether a name is required at all. `text` needs none
+  — its visible label already is the accessible name, and adding one causes a
+  screen reader to announce the control twice. `iconOnly`, `Avatar` and
+  `letterNumber` require one, because each renders nothing announceable.
+- The name is derived in a fixed precedence: the instance's layer name when it
+  reads as an action, then the icon's meaning as an action, then convention for
+  an avatar.
+- The derivation prefers the ACTION over the glyph where they differ, and
+  categorically rejects the rendered content — a two-character avatar or a
+  numeric badge is what the control displays, never what it does.
+
+### 11.y Marking Inference In-Band
+
+Derivation implies inference, and an inferred accessible name is uniquely
+unverifiable: it is invisible in the render, passes every visual check, and is
+discoverable only with a screen reader. The party who can adjudicate it is the
+designer, who is no longer in the loop by the time code exists.
+
+Dino emits a machine-readable marker **inside the generated code** for every
+name that was inferred rather than read:
+
+```
+// DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, from the layer name
+```
+
+carried in-band rather than as conversion metadata. The distinction is
+practical: generated code is routinely copied, saved and pasted into review, and
+a side-channel annotation is lost at each step, while a comment in the artifact
+survives all of them. The same file is then re-read by the tooling to populate
+an accessibility panel, so the inference surfaces as a review item at the point
+a human is already reading the output.
+
+### 11.z Patent Claims
+
+**CLAIM 08  Variant-Gated Accessible Name Requirement   Confidence: MEDIUM**
+A design-to-code method wherein the requirement for an accessible name on a
+generated control is determined by the source component's own semantic variant
+value — a variant denoting visible text suppressing the requirement, variants
+denoting icon, image or character content asserting it — such that the
+obligation is derived from the design rather than requested from the designer,
+and a control whose visible label already serves as its accessible name is not
+given a duplicate one.
+
+**CLAIM 09  In-Band Marking of Inferred Accessibility Metadata   Confidence: MEDIUM**
+A code generation method wherein metadata inferred rather than authored — an
+accessible name derived from a layer name, an icon's semantic meaning, or a
+component convention — is emitted as a structured marker within the generated
+source itself rather than as accompanying metadata, and that marker is
+subsequently parsed from the generated source to present the inference for human
+confirmation, such that the record of what was inferred survives copying,
+storage and transfer of the generated artifact.
+
+---
+
+---
+
 ## 12. Updated IP Registry Table (Section 2)
 
 Add these rows to the Document Ref table:
@@ -981,5 +1062,6 @@ Add these rows to the Document Ref table:
 | DYNO-IP-2025-011 (addendum) | Full-state, full-component accessibility verification including hover, focus, active, and min target area |
 | DYNO-IP-2025-011 (addendum) | AI coding assistant a11y validation via custom slash command |
 | DYNO-IP-2025-011 (addendum) | Figma plugin accessibility validation |
+| DYNO-IP-2025-011 (addendum) | Type-gated accessible name derivation, and in-band marking of inferred names |
 | DYNO-IP-2025-016 (provisional) | VS Code extension for data-attribute validation and token cascade enforcement |
 | *(No filing)* | Cognitive accessibility token layer — covered by Capital One patent under Apache 2.0 |

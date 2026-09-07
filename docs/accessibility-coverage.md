@@ -114,6 +114,92 @@ The accessibility report also validates:
 
 ---
 
+## The other half: accessible names
+
+Everything above is about the design SYSTEM — token contrast, checked once per
+system. Accessible naming is checked per *converted frame*, in
+`src/utils/conversionA11y.ts`, and surfaces in the Accessibility tab beside
+Drift in the AAID workbench.
+
+The two are separate on purpose. A contrast failure is visible the moment you
+look at it. A naming failure renders perfectly.
+
+### Which controls need a name
+
+A Button's **Type** decides it:
+
+| Type | needs `aria-label` | why |
+| --- | --- | --- |
+| `text` | **no** | the visible label already IS the accessible name; adding one makes a screen reader announce the control twice |
+| `iconOnly` | yes | nothing readable to announce |
+| `Avatar` | yes | an image; there is no string anywhere in the component |
+| `letterNumber` | yes | "JD" and "3" are the CONTENT, not a name |
+
+The lib enforces this in dev: `Button.js` warns when a labelless type carries no
+`aria-label` / `aria-labelledby` / `title`, and warns again when the button *and*
+an icon inside it are both labelled.
+
+`letterNumber` was missing from that check until 2026-09-07, and it is the worst
+one to miss. An unnamed avatar announces as nothing, which gets noticed. An
+unnamed letterNumber announces as **"123, button"** — which sounds deliberate,
+so nobody investigates.
+
+### A bad name is worse than no name
+
+This is the part that is not obvious, and it is why `meaningless-name` is an
+**error** and not a warning:
+
+| | what happens |
+| --- | --- |
+| no `aria-label` | lib dev-warning fires · automated checkers flag it · shows up in an audit |
+| `aria-label="button"` | **nothing fires.** A name exists, so every check passes and the lib goes quiet |
+
+A missing name is a bug that announces itself. A meaningless one is a bug that
+hides behind a passing check. The same goes for `aria-label="JD"` and
+`aria-label="3"` — the rendered content mistaken for the name.
+
+### Names are derived, not authored
+
+There is **no Accessible Name property in the Figma file**, and that is a
+decision rather than an omission. A required field gets filled badly, and Figma
+text properties want a default — where the obvious default, `button`, is exactly
+the failure above.
+
+So the converter derives the name, in this order (`figmaToCode.ts`, rule 0d):
+
+1. **The instance's layer name**, when it reads like an action — "Profile",
+   "Search", "Add member". Skipped when generic: "Button", "Frame 12", the
+   component name, a bare number.
+2. **For `iconOnly`, the icon's meaning as an action.** Where the glyph and the
+   action differ, the action wins — a house icon opening a dashboard is
+   "Dashboard", not "Home".
+3. **For `Avatar` in a nav, convention** — "Your account".
+4. **For `letterNumber`, nothing derivable exists.**
+
+Step 1 does most of the work, because designers already name their instances —
+"Profile" is exactly the string that would have gone in the field.
+
+### Every guess is flagged in the code
+
+Deriving means guessing, and a guess has to reach the person who can correct it.
+The converter emits a marker for anything that came from step 2, 3 or 4:
+
+```
+// DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, from the layer name
+```
+
+Same convention as `MISSING-LIB-COMPONENT`, and for the same reason: a marker
+**in the emitted code** survives being copied, saved, or pasted into a PR. A note
+carried beside the code is dropped by all three. `computeA11y` reads it straight
+out of the JSX, which is why nothing had to be plumbed through the conversion
+result.
+
+The Accessibility tab shows these as *info*, not warnings — a derived name is
+usually right. It needs a human only to confirm the ACTION matches the glyph,
+which is the one thing the file cannot know.
+
+---
+
 ## Why the pairing matters more than the count
 
 A high number of passing checks means nothing if a check compares the wrong two
