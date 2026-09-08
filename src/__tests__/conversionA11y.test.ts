@@ -219,8 +219,9 @@ describe('a marker typed on top of a real list', () => {
        shown twice and announced twice. The structure is right, so this is a
        warning, not the structural error above. */
     const f = computeA11y('<List><ListItem>• First</ListItem></List>');
-    expect(f.map(x => x.kind)).toContain('double-marker');
-    expect(f.find(x => x.kind === 'double-marker').severity).toBe('warning');
+    const marker = f.filter(x => x.kind === 'double-marker');
+    expect(marker).toHaveLength(1);
+    expect(marker[0].severity).toBe('warning');
   });
 
   it('accepts a clean ListItem', () => {
