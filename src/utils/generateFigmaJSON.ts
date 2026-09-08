@@ -51,32 +51,38 @@ interface ColorToken {
  * assertThemesMatch below now fails that loudly instead.
  */
 const THEMES = [
-  'Primary', 'Secondary', 'Tertiary', 'Neutral',
+  'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
   'Info', 'Success', 'Warning', 'Error',
 ];
 
 /**
- * The Theme collection's modes, in order, with the user's pick FIRST.
+ * The Theme collection's modes, in order. Default LEADS.
  *
- * Order is load-bearing here in a way it is nowhere else in this file: the
- * plugin reads `Object.keys(data.Themes)` and makes the first one the
- * collection's DEFAULT mode, which every layer inherits without setting a mode
- * explicitly. So the first key IS the default theme.
+ * Order is load-bearing: the plugin reads `Object.keys(data.Themes)` and makes
+ * the first one the collection's DEFAULT mode, which every layer inherits
+ * without setting one.
  *
- * That is what retires 'Default'. It was a whole mode holding a COPY of
- * whichever palette and tone the user chose — one of ten slots spent on a
- * duplicate. A background selection is a (theme, surface level) pair, so the
- * same thing is said by the default theme mode plus the default surface mode,
- * which is exactly how <Palette>-Light was retired into Surface-Brightest.
+ * Default was removed from this list on the theory that a background selection
+ * is a (theme, surface level) pair, so the two collections' default modes could
+ * say between them what Default said alone. That was WRONG, and the way it was
+ * wrong is worth keeping written down: the Surface collection carries only
+ * FOREGROUND roles. `createSCVars` skips the key outright — `if (varName ===
+ * 'Background') continue` — so the surface axis can never supply a background,
+ * and the theme axis alone resolves to the theme's own core tone. A user who
+ * picked Primary / Surface-Brightest got Primary at PC.
  *
- * Figma cannot express this after the fact: `defaultModeId` is readonly and
- * there is no reorderMode, and the plugin only creates modes when the
- * collection is absent. So the order takes effect on a FRESH file; an existing
- * one keeps whatever default it was built with until it is re-imported.
+ * So Default is not a duplicate. It holds the one thing neither axis can
+ * express: the RESOLVED background for the chosen pair, as a single bindable
+ * value. Invariant 2's test — does anything select between the copies — is
+ * answered by the Background role, which exists on one axis only.
+ *
+ * The user's pick still follows Default, which costs nothing and keeps the
+ * palette they chose next to the default that resolves it.
  */
 export function themeOrder(defaultTheme?: string): string[] {
-  if (!defaultTheme || !THEMES.includes(defaultTheme)) return THEMES;
-  return [defaultTheme, ...THEMES.filter((t) => t !== defaultTheme)];
+  const rest = THEMES.filter((t) => t !== 'Default');
+  if (!defaultTheme || !rest.includes(defaultTheme)) return ['Default', ...rest];
+  return ['Default', defaultTheme, ...rest.filter((t) => t !== defaultTheme)];
 }
 
 const SURFACE_GROUPS_INTERNAL = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'];
@@ -1054,12 +1060,8 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // and a name here that the generator no longer produces is dead. Neither
       // shows up as an error at import — the collection is simply short a mode.
       const generated = Object.keys(themes);
-      /* 'Default' is generated for the CSS side and deliberately NOT exported
-         as a Figma mode — the first mode is the default now. Excluded from the
-         comparison rather than left to warn, so a real omission still shows. */
-      const generatedForFigma = generated.filter((t) => t !== 'Default');
-      const missingFromExport = generatedForFigma.filter((t) => !THEME_MODES.includes(t));
-      const deadNames = THEME_MODES.filter((t) => !generatedForFigma.includes(t));
+      const missingFromExport = generated.filter((t) => !THEME_MODES.includes(t));
+      const deadNames = THEME_MODES.filter((t) => !generated.includes(t));
       if (missingFromExport.length) {
         console.warn(
           `\u26A0\uFE0F [Figma] ${missingFromExport.length} generated theme(s) are NOT in the export list ` +
@@ -1533,7 +1535,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
      * back if Default ever returns as a mode — flip this to true and the whole
      * block runs again. It writes nothing but defBg, so skipping it has no
      * other effect. */
-    const EMIT_DEFAULT_BACKGROUND = false;
+    const EMIT_DEFAULT_BACKGROUND = true;
     for (const modeName of (EMIT_DEFAULT_BACKGROUND ? ['Light-Mode', 'Dark-Mode'] : [])) {
       const modeData = designSystemJSON.Modes?.[modeName];
       if (!modeData) continue;

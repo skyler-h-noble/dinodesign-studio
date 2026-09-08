@@ -235,13 +235,15 @@ describe('Surface-Brightest', () => {
     expect(found.slice(0, 5)).toEqual([]);
   });
 
-  it('emits no Default-Background section', () => {
-    /* 466 variables across the two modes, larger than the row ends, and with
-       the Default theme retired as a Figma mode they had no reader at all.
-       Still built for the JSON and CSS, where Default drives :root. */
+  it('emits Default-Background, because Default reads it', () => {
+    /* Briefly removed as 466 orphaned variables when Default was retired as a
+       mode. Default is back — the Surface collection carries no Background, so
+       the theme axis alone resolves to the theme's core tone and a user who
+       picked Primary / Surface-Brightest saw Primary at PC. Default holds the
+       resolved pair, and this is where its background comes from. */
     const f: any = withStyle();
     for (const mode of ['Light-Mode', 'Dark-Mode']) {
-      expect(f.Modes?.[mode]?.['Default-Background'], `${mode} still emits it`).toBeUndefined();
+      expect(f.Modes?.[mode]?.['Default-Background'], `${mode} is missing it`).toBeTruthy();
     }
   });
 
@@ -406,8 +408,10 @@ describe('Surface-Brightest', () => {
     const f: any = withStyle();
     const picked = (json as any).Metadata?.['Default-Settings']?.['Default-Theme']?.Theme?.value;
     const figThemes = Object.keys(f.Themes || {});
-    expect(figThemes).not.toContain('Default');
-    if (picked && figThemes.includes(picked)) expect(figThemes[0]).toBe(picked);
+    // Default leads: it is the only mode holding a BACKGROUND for the chosen
+    // (theme, level) pair, and the first mode is what a layer inherits.
+    expect(figThemes[0]).toBe('Default');
+    if (picked && figThemes.includes(picked)) expect(figThemes[1]).toBe(picked);
     expect(figThemes.length).toBeLessThanOrEqual(10);
   });
 
@@ -417,11 +421,12 @@ describe('Surface-Brightest', () => {
        be switched off and the payload still looks right. A rule checked only
        where it happens to be a no-op is not checked. */
     const base = themeOrder(undefined);
-    expect(base).not.toContain('Default');
+    expect(base[0]).toBe('Default');
 
-    for (const pick of base) {
+    for (const pick of base.filter((t) => t !== 'Default')) {
       const got = themeOrder(pick);
-      expect(got[0], `${pick} should lead`).toBe(pick);
+      expect(got[0], 'Default must stay the default mode').toBe('Default');
+      expect(got[1], `${pick} should follow Default`).toBe(pick);
       expect([...got].sort(), `${pick} set changed`).toEqual([...base].sort());
       expect(new Set(got).size, `${pick} duplicated a theme`).toBe(got.length);
     }
@@ -464,9 +469,12 @@ describe('Surface-Brightest', () => {
       const dt = built.json.Metadata?.['Default-Settings']?.['Default-Theme'];
       const pair = parseBackground(bg);
 
-      // Figma half 1: the Theme collection leads on the chosen theme.
+      /* Figma: Default leads and RESOLVES the pair — the Surface collection has
+         no Background, so the chosen level cannot come from that axis. The
+         chosen theme follows it. */
       const figThemes = themeOrder(dt?.Theme?.value);
-      expect([bg, figThemes[0]]).toEqual([bg, pair.theme]);
+      expect([bg, figThemes[0]]).toEqual([bg, 'Default']);
+      expect([bg, figThemes[1]]).toEqual([bg, pair.theme]);
 
       // Figma half 2: the Surface collection leads on the chosen level.
       expect([bg, dt?.Surface?.value]).toEqual([bg, pair.surface]);
