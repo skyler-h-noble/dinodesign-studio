@@ -159,6 +159,54 @@ describe('Surface-Brightest', () => {
     }
   });
 
+  it('every surface-end reference RESOLVES — invariant 1', () => {
+    /* Theme's two ends were rewired to point at the row's own
+       Background-<n>.Surfaces.Surface-Dimmest / -Brightest instead of standing
+       in a different row's plain Surface. That is a change of reference
+       TARGET, and a Figma alias to a key that is not there does not error —
+       the binding is simply absent and the layer paints nothing.
+
+       So the keys are checked to exist rather than assumed. One flatten
+       orphaned 6,084 of 13,701 references precisely because nothing counted. */
+    const dangling: string[] = [];
+    const walk = (node: any, depth: number) => {
+      if (!node || typeof node !== 'object' || depth > 16) return;
+      if (typeof node.value === 'string') {
+        const m = node.value.match(
+          /^\{Backgrounds\.([\w-]+)\.(Background-\d+)\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/,
+        );
+        if (m) {
+          const [, palette, row, level] = m;
+          for (const mode of ['Light-Mode', 'Dark-Mode'] as const) {
+            const target = json.Modes[mode]?.Backgrounds?.[palette]?.[row]?.Surfaces?.[level];
+            if (!target?.value) dangling.push(`${mode} ${palette}.${row}.${level}`);
+          }
+        }
+        return;
+      }
+      for (const k of Object.keys(node)) if (k !== 'type') walk(node[k], depth + 1);
+    };
+    walk(json.Modes['Light-Mode'].Themes, 0);
+    walk(json.Modes['Dark-Mode'].Themes, 0);
+    expect(dangling).toEqual([]);
+  });
+
+  it('actually points at the ends, so the check above is not vacuous', () => {
+    // A resolution test over zero references passes trivially. This is the
+    // count that makes it mean something.
+    let found = 0;
+    const walk = (node: any, depth: number) => {
+      if (!node || typeof node !== 'object' || depth > 16) return;
+      if (typeof node.value === 'string') {
+        if (/\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/.test(node.value)) found++;
+        return;
+      }
+      for (const k of Object.keys(node)) if (k !== 'type') walk(node[k], depth + 1);
+    };
+    walk(json.Modes['Light-Mode'].Themes, 0);
+    expect(found).toBeGreaterThan(0);
+  });
+
   it('carries the full foreground set, not just a background', () => {
     const s = json.Modes['Light-Mode'].Themes.Primary['Surfaces-Brightest'];
     for (const role of ['Background', 'Text', 'Header', 'Quiet', 'Border', 'Text-BW']) {
@@ -167,9 +215,18 @@ describe('Surface-Brightest', () => {
   });
 
   it('lands on tone 11, stepping to 12 when Bright has taken it', () => {
+    /* Read from the FOREGROUND table's tone, not from the reference's row.
+       
+       The reference used to name the tone directly — Background-11.Surfaces.
+       Surface — because Brightest borrowed another row's plain Surface. It now
+       names its own row and its own level (Background-<n>.Surfaces.
+       Surface-Brightest), so the row number is the theme's surface, not the
+       level's tone. The tone still has to be checked, and the foregrounds are
+       where it is observable: they are keyed by exactly the tone the level
+       paints, which is the pairing that must hold. */
     const toneOf = (theme: string, sec: string) =>
-      (String(json.Modes['Light-Mode'].Themes[theme]?.[sec]?.Background?.value || '')
-        .match(/Background-(\d+)/) || [])[1];
+      (String(json.Modes['Light-Mode'].Themes[theme]?.[sec]?.Text?.value || '')
+        .match(/Color-(\d+)\}$/) || [])[1];
     expect(toneOf('Neutral', 'Surfaces-Brightest')).toBe('12');
     for (const t of ['Primary', 'Secondary', 'Info']) {
       expect(toneOf(t, 'Surfaces-Brightest'), `${t} should land on 11`).toBe('11');
@@ -204,7 +261,11 @@ describe('Surface-Brightest', () => {
     // same colour AND still aliases into Modes. A hard #ffffff would light up
     // dark mode's brightest surface as pure white.
     const light = json.Modes['Light-Mode'].Themes.Neutral?.['Surfaces-Brightest']?.Background?.value;
-    expect(light).toMatch(/Background-12/);
+    // An ALIAS, not a literal — that is the property. Which row it aliases is
+    // the theme's own now, with the level named in the key.
+    expect(light).toMatch(/^\{Backgrounds\./);
+    expect(light).toMatch(/\.Surfaces\.Surface-Brightest\}$/);
+    expect(light).not.toBe('#ffffff');
   });
 
   // The BlackWhite button's Lowlight is answered WITHOUT a Modes variable.

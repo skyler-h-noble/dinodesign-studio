@@ -1,6 +1,6 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
 import { toneToColorNumber, generateSemanticLightModeScale, findClosestColorN } from '../colorScale';
-import { neutralSurfaceWindow } from '../surfaceWindow';
+import { neutralSurfaceWindow, surfaceWindow, MIN_SURFACE_TONE, MAX_SURFACE_TONE } from '../surfaceWindow';
 import type { SurfaceLevel } from '../surfaceWindow';
 // Text and Header roles reference the Text.*/Header.* families directly rather
 // than the getFixed* helpers. Those helpers return a raw {Colors.Palette.Color-N}
@@ -458,6 +458,21 @@ function generateSingleTheme(config: ThemeConfig): any {
   const locked = config.themeName === 'Neutral' ? neutralSurfaceWindow() : null;
   const lockStep = (level: SurfaceLevel) => locked?.find((s) => s.level === level) ?? null;
 
+  /* The ends come from surfaceWindow for CHROMATIC themes too, not just the
+     locked Neutral one.
+     
+     dimmestN used to be `config.n - 2` here and the identical expression lived
+     in generateSimplifiedBackgrounds — two copies of one rule, which is how
+     they drifted. Both now read the module, so Theme's tone index and the
+     Modes value it aliases cannot disagree; when they did, the foreground
+     tables (Text, Quiet, Border, Eyebrow) were solved against one tone while
+     the surface painted another. */
+  const endWindow = locked
+    ?? surfaceWindow(Math.min(Math.max(config.n, MIN_SURFACE_TONE), MAX_SURFACE_TONE));
+  const endStep = (level: SurfaceLevel) => endWindow.find((s) => s.level === level)!;
+  const dimmestStep = endStep('Surface-Dimmest');
+  const brightestStep = endStep('Surface-Brightest');
+
   // A locked end paints the anchor outright; every foreground table is still
   // keyed by toneIndex (1 for black, 12 for white), which is what keeps Text,
   // Quiet, Border and Eyebrow resolving on a surface that has no tone of its own.
@@ -497,14 +512,25 @@ function generateSingleTheme(config: ThemeConfig): any {
   };
 
   // Surface-Dimmest
+  //
+  // LINKED to the row's own end, not to another row's Surface. It used to read
+  // {Background-<n-2>.Surfaces.Surface} — a DIFFERENT background's base surface
+  // standing in for this one's darkest level. Modes has carried a real
+  // Surface-Dimmest entry on every row for a while; nothing pointed at it, so
+  // the link went to a neighbour instead and the level tracked the row it
+  // borrowed from rather than the theme it belongs to.
+  //
+  // Black stays a literal: no tone is true black (Color-1 is L1 in light mode,
+  // L3 in dark), so the anchor can only come from one. That is also what keeps
+  // Neutral's locked window black in BOTH modes.
   theme['Surfaces-Dimmest'] = {
     'Background': {
-      value: dimmestLock?.paint.kind === 'black' || config.n <= 2
+      value: dimmestStep.paint.kind === 'black'
         ? '#000000'
-        : `{Backgrounds.${config.theme}.Background-${dimmestLock ? dimmestLock.toneIndex : dimmestN}.Surfaces.Surface}`,
+        : `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface-Dimmest}`,
       type: 'color'
     },
-    ...buildSurfaceTokens(config, dimmestLock ? dimmestLock.toneIndex : dimmestN)
+    ...buildSurfaceTokens(config, dimmestStep.toneIndex)
   };
 
   // Surface-Bright
@@ -525,15 +551,15 @@ function generateSingleTheme(config: ThemeConfig): any {
   // 11 unless Bright has already taken it (Surface at 10), in which case 12.
   // Above that the ramp is exhausted and it paints white outright — the same
   // shape as Dimmest falling through to black when the tone runs out below.
-  const brightestN = brightN >= 11 ? 12 : 11;
+  // Linked to the row's own end for the same reason as Dimmest above.
   theme['Surfaces-Brightest'] = {
     'Background': {
       value: brightN >= 12
         ? '#ffffff'
-        : `{Backgrounds.${config.theme}.Background-${brightestN}.Surfaces.Surface}`,
+        : `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface-Brightest}`,
       type: 'color'
     },
-    ...buildSurfaceTokens(config, brightestN)
+    ...buildSurfaceTokens(config, brightestStep.toneIndex)
   };
 
   // Containers Section — reference Modes/Containers for Light/Dark mode adaptation

@@ -20,6 +20,7 @@
  * references go unresolved rather than erroring. These tests are that coupling.
  */
 import { describe, it, expect } from 'vitest';
+import { surfaceWindow, MIN_SURFACE_TONE, MAX_SURFACE_TONE } from '../utils/surfaceWindow';
 import { generateAllThemesWithSurfacesAndContainers } from '../utils/cssgen/generateCompleteThemes';
 
 const ACCENTS = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
@@ -121,7 +122,16 @@ describe('Default theme routes every surface role through Default-Background', (
   // Asserted relative to the surface's own tone rather than as a literal, so
   // this stays honest on any background instead of re-pinning to whatever the
   // current default happens to produce.
-  const dimmestToneFor = (surfaceN: number) => Math.max(surfaceN - 2, 1);
+  /* Dimmest's tone, from the module that owns the rule.
+     
+     This was `Math.max(surfaceN - 2, 1)` — a local restatement of a rule the
+     generator no longer uses. It kept passing after the generator changed,
+     because a helper tested against itself proves nothing about what ships;
+     that is the same trap surfaceBrightest.test.ts records for
+     neutralSurfaceWindow. */
+  const dimmestToneFor = (surfaceN: number) =>
+    surfaceWindow(Math.min(Math.max(surfaceN, MIN_SURFACE_TONE), MAX_SURFACE_TONE))
+      .find((s) => s.level === 'Surface-Dimmest')!.toneIndex;
 
   /** The tone a reference like {Backgrounds.Neutral.Background-10...} names. */
   const toneOf = (ref: string | undefined, pattern: RegExp): number | null => {
@@ -129,7 +139,7 @@ describe('Default theme routes every surface role through Default-Background', (
     return m ? Number(m[1]) : null;
   };
 
-  it('places Surfaces-Dimmest two tones below the surface, on its own Backgrounds reference', () => {
+  it('anchors Surfaces-Dimmest, on its own Backgrounds reference', () => {
     const surfaceRef = themes.Default.Surfaces?.Background?.value;
     const dimmestRef = themes.Default['Surfaces-Dimmest']?.Background?.value;
 
@@ -140,32 +150,40 @@ describe('Default theme routes every surface role through Default-Background', (
     expect(dimmestRef).not.toMatch(/Default-Background/);
     expect(dimmestRef).toMatch(/^\{Backgrounds\..*\.Background-\d+\./);
 
-    // The Default surface may itself be routed through Default-Background, in
-    // which case there is no literal tone to compare against — the relative
-    // rule is then checked via the foregrounds test below.
+    /* The reference now names the ROW and the level — Background-<n>.Surfaces.
+       Surface-Dimmest — rather than standing in a different row's plain
+       Surface. So the tone is no longer readable out of the path, and is
+       checked through the foregrounds below, which are what actually have to
+       be paired to it. */
+    expect(dimmestRef).toMatch(/\.Surfaces\.Surface-Dimmest\}$/);
+
     const surfaceN = toneOf(surfaceRef, /Background-(\d+)\./);
     if (surfaceN !== null) {
-      expect(toneOf(dimmestRef, /Background-(\d+)\./)).toBe(dimmestToneFor(surfaceN));
+      expect(toneOf(dimmestRef, /Background-(\d+)\./)).toBe(surfaceN);
     }
   });
 
   it('keeps Surfaces-Dimmest foregrounds paired to its own background tone', () => {
     const dimmest = themes.Default['Surfaces-Dimmest'];
-    const bgTone = toneOf(dimmest?.Background?.value, /Background-(\d+)\./);
-    expect(bgTone, 'Dimmest background should name a tone').not.toBeNull();
+    const rowN = toneOf(dimmest?.Background?.value, /Background-(\d+)\./);
+    expect(rowN, 'Dimmest background should name a row').not.toBeNull();
 
-    // Foregrounds must sit on the tables matching Dimmest's OWN background,
-    // not be rewritten to the Default surface's tone — that pairing is what
-    // keeps its text and border legible against it.
-    expect(dimmest.Text?.value).toMatch(new RegExp(`Color-${bgTone}\\}$`));
-    expect(dimmest.Border?.value).toMatch(new RegExp(`Color-${bgTone}\\}$`));
+    /* Foregrounds must sit on the tables matching the tone Dimmest actually
+       PAINTS, which is the anchored end — not the row it is read from, and not
+       the Default surface's tone. That pairing is what keeps its text and
+       border legible against it, and it is the reason the tone index has to
+       come from the same rule the background does. */
+    const level = dimmestToneFor(rowN!);
+    expect(dimmest.Text?.value).toMatch(new RegExp(`Color-${level}\\}$`));
+    expect(dimmest.Border?.value).toMatch(new RegExp(`Color-${level}\\}$`));
     expect(referencedKeys(dimmest).size, 'Dimmest should reference no Default-Background keys').toBe(0);
   });
 
   it('clamps Surfaces-Dimmest at Color-1 for the darkest surfaces', () => {
-    // tones 1-3 all resolve to 1; the ramp has nowhere darker to go.
-    expect([1, 2, 3].map(dimmestToneFor)).toEqual([1, 1, 1]);
-    expect(dimmestToneFor(12)).toBe(10);
-    expect(dimmestToneFor(4)).toBe(2);
+    // The anchor is Color-3, and it SQUEEZES under Surface-Dim rather than
+    // colliding with it once the surface sits low enough.
+    expect([2, 3].map(dimmestToneFor)).toEqual([1, 1]);   // black indexes 1
+    expect(dimmestToneFor(4)).toBe(2);                    // Dim is 3, step under
+    expect(dimmestToneFor(12)).toBe(3);                   // anchored, was 10
   });
 });
