@@ -215,19 +215,27 @@ describe('Text-BW', () => {
     expect(String(d['Surfaces-Dim']['Text-BW'].value)).toBe('{Default-Background.Surface-Dim-Text-BW}');
   });
 
-  it('resolves in the Figma payload for every Default surface', () => {
-    // Default's surfaces reach Text-BW through {Default-Background.*Text-BW},
-    // and that section is built from ROLE_SOURCES in generateFigmaJSON — a
-    // SEPARATE list from the CSS one. Missing there, the aliases pointed at a
-    // key that did not exist and resolved to nothing, while Containers linked
-    // fine because it needs no indirection.
-    const f: any = figmaOf(json);
-    const db = f.Modes?.['Light-Mode']?.['Default-Background'] || {};
-    for (const key of ['Text-BW', 'Surface-Dim-Text-BW', 'Surface-Bright-Text-BW']) {
-      expect(db[key]?.value, `Default-Background.${key} missing`).toMatch(/^#[0-9a-f]{6}$/i);
+  it('resolves for every Default surface, and flips between them', () => {
+    /* Asserted on the JSON layer, which is where Default still lives.
+       
+       It used to read the Figma payload's Default-Background section. That
+       section existed for one consumer — the Default Figma THEME — and the
+       theme is retired as a mode: the Theme collection's first mode is the
+       default now, so the payload no longer emits Default-Background at all.
+       CSS has no default-mode concept, so Default survives there and drives
+       :root, and this property survives with it.
+
+       The property itself is unchanged and still worth guarding: Text-BW has
+       to be present on each of Default's surfaces AND actually flip between
+       the dark and light ends, rather than being one colour everywhere. */
+    const themes = (json as any).Modes['Light-Mode'].Themes;
+    const roles = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Bright'] as const;
+    for (const role of roles) {
+      expect(themes.Default?.[role]?.['Text-BW']?.value, `Default.${role} Text-BW missing`)
+        .toBeTruthy();
     }
-    // And it must actually flip, not be one colour everywhere.
-    expect(db['Surface-Dim-Text-BW'].value).not.toBe(db['Surface-Bright-Text-BW'].value);
+    expect(themes.Default['Surfaces-Dim']['Text-BW'].value)
+      .not.toBe(themes.Default['Surfaces-Bright']['Text-BW'].value);
   });
 
   it('reaches the CSS as --Text-BW', () => {

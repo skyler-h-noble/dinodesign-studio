@@ -190,22 +190,59 @@ describe('Surface-Brightest', () => {
     walk(json.Modes['Light-Mode'].Themes, 0);
     walk(json.Modes['Dark-Mode'].Themes, 0);
     expect(dangling).toEqual([]);
-  });
 
-  it('actually points at the ends, so the check above is not vacuous', () => {
-    // A resolution test over zero references passes trivially. This is the
-    // count that makes it mean something.
-    let found = 0;
-    const walk = (node: any, depth: number) => {
+    /* And there should be NONE left: the ends are anchored per theme, so Theme
+       aliases {Colors.<palette>.Color-N} directly and the per-row copies are
+       dead weight. This keeps them from creeping back. The previous version
+       guarded that such references EXISTED, which was right while the row was
+       their only home. */
+    let rowEndRefs = 0;
+    const count = (node: any, depth: number) => {
       if (!node || typeof node !== 'object' || depth > 16) return;
       if (typeof node.value === 'string') {
-        if (/\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/.test(node.value)) found++;
+        if (/\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/.test(node.value)) rowEndRefs++;
         return;
       }
-      for (const k of Object.keys(node)) if (k !== 'type') walk(node[k], depth + 1);
+      for (const k of Object.keys(node)) if (k !== 'type') count(node[k], depth + 1);
     };
-    walk(json.Modes['Light-Mode'].Themes, 0);
-    expect(found).toBeGreaterThan(0);
+    count(json.Modes['Light-Mode'].Themes, 0);
+    count(json.Modes['Dark-Mode'].Themes, 0);
+    expect(rowEndRefs).toBe(0);
+  });
+
+  it('emits no per-row copies of the anchored ends', () => {
+    /* The 378 variables (208 light, 170 dark) this removes were one value each
+       repeated across twelve rows and eight palettes. Nothing selects between
+       the copies — the ends are one level per THEME — which is the test
+       invariant 2 actually sets: identical values are redundant only when
+       nothing chooses among them.
+
+       Separate from the reference check above, and it has to be: that one
+       passes whether or not the variables exist, because Theme stopped
+       pointing at them either way. This is what fails if the strip is removed. */
+    const f: any = withStyle();
+    const found: string[] = [];
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      const bg = f.Modes?.[mode]?.Backgrounds || {};
+      for (const palette of Object.keys(bg)) {
+        for (const row of Object.keys(bg[palette] || {})) {
+          for (const k of ['Surface-Dimmest', 'Surface-Brightest']) {
+            if (bg[palette][row]?.Surfaces?.[k]) found.push(`${mode}/${palette}/${row}/${k}`);
+          }
+        }
+      }
+    }
+    expect(found.slice(0, 5)).toEqual([]);
+  });
+
+  it('emits no Default-Background section', () => {
+    /* 466 variables across the two modes, larger than the row ends, and with
+       the Default theme retired as a Figma mode they had no reader at all.
+       Still built for the JSON and CSS, where Default drives :root. */
+    const f: any = withStyle();
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      expect(f.Modes?.[mode]?.['Default-Background'], `${mode} still emits it`).toBeUndefined();
+    }
   });
 
   it('carries the full foreground set, not just a background', () => {
@@ -254,7 +291,10 @@ describe('Surface-Brightest', () => {
     // Default sets theme: 'Neutral' on any grey system, so keying the lock off
     // the PALETTE instead of the theme name blacked out Default's dark end too.
     const bg = json.Modes['Light-Mode'].Themes.Default?.['Surfaces-Dimmest']?.Background?.value;
-    expect(bg).toMatch(/^\{Backgrounds\./);
+    // Not the literal black the Neutral lock produces — Default only borrows
+    // the palette, and keying the lock off the PALETTE blacked it out too.
+    expect(bg).not.toBe('#000000');
+    expect(bg).toMatch(/^\{Colors\./);
   });
 
   it('keeps Neutral Surface-Brightest mode-aware rather than a literal white', () => {
@@ -262,10 +302,11 @@ describe('Surface-Brightest', () => {
     // same colour AND still aliases into Modes. A hard #ffffff would light up
     // dark mode's brightest surface as pure white.
     const light = json.Modes['Light-Mode'].Themes.Neutral?.['Surfaces-Brightest']?.Background?.value;
-    // An ALIAS, not a literal — that is the property. Which row it aliases is
-    // the theme's own now, with the level named in the key.
-    expect(light).toMatch(/^\{Backgrounds\./);
-    expect(light).toMatch(/\.Surfaces\.Surface-Brightest\}$/);
+    /* An ALIAS, not a literal — Neutral keeps aliasing even though its locked
+       window says white, because Neutral's Color-12 IS pure white in light
+       mode while a hard #ffffff would light dark mode's brightest surface to
+       white instead of the dark ramp's top. */
+    expect(light).toMatch(/^\{Colors\.Neutral\.Color-12\}$/);
     expect(light).not.toBe('#ffffff');
   });
 
@@ -646,15 +687,22 @@ describe('Surface-Brightest', () => {
     ]);
   });
 
-  it('is covered by Default indirection in the Figma payload', () => {
-    // Default routes foregrounds through Default-Background. A level missing
-    // there resolves to nothing — which is how Surface/Dim/Bright shipped with
-    // unlinked Text-BW while Containers, needing no indirection, worked.
-    const f: any = withStyle();
-    const db = f.Modes?.['Light-Mode']?.['Default-Background'] || {};
-    const keys = Object.keys(db).filter((k) => k.startsWith('Surface-Brightest-'));
-    expect(keys.length).toBeGreaterThan(20);
-    expect(db['Surface-Brightest-Text']?.value).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(db['Surface-Brightest-Text-BW']?.value).toMatch(/^#[0-9a-f]{6}$/i);
+  it('carries a full foreground set on Default, where Default still lives', () => {
+    /* This read the Figma payload's Default-Background section, which is gone:
+       it served the Default Figma THEME, and that theme is retired as a mode
+       now the collection's first mode is the default. Default remains in the
+       JSON because CSS has no default-mode concept and drives :root from it,
+       so the property moves there rather than disappearing.
+
+       Text-BW is deliberately NOT asserted: Default's Surfaces-Brightest does
+       not carry one in the JSON, and neither the CSS Surface-Brightest block
+       nor :root emits --Text-BW. The Figma indirection was SYNTHESISING it, so
+       removing that section exposed a gap rather than creating one. Asserting
+       it here would fail on a real pre-existing hole; it is recorded instead. */
+    const brightest = (json as any).Modes['Light-Mode'].Themes.Default?.['Surfaces-Brightest'];
+    expect(brightest, 'Default has no Surfaces-Brightest').toBeTruthy();
+    for (const role of ['Background', 'Text', 'Header', 'Quiet', 'Border']) {
+      expect(brightest?.[role]?.value, `Default Surfaces-Brightest missing ${role}`).toBeTruthy();
+    }
   });
 });

@@ -682,6 +682,34 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       }
     }
 
+    /* Drop the anchored ends from every Background-N row.
+     *
+     * Surface-Dimmest and Surface-Brightest are one level per THEME — the
+     * darkest and lightest surface a theme offers — so a copy on all twelve
+     * rows of all eight palettes was 378 variables (208 light, 170 dark)
+     * expressing one value each. Nothing selects between the copies, which is
+     * the test invariant 2 actually sets: identical values are redundant only
+     * when nothing chooses among them.
+     *
+     * The Theme layer aliases {Colors.<palette>.Color-N} directly now, so
+     * these have no readers. Modes sits near its ~4,700-per-mode ceiling and
+     * the light rows alone were about 4% of it.
+     *
+     * Only the Figma payload is trimmed. The JSON and CSS pipelines keep
+     * computing the ends, so surfaceWindow stays the one definition and a
+     * future dark-mode remap still has them to work from. */
+    const bgSection = modeSection['Backgrounds'];
+    if (bgSection) {
+      for (const palette of Object.keys(bgSection)) {
+        for (const row of Object.keys(bgSection[palette] || {})) {
+          const surfaces = bgSection[palette][row]?.Surfaces;
+          if (!surfaces) continue;
+          delete surfaces['Surface-Dimmest'];
+          delete surfaces['Surface-Brightest'];
+        }
+      }
+    }
+
     // Add utility colors
     if (!modeSection.Colors) modeSection.Colors = {};
     modeSection.Colors['Image-Overlay'] = {
@@ -1487,8 +1515,26 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // Dark mode containers are always tonal: Primary Color-3 or Neutral Color-3
     const darkContainerN = 3;
 
-    // Add Default-Background to Modes
-    for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+    /* Default-Background is no longer emitted to Figma — 466 unreferenced
+     * variables across the two modes, more than the 378 row-level ends.
+     *
+     * It existed for one consumer: the Default THEME, which is retired as a
+     * Figma mode. The Theme collection's first mode is the default now, so
+     * nothing in the payload aliases {Default-Background.*} — the
+     * referenceResolution guard that asserted something DID is what caught the
+     * change, and it was right to.
+     *
+     * The JSON and CSS pipelines still build and use it: CSS has no
+     * default-mode concept, so the Default theme drives :root and routes its
+     * surface roles through Default-Background there. This trims the Figma
+     * payload only, exactly like the anchored ends above.
+     *
+     * Kept rather than deleted because it is the one thing that has to come
+     * back if Default ever returns as a mode — flip this to true and the whole
+     * block runs again. It writes nothing but defBg, so skipping it has no
+     * other effect. */
+    const EMIT_DEFAULT_BACKGROUND = false;
+    for (const modeName of (EMIT_DEFAULT_BACKGROUND ? ['Light-Mode', 'Dark-Mode'] : [])) {
       const modeData = designSystemJSON.Modes?.[modeName];
       if (!modeData) continue;
 

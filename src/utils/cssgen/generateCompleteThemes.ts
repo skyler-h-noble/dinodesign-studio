@@ -525,9 +525,15 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Neutral's locked window black in BOTH modes.
   theme['Surfaces-Dimmest'] = {
     'Background': {
+      /* Aliases the COLOUR, not a Backgrounds row. The row's own
+         Surface-Dimmest was never anything but {Colors.<palette>.Color-N}
+         itself, so this resolves identically with one hop fewer — and the two
+         ends are anchored per theme, so a per-row copy of them on all twelve
+         rows was 378 variables saying one thing. Colors is inside Modes, so
+         the alias stays mode-aware. */
       value: dimmestStep.paint.kind === 'black'
         ? '#000000'
-        : `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface-Dimmest}`,
+        : `{Colors.${config.theme}.Color-${dimmestStep.toneIndex}}`,
       type: 'color'
     },
     ...buildSurfaceTokens(config, dimmestStep.toneIndex)
@@ -554,9 +560,14 @@ function generateSingleTheme(config: ThemeConfig): any {
   // Linked to the row's own end for the same reason as Dimmest above.
   theme['Surfaces-Brightest'] = {
     'Background': {
-      value: brightN >= 12
+      /* Same one-hop alias as Dimmest. The literal is reserved for a
+         chromatic ramp that has run out; Neutral keeps ALIASING even though
+         its window says white, because Neutral's Color-12 IS pure white and a
+         hard #ffffff would light dark mode's brightest surface to pure white
+         instead of the dark ramp's top. `locked` is Neutral. */
+      value: !locked && brightestStep.paint.kind === 'white'
         ? '#ffffff'
-        : `{Backgrounds.${config.theme}.Background-${config.n}.Surfaces.Surface-Brightest}`,
+        : `{Colors.${config.theme}.Color-${brightestStep.toneIndex}}`,
       type: 'color'
     },
     ...buildSurfaceTokens(config, brightestStep.toneIndex)
