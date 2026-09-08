@@ -7407,6 +7407,21 @@ export function exportColorSystemToJSON(
           Surfaces: '',
           'Surfaces-Dim': 'Surface-Dim-',
           'Surfaces-Bright': 'Surface-Bright-',
+          /* Surfaces-Brightest was missing, so Default's lightest surface got
+             no Text-BW at all — the one level where the answer is most obvious
+             is the one that had none.
+             
+             Not hardcoded black, even though black is what this produces on a
+             Color-11/12 background. It resolves through the same BlackWhite
+             map as every other level (white at Color-1..5, black from 6 up),
+             which is mode-aware: dark mode's brightest surface is the dark
+             ramp's top, not white, and a literal would have been wrong there
+             while looking right in light mode.
+
+             Surfaces-Dimmest is deliberately absent: it carries a real tone in
+             its own Text-Primary, so it takes the branch above and never
+             reaches this map. */
+          'Surfaces-Brightest': 'Surface-Brightest-',
           Containers: 'Container-',
         };
         const prefix = DEFAULT_BG_PREFIX[sectionName];
