@@ -25,6 +25,17 @@
  * firestore.rules. Admin status is a Firestore flag at users/{uid}.isAdmin,
  * so adding/removing admins is a Firestore field flip, not a redeploy.
  *
+ * Entitlements are currently OFF (REQUIRE_ENTITLEMENTS = false): every
+ * published add-on is available to every design system. Nothing is being
+ * charged for yet, so gating reads adds a failure mode without protecting
+ * revenue — a customer whose entitlement doc was never written just sees an
+ * empty Add-Ons tab with no explanation.
+ *
+ * The entitlement code is kept and still runs when the flag is true. Deleting
+ * it would be the mistake: the Firestore shape, the pinnedVersion resolution
+ * and the expiry handling are the parts that are tedious to rebuild, and
+ * turning charging on should be a one-line flip rather than a re-implementation.
+ *
  * Auth posture: listEntitledAddOns and getAddOn currently use the
  * identifier-as-credential posture — the Dino ID itself is the credential.
  * To upgrade to authenticated reads later, uncomment the verifyOwnerAuth
@@ -33,6 +44,11 @@
  */
 
 const { onRequest } = require('firebase-functions/v2/https');
+
+/* Gate reads on a per-design-system entitlement. See the header note: off
+   while nothing is charged for. Flip to true to require entitlements again —
+   both endpoints below branch on it and the entitlement logic is intact. */
+const REQUIRE_ENTITLEMENTS = false;
 const admin = require('firebase-admin');
 
 // admin.initializeApp() is called in index.js; this file shares that app.
@@ -176,6 +192,28 @@ exports.listEntitledAddOns = onRequest({ cors: true }, async (req, res) => {
 
   const db = admin.firestore();
   const nowMs = Date.now();
+
+  /* Open mode: every PUBLISHED add-on, for any valid Dino ID. Published means
+     currentVersion >= 1 — an add-on in the catalog with no version has no spec
+     in Storage, so listing it would offer an import that can only fail. */
+  if (!REQUIRE_ENTITLEMENTS) {
+    const catalogSnap = await db.collection('addOns').get();
+    const open = [];
+    for (const doc of catalogSnap.docs) {
+      const data = doc.data() || {};
+      const currentVersion = data.currentVersion || 0;
+      if (currentVersion < 1) continue;
+      open.push({
+        addOnId: doc.id,
+        name: data.name || doc.id,
+        currentVersion,
+        pinnedVersion: null,   // pinning is an entitlement concept
+        expiresAt: null,
+      });
+    }
+    return res.status(200).json({ addons: open });
+  }
+
   const snap = await db.collection(`designSystems/${dinoId}/entitlements`)
     .where('active', '==', true)
     .get();
@@ -229,15 +267,23 @@ exports.getAddOn = onRequest({ cors: true }, async (req, res) => {
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
 
-  const entSnap = await db.doc(`designSystems/${dinoId}/entitlements/${addOnId}`).get();
-  if (!entSnap.exists) return res.status(403).json({ error: 'No entitlement for this add-on' });
-  const ent = entSnap.data() || {};
-  if (!ent.active) return res.status(403).json({ error: 'Entitlement inactive' });
-  const expiresAtMs = (ent.expiresAt && typeof ent.expiresAt.toMillis === 'function')
-    ? ent.expiresAt.toMillis()
-    : null;
-  if (expiresAtMs !== null && expiresAtMs < Date.now()) {
-    return res.status(403).json({ error: 'Entitlement expired' });
+  /* Open mode skips the entitlement entirely rather than faking one, so there
+     is no half-state where a document is missing but access is granted. `ent`
+     stays an empty object and pinnedVersion falls through to the catalog's
+     currentVersion below, which is the same resolution an unpinned
+     entitlement produces. */
+  let ent = {};
+  if (REQUIRE_ENTITLEMENTS) {
+    const entSnap = await db.doc(`designSystems/${dinoId}/entitlements/${addOnId}`).get();
+    if (!entSnap.exists) return res.status(403).json({ error: 'No entitlement for this add-on' });
+    ent = entSnap.data() || {};
+    if (!ent.active) return res.status(403).json({ error: 'Entitlement inactive' });
+    const expiresAtMs = (ent.expiresAt && typeof ent.expiresAt.toMillis === 'function')
+      ? ent.expiresAt.toMillis()
+      : null;
+    if (expiresAtMs !== null && expiresAtMs < Date.now()) {
+      return res.status(403).json({ error: 'Entitlement expired' });
+    }
   }
 
   const catalogSnap = await db.doc(`addOns/${addOnId}`).get();
