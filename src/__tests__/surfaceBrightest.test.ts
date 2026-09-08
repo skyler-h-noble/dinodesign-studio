@@ -279,6 +279,37 @@ describe('Surface-Brightest', () => {
     }
   });
 
+  it('links Dropshadow-Color wherever the background is itself a link', () => {
+    /* emitDropshadowRefs aliases into {Dropshadow-Color.<palette>.<Color-N>}
+       only when the group's Background reduces to a {Colors.…} reference.
+       Anything else falls to a computed tinted hex — correct for a literal,
+       wrong for a surface that has a tone.
+
+       Surface-Brightest used to land in that second branch: its Background was
+       either a literal #ffffff, once the chromatic ramp ran out, or a
+       Backgrounds row reference that did not reduce. So its shadow was a baked
+       hex while every sibling level carried a link, which is visible in Figma
+       as a raw value where the others show a chip.
+
+       The rule, stated so it holds for any level: a group whose Background is
+       an alias must have a Dropshadow-Color that is also an alias. A literal
+       background — Neutral's black end — keeps a computed shadow, which is the
+       point of that branch. */
+    const f: any = withStyle();
+    const offenders: string[] = [];
+    for (const [themeName, groups] of Object.entries<any>(f.Themes || {})) {
+      for (const [groupName, data] of Object.entries<any>(groups || {})) {
+        if (!groupName.startsWith('Surface')) continue;   // Containers name theirs differently
+        const bg = data?.Background?.value;
+        const shadow = data?.['Dropshadow-Color']?.value;
+        if (typeof bg !== 'string' || !bg.startsWith('{')) continue;
+        if (typeof shadow === 'string' && shadow.startsWith('{')) continue;
+        offenders.push(`${themeName}/${groupName}: bg=${bg} shadow=${shadow}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('carries the full foreground set, not just a background', () => {
     const s = json.Modes['Light-Mode'].Themes.Primary['Surfaces-Brightest'];
     for (const role of ['Background', 'Text', 'Header', 'Quiet', 'Border', 'Text-BW']) {
