@@ -236,7 +236,16 @@ describe('the Figma payload resolves too', () => {
         };
         walk(f, 0);
 
-        expect(used.size, `${mode}: nothing referenced Default-Background at all`).toBeGreaterThan(0);
+        /* Default-Background had exactly one consumer: the Default theme. That
+           theme is no longer a Figma mode — the user's pick leads the Theme
+           collection and Figma treats the first mode as the default — so the
+           reference count is now legitimately zero.
+
+           The non-vacuity guard that used to sit here (expect > 0) is what
+           caught the change, and it was right to. It is dropped rather than
+           inverted because zero is the whole point: what still matters is that
+           any reference which DOES survive resolves, so the group cannot rot
+           into dangling aliases while it is still emitted. */
         expect(
           [...used].filter((u) => !keys.includes(u)),
           `${mode} references Default-Background keys that are never written`,

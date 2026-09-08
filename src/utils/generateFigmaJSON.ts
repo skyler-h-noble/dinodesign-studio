@@ -51,9 +51,33 @@ interface ColorToken {
  * assertThemesMatch below now fails that loudly instead.
  */
 const THEMES = [
-  'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
+  'Primary', 'Secondary', 'Tertiary', 'Neutral',
   'Info', 'Success', 'Warning', 'Error',
 ];
+
+/**
+ * The Theme collection's modes, in order, with the user's pick FIRST.
+ *
+ * Order is load-bearing here in a way it is nowhere else in this file: the
+ * plugin reads `Object.keys(data.Themes)` and makes the first one the
+ * collection's DEFAULT mode, which every layer inherits without setting a mode
+ * explicitly. So the first key IS the default theme.
+ *
+ * That is what retires 'Default'. It was a whole mode holding a COPY of
+ * whichever palette and tone the user chose — one of ten slots spent on a
+ * duplicate. A background selection is a (theme, surface level) pair, so the
+ * same thing is said by the default theme mode plus the default surface mode,
+ * which is exactly how <Palette>-Light was retired into Surface-Brightest.
+ *
+ * Figma cannot express this after the fact: `defaultModeId` is readonly and
+ * there is no reorderMode, and the plugin only creates modes when the
+ * collection is absent. So the order takes effect on a FRESH file; an existing
+ * one keeps whatever default it was built with until it is re-imported.
+ */
+export function themeOrder(defaultTheme?: string): string[] {
+  if (!defaultTheme || !THEMES.includes(defaultTheme)) return THEMES;
+  return [defaultTheme, ...THEMES.filter((t) => t !== defaultTheme)];
+}
 
 const SURFACE_GROUPS_INTERNAL = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'];
 const SURFACE_GROUP_NAMES: Record<string, string> = {
@@ -506,6 +530,11 @@ function buildFigmaTypeScale(typo: any): any {
 }
 
 export function generateFigmaJSON(designSystemJSON: any): any {
+  /* The user's chosen theme leads the Theme collection, making it Figma's
+     default mode — see themeOrder. Read here so every use below shares it. */
+  const pickedTheme: string | undefined =
+    designSystemJSON?.Metadata?.['Default-Settings']?.['Default-Theme']?.Theme?.value;
+  const THEME_MODES = themeOrder(pickedTheme);
   const figma: any = { Modes: {}, Themes: {}, SurfacesContainers: {} };
 
   /* The user's Shadow controls. Same mapper the CSS exporter and the preview
@@ -997,8 +1026,12 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // and a name here that the generator no longer produces is dead. Neither
       // shows up as an error at import — the collection is simply short a mode.
       const generated = Object.keys(themes);
-      const missingFromExport = generated.filter((t) => !THEMES.includes(t));
-      const deadNames = THEMES.filter((t) => !generated.includes(t));
+      /* 'Default' is generated for the CSS side and deliberately NOT exported
+         as a Figma mode — the first mode is the default now. Excluded from the
+         comparison rather than left to warn, so a real omission still shows. */
+      const generatedForFigma = generated.filter((t) => t !== 'Default');
+      const missingFromExport = generatedForFigma.filter((t) => !THEME_MODES.includes(t));
+      const deadNames = THEME_MODES.filter((t) => !generatedForFigma.includes(t));
       if (missingFromExport.length) {
         console.warn(
           `\u26A0\uFE0F [Figma] ${missingFromExport.length} generated theme(s) are NOT in the export list ` +
@@ -1011,9 +1044,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           `${deadNames.join(', ')}`,
         );
       }
-      if (THEMES.length > 10) {
+      if (THEME_MODES.length > 10) {
         console.warn(
-          `\u26A0\uFE0F [Figma] ${THEMES.length} themes exceeds Figma's 10-mode cap; the tail will not import.`,
+          `\u26A0\uFE0F [Figma] ${THEME_MODES.length} themes exceeds Figma's 10-mode cap; the tail will not import.`,
         );
       }
 
@@ -1055,7 +1088,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         return true;
       };
 
-      for (const themeName of THEMES) {
+      for (const themeName of THEME_MODES) {
         const theme = themes[themeName];
         if (!theme) continue;
 
@@ -1386,7 +1419,11 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   // Surface variants — link directly to Theme
   for (const [surfaceName, groupKey] of Object.entries(surfaceToGroup)) {
     const sc: any = {};
-    const themeGroup = figma.Themes?.Default?.[groupKey];
+    /* Any theme will do — this walks the shape to learn which keys exist and
+       emits {Theme.<group>/<key>} refs whose values come per mode. It named
+       Default, which is going away, and hardcoding one theme as the shape
+       source was fragile regardless. */
+    const themeGroup = figma.Themes?.[THEME_MODES[0]]?.[groupKey];
     if (themeGroup) {
       function buildSurfaceRefs(obj: any, pathPrefix: string): any {
         const result: any = {};
@@ -1412,7 +1449,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     sc.Background = { value: `{Theme.Containers/${containerName}}`, type: 'color' };
 
     // Rest from Theme.Containers
-    const themeContainers = figma.Themes?.Default?.Containers;
+    const themeContainers = figma.Themes?.[THEME_MODES[0]]?.Containers;
     if (themeContainers) {
       function buildContainerRefs(obj: any, pathPrefix: string): any {
         const result: any = {};

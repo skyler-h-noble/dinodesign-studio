@@ -18,7 +18,7 @@ import chroma from 'chroma-js';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
-import { generateFigmaJSON } from '../utils/generateFigmaJSON';
+import { generateFigmaJSON, themeOrder } from '../utils/generateFigmaJSON';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 import { buildAccessibilityReport } from '../utils/accessibilityReport';
@@ -332,7 +332,15 @@ describe('Surface-Brightest', () => {
     for (const m of lm.matchAll(/\[data-theme="([^"]+)"\]\[data-surface=/g)) cssThemes.add(m[1]);
 
     const figThemes = Object.keys(f.Themes || {});
-    const missing = [...cssThemes].filter((t) => !NAV_ONLY.includes(t) && !figThemes.includes(t));
+
+    /* 'Default' is a CSS theme with no Figma mode, on purpose. It held a COPY
+       of whichever palette and tone the user chose, spending one of ten mode
+       slots on a duplicate; the Theme collection's FIRST mode is Figma's
+       default, so the user's pick leading the list says the same thing. CSS
+       keeps the name because a stylesheet has no equivalent of a default mode. */
+    const FIGMA_EXEMPT = ['Default'];
+    const missing = [...cssThemes].filter(
+      (t) => !NAV_ONLY.includes(t) && !FIGMA_EXEMPT.includes(t) && !figThemes.includes(t));
     expect(missing, `themes in CSS but absent from Figma: ${missing.join(', ')}`).toEqual([]);
 
     // and nothing in Figma that the CSS does not emit
@@ -340,6 +348,48 @@ describe('Surface-Brightest', () => {
     expect(stale, `themes in Figma that CSS never emits: ${stale.join(', ')}`).toEqual([]);
 
     for (const t of NAV_ONLY) expect(Object.keys(f.Navigation || {})).toContain(t);
+  });
+
+  it('leads the Theme collection with the user picked theme', () => {
+    /* Order is the mechanism, not decoration: the plugin reads
+       Object.keys(data.Themes) and makes the first one the collection's
+       DEFAULT mode, which every layer inherits without setting one. So the
+       first key IS the default theme, and that is what replaced the Default
+       mode.
+
+       Figma cannot fix this later — defaultModeId is readonly, there is no
+       reorderMode, and the plugin only creates modes when the collection is
+       absent. A fresh file gets it; an existing one keeps the default it was
+       built with until re-imported. */
+    const f: any = withStyle();
+    const picked = (json as any).Metadata?.['Default-Settings']?.['Default-Theme']?.Theme?.value;
+    const figThemes = Object.keys(f.Themes || {});
+    expect(figThemes).not.toContain('Default');
+    if (picked && figThemes.includes(picked)) expect(figThemes[0]).toBe(picked);
+    expect(figThemes.length).toBeLessThanOrEqual(10);
+  });
+
+  it('themeOrder puts the pick first without dropping or duplicating any', () => {
+    /* Tested directly, because the payload assertion above cannot fail on its
+       own: the fixture picks Primary, which is already first, so ordering can
+       be switched off and the payload still looks right. A rule checked only
+       where it happens to be a no-op is not checked. */
+    const base = themeOrder(undefined);
+    expect(base).not.toContain('Default');
+
+    for (const pick of base) {
+      const got = themeOrder(pick);
+      expect(got[0], `${pick} should lead`).toBe(pick);
+      expect([...got].sort(), `${pick} set changed`).toEqual([...base].sort());
+      expect(new Set(got).size, `${pick} duplicated a theme`).toBe(got.length);
+    }
+  });
+
+  it('themeOrder ignores a pick it cannot honour', () => {
+    // A palette that is not a theme must not be prepended — that would invent
+    // a mode with no variables behind it.
+    expect(themeOrder('BlackWhite')).toEqual(themeOrder(undefined));
+    expect(themeOrder('')).toEqual(themeOrder(undefined));
   });
 
   it('gives every Figma theme all five surfaces', () => {
