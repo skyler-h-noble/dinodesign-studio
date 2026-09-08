@@ -5651,7 +5651,11 @@ export function exportColorSystemToJSON(
       };
 
       // Add Dropshadow-Color and Border-Variant to all sections
-      const allThemeSections = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'];
+      /* Surfaces-Brightest belongs in every list that enumerates the surface
+         levels. It was added as a level after these were written, and each one
+         that missed it left that level short a role — silently, because a
+         missing role is simply an absent variable rather than a wrong one. */
+      const allThemeSections = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'];
       allThemeSections.forEach(section => {
         const sectionData = theme[section];
         if (!sectionData) return;
@@ -5767,7 +5771,7 @@ export function exportColorSystemToJSON(
 
       // Add Highlight/Lowlight to ALL sections that have Buttons
       const allSections = [
-        'Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'
+        'Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'
       ];
 
       buttonThemes.forEach(btnTheme => {
@@ -6013,7 +6017,7 @@ export function exportColorSystemToJSON(
       const theme = themes[themeName];
       const target = tagDefaultPaletteMap[themeName];
       if (!target) return;
-      ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Containers'].forEach(section => {
+      ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'].forEach(section => {
         const sectionData = theme[section];
         if (!sectionData) return;
         if (!sectionData.Tag) sectionData.Tag = {};

@@ -247,6 +247,38 @@ describe('Surface-Brightest', () => {
     }
   });
 
+  it('carries the SAME roles as Surface, in every theme', () => {
+    /* Surface-Brightest was added as a level after several lists that
+       enumerate the levels had already been written, and each list that missed
+       it left the level short a role. Three did: the Dropshadow/Border-Variant
+       pass, the Highlight/Lowlight pass, and the Tag-Default pass — costing
+       Icons/On-* and Tag/Default/* here.
+
+       A missing role is an ABSENT variable, not a wrong one, so nothing looked
+       broken; the level just quietly offered less than its siblings.
+
+       Asserted as a set comparison rather than a count so a future list that
+       forgets it names the roles it dropped. */
+    const f: any = withStyle();
+    const flat = (o: any, pre = ''): string[] => {
+      const out: string[] = [];
+      for (const [k, v] of Object.entries<any>(o || {})) {
+        if (v && typeof v === 'object' && 'value' in v) out.push(pre + k);
+        else if (v && typeof v === 'object') out.push(...flat(v, pre + k + '/'));
+      }
+      return out;
+    };
+    for (const [name, groups] of Object.entries<any>(f.Themes || {})) {
+      const surface = flat(groups['Surface']);
+      const brightest = flat(groups['Surface-Brightest']);
+      expect(surface.length, `${name} has no Surface roles`).toBeGreaterThan(0);
+      expect(
+        surface.filter((k) => !brightest.includes(k)),
+        `${name}: Surface-Brightest is missing roles Surface has`,
+      ).toEqual([]);
+    }
+  });
+
   it('carries the full foreground set, not just a background', () => {
     const s = json.Modes['Light-Mode'].Themes.Primary['Surfaces-Brightest'];
     for (const role of ['Background', 'Text', 'Header', 'Quiet', 'Border', 'Text-BW']) {
