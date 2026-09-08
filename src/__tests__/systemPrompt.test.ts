@@ -88,3 +88,38 @@ describe('SYSTEM_PROMPT icon rules', () => {
     expect(SYSTEM_PROMPT).toMatch(/<Icon><AddIcon \/><\/Icon>/);
   });
 });
+
+describe('conditional visibility survives in the prompt', () => {
+  /* `visible` is a bindable field, so one component can show a drawer on
+     mobile and a bar on desktop from a mode-scoped boolean. The plugin stamps
+     that as visibleWhen, deliberately WITHOUT the flat visible:false, so the
+     hidden-means-not-rendered rule cannot fire on it.
+
+     If this rule goes missing — truncation, or an edit — the converter falls
+     back to dropping the layer, and the output is one breakpoint's layout that
+     looks entirely correct while missing most of the design. Exactly the kind
+     of loss nothing else would report. */
+  it('tells the converter that visibleWhen is not hidden', () => {
+    for (const marker of [
+      '_aaid.visibleWhen',
+      '_aaid.visibleNow',
+      'ALWAYS emitted',
+    ]) expect(SYSTEM_PROMPT, marker).toContain(marker);
+  });
+
+  it('says the snapshot is not a decision', () => {
+    // The whole trap in one line: node.visible reports the mode that happened
+    // to be resolved when the file was stamped.
+    expect(SYSTEM_PROMPT).toMatch(/stamp from Desktop|stamped/i);
+  });
+});
+
+describe('prose lists survive in the prompt', () => {
+  it('carries the list rule and its marker convention', () => {
+    for (const marker of [
+      '4d-2. PROSE LISTS',
+      '_aaid.list',
+      'DERIVED-LIST',
+    ]) expect(SYSTEM_PROMPT, marker).toContain(marker);
+  });
+});

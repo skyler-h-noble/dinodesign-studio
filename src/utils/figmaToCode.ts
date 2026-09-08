@@ -243,6 +243,32 @@ CONVERSION RULES:
     OMIT the corresponding element or prop entirely — never render a placeholder
     for it and never duplicate visible text to fill the gap.
 
+    3. _aaid.visibleWhen names a VARIABLE that drives this layer's visibility,
+       which is a different thing from being hidden and must not be treated as
+       one. "visible" is a bindable field, so a boolean variable scoped to a
+       mode can show a drawer on mobile and a bar on desktop from ONE
+       component, with no variants.
+
+       node.visible then reports whichever mode was resolved when the file was
+       stamped. _aaid.visibleNow carries that snapshot, and it is NOT a
+       decision: stamp from Desktop and the mobile drawer reads false; stamp
+       from Mobile and the bar does.
+
+       So a layer with visibleWhen is ALWAYS emitted, whatever visibleNow says,
+       and rendered behind its condition — a breakpoint, a prop, or state named
+       after the variable. Dropping it by rule 1 above produces one
+       breakpoint's layout with nothing to show the others ever existed, which
+       looks completely correct and is missing most of the design.
+
+       The variable name is the condition. Names keyed to device width
+       (Show-Drawer, Is-Mobile, Show-Rail) become breakpoints; anything else
+       becomes a prop. Where several layers share one variable they share one
+       condition — emit them in the same branch rather than testing repeatedly.
+
+       Note the plugin does NOT set _aaid.visible on these, precisely so rule 1
+       cannot fire on them. Seeing visibleWhen without visible is the normal
+       case, not a contradiction.
+
     CONCRETE (the List case): a ListItem whose 2nd row (title) and 3rd row
     (secondary) booleans are false shows ONLY the overline. Emit just
     overline="…" — do NOT pass children (title) or secondary, and do NOT repeat
