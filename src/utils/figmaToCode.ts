@@ -689,6 +689,55 @@ CONVERSION RULES:
     If a design genuinely uses a size the scale does not publish, set BOTH —
     fontSize and lineHeight — and never one alone.
 
+4d-2. PROSE LISTS (bulleted / numbered TEXT) — read _aaid.list, do not guess.
+
+    This is about a paragraph of BULLETS, not the row list in 4d. The two are
+    unrelated: 4d is a component with slots, this is body copy.
+
+    FIGMA DRAWS THE MARKER, SO IT IS NOT IN THE STRING. A native Figma list
+    arrives as plain "First\nSecond\nThird" with no bullet character. It is
+    therefore indistinguishable from three lines of prose by looking at the
+    text — which is exactly why the plugin stamps it:
+
+      _aaid.list = { type: "UNORDERED" }              // whole node, one level
+      _aaid.list = { type: "ORDERED", indent: 1 }     // whole node, nested
+      _aaid.list = { lines: [{t,i},…] }               // per line, when mixed
+
+      t: "U" unordered · "O" ordered · "N" not a list      i: nesting level
+
+    WHEN _aaid.list IS PRESENT, IT IS AUTHORITATIVE. Split the node's characters
+    on newline and emit one <ListItem> per line. Never re-add a bullet glyph or
+    a number — <List> renders the marker:
+
+      <List component="ul">
+        <ListItem>First</ListItem>
+        <ListItem>Second</ListItem>
+      </List>
+
+    ORDERED → component="ol". The lib's <List> defaults to "ul" and sets
+    role="list" with <li> children, so the semantics come for free; a <VStack>
+    of <Body> lines does NOT have them.
+
+    MIXED (the "lines" shape) is the ordinary case, not an edge one — an intro
+    sentence above three bullets produces it. Lines with t:"N" are prose and
+    stay OUTSIDE the <List>; consecutive list lines group into one <List>. A
+    change of "t" starts a new list; an increase in "i" starts a nested <List>
+    inside the current <ListItem>.
+
+    WHEN _aaid.list IS ABSENT BUT THE TEXT LOOKS LIKE A LIST — the designer
+    typed the markers by hand ("• ", "- ", "1. ") instead of using Figma's list
+    control, or built one text node per bullet in a vertical auto-layout.
+
+    Emit the <List> anyway, strip the typed marker from the text, and FLAG IT:
+
+      // DERIVED-LIST: 3 items on <List> — markers typed as "• " in one text node
+
+    Same convention and the same reason as DERIVED-ARIA-LABEL (rule 0d): the
+    marker travels in the code, and a guess about the designer's intent gets
+    surfaced instead of silently becoming markup. A line starting with "-" may
+    be a dash, not a bullet — so this is a judgement, and it is flagged as one.
+    Do NOT flag when _aaid.list is present: that is read, not inferred.
+
 4e. TYPOGRAPHY COLOR PROP — DEFAULT TO STANDARD TEXT.
 
     The typography components (<H1>...<H6>, <Body>, <Subtitle>,

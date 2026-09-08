@@ -59,6 +59,26 @@ const CONTENT_NOT_NAME = /^([0-9]+|[A-Z]{1,3}|[0-9]+\+)$/;
  *  metadata carried beside it. */
 const DERIVED_LABEL = /\/\/\s*DERIVED-ARIA-LABEL:\s*["“']([^"”']+)["”']\s*(?:on\s+[\w.]+\s*)?(?:[—-]\s*([^\n]*))?/g;
 
+/** The converter's marker for a list it inferred from typed markers rather
+ *  than read from _aaid.list.
+ *
+ *      // DERIVED-LIST: 3 items on <List> — markers typed as "• " in one node
+ *
+ *  Distinct from a list Figma actually knows about, which is read and needs no
+ *  confirmation. This one is a judgement about intent: a line starting with
+ *  "-" may be a dash. */
+const DERIVED_LIST = /\/\/\s*DERIVED-LIST:\s*([^\n]*)/g;
+
+/** A bullet or number the designer typed into the string, left in the output.
+ *
+ *  Figma DRAWS a native list's marker, so a real list's characters never
+ *  contain one. A marker surviving into the JSX therefore means the text was
+ *  copied verbatim — the list was never recognised as a list. */
+const TYPED_MARKER = /^\s*(?:[•·▪◦‣∙*]|[-–—]\s|\d+[.)]\s|[a-z][.)]\s)/i;
+
+/** Typography components — the ones a stray bullet would land in. */
+const TYPOGRAPHY = /^(Body|BodySmall|BodyLarge|Subtitle|SubtitleLarge|Caption|Label|Overline|Typography|p|span)$/;
+
 /** Opening tags, with their attribute blob. Good enough for emitted JSX, which
  *  is machine-written and regular — the same assumption conversionDrift makes. */
 const TAG = /<([A-Za-z][\w.]*)((?:\s+[^<>]*?)?)(\/?)>/g;
@@ -194,6 +214,43 @@ export function computeA11y(jsx: string, notes?: string): DriftFinding[] {
       });
     }
 
+    // ── A list rendered as loose lines of prose ────────────────────────────
+    /* The marker is IN the text, which only happens when the list was not
+       recognised as one. The output is a stack of <Body> elements: no list
+       role, no item count, no way to jump by list — WCAG 1.3.1 Info and
+       Relationships. And the glyph is content now, so it is announced.
+
+       Error rather than warning because the fix is structural. Restyling does
+       not recover it; the markup has to change. */
+    if (TYPOGRAPHY.test(t.name)) {
+      const body = innerText(jsx, t);
+      if (body && TYPED_MARKER.test(body)) {
+        findings.push({
+          severity: 'error',
+          kind: 'prose-list',
+          message: `<${t.name}> starts with a list marker, so the text is a list item that was emitted as a paragraph. A screen reader announces no list and no item count, and reads the marker as content. Use <List> + <ListItem>, which render <ul role="list"> with <li> children.`,
+          detail: body.slice(0, 60),
+          where: t.name,
+        });
+      }
+    }
+
+    // ── A list item that kept its typed marker ─────────────────────────────
+    // The structure is right, the text is not: <List> draws the marker, so a
+    // typed one is read out on top of it — "bullet bullet First item".
+    if (t.name === 'ListItem') {
+      const body = innerText(jsx, t);
+      if (body && TYPED_MARKER.test(body)) {
+        findings.push({
+          severity: 'warning',
+          kind: 'double-marker',
+          message: `<ListItem> text still begins with a typed "${body.slice(0, 3).trim()}". <List> renders the marker itself, so this one is duplicate content — visible twice and announced twice.`,
+          detail: body.slice(0, 60),
+          where: 'ListItem',
+        });
+      }
+    }
+
     // ── Images ─────────────────────────────────────────────────────────────
     if (t.name === 'img' && attr(t.attrs, 'alt') === null) {
       findings.push({
@@ -240,6 +297,15 @@ export function computeA11y(jsx: string, notes?: string): DriftFinding[] {
      marker travels with the code and survives being copied, saved or pasted
      into a PR. A separate notes field would be dropped by all three. */
   for (const src of [jsx, notes || '']) {
+    for (const m of src.matchAll(DERIVED_LIST)) {
+      findings.push({
+        severity: 'info',
+        kind: 'derived-list',
+        message: `List structure was inferred from typed markers, not read from the design — ${m[1].trim()}. Confirm these lines are really a list: a line starting with "-" may be a dash. A list authored with Figma's own list control is read rather than guessed and is not reported here.`,
+        detail: m[1].trim().slice(0, 80),
+        where: 'List',
+      });
+    }
     for (const m of src.matchAll(DERIVED_LABEL)) {
       findings.push({
         severity: 'info',

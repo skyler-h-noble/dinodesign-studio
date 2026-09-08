@@ -200,6 +200,65 @@ which is the one thing the file cannot know.
 
 ---
 
+## The third half: lists
+
+A bulleted or numbered list is the other structure that renders perfectly and
+carries no semantics. Its failure mode is the same shape as the accessible
+name: nothing about the output looks wrong.
+
+**Figma draws the marker, so it is not in the string.** A list authored with
+Figma's list control arrives as plain `"First\nSecond\nThird"` — no bullet
+character anywhere. It is therefore indistinguishable from three lines of prose
+by looking at the text, which is the whole problem: the converter, seeing only
+characters, emits three `<Body>` elements. No `role="list"`, no item count
+announced, no way to navigate by list. That is WCAG 1.3.1 Info and
+Relationships, and it is invisible without a screen reader.
+
+So the plugin stamps what Figma knows, in `aaidNodeRecord`:
+
+```
+_aaid.list = { type: "UNORDERED" }              // whole node, one level
+_aaid.list = { type: "ORDERED", indent: 1 }     // whole node, nested
+_aaid.list = { lines: [{t,i},…] }               // per line, when mixed
+```
+
+Read per LINE rather than per node. `node.listOptions` returns `figma.mixed` the
+moment one paragraph is a list and another is not — and that case is the
+ordinary one, not an edge: an intro sentence above three bullets produces it.
+Each line is sampled over its **first character**, which can never be mixed,
+rather than over the line's whole span, which can.
+
+**Three tiers, and only the first is knowledge.**
+
+| Tier | Signal | Confidence |
+| --- | --- | --- |
+| Native Figma list | `_aaid.list` | read, not inferred — no flag |
+| Markers typed into the text | `"• "`, `"1. "` at line start | a guess about intent — flagged |
+| One text node per bullet | sibling analysis | the most guess-prone |
+
+Tier 2 is a judgement: a line starting with `-` may be a dash. So it emits a
+marker in the code, the same convention and for the same reason as
+`DERIVED-ARIA-LABEL`:
+
+```
+// DERIVED-LIST: 3 items on <List> — markers typed as "• " in one text node
+```
+
+and lands as *info*. A tier-1 list is never flagged — there is nothing for a
+human to confirm about a fact.
+
+**Two findings catch what the converter got wrong.** `prose-list` is an
+**error**: a marker surviving inside a `<Body>` proves the text was copied
+verbatim and the list was never recognised, and no amount of restyling recovers
+it — the markup has to change. `double-marker` is a **warning**: the structure
+is right but the item kept its typed bullet, so `<List>` draws one marker and
+the string supplies another, shown twice and announced twice.
+
+No lib gap blocks any of this: `<List>` already renders `<ul role="list">` with
+`<li>` children and takes `component="ol"` (`List.js:343`).
+
+---
+
 ## Why the pairing matters more than the count
 
 A high number of passing checks means nothing if a check compares the wrong two

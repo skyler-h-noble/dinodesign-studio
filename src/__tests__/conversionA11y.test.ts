@@ -174,3 +174,76 @@ describe('shape', () => {
       expect(f.where, f.kind).toBeTruthy();
   });
 });
+
+describe('lists that lost their list-ness', () => {
+  /* Figma DRAWS a native list's marker, so a real list's characters never
+     contain one. A marker surviving into the JSX therefore proves the text was
+     copied verbatim and the list was never recognised — the output is a stack
+     of paragraphs with no list role, no item count, and the glyph read aloud
+     as content. */
+  it('flags a bullet left inside a paragraph', () => {
+    for (const m of ['• First item', '- First item', '* First item', '▪ First item'])
+      expect(kinds(`<Body>${m}</Body>`), m).toContain('prose-list');
+  });
+
+  it('flags a typed number too', () => {
+    for (const m of ['1. First', '2) Second', 'a. Alpha'])
+      expect(kinds(`<Body>${m}</Body>`), m).toContain('prose-list');
+  });
+
+  it('leaves ordinary prose alone', () => {
+    for (const t of [
+      'First item',
+      'A dash-separated word',
+      '3D printing is useful',
+      'Rates dropped 2.5% last year',
+    ]) expect(kinds(`<Body>${t}</Body>`), t).toEqual([]);
+  });
+
+  it('is an error — restyling cannot recover it', () => {
+    // The markup has to change, so it sits at the same severity as an unnamed
+    // control rather than as a warning.
+    const f = computeA11y('<Body>• First item</Body>');
+    expect(f[0].severity).toBe('error');
+  });
+
+  it('catches it in every typography component, not just Body', () => {
+    for (const tag of ['Body', 'BodySmall', 'Caption', 'Label', 'Typography', 'p'])
+      expect(kinds(`<${tag}>• Item</${tag}>`), tag).toContain('prose-list');
+  });
+});
+
+describe('a marker typed on top of a real list', () => {
+  it('warns when a ListItem keeps its own bullet', () => {
+    /* <List> renders the marker itself, so a typed one is duplicate content —
+       shown twice and announced twice. The structure is right, so this is a
+       warning, not the structural error above. */
+    const f = computeA11y('<List><ListItem>• First</ListItem></List>');
+    expect(f.map(x => x.kind)).toContain('double-marker');
+    expect(f.find(x => x.kind === 'double-marker').severity).toBe('warning');
+  });
+
+  it('accepts a clean ListItem', () => {
+    expect(kinds('<List><ListItem>First</ListItem></List>')).toEqual([]);
+  });
+});
+
+describe('lists the converter had to infer', () => {
+  it('reads the DERIVED-LIST marker', () => {
+    const jsx = [
+      '// DERIVED-LIST: 3 items on <List> — markers typed as "• " in one text node',
+      '<List><ListItem>First</ListItem></List>',
+    ].join('\n');
+    const f = computeA11y(jsx).filter(x => x.kind === 'derived-list');
+    expect(f).toHaveLength(1);
+    expect(f[0].severity).toBe('info');
+    expect(f[0].message).toContain('may be a dash');
+  });
+
+  it('stays quiet for a list Figma actually knew about', () => {
+    /* The whole point of stamping _aaid.list: a list authored with Figma's own
+       list control is READ, not guessed, so there is nothing to confirm. Only
+       an inferred one gets a marker, so only an inferred one is reported. */
+    expect(kinds('<List><ListItem>First</ListItem><ListItem>Second</ListItem></List>')).toEqual([]);
+  });
+});
