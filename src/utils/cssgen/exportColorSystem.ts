@@ -21,7 +21,7 @@ import { calculateDefaultThemeSettings, getSelectionName, applyUserSelections } 
 import { generateAllButtonsForMode } from './generateButtons';
 import { generateCompleteButtonSystem } from './generateButtonsSimplified';
 import { generateCompleteSimplifiedSystem } from './completeSimplifiedSystem';
-import { parseBar, toneFor } from '../backgroundSelection';
+import { parseBar, parseBackground, toneFor } from '../backgroundSelection';
 
 // Helper function to convert tone value to Color-X number
 // 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
@@ -496,6 +496,10 @@ interface ColorSystemExport {
         'Theme-Name': { value: string; type: 'string' };
         Theme: { value: string; type: 'string' };
         N: { value: number; type: 'number' };
+        /** The chosen SURFACE LEVEL, not a tone. Figma splits a background
+         *  selection across two mode axes — theme and surface — so the default
+         *  needs a name on each, and a tone cannot name its own level. */
+        Surface: { value: string; type: 'string' };
       };
       'App-Bar': {
         Selection: { value: string; type: 'string' };
@@ -3642,7 +3646,16 @@ export function exportColorSystemToJSON(
           'Default-Theme': {
             'Theme-Name': { value: defaultSettings.defaultThemeName, type: 'string' },
             Theme: { value: defaultSettings.defaultTheme, type: 'string' },
-            N: { value: defaultSettings.defaultN, type: 'number' }
+            N: { value: defaultSettings.defaultN, type: 'number' },
+            /* Resolved through parseBackground rather than inferred from N.
+               A tone cannot name its own level, and the level is what Figma's
+               Surface collection needs in order to know which of its modes is
+               the default. CSS says the same thing a different way, by
+               resolving the whole (theme, level) pair into :root. */
+            Surface: {
+              value: parseBackground(userSelections?.background).surface,
+              type: 'string',
+            }
           },
           'App-Bar': {
             Selection: { value: defaultSettings.appBar, type: 'string' },

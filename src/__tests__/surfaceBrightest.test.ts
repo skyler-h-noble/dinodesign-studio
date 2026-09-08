@@ -19,6 +19,7 @@ import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
 import { generateFigmaJSON, themeOrder } from '../utils/generateFigmaJSON';
+import { parseBackground, toneFor, SURFACE_LEVELS } from '../utils/backgroundSelection';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 import { buildAccessibilityReport } from '../utils/accessibilityReport';
@@ -390,6 +391,49 @@ describe('Surface-Brightest', () => {
     // a mode with no variables behind it.
     expect(themeOrder('BlackWhite')).toEqual(themeOrder(undefined));
     expect(themeOrder('')).toEqual(themeOrder(undefined));
+  });
+
+  it('carries the chosen SURFACE LEVEL, not just its tone', () => {
+    /* Figma splits a background selection across two mode axes — theme and
+       surface — and treats each collection's first mode as its default. So
+       the default needs a NAME on each axis, and N cannot supply the second:
+       a tone does not name its own level.
+
+       This is the pair that replaced the Default theme, and it is what has to
+       line up with the single set of values CSS resolves into :root. */
+    for (const bg of ['primary', 'white', 'black', 'primary-light']) {
+      const built: any = buildAll(SCHEME, { ...(sel as any), background: bg } as never, 'light');
+      const dt = built.json.Metadata?.['Default-Settings']?.['Default-Theme'];
+      const expected = parseBackground(bg);
+      expect([bg, dt?.Surface?.value]).toEqual([bg, expected.surface]);
+      expect([bg, dt?.Theme?.value]).toEqual([bg, expected.theme]);
+      expect(SURFACE_LEVELS as readonly string[]).toContain(dt?.Surface?.value);
+    }
+  });
+
+  it('the default pair is the one CSS resolves into :root', () => {
+    /* The sync that matters. CSS has no default-mode concept, so it bakes the
+       whole (theme, level) pair into :root; Figma names each half as the first
+       mode of its collection. If the two halves disagree with the pair, a
+       layer with no modes set and an element with no data-theme show different
+       colours — and both sides look self-consistent, which is exactly how the
+       last divergence survived a passing parity suite. */
+    for (const bg of ['primary', 'white', 'primary-light']) {
+      const built: any = buildAll(SCHEME, { ...(sel as any), background: bg } as never, 'light');
+      const dt = built.json.Metadata?.['Default-Settings']?.['Default-Theme'];
+      const pair = parseBackground(bg);
+
+      // Figma half 1: the Theme collection leads on the chosen theme.
+      const figThemes = themeOrder(dt?.Theme?.value);
+      expect([bg, figThemes[0]]).toEqual([bg, pair.theme]);
+
+      // Figma half 2: the Surface collection leads on the chosen level.
+      expect([bg, dt?.Surface?.value]).toEqual([bg, pair.surface]);
+
+      // CSS: the same pair resolved to one tone, which :root carries.
+      expect([bg, dt?.N?.value])
+        .toEqual([bg, toneFor(pair.theme as never, pair.surface as never, dt?.N?.value)]);
+    }
   });
 
   it('gives every Figma theme all five surfaces', () => {
