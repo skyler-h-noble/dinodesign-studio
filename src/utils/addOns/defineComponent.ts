@@ -95,15 +95,36 @@ export interface NodeDef {
   children?: NodeDef[];
 }
 
+/** What makes a condition true.
+ *
+ *  Not decoration — the two compile to different machinery and neither can
+ *  stand in for the other:
+ *
+ *    device  the viewport implies it → a media query in CSS, a Device-Sizes
+ *            mode in Figma. Known before anything renders.
+ *    scroll  the page position implies it → a scroll or intersection listener
+ *            in React, and in Figma only a mode a designer flips by hand to
+ *            see the state. There is no CSS that expresses it.
+ *
+ *  Recording the trigger keeps the React compiler from emitting a breakpoint
+ *  for something a breakpoint cannot detect. */
+export type ConditionTrigger = 'device' | 'scroll';
+
+export interface ConditionDef {
+  description: string;
+  trigger: ConditionTrigger;
+}
+
 export interface ComponentDefinition {
   /** Stable id — the add-on id, never changes once shipped. */
   id: string;
   label: string;
   schemaVersion: 1;
-  /** Booleans the component reads, with what each means. Declared up front so
-   *  both compilers agree on the set, and so a breakpoint cannot be invented
-   *  by a typo in a `when`. */
-  conditions?: Record<string, string>;
+  /** Booleans the component reads. Declared up front so both compilers agree
+   *  on the set, and so a breakpoint cannot be invented by a typo in a
+   *  `when` — a layer bound to a variable that does not exist never shows and
+   *  never errors. */
+  conditions?: Record<string, ConditionDef>;
   root: NodeDef;
 }
 
@@ -123,8 +144,10 @@ export const slotBar: ComponentDefinition = {
        shared by every add-on. The collection name is not part of a variable's
        name, so this resolves as Add-Ons → Adaptive-Nav/Show-Divider — group
        included, collection excluded, the same shape as Surface/Background. */
-    'Adaptive-Nav/Show-Divider':
-      'Hairline under the bar. Off when the bar sits on its own surface.',
+    'Adaptive-Nav/Show-Divider': {
+      description: 'Hairline under the bar. Off when the bar sits on its own surface.',
+      trigger: 'device',
+    },
   },
   root: {
     name: 'Slot Bar',

@@ -194,3 +194,41 @@ describe('hero with sticky tabs', () => {
     expect(bar!.sticky).toBe(true);
   });
 });
+
+describe('the condensed state is scroll-driven, not width-driven', () => {
+  it('is declared with a scroll trigger', () => {
+    /* The distinction is not decoration: no media query can detect scroll
+       position, so a compiler that treated this like the device conditions
+       would emit a breakpoint for a state a breakpoint cannot see. */
+    expect(NAV_CONDITIONS['Adaptive-Nav/Show-Condensed'].trigger).toBe('scroll');
+    for (const name of Object.keys(NAV_CONDITIONS)) {
+      if (name === 'Adaptive-Nav/Show-Condensed') continue;
+      expect(NAV_CONDITIONS[name].trigger, name).toBe('device');
+    }
+  });
+
+  it('puts brand and actions behind it, not in the bar outright', () => {
+    /* Unconditional, they would show while the hero is still on screen —
+       duplicating what the hero already shows, which is why the plain hero
+       bar carries no brand at all. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'hero', avatar: true, condensed: true }));
+    const bar = spec.root.children.find((c: any) => c.name === 'Bar');
+    const find = (n: any, name: string): any =>
+      n.name === name ? n : (n.children || []).map((c: any) => find(c, name)).find(Boolean);
+    expect(find(bar, 'Condensed-Brand').visibleWhen).toBe('Adaptive-Nav/Show-Condensed');
+    expect(find(bar, 'End').visibleWhen).toBe('Adaptive-Nav/Show-Condensed');
+  });
+
+  it('is absent entirely when not asked for', () => {
+    const spec: any = toAddonSpec(navDefinition({ layout: 'hero', avatar: true }));
+    expect(JSON.stringify(spec)).not.toContain('Condensed');
+  });
+
+  it('only the hero layout offers it', () => {
+    // The other three have no hero to scroll past.
+    for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
+      const spec = toAddonSpec(navDefinition({ layout: l, condensed: true, avatar: true }));
+      expect(JSON.stringify(spec), l).not.toContain('Condensed');
+    }
+  });
+});

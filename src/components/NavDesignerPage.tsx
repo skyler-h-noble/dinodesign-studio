@@ -21,85 +21,7 @@ import {
   navDefinition, NAV_LAYOUTS, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
 import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
-
-/** One row of the schematic: a labelled box sized like the slot it stands for. */
-function SlotBox({ label, grow, muted }: { label: string; grow?: boolean; muted?: boolean }) {
-  return (
-    <div
-      data-surface={muted ? 'Surface-Dim' : 'Container'}
-      style={{
-        flex: grow ? 1 : '0 0 auto',
-        minWidth: grow ? 0 : 88,
-        padding: 'var(--Sizing-2, 8px) var(--Sizing-3, 12px)',
-        borderRadius: 'var(--Card-Radius, 8px)',
-        border: '1px solid var(--Border)',
-        background: 'var(--Background)',
-        textAlign: 'center',
-      }}
-    >
-      <Caption color="quiet">{label}</Caption>
-    </div>
-  );
-}
-
-function Schematic({ options }: { options: NavOptions }) {
-  const right = [
-    options.search && 'Search',
-    options.actions && 'Actions',
-    options.avatar && 'Avatar',
-  ].filter(Boolean) as string[];
-
-  const bar = (
-    <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', width: '100%' }}>
-      {options.layout === 'hero' ? (
-        <div style={{ flex: 1 }}><SlotBox label="Tabs / Menu" grow /></div>
-      ) : options.layout === 'brand-centre' ? (
-        <>
-          <SlotBox label="Tabs / Menu" />
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <SlotBox label="Brand" />
-          </div>
-        </>
-      ) : (
-        <>
-          <SlotBox label="Brand" />
-          {options.layout === 'rail'
-            ? <div style={{ flex: 1 }} />
-            : <div style={{ flex: 1 }}><SlotBox label="Tabs / Menu" grow /></div>}
-        </>
-      )}
-      {right.length
-        ? right.map((r) => <SlotBox key={r} label={r} />)
-        : <SlotBox label="End (empty)" muted />}
-    </HStack>
-  );
-
-  return (
-    <div
-      data-surface="Surface"
-      style={{
-        border: '1px solid var(--Border)',
-        borderRadius: 'var(--Card-Radius, 8px)',
-        padding: 'var(--Sizing-2, 8px)',
-        background: 'var(--Background)',
-      }}
-    >
-      {options.layout === 'hero' ? (
-        <VStack gap="var(--Sizing-2)">
-          <div style={{ minHeight: 72, display: 'flex' }}>
-            <SlotBox label="Hero (add-on)" grow muted />
-          </div>
-          {bar}
-        </VStack>
-      ) : options.layout === 'rail' ? (
-        <HStack gap="var(--Sizing-2)" style={{ alignItems: 'stretch' }}>
-          <div style={{ width: 96 }}><SlotBox label="Rail" muted /></div>
-          <div style={{ flex: 1 }}>{bar}</div>
-        </HStack>
-      ) : bar}
-    </div>
-  );
-}
+import NavLayoutPreview from './NavLayoutPreview';
 
 export default function NavDesignerPage() {
   const [options, setOptions] = useState<NavOptions>({
@@ -133,16 +55,39 @@ export default function NavDesignerPage() {
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Layout</H4>
-              <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
-                {NAV_LAYOUTS.map((l) => (
-                  <Button
-                    key={l.id}
-                    variant={options.layout === l.id ? 'default' : 'default-outline'}
-                    onClick={() => set('layout', l.id as NavLayout)}
-                  >
-                    {l.label}
-                  </Button>
-                ))}
+              {/* Diagrams rather than words: four layouts differ in where the
+                  parts sit, which a name cannot show and a picture can. */}
+              <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap', alignItems: 'stretch' }}>
+                {NAV_LAYOUTS.map((l) => {
+                  const selected = options.layout === l.id;
+                  return (
+                    <div
+                      key={l.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={selected}
+                      aria-label={l.label}
+                      onClick={() => set('layout', l.id as NavLayout)}
+                      onKeyDown={(e) => {
+                        // A div taking a click has to take Enter and Space too,
+                        // or the picker is unreachable from the keyboard.
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); set('layout', l.id as NavLayout); }
+                      }}
+                      style={{
+                        flex: '1 1 200px', minWidth: 180, cursor: 'pointer',
+                        padding: 'var(--Sizing-1, 4px)',
+                        borderRadius: 'var(--Card-Radius, 8px)',
+                        border: '2px solid ' + (selected ? 'var(--Buttons-Primary-Border)' : 'var(--Border-Variant)'),
+                        outlineOffset: 2,
+                      }}
+                    >
+                      <NavLayoutPreview layout={l.id as NavLayout} options={options} />
+                      <div style={{ padding: 'var(--Sizing-1, 4px) var(--Sizing-2, 8px)' }}>
+                        <Label>{l.label}</Label>
+                      </div>
+                    </div>
+                  );
+                })}
               </HStack>
               <BodySmall color="quiet">
                 {NAV_LAYOUTS.find((l) => l.id === options.layout)?.description}
@@ -153,11 +98,14 @@ export default function NavDesignerPage() {
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Preview</H4>
-              <Schematic options={options} />
+              <div style={{ maxWidth: 480 }}>
+                <NavLayoutPreview layout={options.layout} options={options} />
+              </div>
               <Caption color="quiet">
-                A schematic, not the component. Drawing the real thing here would be a
+                A diagram, not the component. Drawing the real thing here would be a
                 second implementation of the layout, and the two would disagree the
-                moment either changed.
+                moment either changed. Faded parts are the condensed state — present,
+                but not until the hero has scrolled past.
               </Caption>
             </VStack>
           </Card>
@@ -182,6 +130,23 @@ export default function NavDesignerPage() {
                 onChange={(e: { target: { checked: boolean } }) => set('sticky', e.target.checked)}
                 label="Sticky"
               />
+              {options.layout === 'hero' && (
+                <>
+                  <Divider />
+                  <SwitchInput
+                    checked={!!options.condensed}
+                    onChange={(e: { target: { checked: boolean } }) => set('condensed', e.target.checked)}
+                    label="Brand and actions animate in when stuck"
+                  />
+                  <Caption color="quiet">
+                    A SCROLL condition, not a width one — no media query can detect it, so
+                    it compiles to a scroll listener in React and to a mode a designer
+                    flips by hand in Figma. Without it the strip carries navigation only,
+                    because showing the brand before the hero scrolls past would show it
+                    twice.
+                  </Caption>
+                </>
+              )}
               <Caption color="quiet">
                 {options.layout === 'hero'
                   ? 'Intrinsic to this layout: tabs under a hero that do not stick are simply tabs under a hero. Sticky sits on the tab strip, not the whole nav — the hero scrolls away.'

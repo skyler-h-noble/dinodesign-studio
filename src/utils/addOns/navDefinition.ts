@@ -25,7 +25,7 @@
  * ignored by toAddonSpec — a flag that means nothing on one target is better
  * than a fake frame that pretends to mean something.
  */
-import { t, type ComponentDefinition, type NodeDef, type TokenRef } from './defineComponent';
+import { t, type ComponentDefinition, type ConditionDef, type NodeDef, type TokenRef } from './defineComponent';
 
 export type NavLayout = 'brand-left' | 'brand-centre' | 'rail' | 'hero';
 
@@ -37,6 +37,8 @@ export interface NavOptions {
   avatar?: boolean;
   /** React-only; see the note above. */
   sticky?: boolean;
+  /** Hero only: brand and actions animate into the strip once it sticks. */
+  condensed?: boolean;
 }
 
 export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[] = [
@@ -51,11 +53,33 @@ export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[
  *  Declared in one place so both compilers agree on the set and a breakpoint
  *  cannot be invented by a typo in a `when` — a layer bound to a variable that
  *  does not exist never shows and never errors. */
-export const NAV_CONDITIONS: Record<string, string> = {
-  'Adaptive-Nav/Show-Rail': 'The side rail. Off below the width where a rail costs more than it gives.',
-  'Adaptive-Nav/Show-Tabs': 'Inline tabs. Off once they no longer fit, which is what the menu button replaces.',
-  'Adaptive-Nav/Show-Menu-Button': 'The menu button that opens navigation as a drawer. The counterpart of Show-Tabs.',
-  'Adaptive-Nav/Show-Search': 'Search in the bar. Off when it collapses to an icon.',
+export const NAV_CONDITIONS: Record<string, ConditionDef> = {
+  'Adaptive-Nav/Show-Rail': {
+    description: 'The side rail. Off below the width where a rail costs more than it gives.',
+    trigger: 'device',
+  },
+  'Adaptive-Nav/Show-Tabs': {
+    description: 'Inline tabs. Off once they no longer fit, which is what the menu button replaces.',
+    trigger: 'device',
+  },
+  'Adaptive-Nav/Show-Menu-Button': {
+    description: 'The menu button that opens navigation as a drawer. The counterpart of Show-Tabs.',
+    trigger: 'device',
+  },
+  'Adaptive-Nav/Show-Search': {
+    description: 'Search in the bar. Off when it collapses to an icon.',
+    trigger: 'device',
+  },
+  /* SCROLL, not width — and that is the whole reason the trigger is recorded.
+     No media query can detect it, so a compiler that treated this like the
+     others would emit a breakpoint for a state a breakpoint cannot see. In
+     Figma it is a mode a designer flips by hand to view the condensed state. */
+  'Adaptive-Nav/Show-Condensed': {
+    description:
+      'Brand and actions in the sticky strip, once the hero has scrolled past. '
+      + 'Driven by scroll position, not viewport width.',
+    trigger: 'scroll',
+  },
 };
 
 const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => ({
@@ -117,10 +141,19 @@ function bar(o: NavOptions): NodeDef {
        here would show it twice until the bar sticks — and then show it twice
        anyway, because nothing removes the hero's copy on scroll. Navigation
        leads instead. */
+    /* Condensed adds the brand and actions BEHIND a scroll condition rather
+       than unconditionally. Unconditional, they would show while the hero is
+       still on screen — duplicating what the hero already shows — which is the
+       reason the plain hero bar carries no brand at all. */
+    const start: NodeDef[] = [];
+    if (o.condensed) start.push(slot('Condensed-Brand', 'hug', 'Adaptive-Nav/Show-Condensed'));
+    start.push(...navigationSlots());
     children = [
       { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-        width: 'fill', height: 'hug', children: navigationSlots() },
-      endSlot(o),
+        width: 'fill', height: 'hug', children: start },
+      o.condensed
+        ? { ...endSlot(o), presence: { when: 'Adaptive-Nav/Show-Condensed' } }
+        : endSlot(o),
     ];
   } else if (o.layout === 'rail') {
     // Navigation lives in the rail, so the bar carries no tabs at all.
