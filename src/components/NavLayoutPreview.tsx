@@ -56,14 +56,19 @@ export default function NavLayoutPreview(
       {/* The page. */}
       <rect x="0" y="0" width={W} height={H} rx="6" fill="var(--Background)" stroke="var(--Border)" />
 
-      {/* Hero: a filled block the tab strip sits under. */}
+      {/* Hero: a filled block the tab strip sits under.
+          --Border-Variant, because this is DECORATION — the token documented as
+          carrying no contrast requirement. --Hover is a state and --Container a
+          surface; borrowing either to shade a diagram gives it a meaning it
+          does not have, and surfaces are supposed to come from data-surface
+          rather than being named directly. */}
       {layout === 'hero' && (
-        <rect x="6" y="6" width={W - 12} height="46" rx="4" fill="var(--Hover)" />
+        <rect x="6" y="6" width={W - 12} height="46" rx="4" fill="var(--Border-Variant)" />
       )}
 
       {/* Rail: full height down the side, which is why it is drawn outside the bar. */}
       {layout === 'rail' && (
-        <rect x="6" y="6" width="28" height={H - 12} rx="4" fill="var(--Hover)" />
+        <rect x="6" y="6" width="28" height={H - 12} rx="4" fill="var(--Border-Variant)" />
       )}
 
       {/* The bar itself. On hero it sits below and is the part that sticks. */}
@@ -73,7 +78,7 @@ export default function NavLayoutPreview(
         width={(layout === 'rail' ? W - 46 : W - 12)}
         height="28"
         rx="4"
-        fill={layout === 'hero' ? 'var(--Container)' : 'transparent'}
+        fill="transparent"
         stroke={layout === 'hero' ? 'var(--Border)' : 'none'}
       />
 
