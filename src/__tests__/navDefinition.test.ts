@@ -22,12 +22,22 @@ describe('three layouts, one component', () => {
     for (const l of ALL) expect(navDefinition({ layout: l }).id).toBe('adaptive-nav');
   });
 
-  it('all three carry a Bar with start, centre and end', () => {
+  it('every layout carries a Bar with a Start and an End', () => {
     for (const l of ALL) {
       const n = names(toAddonSpec(full(l)));
       expect(n, l).toContain('Bar');
-      for (const slot of ['Start', 'Center', 'End']) expect(n, `${l}/${slot}`).toContain(slot);
+      for (const slot of ['Start', 'End']) expect(n, `${l}/${slot}`).toContain(slot);
     }
+  });
+
+  it('a Center exists only where there is a middle region', () => {
+    /* Hero has two regions, not three: navigation leads and fills, actions sit
+       at the end. Inventing an empty Center for symmetry would put a slot in
+       the file that means nothing and can still be filled. */
+    for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
+      expect(names(toAddonSpec(full(l))), l).toContain('Center');
+    }
+    expect(names(toAddonSpec(full('hero')))).not.toContain('Center');
   });
 });
 
@@ -132,5 +142,55 @@ describe('optional slots', () => {
     const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left', avatar: true }));
     expect(names(spec)).toContain('Avatar');
     expect(names(spec)).not.toContain('Search');
+  });
+});
+
+describe('hero with sticky tabs', () => {
+  it('the hero is a SLOT, not a structure', () => {
+    /* It is a separate add-on. Defining its internals here would be a second
+       definition of the same thing to keep in step. */
+    const spec: any = toAddonSpec(full('hero'));
+    const hero = spec.root.children.find((c: any) => c.name === 'Hero');
+    expect(hero).toBeTruthy();
+    expect(hero.children).toBeUndefined();
+    expect(hero.layoutSizingHorizontal).toBe('FILL');
+  });
+
+  it('the tab strip sits UNDER the hero', () => {
+    const spec: any = toAddonSpec(full('hero'));
+    expect(spec.root.layoutMode).toBe('VERTICAL');
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Hero', 'Bar']);
+  });
+
+  it('carries no brand in the bar', () => {
+    /* The brand belongs to the hero. Repeating it would show it twice before
+       the bar sticks — and still twice after, since nothing removes the
+       hero's copy on scroll. */
+    const spec: any = toAddonSpec(full('hero'));
+    const bar = spec.root.children.find((c: any) => c.name === 'Bar');
+    expect(names(bar)).not.toContain('Brand');
+    expect(names(bar)).toContain('Tabs');
+  });
+
+  it('sticky is on the BAR, not the component', () => {
+    /* The hero scrolls away and only the tabs stay. A component-level flag
+       cannot say which part remains, and applied to the root it would pin the
+       hero to the viewport — the opposite of the pattern. */
+    const def = navDefinition({ layout: 'hero' });
+    const bar = def.root.children!.find((c) => c.name === 'Bar');
+    expect(bar!.sticky).toBe(true);
+    expect(def.root.sticky).toBeUndefined();
+  });
+
+  it('and never reaches the spec', () => {
+    // Figma has no scroll behaviour.
+    expect(JSON.stringify(toAddonSpec(full('hero')))).not.toContain('sticky');
+  });
+
+  it('is intrinsic, not an option', () => {
+    // Tabs under a hero that do not stick are simply tabs under a hero.
+    const off = navDefinition({ layout: 'hero', sticky: false });
+    const bar = off.root.children!.find((c) => c.name === 'Bar');
+    expect(bar!.sticky).toBe(true);
   });
 });

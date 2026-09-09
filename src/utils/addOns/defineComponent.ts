@@ -80,6 +80,17 @@ export interface NodeDef {
    *  which is why it cannot be stored as a paint. */
   surface?: string;
   presence?: Presence;
+  /** Sticks to the top of the scroll container once it reaches it.
+   *
+   *  A property of THIS node, not of the component. In a hero layout the hero
+   *  scrolls away and only the tab strip sticks, so a component-level flag
+   *  could not say which part stays — and getting that wrong pins the hero to
+   *  the viewport, which is the opposite of the pattern.
+   *
+   *  React-only: Figma has no scroll behaviour, so toAddonSpec drops it. A
+   *  flag that means nothing on one target is better than a frame pretending
+   *  to mean something. */
+  sticky?: boolean;
   text?: string;
   children?: NodeDef[];
 }

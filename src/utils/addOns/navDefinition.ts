@@ -27,7 +27,7 @@
  */
 import { t, type ComponentDefinition, type NodeDef, type TokenRef } from './defineComponent';
 
-export type NavLayout = 'brand-left' | 'brand-centre' | 'rail';
+export type NavLayout = 'brand-left' | 'brand-centre' | 'rail' | 'hero';
 
 export interface NavOptions {
   layout: NavLayout;
@@ -43,6 +43,7 @@ export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[
   { id: 'brand-left',   label: 'Brand left',    description: 'Brand, then tabs, then actions on the right.' },
   { id: 'brand-centre', label: 'Brand centred', description: 'Tabs or a menu button on the left, brand centred, actions right.' },
   { id: 'rail',         label: 'Left rail',     description: 'Brand and actions in the bar, navigation in a rail down the side.' },
+  { id: 'hero',         label: 'Hero + sticky tabs', description: 'A hero area with the tab strip beneath it, which sticks once it reaches the top.' },
 ];
 
 /** Every boolean the nav reads, with what each means.
@@ -111,6 +112,16 @@ function bar(o: NavOptions): NodeDef {
         width: 'fill', height: 'hug', children: [brand] },
       endSlot(o),
     ];
+  } else if (o.layout === 'hero') {
+    /* No brand in the bar: it belongs to the hero slot above, and repeating it
+       here would show it twice until the bar sticks — and then show it twice
+       anyway, because nothing removes the hero's copy on scroll. Navigation
+       leads instead. */
+    children = [
+      { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
+        width: 'fill', height: 'hug', children: navigationSlots() },
+      endSlot(o),
+    ];
   } else if (o.layout === 'rail') {
     // Navigation lives in the rail, so the bar carries no tabs at all.
     children = [
@@ -143,7 +154,50 @@ function bar(o: NavOptions): NodeDef {
   };
 }
 
+/**
+ * Hero, with the tab strip beneath it.
+ *
+ * The hero itself is a SLOT — it is a separate add-on, and duplicating its
+ * structure here would be a second definition of the same thing to keep in
+ * step.
+ *
+ * Stickiness sits on the Bar rather than the component. In the other three
+ * layouts the whole nav sticks or does not; here the hero scrolls away and
+ * only the tabs stay, so a component-level flag could not express which part
+ * remains — and applied to the root it would pin the hero to the viewport,
+ * which is the opposite of the pattern.
+ */
+function heroRoot(o: NavOptions): NodeDef {
+  return {
+    name: 'Adaptive Nav',
+    kind: 'stack',
+    direction: 'column',
+    width: 'fill',
+    height: 'hug',
+    surface: 'Surface',
+    children: [
+      slot('Hero', 'fill'),
+      {
+        ...bar(o),
+        // Intrinsic to the pattern, not optional: tabs that do not stick are
+        // simply tabs under a hero.
+        sticky: true,
+      },
+    ],
+  };
+}
+
 export function navDefinition(o: NavOptions): ComponentDefinition {
+  if (o.layout === 'hero') {
+    return {
+      id: 'adaptive-nav',
+      label: 'Adaptive Nav',
+      schemaVersion: 1,
+      conditions: NAV_CONDITIONS,
+      root: heroRoot(o),
+    };
+  }
+
   const root: NodeDef = {
     name: 'Adaptive Nav',
     kind: 'stack',

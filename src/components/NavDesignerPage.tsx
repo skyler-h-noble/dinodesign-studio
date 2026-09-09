@@ -51,7 +51,9 @@ function Schematic({ options }: { options: NavOptions }) {
 
   const bar = (
     <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', width: '100%' }}>
-      {options.layout === 'brand-centre' ? (
+      {options.layout === 'hero' ? (
+        <div style={{ flex: 1 }}><SlotBox label="Tabs / Menu" grow /></div>
+      ) : options.layout === 'brand-centre' ? (
         <>
           <SlotBox label="Tabs / Menu" />
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -82,7 +84,14 @@ function Schematic({ options }: { options: NavOptions }) {
         background: 'var(--Background)',
       }}
     >
-      {options.layout === 'rail' ? (
+      {options.layout === 'hero' ? (
+        <VStack gap="var(--Sizing-2)">
+          <div style={{ minHeight: 72, display: 'flex' }}>
+            <SlotBox label="Hero (add-on)" grow muted />
+          </div>
+          {bar}
+        </VStack>
+      ) : options.layout === 'rail' ? (
         <HStack gap="var(--Sizing-2)" style={{ alignItems: 'stretch' }}>
           <div style={{ width: 96 }}><SlotBox label="Rail" muted /></div>
           <div style={{ flex: 1 }}>{bar}</div>
@@ -168,13 +177,15 @@ export default function NavDesignerPage() {
               )}
               <Divider />
               <SwitchInput
-                checked={!!options.sticky}
+                checked={options.layout === 'hero' ? true : !!options.sticky}
+                disabled={options.layout === 'hero'}
                 onChange={(e: { target: { checked: boolean } }) => set('sticky', e.target.checked)}
                 label="Sticky"
               />
               <Caption color="quiet">
-                Sticky reaches the React component only. Figma has no scroll behaviour,
-                so it is left out of the spec rather than faked as a frame.
+                {options.layout === 'hero'
+                  ? 'Intrinsic to this layout: tabs under a hero that do not stick are simply tabs under a hero. Sticky sits on the tab strip, not the whole nav — the hero scrolls away.'
+                  : 'Reaches the React component only. Figma has no scroll behaviour, so it is left out of the spec rather than faked as a frame.'}
               </Caption>
             </VStack>
           </Card>
