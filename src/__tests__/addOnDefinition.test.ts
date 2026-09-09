@@ -69,7 +69,7 @@ describe('conditional parts bind rather than resolve', () => {
   it('an optional part becomes visibleWhen, not visible:false', () => {
     /* Setting the literal would bake whichever state the author had active —
        the snapshot problem that loses most of a responsive design. */
-    expect(divider.visibleWhen).toBe('Show-Divider');
+    expect(divider.visibleWhen).toBe('Adaptive-Nav/Show-Divider');
     expect(divider.visible).toBeUndefined();
   });
 
@@ -94,7 +94,7 @@ describe('the tokens it needs are knowable before publishing', () => {
        silently unbound — no error, just a component that looks subtly wrong.
        Enumerating them is what allows a pre-publish check. */
     expect(tokensUsed(slotBar)).toEqual([
-      'Show-Divider',
+      'Adaptive-Nav/Show-Divider',
       'Sizing-2',
       'Sizing-3',
       'Sizing-Quarter',
@@ -117,6 +117,6 @@ describe('the tokens it needs are knowable before publishing', () => {
   it('conditions are listed as tokens the file must have', () => {
     // Omitting them let a definition pass a token check and still import with
     // its conditional parts unbound.
-    expect(tokensUsed(slotBar)).toContain('Show-Divider');
+    expect(tokensUsed(slotBar)).toContain('Adaptive-Nav/Show-Divider');
   });
 });

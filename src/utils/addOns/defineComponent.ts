@@ -108,7 +108,12 @@ export const slotBar: ComponentDefinition = {
   label: 'Slot Bar',
   schemaVersion: 1,
   conditions: {
-    'Show-Divider': 'Hairline under the bar. Off when the bar sits on its own surface.',
+    /* Grouped, because a bare 'Show-Divider' is too generic for a namespace
+       shared by every add-on. The collection name is not part of a variable's
+       name, so this resolves as Add-Ons → Adaptive-Nav/Show-Divider — group
+       included, collection excluded, the same shape as Surface/Background. */
+    'Adaptive-Nav/Show-Divider':
+      'Hairline under the bar. Off when the bar sits on its own surface.',
   },
   root: {
     name: 'Slot Bar',
@@ -144,7 +149,7 @@ export const slotBar: ComponentDefinition = {
         width: 'fill',
         height: { fixed: t('Sizing-Quarter') },
         surface: 'Surface-Dim',
-        presence: { when: 'Show-Divider' },
+        presence: { when: 'Adaptive-Nav/Show-Divider' },
       },
     ],
   },
