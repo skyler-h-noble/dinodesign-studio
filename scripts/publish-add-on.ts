@@ -12,22 +12,23 @@
  *   npx tsx scripts/publish-add-on.ts slot-bar
  *   npx tsx scripts/publish-add-on.ts slot-bar --write
  *
- * Auth: publishAddOn requires an admin's Firebase ID token, and a service
- * account does not have one. So this mints a custom token for an admin uid
- * with the Admin SDK and exchanges it for an ID token — the same exchange the
- * Figma plugin does when it signs in. Application Default Credentials:
- *   gcloud auth application-default login
+ * Auth: publishAddOn wants an admin's Firebase ID token, so this signs in as
+ * the admin with email and password — the same way the Figma plugin does, and
+ * the reason scripts/set-admin-password.cjs exists ("so the admin Figma plugin
+ * can sign them in via email + password").
+ *
+ * It does NOT mint a custom token. createCustomToken has to SIGN a JWT, which
+ * user-level Application Default Credentials cannot do; the Admin SDK then
+ * looks for a service account, falls through to the GCE metadata server and
+ * fails with ENOTFOUND on a laptop. Signing in as the user needs no service
+ * account, no signBlob permission and no ADC at all.
+ *
+ * Set ADDON_ADMIN_EMAIL to skip the email prompt. The password is always
+ * prompted and never echoed.
  */
-import { createRequire } from 'node:module';
-import * as path from 'node:path';
 import { slotBar } from '../src/utils/addOns/defineComponent';
 import { toAddonSpec, tokensUsed } from '../src/utils/addOns/toAddonSpec';
 import type { ComponentDefinition } from '../src/utils/addOns/defineComponent';
-
-const require = createRequire(import.meta.url);
-// firebase-admin lives in functions/node_modules, not at the root — same
-// resolution the other scripts use rather than installing it twice.
-const admin = require(path.resolve(process.cwd(), 'functions', 'node_modules', 'firebase-admin'));
 
 const FN_BASE = 'https://us-central1-dino-design.cloudfunctions.net';
 const API_KEY = 'AIzaSyAy-2SAGKOqCiIdsCG4G7UHZWhTUhH4kkw';   // public web key
@@ -37,26 +38,74 @@ const DEFINITIONS: Record<string, ComponentDefinition> = {
   [slotBar.id]: slotBar,
 };
 
-async function adminIdToken(): Promise<string> {
-  /* The admin is looked up rather than hardcoded: admin status is a Firestore
-     flag at users/{uid}.isAdmin, so adding or removing one is a field flip and
-     a name baked in here would go stale silently. */
-  const snap = await admin.firestore().collection('users').where('isAdmin', '==', true).limit(1).get();
-  if (snap.empty) throw new Error('No user has isAdmin: true — cannot publish.');
-  const uid = snap.docs[0].id;
+const CTRL_C = String.fromCharCode(0x03);
+const CTRL_D = String.fromCharCode(0x04);
+const BACKSPACE = String.fromCharCode(0x7f);
 
-  const customToken = await admin.auth().createCustomToken(uid);
+/** Reads a line without echoing it. Same handling as set-admin-password.cjs,
+ *  including Ctrl-C, so a mistyped password can be abandoned cleanly. */
+function promptHidden(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stdout.write(question);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+    let value = '';
+    const handler = (raw: Buffer | string) => {
+      const char = raw.toString();
+      if (char === '\n' || char === '\r' || char === CTRL_D) {
+        process.stdout.write('\n');
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        process.stdin.removeListener('data', handler);
+        resolve(value);
+        return;
+      }
+      if (char === CTRL_C) { process.stdout.write('\n'); process.exit(130); }
+      if (char === BACKSPACE) {
+        if (value.length) { value = value.slice(0, -1); process.stdout.write('\b \b'); }
+        return;
+      }
+      value += char;
+      process.stdout.write('*');
+    };
+    process.stdin.on('data', handler);
+  });
+}
+
+function promptLine(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stdout.write(question);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+    const handler = (raw: Buffer | string) => {
+      process.stdin.pause();
+      process.stdin.removeListener('data', handler);
+      resolve(raw.toString().trim());
+    };
+    process.stdin.on('data', handler);
+  });
+}
+
+async function adminIdToken(): Promise<string> {
+  const email = process.env.ADDON_ADMIN_EMAIL || await promptLine('  admin email: ');
+  const password = await promptHidden('  password: ');
+
   const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${API_KEY}`,
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: customToken, returnSecureToken: true }),
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
     },
   );
-  if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
-  const data = await res.json() as { idToken: string };
-  console.log(`  signing in as admin uid ${uid}`);
+  const data = await res.json() as { idToken?: string; error?: { message?: string } };
+  if (!res.ok || !data.idToken) {
+    /* publishAddOn checks users/{uid}.isAdmin separately, so signing in is
+       only half of it — a valid non-admin account gets a clear 403 from the
+       endpoint rather than failing here. */
+    throw new Error(`Sign-in failed: ${(data.error && data.error.message) || res.status}`);
+  }
   return data.idToken;
 }
 
@@ -94,7 +143,6 @@ async function main() {
     return;
   }
 
-  admin.initializeApp({ projectId: 'dino-design' });
   const idToken = await adminIdToken();
 
   const res = await fetch(`${FN_BASE}/publishAddOn`, {
