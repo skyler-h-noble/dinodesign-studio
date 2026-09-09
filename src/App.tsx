@@ -53,6 +53,7 @@ import MyDesignsPage from './components/MyDesignsPage';
 import AdminProposals from './components/AdminProposals';
 import TypographyTestPage from './components/TypographyTestPage';
 import AaidWorkbenchPage from './components/AaidWorkbenchPage';
+import NavDesignerPage from './components/NavDesignerPage';
 
 /**
  * Re-map a scheme's tone palettes onto a new role order.
@@ -1109,6 +1110,7 @@ function App() {
         <Route path="/admin/proposals" element={<AdminProposals />} />
         <Route path="/test/typography" element={<TypographyTestPage />} />
         <Route path="/admin/aaid-workbench" element={<AaidWorkbenchPage />} />
+        <Route path="/add-ons/nav" element={<NavDesignerPage />} />
       </Routes>
     </BrowserRouter>
     </OmniDesignProvider>
