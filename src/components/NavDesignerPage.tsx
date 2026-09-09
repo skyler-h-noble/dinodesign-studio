@@ -22,6 +22,7 @@ import {
 } from '../utils/addOns/navDefinition';
 import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
 import NavLayoutPreview from './NavLayoutPreview';
+import DefinitionRenderer from './DefinitionRenderer';
 
 export default function NavDesignerPage() {
   const [options, setOptions] = useState<NavOptions>({
@@ -33,10 +34,24 @@ export default function NavDesignerPage() {
 
   /* Recomputed from the definition rather than tracked alongside it, so what
      is shown is always what would be published. */
-  const { spec, tokens } = useMemo(() => {
+  const { definition, spec, tokens } = useMemo(() => {
     const def = navDefinition(options);
-    return { spec: toAddonSpec(def), tokens: tokensUsed(def) };
+    return { definition: def, spec: toAddonSpec(def), tokens: tokensUsed(def) };
   }, [options]);
+
+  /* Which conditions are true in the preview. Defaults to the widest state —
+     everything a large screen shows — because that is the layout being
+     designed; the narrow states are what you flip to check. */
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const active = useMemo(() => {
+    const base: Record<string, boolean> = {};
+    for (const name of Object.keys(definition.conditions || {})) {
+      base[name] = name !== 'Adaptive-Nav/Show-Menu-Button'   // the tabs' counterpart
+        && name !== 'Adaptive-Nav/Show-Condensed';            // only true once scrolled
+    }
+    return { ...base, ...overrides };
+  }, [definition, overrides]);
+  const setActive = setOverrides;
 
   return (
     <div data-theme="Default" data-surface="Surface"
@@ -57,7 +72,15 @@ export default function NavDesignerPage() {
               <H4>Layout</H4>
               {/* Diagrams rather than words: four layouts differ in where the
                   parts sit, which a name cannot show and a picture can. */}
-              <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap', alignItems: 'stretch' }}>
+              {/* A grid, so all four are the same size. Wrapping flex left the
+                  last row wider than the first, which made two layouts look
+                  more important than the others. */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 'var(--Sizing-2, 8px)',
+                alignItems: 'stretch',
+              }}>
                 {NAV_LAYOUTS.map((l) => {
                   const selected = options.layout === l.id;
                   return (
@@ -74,7 +97,7 @@ export default function NavDesignerPage() {
                         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); set('layout', l.id as NavLayout); }
                       }}
                       style={{
-                        flex: '1 1 200px', minWidth: 180, cursor: 'pointer',
+                        cursor: 'pointer',
                         padding: 'var(--Sizing-1, 4px)',
                         borderRadius: 'var(--Card-Radius, 8px)',
                         border: '2px solid ' + (selected ? 'var(--Buttons-Primary-Border)' : 'var(--Border-Variant)'),
@@ -88,7 +111,7 @@ export default function NavDesignerPage() {
                     </div>
                   );
                 })}
-              </HStack>
+              </div>
               <BodySmall color="quiet">
                 {NAV_LAYOUTS.find((l) => l.id === options.layout)?.description}
               </BodySmall>
@@ -98,14 +121,33 @@ export default function NavDesignerPage() {
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Preview</H4>
-              <div style={{ maxWidth: 480 }}>
-                <NavLayoutPreview layout={options.layout} options={options} />
+              {/* Rendered THROUGH the definition, not drawn beside it. The same
+                  description compiles to Figma nodes and to these elements, so
+                  this is the component rather than a picture of it. */}
+              <div style={{
+                border: '1px solid var(--Border)',
+                borderRadius: 'var(--Card-Radius, 8px)',
+                overflow: 'hidden',
+              }}>
+                <DefinitionRenderer definition={definition} conditions={active} showSlots />
               </div>
+
+              <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                {Object.entries(definition.conditions || {}).map(([name, def]) => (
+                  <SwitchInput
+                    key={name}
+                    checked={!!active[name]}
+                    onChange={(e: { target: { checked: boolean } }) =>
+                      setActive((a) => ({ ...a, [name]: e.target.checked }))}
+                    label={name.split('/').pop() + (def.trigger === 'scroll' ? ' (scroll)' : '')}
+                  />
+                ))}
+              </HStack>
               <Caption color="quiet">
-                A diagram, not the component. Drawing the real thing here would be a
-                second implementation of the layout, and the two would disagree the
-                moment either changed. Faded parts are the condensed state — present,
-                but not until the hero has scrolled past.
+                Flip a condition to see that state. These are the same booleans the
+                Figma component binds its layers to — device ones become breakpoints,
+                the scroll one becomes a listener. A part behind a condition that is
+                off is not rendered at all, exactly as it is not drawn in Figma.
               </Caption>
             </VStack>
           </Card>
