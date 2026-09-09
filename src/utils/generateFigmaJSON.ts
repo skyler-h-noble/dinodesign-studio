@@ -9,6 +9,7 @@
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
+import { componentSizePayload } from './componentSize';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
 } from './bevelGeometry';
@@ -2004,6 +2005,22 @@ const BUTTON_BORDER_WIDTH = 1;
     // into a Custom bezier. Both come from src/utils/motion.ts, so the Figma
     // variables and the CSS custom properties cannot drift.
     figma.Motion = motionJSON();
+
+    /* Component-Size — the same numbers keyed by MODE.
+     *
+     * Component-Size carries medium / small / large as real modes, so one
+     * library component needs one variant and changing its size changes the
+     * mode. figma.Components below is the older flat shape (Name / Sm-Name /
+     * Lg-Name), which existed because that collection had a single mode and
+     * the size had to live in the name.
+     *
+     * Both are emitted. The flat one still feeds the CSS contract the lib
+     * reads by name, and removing it would break every consumer on --Sm-*.
+     * These are two encodings of one set of numbers, not two sources: the
+     * payload below is REGROUPED from the same computed values, never
+     * recomputed, so they cannot disagree.
+     */
+    figma['Component-Size'] = componentSizePayload(r as never, buttonModeMetricFigma(cs));
 
     figma.Components = {
       Button: {

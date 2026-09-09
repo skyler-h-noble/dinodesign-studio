@@ -83,3 +83,85 @@ export function componentSizeFigma(
 export function componentSizeNames(payload: ComponentSizePayload): string[] {
   return Object.keys(payload.medium).sort();
 }
+
+/* ── The groups the studio can fill ────────────────────────────────────────
+ *
+ * Component-Size in Figma holds more than the studio computes — Switch, FAB,
+ * Slider, Rating and most of Other are authored by hand. This maps only what
+ * the generator actually derives, and the writer leaves everything else alone.
+ *
+ * Names are the ones IN THE FILE, not the ones the old flat payload used.
+ * Two differ and both would have bound nothing:
+ *   Card-Focus-Border-Radius  →  Card-Focus-Radius
+ *   Accordion-*               →  Accordian-*   (misspelt in the file; the
+ *                                GROUP is spelt correctly, so it is only the
+ *                                variable name that carries the typo)
+ * Matching the file is the whole job — a "correct" name that matches nothing
+ * silently leaves the value at whatever was last typed by hand.
+ */
+export interface RadiiForSize {
+  buttonRadius: number; smButtonRadius: number; lgButtonRadius: number;
+  buttonInnerRadius: number; smButtonInnerRadius: number; lgButtonInnerRadius: number;
+  buttonFocusRadius: number; smButtonFocusRadius: number; lgButtonFocusRadius: number;
+  iconButtonRadius: number; smIconButtonRadius: number; lgIconButtonRadius: number;
+  iconButtonFocusRadius: number; smIconButtonFocusRadius: number; lgIconButtonFocusRadius: number;
+  cardRadius: number; smCardRadius: number; lgCardRadius: number;
+  cardInnerRadius: number; smCardInnerRadius: number; lgCardInnerRadius: number;
+  cardFocusRadius: number; cardPadding: number;
+  inputRadius: number; smInputRadius: number; lgInputRadius: number;
+  inputFocusRadius: number; inputInnerRadius: number;
+  accordionRadius: number; modalRadius: number; dropdownFrameRadius: number;
+}
+
+export function componentSizePayload(
+  r: RadiiForSize,
+  buttonMetrics: Record<string, number>,
+): ComponentSizePayload {
+  return componentSizeFigma({
+    Button: {
+      ...buttonMetrics,                       // Name / Sm-Name / Lg-Name triples
+      'Button-Radius': r.buttonRadius,
+      'Sm-Button-Radius': r.smButtonRadius,
+      'Lg-Button-Radius': r.lgButtonRadius,
+      'Button-Focus-Radius': r.buttonFocusRadius,
+      'Sm-Button-Focus-Radius': r.smButtonFocusRadius,
+      'Lg-Button-Focus-Radius': r.lgButtonFocusRadius,
+      'Button-Inner-Focus-Radius': r.buttonInnerRadius,
+      'Sm-Button-Inner-Focus-Radius': r.smButtonInnerRadius,
+      'Lg-Button-Inner-Focus-Radius': r.lgButtonInnerRadius,
+      'Button-Icon-Radius': r.iconButtonRadius,
+      'Sm-Button-Icon-Radius': r.smIconButtonRadius,
+      'Lg-Button-Icon-Radius': r.lgIconButtonRadius,
+      'Button-Icon-Focus-Radius': r.iconButtonFocusRadius,
+      'Sm-Button-Icon-Focus-Radius': r.smIconButtonFocusRadius,
+      'Lg-Button-Icon-Focus-Radius': r.lgIconButtonFocusRadius,
+    },
+    Card: {
+      'Card-Radius': r.cardRadius,
+      'Sm-Card-Radius': r.smCardRadius,
+      'Lg-Card-Radius': r.lgCardRadius,
+      'Card-Inner-Border-Radius': r.cardInnerRadius,
+      'Sm-Card-Inner-Border-Radius': r.smCardInnerRadius,
+      'Lg-Card-Inner-Border-Radius': r.lgCardInnerRadius,
+      // The file calls this Card-Focus-Radius; the flat payload called it
+      // Card-Focus-Border-Radius and would have matched nothing.
+      'Card-Focus-Radius': r.cardFocusRadius,
+      'Card-Padding': r.cardPadding,
+    },
+    Input: {
+      'Input-Radius': r.inputRadius,
+      'Sm-Input-Radius': r.smInputRadius,
+      'Lg-Input-Radius': r.lgInputRadius,
+      'Input-Focus-Radius': r.inputFocusRadius,
+      'Input-Inner-Focus-Radius': r.inputInnerRadius,
+    },
+    // Misspelt in the file. Matching the typo is deliberate: renaming a Figma
+    // variable to fix it would unbind every layer using it (invariant 8), so
+    // the rename has to be a decision made in Figma, not forced from here.
+    Accordion: { 'Accordian-Radius': r.accordionRadius },
+    Other: {
+      'Modal-Radius': r.modalRadius,
+      'Dropdown-Frame-Radius': r.dropdownFrameRadius,
+    },
+  });
+}

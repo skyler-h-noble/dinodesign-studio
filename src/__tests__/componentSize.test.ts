@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { componentSizeGroup, componentSizeFigma, componentSizeNames, SIZE_MODES } from '../utils/componentSize';
+import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, SIZE_MODES } from '../utils/componentSize';
 
 /* Component-Size carries medium/small/large as MODES, so one library component
    needs one variant and the size switches the mode. The payload has always
@@ -83,5 +83,55 @@ describe('several groups merge into one payload', () => {
     expect(p.small['Button/Button-Height']).toBe(24);
     expect(p.medium['Card/Card-Radius']).toBe(8);
     expect(p.small['Card/Card-Radius']).toBe(8);
+  });
+});
+
+describe('the payload uses the names that are IN THE FILE', () => {
+  /* A "correct" name that matches nothing silently leaves the variable at
+     whatever was last typed by hand — which is how a Button-Focus-Radius of
+     3125 stood where the rule gives 31. Matching the file is the entire job. */
+  const R = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, cardPadding: 16,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    accordionRadius: 8, modalRadius: 32, dropdownFrameRadius: 0,
+  };
+
+  it('Card focus is Card-Focus-Radius, not Card-Focus-Border-Radius', () => {
+    // The flat payload used the longer name; the file does not have it.
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Card/Card-Focus-Radius']).toBe(19);
+    expect(p.medium['Card/Card-Focus-Border-Radius']).toBeUndefined();
+  });
+
+  it('Accordion keeps the file typo, Accordian', () => {
+    /* Deliberate. Renaming the Figma variable to fix the spelling would
+       unbind every layer using it, so that rename is a decision to make in
+       Figma — not one to force from here by writing a name that matches
+       nothing. The GROUP is spelt correctly; only the variable carries it. */
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Accordion/Accordian-Radius']).toBe(8);
+    expect(p.medium['Accordion/Accordion-Radius']).toBeUndefined();
+  });
+
+  it('computes the focus radius rather than trusting the file', () => {
+    // r + 3. The file had 3125 at large where this gives 31 — a hand-typed
+    // value that no import would have corrected while nothing wrote to it.
+    const p = componentSizePayload(R, {});
+    expect(p.large['Button/Button-Focus-Radius']).toBe(31);
+    expect(p.large['Button/Button-Radius']).toBe(28);
+  });
+
+  it('every mode carries the same names', () => {
+    const p = componentSizePayload(R, {});
+    const keys = (['medium', 'small', 'large'] as const).map((m) => Object.keys(p[m]).sort().join('|'));
+    expect(new Set(keys).size).toBe(1);
   });
 });
