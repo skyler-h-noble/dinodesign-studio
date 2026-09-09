@@ -114,5 +114,9 @@ export function tokensUsed(def: ComponentDefinition): string[] {
     (n.children || []).forEach(walk);
   };
   walk(def.root);
+  /* Conditions are tokens too — boolean variables the file must have. They
+     were omitted here, so a definition could pass a pre-publish token check
+     and still import with its conditional parts unbound. */
+  for (const name of Object.keys(def.conditions || {})) out.add(name);
   return [...out].sort();
 }

@@ -34,8 +34,8 @@ describe('nothing resolved travels in a spec', () => {
   });
 
   it('every styled value is a { var } binding', () => {
-    expect(bar.itemSpacing).toEqual({ var: 'Sizing/Sizing-2' });
-    expect(bar.paddingLeft).toEqual({ var: 'Sizing/Sizing-3' });
+    expect(bar.itemSpacing).toEqual({ var: 'Sizing-2' });
+    expect(bar.paddingLeft).toEqual({ var: 'Sizing-3' });
     expect(spec.root.fills[0].color).toEqual({ var: 'Surface/Background' });
   });
 });
@@ -52,7 +52,7 @@ describe('sizing stays adaptive', () => {
 
   it('a fixed size is still a token, not a number', () => {
     expect(divider.layoutSizingVertical).toBe('FIXED');
-    expect(divider.height).toEqual({ var: 'Sizing/Sizing-Quarter' });
+    expect(divider.height).toEqual({ var: 'Sizing-Quarter' });
   });
 
   it('the three slots divide the bar without a spacer element', () => {
@@ -94,11 +94,29 @@ describe('the tokens it needs are knowable before publishing', () => {
        silently unbound — no error, just a component that looks subtly wrong.
        Enumerating them is what allows a pre-publish check. */
     expect(tokensUsed(slotBar)).toEqual([
-      'Sizing/Sizing-2',
-      'Sizing/Sizing-3',
-      'Sizing/Sizing-Quarter',
+      'Show-Divider',
+      'Sizing-2',
+      'Sizing-3',
+      'Sizing-Quarter',
       'Surface-Dim/Background',
       'Surface/Background',
     ]);
+  });
+
+  it('names are collection-RELATIVE, not prefixed with the collection', () => {
+    /* The plugin indexes local variables by v.name, the path WITHIN a
+       collection. 'Sizing/Sizing-2' matched nothing and imported with the
+       field unbound — Figma's default, which looks like a design decision.
+       A group inside a collection DOES count, hence Surface/Background. */
+    const tokens = tokensUsed(slotBar);
+    expect(tokens).toContain('Sizing-2');
+    expect(tokens.filter((t) => t.startsWith('Sizing/'))).toEqual([]);
+    expect(tokens).toContain('Surface/Background');
+  });
+
+  it('conditions are listed as tokens the file must have', () => {
+    // Omitting them let a definition pass a token check and still import with
+    // its conditional parts unbound.
+    expect(tokensUsed(slotBar)).toContain('Show-Divider');
   });
 });

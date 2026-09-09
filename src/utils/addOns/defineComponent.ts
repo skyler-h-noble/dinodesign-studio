@@ -36,6 +36,15 @@ export interface TokenRef { token: string }
 
 export const t = (token: string): TokenRef => ({ token });
 
+/* NAMES ARE COLLECTION-RELATIVE. The plugin indexes local variables by
+   `v.name`, which is the path WITHIN a collection — the collection name is not
+   part of it. So the Sizing collection's Sizing-2 is 'Sizing-2', not
+   'Sizing/Sizing-2'; a group inside a collection does count, which is why the
+   Theme collection's Surface group gives 'Surface/Background'.
+
+   Getting this wrong binds nothing and paints Figma's defaults, which reads as
+   a design decision rather than a failure. */
+
 /** Sizing follows the target's own layout system rather than a measurement.
  *  `hug` and `fill` are the whole reason a component can adapt; a fixed px
  *  would pin it, which is exactly what must not happen to a nav. */
@@ -115,10 +124,10 @@ export const slotBar: ComponentDefinition = {
         direction: 'row',
         justify: 'between',
         align: 'center',
-        gap: t('Sizing/Sizing-2'),
+        gap: t('Sizing-2'),
         padding: {
-          top: t('Sizing/Sizing-2'), bottom: t('Sizing/Sizing-2'),
-          left: t('Sizing/Sizing-3'), right: t('Sizing/Sizing-3'),
+          top: t('Sizing-2'), bottom: t('Sizing-2'),
+          left: t('Sizing-3'), right: t('Sizing-3'),
         },
         width: 'fill',
         height: 'hug',
@@ -133,7 +142,7 @@ export const slotBar: ComponentDefinition = {
         kind: 'stack',
         direction: 'row',
         width: 'fill',
-        height: { fixed: t('Sizing/Sizing-Quarter') },
+        height: { fixed: t('Sizing-Quarter') },
         surface: 'Surface-Dim',
         presence: { when: 'Show-Divider' },
       },
