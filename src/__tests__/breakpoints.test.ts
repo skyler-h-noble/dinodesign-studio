@@ -105,3 +105,46 @@ describe('reading one breakpoint back out', () => {
     expect(conditionsAt(m, 'nonexistent')).toEqual({ 'Show-Tabs': false });
   });
 });
+
+// ─── The nav's own starting table ────────────────────────────────────────────
+import { defaultNavMatrix, NAV_CONDITIONS } from '../utils/addOns/navDefinition';
+
+describe('the default matrix encodes design intent, not blanket true', () => {
+  const names = Object.keys(NAV_CONDITIONS);
+  const m = defaultNavMatrix(names, DEFAULT_BREAKPOINTS);
+
+  it('tabs and the menu button are never both on, or both off', () => {
+    /* Both true shows two navigations; both false shows none. Neither is a
+       state anyone would design, so the starting table cannot produce one. */
+    for (const bp of DEFAULT_BREAKPOINTS) {
+      const tabs = m['Adaptive-Nav/Show-Tabs'][bp.id];
+      const menu = m['Adaptive-Nav/Show-Menu-Button'][bp.id];
+      expect([bp.id, tabs === menu]).toEqual([bp.id, false]);
+    }
+  });
+
+  it('the menu button appears only at the narrowest width', () => {
+    expect(m['Adaptive-Nav/Show-Menu-Button']).toEqual({ mobile: true, tablet: false, desktop: false });
+  });
+
+  it('scroll conditions start false at every width', () => {
+    /* They are not width-driven at all. Seeding one true would show a
+       condensed state that only exists after scrolling. */
+    for (const [name, def] of Object.entries(NAV_CONDITIONS)) {
+      if (def.trigger !== 'scroll') continue;
+      for (const bp of DEFAULT_BREAKPOINTS) expect([name, bp.id, m[name][bp.id]]).toEqual([name, bp.id, false]);
+    }
+  });
+
+  it('the rail only appears where there is width for it', () => {
+    expect(m['Adaptive-Nav/Show-Rail'].mobile).toBe(false);
+    expect(m['Adaptive-Nav/Show-Rail'].desktop).toBe(true);
+  });
+
+  it('covers every condition and every breakpoint', () => {
+    // A hole reads as false downstream and hides a part with nothing to say why.
+    for (const name of names) {
+      for (const bp of DEFAULT_BREAKPOINTS) expect(typeof m[name][bp.id]).toBe('boolean');
+    }
+  });
+});

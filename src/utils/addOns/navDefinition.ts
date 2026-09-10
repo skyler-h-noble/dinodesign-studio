@@ -290,3 +290,45 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
     root,
   };
 }
+
+/**
+ * A sensible starting matrix: which conditions are true at which breakpoint.
+ *
+ * Not arbitrary defaults — this encodes the design intent the layouts are
+ * built around, so a new definition opens on something coherent rather than
+ * everything-on, which is a state no real nav is ever in.
+ *
+ *   tabs / menu button   mutually exclusive, and the narrowest breakpoint is
+ *                        where tabs stop fitting. Setting both true would show
+ *                        two navigations at once; both false would show none.
+ *   rail                 only where there is width to spare for it.
+ *   search               collapses to an icon at the narrowest width, which is
+ *                        the consumer's job — here it simply leaves the bar.
+ *   scroll conditions    false everywhere. They are not width-driven at all,
+ *                        and seeding them true would show a condensed state
+ *                        that only exists after scrolling.
+ */
+export function defaultNavMatrix(
+  conditionNames: string[],
+  breakpoints: { id: string; minWidth: number }[],
+): Record<string, Record<string, boolean>> {
+  const sorted = [...breakpoints].sort((a, b) => a.minWidth - b.minWidth);
+  const narrowest = sorted[0]?.id;
+  const widest = sorted[sorted.length - 1]?.id;
+
+  const out: Record<string, Record<string, boolean>> = {};
+  for (const name of conditionNames) {
+    const def = NAV_CONDITIONS[name];
+    out[name] = {};
+    for (const bp of sorted) {
+      out[name][bp.id] =
+        def?.trigger === 'scroll' ? false
+        : name === 'Adaptive-Nav/Show-Menu-Button' ? bp.id === narrowest
+        : name === 'Adaptive-Nav/Show-Tabs' ? bp.id !== narrowest
+        : name === 'Adaptive-Nav/Show-Rail' ? bp.id === widest
+        : name === 'Adaptive-Nav/Show-Search' ? bp.id !== narrowest
+        : true;
+    }
+  }
+  return out;
+}

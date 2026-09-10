@@ -16,10 +16,15 @@ import { useMemo, useState } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
+  Tabs, TabList, Tab, TextField, Alert,
 } from '@omni-design/components';
 import {
-  navDefinition, NAV_LAYOUTS, type NavLayout, type NavOptions,
+  navDefinition, defaultNavMatrix, NAV_LAYOUTS, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
+import {
+  DEFAULT_BREAKPOINTS, sortBreakpoints, validateBreakpoints, breakpointRange,
+  completeMatrix, conditionsAt, type Breakpoint, type ConditionMatrix,
+} from '../utils/addOns/breakpoints';
 import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
@@ -39,19 +44,34 @@ export default function NavDesignerPage() {
     return { definition: def, spec: toAddonSpec(def), tokens: tokensUsed(def) };
   }, [options]);
 
-  /* Which conditions are true in the preview. Defaults to the widest state —
-     everything a large screen shows — because that is the layout being
-     designed; the narrow states are what you flip to check. */
-  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-  const active = useMemo(() => {
-    const base: Record<string, boolean> = {};
-    for (const name of Object.keys(definition.conditions || {})) {
-      base[name] = name !== 'Adaptive-Nav/Show-Menu-Button'   // the tabs' counterpart
-        && name !== 'Adaptive-Nav/Show-Condensed';            // only true once scrolled
-    }
-    return { ...base, ...overrides };
-  }, [definition, overrides]);
-  const setActive = setOverrides;
+  const [breakpoints, setBreakpoints] = useState<Breakpoint[]>(DEFAULT_BREAKPOINTS);
+  const [selectedBp, setSelectedBp] = useState<string>(DEFAULT_BREAKPOINTS[0].id);
+  const [matrix, setMatrix] = useState<ConditionMatrix>({});
+
+  const problems = validateBreakpoints(breakpoints);
+  const sorted = sortBreakpoints(breakpoints);
+
+  /* The full table, recompleted whenever the conditions or breakpoints change.
+     A hole would read as FALSE downstream, silently hiding a part at whichever
+     widths were never visited — so every cell is filled, and a cell that has
+     never been touched takes the design's own default rather than a blanket
+     true. */
+  const full = useMemo(() => {
+    const names = Object.keys(definition.conditions || {});
+    const seed = defaultNavMatrix(names, sorted);
+    return completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true);
+  }, [definition, matrix, sorted]);
+
+  const active = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
+  /* Writes one cell. The row is spread from the COMPLETED table rather than
+     from raw state, so setting a value at one breakpoint cannot blank the
+     others by writing a row that only has the cell just touched. */
+  const setCondition = (name: string, value: boolean) =>
+    setMatrix((m) => ({ ...m, [name]: { ...full[name], [selectedBp]: value } }));
+
+  const range = breakpointRange(sorted, selectedBp);
+  const editBp = (id: string, patch: Partial<Breakpoint>) =>
+    setBreakpoints((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
   return (
     <div data-theme="Default" data-surface="Surface"
@@ -121,16 +141,40 @@ export default function NavDesignerPage() {
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Preview</H4>
+
+              {/* One tab per breakpoint. Designing per width is the point: a
+                  responsive component is a table of conditions by breakpoint,
+                  not one layout with parts switched off. */}
+              <Tabs value={selectedBp} onChange={(v: string) => setSelectedBp(v)}>
+                <TabList>
+                  {sorted.map((b) => (
+                    <Tab key={b.id} value={b.id}>{b.label}</Tab>
+                  ))}
+                </TabList>
+              </Tabs>
+
               {/* Rendered THROUGH the definition, not drawn beside it. The same
                   description compiles to Figma nodes and to these elements, so
-                  this is the component rather than a picture of it. */}
+                  this is the component rather than a picture of it.
+
+                  Constrained to the breakpoint's own lower bound, because a
+                  layout that only holds at 1400px tells you nothing about the
+                  width it was designed for. */}
               <div style={{
                 border: '1px solid var(--Border)',
                 borderRadius: 'var(--Card-Radius, 8px)',
                 overflow: 'hidden',
+                maxWidth: range ? Math.max(range.from, 320) : undefined,
+                resize: 'horizontal',
               }}>
                 <DefinitionRenderer definition={definition} conditions={active} showSlots />
               </div>
+              <Caption color="quiet">
+                {range && (range.to === null
+                  ? `${range.from}px and up`
+                  : `${range.from}\u2013${range.to}px`)} — shown at its narrowest, which is
+                where a layout breaks if it is going to.
+              </Caption>
 
               <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
                 {Object.entries(definition.conditions || {}).map(([name, def]) => (
@@ -138,16 +182,16 @@ export default function NavDesignerPage() {
                     key={name}
                     checked={!!active[name]}
                     onChange={(e: { target: { checked: boolean } }) =>
-                      setActive((a) => ({ ...a, [name]: e.target.checked }))}
+                      setCondition(name, e.target.checked)}
                     label={name.split('/').pop() + (def.trigger === 'scroll' ? ' (scroll)' : '')}
                   />
                 ))}
               </HStack>
               <Caption color="quiet">
-                Flip a condition to see that state. These are the same booleans the
-                Figma component binds its layers to — device ones become breakpoints,
-                the scroll one becomes a listener. A part behind a condition that is
-                off is not rendered at all, exactly as it is not drawn in Figma.
+                These are set PER BREAKPOINT — the same shape Figma stores, where a
+                boolean holds one value per Device-Sizes mode. Device conditions
+                become breakpoints in CSS; the scroll ones cannot, so they stay false
+                at every width and are switched by a listener instead.
               </Caption>
             </VStack>
           </Card>
@@ -193,6 +237,86 @@ export default function NavDesignerPage() {
                 {options.layout === 'hero'
                   ? 'Intrinsic to this layout: tabs under a hero that do not stick are simply tabs under a hero. Sticky sits on the tab strip, not the whole nav — the hero scrolls away.'
                   : 'Reaches the React component only. Figma has no scroll behaviour, so it is left out of the spec rather than faked as a frame.'}
+              </Caption>
+            </VStack>
+          </Card>
+
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-3)">
+              <H4>Breakpoints</H4>
+              <Body color="quiet">
+                Each is a lower bound. The narrowest must start at 0 — a width no
+                breakpoint covers has no condition values at all, and neither CSS nor
+                Figma reports that.
+              </Body>
+
+              {problems.length > 0 && (
+                <Alert severity="error">
+                  <VStack gap="var(--Sizing-Half)">
+                    {problems.map((p) => <BodySmall key={p.id + p.message}>{p.message}</BodySmall>)}
+                  </VStack>
+                </Alert>
+              )}
+
+              <VStack gap="var(--Sizing-2)">
+                {sorted.map((b) => {
+                  const r = breakpointRange(sorted, b.id);
+                  return (
+                    <HStack key={b.id} gap="var(--Sizing-2)" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <TextField
+                        label="Name"
+                        value={b.label}
+                        onChange={(e: { target: { value: string } }) => editBp(b.id, { label: e.target.value })}
+                        size="small"
+                      />
+                      <TextField
+                        label="From (px)"
+                        type="number"
+                        value={String(b.minWidth)}
+                        onChange={(e: { target: { value: string } }) =>
+                          editBp(b.id, { minWidth: Number(e.target.value) || 0 })}
+                        size="small"
+                      />
+                      <BodySmall color="quiet" style={{ paddingBottom: 8 }}>
+                        {r && (r.to === null ? `${r.from}px and up` : `${r.from}\u2013${r.to}px`)}
+                      </BodySmall>
+                      <Button
+                        variant="default-outline"
+                        size="small"
+                        disabled={sorted.length <= 1}
+                        onClick={() => {
+                          setBreakpoints((bs) => bs.filter((x) => x.id !== b.id));
+                          // Selecting a breakpoint that no longer exists would
+                          // render every condition false — a state nobody designed.
+                          if (selectedBp === b.id) setSelectedBp(sorted.find((x) => x.id !== b.id)!.id);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </HStack>
+                  );
+                })}
+              </VStack>
+
+              <div>
+                <Button
+                  variant="default-outline"
+                  onClick={() => {
+                    const widest = sorted[sorted.length - 1];
+                    const id = `bp-${Date.now().toString(36)}`;
+                    setBreakpoints((bs) => [...bs, {
+                      id, label: 'New', minWidth: widest ? widest.minWidth + 320 : 0,
+                    }]);
+                  }}
+                >
+                  Add breakpoint
+                </Button>
+              </div>
+              <Caption color="quiet">
+                Adding one gives every condition a value there straight away, taken
+                from the design's own defaults rather than a blanket true — an unset
+                cell reads as false downstream and would hide parts at that width
+                with nothing to say why.
               </Caption>
             </VStack>
           </Card>
