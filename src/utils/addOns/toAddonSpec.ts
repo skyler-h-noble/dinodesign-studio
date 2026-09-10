@@ -80,6 +80,19 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
     spec.visibleWhen = node.presence.when;
   }
 
+  /* Overlay leaves the auto-layout flow. The constraints are what keep it
+     pinned to the chosen corner when the parent resizes — without them Figma
+     holds the absolute offset it happened to be created at, so the content
+     drifts off a wider hero. */
+  if (node.overlay) {
+    const [v, h] = node.overlay.anchor.split('-') as ['top' | 'bottom', 'left' | 'right'];
+    spec.layoutPositioning = 'ABSOLUTE';
+    spec.constraints = {
+      horizontal: h === 'left' ? 'MIN' : 'MAX',
+      vertical: v === 'top' ? 'MIN' : 'MAX',
+    };
+  }
+
   if (node.children && node.children.length) {
     spec.children = node.children.map(nodeToSpec);
   }

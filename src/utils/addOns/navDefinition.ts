@@ -145,16 +145,23 @@ function bar(o: NavOptions): NodeDef {
        than unconditionally. Unconditional, they would show while the hero is
        still on screen — duplicating what the hero already shows — which is the
        reason the plain hero bar carries no brand at all. */
+    /* TABS ONLY. The brand belongs to the hero and the actions sit OVER the
+       hero image, so the strip under a hero is navigation and nothing else.
+       
+       Condensed is what brings the actions down here, once the hero has
+       scrolled past and its overlay has gone with it. Without condensed there
+       is no End slot at all — an empty one would still take part in the
+       SPACE_BETWEEN and push the tabs off centre. */
     const start: NodeDef[] = [];
     if (o.condensed) start.push(slot('Condensed-Brand', 'hug', 'Adaptive-Nav/Show-Condensed'));
     start.push(...navigationSlots());
     children = [
       { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
         width: 'fill', height: 'hug', children: start },
-      o.condensed
-        ? { ...endSlot(o), presence: { when: 'Adaptive-Nav/Show-Condensed' } }
-        : endSlot(o),
     ];
+    if (o.condensed) {
+      children.push({ ...endSlot(o), presence: { when: 'Adaptive-Nav/Show-Condensed' } });
+    }
   } else if (o.layout === 'rail') {
     // Navigation lives in the rail, so the bar carries no tabs at all.
     children = [
@@ -209,7 +216,29 @@ function heroRoot(o: NavOptions): NodeDef {
     height: 'hug',
     surface: 'Surface',
     children: [
-      slot('Hero', 'fill'),
+      {
+        /* The hero and what floats on it. A wrapper rather than putting the
+           overlay beside the slot, because an overlay anchors to its PARENT —
+           on the root it would pin to the whole nav and hang over the tab
+           strip too. */
+        name: 'Hero-Area',
+        kind: 'stack',
+        direction: 'column',
+        width: 'fill',
+        height: 'hug',
+        children: [
+          slot('Hero', 'fill'),
+          /* Over the image, top-right. Hidden once condensed, because the same
+             actions reappear in the sticky strip and showing both would be the
+             duplicate this layout is arranged to avoid. */
+          {
+            ...endSlot(o),
+            name: 'Hero-Actions',
+            overlay: { anchor: 'top-right' as const },
+            ...(o.condensed ? { presence: { when: 'Adaptive-Nav/Hide-When-Condensed' } as const } : {}),
+          },
+        ],
+      },
       {
         ...bar(o),
         // Intrinsic to the pattern, not optional: tabs that do not stick are

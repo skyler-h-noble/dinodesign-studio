@@ -89,6 +89,19 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
     // Sticky is a node property because only part of a nav sticks — the hero
     // scrolls away while the strip stays.
     ...(node.sticky ? { position: 'sticky' as const, top: 0, zIndex: 1 } : {}),
+    /* Overlay: out of flow, pinned to a corner. The parent is given
+       position:relative below — without that it would anchor to whatever
+       ancestor happens to be positioned, which is usually the page. */
+    ...(node.overlay ? {
+      position: 'absolute' as const,
+      zIndex: 1,
+      top: node.overlay.anchor.startsWith('top') ? 'var(--Sizing-2, 8px)' : undefined,
+      bottom: node.overlay.anchor.startsWith('bottom') ? 'var(--Sizing-2, 8px)' : undefined,
+      left: node.overlay.anchor.endsWith('left') ? 'var(--Sizing-3, 12px)' : undefined,
+      right: node.overlay.anchor.endsWith('right') ? 'var(--Sizing-3, 12px)' : undefined,
+    } : {}),
+    // A parent of any overlay has to establish the containing block.
+    ...((node.children || []).some((c) => c.overlay) ? { position: 'relative' as const } : {}),
     // The surface's own fill. data-surface below is what makes this resolve.
     ...(node.surface ? { background: 'var(--Background)' } : {}),
   };

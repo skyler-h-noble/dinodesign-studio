@@ -91,6 +91,13 @@ export interface NodeDef {
    *  flag that means nothing on one target is better than a frame pretending
    *  to mean something. */
   sticky?: boolean;
+  /** Sits OVER its parent rather than in the flow beside its siblings.
+   *
+   *  Both targets can express it — Figma as layoutPositioning ABSOLUTE with
+   *  constraints, CSS as position:absolute against a relative parent — but
+   *  neither infers it, so it has to be said. Without it, content meant to
+   *  float over a hero image would push the hero down instead. */
+  overlay?: { anchor: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' };
   text?: string;
   children?: NodeDef[];
 }

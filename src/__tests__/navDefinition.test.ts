@@ -22,12 +22,25 @@ describe('three layouts, one component', () => {
     for (const l of ALL) expect(navDefinition({ layout: l }).id).toBe('adaptive-nav');
   });
 
-  it('every layout carries a Bar with a Start and an End', () => {
+  it('every layout carries a Bar with a Start', () => {
     for (const l of ALL) {
       const n = names(toAddonSpec(full(l)));
       expect(n, l).toContain('Bar');
-      for (const slot of ['Start', 'End']) expect(n, `${l}/${slot}`).toContain(slot);
+      expect(n, `${l}/Start`).toContain('Start');
     }
+  });
+
+  it('an End exists wherever the bar holds actions', () => {
+    /* Hero has none: its actions sit over the image, and an empty End would
+       still take part in the SPACE_BETWEEN and push the tabs off centre.
+       Adding one for symmetry would be a slot that means nothing and can
+       still be filled by mistake. */
+    for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
+      expect(names(toAddonSpec(full(l))), l).toContain('End');
+    }
+    const heroBar = (toAddonSpec(full('hero')) as any).root.children
+      .find((c: any) => c.name === 'Bar');
+    expect(names(heroBar)).not.toContain('End');
   });
 
   it('a Center exists only where there is a middle region', () => {
@@ -150,16 +163,46 @@ describe('hero with sticky tabs', () => {
     /* It is a separate add-on. Defining its internals here would be a second
        definition of the same thing to keep in step. */
     const spec: any = toAddonSpec(full('hero'));
-    const hero = spec.root.children.find((c: any) => c.name === 'Hero');
+    const area = spec.root.children.find((c: any) => c.name === 'Hero-Area');
+    const hero = area.children.find((c: any) => c.name === 'Hero');
     expect(hero).toBeTruthy();
     expect(hero.children).toBeUndefined();
     expect(hero.layoutSizingHorizontal).toBe('FILL');
   });
 
-  it('the tab strip sits UNDER the hero', () => {
+  it('the tab strip sits UNDER the hero area', () => {
     const spec: any = toAddonSpec(full('hero'));
     expect(spec.root.layoutMode).toBe('VERTICAL');
-    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Hero', 'Bar']);
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Hero-Area', 'Bar']);
+  });
+
+  it('the actions sit OVER the hero, not in the strip', () => {
+    /* The strip under a hero is navigation and nothing else. An overlay
+       anchors to its PARENT, which is why the hero and its floating content
+       are wrapped together — on the root it would pin to the whole nav and
+       hang over the tab strip too. */
+    const spec: any = toAddonSpec(full('hero'));
+    const area = spec.root.children.find((c: any) => c.name === 'Hero-Area');
+    const actions = area.children.find((c: any) => c.name === 'Hero-Actions');
+    expect(actions.layoutPositioning).toBe('ABSOLUTE');
+    expect(actions.constraints).toEqual({ horizontal: 'MAX', vertical: 'MIN' });
+
+    const bar = spec.root.children.find((c: any) => c.name === 'Bar');
+    expect(names(bar)).toContain('Tabs');
+    expect(names(bar)).not.toContain('Avatar');
+  });
+
+  it('the actions are never in two places at once', () => {
+    /* Condensed brings them into the strip, and the overlay copy goes at the
+       same moment. Two variables set in opposition, because neither target can
+       express "not X" on a visibility binding. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'hero', avatar: true, condensed: true }));
+    const area = spec.root.children.find((c: any) => c.name === 'Hero-Area');
+    const overlay = area.children.find((c: any) => c.name === 'Hero-Actions');
+    const bar = spec.root.children.find((c: any) => c.name === 'Bar');
+    const end = bar.children.find((c: any) => c.name === 'End');
+    expect(overlay.visibleWhen).toBe('Adaptive-Nav/Hide-When-Condensed');
+    expect(end.visibleWhen).toBe('Adaptive-Nav/Show-Condensed');
   });
 
   it('carries no brand in the bar', () => {

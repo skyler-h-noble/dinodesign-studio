@@ -108,15 +108,21 @@ export default function NavLayoutPreview(
 
       {layout === 'hero' && (
         <>
-          {/* Condensed: brand and actions animate in once the hero is past,
-              so they are drawn faintly — present, but not yet. */}
-          {o.condensed && <g opacity="0.45"><Brand x={14} y={barY + 6} /></g>}
+          {/* Actions sit OVER the hero image, top right — not in the strip. */}
+          <RightGroup x={right} y={12} options={o} />
+          {/* The strip beneath is navigation and nothing else. */}
           <Tab x={o.condensed ? 38 : 14} y={barY} />
           <Tab x={o.condensed ? 66 : 42} y={barY} />
           <Tab x={o.condensed ? 94 : 70} y={barY} />
-          <g opacity={o.condensed ? 0.45 : 1}>
-            <RightGroup x={right} y={barY + 6} options={o} />
-          </g>
+          {/* Condensed: the brand and a copy of the actions drop into the strip
+              once the hero scrolls past. Drawn faintly — present, but not yet,
+              and never at the same time as the overlay pair above. */}
+          {o.condensed && (
+            <g opacity="0.45">
+              <Brand x={14} y={barY + 6} />
+              <RightGroup x={right} y={barY + 6} options={o} />
+            </g>
+          )}
         </>
       )}
     </svg>
