@@ -35,6 +35,9 @@ export interface NavOptions {
   search?: boolean;
   actions?: boolean;
   avatar?: boolean;
+  /** Whether the bar sticks. Only a CHOICE in the two plain bar layouts —
+   *  see stickyBar below. Defaults to true. */
+  sticky?: boolean;
   /** Where the bar sits relative to the rail. Only meaningful for 'rail'. */
   barPosition?: 'above-rail' | 'beside-rail';
   /** Where the page title sits in the bar. Only meaningful for 'rail'. */
@@ -67,8 +70,11 @@ export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[
   /* Every name says sticky, because every one of them is: a top nav that
      scrolls away is not a variation on a top nav, it is a header. Naming it
      is what stops someone looking for the option that used to be here. */
-  { id: 'brand-left',   label: 'Sticky bar, brand left',    description: 'Brand, then tabs, then actions on the right.' },
-  { id: 'brand-centre', label: 'Sticky bar, brand centred', description: 'Tabs or a menu button on the left, brand centred, actions right.' },
+  /* No "sticky" in these two names: it is a choice here, and a name that
+     states one setting of a switch is wrong half the time. The other two keep
+     it, because there it is not a choice. */
+  { id: 'brand-left',   label: 'Brand left',    description: 'Brand, then tabs, then actions on the right.' },
+  { id: 'brand-centre', label: 'Brand centred', description: 'Tabs or a menu button on the left, brand centred, actions right.' },
   { id: 'rail',         label: 'Sticky bar + rail',         description: 'Navigation in a rail down the side. The bar sits above it or beside it.' },
   { id: 'hero',         label: 'Hero + sticky tabs',        description: 'A hero area with the tab strip beneath it, which sticks once it reaches the top.' },
 ];
@@ -366,16 +372,25 @@ function heroRoot(o: NavOptions): NodeDef {
   };
 }
 
-/* The bar is ALWAYS sticky.
+/* Sticky is a CHOICE in two layouts and intrinsic in the other two.
  *
- * It was an option, and it should not have been: a top nav that scrolls away
- * is not a variation on a top nav, it is a header. Every layout here is a
- * navigation that stays reachable, so the flag was a control that could only
- * ever be turned to the wrong answer.
+ * A plain top bar can reasonably scroll away — a marketing page whose nav
+ * gives way to the content is a real design, not a mistake. So brand-left and
+ * brand-centre offer it, defaulting to on.
  *
- * Sticky sits on the BAR rather than the root in all four, and in the rail
- * layout that distinction earns its keep: a full-height rail is already in
- * view and does not stick, while the bar beside it does. */
+ * The other two cannot. A rail layout is an application frame, and a frame
+ * whose bar scrolls off leaves the rail beside nothing. Tabs under a hero that
+ * do not stick are simply tabs under a hero — the pattern IS the sticking.
+ * Offering the switch there would be offering an answer that unmakes the
+ * layout.
+ *
+ * It sits on the BAR rather than the root in all four, and in the rail layout
+ * that distinction earns its keep: a full-height rail is already in view and
+ * does not stick, while the bar beside it does. */
+export function stickyBar(o: NavOptions): boolean {
+  if (o.layout === 'rail' || o.layout === 'hero') return true;
+  return o.sticky !== false;
+}
 function railNode(fullHeight: boolean): NodeDef {
   return {
     name: 'Rail',
@@ -407,7 +422,9 @@ function railNode(fullHeight: boolean): NodeDef {
 }
 
 function railChildren(o: NavOptions): NodeDef[] {
-  const stickyBar = { ...bar(o), sticky: true };
+  // Named apart from the exported stickyBar() to avoid a shadow that would
+  // read as a call site and is not one — the rail's bar is always sticky.
+  const railBar = { ...bar(o), sticky: true };
   /* Above: the bar spans the whole width and the rail starts beneath it, so
      the bar's brand and actions clear the rail. Beside: the rail runs the full
      height and the bar occupies only the column to its right, which is what
@@ -416,8 +433,8 @@ function railChildren(o: NavOptions): NodeDef[] {
      A sibling either way — nesting the rail under the bar would tie its height
      to the bar's, and it would stop being a rail. */
   return o.barPosition === 'above-rail'
-    ? [stickyBar, railNode(false)]
-    : [railNode(true), stickyBar];
+    ? [railBar, railNode(false)]
+    : [railNode(true), railBar];
 }
 
 export function navDefinition(o: NavOptions): ComponentDefinition {
@@ -444,7 +461,7 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
     theme: o.theme,
     children: o.layout === 'rail'
       ? railChildren(o)
-      : [{ ...bar(o), sticky: true }],
+      : [{ ...bar(o), sticky: stickyBar(o) }],
   };
 
   return {

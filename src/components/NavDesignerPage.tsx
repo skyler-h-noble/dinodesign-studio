@@ -16,7 +16,7 @@ import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
-  Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar,
+  Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -24,10 +24,14 @@ import {
 } from '../utils/addOns/navDefinition';
 import {
   DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
-  validateBreakpoints, breakpointRange,
+  validateBreakpoints, breakpointRange, isMobileBreakpoint,
   completeMatrix, conditionsAt, type Breakpoint, type ConditionMatrix,
 } from '../utils/addOns/breakpoints';
 import ScaledPreview from './ScaledPreview';
+import {
+  mobileNavDefinition, MOBILE_LAYOUTS, maxItemsWithFab,
+  type MobileLayout, type MobileOptions,
+} from '../utils/addOns/mobileNav';
 import TuneIcon from '@mui/icons-material/Tune';
 import {
   loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
@@ -52,20 +56,20 @@ export default function NavDesignerPage() {
 
   /* Recomputed from the definition rather than tracked alongside it, so what
      is shown is always what would be published. */
-  const { definition, spec } = useMemo(() => {
-    const def = navDefinition(options);
-    /* tokensUsed is no longer read here — the token list came out with the
-       card that showed it. It stays exported because the publish script prints
-       it before writing, which is where the check actually matters: a missing
-       variable imports unbound and silently looks like a design decision. */
-    return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
-  }, [options]);
-
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>(DEFAULT_BREAKPOINTS);
   /* Opens on the WIDEST. Design runs desktop-down: the wide layout is the one
      being designed and the narrow ones are what it degrades into. */
   const [selectedBp, setSelectedBp] = useState<string>(primaryBreakpoint(DEFAULT_BREAKPOINTS)!.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /* Mobile choices are kept SEPARATELY from the desktop ones. They are
+     different layouts with different options, so one shared object would need
+     every field to be optional and every read to guess which set it is in. */
+  const [mobile, setMobile] = useState<MobileOptions>({
+    layout: 'top-and-bottom', brandAlign: 'left', showMenu: true,
+    topActions: 1, showAvatar: true, itemCount: 4, showLabels: true,
+  });
+  const setMobileOpt = <K extends keyof MobileOptions>(k: K, v: MobileOptions[K]) =>
+    setMobile((m) => ({ ...m, [k]: v }));
   const [brand, setBrand] = useState<BrandAsset | null>(null);
   const [brandError, setBrandError] = useState<string | null>(null);
   const brandInput = useRef<HTMLInputElement>(null);
@@ -230,6 +234,24 @@ export default function NavDesignerPage() {
   const shown = displayBreakpoints(breakpoints);
   const current = sorted.find((b) => b.id === selectedBp);
 
+  const onMobile = isMobileBreakpoint(current);
+
+  const { definition, spec } = useMemo(() => {
+    /* Which VOCABULARY applies is decided by the breakpoint, not by a toggle.
+       Below the tablet cluster a nav is a different component shape, so the
+       definition comes from a different builder rather than the same one with
+       parts switched off. */
+    const def = onMobile
+      ? mobileNavDefinition({ ...mobile, theme: options.theme, surface: options.surface })
+      : navDefinition(options);
+    /* tokensUsed is no longer read here — the token list came out with the
+       card that showed it. It stays exported because the publish script prints
+       it before writing, which is where the check actually matters: a missing
+       variable imports unbound and silently looks like a design decision. */
+    return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
+  }, [options, mobile, onMobile]);
+
+
   /* The full table, recompleted whenever the conditions or breakpoints change.
      A hole would read as FALSE downstream, silently hiding a part at whichever
      widths were never visited — so every cell is filled, and a cell that has
@@ -375,6 +397,28 @@ export default function NavDesignerPage() {
               {/* A grid, so all four are the same size. Wrapping flex left the
                   last row wider than the first, which made two layouts look
                   more important than the others. */}
+              {onMobile ? (
+                /* A different SET, not the same four narrowed. Below the tablet
+                   cluster reach decides the arrangement — navigation moves to
+                   the bottom where a thumb lands — so offering the desktop
+                   layouts here would offer arrangements that do not apply. */
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: 'var(--Sizing-2, 8px)',
+                }}>
+                  {MOBILE_LAYOUTS.map((l) => (
+                    <Button
+                      key={l.id}
+                      variant={mobile.layout === l.id ? 'default' : 'default-outline'}
+                      onClick={() => setMobileOpt('layout', l.id as MobileLayout)}
+                      style={{ justifyContent: 'flex-start', height: 'auto', padding: 'var(--Sizing-2, 8px)' }}
+                    >
+                      {l.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : (
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -412,11 +456,14 @@ export default function NavDesignerPage() {
                   );
                 })}
               </div>
+              )}
               <BodySmall color="quiet">
-                {NAV_LAYOUTS.find((l) => l.id === options.layout)?.description}
+                {onMobile
+                  ? MOBILE_LAYOUTS.find((l) => l.id === mobile.layout)?.description
+                  : NAV_LAYOUTS.find((l) => l.id === options.layout)?.description}
               </BodySmall>
 
-              {options.layout === 'rail' && (
+              {!onMobile && options.layout === 'rail' && (
                 <>
                   <Divider />
                   <Label>Application Bar position</Label>
@@ -529,6 +576,134 @@ export default function NavDesignerPage() {
             </VStack>
           </Card>
           </div>
+
+          {onMobile && (
+            <Card padding="medium">
+              <VStack gap="var(--Sizing-3)">
+                <H4>Mobile options</H4>
+
+                {mobile.layout !== 'bottom-only' && (
+                  <>
+                    <Label>Top bar</Label>
+                    <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                      {([['left', 'Brand left'], ['center', 'Brand centred']] as const).map(([id, l]) => (
+                        <Button
+                          key={id}
+                          size="small"
+                          variant={(mobile.brandAlign ?? 'left') === id ? 'default' : 'default-outline'}
+                          onClick={() => setMobileOpt('brandAlign', id)}
+                        >
+                          {l}
+                        </Button>
+                      ))}
+                    </HStack>
+                    <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
+                      <SwitchInput
+                        checked={mobile.showMenu !== false}
+                        onChange={(e: { target: { checked: boolean } }) => setMobileOpt('showMenu', e.target.checked)}
+                        label="Menu button"
+                      />
+                      <SwitchInput
+                        checked={!!mobile.showAvatar}
+                        onChange={(e: { target: { checked: boolean } }) => setMobileOpt('showAvatar', e.target.checked)}
+                        label="Avatar"
+                      />
+                    </HStack>
+                    <TextField
+                      label="Action buttons"
+                      type="number"
+                      size="small"
+                      value={String(mobile.topActions ?? 1)}
+                      onChange={(e: { target: { value: string } }) =>
+                        setMobileOpt('topActions', Math.max(0, Math.min(3, Number(e.target.value) || 0)))}
+                    />
+                  </>
+                )}
+
+                {mobile.layout === 'toolbar' && (
+                  <>
+                    <Divider />
+                    <Label>Toolbar</Label>
+                    <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                      {([['fixed', 'Fixed'], ['floating', 'Floating']] as const).map(([id, l]) => (
+                        <Button key={id} size="small"
+                          variant={(mobile.toolbarStyle ?? 'fixed') === id ? 'default' : 'default-outline'}
+                          onClick={() => setMobileOpt('toolbarStyle', id)}>{l}</Button>
+                      ))}
+                      {([['horizontal', 'Across'], ['vertical', 'Down']] as const).map(([id, l]) => (
+                        <Button key={id} size="small"
+                          variant={(mobile.toolbarOrientation ?? 'horizontal') === id ? 'default' : 'default-outline'}
+                          onClick={() => setMobileOpt('toolbarOrientation', id)}>{l}</Button>
+                      ))}
+                    </HStack>
+                  </>
+                )}
+
+                {mobile.layout !== 'top-only' && (
+                  <>
+                    <Divider />
+                    <Label>{mobile.layout === 'toolbar' ? 'Toolbar items' : 'Navigation items'}</Label>
+                    <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                      {Array.from({ length: maxItemsWithFab(!!mobile.fab) }, (_, i) => i + 1).map((n) => (
+                        <Button
+                          key={n}
+                          size="small"
+                          variant={(mobile.itemCount ?? 4) === n ? 'default' : 'default-outline'}
+                          onClick={() => setMobileOpt('itemCount', n)}
+                        >
+                          {n}
+                        </Button>
+                      ))}
+                    </HStack>
+                    <Caption color="quiet">
+                      Five is a reach limit rather than a taste one: below about 64px a
+                      target stops being reliably hittable with a thumb, and five items
+                      is where a 360px phone reaches that. A FAB takes one of the five,
+                      because it sits in the same row.
+                    </Caption>
+
+                    <SwitchInput
+                      checked={mobile.showLabels !== false}
+                      onChange={(e: { target: { checked: boolean } }) => setMobileOpt('showLabels', e.target.checked)}
+                      label="Labels under the icons"
+                    />
+
+                    <Divider />
+                    <SwitchInput
+                      checked={!!mobile.fab}
+                      onChange={(e: { target: { checked: boolean } }) => {
+                        const on = e.target.checked;
+                        setMobile((m) => ({
+                          ...m,
+                          fab: on,
+                          // Adding a FAB shrinks the ceiling, so a count that
+                          // was legal a moment ago has to come down with it.
+                          itemCount: Math.min(m.itemCount ?? 4, maxItemsWithFab(on)),
+                        }));
+                      }}
+                      label="FAB"
+                    />
+                    {mobile.fab && (
+                      <>
+                        <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                          {([['center', 'Centred'], ['end', 'At the end']] as const).map(([id, l]) => (
+                            <Button key={id} size="small"
+                              variant={(mobile.fabPosition ?? 'center') === id ? 'default' : 'default-outline'}
+                              onClick={() => setMobileOpt('fabPosition', id)}>{l}</Button>
+                          ))}
+                        </HStack>
+                        <Caption color="quiet">
+                          Centred splits the items into the two slots the NavBar already
+                          has — which is why a centred FAB needs no variant of its own.
+                          At the end it is a sibling and the bar is unchanged.
+                        </Caption>
+                      </>
+                    )}
+                  </>
+                )}
+              </VStack>
+            </Card>
+          )}
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">

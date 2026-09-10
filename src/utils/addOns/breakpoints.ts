@@ -84,6 +84,23 @@ export function displayBreakpoints(bps: Breakpoint[]): Breakpoint[] {
   return [...bps].sort((a, b) => b.minWidth - a.minWidth);
 }
 
+/** Where the layout vocabulary changes.
+ *
+ *  Below the tablet cluster a nav stops being "the desktop bar with fewer
+ *  items": reach decides the arrangement, navigation moves to the bottom where
+ *  a thumb lands, and the top bar keeps only identity and the way in. That is
+ *  a different set of layouts rather than a narrower version of the same ones,
+ *  so the picker offers different options either side of this line.
+ *
+ *  600px is the boundary because it is where the device clusters change too —
+ *  Material's compact/medium line, and the narrowest tablet in the device
+ *  table. */
+export const MOBILE_MAX_WIDTH = 599;
+
+export function isMobileBreakpoint(bp: Breakpoint | undefined): boolean {
+  return !!bp && bp.minWidth <= MOBILE_MAX_WIDTH;
+}
+
 /** The breakpoint to open on: the widest, since that is what gets designed
  *  first and everything else is derived from it. */
 export function primaryBreakpoint(bps: Breakpoint[]): Breakpoint | undefined {

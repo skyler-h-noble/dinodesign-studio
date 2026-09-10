@@ -92,15 +92,27 @@ describe('sticky is a node, not the component', () => {
     expect(out.match(/position:sticky/g) || []).toHaveLength(1);
   });
 
-  it('every layout sticks its bar, and only its bar', () => {
-    /* The bar is always sticky — a top nav that scrolls away is a header
-       rather than a navigation, so it was never a real choice. Exactly one
-       sticky node per layout: applied to the root it would pin the whole nav,
+  it('every layout sticks its bar by default, and only its bar', () => {
+    /* Exactly one sticky node: applied to the root it would pin the whole nav,
        and in the rail layout it would pin a full-height rail that is already
        in view. */
     for (const l of ['brand-left', 'brand-centre', 'rail', 'hero'] as const) {
       const out = html(<DefinitionRenderer definition={navDefinition({ layout: l })} showSlots />);
-      expect((out.match(/position:sticky/g) || []).length, l).toBe(1);
+      expect([l, (out.match(/position:sticky/g) || []).length]).toEqual([l, 1]);
+    }
+  });
+
+  it('the two plain bars can be told not to stick', () => {
+    /* A marketing page whose nav gives way to the content is a real design.
+       The other two cannot: a rail layout is an application frame, and a frame
+       whose bar scrolls off leaves the rail beside nothing. */
+    for (const l of ['brand-left', 'brand-centre'] as const) {
+      const out = html(<DefinitionRenderer definition={navDefinition({ layout: l, sticky: false })} showSlots />);
+      expect([l, out.includes('position:sticky')]).toEqual([l, false]);
+    }
+    for (const l of ['rail', 'hero'] as const) {
+      const out = html(<DefinitionRenderer definition={navDefinition({ layout: l, sticky: false })} showSlots />);
+      expect([l, out.includes('position:sticky')]).toEqual([l, true]);
     }
   });
 });
