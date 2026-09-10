@@ -151,6 +151,12 @@ declare module '@omni-design/components' {
   export const Dropdown: FC<any>;
   export const Menu: FC<any>;
   export const MenuItem: FC<any>;
+  /* The rule between two groups of menu rows. Present in the package and in
+     its own types since the lib's Menu was written — missing HERE, which is
+     the only place that matters for a TS build, so the first use of it failed
+     to compile rather than failing to render. */
+  export const MenuDivider: FC<any>;
+  export const MenuButton: FC<any>;
   export const BottomNavigation: FC<any>;
   export const Stepper: FC<any>;
   export const SpeedDial: FC<any>;

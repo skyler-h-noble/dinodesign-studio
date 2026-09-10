@@ -64,6 +64,15 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
   Object.assign(spec, sizingFields(node, 'H'), sizingFields(node, 'V'));
   if (node.radius) spec.cornerRadius = ref(node.radius);
 
+  /* A hairline, INSIDE the frame. Figma's default is CENTER, which would put
+     half a pixel outside the bounds and leave a rounded panel's corners a
+     half-pixel proud of the fill they trace. */
+  if (node.border) {
+    spec.strokes = [{ type: 'SOLID', color: ref(node.border) }];
+    spec.strokeWeight = 1;
+    spec.strokeAlign = 'INSIDE';
+  }
+
   /* Surface is a LEVEL, and on this target it names the variable group the
      fill comes from — Surface/Background, Surface-Dim/Background. The CSS
      compiler will put the same level on a data-surface attribute instead and
@@ -98,14 +107,31 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
     spec.layoutPositioning = 'ABSOLUTE';
     spec.constraints = {
       horizontal: h === 'left' ? 'MIN' : 'MAX',
-      vertical: v === 'top' ? 'MIN' : 'MAX',
+      /* A dropping panel hangs off the BOTTOM of its parent, so it has to keep
+         its distance from the parent's top edge as the parent grows — pinning
+         it to MAX would slide it up over the control it drops from the moment
+         the bar got taller. The corner half of the anchor decides this in
+         every other case. */
+      vertical: node.overlay.drop ? 'MIN' : v === 'top' ? 'MIN' : 'MAX',
     };
   }
 
   if (node.children && node.children.length) {
+    /* A frame clips its children by default, which is fine until one of them
+       is meant to hang outside — a dropping panel lands entirely in the
+       clipped region and disappears, with no error and nothing on the canvas
+       to say it is there. So every frame on the path to one stops clipping,
+       not just its immediate parent: clipping anywhere up the chain is enough
+       to hide it. */
+    if (node.children.some(subtreeDrops)) spec.clipsContent = false;
     spec.children = node.children.map(nodeToSpec);
   }
   return spec;
+}
+
+/** Whether this node, or anything under it, hangs outside its parent's box. */
+function subtreeDrops(node: NodeDef): boolean {
+  return !!node.overlay?.drop || (node.children || []).some(subtreeDrops);
 }
 
 /** What a breakpoint means, for the plugin to map onto a Device-Sizes mode. */
@@ -172,6 +198,7 @@ export function tokensUsed(def: ComponentDefinition): string[] {
   const walk = (n: NodeDef) => {
     if (n.gap) out.add(n.gap.token);
     if (n.radius) out.add(n.radius.token);
+    if (n.border) out.add(n.border.token);
     for (const k of ['top', 'right', 'bottom', 'left'] as const) {
       const p = n.padding && n.padding[k];
       if (p) out.add(p.token);

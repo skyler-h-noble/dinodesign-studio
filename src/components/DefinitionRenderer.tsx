@@ -72,6 +72,48 @@ export interface RenderOptions {
   contentAlign?: 'left' | 'center';
 }
 
+/** Where an overlay sits.
+ *
+ *  A corner anchor places the panel INSIDE the parent, inset from that corner.
+ *  `drop` places it under the parent's bottom edge instead, keeping only the
+ *  horizontal half of the anchor — which is the difference between a menu that
+ *  sits on the avatar and one that opens below it.
+ *
+ *  The 4px gap and the zero side offset are the library's own Menu panel, not
+ *  a fresh guess: a nav's account menu that floated a different distance from
+ *  its trigger than every other menu in the system would be wrong in a way
+ *  nobody could name. */
+function overlayStyle(overlay: NonNullable<NodeDef['overlay']>): CSSProperties {
+  const [v, h] = overlay.anchor.split('-') as ['top' | 'bottom', 'left' | 'right'];
+
+  if (overlay.drop) {
+    return {
+      position: 'absolute',
+      /* Above the bar it drops from AND above whatever the bar sits on. The
+         corner overlays sit at 1 because they float over a hero inside the
+         same component; this one has to clear the page. */
+      zIndex: 20,
+      top: '100%',
+      marginTop: 'var(--Sizing-1, 4px)',
+      ...(h === 'left' ? { left: 0 } : { right: 0 }),
+    };
+  }
+
+  return {
+    position: 'absolute',
+    zIndex: 1,
+    top: v === 'top' ? 'var(--Sizing-2, 8px)' : undefined,
+    bottom: v === 'bottom' ? 'var(--Sizing-2, 8px)' : undefined,
+    left: h === 'left' ? 'var(--Sizing-3, 12px)' : undefined,
+    right: h === 'right' ? 'var(--Sizing-3, 12px)' : undefined,
+  };
+}
+
+/** Whether anything under this node leaves its box. */
+function escapes(node: NodeDef): boolean {
+  return (node.children || []).some((c) => !!c.overlay || escapes(c));
+}
+
 function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode {
   /* Presence is evaluated, not baked. `visibleWhen` in the Figma spec and this
      check are the same decision on two targets — which is why the definition
@@ -91,21 +133,23 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
     paddingBottom: tok(node.padding?.bottom),
     paddingLeft: tok(node.padding?.left),
     borderRadius: tok(node.radius),
+    // A hairline in the token's colour, so it follows the surface it sits on.
+    border: node.border ? `1px solid ${tok(node.border)}` : undefined,
+    /* A radius that does not clip is a radius on the background only: a row
+       hovering at the top of a rounded panel paints square corners over it.
+       Not applied when something underneath is meant to hang outside — a menu
+       inside a rounded frame would be clipped away by the very rule that
+       tidies its corners. */
+    ...(node.radius && !escapes(node) ? { overflow: 'hidden' as const } : {}),
     ...sizeStyle(node),
     // Sticky is a node property because only part of a nav sticks — the hero
     // scrolls away while the strip stays.
     ...(node.sticky ? { position: 'sticky' as const, top: 0, zIndex: 1 } : {}),
-    /* Overlay: out of flow, pinned to a corner. The parent is given
-       position:relative below — without that it would anchor to whatever
+    /* Overlay: out of flow, pinned to a corner — or hung under the parent
+       entirely, which is what a dropdown does. The parent is given
+       position:relative below; without that it would anchor to whatever
        ancestor happens to be positioned, which is usually the page. */
-    ...(node.overlay ? {
-      position: 'absolute' as const,
-      zIndex: 1,
-      top: node.overlay.anchor.startsWith('top') ? 'var(--Sizing-2, 8px)' : undefined,
-      bottom: node.overlay.anchor.startsWith('bottom') ? 'var(--Sizing-2, 8px)' : undefined,
-      left: node.overlay.anchor.endsWith('left') ? 'var(--Sizing-3, 12px)' : undefined,
-      right: node.overlay.anchor.endsWith('right') ? 'var(--Sizing-3, 12px)' : undefined,
-    } : {}),
+    ...(node.overlay ? overlayStyle(node.overlay) : {}),
     // A parent of any overlay has to establish the containing block.
     ...((node.children || []).some((c) => c.overlay) ? { position: 'relative' as const } : {}),
     // The surface's own fill. data-surface below is what makes this resolve.
@@ -141,9 +185,21 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
          its content does not: an item that no longer fits OVERFLOWS, which is
          visible and is the thing the breakpoint switches exist to resolve.
          Crushing hides the same problem and looks like a rendering fault. */
+      /* Centring is a ROW rule. align-items is the cross axis, so on a column
+         slot — a menu panel, say — the same value centres each row on its own
+         width instead of letting the rows share one edge, and the inner
+         wrapper's implicit row direction lays them out side by side. A panel
+         built that way renders its items in a line. */
+      const column = node.direction === 'column';
+      const cross = column ? 'stretch' : 'center';
       return (
-        <div key={key} style={{ ...style, alignItems: 'center' }} {...surfaceAttrs}>
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+        <div key={key} style={{ ...style, alignItems: cross }} {...surfaceAttrs}>
+          <div style={{
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: column ? 'column' : 'row',
+            alignItems: cross,
+          }}>
             {supplied}
           </div>
         </div>

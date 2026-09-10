@@ -26,6 +26,7 @@
  * than a fake frame that pretends to mean something.
  */
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef, type TokenRef } from './defineComponent';
+import { accountNode, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
 
 export type NavLayout = 'brand-left' | 'brand-centre' | 'rail' | 'hero';
 
@@ -35,6 +36,12 @@ export interface NavOptions {
   search?: boolean;
   actions?: boolean;
   avatar?: boolean;
+  /** Whether the avatar OPENS something.
+   *
+   *  An avatar in the top right is almost never decoration — it is the account
+   *  menu's trigger — but "almost never" is not never, so it stays a choice
+   *  rather than becoming the only shape on offer. */
+  avatarMenu?: boolean;
   /** Whether the bar sticks. Only a CHOICE in the two plain bar layouts —
    *  see stickyBar below. Defaults to true. */
   sticky?: boolean;
@@ -116,6 +123,10 @@ export const NAV_CONDITIONS: Record<string, ConditionDef> = {
     description: 'The account avatar.',
     trigger: 'device',
   },
+  /* Open or closed, and it is NOT a width. Declared here alongside the rest so
+     both compilers see one set, and defined next to the panel it gates so the
+     two cannot be changed apart. */
+  ...ACCOUNT_MENU_CONDITIONS,
   /* SCROLL, not width — and that is the whole reason the trigger is recorded.
      No media query can detect it, so a compiler that treated this like the
      others would emit a breakpoint for a state a breakpoint cannot see. In
@@ -184,7 +195,16 @@ function endSlot(o: NavOptions): NodeDef {
   const children: NodeDef[] = [];
   if (o.search) children.push(slot('Search', 'hug', 'Adaptive-Nav/Show-Search'));
   if (o.actions) children.push(slot('Actions', 'hug', 'Adaptive-Nav/Show-Actions'));
-  if (o.avatar) children.push(slot('Avatar', 'hug', 'Adaptive-Nav/Show-Avatar'));
+  /* The avatar, or the avatar and the panel it opens. One builder for both
+     ends of that choice, shared with the mobile bar, because the menu under a
+     mobile avatar is the same panel and two copies would agree only until the
+     first change. */
+  if (o.avatar) {
+    children.push(accountNode({
+      withMenu: o.avatarMenu,
+      when: 'Adaptive-Nav/Show-Avatar',
+    }));
+  }
   return {
     name: 'End',
     kind: 'stack',
@@ -521,7 +541,11 @@ export function defaultNavMatrix(
     out[name] = {};
     for (const bp of sorted) {
       out[name][bp.id] =
-        def?.trigger === 'scroll' ? false
+        /* Only a DEVICE condition can be true because of a width. Testing for
+           'scroll' by name seeded every trigger added afterwards as true,
+           which would have opened the account menu at every breakpoint the
+           moment it existed. */
+        def && def.trigger !== 'device' ? false
         : name === 'Adaptive-Nav/Show-Menu-Button' ? bp.id === narrowest
         : name === 'Adaptive-Nav/Show-Tabs' ? bp.id !== narrowest
         : name === 'Adaptive-Nav/Show-Rail' ? bp.id === widest

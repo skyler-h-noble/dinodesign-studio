@@ -30,9 +30,19 @@ export interface ScaledPreviewProps {
    *  magnified into something no device shows. */
   maxScale?: number;
   onScale?: (scale: number) => void;
+  /** Crop anything outside the simulated viewport. Default on.
+   *
+   *  Turn it OFF while something is deliberately floating out of the bar — an
+   *  open menu, a drawer — or the box crops it to the bar's own height and the
+   *  panel is simply not there, with nothing on screen to say why. The box's
+   *  height is COMPUTED from the untransformed content, so an absolutely
+   *  positioned panel never counted towards it and never will. */
+  clip?: boolean;
 }
 
-export default function ScaledPreview({ width, children, maxScale = 1, onScale, frame }: ScaledPreviewProps) {
+export default function ScaledPreview(
+  { width, children, maxScale = 1, onScale, frame, clip = true }: ScaledPreviewProps,
+) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -88,7 +98,11 @@ export default function ScaledPreview({ width, children, maxScale = 1, onScale, 
         width: boxWidth,
         maxWidth: '100%',
         height,
-        overflow: 'hidden',
+        overflow: clip ? 'hidden' : 'visible',
+        /* Only while something is escaping. A stacking context that outlives
+           the panel would put the whole preview above the controls under it
+           for no reason. */
+        ...(clip ? {} : { position: 'relative' as const, zIndex: 2 }),
         border: frame ? '1px solid var(--Border)' : undefined,
         boxSizing: 'content-box',
       }}>

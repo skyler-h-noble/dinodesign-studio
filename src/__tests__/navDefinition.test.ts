@@ -267,8 +267,20 @@ describe('the condensed state is scroll-driven, not width-driven', () => {
        position, so a compiler that treated this like the device conditions
        would emit a breakpoint for a state a breakpoint cannot see. */
     expect(NAV_CONDITIONS['Adaptive-Nav/Show-Condensed'].trigger).toBe('scroll');
+    /* Listed rather than excepted one by one. The rest of this test is "every
+       other condition is width-driven", and the only way it keeps meaning that
+       is if adding a non-device condition has to be a deliberate edit HERE —
+       an `if (name === …) continue` per exception would let the next one be
+       waved through by the person adding it. */
+    const notWidthDriven = new Set([
+      'Adaptive-Nav/Show-Condensed',
+      'Adaptive-Nav/Show-Account-Menu',
+    ]);
     for (const name of Object.keys(NAV_CONDITIONS)) {
-      if (name === 'Adaptive-Nav/Show-Condensed') continue;
+      if (notWidthDriven.has(name)) {
+        expect(NAV_CONDITIONS[name].trigger, name).not.toBe('device');
+        continue;
+      }
       expect(NAV_CONDITIONS[name].trigger, name).toBe('device');
     }
   });

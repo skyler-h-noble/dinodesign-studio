@@ -224,3 +224,69 @@ describe('a capped band paints edge to edge', () => {
     expect(out).not.toContain('max-width:1440px');
   });
 });
+
+describe('a panel that drops from its trigger', () => {
+  const def = navDefinition({ layout: 'brand-left', avatar: true, avatarMenu: true });
+  const open = {
+    'Adaptive-Nav/Show-Avatar': true,
+    'Adaptive-Nav/Show-Account-Menu': true,
+  };
+
+  it('hangs under the parent rather than inside a corner', () => {
+    /* The four corner anchors place a panel INSIDE the parent, inset from that
+       corner — which for a dropdown puts it on top of the control it opens
+       from. `drop` is the difference, and it has to survive compilation or the
+       menu covers the avatar. */
+    const out = html(<DefinitionRenderer definition={def} conditions={open} showSlots />);
+    expect(out).toContain('top:100%');
+    expect(out).toContain('right:0');
+    // The inset corner offsets belong to the OTHER kind of overlay.
+    expect(out).not.toContain('top:var(--Sizing-2, 8px)');
+  });
+
+  it('is not rendered at all when the condition is false', () => {
+    const out = html(
+      <DefinitionRenderer definition={def}
+        conditions={{ 'Adaptive-Nav/Show-Avatar': true }} showSlots />,
+    );
+    expect(out).not.toContain('Account-Menu');
+  });
+
+  it('gives the panel a stacking order that clears the bar', () => {
+    // A panel that paints under the bar it drops from is not a panel.
+    const out = html(<DefinitionRenderer definition={def} conditions={open} showSlots />);
+    expect(out).toMatch(/z-index:2\d/);
+  });
+
+  it('does not clip the frame the panel escapes from', () => {
+    /* The rounded-corner clip and a dropping child are in direct conflict:
+       the rule that tidies a panel's corners would delete the panel hanging
+       out of the frame above it. */
+    const out = html(<DefinitionRenderer definition={def} conditions={open} showSlots />);
+    const account = out.indexOf('Account-Menu');
+    expect(account).toBeGreaterThan(-1);
+    // The panel itself still clips its own rows to its radius.
+    expect(out).toContain('overflow:hidden');
+  });
+});
+
+describe('a column slot lays its content out in a column', () => {
+  it('does not centre each row on its own width', () => {
+    /* align-items is the CROSS axis, so 'center' on a column slot centres each
+       row individually AND the wrapper's implicit row direction lays them side
+       by side — a menu rendered as a line of items. */
+    const def = navDefinition({ layout: 'brand-left', avatar: true, avatarMenu: true });
+    const out = html(
+      <DefinitionRenderer
+        definition={def}
+        conditions={{
+          'Adaptive-Nav/Show-Avatar': true,
+          'Adaptive-Nav/Show-Account-Menu': true,
+        }}
+        slots={{ 'Account-Menu': <span>rows</span> }}
+      />,
+    );
+    const panel = out.slice(out.indexOf('flex-direction:column'));
+    expect(panel).toContain('align-items:stretch');
+  });
+});

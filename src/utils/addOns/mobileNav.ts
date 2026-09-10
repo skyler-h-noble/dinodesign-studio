@@ -21,6 +21,7 @@
  * something beside them exists.
  */
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef } from './defineComponent';
+import { accountNode, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
 
 export type MobileLayout = 'top-only' | 'top-and-bottom' | 'toolbar' | 'bottom-only';
 
@@ -54,6 +55,10 @@ export interface MobileOptions {
   showMenu?: boolean;
   topActions?: number;
   showAvatar?: boolean;
+  /** Whether that avatar opens the account menu. The same panel as the desktop
+   *  bar's, from the same builder — a phone's account menu is not a different
+   *  component, it is the same one on a narrower screen. */
+  avatarMenu?: boolean;
   /** Bottom bar or toolbar. */
   itemCount?: number;
   showLabels?: boolean;
@@ -86,6 +91,7 @@ export const MOBILE_CONDITIONS: Record<string, ConditionDef> = {
     description: 'The top bar. Off where navigation and identity both sit at the bottom.',
     trigger: 'device',
   },
+  ...ACCOUNT_MENU_CONDITIONS,
 };
 
 const GAP = t('Sizing-2');
@@ -160,7 +166,7 @@ function topBar(o: MobileOptions): NodeDef {
   const menu = o.showMenu !== false ? [slot('Menu-Button', 'hug')] : [];
   const actions: NodeDef[] = [];
   for (let i = 0; i < (o.topActions ?? 1); i++) actions.push(slot(`Action-${i + 1}`, 'hug'));
-  if (o.showAvatar) actions.push(slot('Avatar', 'hug'));
+  if (o.showAvatar) actions.push(accountNode({ withMenu: o.avatarMenu }));
 
   /* Centred brand needs both sides to claim equal space, or "centred" means
      "wherever the menu button and the actions happen to leave it". The same

@@ -17,7 +17,7 @@ import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
-  Rail, BottomNavigation,
+  Rail, BottomNavigation, MenuItem, MenuDivider,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -41,7 +41,11 @@ import {
   DEFAULT_TABS, DEFAULT_ACTIONS, buttonVariant, itemProblems,
   type NavItem, type NavButtonItem,
 } from '../utils/addOns/navContent';
+import {
+  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, type AccountMenuItem,
+} from '../utils/addOns/accountMenu';
 import NavItemEditor from './NavItemEditor';
+import AccountMenuEditor from './AccountMenuEditor';
 import NavIconGlyph from './NavIconGlyph';
 import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import NavLayoutPreview from './NavLayoutPreview';
@@ -91,6 +95,20 @@ export default function NavDesignerPage() {
   const [actions, setActions] = useState<NavButtonItem[]>(DEFAULT_ACTIONS);
   const [editing, setEditing] = useState<{ kind: 'tab' | 'button'; id: string } | null>(null);
 
+  /* The account menu's rows, and whether the preview is showing them.
+     
+     Kept OUTSIDE the desktop and mobile option sets, both of them, because the
+     menu is the same menu on either — a phone's account menu is not a second
+     design. Two copies would be the two that disagreed.
+     
+     `menuOpen` is preview state, not a condition value. The condition exists
+     and is published, but what it holds is decided by a click rather than by a
+     width, so storing it in the breakpoint matrix would record "open at lg" as
+     a design decision. */
+  const [accountItems, setAccountItems] = useState<AccountMenuItem[]>(DEFAULT_ACCOUNT_MENU);
+  const [accountEditorOpen, setAccountEditorOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const editingItem = editing
     ? (editing.kind === 'tab' ? tabs : actions).find((i) => i.id === editing.id) ?? null
     : null;
@@ -121,6 +139,19 @@ export default function NavDesignerPage() {
     outline: problems.length ? '2px solid var(--Buttons-Warning-Border)' : undefined,
     outlineOffset: 2,
   });
+
+  /* Derived above the slot content rather than beside the rest, because which
+     VOCABULARY applies decides what the slots hold: below the tablet cluster
+     the avatar's options come from the mobile set, not the desktop one. */
+  const problems = validateBreakpoints(breakpoints);
+  const sorted = sortBreakpoints(breakpoints);
+  const shown = displayBreakpoints(breakpoints);
+  const current = sorted.find((b) => b.id === selectedBp);
+
+  const onMobile = isMobileBreakpoint(current);
+
+  /* One menu, asked about through whichever option set is in play. */
+  const avatarOpensMenu = onMobile ? !!mobile.avatarMenu : !!options.avatarMenu;
 
   const slotContent = useMemo(() => {
     const mark = brand ? (
@@ -217,7 +248,69 @@ export default function NavDesignerPage() {
        size, radius and border, and would drift from the real one the moment
        either changed — the preview's whole claim is that it renders the same
        components the nav will. */
-    const avatar = <Avatar size="x-small" alt="Account" />;
+    const face = <Avatar size="x-small" alt="" />;
+
+    /* With a menu behind it the avatar stops being a picture and becomes a
+       control, so it is rendered as one: Button's `avatar` Type, which is the
+       shape the converter and the accessibility check both already know.
+       
+       The BUTTON carries the name and the Avatar inside it carries none —
+       alt="" above — or a screen reader announces the control twice. Naming
+       the ACTION rather than the picture is the same rule: "Your account",
+       never "avatar".
+       
+       Without a menu it stays exactly what it was. An avatar that opens
+       nothing should not take focus. */
+    const avatar = avatarOpensMenu ? (
+      <Button
+        avatar
+        variant="default-ghost"
+        size="small"
+        aria-label="Your account"
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        {face}
+      </Button>
+    ) : face;
+
+    /* The panel's ROWS. The panel itself — its corner, its surface, the fact
+       that it hangs under the avatar — comes from the definition and is
+       compiled to both targets; only what goes in it is supplied here, the
+       same division as the tabs.
+       
+       The library's MenuItem and MenuDivider, not rows drawn here. Both work
+       outside a Dropdown: the default context's setOpen is a no-op, which is
+       all a preview needs, and using them is what keeps this panel the same
+       height, padding and hover as every other menu in the system. */
+    const accountMenu = (
+      <VStack gap="0" style={{ minWidth: 180 }}>
+        {accountItems.map((i) => (
+          <div key={i.id}>
+            {i.dividerBefore && <MenuDivider />}
+            <MenuItem onClick={() => setAccountEditorOpen(true)}>
+              {/* A SPAN, not an HStack.
+
+                MenuItem wraps everything it is given in one Body, which
+                renders a <p> — so a div inside it is invalid nesting that
+                the browser silently repairs by breaking the row apart. An
+                inline-flex span is valid inside a paragraph and is a
+                layout primitive, which is the sanctioned exception.
+
+                The gap sits here rather than on MenuItem for the same
+                reason: MenuItem's own gap applies to its one child, the
+                paragraph, so it never reaches the icon. MenuItem having no
+                startDecorator the way Tab does is a real lib gap. */}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--Sizing-1, 4px)' }}>
+                {i.iconName ? <NavIconGlyph name={i.iconName} /> : null}
+                {i.label || 'Unnamed'}
+              </span>
+            </MenuItem>
+          </div>
+        ))}
+      </VStack>
+    );
 
     /* The hero the sticky tabs sit under. 16:9 because that is what a hero
        image is — an aspect ratio rather than a height, so it stays right at
@@ -290,6 +383,7 @@ export default function NavDesignerPage() {
       Tabs: tabStrip,
       Actions: actionGroup,
       Avatar: avatar,
+      'Account-Menu': accountMenu,
       Page: page,
       Hero: hero,
       'Rail-Items': rail,
@@ -298,16 +392,9 @@ export default function NavDesignerPage() {
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
-  }, [brand, tabs, actions, mobile.showLabels]);
+  }, [brand, tabs, actions, mobile.showLabels, avatarOpensMenu, menuOpen, accountItems]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
-
-  const problems = validateBreakpoints(breakpoints);
-  const sorted = sortBreakpoints(breakpoints);
-  const shown = displayBreakpoints(breakpoints);
-  const current = sorted.find((b) => b.id === selectedBp);
-
-  const onMobile = isMobileBreakpoint(current);
 
   const { definition, spec } = useMemo(() => {
     /* Which VOCABULARY applies is decided by the breakpoint, not by a toggle.
@@ -339,7 +426,26 @@ export default function NavDesignerPage() {
     return completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true);
   }, [definition, matrix, sorted]);
 
-  const active = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
+  const matrixActive = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
+
+  /* Whether the avatar is even there at this width. On the desktop bar it is a
+     condition; on mobile the top bar's avatar is a plain option, so asking the
+     matrix would come back false and the menu could never be opened. */
+  const avatarPresent = onMobile
+    ? !!mobile.showAvatar
+    : !!options.avatar && !!matrixActive['Adaptive-Nav/Show-Avatar'];
+
+  /* The one condition the matrix does not decide.
+     
+     It is published like the others — the panel binds to it, and a design
+     system needs the variable — but no width makes it true, so its value in
+     the preview comes from the click that opened it. Left to the matrix the
+     panel would be shut at every breakpoint with no way to look at it. */
+  const menuShown = menuOpen && avatarOpensMenu && avatarPresent;
+  const active = useMemo<Record<string, boolean>>(
+    () => ({ ...matrixActive, [ACCOUNT_MENU_CONDITION]: menuShown }),
+    [matrixActive, menuShown],
+  );
 
   /* The spec, WITH the responsive table. Derived after the matrix because it
      needs it: a spec that binds visibility to a variable and says nothing
@@ -619,7 +725,17 @@ export default function NavDesignerPage() {
                   design. Square, too: a rounded frame reads as a nav with
                   rounded corners rather than the edge of a viewport. */}
               <div>
-                <ScaledPreview width={previewWidth} onScale={setScale} frame>
+                {/* Stops cropping while the menu is open. The box's height is
+                    computed from the untransformed content, and an absolutely
+                    positioned panel never counted towards it — so cropping
+                    would cut the menu off entirely, which reads as the panel
+                    not rendering rather than as the frame ending. */}
+                <ScaledPreview
+                  width={previewWidth}
+                  onScale={setScale}
+                  frame
+                  clip={!menuShown}
+                >
                   {/* The cap goes THROUGH the renderer rather than around it.
                       Wrapped outside, it capped the whole bar and left bare
                       page either side of a floating coloured strip; passed in,
@@ -677,10 +793,41 @@ export default function NavDesignerPage() {
                       />
                       <SwitchInput
                         checked={!!mobile.showAvatar}
-                        onChange={(e: { target: { checked: boolean } }) => setMobileOpt('showAvatar', e.target.checked)}
+                        onChange={(e: { target: { checked: boolean } }) => {
+                          const on = e.target.checked;
+                          setMobileOpt('showAvatar', on);
+                          // The menu goes with it. Left open, the panel would
+                          // float under a bar with nothing in it.
+                          if (!on) setMenuOpen(false);
+                        }}
                         label="Avatar"
                       />
                     </HStack>
+                    {/* The SAME menu as the desktop bar's, from the same rows.
+                        A phone's account menu is not a second design, and two
+                        lists would be the two that disagreed. */}
+                    {mobile.showAvatar && (
+                      <HStack gap="var(--Sizing-3)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                        <SwitchInput
+                          checked={!!mobile.avatarMenu}
+                          onChange={(e: { target: { checked: boolean } }) => {
+                            const on = e.target.checked;
+                            setMobileOpt('avatarMenu', on);
+                            if (!on) setMenuOpen(false);
+                          }}
+                          label="Avatar opens a menu"
+                        />
+                        {mobile.avatarMenu && (
+                          <Button
+                            variant="default-outline"
+                            size="small"
+                            onClick={() => setAccountEditorOpen(true)}
+                          >
+                            Edit menu
+                          </Button>
+                        )}
+                      </HStack>
+                    )}
                     <HStack gap="var(--Sizing-3)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                       <SwitchInput
                         checked={(mobile.topActions ?? 1) > 0}
@@ -946,6 +1093,45 @@ export default function NavDesignerPage() {
                 )}
               </HStack>
 
+              {/* Only once the avatar is there. A menu behind a slot that does
+                  not exist at this width is a setting with nothing to apply
+                  to, and switching it on would look like it had done nothing. */}
+              {!onMobile && options.avatar && (
+                <>
+                  <Divider />
+                  <HStack gap="var(--Sizing-3)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <SwitchInput
+                      checked={!!options.avatarMenu}
+                      onChange={(e: { target: { checked: boolean } }) => {
+                        const on = e.target.checked;
+                        set('avatarMenu', on);
+                        // Turning it off has to shut the preview too, or the
+                        // panel stays on screen with nothing left to close it.
+                        if (!on) setMenuOpen(false);
+                      }}
+                      label="Avatar opens a menu"
+                    />
+                    {options.avatarMenu && (
+                      <Button
+                        variant="default-outline"
+                        size="small"
+                        onClick={() => setAccountEditorOpen(true)}
+                      >
+                        Edit menu
+                      </Button>
+                    )}
+                  </HStack>
+                  {options.avatarMenu && (
+                    <Caption color="quiet">
+                      Click the avatar in the preview to open it. Open or closed is a
+                      click, not a width — so it is published as a variable the
+                      component reads and left out of the breakpoint table, which
+                      records design decisions rather than states.
+                    </Caption>
+                  )}
+                </>
+              )}
+
               {navigationChoice && (
                 <>
                   <Divider />
@@ -1008,6 +1194,13 @@ export default function NavDesignerPage() {
         onChange={updateItem}
         onRemove={removeItem}
         onClose={() => setEditing(null)}
+      />
+
+      <AccountMenuEditor
+        open={accountEditorOpen}
+        items={accountItems}
+        onChange={setAccountItems}
+        onClose={() => setAccountEditorOpen(false)}
       />
 
       <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} size="medium">
