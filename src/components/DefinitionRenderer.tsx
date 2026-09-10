@@ -122,7 +122,27 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
 
   if (node.kind === 'slot') {
     const supplied = opts.slots?.[node.name];
-    if (supplied) return <div key={key} style={style} {...surfaceAttrs}>{supplied}</div>;
+    if (supplied) {
+      /* A filled slot is a REGION, and its content sits in it at natural size.
+         
+         Two defaults were fighting the content. align-items defaults to
+         stretch, so a tab strip grew to the slot's full height and left a tall
+         empty bar; and min-width:0 — needed so a FILL slot can shrink below its
+         content — let the same strip be crushed to nothing when space ran
+         short, which is how four tabs rendered as four hairlines.
+         
+         Centring fixes the first. For the second the slot still shrinks, but
+         its content does not: an item that no longer fits OVERFLOWS, which is
+         visible and is the thing the breakpoint switches exist to resolve.
+         Crushing hides the same problem and looks like a rendering fault. */
+      return (
+        <div key={key} style={{ ...style, alignItems: 'center' }} {...surfaceAttrs}>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            {supplied}
+          </div>
+        </div>
+      );
+    }
     return (
       <div
         key={key}

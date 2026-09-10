@@ -141,3 +141,38 @@ describe('the app bar paints itself', () => {
     expect(tag).toContain('background:var(--Background)');
   });
 });
+
+describe('a filled slot holds its content at natural size', () => {
+  const filled = (
+    <DefinitionRenderer
+      definition={navDefinition({ layout: 'brand-left' })}
+      conditions={{ 'Adaptive-Nav/Show-Tabs': true }}
+      slots={{ Tabs: <span>TABS</span> }}
+    />
+  );
+
+  it('centres rather than stretching it', () => {
+    /* align-items defaults to stretch, so a tab strip grew to the slot's full
+       height and left a tall empty bar under it. */
+    const out = html(filled);
+    const at = out.indexOf('TABS');
+    expect(out.slice(0, at)).toContain('align-items:center');
+  });
+
+  it('and does not let it be crushed', () => {
+    /* min-width:0 is needed so a FILL slot can shrink — but applied to the
+       CONTENT it squeezed four tabs into four hairlines. The slot still
+       shrinks; what is in it overflows instead, which is visible and is what
+       the breakpoint switches exist to resolve. */
+    const out = html(filled);
+    const at = out.indexOf('TABS');
+    expect(out.slice(0, at)).toContain('flex-shrink:0');
+  });
+
+  it('an empty slot still collapses to nothing', () => {
+    // The non-shrinking wrapper is for supplied content only — an unfilled
+    // slot must not reserve space it has no reason to hold.
+    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} />);
+    expect(out).not.toContain('flex-shrink:0');
+  });
+});
