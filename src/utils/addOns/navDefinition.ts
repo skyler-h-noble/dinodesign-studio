@@ -226,21 +226,26 @@ function bar(o: NavOptions): NodeDef {
        
        Left-aligned is the simpler case — the title just fills after the brand,
        and no equal-width trick is needed because nothing is being balanced. */
+    /* No brand in the bar when the rail is full height — it is at the top of
+       the rail instead, which is the corner it occupies. */
+    const brandInBar = o.barPosition === 'above-rail';
     const centred = o.titleAlign === 'center';
     children = centred
       ? [
           { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center', gap: GAP,
-            width: 'fill', height: 'hug', children: [brand] },
+            width: 'fill', height: 'hug', children: brandInBar ? [brand] : [] },
           { name: 'Title', kind: 'stack', direction: 'row', justify: 'center', align: 'center',
             width: 'hug', height: 'hug', children: [slot('Title', 'hug')] },
           { ...endSlot(o), width: 'fill', justify: 'end' },
         ]
-      : [
-          { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-            width: 'hug', height: 'hug', children: [brand] },
-          slot('Title', 'fill'),
-          endSlot(o),
-        ];
+      : brandInBar
+        ? [
+            { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
+              width: 'hug', height: 'hug', children: [brand] },
+            slot('Title', 'fill'),
+            endSlot(o),
+          ]
+        : [slot('Title', 'fill'), endSlot(o)];
   } else {
     children = [
       { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
@@ -346,7 +351,14 @@ function railNode(fullHeight: boolean): NodeDef {
     surface: 'Surface-Dim',
     padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
     presence: { when: 'Adaptive-Nav/Show-Rail' },
-    children: [slot('Rail-Items', 'hug')],
+    /* The brand belongs to whichever element reaches the top-left corner. A
+       full-height rail does, so it carries the brand and the bar beside it
+       starts with the title. Under a full-width bar the rail does not, and the
+       brand stays in the bar. Putting it in both would show it twice; putting
+       it in the bar while the rail runs past it leaves the corner empty. */
+    children: fullHeight
+      ? [slot('Brand', 'hug'), slot('Rail-Items', 'hug')]
+      : [slot('Rail-Items', 'hug')],
   };
 }
 

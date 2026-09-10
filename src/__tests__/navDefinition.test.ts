@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { navDefinition, applyExclusivity, defaultNavMatrix, NAV_LAYOUTS, NAV_CONDITIONS, type NavLayout } from '../utils/addOns/navDefinition';
-import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
+import { toAddonSpec, tokensUsed, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 
 const ALL: NavLayout[] = NAV_LAYOUTS.map((l) => l.id);
 const full = (layout: NavLayout) =>
@@ -22,12 +22,27 @@ describe('three layouts, one component', () => {
     for (const l of ALL) expect(navDefinition({ layout: l }).id).toBe('adaptive-nav');
   });
 
-  it('every layout carries a Bar with a Start', () => {
-    for (const l of ALL) {
-      const n = names(toAddonSpec(full(l)));
-      expect(n, l).toContain('Bar');
-      expect(n, `${l}/Start`).toContain('Start');
-    }
+  it('every layout carries a Bar', () => {
+    for (const l of ALL) expect(names(toAddonSpec(full(l))), l).toContain('Bar');
+  });
+
+  it('the brand goes wherever the top-left corner is', () => {
+    /* A full-height rail occupies that corner, so it carries the brand and the
+       bar beside it starts with the title. Under a full-width bar the rail
+       does not reach the corner, and the brand stays in the bar. In both, one
+       place only: two would show it twice, neither would leave the corner
+       empty. */
+    const beside: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: 'beside-rail' }));
+    const rail = beside.root.children.find((c: any) => c.name === 'Rail');
+    const bar = beside.root.children.find((c: any) => c.name === 'Bar');
+    expect(names(rail)).toContain('Brand');
+    expect(names(bar)).not.toContain('Brand');
+
+    const above: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: 'above-rail' }));
+    const railAbove = above.root.children.find((c: any) => c.name === 'Rail');
+    const barAbove = above.root.children.find((c: any) => c.name === 'Bar');
+    expect(names(barAbove)).toContain('Brand');
+    expect(names(railAbove)).not.toContain('Brand');
   });
 
   it('an End exists wherever the bar holds actions', () => {
@@ -407,5 +422,69 @@ describe('tabs and the menu button are one decision', () => {
       { id: 'xs', minWidth: 0 }, { id: 'lg', minWidth: 1280 },
     ]);
     for (const bp of ['xs', 'lg']) expect([bp, m[TABS][bp] === m[MENU][bp]]).toEqual([bp, false]);
+  });
+});
+
+describe('the responsive table travels with the spec', () => {
+  const BPS = [
+    { id: 'xs', label: 'xs', minWidth: 0 },
+    { id: 'md', label: 'md', minWidth: 900 },
+  ];
+  const def = navDefinition({ layout: 'brand-left', search: true, avatar: true });
+  const matrix = defaultNavMatrix(Object.keys(NAV_CONDITIONS), BPS);
+
+  it('a spec without it records no decision at all', () => {
+    /* The binding alone is not the design. Hiding search at xs and showing it
+       at md is two values of one variable, and a spec that only says "this
+       layer's visibility is bound" leaves both unwritten — while looking
+       correct, because the binding is there. */
+    const bare: any = toAddonSpec(def);
+    expect(bare.responsive).toBeUndefined();
+    expect(JSON.stringify(bare)).toContain('visibleWhen');
+  });
+
+  it('with it, every gated condition carries a value per breakpoint', () => {
+    const spec: any = toAddonSpec(def, { breakpoints: BPS, matrix });
+    for (const name of conditionsUsedBy(def)) {
+      for (const bp of BPS) {
+        expect([name, bp.id, typeof spec.responsive.matrix[name]?.[bp.id]])
+          .toEqual([name, bp.id, 'boolean']);
+      }
+    }
+  });
+
+  it('records a genuine difference between widths', () => {
+    // The whole point: hidden at one width, shown at another, both written.
+    const spec: any = toAddonSpec(def, {
+      breakpoints: BPS,
+      matrix: { ...matrix, 'Adaptive-Nav/Show-Search': { xs: false, md: true } },
+    });
+    expect(spec.responsive.matrix['Adaptive-Nav/Show-Search']).toEqual({ xs: false, md: true });
+  });
+
+  it('carries the breakpoints, so widths can be matched to modes', () => {
+    /* The matrix keys are breakpoint IDS, which mean nothing to the plugin on
+       their own — it has to line them up with Device-Sizes modes by width. */
+    const spec: any = toAddonSpec(def, { breakpoints: BPS, matrix });
+    expect(spec.responsive.breakpoints.map((b: any) => b.minWidth)).toEqual([0, 900]);
+  });
+
+  it('omits conditions this arrangement does not gate on', () => {
+    // Publishing a value for one nothing binds to would tell the plugin to
+    // write a variable the component never reads.
+    const spec: any = toAddonSpec(def, { breakpoints: BPS, matrix });
+    expect(spec.responsive.matrix['Adaptive-Nav/Show-Rail']).toBeUndefined();
+  });
+
+  it('keeps scroll conditions in, at false everywhere', () => {
+    /* Not a gap. No width makes them true, and leaving them out would leave
+       those variables unwritten and looking like an oversight. */
+    const hero = navDefinition({ layout: 'hero', avatar: true, condensed: true });
+    const spec: any = toAddonSpec(hero, {
+      breakpoints: BPS,
+      matrix: defaultNavMatrix(Object.keys(NAV_CONDITIONS), BPS),
+    });
+    const condensed = spec.responsive.matrix['Adaptive-Nav/Show-Condensed'];
+    expect(condensed).toEqual({ xs: false, md: false });
   });
 });

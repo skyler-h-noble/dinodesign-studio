@@ -99,13 +99,60 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
   return spec;
 }
 
-export function toAddonSpec(def: ComponentDefinition): Record<string, unknown> {
-  return {
+/** What a breakpoint means, for the plugin to map onto a Device-Sizes mode. */
+export interface SpecBreakpoint {
+  id: string;
+  label: string;
+  minWidth: number;
+  maxWidth?: number;
+  align?: 'left' | 'center';
+}
+
+export interface SpecResponsive {
+  breakpoints: SpecBreakpoint[];
+  /** condition name → breakpoint id → true there. */
+  matrix: Record<string, Record<string, boolean>>;
+}
+
+/**
+ * The spec, optionally carrying the responsive table.
+ *
+ * WITHOUT IT the spec says a layer's visibility is BOUND to a variable and
+ * nothing says what that variable holds at each width. The import then creates
+ * the binding and leaves every mode at whatever the file already had — so a
+ * nav designed to hide its search at xs and show it at md arrives with neither
+ * decision recorded, looking correct because the binding is there.
+ *
+ * The plugin needs both halves: the breakpoints to match against Device-Sizes
+ * modes by width, and the matrix to write each boolean per mode.
+ *
+ * Scroll-triggered conditions are in the table too, at false everywhere. That
+ * is not a gap — no width makes them true, and omitting them would leave those
+ * variables unwritten and looking like an oversight rather than a decision.
+ */
+export function toAddonSpec(
+  def: ComponentDefinition,
+  responsive?: SpecResponsive,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {
     name: def.id,
     label: def.label,
     schemaVersion: def.schemaVersion,
     root: nodeToSpec(def.root),
   };
+
+  if (responsive) {
+    /* Only the conditions this arrangement actually gates on. Publishing a
+       value for a condition nothing binds to would tell the plugin to write a
+       variable the component never reads. */
+    const used = new Set(conditionsUsedBy(def));
+    const matrix: Record<string, Record<string, boolean>> = {};
+    for (const [name, byBp] of Object.entries(responsive.matrix)) {
+      if (used.has(name)) matrix[name] = { ...byBp };
+    }
+    out.responsive = { breakpoints: responsive.breakpoints, matrix };
+  }
+  return out;
 }
 
 /** Every token a definition references, so the set can be checked against a

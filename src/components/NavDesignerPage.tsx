@@ -12,11 +12,11 @@
  * exists to avoid. Boxes showing which slot sits where is the honest amount to
  * promise from a definition that has no behaviour in it yet.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
-  Tabs, TabList, Tab, TextField, Alert, Modal,
+  Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -32,7 +32,13 @@ import TuneIcon from '@mui/icons-material/Tune';
 import {
   loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
 } from '../utils/addOns/brandAsset';
-import { toAddonSpec, tokensUsed, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
+import {
+  DEFAULT_TABS, DEFAULT_ACTIONS, buttonVariant, itemProblems, newId,
+  type NavItem, type NavButtonItem,
+} from '../utils/addOns/navContent';
+import NavItemEditor from './NavItemEditor';
+import NavIconGlyph from './NavIconGlyph';
+import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
 
@@ -46,16 +52,19 @@ export default function NavDesignerPage() {
 
   /* Recomputed from the definition rather than tracked alongside it, so what
      is shown is always what would be published. */
-  const { definition, spec, tokens } = useMemo(() => {
+  const { definition, spec } = useMemo(() => {
     const def = navDefinition(options);
-    return { definition: def, spec: toAddonSpec(def), tokens: tokensUsed(def) };
+    /* tokensUsed is no longer read here — the token list came out with the
+       card that showed it. It stays exported because the publish script prints
+       it before writing, which is where the check actually matters: a missing
+       variable imports unbound and silently looks like a design decision. */
+    return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
   }, [options]);
 
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>(DEFAULT_BREAKPOINTS);
   /* Opens on the WIDEST. Design runs desktop-down: the wide layout is the one
      being designed and the narrow ones are what it degrades into. */
   const [selectedBp, setSelectedBp] = useState<string>(primaryBreakpoint(DEFAULT_BREAKPOINTS)!.id);
-  const [expanded, setExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [brand, setBrand] = useState<BrandAsset | null>(null);
   const [brandError, setBrandError] = useState<string | null>(null);
@@ -69,17 +78,135 @@ export default function NavDesignerPage() {
      can carry scripts and event handlers, and inlining one would run them with
      this page's origin. In an <img> it is treated as an image: no scripts, no
      external fetches, no reach into the document. */
-  const brandSlots = useMemo(() => {
-    if (!brand) return undefined;
-    const mark = (
-      <img
-        src={brand.url}
-        alt=""
-        style={{ height: 24, width: 'auto', display: 'block' }}
-      />
+  const [tabs, setTabs] = useState<NavItem[]>(DEFAULT_TABS);
+  const [actions, setActions] = useState<NavButtonItem[]>(DEFAULT_ACTIONS);
+  const [editing, setEditing] = useState<{ kind: 'tab' | 'button'; id: string } | null>(null);
+
+  const editingItem = editing
+    ? (editing.kind === 'tab' ? tabs : actions).find((i) => i.id === editing.id) ?? null
+    : null;
+
+  const updateItem = (next: NavItem | NavButtonItem) => {
+    if (!editing) return;
+    if (editing.kind === 'tab') setTabs((xs) => xs.map((i) => (i.id === next.id ? next : i)));
+    else setActions((xs) => xs.map((i) => (i.id === next.id ? (next as NavButtonItem) : i)));
+  };
+
+  const removeItem = () => {
+    if (!editing) return;
+    if (editing.kind === 'tab') setTabs((xs) => xs.filter((i) => i.id !== editing.id));
+    else setActions((xs) => xs.filter((i) => i.id !== editing.id));
+    setEditing(null);
+  };
+
+  /* Every item is a real control in the preview, and clicking one opens its
+     settings. Editing what you just pointed at is the whole affordance —
+     a list elsewhere would need the two kept in step, and they would not be.
+     
+     A problem shows on the item itself rather than in a summary: an unnamed
+     icon-only button is invisible without a screen reader, so the only place
+     the warning helps is where the thing is. */
+  const itemChrome = (problems: string[]): CSSProperties => ({
+    cursor: 'pointer',
+    borderRadius: 'var(--Sizing-1, 4px)',
+    outline: problems.length ? '2px solid var(--Buttons-Warning-Border)' : undefined,
+    outlineOffset: 2,
+  });
+
+  const slotContent = useMemo(() => {
+    const mark = brand ? (
+      <img src={brand.url} alt="" style={{ height: 24, width: 'auto', display: 'block' }} />
+    ) : null;
+
+    const label = (i: NavItem) => (i.iconOnly ? null : i.label);
+    const glyph = (i: NavItem) => (i.icon ? <NavIconGlyph name={i.icon} /> : null);
+
+    const tabStrip = (
+      <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
+        {tabs.map((t) => {
+          const problems = itemProblems(t);
+          return (
+            <Button
+              key={t.id}
+              variant="default-text"
+              size="small"
+              iconOnly={t.iconOnly}
+              /* An icon-only control needs a name and its icon must not carry
+                 one, or a screen reader announces the control twice. */
+              aria-label={t.iconOnly ? t.label || 'Unnamed tab' : undefined}
+              onClick={() => setEditing({ kind: 'tab', id: t.id })}
+              style={itemChrome(problems)}
+            >
+              {t.iconPosition === 'end' ? <>{label(t)}{glyph(t)}</> : <>{glyph(t)}{label(t)}</>}
+            </Button>
+          );
+        })}
+        <Button
+          iconOnly
+          size="small"
+          variant="default-ghost"
+          aria-label="Add a tab"
+          onClick={() => {
+            const item = { id: newId('tab'), label: 'New tab' };
+            setTabs((xs) => [...xs, item]);
+            setEditing({ kind: 'tab', id: item.id });
+          }}
+        >
+          <NavIconGlyph name="add" />
+        </Button>
+      </HStack>
     );
-    return { Brand: mark, 'Condensed-Brand': mark };
-  }, [brand]);
+
+    const actionGroup = (
+      <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
+        {actions.map((a) => {
+          const problems = itemProblems(a);
+          return (
+            <Button
+              key={a.id}
+              variant={buttonVariant(a.colour, a.treatment)}
+              size="small"
+              iconOnly={a.iconOnly}
+              aria-label={a.iconOnly ? a.label || 'Unnamed button' : undefined}
+              onClick={() => setEditing({ kind: 'button', id: a.id })}
+              style={itemChrome(problems)}
+            >
+              {a.iconPosition === 'end' ? <>{label(a)}{glyph(a)}</> : <>{glyph(a)}{label(a)}</>}
+            </Button>
+          );
+        })}
+        <Button
+          iconOnly
+          size="small"
+          variant="default-ghost"
+          aria-label="Add a button"
+          onClick={() => {
+            const item: NavButtonItem = {
+              id: newId('act'), label: 'New', colour: 'default', treatment: 'outline',
+            };
+            setActions((xs) => [...xs, item]);
+            setEditing({ kind: 'button', id: item.id });
+          }}
+        >
+          <NavIconGlyph name="add" />
+        </Button>
+      </HStack>
+    );
+
+    /* The lib's Avatar, not a circle drawn here. A stand-in would have its own
+       size, radius and border, and would drift from the real one the moment
+       either changed — the preview's whole claim is that it renders the same
+       components the nav will. */
+    const avatar = <Avatar size="x-small" alt="Account" />;
+
+    const out: Record<string, React.ReactNode> = {
+      Tabs: tabStrip,
+      Actions: actionGroup,
+      Avatar: avatar,
+    };
+    if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
+    return out;
+  }, [brand, tabs, actions]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
@@ -103,6 +230,15 @@ export default function NavDesignerPage() {
   }, [definition, matrix, sorted]);
 
   const active = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
+
+  /* The spec, WITH the responsive table. Derived after the matrix because it
+     needs it: a spec that binds visibility to a variable and says nothing
+     about what that variable holds at each width leaves every decision made
+     here unrecorded, while looking correct because the binding is present. */
+  const fullSpec = useMemo(
+    () => toAddonSpec(definition, { breakpoints: sorted, matrix: full }),
+    [definition, sorted, full],
+  );
   /* Writes one cell, at this breakpoint, honouring exclusivity.
      
      Tabs and the menu button are one decision in two booleans: switching one
@@ -127,9 +263,29 @@ export default function NavDesignerPage() {
     });
   };
 
-  /** The other members of a condition's exclusive group, for the UI to say so. */
-  const exclusiveWith = (name: string) =>
-    (NAV_EXCLUSIVE.find((g) => g.includes(name)) || []).filter((n) => n !== name);
+  /* Split the conditions this arrangement uses into the exclusive set — one
+     decision, so one radio group — and everything else, which are independent
+     switches. Doing it here rather than in the markup keeps the two kinds of
+     control from being decided inside a map. */
+  const usedConditions = conditionsUsedBy(definition);
+
+  const navigationChoice = useMemo(() => {
+    const group = NAV_EXCLUSIVE.find((g) => g.every((n) => usedConditions.includes(n)));
+    if (!group) return null;
+    return {
+      /* Whichever is on. Falling back to the first keeps the radio from
+         showing nothing selected in a state the rules do not allow anyway. */
+      value: group.find((n) => active[n]) ?? group[0],
+      options: group.map((n) => ({
+        value: n,
+        label: n.split('/').pop()!.replace(/^Show-/, '').replace(/-/g, ' '),
+      })),
+    };
+  }, [usedConditions, active]);
+
+  const otherConditions = usedConditions.filter(
+    (n) => !NAV_EXCLUSIVE.some((g) => g.includes(n)),
+  );
 
   const range = breakpointRange(sorted, selectedBp);
 
@@ -305,18 +461,10 @@ export default function NavDesignerPage() {
                   be the narrow arrangement wearing a wide label — every
                   judgement from it about the wrong design. */}
               <div
-                role="button"
-                tabIndex={0}
-                aria-label="Open at full size"
-                onClick={() => setExpanded(true)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(true); }
-                }}
                 style={{
                   border: '1px solid var(--Border)',
                   borderRadius: 'var(--Card-Radius, 8px)',
                   overflow: 'hidden',
-                  cursor: 'zoom-in',
                 }}
               >
                 <ScaledPreview width={previewWidth} onScale={setScale}>
@@ -331,7 +479,7 @@ export default function NavDesignerPage() {
                     <DefinitionRenderer
                       definition={definition}
                       conditions={active}
-                      slots={brandSlots}
+                      slots={slotContent}
                       showSlots
                     />
                   </div>
@@ -346,33 +494,8 @@ export default function NavDesignerPage() {
                     ? ` — content capped at ${current.maxWidth}px`
                     : ''}
                 </Caption>
-                <Button variant="default-outline" size="small" onClick={() => setExpanded(true)}>
-                  Open full size
-                </Button>
               </HStack>
 
-              <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
-                {conditionsUsedBy(definition).map((name) => {
-                  const def = definition.conditions?.[name];
-                  return (
-                    <SwitchInput
-                      key={name}
-                      checked={!!active[name]}
-                      onChange={(e: { target: { checked: boolean } }) =>
-                        setCondition(name, e.target.checked)}
-                      label={name.split('/').pop()
-                        + (def?.trigger === 'scroll' ? ' (scroll)' : '')
-                        + (exclusiveWith(name).length ? ' \u00b7 either/or' : '')}
-                    />
-                  );
-                })}
-              </HStack>
-              <Caption color="quiet">
-                These are set PER BREAKPOINT — the same shape Figma stores, where a
-                boolean holds one value per Device-Sizes mode. Device conditions
-                become breakpoints in CSS; the scroll ones cannot, so they stay false
-                at every width and are switched by a listener instead.
-              </Caption>
             </VStack>
           </Card>
 
@@ -443,17 +566,81 @@ export default function NavDesignerPage() {
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
-              <H4>Right-hand slots</H4>
-              {([['search', 'Search'], ['actions', 'Actions'], ['avatar', 'Avatar']] as const).map(
-                ([key, label]) => (
-                  <SwitchInput
-                    key={key}
-                    checked={!!options[key]}
-                    onChange={(e: { target: { checked: boolean } }) => set(key, e.target.checked)}
-                    label={label}
+              <H4>Slots</H4>
+
+              {/* WHICH SLOTS EXIST — structural, and the same at every width.
+                  Kept apart from the visibility switches below because the two
+                  are different decisions that look alike: this one removes the
+                  slot from the component entirely, that one hides an existing
+                  slot at one breakpoint. Merging them into one row of switches
+                  would make "off" mean two different things. */}
+              <Label>Included</Label>
+              <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
+                {([['search', 'Search'], ['actions', 'Actions'], ['avatar', 'Avatar']] as const).map(
+                  ([key, label]) => (
+                    <SwitchInput
+                      key={key}
+                      checked={!!options[key]}
+                      onChange={(e: { target: { checked: boolean } }) => set(key, e.target.checked)}
+                      label={label}
+                    />
+                  ),
+                )}
+              </HStack>
+              <Caption color="quiet">
+                Every breakpoint. A slot switched off here is not in the component at
+                all — nothing to bind, nothing to fill.
+              </Caption>
+
+              {navigationChoice && (
+                <>
+                  <Divider />
+                  {/* Radio, not two switches. It is one decision — both on shows
+                      two navigations, both off shows none — and a radio cannot
+                      express either, where a pair of switches needs a rule and a
+                      label to say so. */}
+                  <RadioGroup
+                    label={`Navigation at ${current?.label}`}
+                    orientation="horizontal"
+                    value={navigationChoice.value}
+                    onChange={(e: { target: { value: string } }) =>
+                      setCondition(e.target.value, true)}
+                    options={navigationChoice.options}
                   />
-                ),
+                </>
               )}
+
+              {otherConditions.length > 0 && (
+                <>
+                  <Divider />
+                  <Label>At {current?.label} only</Label>
+                  <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
+                    {otherConditions.map((name) => {
+                      const def = definition.conditions?.[name];
+                      return (
+                        <SwitchInput
+                          key={name}
+                          checked={!!active[name]}
+                          onChange={(e: { target: { checked: boolean } }) =>
+                            setCondition(name, e.target.checked)}
+                          /* "Search" alone did not say what the switch does.
+                             The heading gives the breakpoint; the label has to
+                             give the rest, or it reads as a noun with no verb. */
+                          label={`Show ${name.split('/').pop()!.replace(/^Show-/, '').replace(/-/g, ' ').toLowerCase()}`
+                            + (def?.trigger === 'scroll' ? ' (on scroll)' : '')}
+                        />
+                      );
+                    })}
+                  </HStack>
+                  <Caption color="quiet">
+                    This breakpoint only — the same shape Figma stores, where a boolean
+                    holds one value per Device-Sizes mode. Device conditions become
+                    breakpoints in CSS; the scroll ones cannot, so they stay false at
+                    every width and are switched by a listener instead.
+                  </Caption>
+                </>
+              )}
+
               {options.layout === 'hero' && (
                 <>
                   <Divider />
@@ -463,33 +650,14 @@ export default function NavDesignerPage() {
                     label="Brand and actions animate in when stuck"
                   />
                   <Caption color="quiet">
-                    A SCROLL condition, not a width one — no media query can detect it, so
-                    it compiles to a scroll listener in React and to a mode a designer
-                    flips by hand in Figma. Without it the strip carries navigation only,
-                    because showing the brand before the hero scrolls past would show it
-                    twice.
+                    A SCROLL condition, not a width one — no media query can detect it,
+                    so it compiles to a scroll listener in React and to a mode a
+                    designer flips by hand in Figma. Without it the strip carries
+                    navigation only, because showing the brand before the hero scrolls
+                    past would show it twice.
                   </Caption>
                 </>
               )}
-              <Caption color="quiet">
-                Sticky is set on each layout above — it is a property of the
-                arrangement, and it reaches the React component only. Figma has no
-                scroll behaviour, so it is left out of the spec rather than faked as a
-                frame.
-              </Caption>
-            </VStack>
-          </Card>
-
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Tokens this needs</H4>
-              <Body>
-                A design system missing one of these imports the nav with that field
-                unbound — no error, just a value that looks chosen.
-              </Body>
-              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-                {tokens.map((t) => <Chip key={t} label={t} size="small" />)}
-              </HStack>
             </VStack>
           </Card>
 
@@ -501,7 +669,7 @@ export default function NavDesignerPage() {
                 each design system rather than carrying these colours.
               </Body>
               <CodeBlock
-                code={JSON.stringify(spec, null, 2)}
+                code={JSON.stringify(fullSpec, null, 2)}
                 language="JSON"
                 maxHeight={360}
               />
@@ -509,6 +677,15 @@ export default function NavDesignerPage() {
           </Card>
         </VStack>
       </Section>
+
+      <NavItemEditor
+        open={!!editing}
+        item={editingItem}
+        kind={editing?.kind ?? 'tab'}
+        onChange={updateItem}
+        onRemove={removeItem}
+        onClose={() => setEditing(null)}
+      />
 
       <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} size="medium">
         <VStack gap="var(--Sizing-3)">
@@ -612,46 +789,6 @@ export default function NavDesignerPage() {
         </VStack>
       </Modal>
 
-      {/* Full size: the same definition and the same conditions, laid out
-          against the real viewport rather than scaled. Nothing about the
-          component is re-described here — a second copy of the layout is the
-          one thing this architecture exists to avoid. */}
-      <Modal open={expanded} onClose={() => setExpanded(false)} size="large">
-        <VStack gap="var(--Sizing-2)">
-          <HStack gap="var(--Sizing-2)" style={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <H4>{current?.label}</H4>
-            <Caption color="quiet">
-              {range && (range.to === null ? `${range.from}px and up` : `${range.from}\u2013${range.to}px`)}
-              {current?.maxWidth ? ` — capped at ${current.maxWidth}px, ${current.align === 'center' ? 'centred' : 'left'}` : ''}
-            </Caption>
-          </HStack>
-          <div style={{
-            border: '1px solid var(--Border)',
-            borderRadius: 'var(--Card-Radius, 8px)',
-            overflowX: 'auto',
-          }}>
-            <div style={{ width: previewWidth }}>
-              <div style={{
-                maxWidth: current?.maxWidth,
-                marginLeft: current?.align === 'center' ? 'auto' : undefined,
-                marginRight: current?.align === 'center' ? 'auto' : undefined,
-              }}>
-                <DefinitionRenderer
-                  definition={definition}
-                  conditions={active}
-                  slots={brandSlots}
-                  showSlots
-                />
-              </div>
-            </div>
-          </div>
-          <Caption color="quiet">
-            Actual size. Scroll sideways if the window is narrower than {previewWidth}px —
-            the layout is not reflowed to fit, because reflowing it would show a
-            different breakpoint.
-          </Caption>
-        </VStack>
-      </Modal>
     </div>
   );
 }
