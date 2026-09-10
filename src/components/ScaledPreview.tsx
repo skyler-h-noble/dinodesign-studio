@@ -47,14 +47,22 @@ export default function ScaledPreview({ width, children, maxScale = 1, onScale, 
       const next = Math.min(maxScale, available / width);
       setScale(next);
       onScale?.(next);
-      /* A transform does not affect layout, so the wrapper keeps the untransformed
-         height and leaves a gap beneath. Measuring the content and applying the
-         scaled height is what closes it. */
-      /* getBoundingClientRect reports the TRANSFORMED height, which is what
-         the box needs — offsetHeight would give the untransformed one and
-         leave a gap under a scaled-down preview. */
-      const h = inner.current?.getBoundingClientRect().height;
-      if (h) setHeight(h);
+      /* A transform does not affect layout, so the wrapper keeps the
+         untransformed height and would leave a gap beneath. The box takes the
+         scaled height instead — COMPUTED, not measured, and that is the fix
+         rather than a shortcut.
+         
+         getBoundingClientRect reports the TRANSFORMED height, so reading it
+         here raced the transform: the new scale had been handed to React but
+         not yet painted, so the number came back from the PREVIOUS one. Wrong
+         in both directions — too tall on the way down, and too short on the
+         way back up, where overflow:hidden then cropped the bar.
+         
+         offsetHeight is the untransformed height and does not move when the
+         scale does, so multiplying it is exact and has no ordering to get
+         wrong. */
+      const natural = inner.current?.offsetHeight;
+      if (natural) setHeight(Math.ceil(natural * next));
     };
 
     measure();
