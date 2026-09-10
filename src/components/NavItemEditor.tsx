@@ -108,8 +108,12 @@ export default function NavItemEditor(
           </>
         )}
 
-        {kind === 'button' && (
-          <>
+        {/* Both kinds get these. A tab IS a button — your Figma Tab is built on
+            Button tokens — so hiding the variant controls from one of them would
+            invent a distinction the design system does not make, and leave a
+            "tab variant" and a "button variant" as two vocabularies for one
+            idea. */}
+        <>
             <Divider />
             <Label>Colour</Label>
             <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
@@ -138,8 +142,7 @@ export default function NavItemEditor(
                 </Button>
               ))}
             </HStack>
-          </>
-        )}
+        </>
 
         <Divider />
         <HStack gap="var(--Sizing-2)" style={{ justifyContent: 'space-between' }}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { navDefinition, applyExclusivity, defaultNavMatrix, NAV_LAYOUTS, NAV_CONDITIONS, type NavLayout } from '../utils/addOns/navDefinition';
+import { navDefinition, applyExclusivity, defaultNavMatrix, NAV_LAYOUTS, NAV_CONDITIONS, NAV_THEMES, NAV_SURFACES, type NavLayout } from '../utils/addOns/navDefinition';
 import { toAddonSpec, tokensUsed, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 
 const ALL: NavLayout[] = NAV_LAYOUTS.map((l) => l.id);
@@ -486,5 +486,45 @@ describe('the responsive table travels with the spec', () => {
     });
     const condensed = spec.responsive.matrix['Adaptive-Nav/Show-Condensed'];
     expect(condensed).toEqual({ xs: false, md: false });
+  });
+});
+
+describe('theme and surface travel as names', () => {
+  it('the surface is a variable path, the theme is a MODE', () => {
+    /* They are not two spellings of one idea. In Figma a surface level is part
+       of the variable's own path, while a theme is a mode of the Theme
+       collection — so a themed subtree pins the mode rather than reading a
+       differently-named variable. Storing either as a colour would bake one
+       brand into an add-on every design system imports. */
+    const spec: any = toAddonSpec(navDefinition({
+      layout: 'brand-left', theme: 'Primary', surface: 'Surface-Bright',
+    }));
+    expect(spec.root.fills[0].color).toEqual({ var: 'Surface-Bright/Background' });
+    expect(spec.root.explicitModes).toEqual({ Theme: 'Primary' });
+  });
+
+  it('defaults to inheriting rather than pinning', () => {
+    // A nav that follows its surroundings is usually what you want, and an
+    // unset theme is how that is expressed — not by choosing one.
+    const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left' }));
+    expect(spec.root.explicitModes).toBeUndefined();
+    expect(spec.root.fills[0].color).toEqual({ var: 'Surface/Background' });
+  });
+
+  it('carries no colour at any setting', () => {
+    for (const theme of NAV_THEMES) {
+      for (const surface of NAV_SURFACES) {
+        const json = JSON.stringify(toAddonSpec(navDefinition({ layout: 'rail', theme, surface })));
+        expect(json, `${theme}/${surface}`).not.toMatch(/#[0-9a-fA-F]{6}/);
+      }
+    }
+  });
+
+  it('the rail stays one step dimmer, whatever the bar is set to', () => {
+    /* Relative rather than fixed: a rail pinned to one surface would collide
+       with the bar at some settings and vanish into it at others. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'rail', surface: 'Surface-Bright' }));
+    const rail = spec.root.children.find((c: any) => c.name === 'Rail');
+    expect(rail.fills[0].color).toEqual({ var: 'Surface-Dim/Background' });
   });
 });

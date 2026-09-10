@@ -20,7 +20,7 @@ import {
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
-  NAV_LAYOUTS, type NavLayout, type NavOptions,
+  NAV_LAYOUTS, NAV_THEMES, NAV_SURFACES, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
 import {
   DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
@@ -33,7 +33,7 @@ import {
   loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
 } from '../utils/addOns/brandAsset';
 import {
-  DEFAULT_TABS, DEFAULT_ACTIONS, buttonVariant, itemProblems, newId,
+  DEFAULT_TABS, DEFAULT_ACTIONS, buttonVariant, itemProblems,
   type NavItem, type NavButtonItem,
 } from '../utils/addOns/navContent';
 import NavItemEditor from './NavItemEditor';
@@ -78,7 +78,7 @@ export default function NavDesignerPage() {
      can carry scripts and event handlers, and inlining one would run them with
      this page's origin. In an <img> it is treated as an image: no scripts, no
      external fetches, no reach into the document. */
-  const [tabs, setTabs] = useState<NavItem[]>(DEFAULT_TABS);
+  const [tabs, setTabs] = useState<NavButtonItem[]>(DEFAULT_TABS);
   const [actions, setActions] = useState<NavButtonItem[]>(DEFAULT_ACTIONS);
   const [editing, setEditing] = useState<{ kind: 'tab' | 'button'; id: string } | null>(null);
 
@@ -88,7 +88,7 @@ export default function NavDesignerPage() {
 
   const updateItem = (next: NavItem | NavButtonItem) => {
     if (!editing) return;
-    if (editing.kind === 'tab') setTabs((xs) => xs.map((i) => (i.id === next.id ? next : i)));
+    if (editing.kind === 'tab') setTabs((xs) => xs.map((i) => (i.id === next.id ? (next as NavButtonItem) : i)));
     else setActions((xs) => xs.map((i) => (i.id === next.id ? (next as NavButtonItem) : i)));
   };
 
@@ -128,7 +128,7 @@ export default function NavDesignerPage() {
           return (
             <Button
               key={t.id}
-              variant="default-text"
+              variant={buttonVariant(t.colour, t.treatment)}
               size="small"
               iconOnly={t.iconOnly}
               /* An icon-only control needs a name and its icon must not carry
@@ -141,19 +141,6 @@ export default function NavDesignerPage() {
             </Button>
           );
         })}
-        <Button
-          iconOnly
-          size="small"
-          variant="default-ghost"
-          aria-label="Add a tab"
-          onClick={() => {
-            const item = { id: newId('tab'), label: 'New tab' };
-            setTabs((xs) => [...xs, item]);
-            setEditing({ kind: 'tab', id: item.id });
-          }}
-        >
-          <NavIconGlyph name="add" />
-        </Button>
       </HStack>
     );
 
@@ -175,21 +162,6 @@ export default function NavDesignerPage() {
             </Button>
           );
         })}
-        <Button
-          iconOnly
-          size="small"
-          variant="default-ghost"
-          aria-label="Add a button"
-          onClick={() => {
-            const item: NavButtonItem = {
-              id: newId('act'), label: 'New', colour: 'default', treatment: 'outline',
-            };
-            setActions((xs) => [...xs, item]);
-            setEditing({ kind: 'button', id: item.id });
-          }}
-        >
-          <NavIconGlyph name="add" />
-        </Button>
       </HStack>
     );
 
@@ -501,6 +473,54 @@ export default function NavDesignerPage() {
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
+              <H4>Theme and surface</H4>
+              <Body color="quiet">
+                Names, not colours. The same definition lands in each design system's
+                own brand — what these paint depends on the palette it is imported
+                into, which is why nothing here is a hex.
+              </Body>
+
+              <Label>Theme</Label>
+              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
+                {NAV_THEMES.map((t) => (
+                  <Button
+                    key={t}
+                    size="small"
+                    variant={(options.theme ?? 'Default') === t ? 'default' : 'default-outline'}
+                    onClick={() => set('theme', t)}
+                  >
+                    {t}
+                  </Button>
+                ))}
+              </HStack>
+              <Caption color="quiet">
+                Default inherits the page's own theme rather than pinning one — a nav
+                that follows its surroundings is usually what you want, which is why it
+                is not simply Primary.
+              </Caption>
+
+              <Label>Surface</Label>
+              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
+                {NAV_SURFACES.map((sf) => (
+                  <Button
+                    key={sf}
+                    size="small"
+                    variant={(options.surface ?? 'Surface') === sf ? 'default' : 'default-outline'}
+                    onClick={() => set('surface', sf)}
+                  >
+                    {sf.replace('Surface-', '').replace('Surface', 'Base')}
+                  </Button>
+                ))}
+              </HStack>
+              <Caption color="quiet">
+                A rail sits one step dimmer than whatever the bar is, so it reads as a
+                distinct region without naming a second colour.
+              </Caption>
+            </VStack>
+          </Card>
+
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-3)">
               <H4>Brand</H4>
               <Body color="quiet">
                 Fills the Brand slot so the nav can be judged with a real mark in it.
@@ -681,7 +701,7 @@ export default function NavDesignerPage() {
       <NavItemEditor
         open={!!editing}
         item={editingItem}
-        kind={editing?.kind ?? 'tab'}
+        kind={editing?.kind ?? 'button'}
         onChange={updateItem}
         onRemove={removeItem}
         onClose={() => setEditing(null)}

@@ -73,6 +73,15 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
     spec.fills = [{ type: 'SOLID', color: { var: `${node.surface}/Background` } }];
   }
 
+  /* A theme is a MODE, not a name inside a variable's path — so it pins the
+     Theme collection for this subtree rather than changing which variable is
+     read. Every token below it then resolves against that palette, which is
+     what makes one nav definition work on a Primary bar and a Neutral one
+     without naming a single colour differently. */
+  if (node.theme) {
+    spec.explicitModes = { ...(spec.explicitModes as Record<string, string> | undefined), Theme: node.theme };
+  }
+
   /* Conditional presence binds `visible` to the boolean rather than setting
      it. Setting it would bake whichever state the author had active — the
      exact snapshot problem that loses two thirds of a responsive design. */

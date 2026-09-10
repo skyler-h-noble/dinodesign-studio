@@ -60,11 +60,16 @@ export interface NavButtonItem extends NavItem {
   treatment: ButtonTreatment;
 }
 
-export const DEFAULT_TABS: NavItem[] = [
-  { id: 'tab-1', label: 'Home' },
-  { id: 'tab-2', label: 'Products' },
-  { id: 'tab-3', label: 'Pricing' },
-  { id: 'tab-4', label: 'About' },
+/* Tabs are BUTTONS. Your Figma Tab is built on Button tokens — Button-Padding,
+   Button-Text, Typography/Buttons/Small — so a tab is a button with a
+   treatment, not a separate kind of thing. Typing them the same way is what
+   lets one editor serve both and stops a "tab variant" and a "button variant"
+   drifting into two vocabularies for one idea. */
+export const DEFAULT_TABS: NavButtonItem[] = [
+  { id: 'tab-1', label: 'Home', colour: 'default', treatment: 'text' },
+  { id: 'tab-2', label: 'Products', colour: 'default', treatment: 'text' },
+  { id: 'tab-3', label: 'Pricing', colour: 'default', treatment: 'text' },
+  { id: 'tab-4', label: 'About', colour: 'default', treatment: 'text' },
 ];
 
 export const DEFAULT_ACTIONS: NavButtonItem[] = [

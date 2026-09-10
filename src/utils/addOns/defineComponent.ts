@@ -79,6 +79,15 @@ export interface NodeDef {
    *  var(--Background). The level lives in different places on each target,
    *  which is why it cannot be stored as a paint. */
   surface?: string;
+  /** Palette this subtree resolves against.
+   *
+   *  Travels differently from `surface` on each target, which is the reason
+   *  both are stored as names rather than as a colour: in Figma a theme is a
+   *  MODE of the Theme collection, so it becomes an explicit mode pin, while
+   *  the surface is part of the variable's own path. In the DOM both are
+   *  attributes — data-theme and data-surface — and the pair is what exposes
+   *  the whole matched token set rather than one colour. */
+  theme?: string;
   presence?: Presence;
   /** Sticks to the top of the scroll container once it reaches it.
    *

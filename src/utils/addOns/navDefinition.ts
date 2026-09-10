@@ -39,9 +39,29 @@ export interface NavOptions {
   barPosition?: 'above-rail' | 'beside-rail';
   /** Where the page title sits in the bar. Only meaningful for 'rail'. */
   titleAlign?: 'left' | 'center';
+  /** Palette and surface level the nav paints on. Names, never colours — the
+   *  same definition lands in each design system's own brand. */
+  theme?: string;
+  surface?: string;
   /** Hero only: brand and actions animate into the strip once it sticks. */
   condensed?: boolean;
 }
+
+/** Palettes a nav can resolve against — the Theme collection's modes.
+ *
+ *  Default first because it is the collection's default mode: a nav that sets
+ *  no theme inherits whatever the page is, which is usually what you want and
+ *  is why it is not simply Primary. */
+export const NAV_THEMES = [
+  'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
+  'Info', 'Success', 'Warning', 'Error',
+] as const;
+
+/** Surface levels, dimmest to brightest. Names, not colours: what each paints
+ *  depends on the theme, which is the point. */
+export const NAV_SURFACES = [
+  'Surface-Dimmest', 'Surface-Dim', 'Surface', 'Surface-Bright', 'Surface-Brightest',
+] as const;
 
 export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[] = [
   /* Every name says sticky, because every one of them is: a top nav that
@@ -290,7 +310,8 @@ function heroRoot(o: NavOptions): NodeDef {
     direction: 'column',
     width: 'fill',
     height: 'hug',
-    surface: 'Surface',
+    surface: o.surface ?? 'Surface',
+    theme: o.theme,
     children: [
       {
         /* The hero and what floats on it. A wrapper rather than putting the
@@ -348,6 +369,9 @@ function railNode(fullHeight: boolean): NodeDef {
        of view — but expressed on the wrong axis it would stretch the rail
        across the page instead. */
     height: fullHeight ? 'fill' : 'fill',
+    /* One step dimmer than the bar, so the rail reads as a distinct region
+       without naming a second colour. Relative to whatever the nav is set to,
+       which is why it is a level rather than a fixed surface. */
     surface: 'Surface-Dim',
     padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
     presence: { when: 'Adaptive-Nav/Show-Rail' },
@@ -396,7 +420,8 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
     direction: o.layout === 'rail' && o.barPosition !== 'above-rail' ? 'row' : 'column',
     width: 'fill',
     height: 'hug',
-    surface: 'Surface',
+    surface: o.surface ?? 'Surface',
+    theme: o.theme,
     children: o.layout === 'rail'
       ? railChildren(o)
       : [{ ...bar(o), sticky: true }],

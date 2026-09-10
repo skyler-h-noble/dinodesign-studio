@@ -103,13 +103,21 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
     // A parent of any overlay has to establish the containing block.
     ...((node.children || []).some((c) => c.overlay) ? { position: 'relative' as const } : {}),
     // The surface's own fill. data-surface below is what makes this resolve.
-    ...(node.surface ? { background: 'var(--Background)' } : {}),
+    ...(node.surface || node.theme ? { background: 'var(--Background)', color: 'var(--Text)' } : {}),
   };
 
-  const surfaceAttrs = node.surface ? { 'data-surface': node.surface } : {};
+  /* Both attributes, never a named colour. data-theme and data-surface expose
+     the whole matched set — Background, Text, Quiet, Border and the rest — so
+     painting var(--Background) below resolves correctly. Reaching for
+     var(--Surface) instead would paint the box and leave everything in it on
+     the parent's tone. */
+  const surfaceAttrs = {
+    ...(node.surface ? { 'data-surface': node.surface } : {}),
+    ...(node.theme ? { 'data-theme': node.theme } : {}),
+  };
 
   if (node.kind === 'text') {
-    return <span key={key} style={style}>{node.text}</span>;
+    return <span key={key} style={style} {...surfaceAttrs}>{node.text}</span>;
   }
 
   if (node.kind === 'slot') {
