@@ -17,6 +17,7 @@ import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
+  Rail, BottomNavigation,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -251,16 +252,42 @@ export default function NavDesignerPage() {
       <div style={{ minHeight: 180, width: '100%' }} aria-hidden />
     );
 
+    /* The library's Rail and BottomNavigation, not shapes drawn here.
+       
+       Both already exist and both take an items array of { icon, label } — so
+       a stand-in would be a second implementation of a component that ships,
+       and it would drift from the real one the moment either changed. The
+       preview's only real claim is that it renders what the nav will.
+       
+       Rail also takes a fabAction, which is the same composition argument the
+       definition makes: a FAB beside a rail is a prop, not a variant. */
+    const railItems = tabs.map((t) => ({
+      icon: <NavIconGlyph name={t.startIconName || t.endIconName || 'Home'} />,
+      label: t.text ? t.label : undefined,
+    }));
+
+    const rail = <Rail items={railItems} defaultValue={0} />;
+
+    const bottomNav = (
+      <BottomNavigation
+        items={railItems}
+        defaultValue={0}
+        showLabels={mobile.showLabels !== false}
+      />
+    );
+
     const out: Record<string, React.ReactNode> = {
       Tabs: tabStrip,
       Actions: actionGroup,
       Avatar: avatar,
       Page: page,
       Hero: hero,
+      'Rail-Items': rail,
+      'Nav-Item-Slot': bottomNav,
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
-  }, [brand, tabs, actions]);
+  }, [brand, tabs, actions, mobile.showLabels]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
