@@ -179,12 +179,21 @@ function endSlot(o: NavOptions): NodeDef {
 /** Tabs and the menu button are one decision expressed twice: exactly one is
  *  visible at any width, so they are mutually exclusive conditions rather than
  *  a single boolean, which is what lets a designer see both states. */
+/** Inline navigation. Just the tabs — the menu button that replaces them
+ *  lives somewhere else entirely, and pairing them here put a control that
+ *  belongs at the far left in the middle of the bar. */
 function navigationSlots(): NodeDef[] {
-  return [
-    slot('Tabs', 'hug', 'Adaptive-Nav/Show-Tabs'),
-    slot('Menu-Button', 'hug', 'Adaptive-Nav/Show-Menu-Button'),
-  ];
+  return [slot('Tabs', 'hug', 'Adaptive-Nav/Show-Tabs')];
 }
+
+/** The menu button, which sits BEFORE the brand.
+ *
+ *  It replaces the tabs, but not in their place: it opens navigation as a
+ *  drawer, and a drawer opens from the edge. Leaving it where the tabs were
+ *  put it after the brand and in the middle of the bar, which reads as one
+ *  more item rather than as the way in. */
+const menuButton = (): NodeDef =>
+  slot('Menu-Button', 'hug', 'Adaptive-Nav/Show-Menu-Button');
 
 function bar(o: NavOptions): NodeDef {
   const brand = slot('Brand', 'hug');
@@ -204,7 +213,7 @@ function bar(o: NavOptions): NodeDef {
        equally between FILL children, CSS gives equal flex-basis. */
     children = [
       { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center', gap: GAP,
-        width: 'fill', height: 'hug', children: navigationSlots() },
+        width: 'fill', height: 'hug', children: [menuButton(), ...navigationSlots()] },
       { name: 'Center', kind: 'stack', direction: 'row', justify: 'center', align: 'center',
         width: 'hug', height: 'hug', children: [brand] },
       { ...endSlot(o), width: 'fill', justify: 'end' },
@@ -225,7 +234,7 @@ function bar(o: NavOptions): NodeDef {
        scrolled past and its overlay has gone with it. Without condensed there
        is no End slot at all — an empty one would still take part in the
        SPACE_BETWEEN and push the tabs off centre. */
-    const start: NodeDef[] = [];
+    const start: NodeDef[] = [menuButton()];
     if (o.condensed) start.push(slot('Condensed-Brand', 'hug', 'Adaptive-Nav/Show-Condensed'));
     start.push(...navigationSlots());
     children = [
@@ -269,7 +278,7 @@ function bar(o: NavOptions): NodeDef {
   } else {
     children = [
       { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-        width: 'hug', height: 'hug', children: [brand] },
+        width: 'hug', height: 'hug', children: [menuButton(), brand] },
       { name: 'Center', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
         width: 'fill', height: 'hug', children: navigationSlots() },
       endSlot(o),

@@ -528,3 +528,45 @@ describe('theme and surface travel as names', () => {
     expect(rail.fills[0].color).toEqual({ var: 'Surface-Dim/Background' });
   });
 });
+
+describe('the menu button sits at the edge, not where the tabs were', () => {
+  it('comes before the brand', () => {
+    /* It replaces the tabs, but not in their place: it opens navigation as a
+       drawer, and a drawer opens from the edge. Left where the tabs were it
+       landed after the brand and mid-bar, reading as one more item rather than
+       as the way in. */
+    const spec: any = toAddonSpec(full('brand-left'));
+    const start = spec.root.children[0].children.find((c: any) => c.name === 'Start');
+    expect(start.children.map((c: any) => c.name)).toEqual(['Menu-Button', 'Brand']);
+  });
+
+  it('and is not among the inline navigation', () => {
+    const spec: any = toAddonSpec(full('brand-left'));
+    const centre = spec.root.children[0].children.find((c: any) => c.name === 'Center');
+    expect(names(centre)).toContain('Tabs');
+    expect(names(centre)).not.toContain('Menu-Button');
+  });
+
+  it('leads the left group when the brand is centred', () => {
+    const spec: any = toAddonSpec(full('brand-centre'));
+    const start = spec.root.children[0].children.find((c: any) => c.name === 'Start');
+    expect(start.children[0].name).toBe('Menu-Button');
+  });
+
+  it('every layout centres its bar contents vertically', () => {
+    /* The bar and each group inside it. One group left at the default would
+       stretch its contents and pull the row off centre without changing
+       anything measurable about the others. */
+    for (const l of ALL) {
+      const spec: any = toAddonSpec(full(l));
+      const bar = spec.root.children.find((c: any) => c.name === 'Bar')
+        ?? spec.root.children[0].children?.find?.((c: any) => c.name === 'Bar');
+      const target = bar ?? spec.root.children.find((c: any) => c.name === 'Bar');
+      expect([l, target?.counterAxisAlignItems]).toEqual([l, 'CENTER']);
+      for (const group of target.children) {
+        if (group.kind === 'slot' || !group.children) continue;
+        expect([l, group.name, group.counterAxisAlignItems]).toEqual([l, group.name, 'CENTER']);
+      }
+    }
+  });
+});
