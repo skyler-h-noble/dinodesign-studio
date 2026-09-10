@@ -19,25 +19,75 @@ export interface Breakpoint {
   label: string;
   /** Inclusive lower bound, in CSS pixels. */
   minWidth: number;
+  /** Where content stops growing, in CSS pixels. Undefined means it keeps
+   *  filling the viewport.
+   *
+   *  This is what a wide breakpoint actually needs. Above the desktop cluster
+   *  the real constraint is a content ceiling, not a gutter — a nav that keeps
+   *  stretching to 2560px puts its brand and its actions half a metre apart.
+   *  Left as a margin, that reads as "80px of padding at 2560", which describes
+   *  the leftover rather than the rule. */
+  maxWidth?: number;
+  /** Where the capped content sits in the leftover space. Only meaningful with
+   *  maxWidth, and there is no correct default: a centred nav matches a centred
+   *  page, while a left-aligned one keeps the brand where the eye starts. */
+  align?: 'left' | 'center';
 }
 
 /** Condition name → breakpoint id → whether it is true there. */
 export type ConditionMatrix = Record<string, Record<string, boolean>>;
 
-/* Defaults chosen from the width clusters that actually exist rather than
-   round numbers: phones sit at 360-430, small tablets at 600-768, and the
-   desktop cluster starts at 1280. See docs on device sizes — the names drift
-   with each product cycle but the clusters do not. */
+/* The five-step scale, with widths taken from the device clusters rather than
+   round numbers. Model names drift every product cycle; the clusters do not:
+   phones at 360-440, small tablets at 600-744, tablet landscape at 960-1180,
+   and the desktop cluster opening at 1280.
+   
+     xs   0      phones
+     sm   600    small tablets — Material's compact/medium boundary, and the
+                 narrowest tablet in the device table
+     md   900    tablet landscape and small laptops (Tablet-Horizontal Narrow
+                 is 960, so 900 catches it rather than splitting it)
+     lg   1280   where the desktop cluster starts (Desktop Narrow)
+     xl   1920   Desktop Default
+
+   Each is a LOWER bound, so xs must be 0 — see validateBreakpoints. */
 export const DEFAULT_BREAKPOINTS: Breakpoint[] = [
-  { id: 'mobile',  label: 'Mobile',  minWidth: 0 },
-  { id: 'tablet',  label: 'Tablet',  minWidth: 768 },
-  { id: 'desktop', label: 'Desktop', minWidth: 1280 },
+  { id: 'xs', label: 'xs', minWidth: 0 },
+  { id: 'sm', label: 'sm', minWidth: 600 },
+  { id: 'md', label: 'md', minWidth: 900 },
+  { id: 'lg', label: 'lg', minWidth: 1280 },
+  /* Capped and centred: past this width a nav that keeps stretching puts the
+     brand and the actions absurdly far apart. 1440 is the widest of the common
+     content ceilings and sits inside Desktop Default's 1920 with room for the
+     margin. */
+  { id: 'xl', label: 'xl', minWidth: 1920, maxWidth: 1440, align: 'center' },
 ];
 
-/** Ascending by width. Order is meaning here, not presentation: "the last one
- *  whose minWidth is at or below this width" only works on a sorted list. */
+/** Ascending by width. Order is MEANING here, not presentation: "the last one
+ *  whose minWidth is at or below this width" only works on a sorted list, and
+ *  a range's ceiling is the next entry's floor.
+ *
+ *  Never reverse this to change what a list looks like — breakpointAt and
+ *  breakpointRange both read it, and both would return plausible wrong answers
+ *  rather than failing. Use displayBreakpoints for presentation. */
 export function sortBreakpoints(bps: Breakpoint[]): Breakpoint[] {
   return [...bps].sort((a, b) => a.minWidth - b.minWidth);
+}
+
+/** Widest first, for showing to a person.
+ *
+ *  Design runs desktop-down: the widest layout is the one being designed and
+ *  the narrow ones are what it degrades into, so the widest belongs first.
+ *  Separate from sortBreakpoints because that order is load-bearing — this one
+ *  is only what a reader sees. */
+export function displayBreakpoints(bps: Breakpoint[]): Breakpoint[] {
+  return [...bps].sort((a, b) => b.minWidth - a.minWidth);
+}
+
+/** The breakpoint to open on: the widest, since that is what gets designed
+ *  first and everything else is derived from it. */
+export function primaryBreakpoint(bps: Breakpoint[]): Breakpoint | undefined {
+  return displayBreakpoints(bps)[0];
 }
 
 export interface BreakpointProblem { id: string; message: string }

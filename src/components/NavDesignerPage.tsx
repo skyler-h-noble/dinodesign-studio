@@ -16,15 +16,18 @@ import { useMemo, useState } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
-  Tabs, TabList, Tab, TextField, Alert,
+  Tabs, TabList, Tab, TextField, Alert, Modal,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, NAV_LAYOUTS, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
 import {
-  DEFAULT_BREAKPOINTS, sortBreakpoints, validateBreakpoints, breakpointRange,
+  DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
+  validateBreakpoints, breakpointRange,
   completeMatrix, conditionsAt, type Breakpoint, type ConditionMatrix,
 } from '../utils/addOns/breakpoints';
+import ScaledPreview from './ScaledPreview';
+import TuneIcon from '@mui/icons-material/Tune';
 import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
@@ -45,11 +48,18 @@ export default function NavDesignerPage() {
   }, [options]);
 
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>(DEFAULT_BREAKPOINTS);
-  const [selectedBp, setSelectedBp] = useState<string>(DEFAULT_BREAKPOINTS[0].id);
+  /* Opens on the WIDEST. Design runs desktop-down: the wide layout is the one
+     being designed and the narrow ones are what it degrades into. */
+  const [selectedBp, setSelectedBp] = useState<string>(primaryBreakpoint(DEFAULT_BREAKPOINTS)!.id);
+  const [expanded, setExpanded] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
   const problems = validateBreakpoints(breakpoints);
   const sorted = sortBreakpoints(breakpoints);
+  const shown = displayBreakpoints(breakpoints);
+  const current = sorted.find((b) => b.id === selectedBp);
 
   /* The full table, recompleted whenever the conditions or breakpoints change.
      A hole would read as FALSE downstream, silently hiding a part at whichever
@@ -70,6 +80,15 @@ export default function NavDesignerPage() {
     setMatrix((m) => ({ ...m, [name]: { ...full[name], [selectedBp]: value } }));
 
   const range = breakpointRange(sorted, selectedBp);
+
+  /* Lay out at the VIEWPORT width — the breakpoint's own lower bound, which is
+     where a layout breaks if it is going to.
+     
+     Not at the cap. A capped breakpoint is a narrow content column inside a
+     wide window, and rendering only the column would hide the thing the cap
+     exists for: how much empty space sits either side, and whether the nav
+     still relates to the page under it. */
+  const previewWidth = Math.max(range?.from ?? 0, 320);
   const editBp = (id: string, patch: Partial<Breakpoint>) =>
     setBreakpoints((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
@@ -87,9 +106,47 @@ export default function NavDesignerPage() {
             </Body>
           </VStack>
 
+          {/* Breakpoint first, because everything below is scoped to it — the
+              layout, the conditions and the preview all describe THIS width.
+              Widest first: design runs desktop-down, and the narrow ones are
+              what the wide layout degrades into. */}
+          <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Tabs value={selectedBp} onChange={(v: string) => setSelectedBp(v)}>
+                <TabList>
+                  {shown.map((b) => (
+                    <Tab key={b.id} value={b.id}>{b.label}</Tab>
+                  ))}
+                </TabList>
+              </Tabs>
+            </div>
+            {/* The button owns the name; the icon carries none, or a screen
+                reader announces the control twice. */}
+            <Button
+              iconOnly
+              variant="default-ghost"
+              aria-label="Breakpoint settings"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <TuneIcon />
+            </Button>
+            {problems.length > 0 && (
+              <Chip label={`${problems.length} problem${problems.length === 1 ? '' : 's'}`} size="small" />
+            )}
+          </HStack>
+
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Layout</H4>
+              <BodySmall color="quiet">
+                For {current?.label}
+                {range && (range.to === null
+                  ? ` — ${range.from}px and up`
+                  : ` — ${range.from}\u2013${range.to}px`)}
+                {current?.maxWidth
+                  ? `, content capped at ${current.maxWidth}px and ${current.align === 'center' ? 'centred' : 'left-aligned'}`
+                  : ''}
+              </BodySmall>
               {/* Diagrams rather than words: four layouts differ in where the
                   parts sit, which a name cannot show and a picture can. */}
               {/* A grid, so all four are the same size. Wrapping flex left the
@@ -142,39 +199,52 @@ export default function NavDesignerPage() {
             <VStack gap="var(--Sizing-3)">
               <H4>Preview</H4>
 
-              {/* One tab per breakpoint. Designing per width is the point: a
-                  responsive component is a table of conditions by breakpoint,
-                  not one layout with parts switched off. */}
-              <Tabs value={selectedBp} onChange={(v: string) => setSelectedBp(v)}>
-                <TabList>
-                  {sorted.map((b) => (
-                    <Tab key={b.id} value={b.id}>{b.label}</Tab>
-                  ))}
-                </TabList>
-              </Tabs>
-
-              {/* Rendered THROUGH the definition, not drawn beside it. The same
-                  description compiles to Figma nodes and to these elements, so
-                  this is the component rather than a picture of it.
-
-                  Constrained to the breakpoint's own lower bound, because a
-                  layout that only holds at 1400px tells you nothing about the
-                  width it was designed for. */}
-              <div style={{
-                border: '1px solid var(--Border)',
-                borderRadius: 'var(--Card-Radius, 8px)',
-                overflow: 'hidden',
-                maxWidth: range ? Math.max(range.from, 320) : undefined,
-                resize: 'horizontal',
-              }}>
-                <DefinitionRenderer definition={definition} conditions={active} showSlots />
+              {/* Laid out at the breakpoint's real width and TRANSFORMED down,
+                  rather than squeezed into the card. Squeezing would make the
+                  tabs wrap and the items collapse, so what is on screen would
+                  be the narrow arrangement wearing a wide label — every
+                  judgement from it about the wrong design. */}
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open at full size"
+                onClick={() => setExpanded(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(true); }
+                }}
+                style={{
+                  border: '1px solid var(--Border)',
+                  borderRadius: 'var(--Card-Radius, 8px)',
+                  overflow: 'hidden',
+                  cursor: 'zoom-in',
+                }}
+              >
+                <ScaledPreview width={previewWidth} onScale={setScale}>
+                  {/* The cap lives HERE, not in the definition: it is a property
+                      of the breakpoint, not of the component, and the same nav
+                      is uncapped at every narrower width. */}
+                  <div style={{
+                    maxWidth: current?.maxWidth,
+                    marginLeft: current?.align === 'center' ? 'auto' : undefined,
+                    marginRight: current?.align === 'center' ? 'auto' : undefined,
+                  }}>
+                    <DefinitionRenderer definition={definition} conditions={active} showSlots />
+                  </div>
+                </ScaledPreview>
               </div>
-              <Caption color="quiet">
-                {range && (range.to === null
-                  ? `${range.from}px and up`
-                  : `${range.from}\u2013${range.to}px`)} — shown at its narrowest, which is
-                where a layout breaks if it is going to.
-              </Caption>
+
+              <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <Caption color="quiet">
+                  {previewWidth}px
+                  {scale < 0.999 ? ` at ${Math.round(scale * 100)}%` : ''}
+                  {current?.maxWidth && current.maxWidth < previewWidth
+                    ? ` — content capped at ${current.maxWidth}px`
+                    : ''}
+                </Caption>
+                <Button variant="default-outline" size="small" onClick={() => setExpanded(true)}>
+                  Open full size
+                </Button>
+              </HStack>
 
               <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
                 {Object.entries(definition.conditions || {}).map(([name, def]) => (
@@ -243,6 +313,36 @@ export default function NavDesignerPage() {
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
+              <H4>Tokens this needs</H4>
+              <Body>
+                A design system missing one of these imports the nav with that field
+                unbound — no error, just a value that looks chosen.
+              </Body>
+              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
+                {tokens.map((t) => <Chip key={t} label={t} size="small" />)}
+              </HStack>
+            </VStack>
+          </Card>
+
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-3)">
+              <H4>Spec</H4>
+              <Body>
+                What gets published. Every value is a variable NAME, so it rebinds to
+                each design system rather than carrying these colours.
+              </Body>
+              <CodeBlock
+                code={JSON.stringify(spec, null, 2)}
+                language="JSON"
+                maxHeight={360}
+              />
+            </VStack>
+          </Card>
+        </VStack>
+      </Section>
+
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} size="medium">
+        <VStack gap="var(--Sizing-3)">
               <H4>Breakpoints</H4>
               <Body color="quiet">
                 Each is a lower bound. The narrowest must start at 0 — a width no
@@ -280,6 +380,28 @@ export default function NavDesignerPage() {
                       <BodySmall color="quiet" style={{ paddingBottom: 8 }}>
                         {r && (r.to === null ? `${r.from}px and up` : `${r.from}\u2013${r.to}px`)}
                       </BodySmall>
+                      <TextField
+                        label="Max content (px)"
+                        type="number"
+                        value={b.maxWidth === undefined ? '' : String(b.maxWidth)}
+                        placeholder="none"
+                        onChange={(e: { target: { value: string } }) => {
+                          // Empty means UNCAPPED, which is different from 0 —
+                          // a cap of 0 would collapse the content entirely.
+                          const raw = e.target.value.trim();
+                          editBp(b.id, { maxWidth: raw === '' ? undefined : Number(raw) || undefined });
+                        }}
+                        size="small"
+                      />
+                      {b.maxWidth !== undefined && (
+                        <Button
+                          variant="default-outline"
+                          size="small"
+                          onClick={() => editBp(b.id, { align: b.align === 'center' ? 'left' : 'center' })}
+                        >
+                          {b.align === 'center' ? 'Centred' : 'Left'}
+                        </Button>
+                      )}
                       <Button
                         variant="default-outline"
                         size="small"
@@ -318,38 +440,44 @@ export default function NavDesignerPage() {
                 cell reads as false downstream and would hide parts at that width
                 with nothing to say why.
               </Caption>
-            </VStack>
-          </Card>
-
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Tokens this needs</H4>
-              <Body>
-                A design system missing one of these imports the nav with that field
-                unbound — no error, just a value that looks chosen.
-              </Body>
-              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-                {tokens.map((t) => <Chip key={t} label={t} size="small" />)}
-              </HStack>
-            </VStack>
-          </Card>
-
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Spec</H4>
-              <Body>
-                What gets published. Every value is a variable NAME, so it rebinds to
-                each design system rather than carrying these colours.
-              </Body>
-              <CodeBlock
-                code={JSON.stringify(spec, null, 2)}
-                language="JSON"
-                maxHeight={360}
-              />
-            </VStack>
-          </Card>
         </VStack>
-      </Section>
+      </Modal>
+
+      {/* Full size: the same definition and the same conditions, laid out
+          against the real viewport rather than scaled. Nothing about the
+          component is re-described here — a second copy of the layout is the
+          one thing this architecture exists to avoid. */}
+      <Modal open={expanded} onClose={() => setExpanded(false)} size="large">
+        <VStack gap="var(--Sizing-2)">
+          <HStack gap="var(--Sizing-2)" style={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <H4>{current?.label}</H4>
+            <Caption color="quiet">
+              {range && (range.to === null ? `${range.from}px and up` : `${range.from}\u2013${range.to}px`)}
+              {current?.maxWidth ? ` — capped at ${current.maxWidth}px, ${current.align === 'center' ? 'centred' : 'left'}` : ''}
+            </Caption>
+          </HStack>
+          <div style={{
+            border: '1px solid var(--Border)',
+            borderRadius: 'var(--Card-Radius, 8px)',
+            overflowX: 'auto',
+          }}>
+            <div style={{ width: previewWidth }}>
+              <div style={{
+                maxWidth: current?.maxWidth,
+                marginLeft: current?.align === 'center' ? 'auto' : undefined,
+                marginRight: current?.align === 'center' ? 'auto' : undefined,
+              }}>
+                <DefinitionRenderer definition={definition} conditions={active} showSlots />
+              </div>
+            </div>
+          </div>
+          <Caption color="quiet">
+            Actual size. Scroll sideways if the window is narrower than {previewWidth}px —
+            the layout is not reflowed to fit, because reflowing it would show a
+            different breakpoint.
+          </Caption>
+        </VStack>
+      </Modal>
     </div>
   );
 }

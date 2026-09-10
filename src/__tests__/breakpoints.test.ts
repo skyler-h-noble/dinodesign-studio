@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_BREAKPOINTS, sortBreakpoints, validateBreakpoints, breakpointAt,
+  DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
+  validateBreakpoints, breakpointAt,
   breakpointRange, completeMatrix, conditionsAt, type Breakpoint,
 } from '../utils/addOns/breakpoints';
 
@@ -35,26 +36,49 @@ describe('a gap below the smallest breakpoint is an error', () => {
 
 describe('which breakpoint governs a width', () => {
   it('takes the last one at or below it', () => {
-    expect(breakpointAt(BPS, 375)?.id).toBe('mobile');
-    expect(breakpointAt(BPS, 768)?.id).toBe('tablet');   // inclusive lower bound
-    expect(breakpointAt(BPS, 1279)?.id).toBe('tablet');
-    expect(breakpointAt(BPS, 1280)?.id).toBe('desktop');
+    expect(breakpointAt(BPS, 375)?.id).toBe('xs');
+    expect(breakpointAt(BPS, 600)?.id).toBe('sm');    // inclusive lower bound
+    expect(breakpointAt(BPS, 899)?.id).toBe('sm');
+    expect(breakpointAt(BPS, 1280)?.id).toBe('lg');
+    expect(breakpointAt(BPS, 2560)?.id).toBe('xl');
   });
 
   it('works on an unsorted list', () => {
     // Order is meaning, not presentation — so the lookup sorts rather than
     // trusting the caller.
-    const shuffled = [BPS[2], BPS[0], BPS[1]];
-    expect(breakpointAt(shuffled, 900)?.id).toBe('tablet');
-    expect(sortBreakpoints(shuffled).map((b) => b.id)).toEqual(['mobile', 'tablet', 'desktop']);
+    const shuffled = [BPS[3], BPS[0], BPS[2], BPS[4], BPS[1]];
+    expect(breakpointAt(shuffled, 950)?.id).toBe('md');
+    expect(sortBreakpoints(shuffled).map((b) => b.id)).toEqual(['xs', 'sm', 'md', 'lg', 'xl']);
+  });
+
+  it('display order is widest first, and does NOT disturb lookup', () => {
+    /* Design runs desktop-down, so the widest is shown first. Reversing the
+       shared sort to achieve that would break breakpointAt and
+       breakpointRange, which both depend on ascending order and would return
+       plausible wrong answers rather than failing. */
+    expect(displayBreakpoints(BPS).map((b) => b.id)).toEqual(['xl', 'lg', 'md', 'sm', 'xs']);
+    expect(primaryBreakpoint(BPS)?.id).toBe('xl');
+    expect(breakpointAt(BPS, 1280)?.id).toBe('lg');
   });
 
   it('reports the range each one covers', () => {
-    expect(breakpointRange(BPS, 'mobile')).toEqual({ from: 0, to: 767 });
-    expect(breakpointRange(BPS, 'tablet')).toEqual({ from: 768, to: 1279 });
+    expect(breakpointRange(BPS, 'xs')).toEqual({ from: 0, to: 599 });
+    expect(breakpointRange(BPS, 'lg')).toEqual({ from: 1280, to: 1919 });
     // The widest has no ceiling, which is different from a ceiling of Infinity
     // — it is what makes "and up" displayable.
-    expect(breakpointRange(BPS, 'desktop')).toEqual({ from: 1280, to: null });
+    expect(breakpointRange(BPS, 'xl')).toEqual({ from: 1920, to: null });
+  });
+
+  it('a content ceiling is separate from the range it applies in', () => {
+    /* The range says which widths a breakpoint governs; maxWidth says where
+       content stops growing inside it. Above the desktop cluster the second is
+       the real constraint — a nav that stretches to 2560 puts its brand and
+       actions absurdly far apart — and describing it as leftover margin
+       reports the symptom instead of the rule. */
+    const xl = BPS.find((b) => b.id === 'xl')!;
+    expect(xl.maxWidth).toBe(1440);
+    expect(xl.align).toBe('center');
+    expect(BPS.find((b) => b.id === 'xs')!.maxWidth).toBeUndefined();
   });
 });
 
@@ -65,37 +89,37 @@ describe('every condition has a value at every breakpoint', () => {
   it('fills holes rather than leaving them false by accident', () => {
     /* An absent value reads as false downstream, so a hole would silently hide
        a part at whichever widths were never visited. */
-    const filled = completeMatrix({ 'Show-Tabs': { mobile: false } }, names, BPS, fallback);
-    expect(filled['Show-Tabs']).toEqual({ mobile: false, tablet: true, desktop: true });
-    expect(filled['Show-Condensed']).toEqual({ mobile: false, tablet: false, desktop: false });
+    const filled = completeMatrix({ 'Show-Tabs': { xs: false } }, names, BPS, fallback);
+    expect(filled['Show-Tabs']).toEqual({ xs: false, sm: true, md: true, lg: true, xl: true });
+    expect(Object.values(filled['Show-Condensed']).every((v) => v === false)).toBe(true);
   });
 
   it('keeps a deliberate false, distinguishing it from a missing one', () => {
     // The whole reason completion takes a fallback rather than defaulting to
     // true: an explicit false must survive it.
-    const filled = completeMatrix({ 'Show-Tabs': { desktop: false } }, names, BPS, fallback);
-    expect(filled['Show-Tabs'].desktop).toBe(false);
+    const filled = completeMatrix({ 'Show-Tabs': { xl: false } }, names, BPS, fallback);
+    expect(filled['Show-Tabs'].xl).toBe(false);
   });
 
   it('drops conditions that no longer exist', () => {
     // A renamed or removed condition should not linger and quietly gate
     // nothing.
-    const filled = completeMatrix({ 'Old-Name': { mobile: true } }, names, BPS, fallback);
+    const filled = completeMatrix({ 'Old-Name': { xs: true } }, names, BPS, fallback);
     expect(Object.keys(filled).sort()).toEqual(['Show-Condensed', 'Show-Tabs']);
   });
 
   it('adds a column when a breakpoint is added', () => {
-    const withXl = [...BPS, { id: 'xl', label: 'Wide', minWidth: 1920 }];
-    const filled = completeMatrix({ 'Show-Tabs': { mobile: false } }, names, withXl, fallback);
-    expect(filled['Show-Tabs'].xl).toBe(true);
+    const withXxl = [...BPS, { id: 'xxl', label: 'xxl', minWidth: 2560 }];
+    const filled = completeMatrix({ 'Show-Tabs': { xs: false } }, names, withXxl, fallback);
+    expect(filled['Show-Tabs'].xxl).toBe(true);
   });
 });
 
 describe('reading one breakpoint back out', () => {
   it('flattens to what the renderer wants', () => {
-    const m = completeMatrix({ 'Show-Tabs': { mobile: false } }, ['Show-Tabs'], BPS, () => true);
-    expect(conditionsAt(m, 'mobile')).toEqual({ 'Show-Tabs': false });
-    expect(conditionsAt(m, 'desktop')).toEqual({ 'Show-Tabs': true });
+    const m = completeMatrix({ 'Show-Tabs': { xs: false } }, ['Show-Tabs'], BPS, () => true);
+    expect(conditionsAt(m, 'xs')).toEqual({ 'Show-Tabs': false });
+    expect(conditionsAt(m, 'xl')).toEqual({ 'Show-Tabs': true });
   });
 
   it('an unknown breakpoint yields all false, not all true', () => {
@@ -124,7 +148,8 @@ describe('the default matrix encodes design intent, not blanket true', () => {
   });
 
   it('the menu button appears only at the narrowest width', () => {
-    expect(m['Adaptive-Nav/Show-Menu-Button']).toEqual({ mobile: true, tablet: false, desktop: false });
+    expect(m['Adaptive-Nav/Show-Menu-Button'].xs).toBe(true);
+    for (const id of ['sm', 'md', 'lg', 'xl']) expect([id, m['Adaptive-Nav/Show-Menu-Button'][id]]).toEqual([id, false]);
   });
 
   it('scroll conditions start false at every width', () => {
@@ -137,8 +162,8 @@ describe('the default matrix encodes design intent, not blanket true', () => {
   });
 
   it('the rail only appears where there is width for it', () => {
-    expect(m['Adaptive-Nav/Show-Rail'].mobile).toBe(false);
-    expect(m['Adaptive-Nav/Show-Rail'].desktop).toBe(true);
+    expect(m['Adaptive-Nav/Show-Rail'].xs).toBe(false);
+    expect(m['Adaptive-Nav/Show-Rail'].xl).toBe(true);
   });
 
   it('covers every condition and every breakpoint', () => {
