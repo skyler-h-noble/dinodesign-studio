@@ -122,7 +122,13 @@ describe('what it does not pretend to do', () => {
     /* A definition has no behaviour, so neither compiler can produce any.
        Miming a button that does nothing would misrepresent what has been
        designed. */
-    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left', avatar: true })} showSlots />);
+    const out = html(
+      <DefinitionRenderer
+        definition={navDefinition({ layout: 'brand-left', avatar: true })}
+        conditions={{ 'Adaptive-Nav/Show-Avatar': true }}
+        showSlots
+      />,
+    );
     expect(out).not.toContain('<button');
     expect(out).toContain('Avatar');
   });

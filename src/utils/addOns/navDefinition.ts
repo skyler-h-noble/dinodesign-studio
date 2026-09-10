@@ -101,6 +101,21 @@ export const NAV_CONDITIONS: Record<string, ConditionDef> = {
     description: 'Search in the bar. Off when it collapses to an icon.',
     trigger: 'device',
   },
+  /* Actions and the avatar are conditions too, not structural options.
+     
+     They were global switches beside per-breakpoint ones, which invented a
+     distinction a user has no reason to hold: "does the avatar exist" and
+     "does the avatar show at this width" are the same question asked twice.
+     A slot that is off at EVERY breakpoint is simply omitted, which is
+     derivable rather than a second control. */
+  'Adaptive-Nav/Show-Actions': {
+    description: 'Action buttons in the bar. Off where the width cannot hold them.',
+    trigger: 'device',
+  },
+  'Adaptive-Nav/Show-Avatar': {
+    description: 'The account avatar.',
+    trigger: 'device',
+  },
   /* SCROLL, not width — and that is the whole reason the trigger is recorded.
      No media query can detect it, so a compiler that treated this like the
      others would emit a breakpoint for a state a breakpoint cannot see. In
@@ -168,8 +183,8 @@ const PAD_X: TokenRef = t('Sizing-3');
 function endSlot(o: NavOptions): NodeDef {
   const children: NodeDef[] = [];
   if (o.search) children.push(slot('Search', 'hug', 'Adaptive-Nav/Show-Search'));
-  if (o.actions) children.push(slot('Actions', 'hug'));
-  if (o.avatar) children.push(slot('Avatar', 'hug'));
+  if (o.actions) children.push(slot('Actions', 'hug', 'Adaptive-Nav/Show-Actions'));
+  if (o.avatar) children.push(slot('Avatar', 'hug', 'Adaptive-Nav/Show-Avatar'));
   return {
     name: 'End',
     kind: 'stack',
@@ -511,6 +526,7 @@ export function defaultNavMatrix(
         : name === 'Adaptive-Nav/Show-Tabs' ? bp.id !== narrowest
         : name === 'Adaptive-Nav/Show-Rail' ? bp.id === widest
         : name === 'Adaptive-Nav/Show-Search' ? bp.id !== narrowest
+        : name === 'Adaptive-Nav/Show-Actions' ? bp.id !== narrowest
         : true;
     }
   }

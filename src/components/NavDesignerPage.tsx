@@ -276,6 +276,16 @@ export default function NavDesignerPage() {
       />
     );
 
+    /* Icon-only ghost with the menu glyph — the control as it actually is,
+       not a labelled placeholder. A slot showing the word "Menu-Button" tells
+       you the slot exists; the real control tells you whether it sits right
+       beside the brand at this width, which is the thing being designed. */
+    const menuButton = (
+      <Button iconOnly variant="default-ghost" size="small" aria-label="Open navigation">
+        <NavIconGlyph name="Menu" />
+      </Button>
+    );
+
     const out: Record<string, React.ReactNode> = {
       Tabs: tabStrip,
       Actions: actionGroup,
@@ -284,6 +294,7 @@ export default function NavDesignerPage() {
       Hero: hero,
       'Rail-Items': rail,
       'Nav-Item-Slot': bottomNav,
+      'Menu-Button': menuButton,
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
@@ -670,14 +681,32 @@ export default function NavDesignerPage() {
                         label="Avatar"
                       />
                     </HStack>
-                    <TextField
-                      label="Action buttons"
-                      type="number"
-                      size="small"
-                      value={String(mobile.topActions ?? 1)}
-                      onChange={(e: { target: { value: string } }) =>
-                        setMobileOpt('topActions', Math.max(0, Math.min(3, Number(e.target.value) || 0)))}
-                    />
+                    <HStack gap="var(--Sizing-3)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                      <SwitchInput
+                        checked={(mobile.topActions ?? 1) > 0}
+                        onChange={(e: { target: { checked: boolean } }) =>
+                          /* Zero IS off. A separate boolean beside a count
+                             would let the two disagree — off with a count of
+                             two, or on with none — and neither reads as a
+                             state anyone chose. */
+                          setMobileOpt('topActions', e.target.checked ? 1 : 0)}
+                        label="Action buttons"
+                      />
+                      {(mobile.topActions ?? 1) > 0 && (
+                        <HStack gap="var(--Sizing-1)">
+                          {[1, 2, 3].map((n) => (
+                            <Button
+                              key={n}
+                              size="small"
+                              variant={(mobile.topActions ?? 1) === n ? 'default' : 'default-outline'}
+                              onClick={() => setMobileOpt('topActions', n)}
+                            >
+                              {n}
+                            </Button>
+                          ))}
+                        </HStack>
+                      )}
+                    </HStack>
                   </>
                 )}
 
@@ -883,29 +912,39 @@ export default function NavDesignerPage() {
             <VStack gap="var(--Sizing-3)">
               <H4>Slots</H4>
 
-              {/* WHICH SLOTS EXIST — structural, and the same at every width.
-                  Kept apart from the visibility switches below because the two
-                  are different decisions that look alike: this one removes the
-                  slot from the component entirely, that one hides an existing
-                  slot at one breakpoint. Merging them into one row of switches
-                  would make "off" mean two different things. */}
-              <Label>Included</Label>
+              {/* One set, and every one of them is per breakpoint.
+                  
+                  There used to be two: a global "does this slot exist" and a
+                  per-breakpoint "does it show". That invented a distinction a
+                  user has no reason to hold — "does the avatar exist" and
+                  "does the avatar show at this width" are the same question
+                  asked twice — and it made the per-breakpoint group look like
+                  the exception when it is the whole point of the add-on.
+                  
+                  A slot off at EVERY breakpoint is simply omitted from the
+                  component, which is derivable rather than a second control. */}
+              <Label>At {current?.label}</Label>
               <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
                 {([['search', 'Search'], ['actions', 'Actions'], ['avatar', 'Avatar']] as const).map(
-                  ([key, label]) => (
-                    <SwitchInput
-                      key={key}
-                      checked={!!options[key]}
-                      onChange={(e: { target: { checked: boolean } }) => set(key, e.target.checked)}
-                      label={label}
-                    />
-                  ),
+                  ([key, label]) => {
+                    const cond = `Adaptive-Nav/Show-${label}`;
+                    return (
+                      <SwitchInput
+                        key={key}
+                        checked={!!options[key] && !!active[cond]}
+                        onChange={(e: { target: { checked: boolean } }) => {
+                          const on = e.target.checked;
+                          // Turning one on has to do both jobs: put the slot in
+                          // the component and switch it on at this width.
+                          if (on && !options[key]) set(key, true);
+                          setCondition(cond, on);
+                        }}
+                        label={label}
+                      />
+                    );
+                  },
                 )}
               </HStack>
-              <Caption color="quiet">
-                Every breakpoint. A slot switched off here is not in the component at
-                all — nothing to bind, nothing to fill.
-              </Caption>
 
               {navigationChoice && (
                 <>
@@ -915,44 +954,13 @@ export default function NavDesignerPage() {
                       express either, where a pair of switches needs a rule and a
                       label to say so. */}
                   <RadioGroup
-                    label={`Navigation at ${current?.label}`}
+                    label="Navigation"
                     orientation="horizontal"
                     value={navigationChoice.value}
                     onChange={(e: { target: { value: string } }) =>
                       setCondition(e.target.value, true)}
                     options={navigationChoice.options}
                   />
-                </>
-              )}
-
-              {otherConditions.length > 0 && (
-                <>
-                  <Divider />
-                  <Label>At {current?.label} only</Label>
-                  <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
-                    {otherConditions.map((name) => {
-                      const def = definition.conditions?.[name];
-                      return (
-                        <SwitchInput
-                          key={name}
-                          checked={!!active[name]}
-                          onChange={(e: { target: { checked: boolean } }) =>
-                            setCondition(name, e.target.checked)}
-                          /* "Search" alone did not say what the switch does.
-                             The heading gives the breakpoint; the label has to
-                             give the rest, or it reads as a noun with no verb. */
-                          label={`Show ${name.split('/').pop()!.replace(/^Show-/, '').replace(/-/g, ' ').toLowerCase()}`
-                            + (def?.trigger === 'scroll' ? ' (on scroll)' : '')}
-                        />
-                      );
-                    })}
-                  </HStack>
-                  <Caption color="quiet">
-                    This breakpoint only — the same shape Figma stores, where a boolean
-                    holds one value per Device-Sizes mode. Device conditions become
-                    breakpoints in CSS; the scroll ones cannot, so they stay false at
-                    every width and are switched by a listener instead.
-                  </Caption>
                 </>
               )}
 

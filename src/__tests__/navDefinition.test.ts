@@ -570,3 +570,34 @@ describe('the menu button sits at the edge, not where the tabs were', () => {
     }
   });
 });
+
+describe('every right-hand slot is per breakpoint', () => {
+  it('actions and the avatar are conditions, not structure', () => {
+    /* They were global switches beside per-breakpoint ones, which invented a
+       distinction a user has no reason to hold: "does the avatar exist" and
+       "does the avatar show at this width" are the same question asked twice.
+       It also made the per-breakpoint group look like the exception when it is
+       the whole point of the add-on. */
+    const used = conditionsUsedBy(full('brand-left'));
+    expect(used).toContain('Adaptive-Nav/Show-Search');
+    expect(used).toContain('Adaptive-Nav/Show-Actions');
+    expect(used).toContain('Adaptive-Nav/Show-Avatar');
+  });
+
+  it('a slot never asked for is omitted, not merely switched off', () => {
+    // Off at every width and off entirely are the same outcome, so the
+    // component carries no slot nothing will ever fill.
+    const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left', search: true }));
+    expect(JSON.stringify(spec)).not.toContain('Avatar');
+  });
+
+  it('all three carry a value at every breakpoint', () => {
+    const bps = [{ id: 'xs', minWidth: 0 }, { id: 'lg', minWidth: 1280 }];
+    const m = defaultNavMatrix(Object.keys(NAV_CONDITIONS), bps);
+    for (const n of ['Show-Search', 'Show-Actions', 'Show-Avatar']) {
+      for (const bp of bps) {
+        expect([n, bp.id, typeof m[`Adaptive-Nav/${n}`][bp.id]]).toEqual([n, bp.id, 'boolean']);
+      }
+    }
+  });
+});
