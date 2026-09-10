@@ -12,14 +12,15 @@
  * exists to avoid. Boxes showing which slot sits where is the honest amount to
  * promise from a definition that has no behaviour in it yet.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal,
 } from '@omni-design/components';
 import {
-  navDefinition, defaultNavMatrix, NAV_LAYOUTS, type NavLayout, type NavOptions,
+  navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
+  NAV_LAYOUTS, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
 import {
   DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
@@ -28,13 +29,16 @@ import {
 } from '../utils/addOns/breakpoints';
 import ScaledPreview from './ScaledPreview';
 import TuneIcon from '@mui/icons-material/Tune';
-import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
+import {
+  loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
+} from '../utils/addOns/brandAsset';
+import { toAddonSpec, tokensUsed, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
 
 export default function NavDesignerPage() {
   const [options, setOptions] = useState<NavOptions>({
-    layout: 'brand-left', search: true, actions: true, avatar: true, sticky: true,
+    layout: 'brand-left', search: true, actions: true, avatar: true,
   });
 
   const set = <K extends keyof NavOptions>(k: K, v: NavOptions[K]) =>
@@ -53,6 +57,29 @@ export default function NavDesignerPage() {
   const [selectedBp, setSelectedBp] = useState<string>(primaryBreakpoint(DEFAULT_BREAKPOINTS)!.id);
   const [expanded, setExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [brand, setBrand] = useState<BrandAsset | null>(null);
+  const [brandError, setBrandError] = useState<string | null>(null);
+  const brandInput = useRef<HTMLInputElement>(null);
+
+  /* Fills the Brand slots locally. It does NOT reach toAddonSpec: a published
+     add-on is imported by every design system, so a brand baked into one would
+     put this logo in everyone's file. Brand is a slot for exactly that reason.
+
+     Rendered as an <img>, never inlined — an uploaded SVG is a document that
+     can carry scripts and event handlers, and inlining one would run them with
+     this page's origin. In an <img> it is treated as an image: no scripts, no
+     external fetches, no reach into the document. */
+  const brandSlots = useMemo(() => {
+    if (!brand) return undefined;
+    const mark = (
+      <img
+        src={brand.url}
+        alt=""
+        style={{ height: 24, width: 'auto', display: 'block' }}
+      />
+    );
+    return { Brand: mark, 'Condensed-Brand': mark };
+  }, [brand]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
@@ -67,17 +94,42 @@ export default function NavDesignerPage() {
      never been touched takes the design's own default rather than a blanket
      true. */
   const full = useMemo(() => {
-    const names = Object.keys(definition.conditions || {});
+    /* Only what THIS arrangement gates on. Completing over every declared
+       condition put a Show-Rail switch on a layout with no rail — and worse,
+       switched ON, saying a part exists when it does not. */
+    const names = conditionsUsedBy(definition);
     const seed = defaultNavMatrix(names, sorted);
     return completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true);
   }, [definition, matrix, sorted]);
 
   const active = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
-  /* Writes one cell. The row is spread from the COMPLETED table rather than
-     from raw state, so setting a value at one breakpoint cannot blank the
-     others by writing a row that only has the cell just touched. */
-  const setCondition = (name: string, value: boolean) =>
-    setMatrix((m) => ({ ...m, [name]: { ...full[name], [selectedBp]: value } }));
+  /* Writes one cell, at this breakpoint, honouring exclusivity.
+     
+     Tabs and the menu button are one decision in two booleans: switching one
+     on switches the other off, and switching the last one off is refused
+     rather than allowed to leave a nav with no navigation in it.
+     
+     Each row is spread from the COMPLETED table rather than raw state, so
+     setting a value at one breakpoint cannot blank the others by writing a row
+     containing only the cell just touched. */
+  const setCondition = (name: string, value: boolean) => {
+    const atBp: Record<string, boolean> = {};
+    for (const n of Object.keys(full)) atBp[n] = full[n][selectedBp];
+    const next = applyExclusivity(atBp, name, value);
+
+    setMatrix((m) => {
+      const out = { ...m };
+      for (const n of Object.keys(next)) {
+        if (next[n] === atBp[n]) continue;
+        out[n] = { ...full[n], [selectedBp]: next[n] };
+      }
+      return out;
+    });
+  };
+
+  /** The other members of a condition's exclusive group, for the UI to say so. */
+  const exclusiveWith = (name: string) =>
+    (NAV_EXCLUSIVE.find((g) => g.includes(name)) || []).filter((n) => n !== name);
 
   const range = breakpointRange(sorted, selectedBp);
 
@@ -192,6 +244,54 @@ export default function NavDesignerPage() {
               <BodySmall color="quiet">
                 {NAV_LAYOUTS.find((l) => l.id === options.layout)?.description}
               </BodySmall>
+
+              {options.layout === 'rail' && (
+                <>
+                  <Divider />
+                  <Label>Application Bar position</Label>
+                  <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                    {([
+                      ['beside-rail', 'Beside the rail'],
+                      ['above-rail', 'Above the rail'],
+                    ] as const).map(([id, label]) => (
+                      <Button
+                        key={id}
+                        variant={(options.barPosition ?? 'beside-rail') === id ? 'default' : 'default-outline'}
+                        size="small"
+                        onClick={() => set('barPosition', id)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </HStack>
+                  <Divider />
+                  <Label>Title alignment</Label>
+                  <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                    {([['left', 'Left'], ['center', 'Centred']] as const).map(([id, label]) => (
+                      <Button
+                        key={id}
+                        variant={(options.titleAlign ?? 'left') === id ? 'default' : 'default-outline'}
+                        size="small"
+                        onClick={() => set('titleAlign', id)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </HStack>
+                  <Caption color="quiet">
+                    Centred balances the brand and the actions so the title is central
+                    in the BAR. Centring it in the space left over would put it
+                    wherever those two happen to differ in width.
+                  </Caption>
+
+                  <Caption color="quiet">
+                    Beside: the rail runs the full height and the Application Bar
+                    occupies the column to its right, so the brand sits above the
+                    CONTENT. Above: the bar spans the full width and the rail starts
+                    beneath it, so the brand sits above the rail too.
+                  </Caption>
+                </>
+              )}
             </VStack>
           </Card>
 
@@ -228,7 +328,12 @@ export default function NavDesignerPage() {
                     marginLeft: current?.align === 'center' ? 'auto' : undefined,
                     marginRight: current?.align === 'center' ? 'auto' : undefined,
                   }}>
-                    <DefinitionRenderer definition={definition} conditions={active} showSlots />
+                    <DefinitionRenderer
+                      definition={definition}
+                      conditions={active}
+                      slots={brandSlots}
+                      showSlots
+                    />
                   </div>
                 </ScaledPreview>
               </div>
@@ -247,15 +352,20 @@ export default function NavDesignerPage() {
               </HStack>
 
               <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
-                {Object.entries(definition.conditions || {}).map(([name, def]) => (
-                  <SwitchInput
-                    key={name}
-                    checked={!!active[name]}
-                    onChange={(e: { target: { checked: boolean } }) =>
-                      setCondition(name, e.target.checked)}
-                    label={name.split('/').pop() + (def.trigger === 'scroll' ? ' (scroll)' : '')}
-                  />
-                ))}
+                {conditionsUsedBy(definition).map((name) => {
+                  const def = definition.conditions?.[name];
+                  return (
+                    <SwitchInput
+                      key={name}
+                      checked={!!active[name]}
+                      onChange={(e: { target: { checked: boolean } }) =>
+                        setCondition(name, e.target.checked)}
+                      label={name.split('/').pop()
+                        + (def?.trigger === 'scroll' ? ' (scroll)' : '')
+                        + (exclusiveWith(name).length ? ' \u00b7 either/or' : '')}
+                    />
+                  );
+                })}
               </HStack>
               <Caption color="quiet">
                 These are set PER BREAKPOINT — the same shape Figma stores, where a
@@ -263,6 +373,71 @@ export default function NavDesignerPage() {
                 become breakpoints in CSS; the scroll ones cannot, so they stay false
                 at every width and are switched by a listener instead.
               </Caption>
+            </VStack>
+          </Card>
+
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-3)">
+              <H4>Brand</H4>
+              <Body color="quiet">
+                Fills the Brand slot so the nav can be judged with a real mark in it.
+                It stays local — a published add-on is imported by every design
+                system, so a brand baked into one would put this logo in everyone's
+                file. That is what the slot is for.
+              </Body>
+
+              {brandError && <Alert severity="error"><BodySmall>{brandError}</BodySmall></Alert>}
+
+              <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                {brand && (
+                  <div style={{
+                    border: '1px solid var(--Border)',
+                    borderRadius: 'var(--Card-Radius, 8px)',
+                    padding: 'var(--Sizing-2, 8px)',
+                  }}>
+                    <img src={brand.url} alt="" style={{ height: 32, width: 'auto', display: 'block' }} />
+                  </div>
+                )}
+                <Button variant="default-outline" onClick={() => brandInput.current?.click()}>
+                  {brand ? 'Replace' : 'Upload a mark'}
+                </Button>
+                {brand && (
+                  <Button
+                    variant="default-ghost"
+                    onClick={() => { releaseBrandAsset(brand); setBrand(null); setBrandError(null); }}
+                  >
+                    Remove
+                  </Button>
+                )}
+                {brand && <Caption color="quiet">{brand.name}</Caption>}
+              </HStack>
+
+              {/* MISSING-LIB-COMPONENT: FileInput
+                  Needed for: choosing a brand mark from disk
+                  Proposed API: <FileInput accept onSelect label />
+                  Lib-track: add to @omni-design/components/src/components/FileInput/
+
+                  Hidden and driven by the Button above, so what the user sees and
+                  operates is a lib control; the raw input exists because there is no
+                  lib equivalent and a file picker cannot be built without one. */}
+              <input
+                ref={brandInput}
+                type="file"
+                accept={BRAND_TYPES.join(',')}
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  // Reset first: picking the same file twice fires no change
+                  // event otherwise, so a re-upload after an error looks dead.
+                  e.target.value = '';
+                  if (!file) return;
+                  const result = loadBrandAsset(file);
+                  if (!result.ok) { setBrandError(result.error); return; }
+                  releaseBrandAsset(brand);
+                  setBrand(result.asset);
+                  setBrandError(null);
+                }}
+              />
             </VStack>
           </Card>
 
@@ -279,13 +454,6 @@ export default function NavDesignerPage() {
                   />
                 ),
               )}
-              <Divider />
-              <SwitchInput
-                checked={options.layout === 'hero' ? true : !!options.sticky}
-                disabled={options.layout === 'hero'}
-                onChange={(e: { target: { checked: boolean } }) => set('sticky', e.target.checked)}
-                label="Sticky"
-              />
               {options.layout === 'hero' && (
                 <>
                   <Divider />
@@ -304,9 +472,10 @@ export default function NavDesignerPage() {
                 </>
               )}
               <Caption color="quiet">
-                {options.layout === 'hero'
-                  ? 'Intrinsic to this layout: tabs under a hero that do not stick are simply tabs under a hero. Sticky sits on the tab strip, not the whole nav — the hero scrolls away.'
-                  : 'Reaches the React component only. Figma has no scroll behaviour, so it is left out of the spec rather than faked as a frame.'}
+                Sticky is set on each layout above — it is a property of the
+                arrangement, and it reaches the React component only. Figma has no
+                scroll behaviour, so it is left out of the spec rather than faked as a
+                frame.
               </Caption>
             </VStack>
           </Card>
@@ -467,7 +636,12 @@ export default function NavDesignerPage() {
                 marginLeft: current?.align === 'center' ? 'auto' : undefined,
                 marginRight: current?.align === 'center' ? 'auto' : undefined,
               }}>
-                <DefinitionRenderer definition={definition} conditions={active} showSlots />
+                <DefinitionRenderer
+                  definition={definition}
+                  conditions={active}
+                  slots={brandSlots}
+                  showSlots
+                />
               </div>
             </div>
           </div>

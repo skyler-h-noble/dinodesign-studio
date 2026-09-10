@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { navDefinition, NAV_LAYOUTS, NAV_CONDITIONS, type NavLayout } from '../utils/addOns/navDefinition';
+import { navDefinition, applyExclusivity, defaultNavMatrix, NAV_LAYOUTS, NAV_CONDITIONS, type NavLayout } from '../utils/addOns/navDefinition';
 import { toAddonSpec, tokensUsed } from '../utils/addOns/toAddonSpec';
 
 const ALL: NavLayout[] = NAV_LAYOUTS.map((l) => l.id);
@@ -43,23 +43,32 @@ describe('three layouts, one component', () => {
     expect(names(heroBar)).not.toContain('End');
   });
 
-  it('a Center exists only where there is a middle region', () => {
-    /* Hero has two regions, not three: navigation leads and fills, actions sit
-       at the end. Inventing an empty Center for symmetry would put a slot in
+  it('the middle region is named for what goes in it', () => {
+    /* 'Center' described a position, not a purpose. In the rail layout that
+       region is the page TITLE, the way an application bar works, and a slot
+       named for where it sits tells a designer nothing about what to put
+       there.
+       
+       Hero has two regions, not three: navigation leads and fills, actions sit
+       at the end. Inventing an empty middle for symmetry would put a slot in
        the file that means nothing and can still be filled. */
-    for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
+    for (const l of ['brand-left', 'brand-centre'] as NavLayout[]) {
       expect(names(toAddonSpec(full(l))), l).toContain('Center');
     }
+    expect(names(toAddonSpec(full('rail')))).toContain('Title');
     expect(names(toAddonSpec(full('hero')))).not.toContain('Center');
   });
 });
 
 describe('what differs between them', () => {
-  it('brand-centre puts the brand in the FILLING centre slot', () => {
-    // Otherwise "centred" only means "after whatever is on the left".
+  it('brand-centre centres the brand rather than parking it after the tabs', () => {
+    /* Superseded assertion: this used to require the CENTRE slot to fill, which
+       is the arrangement that put the brand off-centre — the sides are
+       different widths, so the leftover region is not central. The property
+       that matters is where the brand ends up, and the geometry that gets it
+       there is asserted in its own block below. */
     const spec: any = toAddonSpec(full('brand-centre'));
     const centre = spec.root.children[0].children.find((c: any) => c.name === 'Center');
-    expect(centre.layoutSizingHorizontal).toBe('FILL');
     expect(centre.primaryAxisAlignItems).toBe('CENTER');
     expect(names(centre)).toContain('Brand');
   });
@@ -126,7 +135,7 @@ describe('sticky has no Figma equivalent', () => {
   it('is carried on the definition but absent from the spec', () => {
     /* Figma has no scroll behaviour. A flag that means nothing on one target
        is better than a frame that pretends to. */
-    const def = navDefinition({ layout: 'brand-left', sticky: true });
+    const def = navDefinition({ layout: 'brand-left' });
     expect(JSON.stringify(toAddonSpec(def))).not.toContain('sticky');
   });
 });
@@ -232,8 +241,7 @@ describe('hero with sticky tabs', () => {
 
   it('is intrinsic, not an option', () => {
     // Tabs under a hero that do not stick are simply tabs under a hero.
-    const off = navDefinition({ layout: 'hero', sticky: false });
-    const bar = off.root.children!.find((c) => c.name === 'Bar');
+    const bar = navDefinition({ layout: 'hero' }).root.children!.find((c) => c.name === 'Bar');
     expect(bar!.sticky).toBe(true);
   });
 });
@@ -273,5 +281,131 @@ describe('the condensed state is scroll-driven, not width-driven', () => {
       const spec = toAddonSpec(navDefinition({ layout: l, condensed: true, avatar: true }));
       expect(JSON.stringify(spec), l).not.toContain('Condensed');
     }
+  });
+});
+
+describe('the rail can sit beside the bar or under it', () => {
+  it('beside: the rail runs full height and comes first', () => {
+    /* The bar occupies only the column to the rail's right, which is what puts
+       the brand above the CONTENT rather than above the rail. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: 'beside-rail' }));
+    expect(spec.root.layoutMode).toBe('HORIZONTAL');
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Rail', 'Bar']);
+  });
+
+  it('above: the bar spans the width and the rail starts beneath it', () => {
+    const spec: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: 'above-rail' }));
+    expect(spec.root.layoutMode).toBe('VERTICAL');
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Bar', 'Rail']);
+  });
+
+  it('beside is the default', () => {
+    const spec: any = toAddonSpec(navDefinition({ layout: 'rail' }));
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Rail', 'Bar']);
+  });
+
+  it('the rail is a sibling either way', () => {
+    // Nested under the bar its height would be the bar's, and it would stop
+    // being a rail.
+    for (const pos of ['beside-rail', 'above-rail'] as const) {
+      const spec: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: pos }));
+      const bar = spec.root.children.find((c: any) => c.name === 'Bar');
+      expect(names(bar), pos).not.toContain('Rail');
+    }
+  });
+
+  it('the bar sticks in both, and the rail never does', () => {
+    /* A full-height rail is already in view; sticking it would pin something
+       that cannot scroll out of view anyway. */
+    for (const pos of ['beside-rail', 'above-rail'] as const) {
+      const def = navDefinition({ layout: 'rail', barPosition: pos });
+      const bar = def.root.children!.find((c) => c.name === 'Bar');
+      const rail = def.root.children!.find((c) => c.name === 'Rail');
+      expect(bar!.sticky, pos).toBe(true);
+      expect(rail!.sticky, pos).toBeUndefined();
+    }
+  });
+});
+
+describe('conditions are scoped to the arrangement', () => {
+  it('a layout with no rail does not ask for Show-Rail', () => {
+    /* Offering it would put a switch on the page that gates nothing — and
+       switched on, it says a part exists when it does not. It would also tell
+       the design system to provide a variable nothing binds to. */
+    expect(tokensUsed(full('brand-left'))).not.toContain('Adaptive-Nav/Show-Rail');
+    expect(tokensUsed(full('rail'))).toContain('Adaptive-Nav/Show-Rail');
+  });
+
+  it('only hero asks for the scroll conditions', () => {
+    for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
+      expect(tokensUsed(navDefinition({ layout: l, condensed: true })), l)
+        .not.toContain('Adaptive-Nav/Show-Condensed');
+    }
+  });
+});
+
+describe('brand centred means centred in the BAR', () => {
+  it('both side groups fill, so the middle is genuinely central', () => {
+    /* Filling the MIDDLE and centring inside it is the obvious arrangement and
+       it is wrong: the tabs and the actions are different widths, so the
+       leftover region is off-centre and the brand lands wherever it falls.
+       Equal flex on both sides is what centres it, whatever they hold. */
+    const spec: any = toAddonSpec(full('brand-centre'));
+    const bar = spec.root.children[0];
+    const [start, centre, end] = bar.children;
+    expect(start.layoutSizingHorizontal).toBe('FILL');
+    expect(end.layoutSizingHorizontal).toBe('FILL');
+    expect(centre.layoutSizingHorizontal).toBe('HUG');
+  });
+
+  it('the sides push outward', () => {
+    const spec: any = toAddonSpec(full('brand-centre'));
+    const [start, , end] = spec.root.children[0].children;
+    expect(start.primaryAxisAlignItems).toBe('MIN');
+    expect(end.primaryAxisAlignItems).toBe('MAX');
+  });
+
+  it('and the brand is the thing in the middle', () => {
+    const spec: any = toAddonSpec(full('brand-centre'));
+    expect(names(spec.root.children[0].children[1])).toContain('Brand');
+  });
+});
+
+describe('tabs and the menu button are one decision', () => {
+  const TABS = 'Adaptive-Nav/Show-Tabs';
+  const MENU = 'Adaptive-Nav/Show-Menu-Button';
+
+  it('turning one on turns the other off', () => {
+    /* Both on shows two navigations. Neither state fails — they just look
+       wrong in a way that is easy to create and hard to notice. */
+    const row = { [TABS]: true, [MENU]: false };
+    expect(applyExclusivity(row, MENU, true)).toEqual({ [TABS]: false, [MENU]: true });
+  });
+
+  it('turning the last one off is refused, not obeyed', () => {
+    // A nav with no navigation in it is not a state worth being able to reach
+    // by accident.
+    const row = { [TABS]: true, [MENU]: false };
+    expect(applyExclusivity(row, TABS, false)).toEqual(row);
+  });
+
+  it('but turning one off is fine when the other is already on', () => {
+    const row = { [TABS]: true, [MENU]: true };
+    expect(applyExclusivity(row, TABS, false)).toEqual({ [TABS]: false, [MENU]: true });
+  });
+
+  it('leaves conditions outside any group alone', () => {
+    const row = { 'Adaptive-Nav/Show-Search': true, [TABS]: true, [MENU]: false };
+    const out = applyExclusivity(row, 'Adaptive-Nav/Show-Search', false);
+    expect(out['Adaptive-Nav/Show-Search']).toBe(false);
+    expect(out[TABS]).toBe(true);
+  });
+
+  it('the starting table already respects it', () => {
+    // Otherwise the rule would be enforced on edit but violated on open.
+    const m = defaultNavMatrix([TABS, MENU], [
+      { id: 'xs', minWidth: 0 }, { id: 'lg', minWidth: 1280 },
+    ]);
+    for (const bp of ['xs', 'lg']) expect([bp, m[TABS][bp] === m[MENU][bp]]).toEqual([bp, false]);
   });
 });

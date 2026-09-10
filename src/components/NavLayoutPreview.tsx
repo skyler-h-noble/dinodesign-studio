@@ -66,16 +66,25 @@ export default function NavLayoutPreview(
         <rect x="6" y="6" width={W - 12} height="46" rx="4" fill="var(--Border-Variant)" />
       )}
 
-      {/* Rail: full height down the side, which is why it is drawn outside the bar. */}
+      {/* Rail. Full height beside the bar, or starting under a full-width bar
+          — the difference is whether the brand sits above the rail or above
+          the content, which is the whole reason it is a choice. */}
       {layout === 'rail' && (
-        <rect x="6" y="6" width="28" height={H - 12} rx="4" fill="var(--Border-Variant)" />
+        <rect
+          x="6"
+          y={options.barPosition === 'above-rail' ? 44 : 6}
+          width="28"
+          height={options.barPosition === 'above-rail' ? H - 50 : H - 12}
+          rx="4"
+          fill="var(--Border-Variant)"
+        />
       )}
 
       {/* The bar itself. On hero it sits below and is the part that sticks. */}
       <rect
-        x={layout === 'rail' ? 40 : 6}
+        x={layout === 'rail' && o.barPosition !== 'above-rail' ? 40 : 6}
         y={barY}
-        width={(layout === 'rail' ? W - 46 : W - 12)}
+        width={(layout === 'rail' && o.barPosition !== 'above-rail' ? W - 46 : W - 12)}
         height="28"
         rx="4"
         fill="transparent"
@@ -100,8 +109,10 @@ export default function NavLayoutPreview(
 
       {layout === 'rail' && (
         <>
-          <Tab x={12} y={20} w={16} /><Tab x={12} y={36} w={16} /><Tab x={12} y={52} w={16} />
-          <Brand x={48} y={barY + 6} />
+          {(o.barPosition === 'above-rail' ? [54, 70, 86] : [20, 36, 52]).map((y) => (
+            <Tab key={y} x={12} y={y} w={16} />
+          ))}
+          <Brand x={o.barPosition === 'above-rail' ? 14 : 48} y={barY + 6} />
           <RightGroup x={right} y={barY + 6} options={o} />
         </>
       )}

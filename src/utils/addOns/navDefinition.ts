@@ -35,17 +35,22 @@ export interface NavOptions {
   search?: boolean;
   actions?: boolean;
   avatar?: boolean;
-  /** React-only; see the note above. */
-  sticky?: boolean;
+  /** Where the bar sits relative to the rail. Only meaningful for 'rail'. */
+  barPosition?: 'above-rail' | 'beside-rail';
+  /** Where the page title sits in the bar. Only meaningful for 'rail'. */
+  titleAlign?: 'left' | 'center';
   /** Hero only: brand and actions animate into the strip once it sticks. */
   condensed?: boolean;
 }
 
 export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[] = [
-  { id: 'brand-left',   label: 'Brand left',    description: 'Brand, then tabs, then actions on the right.' },
-  { id: 'brand-centre', label: 'Brand centred', description: 'Tabs or a menu button on the left, brand centred, actions right.' },
-  { id: 'rail',         label: 'Left rail',     description: 'Brand and actions in the bar, navigation in a rail down the side.' },
-  { id: 'hero',         label: 'Hero + sticky tabs', description: 'A hero area with the tab strip beneath it, which sticks once it reaches the top.' },
+  /* Every name says sticky, because every one of them is: a top nav that
+     scrolls away is not a variation on a top nav, it is a header. Naming it
+     is what stops someone looking for the option that used to be here. */
+  { id: 'brand-left',   label: 'Sticky bar, brand left',    description: 'Brand, then tabs, then actions on the right.' },
+  { id: 'brand-centre', label: 'Sticky bar, brand centred', description: 'Tabs or a menu button on the left, brand centred, actions right.' },
+  { id: 'rail',         label: 'Sticky bar + rail',         description: 'Navigation in a rail down the side. The bar sits above it or beside it.' },
+  { id: 'hero',         label: 'Hero + sticky tabs',        description: 'A hero area with the tab strip beneath it, which sticks once it reaches the top.' },
 ];
 
 /** Every boolean the nav reads, with what each means.
@@ -81,6 +86,45 @@ export const NAV_CONDITIONS: Record<string, ConditionDef> = {
     trigger: 'scroll',
   },
 };
+
+/**
+ * Conditions where exactly one of the set is true.
+ *
+ * Tabs and the menu button are one decision expressed as two booleans. Both on
+ * shows two navigations; both off shows none — and neither state fails, they
+ * just look wrong in a way that is easy to create and hard to notice.
+ *
+ * Declared rather than left to the UI so the rule travels with the definition:
+ * a design system setting these variables by hand, or a second editor, has the
+ * same constraint available. Two booleans rather than one because Figma binds
+ * `visible` to a boolean and cannot invert one, so each layer needs its own.
+ */
+export const NAV_EXCLUSIVE: string[][] = [
+  ['Adaptive-Nav/Show-Tabs', 'Adaptive-Nav/Show-Menu-Button'],
+];
+
+/** Apply the exclusivity rules to one change.
+ *
+ *  Turning a member ON turns its partners off. Turning the last one OFF is
+ *  refused rather than allowed to produce a nav with no navigation in it —
+ *  the caller gets the row back unchanged. */
+export function applyExclusivity(
+  row: Record<string, boolean>,
+  changed: string,
+  value: boolean,
+): Record<string, boolean> {
+  const group = NAV_EXCLUSIVE.find((g) => g.includes(changed));
+  if (!group) return { ...row, [changed]: value };
+
+  if (value) {
+    const out = { ...row, [changed]: true };
+    for (const other of group) if (other !== changed) out[other] = false;
+    return out;
+  }
+  // Turning this one off leaves the group empty unless another is already on.
+  const anotherOn = group.some((n) => n !== changed && row[n]);
+  return anotherOn ? { ...row, [changed]: false } : row;
+}
 
 const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => ({
   name,
@@ -127,14 +171,23 @@ function bar(o: NavOptions): NodeDef {
   let children: NodeDef[];
 
   if (o.layout === 'brand-centre') {
-    /* Brand centred needs the centre slot to FILL and the brand to sit inside
-       it, or "centred" would only mean "after whatever is on the left". */
+    /* Centred means centred in the BAR, which needs the two side groups to
+       claim equal space — not the brand centred in whatever is left over.
+       
+       Filling the middle and centring inside it is the obvious arrangement and
+       it is wrong: the tabs and the actions are different widths, so the
+       leftover region is off-centre and the brand lands wherever it happens to
+       fall. Two FILL sides with a HUG middle is what actually centres it,
+       because equal flex gives both sides the same width whatever they hold.
+       
+       Same instruction on both targets: Figma distributes remaining space
+       equally between FILL children, CSS gives equal flex-basis. */
     children = [
-      { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-        width: 'hug', height: 'hug', children: navigationSlots() },
+      { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center', gap: GAP,
+        width: 'fill', height: 'hug', children: navigationSlots() },
       { name: 'Center', kind: 'stack', direction: 'row', justify: 'center', align: 'center',
-        width: 'fill', height: 'hug', children: [brand] },
-      endSlot(o),
+        width: 'hug', height: 'hug', children: [brand] },
+      { ...endSlot(o), width: 'fill', justify: 'end' },
     ];
   } else if (o.layout === 'hero') {
     /* No brand in the bar: it belongs to the hero slot above, and repeating it
@@ -163,13 +216,31 @@ function bar(o: NavOptions): NodeDef {
       children.push({ ...endSlot(o), presence: { when: 'Adaptive-Nav/Show-Condensed' } });
     }
   } else if (o.layout === 'rail') {
-    // Navigation lives in the rail, so the bar carries no tabs at all.
-    children = [
-      { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-        width: 'hug', height: 'hug', children: [brand] },
-      slot('Center', 'fill'),
-      endSlot(o),
-    ];
+    /* Navigation lives in the rail, so the bar carries no tabs — its middle is
+       the page TITLE, the way an application bar works.
+       
+       Centred needs the same geometry as brand-centre and for the same reason:
+       the brand and the actions are different widths, so a title centred in
+       what is left over is not centred in the bar. Two FILL sides with a HUG
+       title is what actually centres it.
+       
+       Left-aligned is the simpler case — the title just fills after the brand,
+       and no equal-width trick is needed because nothing is being balanced. */
+    const centred = o.titleAlign === 'center';
+    children = centred
+      ? [
+          { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center', gap: GAP,
+            width: 'fill', height: 'hug', children: [brand] },
+          { name: 'Title', kind: 'stack', direction: 'row', justify: 'center', align: 'center',
+            width: 'hug', height: 'hug', children: [slot('Title', 'hug')] },
+          { ...endSlot(o), width: 'fill', justify: 'end' },
+        ]
+      : [
+          { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
+            width: 'hug', height: 'hug', children: [brand] },
+          slot('Title', 'fill'),
+          endSlot(o),
+        ];
   } else {
     children = [
       { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
@@ -249,6 +320,50 @@ function heroRoot(o: NavOptions): NodeDef {
   };
 }
 
+/* The bar is ALWAYS sticky.
+ *
+ * It was an option, and it should not have been: a top nav that scrolls away
+ * is not a variation on a top nav, it is a header. Every layout here is a
+ * navigation that stays reachable, so the flag was a control that could only
+ * ever be turned to the wrong answer.
+ *
+ * Sticky sits on the BAR rather than the root in all four, and in the rail
+ * layout that distinction earns its keep: a full-height rail is already in
+ * view and does not stick, while the bar beside it does. */
+function railNode(fullHeight: boolean): NodeDef {
+  return {
+    name: 'Rail',
+    kind: 'stack',
+    direction: 'column',
+    align: 'start',
+    gap: GAP,
+    width: 'hug',
+    /* Full height only when it runs beside the bar. Below a full-width bar it
+       fills what is left, which is the same instruction from the row's point
+       of view — but expressed on the wrong axis it would stretch the rail
+       across the page instead. */
+    height: fullHeight ? 'fill' : 'fill',
+    surface: 'Surface-Dim',
+    padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
+    presence: { when: 'Adaptive-Nav/Show-Rail' },
+    children: [slot('Rail-Items', 'hug')],
+  };
+}
+
+function railChildren(o: NavOptions): NodeDef[] {
+  const stickyBar = { ...bar(o), sticky: true };
+  /* Above: the bar spans the whole width and the rail starts beneath it, so
+     the bar's brand and actions clear the rail. Beside: the rail runs the full
+     height and the bar occupies only the column to its right, which is what
+     puts the brand above the content rather than above the rail.
+     
+     A sibling either way — nesting the rail under the bar would tie its height
+     to the bar's, and it would stop being a rail. */
+  return o.barPosition === 'above-rail'
+    ? [stickyBar, railNode(false)]
+    : [railNode(true), stickyBar];
+}
+
 export function navDefinition(o: NavOptions): ComponentDefinition {
   if (o.layout === 'hero') {
     return {
@@ -263,23 +378,16 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
   const root: NodeDef = {
     name: 'Adaptive Nav',
     kind: 'stack',
-    direction: o.layout === 'rail' ? 'row' : 'column',
+    /* Beside: the rail runs the full height, so the root is a row and the bar
+       sits to its right. Above: the bar spans the full width and the rail
+       hangs below it, so the root is a column. */
+    direction: o.layout === 'rail' && o.barPosition !== 'above-rail' ? 'row' : 'column',
     width: 'fill',
     height: 'hug',
     surface: 'Surface',
     children: o.layout === 'rail'
-      ? [
-          /* The rail is a sibling of the bar, not a child: it runs the full
-             height beside the content, and nesting it under the bar would tie
-             its height to the bar's. */
-          { name: 'Rail', kind: 'stack', direction: 'column', align: 'start', gap: GAP,
-            width: 'hug', height: 'fill', surface: 'Surface-Dim',
-            padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
-            presence: { when: 'Adaptive-Nav/Show-Rail' },
-            children: [slot('Rail-Items', 'hug')] },
-          bar(o),
-        ]
-      : [bar(o)],
+      ? railChildren(o)
+      : [{ ...bar(o), sticky: true }],
   };
 
   return {

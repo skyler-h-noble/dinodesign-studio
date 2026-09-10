@@ -129,7 +129,30 @@ export function tokensUsed(def: ComponentDefinition): string[] {
   walk(def.root);
   /* Conditions are tokens too — boolean variables the file must have. They
      were omitted here, so a definition could pass a pre-publish token check
-     and still import with its conditional parts unbound. */
-  for (const name of Object.keys(def.conditions || {})) out.add(name);
+     and still import with its conditional parts unbound.
+     
+     Only the ones this definition actually REFERENCES, not everything
+     declared: a layout with no rail does not need Show-Rail, and asking a
+     design system for a variable nothing binds to is a false requirement. */
+  for (const name of conditionsUsedBy(def)) out.add(name);
+  return [...out].sort();
+}
+
+/**
+ * The conditions a definition actually gates something on.
+ *
+ * `conditions` on the definition is the DECLARED set — every boolean the
+ * component could read, which is documentation. What a given arrangement uses
+ * is a subset, and the difference matters twice over: a switch for a condition
+ * that gates nothing does nothing, and if it reads as ON it says a part exists
+ * when it does not.
+ */
+export function conditionsUsedBy(def: ComponentDefinition): string[] {
+  const out = new Set<string>();
+  const walk = (n: NodeDef) => {
+    if (n.presence && n.presence !== 'always') out.add(n.presence.when);
+    (n.children || []).forEach(walk);
+  };
+  walk(def.root);
   return [...out].sort();
 }

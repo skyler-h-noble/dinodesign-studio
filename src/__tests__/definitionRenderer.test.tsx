@@ -92,10 +92,15 @@ describe('sticky is a node, not the component', () => {
     expect(out.match(/position:sticky/g) || []).toHaveLength(1);
   });
 
-  it('and no layout without a hero sticks anything', () => {
-    for (const l of ['brand-left', 'brand-centre', 'rail'] as const) {
+  it('every layout sticks its bar, and only its bar', () => {
+    /* The bar is always sticky — a top nav that scrolls away is a header
+       rather than a navigation, so it was never a real choice. Exactly one
+       sticky node per layout: applied to the root it would pin the whole nav,
+       and in the rail layout it would pin a full-height rail that is already
+       in view. */
+    for (const l of ['brand-left', 'brand-centre', 'rail', 'hero'] as const) {
       const out = html(<DefinitionRenderer definition={navDefinition({ layout: l })} showSlots />);
-      expect(out, l).not.toContain('position:sticky');
+      expect((out.match(/position:sticky/g) || []).length, l).toBe(1);
     }
   });
 });
