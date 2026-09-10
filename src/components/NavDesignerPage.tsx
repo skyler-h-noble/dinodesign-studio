@@ -122,9 +122,6 @@ export default function NavDesignerPage() {
       <img src={brand.url} alt="" style={{ height: 24, width: 'auto', display: 'block' }} />
     ) : null;
 
-    const label = (i: NavItem) => (i.iconOnly ? null : i.label);
-    const glyph = (i: NavItem) => (i.icon ? <NavIconGlyph name={i.icon} /> : null);
-
     /* The library's own Tabs, not buttons dressed up. A tab's treatment is a
        SELECTOR — an indicator bar on one edge and a track along the rest, with
        the selected one carrying --Text and the others --Quiet — and none of
@@ -133,6 +130,25 @@ export default function NavDesignerPage() {
        Clicking still opens the editor, which is why the strip is controlled
        here rather than left to manage its own selection: selecting a tab and
        editing it are the same gesture. */
+    /* One helper for both, because a tab and a button carry the same five
+       boolean props — the difference is the treatment, not the content. */
+    const deco = (i: NavItem, end: 'start' | 'end') => {
+      const wantsIcon = end === 'start' ? i.startIcon : i.endIcon;
+      const iconName = end === 'start' ? i.startIconName : i.endIconName;
+      const wantsAvatar = end === 'start' ? i.startAvatar : i.endAvatar;
+      if (wantsAvatar) {
+        return (
+          <Avatar
+            size="x-small"
+            alt=""
+            initials={i.avatarType === 'initials' ? (i.avatarInitials || '?') : undefined}
+            defaultPhoto={i.avatarType !== 'icon'}
+          />
+        );
+      }
+      return wantsIcon ? <NavIconGlyph name={iconName} /> : undefined;
+    };
+
     const tabStrip = (
       <Tabs
         value={selectedTab}
@@ -148,15 +164,18 @@ export default function NavDesignerPage() {
               <Tab
                 key={t.id}
                 value={t.id}
-                iconOnly={t.iconOnly}
-                aria-label={t.iconOnly ? t.label || 'Unnamed tab' : undefined}
-                startDecorator={t.icon && t.iconPosition !== 'end' ? <NavIconGlyph name={t.icon} /> : undefined}
-                endDecorator={t.icon && t.iconPosition === 'end' ? <NavIconGlyph name={t.icon} /> : undefined}
+                iconOnly={!t.text}
+                /* The accessible name survives the text being switched off —
+                   that is the whole reason `label` is kept separately from
+                   whether it is shown. */
+                aria-label={!t.text ? t.label || 'Unnamed tab' : undefined}
+                startDecorator={deco(t, 'start')}
+                endDecorator={deco(t, 'end')}
                 sx={problems.length
                   ? { outline: '2px solid var(--Buttons-Warning-Border)', outlineOffset: 2 }
                   : undefined}
               >
-                {t.iconOnly ? null : t.label}
+                {t.text ? t.label : null}
               </Tab>
             );
           })}
@@ -168,17 +187,21 @@ export default function NavDesignerPage() {
       <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
         {actions.map((a) => {
           const problems = itemProblems(a);
+          const start = deco(a, 'start');
+          const end = deco(a, 'end');
           return (
             <Button
               key={a.id}
               variant={buttonVariant(a.colour, a.treatment)}
               size="small"
-              iconOnly={a.iconOnly}
-              aria-label={a.iconOnly ? a.label || 'Unnamed button' : undefined}
+              iconOnly={!a.text}
+              aria-label={!a.text ? a.label || 'Unnamed button' : undefined}
               onClick={() => setEditing({ kind: 'button', id: a.id })}
               style={itemChrome(problems)}
             >
-              {a.iconPosition === 'end' ? <>{label(a)}{glyph(a)}</> : <>{glyph(a)}{label(a)}</>}
+              {start}
+              {a.text ? a.label : null}
+              {end}
             </Button>
           );
         })}
@@ -443,6 +466,24 @@ export default function NavDesignerPage() {
             </VStack>
           </Card>
 
+          {/* Sticky, so a change made further down is visible as it is made.
+              Everything below this point edits what is in it, and scrolling to
+              check each change and back is most of the work of using the page.
+
+              It carries its own surface: a sticky element with a transparent
+              background shows the content sliding under it, which is the one
+              thing a sticky element cannot do. */}
+          <div
+            data-surface="Surface"
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 2,
+              background: 'var(--Background)',
+              paddingTop: 'var(--Sizing-2, 8px)',
+              paddingBottom: 'var(--Sizing-2, 8px)',
+            }}
+          >
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Preview</H4>
@@ -487,6 +528,7 @@ export default function NavDesignerPage() {
 
             </VStack>
           </Card>
+          </div>
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">

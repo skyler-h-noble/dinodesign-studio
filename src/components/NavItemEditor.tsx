@@ -1,24 +1,28 @@
 /**
  * Edit one tab or action button.
  *
- * Opened by clicking the item in the preview, so what is edited is the thing
- * just pointed at rather than a row in a list somewhere else — the item and
- * its settings are never out of step because there is only ever one open.
+ * The controls mirror the Figma component's variant properties one for one —
+ * startIcon, startAvatar, endIcon, endAvatar, text — rather than a tidier
+ * scheme of my own. The converter has to line them up either way, and two
+ * vocabularies for one set of switches is a translation step that exists only
+ * to be got wrong.
  */
 import {
-  Modal, Button, VStack, HStack, Label, Caption, BodySmall, Alert,
-  TextField, SwitchInput, Divider, H4,
+  Modal, Button, VStack, HStack, Label, Caption, BodySmall, Alert, Link,
+  TextField, SwitchInput, Divider, H4, Avatar, Tabs, TabList, Tab,
 } from '@omni-design/components';
 import {
-  NAV_ICONS, BUTTON_VARIANTS, BUTTON_TREATMENTS, itemProblems,
-  type NavItem, type NavButtonItem, type NavIcon, type ButtonTreatment,
+  BUTTON_VARIANTS, BUTTON_TREATMENTS, AVATAR_TYPES, ICON_REFERENCE_URL,
+  itemProblems, itemRendersNothing, buttonVariant,
+  type NavItem, type NavButtonItem, type ButtonTreatment, type AvatarType,
 } from '../utils/addOns/navContent';
 import NavIconGlyph from './NavIconGlyph';
 
 export interface NavItemEditorProps {
   open: boolean;
   item: NavItem | NavButtonItem | null;
-  /** Buttons carry a variant; tabs do not. */
+  /** Buttons carry a colour and treatment; tabs do not — a tab's treatment is
+   *  a selector bar, not a fill. */
   kind: 'tab' | 'button';
   onChange: (next: NavItem | NavButtonItem) => void;
   onRemove: () => void;
@@ -31,14 +35,88 @@ export default function NavItemEditor(
   if (!item) return null;
   const asButton = item as NavButtonItem;
   const problems = itemProblems(item);
+  const hasAvatar = !!(item.startAvatar || item.endAvatar);
+  /* Refused, not warned about. An item with no text, icon or avatar is an
+     empty control that still takes focus and can still be clicked — there is
+     no reading of it that is intended. */
+  const blocked = itemRendersNothing(item);
+
+  const deco = (end: 'start' | 'end') => {
+    const wantsAvatar = end === 'start' ? item.startAvatar : item.endAvatar;
+    if (wantsAvatar) {
+      return (
+        <Avatar
+          size="x-small"
+          alt=""
+          initials={item.avatarType === 'initials' ? (item.avatarInitials || '?') : undefined}
+          defaultPhoto={item.avatarType !== 'icon'}
+        />
+      );
+    }
+    const wantsIcon = end === 'start' ? item.startIcon : item.endIcon;
+    const iconName = end === 'start' ? item.startIconName : item.endIconName;
+    return wantsIcon ? <NavIconGlyph name={iconName} /> : undefined;
+  };
 
   const set = <K extends keyof NavButtonItem>(k: K, v: NavButtonItem[K]) =>
     onChange({ ...(item as NavButtonItem), [k]: v });
 
   return (
-    <Modal open={open} onClose={onClose} size="medium">
+    /* onClose is guarded, not just the Done button. Escape and the backdrop
+       reach onClose too, so disabling one button would leave two ways to keep
+       an item that renders nothing. */
+    <Modal open={open} onClose={() => { if (!blocked) onClose(); }} size="medium">
       <VStack gap="var(--Sizing-3)">
         <H4>{kind === 'tab' ? 'Tab' : 'Button'}</H4>
+
+        {/* The item itself, rendered by the same components the nav uses — so
+            what is shown here is what will appear in the bar, not a sketch of
+            it. A tab keeps its selector, which is most of what makes a tab
+            legible as one and cannot be judged from switches. */}
+        <div style={{
+          border: '1px solid var(--Border)',
+          padding: 'var(--Sizing-3, 12px)',
+          display: 'flex',
+          justifyContent: 'center',
+        }}>
+          {blocked ? (
+            <Caption color="quiet">Nothing to show yet</Caption>
+          ) : kind === 'tab' ? (
+            <Tabs value={item.id}>
+              <TabList>
+                <Tab
+                  value={item.id}
+                  iconOnly={!item.text}
+                  aria-label={!item.text ? item.label || 'Unnamed tab' : undefined}
+                  startDecorator={deco('start')}
+                  endDecorator={deco('end')}
+                >
+                  {item.text ? item.label : null}
+                </Tab>
+              </TabList>
+            </Tabs>
+          ) : (
+            <Button
+              variant={buttonVariant(asButton.colour, asButton.treatment)}
+              size="small"
+              iconOnly={!item.text}
+              aria-label={!item.text ? item.label || 'Unnamed button' : undefined}
+            >
+              {deco('start')}
+              {item.text ? item.label : null}
+              {deco('end')}
+            </Button>
+          )}
+        </div>
+
+        {blocked && (
+          <Alert severity="error">
+            <BodySmall>
+              Nothing would render. An item with no text, icon or avatar is an empty
+              control that still takes focus and can still be clicked.
+            </BodySmall>
+          </Alert>
+        )}
 
         {problems.length > 0 && (
           <Alert severity="warning">
@@ -49,70 +127,109 @@ export default function NavItemEditor(
         )}
 
         <TextField
-          label={item.iconOnly ? 'Accessible name' : 'Label'}
+          label={item.text ? 'Label' : 'Accessible name'}
           value={item.label}
           onChange={(e: { target: { value: string } }) => set('label', e.target.value)}
         />
-        {item.iconOnly && (
+        <SwitchInput
+          checked={!!item.text}
+          onChange={(e: { target: { checked: boolean } }) => set('text', e.target.checked)}
+          label="Text"
+        />
+        {!item.text && (
           <Caption color="quiet">
-            Not shown on screen, but read aloud. Name the ACTION rather than the
-            glyph — "Search products", not "magnifier".
+            Still read aloud with the text off. Name the ACTION rather than the glyph —
+            "Search products", not "magnifier".
           </Caption>
         )}
 
         <Divider />
 
-        <Label>Icon</Label>
-        <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-          <Button
-            variant={item.icon ? 'default-outline' : 'default'}
-            size="small"
-            onClick={() => onChange({ ...item, icon: undefined, iconOnly: false })}
-          >
-            None
-          </Button>
-          {NAV_ICONS.map((name) => (
-            <Button
-              key={name}
-              iconOnly
-              size="small"
-              variant={item.icon === name ? 'default' : 'default-outline'}
-              aria-label={name}
-              onClick={() => set('icon', name as NavIcon)}
-            >
-              <NavIconGlyph name={name} />
-            </Button>
-          ))}
-        </HStack>
+        {/* Both ends, independently. A tab with an avatar before the label and a
+            chevron after it is one item, not a special case. */}
+        {(['start', 'end'] as const).map((end) => {
+          const iconKey = end === 'start' ? 'startIcon' : 'endIcon';
+          const nameKey = end === 'start' ? 'startIconName' : 'endIconName';
+          const avatarKey = end === 'start' ? 'startAvatar' : 'endAvatar';
+          return (
+            <VStack key={end} gap="var(--Sizing-2)">
+              <Label>{end === 'start' ? 'Before the label' : 'After the label'}</Label>
+              <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
+                <SwitchInput
+                  checked={!!item[iconKey]}
+                  onChange={(e: { target: { checked: boolean } }) => set(iconKey, e.target.checked)}
+                  label="Icon"
+                />
+                <SwitchInput
+                  checked={!!item[avatarKey]}
+                  onChange={(e: { target: { checked: boolean } }) => set(avatarKey, e.target.checked)}
+                  label="Avatar"
+                />
+              </HStack>
+              {item[iconKey] && (
+                <>
+                  <TextField
+                    label="Icon name"
+                    value={item[nameKey] ?? ''}
+                    placeholder="e.g. Search, ExpandMore, Notifications"
+                    onChange={(e: { target: { value: string } }) => set(nameKey, e.target.value)}
+                  />
+                  <Caption color="quiet">
+                    Typed rather than picked: the set runs to several thousand, so a
+                    picker is a search problem and a curated dozen is a guess that will
+                    be wrong for somebody.{' '}
+                    <Link href={ICON_REFERENCE_URL} target="_blank" rel="noreferrer">
+                      Browse the names
+                    </Link>
+                    . A name that does not resolve renders nothing, so it is reported
+                    rather than left looking like a missing icon.
+                  </Caption>
+                </>
+              )}
+            </VStack>
+          );
+        })}
 
-        {item.icon && (
+        {hasAvatar && (
           <>
-            <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
-              {(['start', 'end'] as const).map((pos) => (
+            <Divider />
+            <Label>Avatar</Label>
+            <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+              {AVATAR_TYPES.map((t) => (
                 <Button
-                  key={pos}
+                  key={t}
                   size="small"
-                  disabled={item.iconOnly}
-                  variant={(item.iconPosition ?? 'start') === pos ? 'default' : 'default-outline'}
-                  onClick={() => set('iconPosition', pos)}
+                  variant={(item.avatarType ?? 'photo') === t ? 'default' : 'default-outline'}
+                  onClick={() => set('avatarType', t as AvatarType)}
                 >
-                  {pos === 'start' ? 'Before label' : 'After label'}
+                  {t}
                 </Button>
               ))}
+              <Avatar
+                size="x-small"
+                alt=""
+                initials={item.avatarType === 'initials' ? (item.avatarInitials || '?') : undefined}
+                defaultPhoto={item.avatarType !== 'icon'}
+              />
             </HStack>
-            <SwitchInput
-              checked={!!item.iconOnly}
-              onChange={(e: { target: { checked: boolean } }) => set('iconOnly', e.target.checked)}
-              label="Icon only"
-            />
+            {item.avatarType === 'initials' && (
+              <TextField
+                label="Initials"
+                value={item.avatarInitials ?? ''}
+                placeholder="JD"
+                onChange={(e: { target: { value: string } }) => set('avatarInitials', e.target.value)}
+              />
+            )}
+            <Caption color="quiet">
+              A photo, initials and a glyph are different CONTENT rather than different
+              styling, which is why it is a choice and not a colour.
+            </Caption>
           </>
         )}
 
-        {/* Buttons only. A tab is built from Button TOKENS but its treatment is
-            a selector — an indicator bar and a track — not a fill. Offering
-            colour and treatment here would produce a solid or outlined tab,
-            which the design system does not have, and would lose the indicator
-            that makes a tab legible as one. */}
+        {/* Buttons only. A tab is built from Button TOKENS but its treatment is a
+            selector — an indicator bar and a track — not a fill. Offering colour
+            here would produce a solid tab, which the design system does not have. */}
         {kind === 'button' && (
           <>
             <Divider />
@@ -149,7 +266,7 @@ export default function NavItemEditor(
         <Divider />
         <HStack gap="var(--Sizing-2)" style={{ justifyContent: 'space-between' }}>
           <Button variant="error-ghost" onClick={onRemove}>Remove</Button>
-          <Button variant="default" onClick={onClose}>Done</Button>
+          <Button variant="default" disabled={blocked} onClick={onClose}>Done</Button>
         </HStack>
       </VStack>
     </Modal>
