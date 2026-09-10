@@ -89,6 +89,15 @@ export interface NodeDef {
    *  the whole matched token set rather than one colour. */
   theme?: string;
   presence?: Presence;
+  /** A full-bleed band: paints edge to edge, but its CONTENT respects the
+   *  page's content ceiling.
+   *
+   *  The distinction is the whole point of a capped breakpoint. Capping the
+   *  bar itself leaves bare page either side of a floating coloured strip;
+   *  capping only what is inside it gives an unbroken band with the content
+   *  aligned to everything else on the page. The second is what every capped
+   *  layout means and the first is never what anyone wants. */
+  band?: boolean;
   /** Sticks to the top of the scroll container once it reaches it.
    *
    *  A property of THIS node, not of the component. In a hero layout the hero

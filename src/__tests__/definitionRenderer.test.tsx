@@ -188,3 +188,33 @@ describe('a filled slot holds its content at natural size', () => {
     expect(out).not.toContain('flex-shrink:0');
   });
 });
+
+describe('a capped band paints edge to edge', () => {
+  it('caps its CONTENT, not itself', () => {
+    /* Capping the band left bare page either side of a floating coloured
+       strip. Capping only what is inside gives an unbroken bar with its
+       content aligned to the rest of the page, which is what a content
+       ceiling means everywhere else. */
+    const out = html(
+      <DefinitionRenderer
+        definition={navDefinition({ layout: 'brand-left', surface: 'Surface' })}
+        contentMaxWidth={1440}
+        contentAlign="center"
+        showSlots
+      />,
+    );
+    // The painted element carries no cap...
+    const barTag = out.slice(out.indexOf('data-surface'), out.indexOf('data-surface') + 400);
+    expect(out).toContain('max-width:1440px');
+    // ...and the capped element is INSIDE it, not around it.
+    expect(out.indexOf('background:var(--Background)')).toBeLessThan(out.indexOf('max-width:1440px'));
+    expect(barTag).not.toContain('max-width:1440px');
+  });
+
+  it('is uncapped when the breakpoint has no ceiling', () => {
+    // The same nav at every narrower width — the cap belongs to the
+    // breakpoint, not the component.
+    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} showSlots />);
+    expect(out).not.toContain('max-width:1440px');
+  });
+});

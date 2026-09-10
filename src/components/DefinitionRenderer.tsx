@@ -64,6 +64,12 @@ export interface RenderOptions {
   slots?: Record<string, ReactNode>;
   /** Outline empty slots and label them. Preview only. */
   showSlots?: boolean;
+  /** Where content stops growing inside a full-bleed band, and how it sits in
+   *  the leftover space. A property of the BREAKPOINT, not of the component —
+   *  the same nav is uncapped at every narrower width — which is why it comes
+   *  in as a render option rather than living in the definition. */
+  contentMaxWidth?: number;
+  contentAlign?: 'left' | 'center';
 }
 
 function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode {
@@ -168,9 +174,37 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
     );
   }
 
+  const children = (node.children || []).map((c, i) => renderNode(c, opts, `${node.name}-${i}`));
+
+  /* A band paints edge to edge and caps what is INSIDE it. Capping the band
+     itself would leave bare page either side of a floating coloured strip;
+     this gives an unbroken bar with its content aligned to the rest of the
+     page, which is what a content ceiling means everywhere else. */
+  if (node.band && opts.contentMaxWidth) {
+    return (
+      <div key={key} style={style} {...surfaceAttrs}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: style.flexDirection,
+            justifyContent: style.justifyContent,
+            alignItems: style.alignItems,
+            gap: style.gap,
+            width: '100%',
+            maxWidth: opts.contentMaxWidth,
+            marginLeft: opts.contentAlign === 'center' ? 'auto' : undefined,
+            marginRight: opts.contentAlign === 'center' ? 'auto' : undefined,
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div key={key} style={style} {...surfaceAttrs}>
-      {(node.children || []).map((c, i) => renderNode(c, opts, `${node.name}-${i}`))}
+      {children}
     </div>
   );
 }

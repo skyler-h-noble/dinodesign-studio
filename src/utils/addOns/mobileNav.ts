@@ -151,6 +151,7 @@ function bottomBar(o: MobileOptions): NodeDef {
     height: 'hug',
     surface: o.surface ?? 'Surface',
     theme: o.theme,
+    band: true,
     children,
   };
 }
@@ -177,6 +178,7 @@ function topBar(o: MobileOptions): NodeDef {
     height: 'hug',
     surface: o.surface ?? 'Surface',
     theme: o.theme,
+    band: true,
     sticky: true,
     children: centred
       ? [
@@ -223,12 +225,31 @@ function toolbar(o: MobileOptions): NodeDef {
   };
 }
 
+/** The page between the bars.
+ *
+ *  A nav with a bar at each end is two bars and a GAP, and the gap is most of
+ *  what makes the arrangement legible: stacked directly against each other the
+ *  two read as one thick bar, and nothing about the preview says which end of
+ *  a screen each one lives at.
+ *
+ *  It is a slot rather than a fixed height because it is not the nav's — the
+ *  page owns it. Emitting it as a filling slot says exactly that: the nav
+ *  reserves the space and something else fills it. */
+const pageSlot = (): NodeDef => ({
+  name: 'Page',
+  kind: 'slot',
+  width: 'fill',
+  height: 'fill',
+});
+
 export function mobileNavDefinition(o: MobileOptions): ComponentDefinition {
   const children: NodeDef[] = [];
 
   if (o.layout !== 'bottom-only') children.push(topBar(o));
-  if (o.layout === 'top-and-bottom' || o.layout === 'bottom-only') children.push(bottomBar(o));
-  if (o.layout === 'toolbar') children.push(toolbar(o));
+  if (o.layout === 'top-and-bottom' || o.layout === 'bottom-only') {
+    children.push(pageSlot(), bottomBar(o));
+  }
+  if (o.layout === 'toolbar') children.push(pageSlot(), toolbar(o));
 
   return {
     id: 'adaptive-nav',

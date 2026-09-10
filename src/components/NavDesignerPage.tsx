@@ -218,10 +218,45 @@ export default function NavDesignerPage() {
        components the nav will. */
     const avatar = <Avatar size="x-small" alt="Account" />;
 
+    /* The hero the sticky tabs sit under. 16:9 because that is what a hero
+       image is — an aspect ratio rather than a height, so it stays right at
+       every breakpoint instead of being a number that is only correct at the
+       width it was picked at.
+       
+       A placeholder, not an image: the hero is its own add-on, and putting a
+       picture here would suggest this one owns it. */
+    const hero = (
+      <div
+        aria-hidden
+        data-surface="Surface-Dim"
+        style={{
+          width: '100%',
+          aspectRatio: '16 / 9',
+          background: 'var(--Background)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{ color: 'var(--Text-Quiet)', font: 'var(--Label-ExtraSmall-Font-Size, 11px)/1 var(--Font-Families-Body, sans-serif)' }}>
+          Hero 16:9
+        </span>
+      </div>
+    );
+
+    /* The page the bars sit either end of. Filled with nothing in particular
+       — its only job is to have height, so the two bars read as the top and
+       the bottom of a screen rather than as one thick bar. */
+    const page = (
+      <div style={{ minHeight: 180, width: '100%' }} aria-hidden />
+    );
+
     const out: Record<string, React.ReactNode> = {
       Tabs: tabStrip,
       Actions: actionGroup,
       Avatar: avatar,
+      Page: page,
+      Hero: hero,
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
@@ -540,26 +575,25 @@ export default function NavDesignerPage() {
                   tabs wrap and the items collapse, so what is on screen would
                   be the narrow arrangement wearing a wide label — every
                   judgement from it about the wrong design. */}
-              {/* Square. A rounded frame reads as part of the component — a nav
-                  with rounded corners — when it is only the edge of the
-                  preview. The viewport it stands for has square corners. */}
-              <div style={{ border: '1px solid var(--Border)' }}>
-                <ScaledPreview width={previewWidth} onScale={setScale}>
-                  {/* The cap lives HERE, not in the definition: it is a property
-                      of the breakpoint, not of the component, and the same nav
-                      is uncapped at every narrower width. */}
-                  <div style={{
-                    maxWidth: current?.maxWidth,
-                    marginLeft: current?.align === 'center' ? 'auto' : undefined,
-                    marginRight: current?.align === 'center' ? 'auto' : undefined,
-                  }}>
-                    <DefinitionRenderer
-                      definition={definition}
-                      conditions={active}
-                      slots={slotContent}
-                      showSlots
-                    />
-                  </div>
+              {/* The frame is drawn INSIDE the scaler, on the sized box. Around
+                  it, it spanned the container while the content sat at its own
+                  smaller width, so the empty remainder read as part of the
+                  design. Square, too: a rounded frame reads as a nav with
+                  rounded corners rather than the edge of a viewport. */}
+              <div>
+                <ScaledPreview width={previewWidth} onScale={setScale} frame>
+                  {/* The cap goes THROUGH the renderer rather than around it.
+                      Wrapped outside, it capped the whole bar and left bare
+                      page either side of a floating coloured strip; passed in,
+                      each band paints edge to edge and only its content caps. */}
+                  <DefinitionRenderer
+                    definition={definition}
+                    conditions={active}
+                    slots={slotContent}
+                    contentMaxWidth={current?.maxWidth}
+                    contentAlign={current?.align}
+                    showSlots
+                  />
                 </ScaledPreview>
               </div>
 

@@ -312,6 +312,8 @@ function bar(o: NavOptions): NodeDef {
        against the bar's surface rather than the page's. */
     surface: o.surface ?? 'Surface',
     theme: o.theme,
+    // Paints edge to edge; its content respects the page's ceiling.
+    band: true,
     children,
   };
 }

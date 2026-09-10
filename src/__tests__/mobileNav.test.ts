@@ -16,14 +16,17 @@ const names = (n: any): string[] => {
 describe('mobile is a different shape, not the desktop bar narrowed', () => {
   it('navigation moves to the bottom where a thumb reaches', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'top-and-bottom' }));
-    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Bar', 'Bottom-Bar']);
+    /* Bar, PAGE, bottom bar. The gap is most of what makes the arrangement
+       legible — stacked against each other the two read as one thick bar, and
+       nothing says which end of a screen each lives at. */
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Bar', 'Page', 'Bottom-Bar']);
   });
 
   it('bottom-only drops the top bar entirely', () => {
     // For apps whose identity lives in the content — an empty top bar would
     // take height and say nothing.
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only' }));
-    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Bottom-Bar']);
+    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Page', 'Bottom-Bar']);
   });
 
   it('top-only keeps navigation in a drawer behind the menu button', () => {
@@ -47,14 +50,16 @@ describe('a nav item is not a tab', () => {
        label, a nav item stacks them. Reusing the tab's shape would put the
        label in the wrong place at every size. */
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only' }));
-    const item = spec.root.children[0].children[0].children[0];
+    const bottom = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
+    const item = bottom.children[0].children[0];
     expect(item.layoutMode).toBe('VERTICAL');
     expect(names(item)).toEqual(['Nav-Item-1', 'Nav-Icon-1', 'Nav-Label-1']);
   });
 
   it('labels are behind a condition, so they can go at a narrower width', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only' }));
-    const label = spec.root.children[0].children[0].children[0].children[1];
+    const bottom2 = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
+    const label = bottom2.children[0].children[0].children[1];
     expect(label.visibleWhen).toBe('Adaptive-Nav/Show-Labels');
   });
 
@@ -88,7 +93,8 @@ describe('the FAB is composed, never a variant', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({
       layout: 'bottom-only', itemCount: 4, fab: true, fabPosition: 'center',
     }));
-    expect(spec.root.children[0].children.map((c: any) => c.name))
+    const bar = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
+    expect(bar.children.map((c: any) => c.name))
       .toEqual(['Nav-Item-Slot-Start', 'FAB', 'Nav-Item-Slot-End']);
   });
 
@@ -98,7 +104,8 @@ describe('the FAB is composed, never a variant', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({
       layout: 'bottom-only', itemCount: 4, fab: true, fabPosition: 'end',
     }));
-    expect(spec.root.children[0].children.map((c: any) => c.name)).toEqual(['Nav-Item-Slot', 'FAB']);
+    const endBar = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
+    expect(endBar.children.map((c: any) => c.name)).toEqual(['Nav-Item-Slot', 'FAB']);
   });
 
   it('absent when not asked for', () => {

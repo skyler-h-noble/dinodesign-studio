@@ -18,6 +18,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface ScaledPreviewProps {
+  /** Drawn on the SIZED box, not around it. A frame outside the scaler spans
+   *  the container while the content sits at its own smaller width, so the
+   *  empty remainder reads as part of the design — the same mistake the box
+   *  width fixed one layer in. */
+  frame?: boolean;
   /** The width to lay out at — the breakpoint's own lower bound. */
   width: number;
   children: ReactNode;
@@ -27,7 +32,7 @@ export interface ScaledPreviewProps {
   onScale?: (scale: number) => void;
 }
 
-export default function ScaledPreview({ width, children, maxScale = 1, onScale }: ScaledPreviewProps) {
+export default function ScaledPreview({ width, children, maxScale = 1, onScale, frame }: ScaledPreviewProps) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -71,7 +76,14 @@ export default function ScaledPreview({ width, children, maxScale = 1, onScale }
 
   return (
     <div ref={outer} style={{ width: '100%' }}>
-      <div style={{ width: boxWidth, maxWidth: '100%', height, overflow: 'hidden' }}>
+      <div style={{
+        width: boxWidth,
+        maxWidth: '100%',
+        height,
+        overflow: 'hidden',
+        border: frame ? '1px solid var(--Border)' : undefined,
+        boxSizing: 'content-box',
+      }}>
         <div
           ref={inner}
           style={{
