@@ -60,16 +60,23 @@ export interface NavButtonItem extends NavItem {
   treatment: ButtonTreatment;
 }
 
-/* Tabs are BUTTONS. Your Figma Tab is built on Button tokens — Button-Padding,
-   Button-Text, Typography/Buttons/Small — so a tab is a button with a
-   treatment, not a separate kind of thing. Typing them the same way is what
-   lets one editor serve both and stops a "tab variant" and a "button variant"
-   drifting into two vocabularies for one idea. */
-export const DEFAULT_TABS: NavButtonItem[] = [
-  { id: 'tab-1', label: 'Home', colour: 'default', treatment: 'text' },
-  { id: 'tab-2', label: 'Products', colour: 'default', treatment: 'text' },
-  { id: 'tab-3', label: 'Pricing', colour: 'default', treatment: 'text' },
-  { id: 'tab-4', label: 'About', colour: 'default', treatment: 'text' },
+/* A TAB IS NOT A BUTTON, and the distinction is visual rather than semantic.
+   
+   It is built FROM Button tokens — Button-Padding, Button-Text,
+   Typography/Buttons/Small — which is what keeps it the same size and type as
+   the buttons beside it. But its treatment is a SELECTOR: an indicator bar on
+   one edge, a track hairline along the rest, and the selected one carrying
+   --Text while the others carry --Quiet. A button's treatment is a fill, an
+   outline or nothing.
+   
+   So a tab has no colour and no treatment to choose. Giving it button variants
+   would offer a solid or outlined tab, which the design system does not have,
+   and would lose the indicator that makes a tab legible as one. */
+export const DEFAULT_TABS: NavItem[] = [
+  { id: 'tab-1', label: 'Home' },
+  { id: 'tab-2', label: 'Products' },
+  { id: 'tab-3', label: 'Pricing' },
+  { id: 'tab-4', label: 'About' },
 ];
 
 export const DEFAULT_ACTIONS: NavButtonItem[] = [

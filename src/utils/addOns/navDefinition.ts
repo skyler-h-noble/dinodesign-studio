@@ -286,6 +286,17 @@ function bar(o: NavOptions): NodeDef {
     padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
     width: 'fill',
     height: 'hug',
+    /* The bar carries the pair itself rather than inheriting it.
+       
+       Inheriting works — custom properties cascade — but it leaves the bar
+       transparent and painting whatever is behind it. A sticky bar over
+       scrolling content has to have its OWN background or the content shows
+       through as it passes under, which is the one thing a sticky bar must not
+       do. Setting the attributes on the element that paints is also the rule:
+       it exposes the matched set, so the text and borders inside resolve
+       against the bar's surface rather than the page's. */
+    surface: o.surface ?? 'Surface',
+    theme: o.theme,
     children,
   };
 }

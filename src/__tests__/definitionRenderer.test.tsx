@@ -115,3 +115,29 @@ describe('what it does not pretend to do', () => {
     expect(out).toContain('Avatar');
   });
 });
+
+describe('the app bar paints itself', () => {
+  it('carries data-surface and data-theme, not just the root', () => {
+    /* A sticky bar over scrolling content must have its OWN background, or the
+       content shows through as it passes under — the one thing a sticky bar
+       cannot do. Inheriting the custom properties is not enough: they cascade,
+       but nothing paints. */
+    const out = html(
+      <DefinitionRenderer
+        definition={navDefinition({ layout: 'brand-left', theme: 'Primary', surface: 'Surface-Bright' })}
+        showSlots
+      />,
+    );
+    expect((out.match(/data-surface="Surface-Bright"/g) || []).length).toBeGreaterThan(1);
+    expect((out.match(/data-theme="Primary"/g) || []).length).toBeGreaterThan(1);
+  });
+
+  it('and the sticky element is one that has a background', () => {
+    // Sticky without a background is transparent over whatever scrolls beneath.
+    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} showSlots />);
+    const sticky = out.slice(0, out.indexOf('position:sticky'));
+    const openTag = sticky.lastIndexOf('<div style="');
+    const tag = out.slice(openTag, out.indexOf('>', out.indexOf('position:sticky')));
+    expect(tag).toContain('background:var(--Background)');
+  });
+});

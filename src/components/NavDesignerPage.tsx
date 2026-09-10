@@ -78,7 +78,11 @@ export default function NavDesignerPage() {
      can carry scripts and event handlers, and inlining one would run them with
      this page's origin. In an <img> it is treated as an image: no scripts, no
      external fetches, no reach into the document. */
-  const [tabs, setTabs] = useState<NavButtonItem[]>(DEFAULT_TABS);
+  const [tabs, setTabs] = useState<NavItem[]>(DEFAULT_TABS);
+  /* Which tab reads as selected. A tab strip with none selected is a state a
+     real nav is never in, and the indicator is the thing that makes a tab
+     legible as a tab rather than a text button. */
+  const [selectedTab, setSelectedTab] = useState<string>(DEFAULT_TABS[0].id);
   const [actions, setActions] = useState<NavButtonItem[]>(DEFAULT_ACTIONS);
   const [editing, setEditing] = useState<{ kind: 'tab' | 'button'; id: string } | null>(null);
 
@@ -88,7 +92,7 @@ export default function NavDesignerPage() {
 
   const updateItem = (next: NavItem | NavButtonItem) => {
     if (!editing) return;
-    if (editing.kind === 'tab') setTabs((xs) => xs.map((i) => (i.id === next.id ? (next as NavButtonItem) : i)));
+    if (editing.kind === 'tab') setTabs((xs) => xs.map((i) => (i.id === next.id ? next : i)));
     else setActions((xs) => xs.map((i) => (i.id === next.id ? (next as NavButtonItem) : i)));
   };
 
@@ -121,27 +125,43 @@ export default function NavDesignerPage() {
     const label = (i: NavItem) => (i.iconOnly ? null : i.label);
     const glyph = (i: NavItem) => (i.icon ? <NavIconGlyph name={i.icon} /> : null);
 
+    /* The library's own Tabs, not buttons dressed up. A tab's treatment is a
+       SELECTOR — an indicator bar on one edge and a track along the rest, with
+       the selected one carrying --Text and the others --Quiet — and none of
+       that comes out of a button variant.
+       
+       Clicking still opens the editor, which is why the strip is controlled
+       here rather than left to manage its own selection: selecting a tab and
+       editing it are the same gesture. */
     const tabStrip = (
-      <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
-        {tabs.map((t) => {
-          const problems = itemProblems(t);
-          return (
-            <Button
-              key={t.id}
-              variant={buttonVariant(t.colour, t.treatment)}
-              size="small"
-              iconOnly={t.iconOnly}
-              /* An icon-only control needs a name and its icon must not carry
-                 one, or a screen reader announces the control twice. */
-              aria-label={t.iconOnly ? t.label || 'Unnamed tab' : undefined}
-              onClick={() => setEditing({ kind: 'tab', id: t.id })}
-              style={itemChrome(problems)}
-            >
-              {t.iconPosition === 'end' ? <>{label(t)}{glyph(t)}</> : <>{glyph(t)}{label(t)}</>}
-            </Button>
-          );
-        })}
-      </HStack>
+      <Tabs
+        value={selectedTab}
+        onChange={(v: string) => {
+          setSelectedTab(v);
+          setEditing({ kind: 'tab', id: v });
+        }}
+      >
+        <TabList>
+          {tabs.map((t) => {
+            const problems = itemProblems(t);
+            return (
+              <Tab
+                key={t.id}
+                value={t.id}
+                iconOnly={t.iconOnly}
+                aria-label={t.iconOnly ? t.label || 'Unnamed tab' : undefined}
+                startDecorator={t.icon && t.iconPosition !== 'end' ? <NavIconGlyph name={t.icon} /> : undefined}
+                endDecorator={t.icon && t.iconPosition === 'end' ? <NavIconGlyph name={t.icon} /> : undefined}
+                sx={problems.length
+                  ? { outline: '2px solid var(--Buttons-Warning-Border)', outlineOffset: 2 }
+                  : undefined}
+              >
+                {t.iconOnly ? null : t.label}
+              </Tab>
+            );
+          })}
+        </TabList>
+      </Tabs>
     );
 
     const actionGroup = (
@@ -432,13 +452,10 @@ export default function NavDesignerPage() {
                   tabs wrap and the items collapse, so what is on screen would
                   be the narrow arrangement wearing a wide label — every
                   judgement from it about the wrong design. */}
-              <div
-                style={{
-                  border: '1px solid var(--Border)',
-                  borderRadius: 'var(--Card-Radius, 8px)',
-                  overflow: 'hidden',
-                }}
-              >
+              {/* Square. A rounded frame reads as part of the component — a nav
+                  with rounded corners — when it is only the edge of the
+                  preview. The viewport it stands for has square corners. */}
+              <div style={{ border: '1px solid var(--Border)' }}>
                 <ScaledPreview width={previewWidth} onScale={setScale}>
                   {/* The cap lives HERE, not in the definition: it is a property
                       of the breakpoint, not of the component, and the same nav

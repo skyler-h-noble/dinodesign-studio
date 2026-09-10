@@ -45,6 +45,9 @@ export default function ScaledPreview({ width, children, maxScale = 1, onScale }
       /* A transform does not affect layout, so the wrapper keeps the untransformed
          height and leaves a gap beneath. Measuring the content and applying the
          scaled height is what closes it. */
+      /* getBoundingClientRect reports the TRANSFORMED height, which is what
+         the box needs — offsetHeight would give the untransformed one and
+         leave a gap under a scaled-down preview. */
       const h = inner.current?.getBoundingClientRect().height;
       if (h) setHeight(h);
     };
@@ -56,9 +59,19 @@ export default function ScaledPreview({ width, children, maxScale = 1, onScale }
     return () => ro.disconnect();
   }, [width, maxScale, onScale]);
 
+  /* Three layers, and each earns its place.
+     
+     OUTER is full width purely to measure what is available. INNER BOX is the
+     simulated viewport at its scaled size — this is what was missing: without
+     it the box stayed full width while the content sat at its own smaller
+     width, so a 600px preview drew a 600px bar inside a 1450px frame and the
+     empty remainder read as part of the design. SCALED is the content at its
+     true width, transformed down. */
+  const boxWidth = Math.round(width * scale);
+
   return (
-    <div ref={outer} style={{ width: '100%', overflow: 'hidden' }}>
-      <div style={{ height, overflow: 'hidden' }}>
+    <div ref={outer} style={{ width: '100%' }}>
+      <div style={{ width: boxWidth, maxWidth: '100%', height, overflow: 'hidden' }}>
         <div
           ref={inner}
           style={{
