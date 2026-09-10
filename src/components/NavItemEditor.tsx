@@ -157,7 +157,20 @@ export default function NavItemEditor(
               <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
                 <SwitchInput
                   checked={!!item[iconKey]}
-                  onChange={(e: { target: { checked: boolean } }) => set(iconKey, e.target.checked)}
+                  onChange={(e: { target: { checked: boolean } }) => {
+                    /* Switching it on seeds a name. An empty field renders the
+                       not-found marker straight away, which reads as an error
+                       the user just caused rather than a field they have not
+                       filled in yet. Menu is the safe seed: it is the icon a
+                       nav most often wants, and it is a real name so the
+                       preview shows something real. */
+                    const on = e.target.checked;
+                    onChange({
+                      ...(item as NavButtonItem),
+                      [iconKey]: on,
+                      ...(on && !item[nameKey]?.trim() ? { [nameKey]: 'Menu' } : {}),
+                    });
+                  }}
                   label="Icon"
                 />
                 <SwitchInput
