@@ -113,6 +113,56 @@ export interface RadiiForSize {
   accordionRadius: number; modalRadius: number; dropdownFrameRadius: number;
 }
 
+/* ── Nav chrome: three sizes, and not derived from anything ───────────────
+ *
+ * Every other metric in this file is computed from the user's own choices —
+ * a radius follows their button radius, a padding follows their radius. These
+ * do not: a rail is 80 wide in every brand, and the three sizes are a density
+ * decision rather than a consequence of the type scale or the corner rounding.
+ *
+ * So they are CONSTANTS, and they are stated once. Three copies of 80 — the
+ * CSS export, the preview and the Figma payload — is exactly the shape that
+ * has drifted here before, and it drifts silently because each copy is
+ * self-consistent (invariant 5).
+ *
+ * The names are the FILE's, which is why one of them carries a space:
+ * Component-Size holds `App-Bar Height`, not `App-Bar-Height`. A tidier name
+ * would match nothing and leave the variable at whatever was last typed by
+ * hand, reporting success the whole time.
+ */
+export const NAV_METRICS = {
+  'Rail-Width': { medium: 80, small: 72, large: 96 },
+  'App-Bar Height': { medium: 64, small: 56, large: 72 },
+} as const;
+
+/** The flat Sm-/Lg- shape componentSizeGroup takes, from the table above. */
+export function navMetricsFlat(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [name, byMode] of Object.entries(NAV_METRICS)) {
+    out[name] = byMode.medium;
+    out[`Sm-${name}`] = byMode.small;
+    out[`Lg-${name}`] = byMode.large;
+  }
+  return out;
+}
+
+/** The same table as CSS custom properties.
+ *
+ *  CSS has no modes, so a mode becomes the Sm-/Lg- prefix — the idiom Button
+ *  and Tabs already use, and what a component's SIZE_MAP picks between. The
+ *  hyphenated form is the CSS name even where the Figma variable has a space:
+ *  a custom property cannot contain one. */
+export function navMetricsCSS(indent = '  '): string[] {
+  const out: string[] = [];
+  for (const [name, byMode] of Object.entries(NAV_METRICS)) {
+    const css = name.replace(/ /g, '-');
+    out.push(`${indent}--${css}: ${byMode.medium}px;`);
+    out.push(`${indent}--Sm-${css}: ${byMode.small}px;`);
+    out.push(`${indent}--Lg-${css}: ${byMode.large}px;`);
+  }
+  return out;
+}
+
 export function componentSizePayload(
   r: RadiiForSize,
   buttonMetrics: Record<string, number>,
@@ -162,6 +212,11 @@ export function componentSizePayload(
     Other: {
       'Modal-Radius': r.modalRadius,
       'Dropdown-Frame-Radius': r.dropdownFrameRadius,
+      /* Written, not left hand-authored. populateComponentSize is
+         update-only, so these land on the variables already in the file —
+         which is the point: the number then has one home instead of living
+         in Figma and being re-typed in CSS. */
+      ...navMetricsFlat(),
     },
   });
 }

@@ -3,6 +3,7 @@ import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor } from './backgroundSelection';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -1855,6 +1856,7 @@ ${(() => {
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;
   --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
+${navMetricsCSS('  ').join('\n')}
   --Accordion-Radius: ${cappedAccordionRadius}px;
   --Input-Radius: ${r.inputRadius}px;
   --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;

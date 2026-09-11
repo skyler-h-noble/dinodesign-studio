@@ -10,6 +10,7 @@
 
 import chroma from 'chroma-js';
 import { buttonModeMetricCSS } from '../buttonSizing';
+import { navMetricsCSS } from '../componentSize';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
@@ -5050,6 +5051,11 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Modal-Focus-Radius: ${r.modalFocusRadius}px;`);
     // Dropdown / menu frame: min(Input-Radius, Card-Radius, 16).
     lines.push(`  --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;`);
+    /* Nav chrome — the rail's width and the app bar's height, one per size.
+       Constants rather than derived: a rail is 80 wide in every brand, and
+       the three sizes are a density decision. Emitted from the SAME table
+       the Figma payload reads, so the two cannot disagree. */
+    navMetricsCSS('  ').forEach(l => lines.push(l));
     lines.push(`  --Input-Radius: ${r.inputRadius}px;`);
     lines.push(`  --Sm-Input-Radius: ${r.smInputRadius}px;`);
     lines.push(`  --Lg-Input-Radius: ${r.lgInputRadius}px;`);
