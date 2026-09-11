@@ -23,6 +23,9 @@ import { generateCompleteButtonSystem } from './generateButtonsSimplified';
 import { generateCompleteSimplifiedSystem } from './completeSimplifiedSystem';
 import { parseBar, parseBackground, toneFor } from '../backgroundSelection';
 
+import { STATE_THEME_TONE } from '../themes';
+
+
 // Helper function to convert tone value to Color-X number
 // 12-TONE SYSTEM: [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99]
 //                   1   2   3   4   5   6   7   8   9  10  11  12
@@ -133,21 +136,13 @@ interface ButtonDetails {
 
 interface ButtonsForBackground {
   Primary: ButtonDetails;
-  'Primary-Light': ButtonDetails;
   Secondary: ButtonDetails;
-  'Secondary-Light': ButtonDetails;
   Tertiary: ButtonDetails;
-  'Tertiary-Light': ButtonDetails;
   Neutral: ButtonDetails;
-  'Neutral-Light': ButtonDetails;
   Info: ButtonDetails;
-  'Info-Light': ButtonDetails;
   Success: ButtonDetails;
-  'Success-Light': ButtonDetails;
   Warning: ButtonDetails;
-  'Warning-Light': ButtonDetails;
   Error: ButtonDetails;
-  'Error-Light': ButtonDetails;
 }
 
 /**
@@ -1079,14 +1074,6 @@ function createThemeReference(
           Pressed: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Pressed'),
           Quiet: createPrimaryButtonReference('Surfaces', bgName, 'Primary.Quiet')
         },
-        'Primary-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Primary-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Primary-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Primary-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Primary-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Primary-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Primary-Light.Quiet')
-        },
         Secondary: {
           Button: createButtonReference('Surfaces', bgName, 'Secondary.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Secondary.Text'),
@@ -1094,14 +1081,6 @@ function createThemeReference(
           Hover: createButtonReference('Surfaces', bgName, 'Secondary.Hover'),
           Pressed: createButtonReference('Surfaces', bgName, 'Secondary.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Secondary.Quiet')
-        },
-        'Secondary-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Secondary-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Secondary-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Secondary-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Secondary-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Secondary-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Secondary-Light.Quiet')
         },
         Tertiary: {
           Button: createButtonReference('Surfaces', bgName, 'Tertiary.Button'),
@@ -1111,14 +1090,6 @@ function createThemeReference(
           Pressed: createButtonReference('Surfaces', bgName, 'Tertiary.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Tertiary.Quiet')
         },
-        'Tertiary-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Tertiary-Light.Quiet')
-        },
         Neutral: {
           Button: createButtonReference('Surfaces', bgName, 'Neutral.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Neutral.Text'),
@@ -1126,14 +1097,6 @@ function createThemeReference(
           Hover: createButtonReference('Surfaces', bgName, 'Neutral.Hover'),
           Pressed: createButtonReference('Surfaces', bgName, 'Neutral.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Neutral.Quiet')
-        },
-        'Neutral-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Neutral-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Neutral-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Neutral-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Neutral-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Neutral-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Neutral-Light.Quiet')
         },
         Info: {
           Button: createButtonReference('Surfaces', bgName, 'Info.Button'),
@@ -1143,14 +1106,6 @@ function createThemeReference(
           Pressed: createButtonReference('Surfaces', bgName, 'Info.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Info.Quiet')
         },
-        'Info-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Info-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Info-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Info-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Info-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Info-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Info-Light.Quiet')
-        },
         Success: {
           Button: createButtonReference('Surfaces', bgName, 'Success.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Success.Text'),
@@ -1158,14 +1113,6 @@ function createThemeReference(
           Hover: createButtonReference('Surfaces', bgName, 'Success.Hover'),
           Pressed: createButtonReference('Surfaces', bgName, 'Success.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Success.Quiet')
-        },
-        'Success-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Success-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Success-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Success-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Success-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Success-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Success-Light.Quiet')
         },
         Warning: {
           Button: createButtonReference('Surfaces', bgName, 'Warning.Button'),
@@ -1175,14 +1122,6 @@ function createThemeReference(
           Pressed: createButtonReference('Surfaces', bgName, 'Warning.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Warning.Quiet')
         },
-        'Warning-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Warning-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Warning-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Warning-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Warning-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Warning-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Warning-Light.Quiet')
-        },
         Error: {
           Button: createButtonReference('Surfaces', bgName, 'Error.Button'),
           Text: createButtonReference('Surfaces', bgName, 'Error.Text'),
@@ -1190,14 +1129,6 @@ function createThemeReference(
           Hover: createButtonReference('Surfaces', bgName, 'Error.Hover'),
           Pressed: createButtonReference('Surfaces', bgName, 'Error.Pressed'),
           Quiet: createButtonReference('Surfaces', bgName, 'Error.Quiet')
-        },
-        'Error-Light': {
-          Button: createButtonReference('Surfaces', bgName, 'Error-Light.Button'),
-          Text: createButtonReference('Surfaces', bgName, 'Error-Light.Text'),
-          Border: createButtonReference('Surfaces', bgName, 'Error-Light.Border'),
-          Hover: createButtonReference('Surfaces', bgName, 'Error-Light.Hover'),
-          Pressed: createButtonReference('Surfaces', bgName, 'Error-Light.Pressed'),
-          Quiet: createButtonReference('Surfaces', bgName, 'Error-Light.Quiet')
         }
       },
       Icons: {
@@ -1280,14 +1211,6 @@ function createThemeReference(
           Pressed: createPrimaryButtonReference('Containers', bgName, 'Primary.Pressed'),
           Quiet: createPrimaryButtonReference('Containers', bgName, 'Primary.Quiet')
         },
-        'Primary-Light': {
-          Button: createButtonReference('Containers', bgName, 'Primary-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Primary-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Primary-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Primary-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Primary-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Primary-Light.Quiet')
-        },
         Secondary: {
           Button: createButtonReference('Containers', bgName, 'Secondary.Button'),
           Text: createButtonReference('Containers', bgName, 'Secondary.Text'),
@@ -1295,14 +1218,6 @@ function createThemeReference(
           Hover: createButtonReference('Containers', bgName, 'Secondary.Hover'),
           Pressed: createButtonReference('Containers', bgName, 'Secondary.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Secondary.Quiet')
-        },
-        'Secondary-Light': {
-          Button: createButtonReference('Containers', bgName, 'Secondary-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Secondary-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Secondary-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Secondary-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Secondary-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Secondary-Light.Quiet')
         },
         Tertiary: {
           Button: createButtonReference('Containers', bgName, 'Tertiary.Button'),
@@ -1312,14 +1227,6 @@ function createThemeReference(
           Pressed: createButtonReference('Containers', bgName, 'Tertiary.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Tertiary.Quiet')
         },
-        'Tertiary-Light': {
-          Button: createButtonReference('Containers', bgName, 'Tertiary-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Tertiary-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Tertiary-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Tertiary-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Tertiary-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Tertiary-Light.Quiet')
-        },
         Neutral: {
           Button: createButtonReference('Containers', bgName, 'Neutral.Button'),
           Text: createButtonReference('Containers', bgName, 'Neutral.Text'),
@@ -1327,14 +1234,6 @@ function createThemeReference(
           Hover: createButtonReference('Containers', bgName, 'Neutral.Hover'),
           Pressed: createButtonReference('Containers', bgName, 'Neutral.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Neutral.Quiet')
-        },
-        'Neutral-Light': {
-          Button: createButtonReference('Containers', bgName, 'Neutral-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Neutral-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Neutral-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Neutral-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Neutral-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Neutral-Light.Quiet')
         },
         Info: {
           Button: createButtonReference('Containers', bgName, 'Info.Button'),
@@ -1344,14 +1243,6 @@ function createThemeReference(
           Pressed: createButtonReference('Containers', bgName, 'Info.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Info.Quiet')
         },
-        'Info-Light': {
-          Button: createButtonReference('Containers', bgName, 'Info-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Info-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Info-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Info-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Info-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Info-Light.Quiet')
-        },
         Success: {
           Button: createButtonReference('Containers', bgName, 'Success.Button'),
           Text: createButtonReference('Containers', bgName, 'Success.Text'),
@@ -1359,14 +1250,6 @@ function createThemeReference(
           Hover: createButtonReference('Containers', bgName, 'Success.Hover'),
           Pressed: createButtonReference('Containers', bgName, 'Success.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Success.Quiet')
-        },
-        'Success-Light': {
-          Button: createButtonReference('Containers', bgName, 'Success-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Success-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Success-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Success-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Success-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Success-Light.Quiet')
         },
         Warning: {
           Button: createButtonReference('Containers', bgName, 'Warning.Button'),
@@ -1376,14 +1259,6 @@ function createThemeReference(
           Pressed: createButtonReference('Containers', bgName, 'Warning.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Warning.Quiet')
         },
-        'Warning-Light': {
-          Button: createButtonReference('Containers', bgName, 'Warning-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Warning-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Warning-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Warning-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Warning-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Warning-Light.Quiet')
-        },
         Error: {
           Button: createButtonReference('Containers', bgName, 'Error.Button'),
           Text: createButtonReference('Containers', bgName, 'Error.Text'),
@@ -1391,14 +1266,6 @@ function createThemeReference(
           Hover: createButtonReference('Containers', bgName, 'Error.Hover'),
           Pressed: createButtonReference('Containers', bgName, 'Error.Pressed'),
           Quiet: createButtonReference('Containers', bgName, 'Error.Quiet')
-        },
-        'Error-Light': {
-          Button: createButtonReference('Containers', bgName, 'Error-Light.Button'),
-          Text: createButtonReference('Containers', bgName, 'Error-Light.Text'),
-          Border: createButtonReference('Containers', bgName, 'Error-Light.Border'),
-          Hover: createButtonReference('Containers', bgName, 'Error-Light.Hover'),
-          Pressed: createButtonReference('Containers', bgName, 'Error-Light.Pressed'),
-          Quiet: createButtonReference('Containers', bgName, 'Error-Light.Quiet')
         }
       },
       Icons: {
@@ -1563,14 +1430,6 @@ function generateButtonsForBackground(
       Pressed: { value: primary.buttonActive, type: 'color' },
       Quiet: { value: primary.buttonQuiet, type: 'color' }
     },
-    'Primary-Light': {
-      Button: { value: primaryLight.buttonBg, type: 'color' },
-      Text: { value: primaryLight.buttonText, type: 'color' },
-      Border: { value: primaryLight.buttonBorder, type: 'color' },
-      Hover: { value: primaryLight.buttonHover, type: 'color' },
-      Pressed: { value: primaryLight.buttonActive, type: 'color' },
-      Quiet: { value: primaryLight.buttonQuiet, type: 'color' }
-    },
     Secondary: {
       Button: { value: secondary.buttonBg, type: 'color' },
       Text: { value: secondary.buttonText, type: 'color' },
@@ -1578,14 +1437,6 @@ function generateButtonsForBackground(
       Hover: { value: secondary.buttonHover, type: 'color' },
       Pressed: { value: secondary.buttonActive, type: 'color' },
       Quiet: { value: secondary.buttonQuiet, type: 'color' }
-    },
-    'Secondary-Light': {
-      Button: { value: secondaryLight.buttonBg, type: 'color' },
-      Text: { value: secondaryLight.buttonText, type: 'color' },
-      Border: { value: secondaryLight.buttonBorder, type: 'color' },
-      Hover: { value: secondaryLight.buttonHover, type: 'color' },
-      Pressed: { value: secondaryLight.buttonActive, type: 'color' },
-      Quiet: { value: secondaryLight.buttonQuiet, type: 'color' }
     },
     Tertiary: {
       Button: { value: tertiary.buttonBg, type: 'color' },
@@ -1595,14 +1446,6 @@ function generateButtonsForBackground(
       Pressed: { value: tertiary.buttonActive, type: 'color' },
       Quiet: { value: tertiary.buttonQuiet, type: 'color' }
     },
-    'Tertiary-Light': {
-      Button: { value: tertiaryLight.buttonBg, type: 'color' },
-      Text: { value: tertiaryLight.buttonText, type: 'color' },
-      Border: { value: tertiaryLight.buttonBorder, type: 'color' },
-      Hover: { value: tertiaryLight.buttonHover, type: 'color' },
-      Pressed: { value: tertiaryLight.buttonActive, type: 'color' },
-      Quiet: { value: tertiaryLight.buttonQuiet, type: 'color' }
-    },
     Neutral: {
       Button: { value: neutral.buttonBg, type: 'color' },
       Text: { value: neutral.buttonText, type: 'color' },
@@ -1610,14 +1453,6 @@ function generateButtonsForBackground(
       Hover: { value: neutral.buttonHover, type: 'color' },
       Pressed: { value: neutral.buttonActive, type: 'color' },
       Quiet: { value: neutral.buttonQuiet, type: 'color' }
-    },
-    'Neutral-Light': {
-      Button: { value: neutralLight.buttonBg, type: 'color' },
-      Text: { value: neutralLight.buttonText, type: 'color' },
-      Border: { value: neutralLight.buttonBorder, type: 'color' },
-      Hover: { value: neutralLight.buttonHover, type: 'color' },
-      Pressed: { value: neutralLight.buttonActive, type: 'color' },
-      Quiet: { value: neutralLight.buttonQuiet, type: 'color' }
     },
     Info: {
       Button: { value: info.buttonBg, type: 'color' },
@@ -1627,14 +1462,6 @@ function generateButtonsForBackground(
       Pressed: { value: info.buttonActive, type: 'color' },
       Quiet: { value: info.buttonQuiet, type: 'color' }
     },
-    'Info-Light': {
-      Button: { value: infoLight.buttonBg, type: 'color' },
-      Text: { value: infoLight.buttonText, type: 'color' },
-      Border: { value: infoLight.buttonBorder, type: 'color' },
-      Hover: { value: infoLight.buttonHover, type: 'color' },
-      Pressed: { value: infoLight.buttonActive, type: 'color' },
-      Quiet: { value: infoLight.buttonQuiet, type: 'color' }
-    },
     Success: {
       Button: { value: success.buttonBg, type: 'color' },
       Text: { value: success.buttonText, type: 'color' },
@@ -1642,14 +1469,6 @@ function generateButtonsForBackground(
       Hover: { value: success.buttonHover, type: 'color' },
       Pressed: { value: success.buttonActive, type: 'color' },
       Quiet: { value: success.buttonQuiet, type: 'color' }
-    },
-    'Success-Light': {
-      Button: { value: successLight.buttonBg, type: 'color' },
-      Text: { value: successLight.buttonText, type: 'color' },
-      Border: { value: successLight.buttonBorder, type: 'color' },
-      Hover: { value: successLight.buttonHover, type: 'color' },
-      Pressed: { value: successLight.buttonActive, type: 'color' },
-      Quiet: { value: successLight.buttonQuiet, type: 'color' }
     },
     Warning: {
       Button: { value: warning.buttonBg, type: 'color' },
@@ -1659,14 +1478,6 @@ function generateButtonsForBackground(
       Pressed: { value: warning.buttonActive, type: 'color' },
       Quiet: { value: warning.buttonQuiet, type: 'color' }
     },
-    'Warning-Light': {
-      Button: { value: warningLight.buttonBg, type: 'color' },
-      Text: { value: warningLight.buttonText, type: 'color' },
-      Border: { value: warningLight.buttonBorder, type: 'color' },
-      Hover: { value: warningLight.buttonHover, type: 'color' },
-      Pressed: { value: warningLight.buttonActive, type: 'color' },
-      Quiet: { value: warningLight.buttonQuiet, type: 'color' }
-    },
     Error: {
       Button: { value: error.buttonBg, type: 'color' },
       Text: { value: error.buttonText, type: 'color' },
@@ -1674,14 +1485,6 @@ function generateButtonsForBackground(
       Hover: { value: error.buttonHover, type: 'color' },
       Pressed: { value: error.buttonActive, type: 'color' },
       Quiet: { value: error.buttonQuiet, type: 'color' }
-    },
-    'Error-Light': {
-      Button: { value: errorLight.buttonBg, type: 'color' },
-      Text: { value: errorLight.buttonText, type: 'color' },
-      Border: { value: errorLight.buttonBorder, type: 'color' },
-      Hover: { value: errorLight.buttonHover, type: 'color' },
-      Pressed: { value: errorLight.buttonActive, type: 'color' },
-      Quiet: { value: errorLight.buttonQuiet, type: 'color' }
     }
   };
 }
@@ -2303,10 +2106,10 @@ function generateModesThemes(
       // Neutral themes: Primary btn = Primary, Secondary btn = Tertiary, Tertiary btn = Primary, Neutral btn = Primary
       
       // Check which theme family we're in
-      const isPrimaryTheme = themeName === 'Primary' || themeName === 'Primary-Light' || themeName === 'Primary-Medium' || themeName === 'Primary-Dark';
-      const isSecondaryTheme = themeName === 'Secondary' || themeName === 'Secondary-Light' || themeName === 'Secondary-Medium' || themeName === 'Secondary-Dark';
-      const isTertiaryTheme = themeName === 'Tertiary' || themeName === 'Tertiary-Light' || themeName === 'Tertiary-Medium' || themeName === 'Tertiary-Dark';
-      const isNeutralTheme = themeName === 'Neutral' || themeName === 'Neutral-Light' || themeName === 'Neutral-Medium' || themeName === 'Neutral-Dark';
+      const isPrimaryTheme = themeName === 'Primary';
+      const isSecondaryTheme = themeName === 'Secondary';
+      const isTertiaryTheme = themeName === 'Tertiary';
+      const isNeutralTheme = themeName === 'Neutral';
       
       console.log('   🔍 Laddered mapping for themeName:', themeName);
       
@@ -2959,37 +2762,39 @@ function generateModesThemes(
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
   
-  // Generate all 31 themes (including Default) following Section 1 mapping table
+  /* NINE themes, plus the three bars. Not thirty-one.
+   *
+   * The -Light / -Medium / -Dark shades are gone. A shade and a surface level
+   * were two ways of saying one thing and the surface ladder already does it:
+   * what used to be Primary-Light is data-theme="Primary" with
+   * data-surface="Surface-Brightest". Keeping both needed four modes per
+   * palette, which is 33 — past Figma's 10-mode cap on the Theme collection.
+   *
+   * This list is now the same nine as generateFigmaJSON's THEMES, which is the
+   * point: the Figma side was trimmed to nine and this side was not, so four
+   * of the nine (Info, Success, Warning, Error) were named in Figma's mode
+   * list and produced by nobody. The collection imported four modes short and
+   * said nothing — generateFigmaJSON's own deadNames warning was firing into
+   * a console no one reads.
+   *
+   * The three bars stay and are deliberately CSS-only: App-Bar, Nav-Bar and
+   * Status are compositions of a user pick, not palettes, and Figma reaches
+   * the same result by pinning a mode on the bar's frame. */
   return {
     'Default': createThemeStructure('Default', defaultConfig.theme, defaultConfig.n),  // CRITICAL: User's selected background
-    'Primary-Light': createThemeStructure('Primary-Light', 'Primary', 13),
     'Primary': createThemeStructure('Primary', 'Primary', PC),
-    'Primary-Medium': createThemeStructure('Primary-Medium', 'Primary', 6),
-    'Primary-Dark': createThemeStructure('Primary-Dark', 'Primary', 3),
-    'Secondary-Light': createThemeStructure('Secondary-Light', 'Secondary', 13),
     'Secondary': createThemeStructure('Secondary', 'Secondary', SC),
-    'Secondary-Medium': createThemeStructure('Secondary-Medium', 'Secondary', 6),
-    'Secondary-Dark': createThemeStructure('Secondary-Dark', 'Secondary', 3),
-    'Tertiary-Light': createThemeStructure('Tertiary-Light', 'Tertiary', 13),
     'Tertiary': createThemeStructure('Tertiary', 'Tertiary', TC),
-    'Tertiary-Medium': createThemeStructure('Tertiary-Medium', 'Tertiary', 6),
-    'Tertiary-Dark': createThemeStructure('Tertiary-Dark', 'Tertiary', 3),
     'Neutral': createThemeStructure('Neutral', 'Neutral', isDark ? 2 : 14),  // Dark Mode: Neutral-2, Light Mode: Neutral-14
-    'Neutral-Light': createThemeStructure('Neutral-Light', 'Neutral', 12),
-    'Neutral-Medium': createThemeStructure('Neutral-Medium', 'Neutral', 6),
-    'Neutral-Dark': createThemeStructure('Neutral-Dark', 'Neutral', isDark ? 2 : 3),  // Dark Mode: Neutral-2, Light Mode: Neutral-3
-    'Error-Light': createThemeStructure('Error-Light', 'Error', 12),
-    'Error-Medium': createThemeStructure('Error-Medium', 'Error', 6),
-    'Error-Dark': createThemeStructure('Error-Dark', 'Error', 3),
-    'Success-Light': createThemeStructure('Success-Light', 'Success', 12),
-    'Success-Medium': createThemeStructure('Success-Medium', 'Success', 6),
-    'Success-Dark': createThemeStructure('Success-Dark', 'Success', 3),
-    'Warning-Light': createThemeStructure('Warning-Light', 'Warning', 12),
-    'Warning-Medium': createThemeStructure('Warning-Medium', 'Warning', 6),
-    'Warning-Dark': createThemeStructure('Warning-Dark', 'Warning', 3),
-    'Info-Light': createThemeStructure('Info-Light', 'Info', 12),
-    'Info-Medium': createThemeStructure('Info-Medium', 'Info', 6),
-    'Info-Dark': createThemeStructure('Info-Dark', 'Info', 3),
+    /* The state palettes at FULL STRENGTH — the tone the removed -Medium held,
+       which both theme maps already documented as "Medium always uses
+       Color-6". A brand palette's bare tone is the one the user picked; a
+       state palette has no pick, so the full-strength tone is it, and the
+       ladder reaches the tint that -Light used to name. */
+    'Info': createThemeStructure('Info', 'Info', STATE_THEME_TONE),
+    'Success': createThemeStructure('Success', 'Success', STATE_THEME_TONE),
+    'Warning': createThemeStructure('Warning', 'Warning', STATE_THEME_TONE),
+    'Error': createThemeStructure('Error', 'Error', STATE_THEME_TONE),
     'App-Bar': createThemeStructure('App-Bar', appBarConfig.theme, appBarConfig.n),
     'Nav-Bar': createThemeStructure('Nav-Bar', navBarConfig.theme, navBarConfig.n),
     'Status': createThemeStructure('Status', statusConfig.theme, statusConfig.n)
@@ -3127,13 +2932,6 @@ function generateThemesSection(
           Border: { value: `{Border.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Hover}`, type: 'color' },
           Pressed: { value: `{Primary-Button.Surfaces.Background-7.Pressed}`, type: 'color' }
-        },
-        'Primary-Light': {
-          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
-          Border: { value: `{Border.Surfaces.Primary.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Pressed: { value: `{Pressed.Primary.Color-10}`, type: 'color' }
         },
         'Primary-Outline': {
           Button: { value: '#00000000', type: 'color' },
@@ -3278,13 +3076,6 @@ function generateThemesSection(
           Hover: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Hover}`, type: 'color' },
           Pressed: { value: `{Primary-Button.Containers.Background-7.Pressed}`, type: 'color' }
         },
-        'Primary-Light': {
-          Button: { value: '{Colors.Primary.Color-10}', type: 'color' },
-          Text: { value: '{Text.Containers.Primary.Color-10}', type: 'color' },
-          Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
-          Hover: { value: '{Hover.Primary.Color-10}', type: 'color' },
-          Pressed: { value: '{Pressed.Primary.Color-10}', type: 'color' }
-        },
         'Primary-Outline': {
           Button: { value: '#00000000', type: 'color' },
           Text: { value: `{Text.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
@@ -3392,34 +3183,16 @@ function generateThemesSection(
 
   return {
     Default: createTheme(defaultConfig.n, defaultConfig.theme),  // Use background selection
+    // Nine themes. See the note on the other map — the shades are gone and a
+    // level reaches what they named.
     Primary: createTheme(primaryN, 'Primary'),  // Use extracted tone → Color-N
-    'Primary-Light': createTheme(11, 'Primary'),
-    'Primary-Medium': createTheme(6, 'Primary'),  // Medium always uses Color-6
-    'Primary-Dark': createTheme(3, 'Primary'),
     Secondary: createTheme(secondaryN, 'Secondary'),  // Use extracted tone → Color-N
-    'Secondary-Light': createTheme(11, 'Secondary'),
-    'Secondary-Medium': createTheme(6, 'Secondary'),  // Medium always uses Color-6
-    'Secondary-Dark': createTheme(3, 'Secondary'),
     Tertiary: createTheme(tertiaryN, 'Tertiary'),  // Use extracted tone → Color-N
-    'Tertiary-Light': createTheme(11, 'Tertiary'),
-    'Tertiary-Medium': createTheme(6, 'Tertiary'),  // Medium always uses Color-6
-    'Tertiary-Dark': createTheme(3, 'Tertiary'),
     Neutral: createTheme(9, 'Neutral'),
-    'Neutral-Light': createTheme(11, 'Neutral'),
-    'Neutral-Medium': createTheme(6, 'Neutral'),
-    'Neutral-Dark': createTheme(3, 'Neutral'),
-    'Info-Light': createTheme(11, 'Info'),
-    'Info-Medium': createTheme(6, 'Info'),
-    'Info-Dark': createTheme(3, 'Info'),
-    'Success-Light': createTheme(11, 'Success'),
-    'Success-Medium': createTheme(6, 'Success'),
-    'Success-Dark': createTheme(3, 'Success'),
-    'Warning-Light': createTheme(11, 'Warning'),
-    'Warning-Medium': createTheme(6, 'Warning'),
-    'Warning-Dark': createTheme(3, 'Warning'),
-    'Error-Light': createTheme(11, 'Error'),
-    'Error-Medium': createTheme(6, 'Error'),
-    'Error-Dark': createTheme(3, 'Error'),
+    Info: createTheme(STATE_THEME_TONE, 'Info'),
+    Success: createTheme(STATE_THEME_TONE, 'Success'),
+    Warning: createTheme(STATE_THEME_TONE, 'Warning'),
+    Error: createTheme(STATE_THEME_TONE, 'Error'),
     'App-Bar': createTheme(appBarConfig.n, appBarConfig.theme),  // Use App Bar selection
     'Nav-Bar': createTheme(navBarConfig.n, navBarConfig.theme),  // Use Nav Bar selection
     Status: createTheme(statusConfig.n, statusConfig.theme)  // Use Status Bar selection
@@ -5988,27 +5761,30 @@ export function exportColorSystemToJSON(
     // higher-contrast of black/var(--White) for the chip background, with
     // the opposite as text. App-Bar/Nav-Bar/Status alias their source
     // theme so the mapping flows through.
+    /* One row per theme, and the -Light rows are gone with the themes. The
+       rotation never depended on the shade anyway — it is a property of the
+       PALETTE, so Primary-Light always mapped exactly where Primary did, and
+       the extra rows were four ways to say the same thing that had to be kept
+       in step by hand.
+       
+       Black / White / Light-Gray are kept: those are not theme modes either,
+       but this map is also consulted for background names, and a missing row
+       falls through to the Secondary default silently. */
     const tagDefaultPaletteMap: Record<string, 'Primary' | 'Secondary' | 'Tertiary' | 'bw'> = {
       'Default':         'Secondary',
       'Primary':         'Secondary',
-      'Primary-Light':   'Secondary',
       'Black':           'Secondary',
       'White':           'Secondary',
       'Light-Gray':      'Secondary',
       'Secondary':       'Tertiary',
-      'Secondary-Light': 'Tertiary',
       'Tertiary':        'Primary',
-      'Tertiary-Light':  'Primary',
+      'Neutral':         'Primary',
       'Info':            'bw',
-      'Info-Light':      'bw',
       'Success':         'bw',
-      'Success-Light':   'bw',
       'Warning':         'bw',
-      'Warning-Light':   'bw',
       'Error':           'bw',
-      'Error-Light':     'bw',
-      // Nav themes alias their source — fall through to Secondary as a
-      // safe default since they typically render on Primary/Primary-Light.
+      // Nav themes alias their source — Secondary as a safe default, since a
+      // bar typically renders on Primary.
       'App-Bar':         'Secondary',
       'Nav-Bar':         'Secondary',
       'Status':          'Secondary',
@@ -6341,13 +6117,6 @@ export function exportColorSystemToJSON(
         Border: { value: `{${surfaceType}.Buttons.Primary.Border}`, type: 'color' as const },
         Hover: { value: `{${surfaceType}.Buttons.Primary.Hover}`, type: 'color' as const },
         Pressed: { value: `{${surfaceType}.Buttons.Primary.Pressed}`, type: 'color' as const }
-      },
-      'Primary-Light': {
-        Button: { value: `{${surfaceType}.Buttons.Primary-Light.Button}`, type: 'color' as const },
-        Text: { value: `{${surfaceType}.Buttons.Primary-Light.Text}`, type: 'color' as const },
-        Border: { value: `{${surfaceType}.Buttons.Primary-Light.Border}`, type: 'color' as const },
-        Hover: { value: `{${surfaceType}.Buttons.Primary-Light.Hover}`, type: 'color' as const },
-        Pressed: { value: `{${surfaceType}.Buttons.Primary-Light.Pressed}`, type: 'color' as const }
       },
       'Primary-Outline': {
         Button: { value: `{${surfaceType}.Buttons.Primary-Outline.Button}`, type: 'color' as const },
@@ -6989,9 +6758,9 @@ export function exportColorSystemToJSON(
   }
   
   // DEBUG: Check if Buttons/Icons exist in a theme
-  const sampleTheme = (colorSystem.Modes['Light-Mode'] as any).Themes?.['Primary-Light'];
+  const sampleTheme = (colorSystem.Modes['Light-Mode'] as any).Themes?.['Primary'];
   if (sampleTheme) {
-    console.log('  🔍 [DEBUG] Primary-Light theme structure:');
+    console.log('  🔍 [DEBUG] Primary theme structure:');
     console.log(`      - Surfaces has ${Object.keys(sampleTheme.Surfaces || {}).length} keys:`, Object.keys(sampleTheme.Surfaces || {}).join(', '));
     console.log(`      - Surfaces.Buttons exists: ${!!sampleTheme.Surfaces?.Buttons}`);
     console.log(`      - Surfaces.Icons exists: ${!!sampleTheme.Surfaces?.Icons}`);

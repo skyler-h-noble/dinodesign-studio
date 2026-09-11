@@ -11,6 +11,7 @@
 import chroma from 'chroma-js';
 import { buttonModeMetricCSS } from '../buttonSizing';
 import { navMetricsCSS } from '../componentSize';
+import { CSS_THEME_NAMES } from '../themes';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
@@ -2292,7 +2293,13 @@ function generateThemeCSS(modeData: any, fullJsonData?: any): string {
   ];
   
   // Button types
-  const buttonTypes = ['Primary', 'Primary-Light', 'Secondary', 'Secondary-Light', 'Tertiary', 'Tertiary-Light', 'Neutral', 'Neutral-Light', 'Info', 'Info-Light', 'Success', 'Success-Light', 'Warning', 'Warning-Light', 'Error', 'Error-Light'];
+  /* The eight palettes. No -Light siblings: a button has no light SHADE any
+     more, the same removal the themes went through and for the same reason —
+     the surface the button sits on already carries that axis, and the Theme
+     layer picks the button's tokens per surface. Keeping a shade meant two
+     variants that resolved identically on most surfaces and differed on the
+     ones where the surface had already said it. */
+  const buttonTypes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
   /* 'Quiet' joins the slots: muted text ON the button fill, from the same
      curated Quiet table the surfaces read, at the tone the button IS — so its
      4.5:1 comes from the existing per-palette-per-tone guarantee rather than a
@@ -4243,11 +4250,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Hover: var(--${prefix}-Buttons-Surfaces-Primary-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Pressed: var(--${prefix}-Buttons-Surfaces-Primary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Surfaces-Primary-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Surfaces-Primary-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Surfaces-Primary-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Surfaces-Primary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Primary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Button: var(--${prefix}-Buttons-Surfaces-Secondary-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Text: var(--${prefix}-Buttons-Surfaces-Secondary-Text);`);
@@ -4255,11 +4257,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Hover: var(--${prefix}-Buttons-Surfaces-Secondary-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Pressed: var(--${prefix}-Buttons-Surfaces-Secondary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Button: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Text: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Border: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Hover: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Button: var(--${prefix}-Buttons-Surfaces-Tertiary-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Text: var(--${prefix}-Buttons-Surfaces-Tertiary-Text);`);
@@ -4267,11 +4264,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Hover: var(--${prefix}-Buttons-Surfaces-Tertiary-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Pressed: var(--${prefix}-Buttons-Surfaces-Tertiary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Button: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Text: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Border: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Hover: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Button: var(--${prefix}-Buttons-Surfaces-Neutral-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Text: var(--${prefix}-Buttons-Surfaces-Neutral-Text);`);
@@ -4279,11 +4271,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Hover: var(--${prefix}-Buttons-Surfaces-Neutral-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Pressed: var(--${prefix}-Buttons-Surfaces-Neutral-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Button: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Text: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Border: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Hover: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Button: var(--${prefix}-Buttons-Surfaces-Info-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Text: var(--${prefix}-Buttons-Surfaces-Info-Text);`);
@@ -4291,11 +4278,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Hover: var(--${prefix}-Buttons-Surfaces-Info-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Pressed: var(--${prefix}-Buttons-Surfaces-Info-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Button: var(--${prefix}-Buttons-Surfaces-Info-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Text: var(--${prefix}-Buttons-Surfaces-Info-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Border: var(--${prefix}-Buttons-Surfaces-Info-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Hover: var(--${prefix}-Buttons-Surfaces-Info-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Info-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Button: var(--${prefix}-Buttons-Surfaces-Success-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Text: var(--${prefix}-Buttons-Surfaces-Success-Text);`);
@@ -4303,11 +4285,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Hover: var(--${prefix}-Buttons-Surfaces-Success-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Pressed: var(--${prefix}-Buttons-Surfaces-Success-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Button: var(--${prefix}-Buttons-Surfaces-Success-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Text: var(--${prefix}-Buttons-Surfaces-Success-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Border: var(--${prefix}-Buttons-Surfaces-Success-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Hover: var(--${prefix}-Buttons-Surfaces-Success-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Success-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Button: var(--${prefix}-Buttons-Surfaces-Warning-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Text: var(--${prefix}-Buttons-Surfaces-Warning-Text);`);
@@ -4315,11 +4292,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Hover: var(--${prefix}-Buttons-Surfaces-Warning-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Pressed: var(--${prefix}-Buttons-Surfaces-Warning-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Button: var(--${prefix}-Buttons-Surfaces-Warning-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Text: var(--${prefix}-Buttons-Surfaces-Warning-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Border: var(--${prefix}-Buttons-Surfaces-Warning-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Hover: var(--${prefix}-Buttons-Surfaces-Warning-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Warning-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Button: var(--${prefix}-Buttons-Surfaces-Error-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Text: var(--${prefix}-Buttons-Surfaces-Error-Text);`);
@@ -4327,11 +4299,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Hover: var(--${prefix}-Buttons-Surfaces-Error-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Pressed: var(--${prefix}-Buttons-Surfaces-Error-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Button: var(--${prefix}-Buttons-Surfaces-Error-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Text: var(--${prefix}-Buttons-Surfaces-Error-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Border: var(--${prefix}-Buttons-Surfaces-Error-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Hover: var(--${prefix}-Buttons-Surfaces-Error-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Error-Light-Pressed);`);
   
   lines.push('');
   lines.push('  /* Surface Icons */');
@@ -4399,11 +4366,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Primary-Hover: var(--${prefix}-Buttons-Containers-Primary-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Primary-Pressed: var(--${prefix}-Buttons-Containers-Primary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Containers-Primary-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Containers-Primary-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Containers-Primary-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Containers-Primary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Containers-Primary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Button: var(--${prefix}-Buttons-Containers-Secondary-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Text: var(--${prefix}-Buttons-Containers-Secondary-Text);`);
@@ -4411,11 +4373,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Hover: var(--${prefix}-Buttons-Containers-Secondary-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Pressed: var(--${prefix}-Buttons-Containers-Secondary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Button: var(--${prefix}-Buttons-Containers-Secondary-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Text: var(--${prefix}-Buttons-Containers-Secondary-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Border: var(--${prefix}-Buttons-Containers-Secondary-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Hover: var(--${prefix}-Buttons-Containers-Secondary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Pressed: var(--${prefix}-Buttons-Containers-Secondary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Button: var(--${prefix}-Buttons-Containers-Tertiary-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Text: var(--${prefix}-Buttons-Containers-Tertiary-Text);`);
@@ -4423,11 +4380,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Hover: var(--${prefix}-Buttons-Containers-Tertiary-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Pressed: var(--${prefix}-Buttons-Containers-Tertiary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Button: var(--${prefix}-Buttons-Containers-Tertiary-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Text: var(--${prefix}-Buttons-Containers-Tertiary-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Border: var(--${prefix}-Buttons-Containers-Tertiary-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Hover: var(--${prefix}-Buttons-Containers-Tertiary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Pressed: var(--${prefix}-Buttons-Containers-Tertiary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Button: var(--${prefix}-Buttons-Containers-Neutral-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Text: var(--${prefix}-Buttons-Containers-Neutral-Text);`);
@@ -4435,11 +4387,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Hover: var(--${prefix}-Buttons-Containers-Neutral-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Pressed: var(--${prefix}-Buttons-Containers-Neutral-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Button: var(--${prefix}-Buttons-Containers-Neutral-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Text: var(--${prefix}-Buttons-Containers-Neutral-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Border: var(--${prefix}-Buttons-Containers-Neutral-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Hover: var(--${prefix}-Buttons-Containers-Neutral-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Pressed: var(--${prefix}-Buttons-Containers-Neutral-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Button: var(--${prefix}-Buttons-Containers-Info-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Text: var(--${prefix}-Buttons-Containers-Info-Text);`);
@@ -4447,11 +4394,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Hover: var(--${prefix}-Buttons-Containers-Info-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Pressed: var(--${prefix}-Buttons-Containers-Info-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Button: var(--${prefix}-Buttons-Containers-Info-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Text: var(--${prefix}-Buttons-Containers-Info-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Border: var(--${prefix}-Buttons-Containers-Info-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Hover: var(--${prefix}-Buttons-Containers-Info-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Pressed: var(--${prefix}-Buttons-Containers-Info-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Button: var(--${prefix}-Buttons-Containers-Success-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Text: var(--${prefix}-Buttons-Containers-Success-Text);`);
@@ -4459,11 +4401,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Hover: var(--${prefix}-Buttons-Containers-Success-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Pressed: var(--${prefix}-Buttons-Containers-Success-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Button: var(--${prefix}-Buttons-Containers-Success-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Text: var(--${prefix}-Buttons-Containers-Success-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Border: var(--${prefix}-Buttons-Containers-Success-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Hover: var(--${prefix}-Buttons-Containers-Success-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Pressed: var(--${prefix}-Buttons-Containers-Success-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Button: var(--${prefix}-Buttons-Containers-Warning-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Text: var(--${prefix}-Buttons-Containers-Warning-Text);`);
@@ -4471,11 +4408,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Hover: var(--${prefix}-Buttons-Containers-Warning-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Pressed: var(--${prefix}-Buttons-Containers-Warning-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Button: var(--${prefix}-Buttons-Containers-Warning-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Text: var(--${prefix}-Buttons-Containers-Warning-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Border: var(--${prefix}-Buttons-Containers-Warning-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Hover: var(--${prefix}-Buttons-Containers-Warning-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Pressed: var(--${prefix}-Buttons-Containers-Warning-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Button: var(--${prefix}-Buttons-Containers-Error-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Text: var(--${prefix}-Buttons-Containers-Error-Text);`);
@@ -4483,11 +4415,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Hover: var(--${prefix}-Buttons-Containers-Error-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Pressed: var(--${prefix}-Buttons-Containers-Error-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Button: var(--${prefix}-Buttons-Containers-Error-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Text: var(--${prefix}-Buttons-Containers-Error-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Border: var(--${prefix}-Buttons-Containers-Error-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Hover: var(--${prefix}-Buttons-Containers-Error-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Pressed: var(--${prefix}-Buttons-Containers-Error-Light-Pressed);`);
   
   lines.push('');
   lines.push('  /* Container Icons */');
@@ -4715,92 +4642,49 @@ export function generateBaseCSS(jsonData: any): string {
   // REMOVED: lines.push(`  --Buttons-Primary-Border: var(--Border-Surfaces-Neutral-Color-${primaryTone});`);
   lines.push(`  --Buttons-Primary-Hover: ${hoverHex('Primary', primaryTone)};`);
   lines.push(`  --Buttons-Primary-Pressed: ${pressedHex('Primary', primaryTone)};`);
-  lines.push('  --Buttons-Primary-Light-Button: var(--Primary-Color-12);');
-  lines.push('  --Buttons-Primary-Light-Text: var(--Text-Surfaces-Primary-Color-12);');
-  lines.push(`  --Buttons-Primary-Light-Border: var(--Border-Surfaces-Primary-Color-12);`);
-  lines.push(`  --Buttons-Primary-Light-Hover: ${hoverHex('Primary', 12)};`);
-  lines.push(`  --Buttons-Primary-Light-Pressed: ${pressedHex('Primary', 12)};`);
   lines.push(`  --Buttons-Secondary-Button: var(--Secondary-Color-${SC});`);
   lines.push(`  --Buttons-Secondary-Text: var(--Text-Surfaces-Secondary-Color-${SC});`);
   lines.push(`  --Buttons-Secondary-Border: var(--Border-Surfaces-Secondary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Secondary-Hover: ${hoverHex('Secondary', SC)};`);
   lines.push(`  --Buttons-Secondary-Pressed: ${pressedHex('Secondary', SC)};`);
-  lines.push('  --Buttons-Secondary-Light-Button: var(--Secondary-Color-12);');
-  lines.push('  --Buttons-Secondary-Light-Text: var(--Text-Surfaces-Secondary-Color-12);');
-  lines.push(`  --Buttons-Secondary-Light-Border: var(--Border-Surfaces-Secondary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Secondary-Light-Hover: ${hoverHex('Secondary', 12)};`);
-  lines.push(`  --Buttons-Secondary-Light-Pressed: ${pressedHex('Secondary', 12)};`);
   lines.push(`  --Buttons-Tertiary-Button: var(--Tertiary-Color-${TC});`);
   lines.push(`  --Buttons-Tertiary-Text: var(--Text-Surfaces-Tertiary-Color-${TC});`);
   lines.push(`  --Buttons-Tertiary-Border: var(--Border-Surfaces-Tertiary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Tertiary-Hover: ${hoverHex('Tertiary', TC)};`);
   lines.push(`  --Buttons-Tertiary-Pressed: ${pressedHex('Tertiary', TC)};`);
-  lines.push('  --Buttons-Tertiary-Light-Button: var(--Tertiary-Color-12);');
-  lines.push('  --Buttons-Tertiary-Light-Text: var(--Text-Surfaces-Tertiary-Color-12);');
-  lines.push(`  --Buttons-Tertiary-Light-Border: var(--Border-Surfaces-Tertiary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Tertiary-Light-Hover: ${hoverHex('Tertiary', 12)};`);
-  lines.push(`  --Buttons-Tertiary-Light-Pressed: ${pressedHex('Tertiary', 12)};`);
   // Container section for Primary buttons
   lines.push(`  --Buttons-Primary-Button: var(--Primary-Button-Containers-Background-${primaryTone}-Button);`);
   lines.push(`  --Buttons-Primary-Text: var(--Primary-Button-Containers-Background-${primaryTone}-Text);`);
   lines.push(`  --Buttons-Primary-Border: var(--Border-Containers-Primary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Primary-Hover: ${hoverHex('Primary', primaryTone)};`);
   lines.push(`  --Buttons-Primary-Pressed: ${pressedHex('Primary', primaryTone)};`);
-  lines.push('  --Buttons-Primary-Light-Border: var(--Border-Containers-Primary-Color-12);');
   lines.push(`  --Buttons-Secondary-Border: var(--Border-Containers-Secondary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Secondary-Light-Border: var(--Border-Containers-Secondary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Tertiary-Border: var(--Border-Containers-Tertiary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Tertiary-Light-Border: var(--Border-Containers-Tertiary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Neutral-Button: var(--Neutral-Color-${OB});`);
   lines.push(`  --Buttons-Neutral-Text: var(--Text-Surfaces-Neutral-Color-${OB});`);
   lines.push(`  --Buttons-Neutral-Border: var(--Border-Containers-Neutral-Color-${primaryTone});`);
   lines.push(`  --Buttons-Neutral-Hover: ${hoverHex('Neutral', OB)};`);
   lines.push(`  --Buttons-Neutral-Pressed: ${pressedHex('Neutral', OB)};`);
-  lines.push('  --Buttons-Neutral-Light-Button: var(--Neutral-Color-12);');
-  lines.push('  --Buttons-Neutral-Light-Text: var(--Text-Surfaces-Neutral-Color-12);');
-  lines.push(`  --Buttons-Neutral-Light-Border: var(--Border-Containers-Neutral-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Neutral-Light-Hover: ${hoverHex('Neutral', 12)};`);
-  lines.push(`  --Buttons-Neutral-Light-Pressed: ${pressedHex('Neutral', 12)};`);
   lines.push(`  --Buttons-Info-Button: var(--Info-Color-${OB});`);
   lines.push(`  --Buttons-Info-Text: var(--Text-Surfaces-Info-Color-${OB});`);
   lines.push(`  --Buttons-Info-Border: var(--Border-Containers-Info-Color-${primaryTone});`);
   lines.push(`  --Buttons-Info-Hover: ${hoverHex('Info', OB)};`);
   lines.push(`  --Buttons-Info-Pressed: ${pressedHex('Info', OB)};`);
-  lines.push('  --Buttons-Info-Light-Button: var(--Info-Color-12);');
-  lines.push('  --Buttons-Info-Light-Text: var(--Text-Surfaces-Info-Color-12);');
-  lines.push(`  --Buttons-Info-Light-Border: var(--Border-Containers-Info-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Info-Light-Hover: ${hoverHex('Info', 12)};`);
-  lines.push(`  --Buttons-Info-Light-Pressed: ${pressedHex('Info', 12)};`);
   lines.push(`  --Buttons-Success-Button: var(--Success-Color-${OB});`);
   lines.push(`  --Buttons-Success-Text: var(--Text-Surfaces-Success-Color-${OB});`);
   lines.push(`  --Buttons-Success-Border: var(--Border-Containers-Success-Color-${primaryTone});`);
   lines.push(`  --Buttons-Success-Hover: ${hoverHex('Success', OB)};`);
   lines.push(`  --Buttons-Success-Pressed: ${pressedHex('Success', OB)};`);
-  lines.push('  --Buttons-Success-Light-Button: var(--Success-Color-12);');
-  lines.push('  --Buttons-Success-Light-Text: var(--Text-Surfaces-Success-Color-12);');
-  lines.push(`  --Buttons-Success-Light-Border: var(--Border-Containers-Success-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Success-Light-Hover: ${hoverHex('Success', 12)};`);
-  lines.push(`  --Buttons-Success-Light-Pressed: ${pressedHex('Success', 12)};`);
   lines.push(`  --Buttons-Warning-Button: var(--Warning-Color-${OB});`);
   lines.push(`  --Buttons-Warning-Text: var(--Text-Surfaces-Warning-Color-${OB});`);
   lines.push(`  --Buttons-Warning-Border: var(--Border-Containers-Warning-Color-${primaryTone});`);
   lines.push(`  --Buttons-Warning-Hover: ${hoverHex('Warning', OB)};`);
   lines.push(`  --Buttons-Warning-Pressed: ${pressedHex('Warning', OB)};`);
-  lines.push('  --Buttons-Warning-Light-Button: var(--Warning-Color-12);');
-  lines.push('  --Buttons-Warning-Light-Text: var(--Text-Surfaces-Warning-Color-12);');
-  lines.push(`  --Buttons-Warning-Light-Border: var(--Border-Containers-Warning-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Warning-Light-Hover: ${hoverHex('Warning', 12)};`);
-  lines.push(`  --Buttons-Warning-Light-Pressed: ${pressedHex('Warning', 12)};`);
   lines.push(`  --Buttons-Error-Button: var(--Error-Color-${OB});`);
   lines.push(`  --Buttons-Error-Text: var(--Text-Surfaces-Error-Color-${OB});`);
   lines.push(`  --Buttons-Error-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
   lines.push(`  --Buttons-Error-Hover: ${hoverHex('Error', OB)};`);
   lines.push(`  --Buttons-Error-Pressed: ${pressedHex('Error', OB)};`);
-  lines.push('  --Buttons-Error-Light-Button: var(--Error-Color-12);');
-  lines.push('  --Buttons-Error-Light-Text: var(--Text-Surfaces-Error-Color-12);');
-  lines.push(`  --Buttons-Error-Light-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Error-Light-Hover: ${hoverHex('Error', 12)};`);
-  lines.push(`  --Buttons-Error-Light-Pressed: ${pressedHex('Error', 12)};`);
   // The Quiet table is consumed by reference inside the JSON and never
   // flattened into `--Quiet-...` variables, so the BW faces cannot point at it
   // by name the way they point at a palette. Read the row here and re-emit it
@@ -5216,11 +5100,6 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     cssLines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
     cssLines.push(`  --Buttons-Primary-Outline-Hover: var(--${prefix}-Buttons-Primary-Outline-Hover);`);
     cssLines.push(`  --Buttons-Primary-Outline-Pressed: var(--${prefix}-Buttons-Primary-Outline-Pressed);`);
-    cssLines.push(`  --Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Primary-Light-Button);`);
-    cssLines.push(`  --Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Primary-Light-Text);`);
-    cssLines.push(`  --Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Primary-Light-Border);`);
-    cssLines.push(`  --Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Primary-Light-Hover);`);
-    cssLines.push(`  --Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Primary-Light-Pressed);`);
     cssLines.push(`  --Buttons-Secondary-Button: var(--${prefix}-Buttons-Secondary-Button);`);
     cssLines.push(`  --Buttons-Secondary-Text: var(--${prefix}-Buttons-Secondary-Text);`);
     cssLines.push(`  --Buttons-Secondary-Border: var(--${prefix}-Buttons-Secondary-Border);`);
@@ -5375,11 +5254,6 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
     lines.push(`  --Buttons-Primary-Outline-Hover: var(--${prefix}-Buttons-Primary-Outline-Hover);`);
     lines.push(`  --Buttons-Primary-Outline-Pressed: var(--${prefix}-Buttons-Primary-Outline-Pressed);`);
-    lines.push(`  --Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Primary-Light-Button);`);
-    lines.push(`  --Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Primary-Light-Text);`);
-    lines.push(`  --Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Primary-Light-Border);`);
-    lines.push(`  --Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Primary-Light-Hover);`);
-    lines.push(`  --Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Primary-Light-Pressed);`);
     lines.push(`  --Buttons-Secondary-Button: var(--${prefix}-Buttons-Secondary-Button);`);
     lines.push(`  --Buttons-Secondary-Text: var(--${prefix}-Buttons-Secondary-Text);`);
     lines.push(`  --Buttons-Secondary-Border: var(--${prefix}-Buttons-Secondary-Border);`);
@@ -5622,39 +5496,26 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
   };
   
   // All theme variants to generate
+  /* The nine, plus the three bars — generated from a list, not typed out.
+     
+     Thirty-three hand-written selectors is how four of them ended up naming
+     themes the generator had stopped producing, and how the four it DOES
+     produce (Info, Success, Warning, Error) ended up with no selector at all.
+     
+     Bare names only. The -Light / -Medium / -Dark shades are gone: what used
+     to be Primary-Light is data-theme="Primary" with
+     data-surface="Surface-Brightest", so the surface ladder reaches it and
+     the theme no longer has to name it.
+     
+     Both selector forms, as before. A theme with no surface stated resolves
+     to Surface, so the paired form has to carry the same block or that
+     combination falls through to :root. */
   const themeVariants = [
     { name: 'Default', selector: ':root' },
-    { name: 'Primary', selector: '[data-theme="Primary"],\n[data-theme="Primary"][data-surface="Surface"]' },
-    { name: 'Primary-Light', selector: '[data-theme="Primary-Light"],\n[data-theme="Primary-Light"][data-surface="Surface"]' },
-    { name: 'Primary-Medium', selector: '[data-theme="Primary-Medium"],\n[data-theme="Primary-Medium"][data-surface="Surface"]' },
-    { name: 'Primary-Dark', selector: '[data-theme="Primary-Dark"],\n[data-theme="Primary-Dark"][data-surface="Surface"]' },
-    { name: 'Secondary', selector: '[data-theme="Secondary"],\n[data-theme="Secondary"][data-surface="Surface"]' },
-    { name: 'Secondary-Light', selector: '[data-theme="Secondary-Light"],\n[data-theme="Secondary-Light"][data-surface="Surface"]' },
-    { name: 'Secondary-Medium', selector: '[data-theme="Secondary-Medium"],\n[data-theme="Secondary-Medium"][data-surface="Surface"]' },
-    { name: 'Secondary-Dark', selector: '[data-theme="Secondary-Dark"],\n[data-theme="Secondary-Dark"][data-surface="Surface"]' },
-    { name: 'Tertiary', selector: '[data-theme="Tertiary"],\n[data-theme="Tertiary"][data-surface="Surface"]' },
-    { name: 'Tertiary-Light', selector: '[data-theme="Tertiary-Light"],\n[data-theme="Tertiary-Light"][data-surface="Surface"]' },
-    { name: 'Tertiary-Medium', selector: '[data-theme="Tertiary-Medium"],\n[data-theme="Tertiary-Medium"][data-surface="Surface"]' },
-    { name: 'Tertiary-Dark', selector: '[data-theme="Tertiary-Dark"],\n[data-theme="Tertiary-Dark"][data-surface="Surface"]' },
-    { name: 'Neutral', selector: '[data-theme="Neutral"],\n[data-theme="Neutral"][data-surface="Surface"]' },
-    { name: 'Neutral-Light', selector: '[data-theme="Neutral-Light"],\n[data-theme="Neutral-Light"][data-surface="Surface"]' },
-    { name: 'Neutral-Medium', selector: '[data-theme="Neutral-Medium"],\n[data-theme="Neutral-Medium"][data-surface="Surface"]' },
-    { name: 'Neutral-Dark', selector: '[data-theme="Neutral-Dark"],\n[data-theme="Neutral-Dark"][data-surface="Surface"]' },
-    { name: 'Info-Light', selector: '[data-theme="Info-Light"],\n[data-theme="Info-Light"][data-surface="Surface"]' },
-    { name: 'Info-Medium', selector: '[data-theme="Info-Medium"],\n[data-theme="Info-Medium"][data-surface="Surface"]' },
-    { name: 'Info-Dark', selector: '[data-theme="Info-Dark"],\n[data-theme="Info-Dark"][data-surface="Surface"]' },
-    { name: 'Success-Light', selector: '[data-theme="Success-Light"],\n[data-theme="Success-Light"][data-surface="Surface"]' },
-    { name: 'Success-Medium', selector: '[data-theme="Success-Medium"],\n[data-theme="Success-Medium"][data-surface="Surface"]' },
-    { name: 'Success-Dark', selector: '[data-theme="Success-Dark"],\n[data-theme="Success-Dark"][data-surface="Surface"]' },
-    { name: 'Warning-Light', selector: '[data-theme="Warning-Light"],\n[data-theme="Warning-Light"][data-surface="Surface"]' },
-    { name: 'Warning-Medium', selector: '[data-theme="Warning-Medium"],\n[data-theme="Warning-Medium"][data-surface="Surface"]' },
-    { name: 'Warning-Dark', selector: '[data-theme="Warning-Dark"],\n[data-theme="Warning-Dark"][data-surface="Surface"]' },
-    { name: 'Error-Light', selector: '[data-theme="Error-Light"],\n[data-theme="Error-Light"][data-surface="Surface"]' },
-    { name: 'Error-Medium', selector: '[data-theme="Error-Medium"],\n[data-theme="Error-Medium"][data-surface="Surface"]' },
-    { name: 'Error-Dark', selector: '[data-theme="Error-Dark"],\n[data-theme="Error-Dark"][data-surface="Surface"]' },
-    { name: 'App-Bar', selector: '[data-theme="App-Bar"],\n[data-theme="App-Bar"][data-surface="Surface"]' },
-    { name: 'Nav-Bar', selector: '[data-theme="Nav-Bar"],\n[data-theme="Nav-Bar"][data-surface="Surface"]' },
-    { name: 'Status', selector: '[data-theme="Status"],\n[data-theme="Status"][data-surface="Surface"]' }
+    ...CSS_THEME_NAMES.map((name) => ({
+      name,
+      selector: `[data-theme="${name}"],\n[data-theme="${name}"][data-surface="Surface"]`,
+    })),
   ];
   
   themeVariants.forEach(({ name, selector }) => {

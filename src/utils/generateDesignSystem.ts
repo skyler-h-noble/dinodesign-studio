@@ -196,20 +196,32 @@ Apply \`data-theme\` to any element to change the color context for it and all c
   <Body>Text, borders, buttons all adapt automatically</Body>
 </section>
 
-{/* Dark hero banner */}
-<div data-theme="Primary-Dark">
+{/* Dark hero banner — the palette, on its dimmest level */}
+<div data-theme="Primary" data-surface="Surface-Dimmest">
   <H1>Dark themed hero</H1>
 </div>
 
-{/* Error alert area */}
-<div data-theme="Error-Light">
+{/* Error alert area — the same palette, on its brightest level */}
+<div data-theme="Error" data-surface="Surface-Brightest">
   <Alert variant="error">Something went wrong</Alert>
 </div>
 \`\`\`
 
-**Light themes** (-Light suffix) use the palette's lightest tone as background.
-**Medium themes** (no suffix) use the palette's mid-range tone.
-**Dark themes** (-Dark suffix) use the palette's darkest tone.
+**A theme is a palette. A surface is how light it sits.** They are two
+attributes because they are two decisions, and pairing them is what gives you
+the whole matched token set — Background, Text, Quiet, Border, Hover and the
+rest — tuned for that combination.
+
+There is no \`-Light\` or \`-Dark\` theme. There used to be, and the suffix was
+doing the surface's job: \`Primary-Light\` is \`data-theme="Primary"\` with
+\`data-surface="Surface-Brightest"\`. One axis per attribute means five levels
+per palette instead of three named ones, and it is the same five everywhere.
+
+| you want | theme | surface |
+| --- | --- | --- |
+| the palette at full strength | \`Primary\` | omit, or \`Surface\` |
+| a pale tint of it | \`Primary\` | \`Surface-Brightest\` |
+| a deep version of it | \`Primary\` | \`Surface-Dimmest\` |
 **Default** adapts based on user selection — it can be white, black, tonal, or gray.
 
 ---
@@ -659,14 +671,21 @@ switch the whole region's \`data-theme\` and let the surface carry it.
 
 ## Dark Mode
 
-Dark mode is applied via theme suffixes: \`Primary-Dark\`, \`Secondary-Dark\`, \`Tertiary-Dark\`, \`Neutral-Dark\`.
+Dark mode is a **stylesheet**, not a theme name. You ship both mode sheets and
+swap which one is active; every theme and every surface then resolves to its
+dark-mode values, and nothing in your markup changes.
+
+This is worth being exact about, because the two used to look alike. A
+\`-Dark\` THEME suffix is gone — it never meant dark mode, it meant "this
+palette at its darkest tone", which is now a surface level:
 
 \`\`\`jsx
-{/* Dark section */}
-<div data-theme="Primary-Dark">
-  <H1>Dark Mode Section</H1>
+{/* A dim section. Same in light mode and dark mode — the mode sheet
+    decides what "dimmest" resolves to. */}
+<div data-theme="Primary" data-surface="Surface-Dimmest">
+  <H1>Dim section</H1>
   <Card>
-    <Body>Card adapts automatically in dark mode</Body>
+    <Body>Card adapts automatically</Body>
   </Card>
 </div>
 \`\`\`
@@ -704,8 +723,8 @@ The design system uses CSS custom property cascading. Here is the precedence:
   </div>
 
   <!-- Themed section nested inside -->
-  <section data-theme="Primary-Light">
-    <p style="color: var(--Text)">Now using Primary-Light text color</p>
+  <section data-theme="Primary" data-surface="Surface-Brightest">
+    <p style="color: var(--Text)">Now using Primary's text color, on its brightest level</p>
   </section>
 </div>
 \`\`\`
@@ -947,7 +966,13 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     defaultTheme: 'Default',
     defaultStyle: input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1),
     defaultSurface: 'Surface',
-    darkTheme: 'Neutral-Dark',
+    /* A theme that exists. 'Neutral-Dark' was written here and there is no
+       such theme any more — the root would have bound nothing in dark mode
+       and fallen through to Default, silently.
+       
+       Dark mode is the mode STYLESHEET; every theme resolves to its dark
+       values under it. This only says which palette the root carries. */
+    darkTheme: 'Neutral',
   }, null, 2);
 
   // 5. Build foundation.css and styles.css (simple static files)

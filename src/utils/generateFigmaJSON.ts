@@ -10,6 +10,7 @@
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
 import { componentSizePayload } from './componentSize';
+import { THEME_MODES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
 } from './bevelGeometry';
@@ -51,10 +52,10 @@ interface ColorToken {
  *
  * assertThemesMatch below now fails that loudly instead.
  */
-const THEMES = [
-  'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
-  'Info', 'Success', 'Warning', 'Error',
-];
+/* Imported, not restated. This list and the CSS exporter's had drifted —
+   four names here were produced by nobody — and each side looked right on
+   its own, which is the only way that survives. */
+const THEMES: string[] = [...THEME_MODES];
 
 /**
  * The Theme collection's modes, in order. Default LEADS.
@@ -1852,16 +1853,24 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   }
 
   if (defaultSettings) {
-    // Derive Figma theme name from stored Theme + N values
+    /* The bar's theme, as a MODE NAME the Theme collection actually has.
+     *
+     * This returned 'Primary-Light' as its fallback, 'Black' or 'White' for
+     * Neutral at the extremes, and `${theme}-Light` for any light pick. None
+     * of those is a Theme mode — the collection is the nine bare palettes —
+     * and the plugin resolves this by `themeModeMap[s.theme]`, so every one
+     * of them came back undefined and the bar's theme was never applied. It
+     * bound nothing and reported success, which is why nobody noticed.
+     *
+     * The tone is not lost by dropping the suffix: a light pick is the same
+     * palette on a brighter SURFACE, which is the whole reason the shades
+     * went. What this payload cannot yet say is which surface — it carries a
+     * theme and nothing else — so a light App-Bar arrives on the palette's
+     * default level and a designer sets the level. That is a smaller gap
+     * than the one it replaces, where the palette was wrong too. */
     function deriveThemeName(navSettings: any): string {
       const theme = navSettings?.Theme?.value;
-      const n = navSettings?.N?.value;
-      if (!theme) return 'Primary-Light';
-      if (theme === 'Neutral' && n <= 2) return 'Black';
-      if (theme === 'Neutral' && n >= 11) return 'White';
-      // Primary with N=11 is Primary-Light, otherwise Primary
-      if (n >= 11) return `${theme}-Light`;
-      return theme;
+      return THEMES.includes(theme) ? theme : 'Default';
     }
 
     figma.Navigation = {
