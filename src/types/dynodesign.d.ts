@@ -179,7 +179,12 @@ declare module '@omni-design/components' {
   // Data Display
   export const Avatar: FC<any>;
   export const AvatarGroup: FC<any>;
-  export const AvatarMenu: FC<any>;
+  /* AvatarMenu is NOT exported by the package — no component of that name
+     exists in the lib. Declaring it here made the import typecheck and crash
+     at runtime, which is worse than no declaration: the compiler stops being
+     able to tell you. The studio's AvatarDropdown.tsx implements it locally
+     and is tagged MISSING-LIB-COMPONENT.
+  export const AvatarMenu: FC<any>; */
   export const Badge: FC<any>;
   export const Divider: FC<any>;
   export const List: FC<any>;

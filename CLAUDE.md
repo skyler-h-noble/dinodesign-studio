@@ -163,21 +163,37 @@ Its 18 failing ARIA tests are **test** bugs, not component bugs: they assert on
 `aria-haspopup` / `aria-expanded` / `aria-controls` are correctly set on the
 ancestor `<button>`. Do not "fix" the component to satisfy them.
 
-### `AvatarMenu` — fixed in lib
+### `AvatarMenu` — does NOT exist in the lib
 
-If `@omni-design/components`'s `AvatarMenu` ever silent-fails again, the cause is
-a `Menu` rendered without its `<Dropdown>` root: the default context has
-`open: false`, so it returns `null` silently. That is a usage error rather than
-a component bug — see the `Menu` entry above. The fix is the inline-portal
-pattern; the rewrite lives at
-`/Users/lisenoble/Documents/dinodesign/src/components/AvatarMenu/AvatarMenu.js`.
+**This entry said "fixed in lib" and pointed at `~/Documents/dinodesign`,
+which is not this project's library.** There is no `AvatarMenu` in
+`~/DinoDesign/src/components/` and none exported from the package. The entry
+described a fix in a repo nothing here builds against.
 
-### `ButtonGroup` — fixed via wrapper
+The studio's own `src/components/AvatarDropdown.tsx` has this right — it is
+tagged `MISSING-LIB-COMPONENT: AvatarMenu` and implements the inline-portal
+pattern locally. Use that, not an import.
 
-The legacy `ButtonGroup` paints an outer border on its `Box` and clones each
-child with `*-outline` variant — producing a double-pill outline. The wrapper
-at `/Users/lisenoble/Documents/dinodesign/src/components/ButtonGroup/ButtonGroup.js`
-strips the outer border via `sx`. Use as normal:
+Do not add `AvatarMenu` to `src/types/dynodesign.d.ts`. It was declared there
+as `FC<any>`, so `import { AvatarMenu } from '@omni-design/components'` passed
+the typecheck and would have crashed at runtime — a shim that promises an
+export the package does not have is worse than no shim, because the compiler
+stops being able to tell you.
+
+### `ButtonGroup` — works; the wrapper this described does not exist
+
+**This entry said "fixed via wrapper" and pointed at a file in
+`~/Documents/dinodesign`, which is not this project's library** — the lib is
+`~/DinoDesign`, and nothing here imports a wrapper. `ButtonGroup` comes
+straight from `@omni-design/components` like any other component.
+
+The double-pill outline it described was real and is fixed IN THE LIB: the
+container sets `border: none` and only the segments carry one. Leaving the
+entry up meant every tool reading this file believed a workaround was load-
+bearing and that the component could not be trusted — the same way the `Menu`
+entry made a working menu go unused for months.
+
+Use it as normal:
 
 ```tsx
 <ButtonGroup value={selected} onChange={setSelected} size="small">
@@ -187,8 +203,15 @@ strips the outer border via `sx`. Use as normal:
 ```
 
 Always pass `value` + `onChange` to the group and `value=` on each child
-(controlled mode). Setting `variant="default"` / `variant="outline"` on
-children manually is wrong — that's what re-introduces the double-border.
+(controlled mode). Do NOT set `variant` on the children: the group assigns it
+per segment — the palette when selected, `-outline` when not — and an explicit
+one wins over that, which is how a group ends up with every segment looking
+selected.
+
+`variant="light"` on the GROUP lightens the unselected segments by changing
+their **surface**, not their theme — `data-theme="{Color}"` plus
+`data-surface="Surface-Brightest"`. It used to name a `{Color}-Light` theme,
+which no longer exists.
 
 ### `Select`
 
