@@ -329,18 +329,18 @@ export function generateAllButtonsForMode(
     buttons['Default'] = generateButtonsForMode(mode, 'Default', defaultConfig.theme, defaultConfig.colorN as any, extractedTones);
   }
   
-  // Default-Light Button (same theme as Default, but always uses Color-Vibrant)
-  if (buttonStyle === 'black-white') {
-    // For BW, Default-Light uses Neutral theme with Color-Vibrant
-    buttons['Default-Light'] = generateButtonsForMode(mode, 'Default-Light', 'Neutral', 'Vibrant', extractedTones);
-  } else if (defaultConfig.theme === 'tonal') {
-    // For tonal, use Primary theme with Color-Vibrant
-    buttons['Default-Light'] = generateButtonsForMode(mode, 'Default-Light', 'Primary', 'Vibrant', extractedTones);
-  } else {
-    // Use the same theme as Default, but with Color-Vibrant
-    buttons['Default-Light'] = generateButtonsForMode(mode, 'Default-Light', defaultConfig.theme, 'Vibrant', extractedTones);
-  }
-  
+  /* No Default-Light button.
+   *
+   * "Default" means inherit whatever palette is around, so a lighter version
+   * of it names nothing — there is no Default palette to take a light tone
+   * from. The lightening is a SURFACE, and a surface needs no second button
+   * type.
+   *
+   * It was generated here in three branches and consumed by nobody: nothing
+   * aliased into Buttons.Default-Light, and it reached neither the CSS nor
+   * the Figma payload. Three branches of work, thrown away every export.
+   */
+
   // Primary Button (always uses Primary theme)
   const primaryColorN = buttonStyle === 'primary-fixed'
     ? (extractedTones ? toneToColorNumber(extractedTones.primary) : 9)

@@ -2920,12 +2920,6 @@ function generateThemesSection(
           Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
           Pressed: { value: `{Pressed.Primary.Color-${backgroundNum}}`, type: 'color' }
         },
-        'Default-Light': {
-          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Surfaces.Primary.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Pressed: { value: `{Pressed.Primary.Color-10}`, type: 'color' }
-        },
         Primary: {
           Button: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Button}`, type: 'color' },
           Text: { value: `{Primary-Button.Surfaces.Background-${backgroundNum}.Text}`, type: 'color' },
@@ -3062,12 +3056,6 @@ function generateThemesSection(
           Border: { value: `{Border.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
           Hover: { value: `{Hover.Primary.Color-${backgroundNum}}`, type: 'color' },
           Pressed: { value: `{Pressed.Primary.Color-${backgroundNum}}`, type: 'color' }
-        },
-        'Default-Light': {
-          Button: { value: `{Colors.Primary.Color-10}`, type: 'color' },
-          Text: { value: `{Text.Containers.Primary.Color-10}`, type: 'color' },
-          Hover: { value: `{Hover.Primary.Color-10}`, type: 'color' },
-          Pressed: { value: `{Pressed.Primary.Color-10}`, type: 'color' }
         },
         Primary: {
           Button: { value: `{Primary-Button.Containers.Background-${backgroundNum}.Button}`, type: 'color' },
@@ -5886,7 +5874,10 @@ export function exportColorSystemToJSON(
   
   // Helper function to get theme from button type
   const getThemeForButtonType = (buttonType: string): string => {
-    if (buttonType === 'Default' || buttonType === 'Default-Light') {
+    /* Default only. Default-Light is gone: "Default" means inherit whatever
+       palette is around, and a lighter version of inherit names nothing — the
+       lightening is a SURFACE, which needs no second button type. */
+    if (buttonType === 'Default') {
       // For Default buttons, determine theme based on button style
       if (buttonStyle === 'black-white') return 'Neutral';
       if (buttonStyle.includes('primary')) return 'Primary';
