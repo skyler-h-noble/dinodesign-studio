@@ -229,6 +229,17 @@ const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => 
  *  is the authority here, and the lib is worth a look. */
 export const APP_BAR_ELEVATION = 2;
 
+/** The width below which inline tabs give way to a menu button.
+ *
+ *  900 — the tablet-landscape floor. Below it a bar has to hold a brand, four
+ *  or five tab labels, a search field and the actions, and the tabs are the
+ *  part that loses: they wrap, or they push the actions off the end. The menu
+ *  button is the same navigation behind one control.
+ *
+ *  A threshold rather than "the narrowest breakpoint", so it still means the
+ *  same thing after someone adds or moves one. */
+export const TABS_MIN_WIDTH = 900;
+
 /**
  * The brand's rectangle, and it is the SAME rectangle in both arrangements.
  *
@@ -603,7 +614,16 @@ function railNode(fullHeight: boolean): NodeDef {
        
        What is left is room for the brand above the items, which is this
        wrapper's own job. */
-    padding: { top: PAD_Y, bottom: PAD_Y },
+    /* No TOP padding when the rail carries the brand. The brand block is
+       App-Bar Height tall so its bottom edge lands on the bar's — but only if
+       it starts at zero. Padding above it pushed the whole rail down by
+       Sizing-2 and the two edges missed each other, which is the misalignment
+       the block exists to prevent.
+       
+       Under a full-width bar there is no brand block and the rail starts below
+       the bar anyway, so the padding is what keeps its first item off the
+       bar's edge. */
+    padding: fullHeight ? { bottom: PAD_Y } : { top: PAD_Y, bottom: PAD_Y },
     presence: { when: 'Adaptive-Nav/Show-Rail' },
     /* The brand belongs to whichever element reaches the top-left corner. A
        full-height rail does, so it carries the brand and the bar beside it
@@ -738,8 +758,15 @@ export function defaultNavMatrix(
            which would have opened the account menu at every breakpoint the
            moment it existed. */
         def && def.trigger !== 'device' ? false
-        : name === 'Adaptive-Nav/Show-Menu-Button' ? bp.id === narrowest
-        : name === 'Adaptive-Nav/Show-Tabs' ? bp.id !== narrowest
+        /* By WIDTH, not by position in the list.
+           
+           This was "the narrowest breakpoint gets the menu button", so sm
+           carried inline tabs at 600px — where four labels and a brand and a
+           search field do not fit — and adding a breakpoint below xs would
+           have moved the whole rule. A threshold holds wherever the user puts
+           their breakpoints. */
+        : name === 'Adaptive-Nav/Show-Menu-Button' ? bp.minWidth < TABS_MIN_WIDTH
+        : name === 'Adaptive-Nav/Show-Tabs' ? bp.minWidth >= TABS_MIN_WIDTH
         : name === 'Adaptive-Nav/Show-Rail' ? bp.id === widest
         : name === 'Adaptive-Nav/Show-Search' ? bp.id !== narrowest
         : name === 'Adaptive-Nav/Show-Actions' ? bp.id !== narrowest

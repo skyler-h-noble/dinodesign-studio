@@ -131,7 +131,7 @@ describe('reading one breakpoint back out', () => {
 });
 
 // ─── The nav's own starting table ────────────────────────────────────────────
-import { defaultNavMatrix, NAV_CONDITIONS } from '../utils/addOns/navDefinition';
+import { defaultNavMatrix, NAV_CONDITIONS, TABS_MIN_WIDTH } from '../utils/addOns/navDefinition';
 
 describe('the default matrix encodes design intent, not blanket true', () => {
   const names = Object.keys(NAV_CONDITIONS);
@@ -147,9 +147,25 @@ describe('the default matrix encodes design intent, not blanket true', () => {
     }
   });
 
-  it('the menu button appears only at the narrowest width', () => {
-    expect(m['Adaptive-Nav/Show-Menu-Button'].xs).toBe(true);
-    for (const id of ['sm', 'md', 'lg', 'xl']) expect([id, m['Adaptive-Nav/Show-Menu-Button'][id]]).toEqual([id, false]);
+  it('the menu button appears below the tab threshold, not just at the narrowest', () => {
+    /* It used to be "the narrowest breakpoint", so sm carried inline tabs at
+       600px — where a brand, four or five labels, a search field and the
+       actions do not fit, and the tabs are the part that loses.
+       
+       A WIDTH threshold also survives someone adding or moving a breakpoint,
+       where "the narrowest" quietly changes meaning. */
+    for (const bp of DEFAULT_BREAKPOINTS) {
+      const wantsMenu = bp.minWidth < TABS_MIN_WIDTH;
+      expect([bp.id, m['Adaptive-Nav/Show-Menu-Button'][bp.id]]).toEqual([bp.id, wantsMenu]);
+      expect([bp.id, m['Adaptive-Nav/Show-Tabs'][bp.id]]).toEqual([bp.id, !wantsMenu]);
+    }
+  });
+
+  it('xs and sm get the menu button; md and up get tabs', () => {
+    // The concrete reading of the same rule, so a threshold change is visible
+    // as a change to these five rather than only to the arithmetic.
+    for (const id of ['xs', 'sm']) expect([id, m['Adaptive-Nav/Show-Menu-Button'][id]]).toEqual([id, true]);
+    for (const id of ['md', 'lg', 'xl']) expect([id, m['Adaptive-Nav/Show-Tabs'][id]]).toEqual([id, true]);
   });
 
   it('scroll conditions start false at every width', () => {
