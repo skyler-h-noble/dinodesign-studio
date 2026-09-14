@@ -22,7 +22,7 @@
  */
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef } from './defineComponent';
 import { accountNode, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
-import { pageSlot } from './navDefinition';
+import { pageSlot, APP_BAR_ELEVATION } from './navDefinition';
 
 export type MobileLayout = 'top-only' | 'top-and-bottom' | 'toolbar' | 'bottom-only';
 
@@ -187,6 +187,8 @@ function topBar(o: MobileOptions): NodeDef {
     theme: o.theme,
     band: true,
     sticky: true,
+    pin: 'top',
+    elevation: APP_BAR_ELEVATION,
     children: centred
       ? [
           { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center',

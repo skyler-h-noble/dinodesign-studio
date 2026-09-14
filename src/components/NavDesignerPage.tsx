@@ -17,7 +17,7 @@ import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
-  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio,
+  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Fab, Subtitle,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -425,6 +425,35 @@ export default function NavDesignerPage() {
       </Button>
     );
 
+    /* The last four slots that were rendering as empty dashed boxes.
+       
+       Every one has a real component in the library, so a placeholder was a
+       claim the preview could not back: it says "something goes here" where
+       the whole point of the preview is that it shows what the nav will
+       actually be. A Search slot in particular is a sized control — it is the
+       widest thing in the bar after the tabs, and a 56px dashed box told you
+       nothing about whether the bar still fits. */
+    const search = <SearchField size={componentSize} placeholder="Search" />;
+
+    /* A FAB is composed beside the bar rather than being a variant of it, so
+       the slot exists in every mobile layout that offers one. */
+    const fab = (
+      <Fab size={componentSize} aria-label="Create">
+        <NavIconGlyph name="Add" />
+      </Fab>
+    );
+
+    /* The page title, in the rail layouts where the bar's middle is a title
+       rather than navigation. Subtitle rather than a heading: it names the
+       current view, and a bar is not a section of the document. */
+    const title = <Subtitle color="standard">Page title</Subtitle>;
+
+    /* The brand, when none is uploaded. A neutral word rather than a dashed
+       box: the slot is the customer's to fill, but the bar's geometry depends
+       on something being in it, and an empty box makes the brand look narrower
+       than any real mark. */
+    const brandPlaceholder = <Subtitle color="quiet">Brand</Subtitle>;
+
     const out: Record<string, React.ReactNode> = {
       Tabs: tabStrip,
       Actions: actionGroup,
@@ -435,6 +464,11 @@ export default function NavDesignerPage() {
       'Rail-Items': rail,
       'Nav-Item-Slot': bottomNav,
       'Menu-Button': menuButton,
+      Search: search,
+      FAB: fab,
+      Title: title,
+      Brand: brandPlaceholder,
+      'Condensed-Brand': brandPlaceholder,
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;

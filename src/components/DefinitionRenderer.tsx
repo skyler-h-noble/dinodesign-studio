@@ -35,15 +35,34 @@ const ALIGN: Record<string, string> = { start: 'flex-start', center: 'center', e
 
 /** hug/fill/fixed map onto flex, not onto widths. A measured pixel here would
  *  pin a component built to adapt. */
-function sizeStyle(node: NodeDef): CSSProperties {
+/** hug/fill/fixed map onto flex, and WHICH flex depends on the parent.
+ *
+ *  This assumed width was always the main axis — `fill` became `flex: 1` and
+ *  height became alignSelf. In a ROW that is right. In a COLUMN it is exactly
+ *  inverted: `flex: 1` grows the main axis, which is vertical there, so a bar
+ *  declared width:'fill' height:'hug' grew to half the screen. A 64px app bar
+ *  rendered 556px tall and split the frame with the page, and nothing about
+ *  the definition was wrong.
+ *
+ *  So the parent's direction comes in, and each axis is classified as main or
+ *  cross before being translated. */
+function sizeStyle(node: NodeDef, parentDirection: 'row' | 'column'): CSSProperties {
   const s: CSSProperties = {};
   const apply = (v: Sizing | undefined, axis: 'width' | 'height') => {
     if (!v) return;
+    const isMain = parentDirection === 'row' ? axis === 'width' : axis === 'height';
     if (v === 'fill') {
-      if (axis === 'width') { s.flex = '1 1 0%'; s.minWidth = 0; }
-      else { s.alignSelf = 'stretch'; }
+      if (isMain) {
+        s.flex = '1 1 0%';
+        if (axis === 'width') s.minWidth = 0; else s.minHeight = 0;
+      } else {
+        s.alignSelf = 'stretch';
+      }
     } else if (v === 'hug') {
-      if (axis === 'width') s.flex = '0 0 auto';
+      /* Explicitly refuse to grow OR shrink on the main axis. A bar that hugs
+         must not be stretched by a tall sibling, and must not be squeezed by
+         one either. */
+      if (isMain) s.flex = '0 0 auto';
     } else {
       s[axis] = tok(v.fixed);
       s.flexShrink = 0;
@@ -114,7 +133,10 @@ function escapes(node: NodeDef): boolean {
   return (node.children || []).some((c) => !!c.overlay || escapes(c));
 }
 
-function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode {
+function renderNode(
+  node: NodeDef, opts: RenderOptions, key?: string,
+  parentDirection: 'row' | 'column' = 'column',
+): ReactNode {
   /* Presence is evaluated, not baked. `visibleWhen` in the Figma spec and this
      check are the same decision on two targets — which is why the definition
      stores the condition rather than a resolved boolean. */
@@ -141,17 +163,35 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
        inside a rounded frame would be clipped away by the very rule that
        tidies its corners. */
     ...(node.radius && !escapes(node) ? { overflow: 'hidden' as const } : {}),
-    ...sizeStyle(node),
-    // Sticky is a node property because only part of a nav sticks — the hero
-    // scrolls away while the strip stays.
-    ...(node.sticky ? { position: 'sticky' as const, top: 0, zIndex: 1 } : {}),
+    ...sizeStyle(node, parentDirection),
+    /* PINNED leaves the flow; `sticky` then says how.
+     
+       fixed  stays put through a scroll — an app bar that is always there
+       absolute  scrolls away with the page
+     
+       Either way the node is out of the flow, so the page has to be inset to
+       clear it — which is what contentInsets computes. A pinned bar left in
+       the flow would take its own space AND be inset for, pushing the content
+       down by twice the bar's height. */
+    ...(node.pin ? {
+      position: (node.sticky ? 'fixed' : 'absolute') as 'fixed' | 'absolute',
+      zIndex: 10,
+      ...(node.pin === 'top' ? { top: 0, left: 0, right: 0 } : {}),
+      ...(node.pin === 'bottom' ? { bottom: 0, left: 0, right: 0 } : {}),
+      ...(node.pin === 'left' ? { top: 0, bottom: 0, left: 0 } : {}),
+      ...(node.pin === 'right' ? { top: 0, bottom: 0, right: 0 } : {}),
+    } : node.sticky ? { position: 'sticky' as const, top: 0, zIndex: 1 } : {}),
+    /* Component-Elevations, by LEVEL. The geometry is the design system's —
+       --Effect-Level-N — so the bar's shadow follows the brand's own shadow
+       controls rather than carrying one this file invented. */
+    ...(node.elevation ? { boxShadow: `var(--Effect-Level-${node.elevation})` } : {}),
     /* Overlay: out of flow, pinned to a corner — or hung under the parent
        entirely, which is what a dropdown does. The parent is given
        position:relative below; without that it would anchor to whatever
        ancestor happens to be positioned, which is usually the page. */
     ...(node.overlay ? overlayStyle(node.overlay) : {}),
     // A parent of any overlay has to establish the containing block.
-    ...((node.children || []).some((c) => c.overlay) ? { position: 'relative' as const } : {}),
+    ...((node.children || []).some((c) => c.overlay || c.pin) ? { position: 'relative' as const } : {}),
     // The surface's own fill. data-surface below is what makes this resolve.
     ...(node.surface || node.theme ? { background: 'var(--Background)', color: 'var(--Text)' } : {}),
   };
@@ -248,7 +288,8 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
     );
   }
 
-  const children = (node.children || []).map((c, i) => renderNode(c, opts, `${node.name}-${i}`));
+  const dir: 'row' | 'column' = node.direction === 'column' ? 'column' : 'row';
+  const children = (node.children || []).map((c, i) => renderNode(c, opts, `${node.name}-${i}`, dir));
 
   /* A band paints edge to edge and caps what is INSIDE it. Capping the band
      itself would leave bare page either side of a floating coloured strip;
@@ -286,5 +327,6 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
 export default function DefinitionRenderer(
   { definition, ...opts }: { definition: ComponentDefinition } & RenderOptions,
 ) {
-  return <>{renderNode(definition.root, opts)}</>;
+  /* The root's own parent is the preview frame, which is a column. */
+  return <>{renderNode(definition.root, opts, undefined, 'column')}</>;
 }

@@ -205,6 +205,16 @@ const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => 
   ...(when ? { presence: { when } } : {}),
 });
 
+/** The level the design system's Component-Elevations gives an app bar.
+ *
+ *  2 — the "AppBar, Toolbars, Menus" group's base. Taken from the collection
+ *  rather than picked: a bar that invents its own shadow stops agreeing with
+ *  every other bar in the system the moment the brand's shadow controls move.
+ *
+ *  Note the LIB's AppBar draws level 1, so the two disagree. The design system
+ *  is the authority here, and the lib is worth a look. */
+export const APP_BAR_ELEVATION = 2;
+
 const GAP: TokenRef = t('Sizing-2');
 const PAD_Y: TokenRef = t('Sizing-2');
 const PAD_X: TokenRef = t('Sizing-3');
@@ -480,7 +490,7 @@ function railNode(fullHeight: boolean): NodeDef {
 function railChildren(o: NavOptions): NodeDef[] {
   // Named apart from the exported stickyBar() to avoid a shadow that would
   // read as a call site and is not one — the rail's bar is always sticky.
-  const railBar = { ...bar(o), sticky: true };
+  const railBar = { ...bar(o), sticky: true, pin: 'top' as const, elevation: APP_BAR_ELEVATION };
   /* Above: the bar spans the whole width and the rail starts beneath it, so
      the bar's brand and actions clear the rail. Beside: the rail runs the full
      height and the bar occupies only the column to its right, which is what
@@ -529,7 +539,7 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
     theme: o.theme,
     children: o.layout === 'rail'
       ? railChildren(o)
-      : [{ ...bar(o), sticky: stickyBar(o) }, pageSlot()],
+      : [{ ...bar(o), sticky: stickyBar(o), pin: 'top' as const, elevation: APP_BAR_ELEVATION }, pageSlot()],
   };
 
   return {

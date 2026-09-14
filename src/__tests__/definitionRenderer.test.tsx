@@ -92,45 +92,47 @@ describe('sticky is a node, not the component', () => {
     expect(out.match(/position:sticky/g) || []).toHaveLength(1);
   });
 
-  it('every layout sticks its bar by default, and only its bar', () => {
-    /* Exactly one sticky node: applied to the root it would pin the whole nav,
-       and in the rail layout it would pin a full-height rail that is already
-       in view. */
-    for (const l of ['brand-left', 'brand-centre', 'rail', 'hero'] as const) {
+  it('pins exactly one node, and only the bar', () => {
+    /* Applied to the root it would pin the whole nav; in the rail layout it
+       would pin a full-height rail that is already in view.
+       
+       An APP BAR is out of the flow — position:fixed, so it stays through a
+       scroll. A HERO's strip is not: it scrolls with the page until it reaches
+       the top and then sticks, which is what position:sticky actually means
+       and the one place it is right. The two used to be the same code and the
+       app bar sat in the flow, taking its own space AND being inset for. */
+    for (const l of ['brand-left', 'brand-centre', 'rail'] as const) {
       const out = html(<DefinitionRenderer definition={navDefinition({ layout: l })} showSlots />);
-      expect([l, (out.match(/position:sticky/g) || []).length]).toEqual([l, 1]);
-    }
-  });
-
-  it('the two plain bars can be told not to stick', () => {
-    /* A marketing page whose nav gives way to the content is a real design.
-       The other two cannot: a rail layout is an application frame, and a frame
-       whose bar scrolls off leaves the rail beside nothing. */
-    for (const l of ['brand-left', 'brand-centre'] as const) {
-      const out = html(<DefinitionRenderer definition={navDefinition({ layout: l, sticky: false })} showSlots />);
+      expect([l, (out.match(/position:fixed/g) || []).length]).toEqual([l, 1]);
       expect([l, out.includes('position:sticky')]).toEqual([l, false]);
     }
-    for (const l of ['rail', 'hero'] as const) {
-      const out = html(<DefinitionRenderer definition={navDefinition({ layout: l, sticky: false })} showSlots />);
-      expect([l, out.includes('position:sticky')]).toEqual([l, true]);
-    }
+    const hero = html(<DefinitionRenderer definition={navDefinition({ layout: 'hero' })} showSlots />);
+    expect((hero.match(/position:sticky/g) || []).length).toBe(1);
   });
-});
 
-describe('what it does not pretend to do', () => {
-  it('renders slots as regions, not as controls', () => {
-    /* A definition has no behaviour, so neither compiler can produce any.
-       Miming a button that does nothing would misrepresent what has been
-       designed. */
-    const out = html(
-      <DefinitionRenderer
-        definition={navDefinition({ layout: 'brand-left', avatar: true })}
-        conditions={{ 'Adaptive-Nav/Show-Avatar': true }}
-        showSlots
-      />,
-    );
-    expect(out).not.toContain('<button');
-    expect(out).toContain('Avatar');
+  it('a bar told not to stick still leaves the flow', () => {
+    /* A marketing page whose nav gives way to the content is a real design —
+       but the bar is still pinned to the top of the page, just absolutely
+       rather than to the viewport. Dropping it back into the flow would be a
+       different LAYOUT, not a different scroll behaviour, and the page would
+       then be inset for a bar that was also taking its own space. */
+    for (const l of ['brand-left', 'brand-centre'] as const) {
+      const out = html(<DefinitionRenderer definition={navDefinition({ layout: l, sticky: false })} showSlots />);
+      expect([l, out.includes('position:absolute')]).toEqual([l, true]);
+      expect([l, out.includes('position:fixed')]).toEqual([l, false]);
+    }
+    /* The other two cannot be told: a rail layout is an application frame, and
+       a frame whose bar scrolls off leaves the rail beside nothing. */
+    const rail = html(<DefinitionRenderer definition={navDefinition({ layout: 'rail', sticky: false })} showSlots />);
+    expect(rail.includes('position:fixed')).toBe(true);
+  });
+
+  it('carries the design system\'s app bar elevation, by level', () => {
+    /* --Effect-Level-2, not a shadow written here: the level comes from
+       Component-Elevations (the "AppBar, Toolbars, Menus" group) so the bar
+       follows the brand's own shadow controls. */
+    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} showSlots />);
+    expect(out).toContain('box-shadow:var(--Effect-Level-2)');
   });
 });
 
@@ -150,12 +152,12 @@ describe('the app bar paints itself', () => {
     expect((out.match(/data-theme="Primary"/g) || []).length).toBeGreaterThan(1);
   });
 
-  it('and the sticky element is one that has a background', () => {
-    // Sticky without a background is transparent over whatever scrolls beneath.
+  it('and the pinned element is one that has a background', () => {
+    // Pinned without a background is transparent over whatever scrolls beneath.
     const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} showSlots />);
-    const sticky = out.slice(0, out.indexOf('position:sticky'));
-    const openTag = sticky.lastIndexOf('<div style="');
-    const tag = out.slice(openTag, out.indexOf('>', out.indexOf('position:sticky')));
+    const before = out.slice(0, out.indexOf('position:fixed'));
+    const openTag = before.lastIndexOf('<div style="');
+    const tag = out.slice(openTag, out.indexOf('>', out.indexOf('position:fixed')));
     expect(tag).toContain('background:var(--Background)');
   });
 });

@@ -101,6 +101,11 @@ declare module '@omni-design/components' {
   export const SliderInput: FC<any>;
   export const RatingInput: FC<any>;
   export const SearchField: FC<any>;
+  /* Body at 700 — the bold weight Body itself does not have. Exported by
+     the package and simply missing here, so using it failed to compile. */
+  export const Subtitle: FC<any>;
+  export const SubtitleLarge: FC<any>;
+  export const SubtitleSmall: FC<any>;
 
   // Chips
   export const Chip: FC<any>;

@@ -55,17 +55,11 @@ export interface ContentInsets {
  *  is the first child when it runs beside the bar and the second when it
  *  hangs below one, and both are still the left edge. */
 function edgeOf(node: NodeDef): Edge | null {
-  switch (node.name) {
-    case 'Bar': return 'top';
-    case 'Bottom-Bar': return 'bottom';
-    case 'Rail': return 'left';
-    case 'Toolbar':
-      /* A vertical toolbar is a rail on the right; a horizontal one is a
-         second bottom bar. The direction is on the node, so this does not
-         have to be told. */
-      return node.direction === 'column' ? 'right' : 'bottom';
-    default: return null;
-  }
+  /* The node says which edge it pins to, so this no longer has to recognise
+     it by name. Names were a guess that happened to be right — and would have
+     stopped being right the first time a layout renamed a bar. */
+  if (node.pin) return node.pin;
+  return null;
 }
 
 /**
@@ -81,11 +75,15 @@ export function contentInsets(def: ComponentDefinition): ContentInsets {
 
   const walk = (node: NodeDef) => {
     const edge = edgeOf(node);
-    /* `sticky` is the definition's word for "leaves the flow when it has to".
-       A rail is not marked sticky and does not need to be: it runs the full
-       height beside the content rather than over it, so the page is already
-       clear of it and an inset would double the gap. */
-    if (edge && node.sticky && !out[edge]) {
+    /* PINNED, not sticky. A pinned bar is out of the flow whether it stays
+       through a scroll or not, so the page needs clearing either way —
+       `sticky` only decides fixed versus absolute.
+       
+       Testing sticky meant a non-sticky app bar got no inset and sat on top
+       of the first thing on the page. A rail is not pinned at all: it runs
+       the full height BESIDE the content, so the page is already clear of it
+       and an inset would double the gap. */
+    if (edge && !out[edge]) {
       out[edge] = `var(${EDGE_TOKEN[edge]}, ${EDGE_FALLBACK[edge]}px)`;
     }
     (node.children || []).forEach(walk);

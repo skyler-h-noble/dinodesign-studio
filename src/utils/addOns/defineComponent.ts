@@ -122,6 +122,22 @@ export interface NodeDef {
    *  flag that means nothing on one target is better than a frame pretending
    *  to mean something. */
   sticky?: boolean;
+  /** Which edge this node pins to, leaving the flow entirely.
+   *
+   *  An application bar is not in the page's flow — it sits over the content
+   *  at an edge, and the content is inset to clear it. `sticky` then decides
+   *  only HOW it is pinned: fixed when it should stay through a scroll,
+   *  absolute when it should scroll away with the page.
+   *
+   *  Separate from `sticky` because they answer different questions, and
+   *  conflating them made a non-sticky bar sit in the flow — which is a
+   *  different layout, not a different scroll behaviour. */
+  pin?: 'top' | 'bottom' | 'left' | 'right';
+  /** Component-Elevations level. A NUMBER because that is what the collection
+   *  holds: one level per component, and the geometry for it lives in the
+   *  design system rather than here. The bar is 2 — the level the
+   *  "AppBar, Toolbars, Menus" group resolves to. */
+  elevation?: number;
   /** Sits OVER its parent rather than in the flow beside its siblings.
    *
    *  Both targets can express it — Figma as layoutPositioning ABSOLUTE with
