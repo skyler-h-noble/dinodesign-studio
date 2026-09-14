@@ -246,6 +246,8 @@ describe('a panel that drops from its trigger', () => {
   const open = {
     'Adaptive-Nav/Show-Avatar': true,
     'Adaptive-Nav/Show-Account-Menu': true,
+    // No account without a session — the menu cannot be open for a visitor.
+    'Adaptive-Nav/Signed-In': true,
   };
 
   it('hangs under the parent rather than inside a corner', () => {
@@ -298,6 +300,7 @@ describe('a column slot lays its content out in a column', () => {
         conditions={{
           'Adaptive-Nav/Show-Avatar': true,
           'Adaptive-Nav/Show-Account-Menu': true,
+          'Adaptive-Nav/Signed-In': true,
         }}
         slots={{ 'Account-Menu': <span>rows</span> }}
       />,

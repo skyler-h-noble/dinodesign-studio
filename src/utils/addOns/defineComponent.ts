@@ -188,11 +188,17 @@ export interface NodeDef {
  *            own, while this one has been ASKED for and stays until dismissed.
  *            Collapsing the two would have a scroll listener drive a menu.
  *
+ *  `session`  who is looking: signed in or not. Set once at sign-in and held
+ *            for the visit, so it is neither ambient like scroll nor a click
+ *            like interaction — and unlike both, a real product has it TRUE
+ *            most of the time. In Figma it is a mode a designer flips to see
+ *            the signed-out state.
+ *
  *  Recording the trigger keeps the React compiler from emitting a breakpoint
  *  for something a breakpoint cannot detect. Only `device` is width-driven, so
  *  that is the test to write — not `!== 'scroll'`, which quietly admits every
  *  trigger added after it. */
-export type ConditionTrigger = 'device' | 'scroll' | 'interaction';
+export type ConditionTrigger = 'device' | 'scroll' | 'interaction' | 'session';
 
 export interface ConditionDef {
   description: string;

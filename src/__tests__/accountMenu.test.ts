@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  accountNode, accountMenuProblems, ACCOUNT_MENU_CONDITION,
+  accountNode, signedInOnly, accountMenuProblems, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION,
   DEFAULT_ACCOUNT_MENU, type AccountMenuItem,
 } from '../utils/addOns/accountMenu';
 import { navDefinition, NAV_CONDITIONS, defaultNavMatrix } from '../utils/addOns/navDefinition';
@@ -209,5 +209,48 @@ describe('rows that would ship broken', () => {
   it('never puts a rule above the first row', () => {
     // A line drawn against nothing.
     expect(DEFAULT_ACCOUNT_MENU[0].dividerBefore).toBeFalsy();
+  });
+});
+
+describe('signed in or not', () => {
+  /* The account is only there for someone who has one. A session state, not
+     a width — set once at sign-in and held for the visit — so it is its own
+     variable, and one a design system can bind anything else to. */
+  it('is a session condition, in both sets', () => {
+    expect(NAV_CONDITIONS[SIGNED_IN_CONDITION].trigger).toBe('session');
+    expect(MOBILE_CONDITIONS[SIGNED_IN_CONDITION].trigger).toBe('session');
+  });
+
+  it('wraps the account rather than gating it — Figma binds one boolean per layer', () => {
+    /* The avatar is gated by two things: the width says whether it fits and
+       the session says whether there is an account. A layer's visibility
+       binds to ONE variable, so the AND is a frame with the session on it
+       around the node with the width on it. */
+    const node = signedInOnly(accountNode({ withMenu: true, when: 'Adaptive-Nav/Show-Avatar' }));
+    expect(node.name).toBe('Signed-In');
+    expect(node.presence).toEqual({ when: SIGNED_IN_CONDITION });
+    expect(node.children![0].presence).toEqual({ when: 'Adaptive-Nav/Show-Avatar' });
+  });
+
+  it('gates the account on the desktop bar and the phone bar alike', () => {
+    const desktop = navDefinition({ layout: 'brand-left', avatar: true });
+    const phone = mobileNavDefinition({ layout: 'top-only', showAvatar: true });
+    for (const def of [desktop, phone]) {
+      expect(conditionsUsedBy(def)).toContain(SIGNED_IN_CONDITION);
+      expect(find(find(def.root, 'Signed-In')!, 'Avatar')).toBeDefined();
+    }
+  });
+
+  it('is not seeded true by any width', () => {
+    // Only a device condition can be true because of a width; the preview
+    // sets this one from its own control.
+    const m = defaultNavMatrix([SIGNED_IN_CONDITION], [{ id: 'xs', minWidth: 0 }, { id: 'lg', minWidth: 1280 }]);
+    expect(m[SIGNED_IN_CONDITION]).toEqual({ xs: false, lg: false });
+  });
+
+  it('is absent when there is no account to gate', () => {
+    const def = navDefinition({ layout: 'brand-left', avatar: false });
+    expect(conditionsUsedBy(def)).not.toContain(SIGNED_IN_CONDITION);
+    expect(find(def.root, 'Signed-In')).toBeUndefined();
   });
 });

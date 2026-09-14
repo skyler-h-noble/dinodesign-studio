@@ -297,6 +297,7 @@ describe('the condensed state is scroll-driven, not width-driven', () => {
     const notWidthDriven = new Set([
       'Adaptive-Nav/Show-Condensed',
       'Adaptive-Nav/Show-Account-Menu',
+      'Adaptive-Nav/Signed-In',
     ]);
     for (const name of Object.keys(NAV_CONDITIONS)) {
       if (notWidthDriven.has(name)) {
@@ -636,6 +637,32 @@ describe('every right-hand slot is per breakpoint', () => {
         expect([n, bp.id, typeof m[`Adaptive-Nav/${n}`][bp.id]]).toEqual([n, bp.id, 'boolean']);
       }
     }
+  });
+});
+
+describe('the brand is a slot like the others', () => {
+  /* It had no switch: the one slot in the bar that could not be turned off
+     at a width, while everything beside it could. It is gated by one
+     condition in every layout — the bar's and the rail's brand block — and
+     the mobile top bar reads the same one, so "no brand at xs" is one
+     decision rather than a desktop one and a phone one. */
+  it('is gated by Show-Brand in every layout', () => {
+    for (const layout of NAV_LAYOUTS.map((l) => l.id)) {
+      if (layout === 'hero') continue; // the hero owns its brand
+      expect(conditionsUsedBy(full(layout)), layout).toContain('Adaptive-Nav/Show-Brand');
+    }
+  });
+
+  it('is on at every breakpoint by default', () => {
+    const bps = [{ id: 'xs', minWidth: 0 }, { id: 'lg', minWidth: 1280 }];
+    const m = defaultNavMatrix(Object.keys(NAV_CONDITIONS), bps);
+    expect(m['Adaptive-Nav/Show-Brand']).toEqual({ xs: true, lg: true });
+  });
+
+  it('the phone bar reads the same variable', async () => {
+    const { mobileNavDefinition } = await import('../utils/addOns/mobileNav');
+    expect(conditionsUsedBy(mobileNavDefinition({ layout: 'top-only' })))
+      .toContain('Adaptive-Nav/Show-Brand');
   });
 });
 

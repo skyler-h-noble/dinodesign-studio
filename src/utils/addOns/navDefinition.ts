@@ -26,7 +26,7 @@
  * than a fake frame that pretends to mean something.
  */
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef, type TokenRef } from './defineComponent';
-import { accountNode, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
+import { accountNode, signedInOnly, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
 
 export type NavLayout = 'brand-left' | 'brand-centre' | 'rail' | 'hero';
 
@@ -105,7 +105,19 @@ export const NAV_LAYOUTS: { id: NavLayout; label: string; description: string }[
  *  Declared in one place so both compilers agree on the set and a breakpoint
  *  cannot be invented by a typo in a `when` — a layer bound to a variable that
  *  does not exist never shows and never errors. */
+/** The brand is a slot like the others, and it can be switched off per
+ *  breakpoint like the others. Shared with the mobile set because the top bar
+ *  there carries the same slot: one variable gates the brand at every width,
+ *  rather than one for the desktop bar and another for the phone's. */
+export const BRAND_CONDITION: Record<string, ConditionDef> = {
+  'Adaptive-Nav/Show-Brand': {
+    description: 'The brand mark. Off where identity lives in the content instead.',
+    trigger: 'device',
+  },
+};
+
 export const NAV_CONDITIONS: Record<string, ConditionDef> = {
+  ...BRAND_CONDITION,
   'Adaptive-Nav/Show-Rail': {
     description: 'The side rail. Off below the width where a rail costs more than it gives.',
     trigger: 'device',
@@ -270,7 +282,7 @@ function brandBlock(inRail: boolean): NodeDef {
     /* Only in the rail. In the bar the rule IS the bar's own bottom edge, and
        a second one inside it would draw the same line twice. */
     ...(inRail ? { borderBottom: t('Border-Variant') } : {}),
-    children: [slot('Brand', 'hug')],
+    children: [slot('Brand', 'hug', 'Adaptive-Nav/Show-Brand')],
   };
 }
 
@@ -294,10 +306,10 @@ function endSlot(o: NavOptions): NodeDef {
      mobile avatar is the same panel and two copies would agree only until the
      first change. */
   if (o.avatar) {
-    children.push(accountNode({
+    children.push(signedInOnly(accountNode({
       withMenu: o.avatarMenu,
       when: 'Adaptive-Nav/Show-Avatar',
-    }));
+    })));
   }
   return {
     name: 'End',
@@ -331,7 +343,7 @@ const menuButton = (): NodeDef =>
   slot('Menu-Button', 'hug', 'Adaptive-Nav/Show-Menu-Button');
 
 function bar(o: NavOptions): NodeDef {
-  const brand = slot('Brand', 'hug');
+  const brand = slot('Brand', 'hug', 'Adaptive-Nav/Show-Brand');
   let children: NodeDef[];
 
   if (o.layout === 'brand-centre') {

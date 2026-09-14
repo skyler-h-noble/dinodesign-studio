@@ -17,7 +17,7 @@ import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
-  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Fab, Subtitle, LabelExtraSmall,
+  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -31,7 +31,7 @@ import {
 } from '../utils/addOns/breakpoints';
 import ScaledPreview from './ScaledPreview';
 import {
-  mobileNavDefinition, MOBILE_LAYOUTS, maxItemsWithFab,
+  mobileNavDefinition, MOBILE_LAYOUTS, maxItemsWithFab, bottomItemCounts, bottomBarItems,
   type MobileLayout, type MobileOptions,
 } from '../utils/addOns/mobileNav';
 import TuneIcon from '@mui/icons-material/Tune';
@@ -43,10 +43,12 @@ import {
   type NavItem, type NavButtonItem,
 } from '../utils/addOns/navContent';
 import {
-  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, type AccountMenuItem,
+  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, type AccountMenuItem,
 } from '../utils/addOns/accountMenu';
 import NavItemEditor from './NavItemEditor';
 import AccountMenuEditor from './AccountMenuEditor';
+import SpeedDialEditor from './SpeedDialEditor';
+import { DEFAULT_SPEED_DIAL, type SpeedDialItem } from '../utils/addOns/speedDial';
 import NavIconGlyph from './NavIconGlyph';
 import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import { contentInsets, contentInsetCSS } from '../utils/addOns/contentInsets';
@@ -93,7 +95,7 @@ export default function NavDesignerPage() {
   const [mobile, setMobile] = useState<MobileOptions>({
     layout: 'top-and-bottom', brandAlign: 'left', showMenu: true,
     topActions: 1, showAvatar: true, itemCount: 4, showLabels: true,
-    /* A toolbar defaults to FLOATING, and that is not decoration.
+    /* The bar defaults to FLOATING, and that is not decoration.
        
        Fixed and across, a toolbar IS a bottom bar — same component, same
        three variant axes, same place on the screen — so picking "top bar and
@@ -101,8 +103,13 @@ export default function NavDesignerPage() {
        the two options looked broken. The difference between them is what goes
        IN the bar (actions rather than navigation), which the preview cannot
        show on its own. Floating makes the pick visibly do something, and it
-       is the arrangement a toolbar of actions usually wants anyway. */
-    toolbarStyle: 'floating',
+       is the arrangement a toolbar of actions usually wants anyway.
+       
+       One style for both bars, because both are the Nav-Bar component. When
+       this was "toolbarStyle" the preview still applied it to the bottom bar,
+       so a top-and-bottom nav rendered a floating pill inside a frame that
+       the definition had painted as a fixed band. */
+    barStyle: 'floating',
   });
   const setMobileOpt = <K extends keyof MobileOptions>(k: K, v: MobileOptions[K]) =>
     setMobile((m) => ({ ...m, [k]: v }));
@@ -143,7 +150,16 @@ export default function NavDesignerPage() {
   const [componentSize, setComponentSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [accountItems, setAccountItems] = useState<AccountMenuItem[]>(DEFAULT_ACCOUNT_MENU);
   const [accountEditorOpen, setAccountEditorOpen] = useState(false);
+  /* The speed dial's actions, kept the way the account menu's rows are: a
+     list edited as a list, local to the page, filling what the component
+     opens. */
+  const [dialItems, setDialItems] = useState<SpeedDialItem[]>(DEFAULT_SPEED_DIAL);
+  const [dialEditorOpen, setDialEditorOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /* Signed in, by default. A session state rather than a width, so it is
+     one value for the whole nav — and true is the state a product is in
+     most of the time, so it is the one to design in. */
+  const [signedIn, setSignedIn] = useState(true);
 
   const editingItem = editing
     ? (editing.kind === 'tab' ? tabs : actions).find((i) => i.id === editing.id) ?? null
@@ -423,7 +439,7 @@ export default function NavDesignerPage() {
     const avatar = avatarOpensMenu ? (
       <Button
         avatar
-        variant="default-ghost"
+        variant="ghost"
         size="small"
         aria-label="Your account"
         aria-expanded={menuOpen}
@@ -544,10 +560,18 @@ export default function NavDesignerPage() {
        
        Rail also takes a fabAction, which is the same composition argument the
        definition makes: a FAB beside a rail is a prop, not a variant. */
-    const railItems = tabs.map((t) => ({
+    const toNavItem = (t: NavItem) => ({
       icon: <NavIconGlyph name={t.startIconName || t.endIconName || 'Home'} />,
       label: t.text ? t.label : undefined,
-    }));
+    });
+    const railItems = tabs.map(toNavItem);
+    /* The bottom bar shows the COUNT asked for, not every tab. It mapped the
+       tabs straight through, so the count buttons changed nothing — always
+       four, because there are four tabs. */
+    const barItems = bottomBarItems(
+      tabs, mobile.itemCount ?? 4,
+      (n) => ({ id: `stand-in-${n}`, label: `Item ${n}`, text: true }),
+    ).map(toNavItem);
 
     const rail = (
       <Rail
@@ -558,13 +582,32 @@ export default function NavDesignerPage() {
       />
     );
 
+    /* The FAB goes INTO the component. It is an outlined ring among the
+       items — at the end, or centred with the items split either side —
+       which the lib's BottomNavigation renders from fabAction, the way Rail
+       does. It was a solid Fab in a slot beside the bar, which is a different
+       pattern from the design's and put a second filled circle next to the
+       selected item's. */
     const bottomNav = (
       <BottomNavigation
-        items={railItems}
+        items={barItems}
         defaultValue={0}
         showLabels={mobile.showLabels !== false}
-        variant={mobile.toolbarStyle === 'floating' ? 'floating' : 'fixed'}
+        variant={mobile.barStyle === 'floating' ? 'floating' : 'fixed'}
         orientation={mobile.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal'}
+        fabAction={mobile.fab ? {
+          icon: <NavIconGlyph name="Add" />,
+          label: 'Create',
+          /* With actions the ring is a speed dial: the component opens the
+             panel above the bar and lays the rows out in the ring's column.
+             The rows are this page's list, the way the account menu's are. */
+          ...(mobile.fabSpeedDial ? {
+            actions: dialItems.map((d) => ({
+              key: d.id, label: d.label, icon: <NavIconGlyph name={d.iconName || 'Add'} />,
+            })),
+          } : {}),
+        } : undefined}
+        fabPosition={mobile.fabPosition ?? 'center'}
         fixed={false}
       />
     );
@@ -574,7 +617,7 @@ export default function NavDesignerPage() {
        you the slot exists; the real control tells you whether it sits right
        beside the brand at this width, which is the thing being designed. */
     const menuButton = (
-      <Button iconOnly variant="default-ghost" size={componentSize} aria-label="Open navigation">
+      <Button iconOnly variant="ghost" size={componentSize} aria-label="Open navigation">
         <NavIconGlyph name="Menu" />
       </Button>
     );
@@ -588,14 +631,6 @@ export default function NavDesignerPage() {
        widest thing in the bar after the tabs, and a 56px dashed box told you
        nothing about whether the bar still fits. */
     const search = <SearchField size={componentSize} placeholder="Search" />;
-
-    /* A FAB is composed beside the bar rather than being a variant of it, so
-       the slot exists in every mobile layout that offers one. */
-    const fab = (
-      <Fab size={componentSize} aria-label="Create">
-        <NavIconGlyph name="Add" />
-      </Fab>
-    );
 
     /* The page title, in the rail layouts where the bar's middle is a title
        rather than navigation. Subtitle rather than a heading: it names the
@@ -633,14 +668,13 @@ export default function NavDesignerPage() {
           [`Nav-Label-${i + 1}`, <LabelExtraSmall key={`nl${i}`}>{t.label}</LabelExtraSmall>],
         ]),
       ),
-      FAB: fab,
       Title: title,
       Brand: brandPlaceholder,
       'Condensed-Brand': brandPlaceholder,
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
-  }, [brand, tabs, actions, mobile.showLabels, mobile.toolbarStyle, mobile.toolbarOrientation,
+  }, [brand, tabs, actions, mobile.showLabels, mobile.barStyle, mobile.toolbarOrientation, mobile.fab, mobile.fabPosition, mobile.fabSpeedDial, dialItems, mobile.itemCount,
       avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap,
       options.railExpandable]);
   const [scale, setScale] = useState(1);
@@ -678,10 +712,10 @@ export default function NavDesignerPage() {
      system needs the variable — but no width makes it true, so its value in
      the preview comes from the click that opened it. Left to the matrix the
      panel would be shut at every breakpoint with no way to look at it. */
-  const menuShown = menuOpen && avatarOpensMenu && avatarPresent;
+  const menuShown = menuOpen && avatarOpensMenu && avatarPresent && signedIn;
   const active = useMemo<Record<string, boolean>>(
-    () => ({ ...matrixActive, [ACCOUNT_MENU_CONDITION]: menuShown }),
-    [matrixActive, menuShown],
+    () => ({ ...matrixActive, [ACCOUNT_MENU_CONDITION]: menuShown, [SIGNED_IN_CONDITION]: signedIn }),
+    [matrixActive, menuShown, signedIn],
   );
 
   /* The spec, WITH the responsive table. Derived after the matrix because it
@@ -812,7 +846,7 @@ export default function NavDesignerPage() {
                 reader announces the control twice. */}
             <Button
               iconOnly
-              variant="default-ghost"
+              variant="ghost"
               aria-label="Breakpoint settings"
               onClick={() => setSettingsOpen(true)}
             >
@@ -1124,21 +1158,27 @@ export default function NavDesignerPage() {
                   </>
                 )}
 
-                {mobile.layout === 'toolbar' && (
+                {/* Style is offered wherever there is a bar at the bottom,
+                    not only for the toolbar: the bottom bar is the same
+                    Nav-Bar component and floats the same way. Orientation
+                    stays the toolbar's alone — a navigation bar runs along
+                    the bottom edge, and "down" would make it a rail. */}
+                {mobile.layout !== 'top-only' && (
                   <>
                     <Divider />
-                    <Label>Toolbar</Label>
+                    <Label>{mobile.layout === 'toolbar' ? 'Toolbar' : 'Bottom bar'}</Label>
                     <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
                       {([['fixed', 'Fixed'], ['floating', 'Floating']] as const).map(([id, l]) => (
                         <Button key={id} size="small"
-                          variant={(mobile.toolbarStyle ?? 'fixed') === id ? 'default' : 'default-outline'}
-                          onClick={() => setMobileOpt('toolbarStyle', id)}>{l}</Button>
+                          variant={(mobile.barStyle ?? 'fixed') === id ? 'default' : 'default-outline'}
+                          onClick={() => setMobileOpt('barStyle', id)}>{l}</Button>
                       ))}
-                      {([['horizontal', 'Across'], ['vertical', 'Down']] as const).map(([id, l]) => (
-                        <Button key={id} size="small"
-                          variant={(mobile.toolbarOrientation ?? 'horizontal') === id ? 'default' : 'default-outline'}
-                          onClick={() => setMobileOpt('toolbarOrientation', id)}>{l}</Button>
-                      ))}
+                      {mobile.layout === 'toolbar' &&
+                        ([['horizontal', 'Across'], ['vertical', 'Down']] as const).map(([id, l]) => (
+                          <Button key={id} size="small"
+                            variant={(mobile.toolbarOrientation ?? 'horizontal') === id ? 'default' : 'default-outline'}
+                            onClick={() => setMobileOpt('toolbarOrientation', id)}>{l}</Button>
+                        ))}
                     </HStack>
                   </>
                 )}
@@ -1148,7 +1188,7 @@ export default function NavDesignerPage() {
                     <Divider />
                     <Label>{mobile.layout === 'toolbar' ? 'Toolbar items' : 'Navigation items'}</Label>
                     <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                      {Array.from({ length: maxItemsWithFab(!!mobile.fab) }, (_, i) => i + 1).map((n) => (
+                      {bottomItemCounts(!!mobile.fab).map((n) => (
                         <Button
                           key={n}
                           size="small"
@@ -1160,10 +1200,10 @@ export default function NavDesignerPage() {
                       ))}
                     </HStack>
                     <Caption color="quiet">
-                      Five is a reach limit rather than a taste one: below about 64px a
-                      target stops being reliably hittable with a thumb, and five items
-                      is where a 360px phone reaches that. A FAB takes one of the five,
-                      because it sits in the same row.
+                      Two to five. Five is a reach limit rather than a taste one: below
+                      about 64px a target stops being reliably hittable with a thumb, and
+                      five items is where a 360px phone reaches that. A FAB takes one of
+                      the five, because it sits in the same row. One is not navigation.
                     </Caption>
 
                     <SwitchInput
@@ -1197,10 +1237,34 @@ export default function NavDesignerPage() {
                           ))}
                         </HStack>
                         <Caption color="quiet">
-                          Centred splits the items into the two slots the NavBar already
-                          has — which is why a centred FAB needs no variant of its own.
-                          At the end it is a sibling and the bar is unchanged.
+                          An outlined ring in the bar, drawn by the Nav-Bar component
+                          in an item's place — so it takes one of the five, and the
+                          definition carries nothing for it.
                         </Caption>
+                        <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                          <SwitchInput
+                            checked={!!mobile.fabSpeedDial}
+                            onChange={(e: { target: { checked: boolean } }) =>
+                              setMobileOpt('fabSpeedDial', e.target.checked)}
+                            label="Opens a speed dial"
+                          />
+                          {mobile.fabSpeedDial && (
+                            <Button
+                              variant="default-outline"
+                              size="small"
+                              onClick={() => setDialEditorOpen(true)}
+                            >
+                              Edit actions
+                            </Button>
+                          )}
+                        </HStack>
+                        {mobile.fabSpeedDial && (
+                          <Caption color="quiet">
+                            Press the ring in the preview to open it. The actions climb from
+                            the ring, first one nearest; open or closed is published as its
+                            own variable, the way the account menu's is.
+                          </Caption>
+                        )}
                       </>
                     )}
                   </>
@@ -1284,7 +1348,7 @@ export default function NavDesignerPage() {
                 </Button>
                 {brand && (
                   <Button
-                    variant="default-ghost"
+                    variant="ghost"
                     onClick={() => { releaseBrandAsset(brand); setBrand(null); setBrandError(null); }}
                   >
                     Remove
@@ -1348,6 +1412,21 @@ export default function NavDesignerPage() {
                 {' · '}App-Bar Height {componentSize === 'small' ? 56 : componentSize === 'large' ? 72 : 64}px
                 {' · '}Nav-Bar Height {componentSize === 'small' ? 73 : componentSize === 'large' ? 93 : 83}px
               </Caption>
+
+              <Divider />
+              <Label>Signed in</Label>
+              <HStack gap="var(--Sizing-2)">
+                {([[true, 'On'], [false, 'Off']] as const).map(([v, l]) => (
+                  <Button key={l} size="small"
+                    variant={signedIn === v ? 'default' : 'default-outline'}
+                    onClick={() => setSignedIn(v)}>{l}</Button>
+                ))}
+              </HStack>
+              <Caption color="quiet">
+                A session state, not a width: one value for the whole nav, published
+                as its own variable so a design can differ for a visitor. Here it
+                gates the account — off shows the bar with no avatar.
+              </Caption>
             </VStack>
           </Card>
 
@@ -1368,18 +1447,29 @@ export default function NavDesignerPage() {
                   component, which is derivable rather than a second control. */}
               <Label>At {current?.label}</Label>
               <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
-                {([['search', 'Search'], ['actions', 'Actions'], ['avatar', 'Avatar']] as const).map(
+                {/* Brand has no structural option — the slot is always in
+                    the component — so its switch is the condition alone.
+                    
+                    A switch is live only where this arrangement READS its
+                    condition. "Bottom bar only" has no top bar, so none of
+                    these slots exist there, and a switch that flips a
+                    variable nothing is bound to looks like it does nothing
+                    — because it does nothing. Disabled rather than hidden, so
+                    the set stays in one place across breakpoints. */}
+                {([[null, 'Brand'], ['search', 'Search'], ['actions', 'Actions'], ['avatar', 'Avatar']] as const).map(
                   ([key, label]) => {
                     const cond = `Adaptive-Nav/Show-${label}`;
+                    const applies = usedConditions.includes(cond);
                     return (
                       <SwitchInput
-                        key={key}
-                        checked={!!options[key] && !!active[cond]}
+                        key={label}
+                        checked={applies && (key === null || !!options[key]) && !!active[cond]}
+                        disabled={!applies}
                         onChange={(e: { target: { checked: boolean } }) => {
                           const on = e.target.checked;
                           // Turning one on has to do both jobs: put the slot in
                           // the component and switch it on at this width.
-                          if (on && !options[key]) set(key, true);
+                          if (on && key !== null && !options[key]) set(key, true);
                           setCondition(cond, on);
                         }}
                         label={label}
@@ -1398,8 +1488,11 @@ export default function NavDesignerPage() {
                     at a width where the seed had it off gave you a rail
                     layout with no rail and nothing to turn it back on. */}
                 {otherConditions
-                  .filter((n) => !['Adaptive-Nav/Show-Search', 'Adaptive-Nav/Show-Actions',
-                                   'Adaptive-Nav/Show-Avatar'].includes(n))
+                  .filter((n) => !['Adaptive-Nav/Show-Brand', 'Adaptive-Nav/Show-Search',
+                                   'Adaptive-Nav/Show-Actions', 'Adaptive-Nav/Show-Avatar',
+                                   /* Its own control, under the sizes: one value, not
+                                      one per width. */
+                                   SIGNED_IN_CONDITION].includes(n))
                   .map((name) => (
                     <SwitchInput
                       key={name}
@@ -1410,6 +1503,11 @@ export default function NavDesignerPage() {
                     />
                   ))}
               </HStack>
+              {onMobile && !usedConditions.includes('Adaptive-Nav/Show-Brand') && (
+                <Caption color="quiet">
+                  This arrangement has no top bar, so there is nothing here to show or hide.
+                </Caption>
+              )}
 
               {/* Only once the avatar is there. A menu behind a slot that does
                   not exist at this width is a setting with nothing to apply
@@ -1640,6 +1738,13 @@ export default function NavDesignerPage() {
         items={accountItems}
         onChange={setAccountItems}
         onClose={() => setAccountEditorOpen(false)}
+      />
+
+      <SpeedDialEditor
+        open={dialEditorOpen}
+        items={dialItems}
+        onChange={setDialItems}
+        onClose={() => setDialEditorOpen(false)}
       />
 
       <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} size="medium">

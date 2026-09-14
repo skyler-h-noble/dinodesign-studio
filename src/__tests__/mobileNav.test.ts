@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  mobileNavDefinition, MOBILE_LAYOUTS, MAX_BOTTOM_ITEMS, maxItemsWithFab,
+  mobileNavDefinition, MOBILE_LAYOUTS, MAX_BOTTOM_ITEMS, maxItemsWithFab, bottomItemCounts, bottomBarItems,
   type MobileLayout,
 } from '../utils/addOns/mobileNav';
 import { toAddonSpec, conditionsUsedBy, conditionsToPublish, tokensUsed } from '../utils/addOns/toAddonSpec';
@@ -83,7 +83,28 @@ describe('the bar is ONE slot, filled by the Nav-Bar component', () => {
   });
 });
 
-describe('five items is a reach limit', () => {
+describe('two to five items', () => {
+  it('one is not navigation', () => {
+    /* There is nowhere to go from one item, and a bar holding it is a button
+       that has taken the whole edge. The picker starts at two, and a count
+       below it is lifted to two rather than shown. */
+    expect(bottomItemCounts(false)).toEqual([2, 3, 4, 5]);
+    expect(bottomItemCounts(true)).toEqual([2, 3, 4]);
+    const item = (n: number) => ({ label: `Item ${n}` });
+    expect(bottomBarItems([item(1), item(2), item(3)], 1, item).map((i) => i.label))
+      .toEqual(['Item 1', 'Item 2']);
+  });
+
+  it('the count is what the bar shows — padded with stand-ins past the tabs', () => {
+    /* Four tabs and a count of five showed four: the tabs were mapped
+       straight through and the count changed nothing. */
+    const item = (n: number) => ({ label: `Tab ${n}` });
+    const tabs = [item(1), item(2), item(3), item(4)];
+    expect(bottomBarItems(tabs, 5, (n) => ({ label: `Item ${n}` })).map((i) => i.label))
+      .toEqual(['Tab 1', 'Tab 2', 'Tab 3', 'Tab 4', 'Item 5']);
+    expect(bottomBarItems(tabs, 3, item).map((i) => i.label)).toEqual(['Tab 1', 'Tab 2', 'Tab 3']);
+  });
+
   it('a FAB takes one of the five, because it is in the same row', () => {
     /* The ceiling is still the add-on's to state — it is a reach fact, not a
        component preference — and it still bounds what the preview offers.
@@ -94,48 +115,82 @@ describe('five items is a reach limit', () => {
   });
 });
 
-describe('the FAB is composed, never a variant', () => {
-  it('centred, it splits the items into the two slots the design already has', () => {
-    /* Which is why a centred FAB needs no variant of its own: the NavBar is
-       built with two item slots, and a centre gap is what they are for. */
-    const spec: any = toAddonSpec(mobileNavDefinition({
-      layout: 'bottom-only', itemCount: 4, fab: true, fabPosition: 'center',
-    }));
-    const bar = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
-    expect(bar.children.map((c: any) => c.name))
-      .toEqual(['Nav-Item-Slot-Start', 'FAB', 'Nav-Item-Slot-End']);
-  });
+describe('the FAB is the component\'s, not the definition\'s', () => {
+  /* It sits IN the bar in an item's place — an outlined ring, at the end or
+     centred — and the Nav-Bar component draws it. So the frame carries no
+     slot for it, and a centred one no longer splits the items into two
+     slots with a FAB slot between: whatever fills the one slot places the
+     ring. The option survives because it drives the preview and the reach
+     ceiling. */
+  for (const fabPosition of ['center', 'end'] as const) {
+    it(`${fabPosition}: the bar is one slot, with nothing beside it`, () => {
+      const spec: any = toAddonSpec(mobileNavDefinition({
+        layout: 'bottom-only', itemCount: 4, fab: true, fabPosition,
+      }));
+      const bar = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
+      expect(bar.children.map((c: any) => c.name)).toEqual(['Nav-Item-Slot']);
+      expect(names(spec)).not.toContain('FAB');
+    });
+  }
 
-  it('at the end, it is a sibling and the bar is unchanged', () => {
-    // The bar's geometry is identical with or without it — enumerating that as
-    // a variant would multiply the set for something that does not alter it.
-    const spec: any = toAddonSpec(mobileNavDefinition({
-      layout: 'bottom-only', itemCount: 4, fab: true, fabPosition: 'end',
-    }));
-    const endBar = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
-    expect(endBar.children.map((c: any) => c.name)).toEqual(['Nav-Item-Slot', 'FAB']);
-  });
-
-  it('absent when not asked for', () => {
-    const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only' }));
+  it('the toolbar carries none either', () => {
+    const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'toolbar', fab: true }));
     expect(names(spec)).not.toContain('FAB');
+  });
+
+  it('still takes one of the five places', () => {
+    expect(maxItemsWithFab(true)).toBe(MAX_BOTTOM_ITEMS - 1);
   });
 });
 
 describe('the toolbar', () => {
-  it('floats or is fixed, and the difference is a corner', () => {
-    const floating: any = toAddonSpec(mobileNavDefinition({ layout: 'toolbar', toolbarStyle: 'floating' }));
-    const fixed: any = toAddonSpec(mobileNavDefinition({ layout: 'toolbar', toolbarStyle: 'fixed' }));
-    const tb = (s: any) => s.root.children.find((c: any) => c.name === 'Toolbar');
-    expect(tb(floating).cornerRadius).toEqual({ var: 'Sizing-6' });
-    expect(tb(fixed).cornerRadius).toBeUndefined();
-  });
-
   it('runs across or down', () => {
     const v: any = toAddonSpec(mobileNavDefinition({ layout: 'toolbar', toolbarOrientation: 'vertical' }));
     const tb = v.root.children.find((c: any) => c.name === 'Toolbar');
     expect(tb.layoutMode).toBe('VERTICAL');
     expect(tb.layoutSizingHorizontal).toBe('HUG');
+  });
+});
+
+describe('fixed or floating — the frame does one thing or the other', () => {
+  /* The Nav-Bar component paints ITSELF in both styles: its own fill, and as
+     a floating pill its own corners. So the frame around it never paints a
+     floating bar — doing so put a full-width band behind the pill, a bar
+     inside a bar in two tones of the same surface. The frame's only job when
+     floating is the inset off the screen edge.
+
+     Fixed is the reverse. The bar is the edge, so the frame carries the
+     surface, the band and the elevation — and NO inset, which showed as a
+     stripe of frame around a component meant to reach the corners. */
+  const frameOf = (name: string, o: object): any =>
+    (toAddonSpec(mobileNavDefinition(o as any)) as any).root.children
+      .find((c: any) => c.name === name);
+
+  for (const [layout, name] of [['bottom-only', 'Bottom-Bar'], ['toolbar', 'Toolbar']] as const) {
+    it(`${name}: floating is an unpainted inset`, () => {
+      const f = frameOf(name, { layout, barStyle: 'floating', theme: 'Primary', surface: 'Surface-Dim' });
+      expect(f.fills).toBeUndefined();
+      expect(f.cornerRadius).toBeUndefined();
+      /* The page's margin, not a spacing step: the pill's outer edge lines
+         up with the page's contents, the way the desktop bar's do. */
+      expect(f.paddingLeft).toEqual({ var: 'Margin' });
+      expect(f.paddingTop).toEqual({ var: 'Sizing-2' });
+    });
+
+    it(`${name}: fixed is painted, edge to edge`, () => {
+      const f = frameOf(name, { layout, barStyle: 'fixed', theme: 'Primary', surface: 'Surface-Dim' });
+      expect(f.fills).toEqual([{ type: 'SOLID', color: { var: 'Surface-Dim/Background' } }]);
+      expect(f.paddingLeft).toBeUndefined();
+      expect(f.paddingTop).toBeUndefined();
+    });
+  }
+
+  it('the style is one axis for both bars, not a toolbar-only one', () => {
+    /* When it was toolbarStyle the preview read it for the bottom bar too,
+       so the preview floated a pill inside a frame the definition had
+       painted as a fixed band. One field, read by both. */
+    const bottom = frameOf('Bottom-Bar', { layout: 'top-and-bottom', barStyle: 'floating' });
+    expect(bottom.fills).toBeUndefined();
   });
 });
 

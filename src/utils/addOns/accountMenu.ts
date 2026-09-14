@@ -27,7 +27,18 @@ import { t, type ConditionDef, type NodeDef } from './defineComponent';
  *  one, which is not a thing anybody wants to express. */
 export const ACCOUNT_MENU_CONDITION = 'Adaptive-Nav/Show-Account-Menu';
 
+/** Signed in or not. The account is only there for someone who has one, and
+ *  a nav genuinely differs between the two — so it is a variable of its own,
+ *  published with the rest, that a design system can bind anything else to.
+ *  Here it gates the account. */
+export const SIGNED_IN_CONDITION = 'Adaptive-Nav/Signed-In';
+
 export const ACCOUNT_MENU_CONDITIONS: Record<string, ConditionDef> = {
+  [SIGNED_IN_CONDITION]: {
+    description:
+      'Someone is signed in. Off shows the nav as a visitor sees it, with no account.',
+    trigger: 'session',
+  },
   [ACCOUNT_MENU_CONDITION]: {
     description:
       'The account menu, open. Driven by a click on the avatar, not by viewport width.',
@@ -119,6 +130,29 @@ export function accountNode(opts: { withMenu?: boolean; when?: string }): NodeDe
     height: 'hug',
     ...gate,
     children: [avatar, accountPanel()],
+  };
+}
+
+/** The account, for a signed-in user only.
+ *
+ *  A WRAPPER, and it is there because Figma needs it: a layer's visibility
+ *  binds to one boolean, and the account is gated by two — the width says
+ *  whether the avatar fits, the session says whether there is an account at
+ *  all. Two conditions on one layer is not a thing a plugin can write, so the
+ *  AND is a frame with the session on it around a node with the width on it.
+ *
+ *  Named for what it gates rather than for what it holds, so the layer list
+ *  reads as the decision: Signed-In › Account › Avatar. */
+export function signedInOnly(node: NodeDef): NodeDef {
+  return {
+    name: 'Signed-In',
+    kind: 'stack',
+    direction: 'row',
+    align: 'center',
+    width: 'hug',
+    height: 'hug',
+    presence: { when: SIGNED_IN_CONDITION },
+    children: [node],
   };
 }
 
