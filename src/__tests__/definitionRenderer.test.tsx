@@ -92,20 +92,28 @@ describe('sticky is a node, not the component', () => {
     expect(out.match(/position:sticky/g) || []).toHaveLength(1);
   });
 
-  it('pins exactly one node, and only the bar', () => {
-    /* Applied to the root it would pin the whole nav; in the rail layout it
-       would pin a full-height rail that is already in view.
+  it('pins the bar only where it spans the whole width', () => {
+    /* Pinning means left:0 right:0, so a pinned bar spans everything under it
+       — including a rail. That is the arrangement "beside the rail" exists to
+       avoid, so there the bar sticks within its own column instead and the
+       rail is never underneath it.
        
-       An APP BAR is out of the flow — position:fixed, so it stays through a
-       scroll. A HERO's strip is not: it scrolls with the page until it reaches
-       the top and then sticks, which is what position:sticky actually means
-       and the one place it is right. The two used to be the same code and the
-       app bar sat in the flow, taking its own space AND being inset for. */
-    for (const l of ['brand-left', 'brand-centre', 'rail'] as const) {
+       An APP BAR is out of the flow. A HERO's strip is not: it scrolls with
+       the page until it reaches the top and then sticks, which is what
+       position:sticky actually means and the one place it is right. */
+    for (const l of ['brand-left', 'brand-centre'] as const) {
       const out = html(<DefinitionRenderer definition={navDefinition({ layout: l })} showSlots />);
       expect([l, (out.match(/position:fixed/g) || []).length]).toEqual([l, 1]);
-      expect([l, out.includes('position:sticky')]).toEqual([l, false]);
     }
+    const above = html(<DefinitionRenderer
+      definition={navDefinition({ layout: 'rail', barPosition: 'above-rail' })} showSlots />);
+    expect((above.match(/position:fixed/g) || []).length).toBe(1);
+
+    const beside = html(<DefinitionRenderer
+      definition={navDefinition({ layout: 'rail', barPosition: 'beside-rail' })} showSlots />);
+    expect(beside.includes('position:fixed')).toBe(false);
+    expect((beside.match(/position:sticky/g) || []).length).toBe(1);
+
     const hero = html(<DefinitionRenderer definition={navDefinition({ layout: 'hero' })} showSlots />);
     expect((hero.match(/position:sticky/g) || []).length).toBe(1);
   });
@@ -114,17 +122,17 @@ describe('sticky is a node, not the component', () => {
     /* A marketing page whose nav gives way to the content is a real design —
        but the bar is still pinned to the top of the page, just absolutely
        rather than to the viewport. Dropping it back into the flow would be a
-       different LAYOUT, not a different scroll behaviour, and the page would
-       then be inset for a bar that was also taking its own space. */
+       different LAYOUT, and the page would then be inset for a bar that was
+       also taking its own space. */
     for (const l of ['brand-left', 'brand-centre'] as const) {
       const out = html(<DefinitionRenderer definition={navDefinition({ layout: l, sticky: false })} showSlots />);
       expect([l, out.includes('position:absolute')]).toEqual([l, true]);
       expect([l, out.includes('position:fixed')]).toEqual([l, false]);
     }
-    /* The other two cannot be told: a rail layout is an application frame, and
-       a frame whose bar scrolls off leaves the rail beside nothing. */
+    /* The rail layout cannot be told: it is an application frame, and a frame
+       whose bar scrolls off leaves the rail beside nothing. */
     const rail = html(<DefinitionRenderer definition={navDefinition({ layout: 'rail', sticky: false })} showSlots />);
-    expect(rail.includes('position:fixed')).toBe(true);
+    expect(rail.includes('position:sticky')).toBe(true);
   });
 
   it('carries the design system\'s app bar elevation, by level', () => {

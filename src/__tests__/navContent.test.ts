@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { itemProblems, itemRendersNothing, buttonVariant, DEFAULT_TABS, type NavItem } from '../utils/addOns/navContent';
+import {
+  itemProblems, itemRendersNothing, buttonVariant, DEFAULT_TABS,
+  decoratorAt, setDecorator, type NavItem,
+} from '../utils/addOns/navContent';
 import { resolveIcon } from '../components/NavIconGlyph';
 
 /* These are the failures that SHIP rather than fail: every one renders
@@ -97,5 +100,54 @@ describe('an item that would render nothing is refused', () => {
 
   it('text alone is enough', () => {
     expect(itemRendersNothing(item())).toBe(false);
+  });
+});
+
+/* --- One decorator per end --- */
+describe('a decorator is one choice, not two switches', () => {
+  /* startIcon and startAvatar are separate booleans because those are Figma's
+     variant property names and the converter has to line up with them. They
+     are NOT independent: one end holds one decorator, and with both set the
+     renderer takes the avatar and drops the icon — so the old pair of switches
+     could express a state the component cannot render, and the icon switch
+     stayed on with nothing appearing. */
+  it('reads back what the renderer would actually draw', () => {
+    const both = { id: 'a', label: 'X', startIcon: true, startAvatar: true };
+    expect(decoratorAt(both, 'start')).toBe('avatar');
+  });
+
+  it('turning one on turns the other off', () => {
+    let item: NavItem = { id: 'a', label: 'X' };
+    item = setDecorator(item, 'start', 'icon');
+    expect([item.startIcon, item.startAvatar]).toEqual([true, false]);
+    item = setDecorator(item, 'start', 'avatar');
+    expect([item.startIcon, item.startAvatar]).toEqual([false, true]);
+  });
+
+  it('off clears both', () => {
+    const item = setDecorator(
+      { id: 'a', label: 'X', startIcon: true, startAvatar: true }, 'start', 'none',
+    );
+    expect([item.startIcon, item.startAvatar]).toEqual([false, false]);
+    expect(decoratorAt(item, 'start')).toBe('none');
+  });
+
+  it('seeds an icon name, so the field is never empty on arrival', () => {
+    // An empty name renders the not-found marker straight away, which reads
+    // as an error the user just caused rather than a field not yet filled in.
+    expect(setDecorator({ id: 'a', label: 'X' }, 'start', 'icon').startIconName).toBe('Menu');
+  });
+
+  it('keeps a name the user already typed', () => {
+    const item = setDecorator({ id: 'a', label: 'X', startIconName: 'Search' }, 'start', 'icon');
+    expect(item.startIconName).toBe('Search');
+  });
+
+  it('the two ends are independent of each other', () => {
+    let item: NavItem = { id: 'a', label: 'X' };
+    item = setDecorator(item, 'start', 'avatar');
+    item = setDecorator(item, 'end', 'icon');
+    expect(decoratorAt(item, 'start')).toBe('avatar');
+    expect(decoratorAt(item, 'end')).toBe('icon');
   });
 });

@@ -490,7 +490,22 @@ function railNode(fullHeight: boolean): NodeDef {
 function railChildren(o: NavOptions): NodeDef[] {
   // Named apart from the exported stickyBar() to avoid a shadow that would
   // read as a call site and is not one — the rail's bar is always sticky.
-  const railBar = { ...bar(o), sticky: true, pin: 'top' as const, elevation: APP_BAR_ELEVATION };
+  /* PINNED only when the bar spans the whole width.
+   *
+   * Above the rail it does, so it pins to the viewport's top edge. BESIDE the
+   * rail it does not — it occupies the column to the rail's right, and a node
+   * pinned left:0 right:0 spans the rail as well, which is the arrangement
+   * "beside" exists to avoid. There it sticks within its own column instead,
+   * which puts it at the top of the content and nowhere near the rail.
+   *
+   * The elevation is the same either way: it is the same bar. */
+  const spansFullWidth = o.barPosition === 'above-rail';
+  const railBar = {
+    ...bar(o),
+    sticky: true,
+    elevation: APP_BAR_ELEVATION,
+    ...(spansFullWidth ? { pin: 'top' as const } : {}),
+  };
   /* Above: the bar spans the whole width and the rail starts beneath it, so
      the bar's brand and actions clear the rail. Beside: the rail runs the full
      height and the bar occupies only the column to its right, which is what
@@ -534,7 +549,11 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
        hangs below it, so the root is a column. */
     direction: o.layout === 'rail' && o.barPosition !== 'above-rail' ? 'row' : 'column',
     width: 'fill',
-    height: 'hug',
+    /* FILL, not hug. The nav is a frame for a screen, not a strip: the bars
+       are at the edges and everything between them is page. Hugging made the
+       root as tall as its bars, so the rail and the content had 153px to
+       share and the page had nowhere to be. */
+    height: 'fill',
     surface: o.surface ?? 'Surface',
     theme: o.theme,
     children: o.layout === 'rail'

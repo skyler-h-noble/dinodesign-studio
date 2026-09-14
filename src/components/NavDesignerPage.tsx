@@ -179,6 +179,11 @@ export default function NavDesignerPage() {
      size mode instead of a number read off the screen once. */
   const insets = useMemo(() => contentInsets(definition), [definition]);
 
+  /* How tall a hero may get before it swallows the screen. A share of the
+     device rather than a fixed number: the cap exists so the tab strip stays
+     visible, and what counts as "visible" depends on the frame. */
+  const heroCap = Math.round((current?.deviceHeight ?? 800) * 0.55);
+
   const slotContent = useMemo(() => {
     const mark = brand ? (
       <img src={brand.url} alt="" style={{ height: 24, width: 'auto', display: 'block' }} />
@@ -349,7 +354,22 @@ export default function NavDesignerPage() {
        
        A placeholder rather than a picture, still: the hero is its own add-on,
        and putting an image here would suggest this one owns it. */
-    const hero = <Ratio ratio="16:9" fit="width" sx={{ width: '100%' }} />;
+    /* 16:9 and CAPPED, because on a 1920x1080 screen those two are the same
+       thing: a full-width 16:9 hero is exactly 1080 tall, so it fills the
+       viewport and the sticky tabs it exists to sit above are below the fold.
+       
+       That is what a real full-bleed hero does — aspect-ratio with a
+       max-height, and the image crops rather than the layout growing. 55% of
+       the frame leaves the strip and the start of the page visible, which is
+       the arrangement being designed. */
+    const hero = (
+      <Ratio
+        ratio="16:9"
+        fit="width"
+        maxHeight={heroCap}
+        sx={{ width: '100%', overflow: 'hidden' }}
+      />
+    );
 
     /* The page the nav sits against.
        
@@ -473,7 +493,7 @@ export default function NavDesignerPage() {
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
   }, [brand, tabs, actions, mobile.showLabels, mobile.toolbarStyle, mobile.toolbarOrientation,
-      avatarOpensMenu, menuOpen, accountItems, componentSize, insets]);
+      avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 

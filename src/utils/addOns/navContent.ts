@@ -82,6 +82,44 @@ export interface NavItem {
   avatarInitials?: string;
 }
 
+/** What sits at one end of a label. Exactly one thing, or nothing.
+ *
+ *  The data model keeps startIcon / startAvatar as separate booleans because
+ *  those are Figma's variant property names and the converter has to line up
+ *  with them. But they are not independent: one END holds one decorator, and
+ *  with both set the renderer silently picks the avatar and drops the icon —
+ *  a control that can express a state the component cannot.
+ *
+ *  So the pair is read and written through here, and the exclusivity lives
+ *  with the data rather than in whichever editor happens to be open. */
+export type Decorator = 'none' | 'icon' | 'avatar';
+
+export function decoratorAt(item: NavItem, end: 'start' | 'end'): Decorator {
+  const avatar = end === 'start' ? item.startAvatar : item.endAvatar;
+  const icon = end === 'start' ? item.startIcon : item.endIcon;
+  /* Avatar first, matching what the renderer actually does — so a legacy item
+     with both set reads back as what it LOOKS like, not as what was typed. */
+  if (avatar) return 'avatar';
+  if (icon) return 'icon';
+  return 'none';
+}
+
+export function setDecorator(item: NavItem, end: 'start' | 'end', to: Decorator): NavItem {
+  const iconKey = end === 'start' ? 'startIcon' : 'endIcon';
+  const avatarKey = end === 'start' ? 'startAvatar' : 'endAvatar';
+  const nameKey = end === 'start' ? 'startIconName' : 'endIconName';
+  const next: NavItem = {
+    ...item,
+    [iconKey]: to === 'icon',
+    [avatarKey]: to === 'avatar',
+  };
+  /* Seed a name when the icon is chosen. An empty field renders the
+     not-found marker straight away, which reads as an error the user just
+     caused rather than a field they have not filled in yet. */
+  if (to === 'icon' && !item[nameKey]?.trim()) next[nameKey] = 'Menu';
+  return next;
+}
+
 export interface NavButtonItem extends NavItem {
   colour: string;
   treatment: ButtonTreatment;

@@ -9,12 +9,13 @@
  */
 import {
   Modal, Button, VStack, HStack, Label, Caption, BodySmall, Alert, Link,
-  TextField, SwitchInput, Divider, H4, Avatar, Tabs, TabList, Tab,
+  TextField, SwitchInput, Divider, H4, Avatar, Tabs, TabList, Tab, RadioGroup,
 } from '@omni-design/components';
 import {
   BUTTON_VARIANTS, BUTTON_TREATMENTS, AVATAR_TYPES, ICON_REFERENCE_URL,
-  itemProblems, itemRendersNothing, buttonVariant,
+  itemProblems, itemRendersNothing, buttonVariant, decoratorAt, setDecorator,
   type NavItem, type NavButtonItem, type ButtonTreatment, type AvatarType,
+  type Decorator,
 } from '../utils/addOns/navContent';
 import NavIconGlyph from './NavIconGlyph';
 
@@ -145,41 +146,44 @@ export default function NavItemEditor(
 
         <Divider />
 
-        {/* Both ends, independently. A tab with an avatar before the label and a
-            chevron after it is one item, not a special case. */}
+        {/* Both ends, independently — but ONE decorator per end.
+            
+            This was two switches, Icon and Avatar, and nothing stopped both
+            being on. The renderer resolves that by taking the avatar and
+            dropping the icon, so the control could express a state the
+            component cannot render: the switch stayed on and nothing appeared.
+            
+            A toggle and a radio says the same thing without the hole. The
+            underlying booleans are unchanged — they are Figma's variant
+            property names and the converter has to line up with them — they
+            are just written as a pair now. */}
         {(['start', 'end'] as const).map((end) => {
-          const iconKey = end === 'start' ? 'startIcon' : 'endIcon';
           const nameKey = end === 'start' ? 'startIconName' : 'endIconName';
-          const avatarKey = end === 'start' ? 'startAvatar' : 'endAvatar';
+          const choice = decoratorAt(item, end);
           return (
             <VStack key={end} gap="var(--Sizing-2)">
-              <Label>{end === 'start' ? 'Before the label' : 'After the label'}</Label>
-              <HStack gap="var(--Sizing-3)" style={{ flexWrap: 'wrap' }}>
-                <SwitchInput
-                  checked={!!item[iconKey]}
-                  onChange={(e: { target: { checked: boolean } }) => {
-                    /* Switching it on seeds a name. An empty field renders the
-                       not-found marker straight away, which reads as an error
-                       the user just caused rather than a field they have not
-                       filled in yet. Menu is the safe seed: it is the icon a
-                       nav most often wants, and it is a real name so the
-                       preview shows something real. */
-                    const on = e.target.checked;
-                    onChange({
-                      ...(item as NavButtonItem),
-                      [iconKey]: on,
-                      ...(on && !item[nameKey]?.trim() ? { [nameKey]: 'Menu' } : {}),
-                    });
-                  }}
-                  label="Icon"
+              <SwitchInput
+                checked={choice !== 'none'}
+                onChange={(e: { target: { checked: boolean } }) =>
+                  onChange(setDecorator(item, end, e.target.checked ? 'icon' : 'none') as NavButtonItem)}
+                label={end === 'start' ? 'Before the label' : 'After the label'}
+              />
+
+              {choice !== 'none' && (
+                <RadioGroup
+                  label=""
+                  orientation="horizontal"
+                  value={choice}
+                  onChange={(e: { target: { value: string } }) =>
+                    onChange(setDecorator(item, end, e.target.value as Decorator) as NavButtonItem)}
+                  options={[
+                    { value: 'icon', label: 'Icon' },
+                    { value: 'avatar', label: 'Avatar' },
+                  ]}
                 />
-                <SwitchInput
-                  checked={!!item[avatarKey]}
-                  onChange={(e: { target: { checked: boolean } }) => set(avatarKey, e.target.checked)}
-                  label="Avatar"
-                />
-              </HStack>
-              {item[iconKey] && (
+              )}
+
+              {choice === 'icon' && (
                 <>
                   <TextField
                     label="Icon name"
