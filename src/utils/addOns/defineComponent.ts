@@ -197,6 +197,18 @@ export type ConditionTrigger = 'device' | 'scroll' | 'interaction';
 export interface ConditionDef {
   description: string;
   trigger: ConditionTrigger;
+  /** Publish the variable even though this definition binds nothing to it.
+   *
+   *  The add-on ships SLOTS, and what goes in them is added when the nav is
+   *  built — the right number of items, each with a label the builder binds to
+   *  this variable. So the definition legitimately has nothing to gate on, and
+   *  the variable still has to exist: a layer bound to a name the file does
+   *  not have is unbound, and an unbound visibility is simply visible.
+   *
+   *  The default stays "publish only what is bound", because that is what
+   *  stops an add-on asking a design system for variables nothing reads. This
+   *  is the narrow exception where the reader arrives later. */
+  boundWhenBuilt?: boolean;
 }
 
 export interface ComponentDefinition {

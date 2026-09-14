@@ -3,7 +3,7 @@ import {
   mobileNavDefinition, MOBILE_LAYOUTS, MAX_BOTTOM_ITEMS, maxItemsWithFab,
   type MobileLayout,
 } from '../utils/addOns/mobileNav';
-import { toAddonSpec } from '../utils/addOns/toAddonSpec';
+import { toAddonSpec, conditionsUsedBy, conditionsToPublish, tokensUsed } from '../utils/addOns/toAddonSpec';
 
 const ALL: MobileLayout[] = MOBILE_LAYOUTS.map((l) => l.id);
 const names = (n: any): string[] => {
@@ -147,5 +147,43 @@ describe('nothing carries a colour', () => {
       })));
       expect(json, l).not.toMatch(/#[0-9a-fA-F]{6}/);
     }
+  });
+});
+
+describe('a variable the BUILD will bind still has to exist', () => {
+  /* The add-on ships holes. A bottom bar's labels are added when the nav is
+     built, and the builder binds each one's visibility to Show-Labels — so
+     the definition gates on nothing and the variable still has to be there.
+     A layer bound to a name the file does not have is unbound, and an unbound
+     visibility renders as permanently visible rather than as an error. */
+  const def = mobileNavDefinition({ layout: 'bottom-only' });
+
+  it('is not among the conditions the definition binds', () => {
+    expect(conditionsUsedBy(def)).not.toContain('Adaptive-Nav/Show-Labels');
+  });
+
+  it('is published anyway', () => {
+    expect(conditionsToPublish(def)).toContain('Adaptive-Nav/Show-Labels');
+  });
+
+  it('reaches the payload, with a value at every breakpoint', () => {
+    const bps = [{ id: 'xs', label: 'xs', minWidth: 0 }, { id: 'md', label: 'md', minWidth: 900 }];
+    const spec: any = toAddonSpec(def, {
+      breakpoints: bps,
+      matrix: { 'Adaptive-Nav/Show-Labels': { xs: false, md: true } },
+    });
+    expect(spec.responsive.matrix['Adaptive-Nav/Show-Labels']).toEqual({ xs: false, md: true });
+  });
+
+  it('and is asked for as a token, so a pre-publish check catches a file without it', () => {
+    expect(tokensUsed(def)).toContain('Adaptive-Nav/Show-Labels');
+  });
+
+  it('does NOT publish every declared condition — only the marked one', () => {
+    /* Otherwise an add-on asks every design system for variables nothing
+       reads, which is the failure this exception is carved out of. */
+    const declared = Object.keys(def.conditions ?? {});
+    const published = conditionsToPublish(def);
+    expect(declared.length).toBeGreaterThan(published.length);
   });
 });

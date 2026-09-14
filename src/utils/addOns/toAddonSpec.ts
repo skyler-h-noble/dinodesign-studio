@@ -192,7 +192,7 @@ export function toAddonSpec(
     /* Only the conditions this arrangement actually gates on. Publishing a
        value for a condition nothing binds to would tell the plugin to write a
        variable the component never reads. */
-    const used = new Set(conditionsUsedBy(def));
+    const used = new Set(conditionsToPublish(def));
     const matrix: Record<string, Record<string, boolean>> = {};
     for (const [name, byBp] of Object.entries(responsive.matrix)) {
       if (used.has(name)) matrix[name] = { ...byBp };
@@ -229,7 +229,7 @@ export function tokensUsed(def: ComponentDefinition): string[] {
      Only the ones this definition actually REFERENCES, not everything
      declared: a layout with no rail does not need Show-Rail, and asking a
      design system for a variable nothing binds to is a false requirement. */
-  for (const name of conditionsUsedBy(def)) out.add(name);
+  for (const name of conditionsToPublish(def)) out.add(name);
   return [...out].sort();
 }
 
@@ -249,5 +249,27 @@ export function conditionsUsedBy(def: ComponentDefinition): string[] {
     (n.children || []).forEach(walk);
   };
   walk(def.root);
+  return [...out].sort();
+}
+
+/**
+ * The conditions that must EXIST in the file — what the definition binds, plus
+ * what the build will bind once the slots are filled.
+ *
+ * The two differ because an add-on ships holes. A bottom bar's labels are
+ * added when the nav is built, and the builder binds each one's visibility to
+ * Show-Labels — so the definition gates on nothing and the variable still has
+ * to be there. Publishing only what is BOUND left that name out of the payload
+ * entirely, and a layer bound to a name the file does not have is unbound,
+ * which renders as permanently visible rather than as an error.
+ *
+ * Still not "publish everything declared": that would ask every design system
+ * for variables nothing reads. Only the ones marked as bound at build time.
+ */
+export function conditionsToPublish(def: ComponentDefinition): string[] {
+  const out = new Set(conditionsUsedBy(def));
+  for (const [name, cond] of Object.entries(def.conditions ?? {})) {
+    if (cond.boundWhenBuilt) out.add(name);
+  }
   return [...out].sort();
 }

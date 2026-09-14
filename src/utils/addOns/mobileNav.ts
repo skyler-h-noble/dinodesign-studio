@@ -87,6 +87,11 @@ export const MOBILE_CONDITIONS: Record<string, ConditionDef> = {
   'Adaptive-Nav/Show-Labels': {
     description: 'Labels under the bottom bar icons. Off leaves icons alone.',
     trigger: 'device',
+    /* The definition binds nothing to this: the bar is one slot and the items
+       are added when the nav is built. The builder binds each label's
+       visibility to this variable, so it has to exist in the file even though
+       nothing here gates on it. */
+    boundWhenBuilt: true,
   },
   'Adaptive-Nav/Show-Top-Bar': {
     description: 'The top bar. Off where navigation and identity both sit at the bottom.',
