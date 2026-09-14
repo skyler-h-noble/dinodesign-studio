@@ -104,6 +104,7 @@ declare module '@omni-design/components' {
   /* Body at 700 — the bold weight Body itself does not have. Exported by
      the package and simply missing here, so using it failed to compile. */
   export const Subtitle: FC<any>;
+  export const LabelExtraSmall: FC<any>;
   export const SubtitleLarge: FC<any>;
   export const SubtitleSmall: FC<any>;
 

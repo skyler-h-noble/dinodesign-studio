@@ -104,47 +104,38 @@ const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => 
   ...(when ? { presence: { when } } : {}),
 });
 
-/** One bottom-bar item: an icon holder with an optional label under it.
- *
- *  Built as a column because that is what the design is — the label sits
- *  UNDER the icon rather than beside it, which is what distinguishes a nav
- *  item from a tab and is why it cannot reuse the tab's structure. */
-function navItem(index: number, withLabel: boolean): NodeDef {
-  return {
-    name: `Nav-Item-${index + 1}`,
-    kind: 'stack',
-    direction: 'column',
-    align: 'center',
-    gap: t('Sizing-Half'),
-    width: 'hug',
-    height: 'hug',
-    children: withLabel
-      ? [slot(`Nav-Icon-${index + 1}`, 'hug'), slot(`Nav-Label-${index + 1}`, 'hug', 'Adaptive-Nav/Show-Labels')]
-      : [slot(`Nav-Icon-${index + 1}`, 'hug')],
-  };
-}
+/* navItem is gone. It hand-built an icon holder and a label per item —
+   a second implementation of what the Nav-Bar component already owns, which
+   would have drifted from it the moment either changed. The bar is one slot
+   now and the component fills it. */
 
 /** The bottom bar. Two item groups with the FAB between them when it is
  *  centred — which is the arrangement the NavBar's two slots exist for, and
  *  the reason a centred FAB needs no variant of its own. */
 function bottomBar(o: MobileOptions): NodeDef {
-  const count = Math.min(o.itemCount ?? 4, maxItemsWithFab(!!o.fab));
-  const items = Array.from({ length: count }, (_, i) => navItem(i, o.showLabels !== false));
   const centred = o.fab && o.fabPosition !== 'end';
-  const split = centred ? Math.ceil(count / 2) : count;
 
-  const group = (name: string, children: NodeDef[]): NodeDef => ({
-    name, kind: 'stack', direction: 'row', justify: 'between', align: 'center',
-    gap: GAP, width: 'fill', height: 'hug', children,
-  });
-
+  /* ONE SLOT, filled by the Nav-Bar component — the same shape the rail uses,
+     where Rail-Items is a single slot the real Rail drops into.
+     
+     This hand-built a Nav-Item-N stack per item, each holding its own
+     Nav-Icon-N and Nav-Label-N. That is a second implementation of a shipped
+     component: the design's Nav-Bar already owns the item's geometry, its
+     selected pill and its label, and the copy here would drift from it the
+     moment either changed. It also could not be filled — the group was a
+     STACK, so the preview's BottomNavigation never landed and every item
+     rendered as two dashed boxes.
+     
+     A centred FAB still splits it in two, because that is the one thing the
+     bar's geometry does change for, and it is why the design's Nav-Bar has
+     two item slots rather than one. */
   const children: NodeDef[] = centred
     ? [
-        group('Nav-Item-Slot-Start', items.slice(0, split)),
+        slot('Nav-Item-Slot-Start', 'fill'),
         slot('FAB', 'hug'),
-        group('Nav-Item-Slot-End', items.slice(split)),
+        slot('Nav-Item-Slot-End', 'fill'),
       ]
-    : [group('Nav-Item-Slot', items), ...(o.fab ? [slot('FAB', 'hug')] : [])];
+    : [slot('Nav-Item-Slot', 'fill'), ...(o.fab ? [slot('FAB', 'hug')] : [])];
 
   return {
     name: 'Bottom-Bar',
@@ -159,6 +150,16 @@ function bottomBar(o: MobileOptions): NodeDef {
     surface: o.surface ?? 'Surface',
     theme: o.theme,
     band: true,
+    /* Pinned to the bottom edge, and that is the whole point of a bottom bar:
+       it is where a thumb rests, which is only true if it stays there. In the
+       flow it sat directly under the content — so on a short page it floated
+       in the middle of the screen, which is the one place a bottom bar must
+       never be.
+       
+       Not sticky: a bottom bar that scrolls away is a footer. */
+    pin: 'bottom',
+    sticky: true,
+    elevation: APP_BAR_ELEVATION,
     children,
   };
 }
@@ -209,9 +210,11 @@ function topBar(o: MobileOptions): NodeDef {
 
 /** The toolbar: actions rather than navigation, and it can float. */
 function toolbar(o: MobileOptions): NodeDef {
-  const count = Math.min(o.itemCount ?? 4, maxItemsWithFab(!!o.fab));
   const vertical = o.toolbarOrientation === 'vertical';
-  const items = Array.from({ length: count }, (_, i) => navItem(i, o.showLabels !== false));
+  /* The same one slot as the bottom bar, for the same reason: a toolbar IS
+     the Nav-Bar component — its Style and Orientation are two of that
+     component's three variant axes. */
+  const items: NodeDef[] = [slot('Nav-Item-Slot', vertical ? 'hug' : 'fill')];
   if (o.fab) items.push(slot('FAB', 'hug'));
 
   return {
@@ -257,7 +260,10 @@ export function mobileNavDefinition(o: MobileOptions): ComponentDefinition {
       direction: 'column',
       justify: 'between',
       width: 'fill',
-      height: 'hug',
+      /* FILL, like the desktop root. Hugging made the nav as tall as its bars
+         with the page squeezed between them, so a pinned bottom bar had no
+         bottom to pin to. */
+      height: 'fill',
       children,
     },
   };

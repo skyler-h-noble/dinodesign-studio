@@ -17,7 +17,7 @@ import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
-  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Fab, Subtitle,
+  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Fab, Subtitle, LabelExtraSmall,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -66,6 +66,12 @@ const PREVIEW_MIN_WIDTH = 300;
  *  a jump the moment it sticks. */
 const SHRINK_OVER = 600;
 
+/** The viewport width at which the tools and the preview sit side by side.
+ *
+ *  Below it they stack, because 40% of a narrow screen is too little for the
+ *  controls and 60% is too little for a desktop nav at true width. */
+const TWO_COL_MIN = 1100;
+
 export default function NavDesignerPage() {
   const [options, setOptions] = useState<NavOptions>({
     layout: 'brand-left', search: true, actions: true, avatar: true,
@@ -87,6 +93,16 @@ export default function NavDesignerPage() {
   const [mobile, setMobile] = useState<MobileOptions>({
     layout: 'top-and-bottom', brandAlign: 'left', showMenu: true,
     topActions: 1, showAvatar: true, itemCount: 4, showLabels: true,
+    /* A toolbar defaults to FLOATING, and that is not decoration.
+       
+       Fixed and across, a toolbar IS a bottom bar — same component, same
+       three variant axes, same place on the screen — so picking "top bar and
+       toolbar" gave you something indistinguishable from "top and bottom" and
+       the two options looked broken. The difference between them is what goes
+       IN the bar (actions rather than navigation), which the preview cannot
+       show on its own. Floating makes the pick visibly do something, and it
+       is the arrangement a toolbar of actions usually wants anyway. */
+    toolbarStyle: 'floating',
   });
   const setMobileOpt = <K extends keyof MobileOptions>(k: K, v: MobileOptions[K]) =>
     setMobile((m) => ({ ...m, [k]: v }));
@@ -240,6 +256,18 @@ export default function NavDesignerPage() {
    * at every scroll position and the preview never shrank. A zero-height
    * marker just above it keeps scrolling normally, and how far ITS top has
    * gone negative is exactly the distance the preview has been stuck for. */
+  /* Whether there is room for the split. Below it the preview would be 40% of
+     a narrow screen, which is less use than having it above the controls. */
+  const [twoCol, setTwoCol] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(`(min-width: ${TWO_COL_MIN}px)`).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${TWO_COL_MIN}px)`);
+    const on = () => setTwoCol(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [shrink, setShrink] = useState(0);
 
@@ -591,6 +619,20 @@ export default function NavDesignerPage() {
       'Nav-Item-Slot': bottomNav,
       'Menu-Button': menuButton,
       Search: search,
+      /* The bottom bar's items, one slot each.
+         
+         The definition builds Nav-Item-N stacks holding Nav-Icon-N and
+         Nav-Label-N, because a designer needs those frames in Figma. The
+         preview was filling `Nav-Item-Slot` — which is a STACK, not a slot, so
+         nothing landed and every item rendered as two dashed boxes. Filling
+         the leaves puts real content in the definition's own structure rather
+         than replacing it with a component that would not match. */
+      ...Object.fromEntries(
+        tabs.flatMap((t, i) => [
+          [`Nav-Icon-${i + 1}`, <NavIconGlyph key={`ni${i}`} name={t.startIconName || t.endIconName || 'Home'} />],
+          [`Nav-Label-${i + 1}`, <LabelExtraSmall key={`nl${i}`}>{t.label}</LabelExtraSmall>],
+        ]),
+      ),
       FAB: fab,
       Title: title,
       Brand: brandPlaceholder,
@@ -719,7 +761,13 @@ export default function NavDesignerPage() {
   /* The scale cap, interpolated. ScaledPreview already takes the smaller of
      this and what fits, so at rest this is 1 and the box is as big as the
      card allows — the shrink only ever takes width away. */
-  const previewMaxScale = 1 - shrink * (1 - previewMinWidth / previewWidth);
+  /* Only when stacked. Side by side the preview has a column of its own and
+     is always in view, so shrinking it would give the space back to nothing —
+     the point of the shrink is to stop a full-width preview covering the
+     controls underneath it, and side by side there is nothing underneath. */
+  const previewMaxScale = twoCol
+    ? 1
+    : 1 - shrink * (1 - previewMinWidth / previewWidth);
 
   const editBp = (id: string, patch: Partial<Breakpoint>) =>
     setBreakpoints((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
@@ -729,7 +777,15 @@ export default function NavDesignerPage() {
       style={{ background: 'var(--Background)', color: 'var(--Text)', minHeight: '100vh' }}>
       <AppBar />
       <Section padding="32px 24px 64px">
-        <VStack gap="var(--Sizing-4)" style={{ maxWidth: 960, margin: '0 auto' }}>
+        {/* Wider when split. 960 is a comfortable measure for one column of
+            forms, and it was the cap when everything was one column — but
+            against a 40/60 split it leaves the preview 560px to lay a 1920px
+            nav out in, which is a third of the resolution the column exists
+            to provide. */}
+        <VStack
+          gap="var(--Sizing-4)"
+          style={{ maxWidth: twoCol ? 1760 : 960, margin: '0 auto' }}
+        >
           <VStack gap="var(--Sizing-1)">
             <H1>Adaptive Nav</H1>
             <Body color="quiet">
@@ -767,6 +823,27 @@ export default function NavDesignerPage() {
             )}
           </HStack>
 
+          {/* Tools left, preview right.
+              
+              The preview used to sit in the middle of the column it is a
+              preview OF, so every control below it needed a scroll to reach
+              and a scroll back to check. Side by side it is simply always
+              there, which is what a preview is for.
+              
+              40/60: the controls are forms and read fine narrow, while the
+              preview is laying a desktop nav out at its true width and then
+              scaling — every percent of that column is resolution. It
+              collapses to one column below TWO_COL_MIN, where 40% of the
+              screen is too little for either. */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: twoCol ? '40fr 60fr' : '1fr',
+              gap: 'var(--Sizing-4, 32px)',
+              alignItems: 'start',
+            }}
+          >
+            <VStack gap="var(--Sizing-4)" style={{ minWidth: 0 }}>
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
               <H4>Layout</H4>
@@ -954,84 +1031,6 @@ export default function NavDesignerPage() {
             </VStack>
           </Card>
 
-          {/* Sticky, so a change made further down is visible as it is made.
-              Everything below this point edits what is in it, and scrolling to
-              check each change and back is most of the work of using the page.
-
-              It carries its own surface: a sticky element with a transparent
-              background shows the content sliding under it, which is the one
-              thing a sticky element cannot do. */}
-          <div ref={sentinelRef} aria-hidden style={{ height: 0 }} />
-          <div
-            data-surface="Surface"
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 2,
-              background: 'var(--Background)',
-              paddingTop: 'var(--Sizing-2, 8px)',
-              paddingBottom: 'var(--Sizing-2, 8px)',
-            }}
-          >
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Preview</H4>
-
-              {/* Laid out at the breakpoint's real width and TRANSFORMED down,
-                  rather than squeezed into the card. Squeezing would make the
-                  tabs wrap and the items collapse, so what is on screen would
-                  be the narrow arrangement wearing a wide label — every
-                  judgement from it about the wrong design. */}
-              {/* The frame is drawn INSIDE the scaler, on the sized box. Around
-                  it, it spanned the container while the content sat at its own
-                  smaller width, so the empty remainder read as part of the
-                  design. Square, too: a rounded frame reads as a nav with
-                  rounded corners rather than the edge of a viewport. */}
-              <div>
-                {/* Stops cropping while the menu is open. The box's height is
-                    computed from the untransformed content, and an absolutely
-                    positioned panel never counted towards it — so cropping
-                    would cut the menu off entirely, which reads as the panel
-                    not rendering rather than as the frame ending. */}
-                <ScaledPreview
-                  style={metricVars}
-                  width={previewWidth}
-                  height={current?.deviceHeight}
-                  maxScale={previewMaxScale}
-                  onScale={setScale}
-                  frame
-                  clip={!menuShown}
-                >
-                  {/* The cap goes THROUGH the renderer rather than around it.
-                      Wrapped outside, it capped the whole bar and left bare
-                      page either side of a floating coloured strip; passed in,
-                      each band paints edge to edge and only its content caps. */}
-                  <DefinitionRenderer
-                    definition={definition}
-                    conditions={active}
-                    slots={slotContent}
-                    contentMaxWidth={current?.maxWidth}
-                    contentAlign={current?.align}
-                    insets={insets}
-                    showSlots
-                  />
-                </ScaledPreview>
-              </div>
-
-              <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                <Caption color="quiet">
-                  {previewWidth}
-                  {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''}px
-                  {scale < 0.999 ? ` — shown at ${Math.round(scale * 100)}%` : ' — actual size'}
-                  {current?.maxWidth && current.maxWidth < previewWidth
-                    ? `, content capped at ${current.maxWidth}px`
-                    : ''}
-                </Caption>
-              </HStack>
-
-            </VStack>
-          </Card>
-          </div>
 
           {onMobile && (
             <Card padding="medium">
@@ -1538,6 +1537,92 @@ export default function NavDesignerPage() {
               )}
             </VStack>
           </Card>
+            </VStack>
+
+            {/* The right-hand column. Sticky so it stays put while the tools
+                scroll — the same job the full-width sticky did, without
+                taking the whole width to do it. */}
+            <div style={{ position: 'sticky', top: 0, minWidth: 0 }}>
+          {/* Sticky, so a change made further down is visible as it is made.
+              Everything below this point edits what is in it, and scrolling to
+              check each change and back is most of the work of using the page.
+
+              It carries its own surface: a sticky element with a transparent
+              background shows the content sliding under it, which is the one
+              thing a sticky element cannot do. */}
+          <div ref={sentinelRef} aria-hidden style={{ height: 0 }} />
+          <div
+            data-surface="Surface"
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 2,
+              background: 'var(--Background)',
+              paddingTop: 'var(--Sizing-2, 8px)',
+              paddingBottom: 'var(--Sizing-2, 8px)',
+            }}
+          >
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-3)">
+              <H4>Preview</H4>
+
+              {/* Laid out at the breakpoint's real width and TRANSFORMED down,
+                  rather than squeezed into the card. Squeezing would make the
+                  tabs wrap and the items collapse, so what is on screen would
+                  be the narrow arrangement wearing a wide label — every
+                  judgement from it about the wrong design. */}
+              {/* The frame is drawn INSIDE the scaler, on the sized box. Around
+                  it, it spanned the container while the content sat at its own
+                  smaller width, so the empty remainder read as part of the
+                  design. Square, too: a rounded frame reads as a nav with
+                  rounded corners rather than the edge of a viewport. */}
+              <div>
+                {/* Stops cropping while the menu is open. The box's height is
+                    computed from the untransformed content, and an absolutely
+                    positioned panel never counted towards it — so cropping
+                    would cut the menu off entirely, which reads as the panel
+                    not rendering rather than as the frame ending. */}
+                <ScaledPreview
+                  style={metricVars}
+                  width={previewWidth}
+                  height={current?.deviceHeight}
+                  maxScale={previewMaxScale}
+                  onScale={setScale}
+                  frame
+                  clip={!menuShown}
+                >
+                  {/* The cap goes THROUGH the renderer rather than around it.
+                      Wrapped outside, it capped the whole bar and left bare
+                      page either side of a floating coloured strip; passed in,
+                      each band paints edge to edge and only its content caps. */}
+                  <DefinitionRenderer
+                    definition={definition}
+                    conditions={active}
+                    slots={slotContent}
+                    contentMaxWidth={current?.maxWidth}
+                    contentAlign={current?.align}
+                    insets={insets}
+                    showSlots
+                  />
+                </ScaledPreview>
+              </div>
+
+              <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <Caption color="quiet">
+                  {previewWidth}
+                  {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''}px
+                  {scale < 0.999 ? ` — shown at ${Math.round(scale * 100)}%` : ' — actual size'}
+                  {current?.maxWidth && current.maxWidth < previewWidth
+                    ? `, content capped at ${current.maxWidth}px`
+                    : ''}
+                </Caption>
+              </HStack>
+
+            </VStack>
+          </Card>
+          </div>
+            </div>
+          </div>
         </VStack>
       </Section>
 

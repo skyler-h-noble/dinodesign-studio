@@ -44,45 +44,53 @@ describe('mobile is a different shape, not the desktop bar narrowed', () => {
   });
 });
 
-describe('a nav item is not a tab', () => {
-  it('the label sits UNDER the icon, so the item is a column', () => {
-    /* That is the whole structural difference: a tab lays its icon beside its
-       label, a nav item stacks them. Reusing the tab's shape would put the
-       label in the wrong place at every size. */
+describe('the bar is ONE slot, filled by the Nav-Bar component', () => {
+  /* It used to build a Nav-Item-N stack per item, each with its own
+     Nav-Icon-N and Nav-Label-N. That was a second implementation of what the
+     design's Nav-Bar already owns — the item's geometry, its selected pill,
+     its label — and it would have drifted from the component the moment
+     either changed. It also could not be FILLED: the group was a stack, so
+     the preview's BottomNavigation never landed and every item rendered as
+     two dashed boxes.
+
+     The rail already worked this way: Rail-Items is one slot the real Rail
+     drops into. This is the same shape.
+
+     WHAT THIS COSTS, stated so it is a decision rather than a surprise: the
+     item count and the per-breakpoint label switch no longer reach Figma,
+     because the component owns them now. They still drive the preview. */
+  it('emits one item slot, not a frame per item', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only' }));
     const bottom = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
-    const item = bottom.children[0].children[0];
-    expect(item.layoutMode).toBe('VERTICAL');
-    expect(names(item)).toEqual(['Nav-Item-1', 'Nav-Icon-1', 'Nav-Label-1']);
+    expect(bottom.children.map((c: any) => c.name)).toEqual(['Nav-Item-Slot']);
+    expect(names(spec).filter((n) => /^Nav-Item-\d+$/.test(n))).toHaveLength(0);
   });
 
-  it('labels are behind a condition, so they can go at a narrower width', () => {
+  it('the slot fills, so the component decides how the items distribute', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only' }));
-    const bottom2 = spec.root.children.find((c: any) => c.name === 'Bottom-Bar');
-    const label = bottom2.children[0].children[0].children[1];
-    expect(label.visibleWhen).toBe('Adaptive-Nav/Show-Labels');
+    const slot = spec.root.children
+      .find((c: any) => c.name === 'Bottom-Bar').children[0];
+    expect(slot.layoutSizingHorizontal).toBe('FILL');
   });
 
-  it('and are omitted entirely when the layout has none', () => {
-    // Different from hidden: a labelless bar has no label slot to fill.
-    const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only', showLabels: false }));
-    expect(names(spec)).not.toContain('Nav-Label-1');
+  it('a toolbar is the same component, not a different one', () => {
+    /* Its Style and Orientation are two of the Nav-Bar's own three variant
+       axes — fixed or floating, across or down — so a toolbar is that
+       component configured, not a second thing to keep in step. */
+    const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'toolbar' }));
+    const toolbar = spec.root.children.find((c: any) => c.name === 'Toolbar');
+    expect(toolbar.children.some((c: any) => c.name === 'Nav-Item-Slot')).toBe(true);
   });
 });
 
 describe('five items is a reach limit', () => {
-  it('caps at five', () => {
-    /* Below about 64px a target stops being reliably hittable with a thumb,
-       and five items is where a 360px phone reaches that. */
-    const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only', itemCount: 9 }));
-    expect(names(spec).filter((n) => /^Nav-Item-\d+$/.test(n))).toHaveLength(MAX_BOTTOM_ITEMS);
-  });
-
   it('a FAB takes one of the five, because it is in the same row', () => {
-    expect(maxItemsWithFab(false)).toBe(5);
-    expect(maxItemsWithFab(true)).toBe(4);
-    const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'bottom-only', itemCount: 9, fab: true }));
-    expect(names(spec).filter((n) => /^Nav-Item-\d+$/.test(n))).toHaveLength(4);
+    /* The ceiling is still the add-on's to state — it is a reach fact, not a
+       component preference — and it still bounds what the preview offers.
+       Below about 64px a target stops being reliably hittable with a thumb,
+       and five items is where a 360px phone reaches that. */
+    expect(maxItemsWithFab(false)).toBe(MAX_BOTTOM_ITEMS);
+    expect(maxItemsWithFab(true)).toBe(MAX_BOTTOM_ITEMS - 1);
   });
 });
 
