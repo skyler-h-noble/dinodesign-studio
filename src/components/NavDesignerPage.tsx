@@ -49,6 +49,7 @@ import AccountMenuEditor from './AccountMenuEditor';
 import NavIconGlyph from './NavIconGlyph';
 import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import { contentInsets, contentInsetCSS } from '../utils/addOns/contentInsets';
+import { NAV_METRICS } from '../utils/componentSize';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
 
@@ -183,6 +184,27 @@ export default function NavDesignerPage() {
      device rather than a fixed number: the cap exists so the tab strip stays
      visible, and what counts as "visible" depends on the frame. */
   const heroCap = Math.round((current?.deviceHeight ?? 800) * 0.55);
+
+  /* The nav metrics, resolved for the size on the picker.
+   *
+   * The preview had none of them. tok() emits var(--Rail-Width) with no
+   * fallback, so a fixed width bound to it collapsed to nothing and the brand
+   * block hugged instead of spanning the rail — the layout looked broken and
+   * the definition was right.
+   *
+   * These land on the preview wrapper rather than at :root so the picker
+   * actually drives them: switching size rewrites the same three names, which
+   * is exactly what switching a Component-Size mode does in Figma. The
+   * VALUES come from NAV_METRICS, the same table the CSS export and the Figma
+   * payload read, so the preview cannot show a size the export does not
+   * produce. */
+  const metricVars = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [name, byMode] of Object.entries(NAV_METRICS)) {
+      out[`--${name.replace(/ /g, '-')}`] = `${byMode[componentSize]}px`;
+    }
+    return out as CSSProperties;
+  }, [componentSize]);
 
   const slotContent = useMemo(() => {
     const mark = brand ? (
@@ -839,6 +861,7 @@ export default function NavDesignerPage() {
                     would cut the menu off entirely, which reads as the panel
                     not rendering rather than as the frame ending. */}
                 <ScaledPreview
+                  style={metricVars}
                   width={previewWidth}
                   height={current?.deviceHeight}
                   onScale={setScale}

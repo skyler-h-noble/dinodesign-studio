@@ -229,6 +229,40 @@ const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => 
  *  is the authority here, and the lib is worth a look. */
 export const APP_BAR_ELEVATION = 2;
 
+/**
+ * The brand's rectangle, and it is the SAME rectangle in both arrangements.
+ *
+ * Rail-Width across, App-Bar Height down, at the top-left corner — the
+ * intersection of the rail's column and the bar's row. Which component happens
+ * to contain it changes with barPosition; where it lands on screen does not.
+ *
+ * That was the bug: above the rail the brand sat in the bar's Start group,
+ * which hugs, so it landed at the bar's left padding and the rail beneath it
+ * started somewhere else entirely. Beside the rail it was already right. A
+ * brand that moves when you change where the bar sits reads as two different
+ * logos rather than one in two layouts.
+ *
+ * `inRail` decides which axis is fixed and which fills, because the container
+ * already constrains the other one: the rail is Rail-Width wide, so the block
+ * fills it and fixes its height; the bar is App-Bar Height tall, so the block
+ * fills it and fixes its width.
+ */
+function brandBlock(inRail: boolean): NodeDef {
+  return {
+    name: 'Brand-Block',
+    kind: 'stack',
+    direction: 'row',
+    justify: 'center',
+    align: 'center',
+    width: inRail ? 'fill' : { fixed: t('Other/Rail-Width') },
+    height: inRail ? { fixed: t('Other/App-Bar Height') } : 'fill',
+    /* Only in the rail. In the bar the rule IS the bar's own bottom edge, and
+       a second one inside it would draw the same line twice. */
+    ...(inRail ? { borderBottom: t('Border-Variant') } : {}),
+    children: [slot('Brand', 'hug')],
+  };
+}
+
 const GAP: TokenRef = t('Sizing-2');
 const PAD_Y: TokenRef = t('Sizing-2');
 const PAD_X: TokenRef = t('Sizing-3');
@@ -329,6 +363,16 @@ function bar(o: NavOptions): NodeDef {
     const tabsCentred = o.heroTabsAlign === 'center';
     children = tabsCentred
       ? [
+          /* THREE groups, and the third is why it works. Two FILL sides with a
+             HUG middle is what actually centres the middle — with only a
+             filling Start the space-between pushed the tabs hard right, which
+             is the bug this had.
+             
+             The End group is empty unless condensed brings the actions down,
+             and an empty FILLING group is the point: it claims the same width
+             as the Start, so the middle lands on the bar's centre line rather
+             than wherever the menu button happens to leave it. Same geometry
+             as the centred brand, for the same reason. */
           { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center',
             gap: GAP, width: 'fill', height: 'hug', children: [menuButton()] },
           { name: 'Center', kind: 'stack', direction: 'row', justify: 'center', align: 'center',
@@ -336,12 +380,21 @@ function bar(o: NavOptions): NodeDef {
             children: o.condensed
               ? [slot('Condensed-Brand', 'hug', 'Adaptive-Nav/Show-Condensed'), ...navigationSlots()]
               : navigationSlots() },
+          o.condensed
+            ? { ...endSlot(o), width: 'fill' as const, justify: 'end' as const,
+                presence: { when: 'Adaptive-Nav/Show-Condensed' } as const }
+            : { name: 'End', kind: 'stack' as const, direction: 'row' as const, justify: 'end' as const,
+                align: 'center' as const, width: 'fill' as const, height: 'hug' as const, children: [] },
         ]
       : [
           { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
             width: 'fill', height: 'hug', children: start },
         ];
-    if (o.condensed) {
+    /* Only for the LEFT-aligned arrangement. The centred one already ends
+       with a filling End — it needs one to balance the Start — so pushing
+       another here gave the bar two, and the second took a share of the width
+       that pulled the "centred" tabs off centre again. */
+    if (o.condensed && !tabsCentred) {
       children.push({ ...endSlot(o), presence: { when: 'Adaptive-Nav/Show-Condensed' } });
     }
   } else if (o.layout === 'rail') {
@@ -376,8 +429,9 @@ function bar(o: NavOptions): NodeDef {
         ]
       : brandInBar
         ? [
-            { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-              width: 'hug', height: 'hug', children: [brand] },
+            /* Rail-Width wide and flush to the bar's left edge, so it sits
+               directly above the rail rather than at the bar's padding. */
+            brandBlock(false),
             slot('Title', 'fill'),
             endSlot(o),
           ]
@@ -399,7 +453,15 @@ function bar(o: NavOptions): NodeDef {
     justify: 'between',
     align: 'center',
     gap: GAP,
-    padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
+    /* No LEFT padding when the brand block is in the bar: the block is
+       Rail-Width wide and has to start at x=0 to line up with the rail under
+       it. Padding would inset it and the two would miss each other by exactly
+       Sizing-3, which reads as the rail being misaligned rather than the bar
+       being padded. */
+    padding: {
+      top: PAD_Y, bottom: PAD_Y, right: PAD_X,
+      ...(o.layout === 'rail' && o.barPosition === 'above-rail' ? {} : { left: PAD_X }),
+    },
     width: 'fill',
     /* FIXED at the design system's own App-Bar Height, not hug.
      
@@ -539,23 +601,7 @@ function railNode(fullHeight: boolean): NodeDef {
        it in the bar while the rail runs past it leaves the corner empty. */
     children: fullHeight
       ? [
-          /* The brand block is App-Bar Height tall, so its bottom edge lands
-             on the bar's. They sit side by side at the top of the screen, and
-             two different heights there reads as a misalignment rather than
-             as two components — the rail's own top edge is the one line the
-             eye checks. */
-          {
-            name: 'Brand-Block', kind: 'stack', direction: 'row',
-            justify: 'center', align: 'center',
-            width: 'fill', height: { fixed: t('Other/App-Bar Height') },
-            /* The rule lands exactly where the app bar's bottom edge does,
-               because the block is exactly that tall. It is what carries the
-               alignment across the gap between the two components — without
-               it the eye has only the brand's baseline to go on, and a brand
-               is centred in the block rather than sitting on its floor. */
-            borderBottom: t('Border-Variant'),
-            children: [slot('Brand', 'hug')],
-          },
+          brandBlock(true),
           slot('Rail-Items', 'hug'),
         ]
       : [slot('Rail-Items', 'hug')],

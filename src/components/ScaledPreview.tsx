@@ -15,7 +15,7 @@
  * card it sits in is itself responsive — a hardcoded ratio would be wrong on
  * every screen but the one it was picked on.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 export interface ScaledPreviewProps {
   /** Drawn on the SIZED box, not around it. A frame outside the scaler spans
@@ -46,10 +46,17 @@ export interface ScaledPreviewProps {
    *  height is COMPUTED from the untransformed content, so an absolutely
    *  positioned panel never counted towards it and never will. */
   clip?: boolean;
+  /** Custom properties for the simulated viewport.
+   *
+   *  The nav's metrics land here rather than at :root so the size picker can
+   *  rewrite them — which is what switching a Component-Size mode does in
+   *  Figma, and what makes the preview show the size that was chosen. */
+  style?: CSSProperties;
 }
 
 export default function ScaledPreview(
-  { width, height: deviceHeight, children, maxScale = 1, onScale, frame, clip = true }: ScaledPreviewProps,
+  { width, height: deviceHeight, children, maxScale = 1, onScale, frame, clip = true,
+    style }: ScaledPreviewProps,
 ) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -104,7 +111,7 @@ export default function ScaledPreview(
   const boxWidth = Math.round(width * scale);
 
   return (
-    <div ref={outer} style={{ width: '100%' }}>
+    <div ref={outer} style={{ width: '100%', ...style }}>
       <div style={{
         width: boxWidth,
         maxWidth: '100%',

@@ -638,3 +638,104 @@ describe('every right-hand slot is per breakpoint', () => {
     }
   });
 });
+
+describe('the brand occupies the same rectangle either way', () => {
+  /* Rail-Width across, App-Bar Height down, at the top-left corner — the
+     intersection of the rail's column and the bar's row. Which component
+     contains it changes with barPosition; where it lands on screen must not.
+
+     Above the rail it used to sit in the bar's Start group, which HUGS, so it
+     landed at the bar's left padding while the rail beneath it started at
+     zero. A brand that moves when you change where the bar sits reads as two
+     logos rather than one in two layouts. */
+  const block = (pos: 'beside-rail' | 'above-rail') =>
+    find(navDefinition({ layout: 'rail', barPosition: pos }).root, 'Brand-Block');
+
+  it('is Rail-Width across in both', () => {
+    /* Fixed in the bar; in the rail it FILLS, and the rail is Rail-Width — so
+       the rendered width is the same token either way. Asserting the token on
+       both would be asserting the implementation rather than the result. */
+    expect(block('above-rail').width).toEqual({ fixed: { token: 'Other/Rail-Width' } });
+    expect(block('beside-rail').width).toBe('fill');
+    expect(find(navDefinition({ layout: 'rail' }).root, 'Rail').width).toBe('hug');
+  });
+
+  it('is App-Bar Height down in both', () => {
+    expect(block('beside-rail').height).toEqual({ fixed: { token: 'Other/App-Bar Height' } });
+    // In the bar it fills, and the bar is App-Bar Height.
+    expect(block('above-rail').height).toBe('fill');
+    expect(find(navDefinition({ layout: 'rail', barPosition: 'above-rail' }).root, 'Bar').height)
+      .toEqual({ fixed: { token: 'Other/App-Bar Height' } });
+  });
+
+  it('centres the brand in it, both ways', () => {
+    for (const pos of ['beside-rail', 'above-rail'] as const) {
+      expect([pos, block(pos).justify]).toEqual([pos, 'center']);
+      expect([pos, block(pos).align]).toEqual([pos, 'center']);
+    }
+  });
+
+  it('starts at the bar’s left edge when the bar carries it', () => {
+    /* Rail-Width from x=0. With the bar's left padding still applied the two
+       would miss each other by exactly Sizing-3, which reads as the rail being
+       misaligned rather than the bar being padded. */
+    const bar = find(navDefinition({ layout: 'rail', barPosition: 'above-rail' }).root, 'Bar');
+    expect(bar.padding?.left).toBeUndefined();
+    expect(bar.padding?.right).toBeTruthy();
+    expect(bar.children[0].name).toBe('Brand-Block');
+  });
+
+  it('keeps the bar’s left padding when the rail carries the brand', () => {
+    const bar = find(navDefinition({ layout: 'rail', barPosition: 'beside-rail' }).root, 'Bar');
+    expect(bar.padding?.left).toBeTruthy();
+  });
+
+  it('draws the rule only in the rail', () => {
+    // In the bar the rule IS the bar's own bottom edge; a second one inside it
+    // would draw the same line twice.
+    expect(block('beside-rail').borderBottom).toEqual({ token: 'Border-Variant' });
+    expect(block('above-rail').borderBottom).toBeUndefined();
+  });
+});
+
+describe('centring needs two filling sides', () => {
+  /* Two FILL sides with a HUG middle is what actually centres the middle. It
+     is not optional geometry: with only a filling Start, space-between pushes
+     the middle hard right, which is exactly what the hero's centred tabs did.
+     The same rule the centred brand already followed. */
+  const groups = (def: ReturnType<typeof navDefinition>) =>
+    (find(def.root, 'Bar').children as any[]).map((c) => [c.name, c.width]);
+
+  it('the hero centres its tabs between two filling groups', () => {
+    const g = groups(navDefinition({ layout: 'hero', heroTabsAlign: 'center' }));
+    expect(g).toEqual([['Start', 'fill'], ['Center', 'hug'], ['End', 'fill']]);
+  });
+
+  it('and the End fills even with nothing in it', () => {
+    /* An EMPTY filling group is the point — it claims the same width as the
+       Start, so the middle lands on the bar's centre line rather than wherever
+       the menu button leaves it. */
+    const end = (find(navDefinition({ layout: 'hero', heroTabsAlign: 'center' }).root, 'End'));
+    expect(end.children).toEqual([]);
+    expect(end.width).toBe('fill');
+  });
+
+  it('condensed puts the actions in that group rather than adding a fourth', () => {
+    const g = groups(navDefinition({ layout: 'hero', heroTabsAlign: 'center', condensed: true, avatar: true }));
+    expect(g.map(([n]: any) => n)).toEqual(['Start', 'Center', 'End']);
+    expect(find(navDefinition({ layout: 'hero', heroTabsAlign: 'center', condensed: true, avatar: true }).root, 'Avatar'))
+      .toBeTruthy();
+  });
+
+  it('left-aligned tabs use one filling group and no End', () => {
+    // An empty End would take part in the space-between and push the tabs off
+    // the left edge they are meant to sit on.
+    const g = groups(navDefinition({ layout: 'hero', heroTabsAlign: 'left' }));
+    expect(g).toEqual([['Start', 'fill']]);
+  });
+
+  it('the centred brand works the same way', () => {
+    const g = groups(navDefinition({ layout: 'brand-centre' }));
+    expect(g.map(([, w]: any) => w)).toEqual(['fill', 'hug', 'fill']);
+  });
+});
