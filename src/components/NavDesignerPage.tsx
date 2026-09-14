@@ -393,7 +393,6 @@ export default function NavDesignerPage() {
           minHeight: 120,
           width: '100%',
           background: 'var(--Background)',
-          ...insets,
           boxSizing: 'border-box',
         }}
       >
@@ -835,6 +834,7 @@ export default function NavDesignerPage() {
                     slots={slotContent}
                     contentMaxWidth={current?.maxWidth}
                     contentAlign={current?.align}
+                    insets={insets}
                     showSlots
                   />
                 </ScaledPreview>
@@ -1271,6 +1271,27 @@ export default function NavDesignerPage() {
 
               {options.layout === 'hero' && (
                 <>
+                  <Divider />
+                  <Label>Tab alignment</Label>
+                  <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                    {([['left', 'Left'], ['center', 'Centred']] as const).map(([id, l]) => (
+                      <Button
+                        key={id}
+                        size="small"
+                        variant={(options.heroTabsAlign ?? 'left') === id ? 'default' : 'default-outline'}
+                        onClick={() => set('heroTabsAlign', id)}
+                      >
+                        {l}
+                      </Button>
+                    ))}
+                  </HStack>
+                  <Caption color="quiet">
+                    Left keeps the tabs on the page's own text edge, which is what a
+                    content site wants. Centred balances them under a full-bleed
+                    image. Centring uses the same two-filling-sides geometry the
+                    centred brand does — centring inside one filling group would put
+                    them wherever the menu button happens to leave them.
+                  </Caption>
                   <Divider />
                   <SwitchInput
                     checked={!!options.condensed}

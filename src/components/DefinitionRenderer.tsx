@@ -25,8 +25,13 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ComponentDefinition, NodeDef, Sizing, TokenRef } from '../utils/addOns/defineComponent';
 
+/* A custom property cannot contain a space, so a Figma variable that has one
+   — Component-Size holds `App-Bar Height` — hyphenates on the way to CSS.
+   navMetricsCSS emits the hyphenated name for exactly this reason; without
+   the same conversion here the reference came out `var(--App-Bar Height)`,
+   which is invalid and silently resolves to nothing. */
 const tok = (t: TokenRef | undefined): string | undefined =>
-  t ? `var(--${t.token.split('/').pop()})` : undefined;
+  t ? `var(--${t.token.split('/').pop()!.replace(/ /g, '-')})` : undefined;
 
 const JUSTIFY: Record<string, string> = {
   start: 'flex-start', center: 'center', end: 'flex-end', between: 'space-between',
@@ -89,6 +94,13 @@ export interface RenderOptions {
    *  in as a render option rather than living in the definition. */
   contentMaxWidth?: number;
   contentAlign?: 'left' | 'center';
+  /** Space the ROOT reserves for its own pinned bars.
+   *
+   *  On the root rather than on the Page slot, and the difference is the whole
+   *  fix: with the rail beside the page, insetting only the Page left the rail
+   *  to slide under a bar pinned above it. Everything inside the nav has to
+   *  start below the bar, not just the part that holds content. */
+  insets?: { top?: string; bottom?: string; left?: string; right?: string };
 }
 
 /** Where an overlay sits.
@@ -328,5 +340,24 @@ export default function DefinitionRenderer(
   { definition, ...opts }: { definition: ComponentDefinition } & RenderOptions,
 ) {
   /* The root's own parent is the preview frame, which is a column. */
-  return <>{renderNode(definition.root, opts, undefined, 'column')}</>;
+  const root = renderNode(definition.root, opts, undefined, 'column');
+  if (!opts.insets || !Object.keys(opts.insets).length) return <>{root}</>;
+
+  /* A wrapper rather than padding ON the root: the root paints the nav's
+     surface, and padding it would put the bar's reserved space inside that
+     paint — a band of nav-coloured nothing above the content. The wrapper
+     carries the space and the root keeps its own box. */
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      flex: '1 1 auto', minHeight: 0,
+      paddingTop: opts.insets.top,
+      paddingBottom: opts.insets.bottom,
+      paddingLeft: opts.insets.left,
+      paddingRight: opts.insets.right,
+      boxSizing: 'border-box',
+    }}>
+      {root}
+    </div>
+  );
 }

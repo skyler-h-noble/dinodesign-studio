@@ -55,6 +55,13 @@ export interface NavOptions {
   surface?: string;
   /** Hero only: brand and actions animate into the strip once it sticks. */
   condensed?: boolean;
+  /** Hero only: where the tab strip sits under the hero.
+   *
+   *  A real choice, not a default with an escape hatch. Left keeps the tabs
+   *  on the page's own text edge, which is what a content site wants; centred
+   *  balances them under a full-bleed image, which is what a marketing hero
+   *  wants. Neither is right for both. */
+  heroTabsAlign?: 'left' | 'center';
 }
 
 /** Palettes a nav can resolve against — the Theme collection's modes.
@@ -307,10 +314,26 @@ function bar(o: NavOptions): NodeDef {
     const start: NodeDef[] = [menuButton()];
     if (o.condensed) start.push(slot('Condensed-Brand', 'hug', 'Adaptive-Nav/Show-Condensed'));
     start.push(...navigationSlots());
-    children = [
-      { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
-        width: 'fill', height: 'hug', children: start },
-    ];
+    /* Centred means centred in the BAR, which needs the SPACE_BETWEEN to have
+       something to push against on both sides — the same geometry the centred
+       brand uses, and for the same reason. Centring inside a single filling
+       group would put the tabs wherever the menu button and the condensed
+       brand happen to leave them. */
+    const tabsCentred = o.heroTabsAlign === 'center';
+    children = tabsCentred
+      ? [
+          { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center',
+            gap: GAP, width: 'fill', height: 'hug', children: [menuButton()] },
+          { name: 'Center', kind: 'stack', direction: 'row', justify: 'center', align: 'center',
+            gap: GAP, width: 'hug', height: 'hug',
+            children: o.condensed
+              ? [slot('Condensed-Brand', 'hug', 'Adaptive-Nav/Show-Condensed'), ...navigationSlots()]
+              : navigationSlots() },
+        ]
+      : [
+          { name: 'Start', kind: 'stack', direction: 'row', align: 'center', gap: GAP,
+            width: 'fill', height: 'hug', children: start },
+        ];
     if (o.condensed) {
       children.push({ ...endSlot(o), presence: { when: 'Adaptive-Nav/Show-Condensed' } });
     }
@@ -328,7 +351,14 @@ function bar(o: NavOptions): NodeDef {
     /* No brand in the bar when the rail is full height — it is at the top of
        the rail instead, which is the corner it occupies. */
     const brandInBar = o.barPosition === 'above-rail';
-    const centred = o.titleAlign === 'center';
+    /* Above the rail the bar spans the whole width and carries the brand, so
+       its title belongs at the LEFT — beside the brand, where a title in an
+       application bar goes. Centring it there pushes it into the middle of a
+       1920px span, half a screen from the thing it names.
+       
+       Beside the rail the bar is only the content column and centring is a
+       real choice, so it stays one. */
+    const centred = !brandInBar && o.titleAlign === 'center';
     children = centred
       ? [
           { name: 'Start', kind: 'stack', direction: 'row', justify: 'start', align: 'center', gap: GAP,
@@ -364,7 +394,14 @@ function bar(o: NavOptions): NodeDef {
     gap: GAP,
     padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
     width: 'fill',
-    height: 'hug',
+    /* FIXED at the design system's own App-Bar Height, not hug.
+     
+       Hugging meant the bar was as tall as its tallest child plus padding —
+       92px where the token says 64 — so the inset that clears it was 28px
+       short and the rail slid under the bar. The token and the thing it
+       measures have to be the same number, and the design system is the one
+       that decides it. */
+    height: { fixed: t('Other/App-Bar Height') },
     /* The bar carries the pair itself rather than inheriting it.
        
        Inheriting works — custom properties cascade — but it leaves the bar
@@ -462,7 +499,11 @@ function railNode(fullHeight: boolean): NodeDef {
     name: 'Rail',
     kind: 'stack',
     direction: 'column',
-    align: 'start',
+    /* Centre, not start. The brand and the rail's items are different widths
+       and both belong on the rail's centre line — left-aligned, the brand sat
+       against the edge while the items centred themselves, and the column read
+       as two things rather than one. */
+    align: 'center',
     gap: GAP,
     width: 'hug',
     /* Full height only when it runs beside the bar. Below a full-width bar it
@@ -474,7 +515,15 @@ function railNode(fullHeight: boolean): NodeDef {
        without naming a second colour. Relative to whatever the nav is set to,
        which is why it is a level rather than a fixed surface. */
     surface: 'Surface-Dim',
-    padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
+    /* VERTICAL only. The horizontal inset belongs to the Rail component — the
+       design's Rail Slot insets its items by Sizing-1 — so adding Sizing-3
+       here too meant 24px of definition padding around 8px of component
+       padding around a 44px item, inside a rail 80px wide. The item had 32px
+       to live in and the labels wrapped.
+       
+       What is left is room for the brand above the items, which is this
+       wrapper's own job. */
+    padding: { top: PAD_Y, bottom: PAD_Y },
     presence: { when: 'Adaptive-Nav/Show-Rail' },
     /* The brand belongs to whichever element reaches the top-left corner. A
        full-height rail does, so it carries the brand and the bar beside it
@@ -482,7 +531,20 @@ function railNode(fullHeight: boolean): NodeDef {
        brand stays in the bar. Putting it in both would show it twice; putting
        it in the bar while the rail runs past it leaves the corner empty. */
     children: fullHeight
-      ? [slot('Brand', 'hug'), slot('Rail-Items', 'hug')]
+      ? [
+          /* The brand block is App-Bar Height tall, so its bottom edge lands
+             on the bar's. They sit side by side at the top of the screen, and
+             two different heights there reads as a misalignment rather than
+             as two components — the rail's own top edge is the one line the
+             eye checks. */
+          {
+            name: 'Brand-Block', kind: 'stack', direction: 'row',
+            justify: 'center', align: 'center',
+            width: 'fill', height: { fixed: t('Other/App-Bar Height') },
+            children: [slot('Brand', 'hug')],
+          },
+          slot('Rail-Items', 'hug'),
+        ]
       : [slot('Rail-Items', 'hug')],
   };
 }

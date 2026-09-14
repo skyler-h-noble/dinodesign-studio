@@ -198,10 +198,16 @@ describe('a filled slot holds its content at natural size', () => {
   });
 
   it('an empty slot still collapses to nothing', () => {
-    // The non-shrinking wrapper is for supplied content only — an unfilled
-    // slot must not reserve space it has no reason to hold.
-    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} />);
-    expect(out).not.toContain('flex-shrink:0');
+    /* The non-shrinking wrapper is for supplied content only — an unfilled
+       slot must not reserve space it has no reason to hold.
+       
+       Scoped to the SLOT, not the whole tree: a fixed-size node sets
+       flex-shrink:0 legitimately, and the bar is App-Bar Height now, so a
+       blanket search caught the bar and reported it as a slot reserving
+       space. */
+    const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} showSlots />);
+    const slotTag = out.slice(out.indexOf('Tabs') - 600, out.indexOf('Tabs'));
+    expect(slotTag).not.toContain('flex-shrink:0');
   });
 });
 
