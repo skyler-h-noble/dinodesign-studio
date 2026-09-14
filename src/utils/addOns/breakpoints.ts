@@ -124,6 +124,23 @@ export function isMobileBreakpoint(bp: Breakpoint | undefined): boolean {
   return !!bp && bp.minWidth <= MOBILE_MAX_WIDTH;
 }
 
+/** Where a bottom bar or toolbar stops making sense.
+ *
+ *  Wider than the mobile line, and deliberately: reach is what puts navigation
+ *  at the bottom, and a tablet held in two hands has the same thumbs as a
+ *  phone. A bottom bar at 900 is a real design; at 1920, on a screen nobody
+ *  holds, it is a long way from anything the pointer is near.
+ *
+ *  This does NOT swap the vocabulary the way the mobile line does. Below it
+ *  the bottom-bar arrangements are OFFERED alongside the top-bar ones, because
+ *  a tablet can legitimately have either — swapping would take the tabs away
+ *  from md, which is a width where they still fit. */
+export const BOTTOM_BAR_MAX_WIDTH = 1279;
+
+export function offersBottomBar(bp: Breakpoint | undefined): boolean {
+  return !!bp && bp.minWidth <= BOTTOM_BAR_MAX_WIDTH;
+}
+
 /** The breakpoint to open on: the widest, since that is what gets designed
  *  first and everything else is derived from it. */
 export function primaryBreakpoint(bps: Breakpoint[]): Breakpoint | undefined {

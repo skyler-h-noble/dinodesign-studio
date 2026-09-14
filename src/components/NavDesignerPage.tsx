@@ -12,7 +12,7 @@
  * exists to avoid. Boxes showing which slot sits where is the honest amount to
  * promise from a definition that has no behaviour in it yet.
  */
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
@@ -26,7 +26,8 @@ import {
 import {
   DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
   validateBreakpoints, breakpointRange, isMobileBreakpoint,
-  completeMatrix, conditionsAt, type Breakpoint, type ConditionMatrix,
+  completeMatrix, conditionsAt, offersBottomBar,
+  type Breakpoint, type ConditionMatrix,
 } from '../utils/addOns/breakpoints';
 import ScaledPreview from './ScaledPreview';
 import {
@@ -52,6 +53,18 @@ import { contentInsets, contentInsetCSS } from '../utils/addOns/contentInsets';
 import { NAV_METRICS } from '../utils/componentSize';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
+
+/** The narrowest the sticky preview shrinks to.
+ *
+ *  Below about this a desktop nav's tabs and actions are a few pixels each,
+ *  so the preview shows that something is there rather than what it is — and
+ *  a preview you cannot read is worse than one that is simply out of the way. */
+const PREVIEW_MIN_WIDTH = 300;
+
+/** How far you scroll past the preview before it reaches that floor. Roughly
+ *  a screenful, so the shrink reads as a response to scrolling rather than as
+ *  a jump the moment it sticks. */
+const SHRINK_OVER = 600;
 
 export default function NavDesignerPage() {
   const [options, setOptions] = useState<NavOptions>({
@@ -155,7 +168,17 @@ export default function NavDesignerPage() {
   const shown = displayBreakpoints(breakpoints);
   const current = sorted.find((b) => b.id === selectedBp);
 
-  const onMobile = isMobileBreakpoint(current);
+  /* Which VOCABULARY this breakpoint is designing in.
+   *
+   * Below the mobile line it is always the bottom-bar set — a phone nav is a
+   * different shape, not a narrower one. Between there and the bottom-bar
+   * ceiling it is a CHOICE, recorded per breakpoint: a tablet can have a top
+   * bar with tabs or a bottom bar within thumb reach, and both are real. The
+   * bottom-bar layouts were simply unreachable above 599 before, so md and sm
+   * could not have one at all. */
+  const [bottomBarAt, setBottomBarAt] = useState<Record<string, boolean>>({});
+  const onMobile = isMobileBreakpoint(current) || !!bottomBarAt[selectedBp];
+  const canOfferBottomBar = offersBottomBar(current);
 
   /* One menu, asked about through whichever option set is in play. */
   const avatarOpensMenu = onMobile ? !!mobile.avatarMenu : !!options.avatarMenu;
@@ -185,6 +208,7 @@ export default function NavDesignerPage() {
      visible, and what counts as "visible" depends on the frame. */
   const heroCap = Math.round((current?.deviceHeight ?? 800) * 0.55);
 
+
   /* The nav metrics, resolved for the size on the picker.
    *
    * The preview had none of them. tok() emits var(--Rail-Width) with no
@@ -198,6 +222,56 @@ export default function NavDesignerPage() {
    * VALUES come from NAV_METRICS, the same table the CSS export and the Figma
    * payload read, so the preview cannot show a size the export does not
    * produce. */
+  /* The preview shrinks as it sticks.
+   *
+   * A sticky preview that keeps its full height covers most of the screen,
+   * and the controls it exists to show the effect of are underneath it. So it
+   * gives ground as you scroll past — down to a floor rather than to nothing,
+   * because below about 300px a nav stops being legible and the preview stops
+   * being worth its space at all.
+   *
+   * Measured from the wrapper's own offset rather than window.scrollY: the
+   * preview is one card in a column and what matters is how far PAST it the
+   * page has gone, which is the same number whatever sits above it. */
+  /* A SENTINEL, not the sticky element itself.
+   *
+   * A stuck element's top is pinned at 0 — that is what sticky means — so it
+   * can never report how far past it the page has gone. Measuring it gave 0
+   * at every scroll position and the preview never shrank. A zero-height
+   * marker just above it keeps scrolling normally, and how far ITS top has
+   * gone negative is exactly the distance the preview has been stuck for. */
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [shrink, setShrink] = useState(0);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    let frame = 0;
+    const measure = () => {
+      const past = Math.max(0, -el.getBoundingClientRect().top);
+      setShrink(Math.min(1, past / SHRINK_OVER));
+    };
+    /* Cancel and reschedule, never "skip if one is pending".
+       
+       The skip version wedges: if a scheduled frame is dropped — a background
+       tab, a long task — the pending flag is never cleared and every scroll
+       after it is ignored. The preview froze at whatever size it happened to
+       be, which looked like the shrink not working at all rather than like a
+       stuck listener. */
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const metricVars = useMemo(() => {
     const out: Record<string, string> = {};
     for (const [name, byMode] of Object.entries(NAV_METRICS)) {
@@ -634,6 +708,19 @@ export default function NavDesignerPage() {
      exists for: how much empty space sits either side, and whether the nav
      still relates to the page under it. */
   const previewWidth = Math.max(range?.from ?? 0, 320);
+
+  /* How wide the preview may shrink to, and how far it takes to get there.
+     
+     300 is the floor: narrower than that a desktop nav's tabs and actions are
+     a few pixels each and the preview shows that something is there rather
+     than what it is. The distance is a screenful-ish — long enough that the
+     shrink reads as a response to scrolling rather than a jump. */
+  const previewMinWidth = Math.min(PREVIEW_MIN_WIDTH, previewWidth);
+  /* The scale cap, interpolated. ScaledPreview already takes the smaller of
+     this and what fits, so at rest this is 1 and the box is as big as the
+     card allows — the shrink only ever takes width away. */
+  const previewMaxScale = 1 - shrink * (1 - previewMinWidth / previewWidth);
+
   const editBp = (id: string, patch: Partial<Breakpoint>) =>
     setBreakpoints((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
@@ -734,7 +821,10 @@ export default function NavDesignerPage() {
                       tabIndex={0}
                       aria-pressed={selected}
                       aria-label={l.label}
-                      onClick={() => set('layout', l.id as NavLayout)}
+                      onClick={() => {
+                        set('layout', l.id as NavLayout);
+                        setBottomBarAt((m) => ({ ...m, [selectedBp]: false }));
+                      }}
                       onKeyDown={(e) => {
                         // A div taking a click has to take Enter and Space too,
                         // or the picker is unreachable from the keyboard.
@@ -762,6 +852,44 @@ export default function NavDesignerPage() {
                   ? MOBILE_LAYOUTS.find((l) => l.id === mobile.layout)?.description
                   : NAV_LAYOUTS.find((l) => l.id === options.layout)?.description}
               </BodySmall>
+
+              {/* The bottom-bar arrangements, OFFERED rather than swapped in.
+                  
+                  Below 600 they are the only set — a phone nav is a different
+                  shape, not a narrower one. From there to 1280 they sit beside
+                  the top-bar ones, because a tablet can legitimately have
+                  either and swapping would take the tabs away from md, which
+                  is a width where they still fit.
+                  
+                  They were unreachable above 599 entirely, so md and sm could
+                  not have a bottom bar at all. */}
+              {canOfferBottomBar && !isMobileBreakpoint(current) && (
+                <>
+                  <Divider />
+                  <Label>Or put navigation at the bottom</Label>
+                  <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                    {MOBILE_LAYOUTS.filter((l) => l.id !== 'top-only').map((l) => (
+                      <Button
+                        key={l.id}
+                        size="small"
+                        variant={onMobile && mobile.layout === l.id ? 'default' : 'default-outline'}
+                        onClick={() => {
+                          setMobileOpt('layout', l.id as MobileLayout);
+                          setBottomBarAt((m) => ({ ...m, [selectedBp]: true }));
+                        }}
+                      >
+                        {l.label}
+                      </Button>
+                    ))}
+                  </HStack>
+                  <Caption color="quiet">
+                    Reach is what puts navigation at the bottom, and a tablet held
+                    in two hands has the same thumbs as a phone. Above 1280 it stops
+                    being offered — on a screen nobody holds, the bottom edge is a
+                    long way from where the pointer already is.
+                  </Caption>
+                </>
+              )}
 
               {!onMobile && options.layout === 'rail' && (
                 <>
@@ -833,6 +961,7 @@ export default function NavDesignerPage() {
               It carries its own surface: a sticky element with a transparent
               background shows the content sliding under it, which is the one
               thing a sticky element cannot do. */}
+          <div ref={sentinelRef} aria-hidden style={{ height: 0 }} />
           <div
             data-surface="Surface"
             style={{
@@ -868,6 +997,7 @@ export default function NavDesignerPage() {
                   style={metricVars}
                   width={previewWidth}
                   height={current?.deviceHeight}
+                  maxScale={previewMaxScale}
                   onScale={setScale}
                   frame
                   clip={!menuShown}
