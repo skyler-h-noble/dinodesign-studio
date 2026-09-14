@@ -169,6 +169,7 @@ function renderNode(
     borderRadius: tok(node.radius),
     // A hairline in the token's colour, so it follows the surface it sits on.
     border: node.border ? `1px solid ${tok(node.border)}` : undefined,
+    borderBottom: node.borderBottom ? `1px solid ${tok(node.borderBottom)}` : undefined,
     /* A radius that does not clip is a radius on the background only: a row
        hovering at the top of a rounded panel paints square corners over it.
        Not applied when something underneath is meant to hang outside — a menu

@@ -49,6 +49,13 @@ export interface NavOptions {
   barPosition?: 'above-rail' | 'beside-rail';
   /** Where the page title sits in the bar. Only meaningful for 'rail'. */
   titleAlign?: 'left' | 'center';
+  /** Rail only: the rail can widen into a labelled drawer.
+   *
+   *  A CAPABILITY, not a state. The rail ships collapsed and the toggle is
+   *  the user's; what this decides is whether the toggle exists at all,
+   *  which is a design decision about the product rather than about the
+   *  moment. */
+  railExpandable?: boolean;
   /** Palette and surface level the nav paints on. Names, never colours — the
    *  same definition lands in each design system's own brand. */
   theme?: string;
@@ -541,6 +548,12 @@ function railNode(fullHeight: boolean): NodeDef {
             name: 'Brand-Block', kind: 'stack', direction: 'row',
             justify: 'center', align: 'center',
             width: 'fill', height: { fixed: t('Other/App-Bar Height') },
+            /* The rule lands exactly where the app bar's bottom edge does,
+               because the block is exactly that tall. It is what carries the
+               alignment across the gap between the two components — without
+               it the eye has only the brand's baseline to go on, and a brand
+               is centred in the block rather than sitting on its floor. */
+            borderBottom: t('Border-Variant'),
             children: [slot('Brand', 'hug')],
           },
           slot('Rail-Items', 'hug'),

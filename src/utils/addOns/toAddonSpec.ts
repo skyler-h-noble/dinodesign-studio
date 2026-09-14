@@ -73,6 +73,18 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
     spec.strokeAlign = 'INSIDE';
   }
 
+  /* One edge. Figma has no per-side stroke colour, but it does have per-side
+     WEIGHT — so the stroke is the colour and the other three sides are zeroed,
+     which is how a designer draws the same rule by hand. */
+  if (node.borderBottom) {
+    spec.strokes = [{ type: 'SOLID', color: ref(node.borderBottom) }];
+    spec.strokeAlign = 'INSIDE';
+    spec.strokeTopWeight = 0;
+    spec.strokeLeftWeight = 0;
+    spec.strokeRightWeight = 0;
+    spec.strokeBottomWeight = 1;
+  }
+
   /* Surface is a LEVEL, and on this target it names the variable group the
      fill comes from — Surface/Background, Surface-Dim/Background. The CSS
      compiler will put the same level on a data-surface attribute instead and

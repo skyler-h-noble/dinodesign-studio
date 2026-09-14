@@ -87,6 +87,13 @@ export interface NodeDef {
    *  is already Surface-Brightest has no visible boundary, and the panel reads
    *  as text lying loose on the page. */
   border?: TokenRef;
+  /** A hairline on the BOTTOM edge only, named by its colour token.
+   *
+   *  Separate from `border` rather than a side option on it, because the two
+   *  are different things: `border` outlines a floating panel, and this draws
+   *  a rule between two stacked regions. A rail's brand block ends where the
+   *  app bar beside it ends, and the line is what says so. */
+  borderBottom?: TokenRef;
   /** Surface level, NOT a colour. In Figma this is the variable group the
    *  fill comes from; in CSS it is a data-surface attribute and the fill is
    *  var(--Background). The level lives in different places on each target,

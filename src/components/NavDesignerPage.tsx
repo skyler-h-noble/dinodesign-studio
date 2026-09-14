@@ -421,7 +421,14 @@ export default function NavDesignerPage() {
       label: t.text ? t.label : undefined,
     }));
 
-    const rail = <Rail items={railItems} defaultValue={0} size={componentSize} />;
+    const rail = (
+      <Rail
+        items={railItems}
+        defaultValue={0}
+        size={componentSize}
+        expandable={!!options.railExpandable}
+      />
+    );
 
     const bottomNav = (
       <BottomNavigation
@@ -492,7 +499,8 @@ export default function NavDesignerPage() {
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
   }, [brand, tabs, actions, mobile.showLabels, mobile.toolbarStyle, mobile.toolbarOrientation,
-      avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap]);
+      avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap,
+      options.railExpandable]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
@@ -748,6 +756,19 @@ export default function NavDesignerPage() {
                       </Button>
                     ))}
                   </HStack>
+                  <Divider />
+                  <SwitchInput
+                    checked={!!options.railExpandable}
+                    onChange={(e: { target: { checked: boolean } }) =>
+                      set('railExpandable', e.target.checked)}
+                    label="Rail can expand to a drawer"
+                  />
+                  <Caption color="quiet">
+                    Adds the toggle that widens the rail into a labelled drawer. A
+                    capability rather than a state — the rail still ships collapsed,
+                    and whether the toggle exists at all is a decision about the
+                    product rather than about the moment.
+                  </Caption>
                   <Divider />
                   <Label>Title alignment</Label>
                   <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
