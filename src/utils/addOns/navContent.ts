@@ -37,19 +37,35 @@ export const ICON_REFERENCE_URL = 'https://mui.com/material-ui/material-icons/';
 export const AVATAR_TYPES = ['photo', 'initials', 'icon'] as const;
 export type AvatarType = (typeof AVATAR_TYPES)[number];
 
-/** The library's Button variants. Kept in step with Button.js by hand, so a
+/** The library's Button colours. Kept in step with Button.js by hand, so a
  *  variant offered here is one that renders — an invented one falls back to
  *  default and looks like a bug in the component rather than in this list. */
 export const BUTTON_VARIANTS = [
   'default', 'primary', 'secondary', 'tertiary', 'neutral',
   'info', 'success', 'warning', 'error',
 ] as const;
-export const BUTTON_TREATMENTS = ['solid', 'outline', 'light', 'ghost', 'text'] as const;
+/* `light` is gone: the lib removed the shape, and "{colour}-light" now
+   resolves to the SOLID colour with a dev warning — so offering it here was
+   offering a second solid. */
+export const BUTTON_TREATMENTS = ['solid', 'outline', 'ghost', 'text'] as const;
 export type ButtonTreatment = (typeof BUTTON_TREATMENTS)[number];
 
-/** Compose what the lib expects: 'primary-outline', 'default', 'error-ghost'. */
+/** Compose what the lib expects — and the lib's shapes are NOT all
+ *  colour-suffixed.
+ *
+ *  Solid is the bare colour and outline is "{colour}-outline". Ghost and text
+ *  are the bare words "ghost" / "text": they carry no colour, because the lib
+ *  paints them from the surface (--Hotlink for a text label, --Text for an
+ *  icon) rather than from a palette. This used to emit "error-ghost", which
+ *  Button.js has never had — an unknown variant falls through to
+ *  `variantMap.default`, so every ghost in the nav preview rendered as a
+ *  solid brand-green button and the mistake looked like a component bug. */
 export function buttonVariant(colour: string, treatment: ButtonTreatment): string {
-  return treatment === 'solid' ? colour : `${colour}-${treatment}`;
+  switch (treatment) {
+    case 'solid': return colour;
+    case 'outline': return `${colour}-outline`;
+    default: return treatment;
+  }
 }
 
 /**

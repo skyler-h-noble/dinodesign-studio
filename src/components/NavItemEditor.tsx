@@ -282,7 +282,7 @@ export default function NavItemEditor(
 
         <Divider />
         <HStack gap="var(--Sizing-2)" style={{ justifyContent: 'space-between' }}>
-          <Button variant="error-ghost" onClick={onRemove}>Remove</Button>
+          <Button variant="ghost" onClick={onRemove}>Remove</Button>
           <Button variant="default" disabled={blocked} onClick={onClose}>Done</Button>
         </HStack>
       </VStack>

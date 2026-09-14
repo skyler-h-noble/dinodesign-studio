@@ -132,7 +132,7 @@ export default function AccountMenuEditor(
                 </div>
                 <Button
                   iconOnly
-                  variant="default-ghost"
+                  variant="ghost"
                   size="small"
                   aria-label={`Move ${item.label || 'item'} up`}
                   disabled={index === 0}
@@ -142,7 +142,7 @@ export default function AccountMenuEditor(
                 </Button>
                 <Button
                   iconOnly
-                  variant="default-ghost"
+                  variant="ghost"
                   size="small"
                   aria-label={`Move ${item.label || 'item'} down`}
                   disabled={index === items.length - 1}
@@ -151,7 +151,7 @@ export default function AccountMenuEditor(
                   <NavIconGlyph name="ArrowDownward" />
                 </Button>
                 <Button
-                  variant="error-ghost"
+                  variant="ghost"
                   size="small"
                   onClick={() => remove(item.id)}
                 >
