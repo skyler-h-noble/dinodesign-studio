@@ -93,6 +93,8 @@ declare module '@omni-design/components' {
   export const CheckboxWithDescription: FC<any>;
   export const IndeterminateCheckbox: FC<any>;
   export const Radio: FC<any>;
+  /** Aspect-ratio slot. fit="width" fills the parent and derives the height. */
+  export const Ratio: FC<any>;
   export const RadioInput: FC<any>;
   export const RadioGroup: FC<any>;
   export const SwitchInput: FC<any>;

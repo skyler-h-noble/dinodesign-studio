@@ -17,7 +17,7 @@ describe('one table, three targets', () => {
        is the whole point of Component-Size: a component has one variant and
        switching the mode switches the size. */
     expect(componentSizeNames(payload)).toEqual([
-      'Other/App-Bar Height', 'Other/Rail-Width',
+      'Other/App-Bar Height', 'Other/Nav-Bar Height', 'Other/Rail-Width',
     ]);
     expect(payload.medium['Other/Rail-Width']).toBe(80);
     expect(payload.small['Other/Rail-Width']).toBe(72);

@@ -14,6 +14,25 @@ const names = (specOrNode: any): string[] => {
   return out;
 };
 
+/* Find a node by name anywhere in the tree.
+ *
+ * The rail layouts gained a `Body` wrapper when every layout got a Page — the
+ * bar and the page have to stack in the column beside the rail — so asserting
+ * on the ROOT's direct children was asserting on the wrapper rather than on
+ * the relationship the tests are about. These look for the node and check what
+ * is true of it, which survives the next wrapper too. */
+const find = (n: any, name: string): any => {
+  if (n?.name === name) return n;
+  for (const c of n?.children || []) {
+    const hit = find(c, name);
+    if (hit) return hit;
+  }
+  return null;
+};
+/* Whether one node contains another — the actual claim in "sibling, not a
+ * child". */
+const contains = (n: any, name: string): boolean => !!find(n, name);
+
 describe('three layouts, one component', () => {
   it('every layout produces the same add-on id', () => {
     /* They are one component with a picked layout, not three add-ons. Three
@@ -99,8 +118,11 @@ describe('what differs between them', () => {
     /* It runs the full height beside the content. Nested under the bar its
        height would be the bar's, which is a rail in name only. */
     const spec: any = toAddonSpec(full('rail'));
-    const top = spec.root.children.map((c: any) => c.name);
-    expect(top).toEqual(['Rail', 'Bar']);
+    // Neither contains the other. That is the whole claim — nested under the
+    // bar the rail's height would be the bar's, which is a rail in name only.
+    expect(contains(find(spec.root, 'Bar'), 'Rail')).toBe(false);
+    expect(contains(find(spec.root, 'Rail'), 'Bar')).toBe(false);
+    expect(spec.root.children[0].name).toBe('Rail');
     expect(spec.root.layoutMode).toBe('HORIZONTAL');
   });
 
@@ -317,18 +339,25 @@ describe('the rail can sit beside the bar or under it', () => {
        the brand above the CONTENT rather than above the rail. */
     const spec: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: 'beside-rail' }));
     expect(spec.root.layoutMode).toBe('HORIZONTAL');
-    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Rail', 'Bar']);
+    // Rail first, then the column holding the bar and the page.
+    expect(spec.root.children[0].name).toBe('Rail');
+    expect(contains(spec.root.children[1], 'Bar')).toBe(true);
+    expect(contains(spec.root.children[1], 'Page')).toBe(true);
   });
 
   it('above: the bar spans the width and the rail starts beneath it', () => {
     const spec: any = toAddonSpec(navDefinition({ layout: 'rail', barPosition: 'above-rail' }));
     expect(spec.root.layoutMode).toBe('VERTICAL');
-    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Bar', 'Rail']);
+    // Bar spans the top; the rail and the page share the row beneath it.
+    expect(spec.root.children[0].name).toBe('Bar');
+    expect(contains(spec.root.children[1], 'Rail')).toBe(true);
+    expect(contains(spec.root.children[1], 'Page')).toBe(true);
   });
 
   it('beside is the default', () => {
     const spec: any = toAddonSpec(navDefinition({ layout: 'rail' }));
-    expect(spec.root.children.map((c: any) => c.name)).toEqual(['Rail', 'Bar']);
+    expect(spec.root.children[0].name).toBe('Rail');
+    expect(spec.root.layoutMode).toBe('HORIZONTAL');
   });
 
   it('the rail is a sibling either way', () => {
@@ -346,10 +375,8 @@ describe('the rail can sit beside the bar or under it', () => {
        that cannot scroll out of view anyway. */
     for (const pos of ['beside-rail', 'above-rail'] as const) {
       const def = navDefinition({ layout: 'rail', barPosition: pos });
-      const bar = def.root.children!.find((c) => c.name === 'Bar');
-      const rail = def.root.children!.find((c) => c.name === 'Rail');
-      expect(bar!.sticky, pos).toBe(true);
-      expect(rail!.sticky, pos).toBeUndefined();
+      expect(find(def.root, 'Bar').sticky, pos).toBe(true);
+      expect(find(def.root, 'Rail').sticky, pos).toBeUndefined();
     }
   });
 });
@@ -571,9 +598,7 @@ describe('the menu button sits at the edge, not where the tabs were', () => {
        anything measurable about the others. */
     for (const l of ALL) {
       const spec: any = toAddonSpec(full(l));
-      const bar = spec.root.children.find((c: any) => c.name === 'Bar')
-        ?? spec.root.children[0].children?.find?.((c: any) => c.name === 'Bar');
-      const target = bar ?? spec.root.children.find((c: any) => c.name === 'Bar');
+      const target = find(spec.root, 'Bar');
       expect([l, target?.counterAxisAlignItems]).toEqual([l, 'CENTER']);
       for (const group of target.children) {
         if (group.kind === 'slot' || !group.children) continue;

@@ -25,6 +25,14 @@ export interface ScaledPreviewProps {
   frame?: boolean;
   /** The width to lay out at — the breakpoint's own lower bound. */
   width: number;
+  /** The device's height, so the frame is a SCREEN rather than a strip.
+   *
+   *  Without it the box is only as tall as the nav, and a top bar and a
+   *  bottom bar end up stacked against each other with no page between —
+   *  which is the one arrangement that tells you nothing about either. With
+   *  it the content starts at the top and the bottom bar sits where a thumb
+   *  would actually find it. */
+  height?: number;
   children: ReactNode;
   /** Never scale UP. A mobile layout at 375px inside a 900px card would be
    *  magnified into something no device shows. */
@@ -41,7 +49,7 @@ export interface ScaledPreviewProps {
 }
 
 export default function ScaledPreview(
-  { width, children, maxScale = 1, onScale, frame, clip = true }: ScaledPreviewProps,
+  { width, height: deviceHeight, children, maxScale = 1, onScale, frame, clip = true }: ScaledPreviewProps,
 ) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -71,7 +79,10 @@ export default function ScaledPreview(
          offsetHeight is the untransformed height and does not move when the
          scale does, so multiplying it is exact and has no ordering to get
          wrong. */
-      const natural = inner.current?.offsetHeight;
+      /* A stated device height wins over the measured one. Measuring gives
+         the height of the CONTENT, which is the nav — so a 1920x1080 desktop
+         would come back 64px tall and the page would have nowhere to be. */
+      const natural = deviceHeight ?? inner.current?.offsetHeight;
       if (natural) setHeight(Math.ceil(natural * next));
     };
 
@@ -80,7 +91,7 @@ export default function ScaledPreview(
     ro.observe(el);
     if (inner.current) ro.observe(inner.current);
     return () => ro.disconnect();
-  }, [width, maxScale, onScale]);
+  }, [width, deviceHeight, maxScale, onScale]);
 
   /* Three layers, and each earns its place.
      
@@ -110,6 +121,12 @@ export default function ScaledPreview(
           ref={inner}
           style={{
             width,
+            /* The device's full height, so the nav sits at the TOP of a
+               screen rather than being vertically centred in a box that
+               hugs it. Anything the nav does not occupy is page. */
+            ...(deviceHeight ? { height: deviceHeight } : {}),
+            display: 'flex',
+            flexDirection: 'column',
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
           }}

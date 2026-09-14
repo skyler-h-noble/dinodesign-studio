@@ -178,6 +178,25 @@ export function applyExclusivity(
   return anotherOn ? { ...row, [changed]: false } : row;
 }
 
+/**
+ * The page the nav sits against.
+ *
+ * A slot rather than a fixed height, because it is not the nav's — the page
+ * owns it. Emitting it as a FILLING slot says exactly that: the nav reserves
+ * the space and something else puts content in it.
+ *
+ * It was missing from every desktop layout, and its absence was invisible
+ * because the nav still rendered: a bar on its own looks fine until you ask
+ * where the content goes, and then there is nowhere for the sticky bar to
+ * stick OVER and no way to see that it needs an inset at all.
+ */
+export const pageSlot = (): NodeDef => ({
+  name: 'Page',
+  kind: 'slot',
+  width: 'fill',
+  height: 'fill',
+});
+
 const slot = (name: string, width: NodeDef['width'], when?: string): NodeDef => ({
   name,
   kind: 'slot',
@@ -469,9 +488,21 @@ function railChildren(o: NavOptions): NodeDef[] {
      
      A sibling either way — nesting the rail under the bar would tie its height
      to the bar's, and it would stop being a rail. */
+  /* The page goes WITH the bar, on the side of the rail the content is on.
+     Above: the bar spans the top and the rail and the page share the row
+     beneath it. Beside: the rail runs the full height and the bar and page
+     stack in the column to its right. */
   return o.barPosition === 'above-rail'
-    ? [railBar, railNode(false)]
-    : [railNode(true), railBar];
+    ? [railBar, {
+        name: 'Body', kind: 'stack', direction: 'row',
+        width: 'fill', height: 'fill',
+        children: [railNode(false), pageSlot()],
+      }]
+    : [railNode(true), {
+        name: 'Body', kind: 'stack', direction: 'column',
+        width: 'fill', height: 'fill',
+        children: [railBar, pageSlot()],
+      }];
 }
 
 export function navDefinition(o: NavOptions): ComponentDefinition {
@@ -498,7 +529,7 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
     theme: o.theme,
     children: o.layout === 'rail'
       ? railChildren(o)
-      : [{ ...bar(o), sticky: stickyBar(o) }],
+      : [{ ...bar(o), sticky: stickyBar(o) }, pageSlot()],
   };
 
   return {

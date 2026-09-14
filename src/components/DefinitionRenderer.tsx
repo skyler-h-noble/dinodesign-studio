@@ -192,13 +192,31 @@ function renderNode(node: NodeDef, opts: RenderOptions, key?: string): ReactNode
          built that way renders its items in a line. */
       const column = node.direction === 'column';
       const cross = column ? 'stretch' : 'center';
+
+      /* The wrapper exists to stop an ITEM being crushed — a tab strip with
+         min-width:0 collapsed to four hairlines — so it hugs and refuses to
+         shrink. That is exactly wrong for a REGION, which is declared `fill`
+         precisely because it should take the space it is given.
+         
+         So it is decided per AXIS, from what the slot itself declares. Keying
+         it on one axis was not enough: the Page is fill/fill and the Hero is
+         fill/hug, and testing only the height collapsed the hero to the
+         intrinsic size of an empty 16:9 box — fifteen pixels wide.
+         
+         An item is hug on both axes, so nothing that needs the protection
+         loses it. */
+      const fillsX = node.width === 'fill';
+      const fillsY = node.height === 'fill';
+      const isRegion = fillsX || fillsY;
       return (
-        <div key={key} style={{ ...style, alignItems: cross }} {...surfaceAttrs}>
+        <div key={key} style={{ ...style, alignItems: fillsY ? 'stretch' : cross }} {...surfaceAttrs}>
           <div style={{
-            flexShrink: 0,
+            flexShrink: isRegion ? 1 : 0,
             display: 'flex',
             flexDirection: column ? 'column' : 'row',
-            alignItems: cross,
+            alignItems: fillsY ? 'stretch' : cross,
+            ...(fillsX ? { width: '100%', minWidth: 0 } : {}),
+            ...(fillsY ? { flex: '1 1 auto' } : {}),
           }}>
             {supplied}
           </div>

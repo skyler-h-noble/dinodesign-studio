@@ -133,6 +133,15 @@ export interface RadiiForSize {
 export const NAV_METRICS = {
   'Rail-Width': { medium: 80, small: 72, large: 96 },
   'App-Bar Height': { medium: 64, small: 56, large: 72 },
+  /* The bottom bar. 83 at medium is the design's own figure (Nav-Bar
+     7442:31305, 398x83); the other two follow App-Bar Height's proportions
+     rather than being measured, because the design has no small or large
+     Nav-Bar to read.
+     
+     Stated here rather than left implicit because a PAGE needs it: a pinned
+     bottom bar covers the last 83px of content, and the inset that clears it
+     has to track the size mode or it is right at exactly one of the three. */
+  'Nav-Bar Height': { medium: 83, small: 73, large: 93 },
 } as const;
 
 /** The flat Sm-/Lg- shape componentSizeGroup takes, from the table above. */

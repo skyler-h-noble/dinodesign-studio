@@ -32,6 +32,14 @@ export interface Breakpoint {
    *  maxWidth, and there is no correct default: a centred nav matches a centred
    *  page, while a left-aligned one keeps the brand where the eye starts. */
   align?: 'left' | 'center';
+  /** The device frame to preview in, so a nav is judged on a SCREEN rather
+   *  than as a strip floating on its own.
+   *
+   *  Real device figures, taken from the file's own Devices-Type collection
+   *  rather than invented: Desktop is 1920x1080, its Common size 1536x864,
+   *  Tablet-Vertical 820x1180 and Tablet-Horizontal 1180x820. A made-up
+   *  height would put the bottom bar somewhere no device does. */
+  deviceHeight?: number;
 }
 
 /** Condition name → breakpoint id → whether it is true there. */
@@ -52,15 +60,19 @@ export type ConditionMatrix = Record<string, Record<string, boolean>>;
 
    Each is a LOWER bound, so xs must be 0 — see validateBreakpoints. */
 export const DEFAULT_BREAKPOINTS: Breakpoint[] = [
-  { id: 'xs', label: 'xs', minWidth: 0 },
-  { id: 'sm', label: 'sm', minWidth: 600 },
-  { id: 'md', label: 'md', minWidth: 900 },
-  { id: 'lg', label: 'lg', minWidth: 1280 },
+  /* Heights are the device each breakpoint stands for, not the width times
+     some ratio: a phone is tall, a tablet turned sideways is not, and the
+     whole point of showing the frame is that the bottom bar lands where a
+     thumb would find it. */
+  { id: 'xs', label: 'xs', minWidth: 0, deviceHeight: 844 },
+  { id: 'sm', label: 'sm', minWidth: 600, deviceHeight: 1180 },
+  { id: 'md', label: 'md', minWidth: 900, deviceHeight: 820 },
+  { id: 'lg', label: 'lg', minWidth: 1280, deviceHeight: 864 },
   /* Capped and centred: past this width a nav that keeps stretching puts the
      brand and the actions absurdly far apart. 1440 is the widest of the common
      content ceilings and sits inside Desktop Default's 1920 with room for the
      margin. */
-  { id: 'xl', label: 'xl', minWidth: 1920, maxWidth: 1440, align: 'center' },
+  { id: 'xl', label: 'xl', minWidth: 1920, maxWidth: 1440, align: 'center', deviceHeight: 1080 },
 ];
 
 /** Ascending by width. Order is MEANING here, not presentation: "the last one

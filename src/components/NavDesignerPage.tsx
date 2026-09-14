@@ -17,7 +17,7 @@ import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
-  Rail, BottomNavigation, MenuItem, MenuDivider,
+  Rail, BottomNavigation, MenuItem, MenuDivider, Ratio,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -48,6 +48,7 @@ import NavItemEditor from './NavItemEditor';
 import AccountMenuEditor from './AccountMenuEditor';
 import NavIconGlyph from './NavIconGlyph';
 import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
+import { contentInsets, contentInsetCSS } from '../utils/addOns/contentInsets';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
 
@@ -105,6 +106,11 @@ export default function NavDesignerPage() {
      and is published, but what it holds is decided by a click rather than by a
      width, so storing it in the breakpoint matrix would record "open at lg" as
      a design decision. */
+  /* Which Component-Size mode everything in the nav resolves at. One control
+     for the whole thing, not a size per component: the point of the mode is
+     that a rail, a bar and the buttons in it move together, and three pickers
+     would let them disagree in ways no design system has a name for. */
+  const [componentSize, setComponentSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [accountItems, setAccountItems] = useState<AccountMenuItem[]>(DEFAULT_ACCOUNT_MENU);
   const [accountEditorOpen, setAccountEditorOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -152,6 +158,26 @@ export default function NavDesignerPage() {
 
   /* One menu, asked about through whichever option set is in play. */
   const avatarOpensMenu = onMobile ? !!mobile.avatarMenu : !!options.avatarMenu;
+
+  const { definition, spec } = useMemo(() => {
+    /* Which VOCABULARY applies is decided by the breakpoint, not by a toggle.
+       Below the tablet cluster a nav is a different component shape, so the
+       definition comes from a different builder rather than the same one with
+       parts switched off. */
+    const def = onMobile
+      ? mobileNavDefinition({ ...mobile, theme: options.theme, surface: options.surface })
+      : navDefinition(options);
+    /* tokensUsed is no longer read here — the token list came out with the
+       card that showed it. It stays exported because the publish script prints
+       it before writing, which is where the check actually matters: a missing
+       variable imports unbound and silently looks like a design decision. */
+    return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
+  }, [options, mobile, onMobile]);
+
+  /* What the nav occupies, so the page can keep clear of it. Derived from the
+     definition rather than measured, so it follows the arrangement and the
+     size mode instead of a number read off the screen once. */
+  const insets = useMemo(() => contentInsets(definition), [definition]);
 
   const slotContent = useMemo(() => {
     const mark = brand ? (
@@ -312,37 +338,54 @@ export default function NavDesignerPage() {
       </VStack>
     );
 
-    /* The hero the sticky tabs sit under. 16:9 because that is what a hero
-       image is — an aspect ratio rather than a height, so it stays right at
-       every breakpoint instead of being a number that is only correct at the
-       width it was picked at.
+    /* The hero the sticky tabs sit under — the lib's Ratio, not a div with
+       an aspectRatio on it.
        
-       A placeholder, not an image: the hero is its own add-on, and putting a
-       picture here would suggest this one owns it. */
-    const hero = (
+       Ratio already IS this: fit="width" fills the parent and derives the
+       height from the ratio, and an empty one renders the image placeholder,
+       so the hand-drawn box was a second implementation of a shipped
+       component down to the "Hero 16:9" caption standing in for the
+       placeholder art.
+       
+       A placeholder rather than a picture, still: the hero is its own add-on,
+       and putting an image here would suggest this one owns it. */
+    const hero = <Ratio ratio="16:9" fit="width" sx={{ width: '100%' }} />;
+
+    /* The page the nav sits against.
+       
+       Painted, and painted with the PAGE's own background rather than left
+       blank: a nav is judged against what it sits on, and an empty white
+       strip is not that. data-theme="Default" is the page inheriting the
+       brand's own default, which is what a real app's content area does.
+       
+       Inset by whatever the nav occupies. A pinned bar leaves the flow, so
+       without the inset the content starts underneath it and the first thing
+       on the page is hidden — the bug every consumer of a sticky nav hits and
+       then fixes by typing a measured number into their own CSS. The numbers
+       come from the definition, so they follow the arrangement and the size
+       mode instead of being copied out of devtools. */
+    const page = (
       <div
-        aria-hidden
-        data-surface="Surface-Dim"
+        data-theme="Default"
+        data-surface="Surface"
         style={{
+          flex: 1,
+          minHeight: 120,
           width: '100%',
-          aspectRatio: '16 / 9',
           background: 'var(--Background)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          ...insets,
+          boxSizing: 'border-box',
         }}
       >
-        <span style={{ color: 'var(--Text-Quiet)', font: 'var(--Label-ExtraSmall-Font-Size, 11px)/1 var(--Font-Families-Body, sans-serif)' }}>
-          Hero 16:9
-        </span>
+        <div style={{
+          height: '100%',
+          border: '1px dashed var(--Border-Variant)',
+          borderRadius: 'var(--Card-Radius, 8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Caption color="quiet">Content</Caption>
+        </div>
       </div>
-    );
-
-    /* The page the bars sit either end of. Filled with nothing in particular
-       — its only job is to have height, so the two bars read as the top and
-       the bottom of a screen rather than as one thick bar. */
-    const page = (
-      <div style={{ minHeight: 180, width: '100%' }} aria-hidden />
     );
 
     /* The library's Rail and BottomNavigation, not shapes drawn here.
@@ -359,13 +402,16 @@ export default function NavDesignerPage() {
       label: t.text ? t.label : undefined,
     }));
 
-    const rail = <Rail items={railItems} defaultValue={0} />;
+    const rail = <Rail items={railItems} defaultValue={0} size={componentSize} />;
 
     const bottomNav = (
       <BottomNavigation
         items={railItems}
         defaultValue={0}
         showLabels={mobile.showLabels !== false}
+        variant={mobile.toolbarStyle === 'floating' ? 'floating' : 'fixed'}
+        orientation={mobile.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal'}
+        fixed={false}
       />
     );
 
@@ -374,7 +420,7 @@ export default function NavDesignerPage() {
        you the slot exists; the real control tells you whether it sits right
        beside the brand at this width, which is the thing being designed. */
     const menuButton = (
-      <Button iconOnly variant="default-ghost" size="small" aria-label="Open navigation">
+      <Button iconOnly variant="default-ghost" size={componentSize} aria-label="Open navigation">
         <NavIconGlyph name="Menu" />
       </Button>
     );
@@ -392,24 +438,12 @@ export default function NavDesignerPage() {
     };
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
-  }, [brand, tabs, actions, mobile.showLabels, avatarOpensMenu, menuOpen, accountItems]);
+  }, [brand, tabs, actions, mobile.showLabels, mobile.toolbarStyle, mobile.toolbarOrientation,
+      avatarOpensMenu, menuOpen, accountItems, componentSize, insets]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
-  const { definition, spec } = useMemo(() => {
-    /* Which VOCABULARY applies is decided by the breakpoint, not by a toggle.
-       Below the tablet cluster a nav is a different component shape, so the
-       definition comes from a different builder rather than the same one with
-       parts switched off. */
-    const def = onMobile
-      ? mobileNavDefinition({ ...mobile, theme: options.theme, surface: options.surface })
-      : navDefinition(options);
-    /* tokensUsed is no longer read here — the token list came out with the
-       card that showed it. It stays exported because the publish script prints
-       it before writing, which is where the check actually matters: a missing
-       variable imports unbound and silently looks like a design decision. */
-    return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
-  }, [options, mobile, onMobile]);
+
 
 
   /* The full table, recompleted whenever the conditions or breakpoints change.
@@ -732,6 +766,7 @@ export default function NavDesignerPage() {
                     not rendering rather than as the frame ending. */}
                 <ScaledPreview
                   width={previewWidth}
+                  height={current?.deviceHeight}
                   onScale={setScale}
                   frame
                   clip={!menuShown}
@@ -753,10 +788,11 @@ export default function NavDesignerPage() {
 
               <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                 <Caption color="quiet">
-                  {previewWidth}px
-                  {scale < 0.999 ? ` at ${Math.round(scale * 100)}%` : ''}
+                  {previewWidth}
+                  {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''}px
+                  {scale < 0.999 ? ` — shown at ${Math.round(scale * 100)}%` : ' — actual size'}
                   {current?.maxWidth && current.maxWidth < previewWidth
-                    ? ` — content capped at ${current.maxWidth}px`
+                    ? `, content capped at ${current.maxWidth}px`
                     : ''}
                 </Caption>
               </HStack>
@@ -1057,6 +1093,35 @@ export default function NavDesignerPage() {
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
+              <H4>Component size</H4>
+              <Body color="quiet">
+                One control for the whole nav. Size is a Component-Size MODE, so
+                the rail's width, the bar's height and the buttons inside it move
+                together — three separate pickers would let them disagree in ways
+                the design system has no name for.
+              </Body>
+              <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+                {(['small', 'medium', 'large'] as const).map((sz) => (
+                  <Button
+                    key={sz}
+                    size="small"
+                    variant={componentSize === sz ? 'default' : 'default-outline'}
+                    onClick={() => setComponentSize(sz)}
+                  >
+                    {sz}
+                  </Button>
+                ))}
+              </HStack>
+              <Caption color="quiet">
+                Rail-Width {componentSize === 'small' ? 72 : componentSize === 'large' ? 96 : 80}px
+                {' · '}App-Bar Height {componentSize === 'small' ? 56 : componentSize === 'large' ? 72 : 64}px
+                {' · '}Nav-Bar Height {componentSize === 'small' ? 73 : componentSize === 'large' ? 93 : 83}px
+              </Caption>
+            </VStack>
+          </Card>
+
+          <Card padding="medium">
+            <VStack gap="var(--Sizing-3)">
               <H4>Slots</H4>
 
               {/* One set, and every one of them is per breakpoint.
@@ -1182,6 +1247,20 @@ export default function NavDesignerPage() {
                 language="JSON"
                 maxHeight={360}
               />
+
+              {contentInsetCSS(insets) && (
+                <>
+                  <Divider />
+                  <H4>Content insets</H4>
+                  <Body>
+                    A pinned bar leaves the flow, so the page starts underneath it
+                    and the first thing on it is hidden. This is the CSS that
+                    clears it — in tokens, so it follows the size mode rather than
+                    being a number read off the screen once.
+                  </Body>
+                  <CodeBlock code={contentInsetCSS(insets)!} language="CSS" />
+                </>
+              )}
             </VStack>
           </Card>
         </VStack>
