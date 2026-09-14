@@ -203,8 +203,12 @@ export default function NavDesignerPage() {
     for (const [name, byMode] of Object.entries(NAV_METRICS)) {
       out[`--${name.replace(/ /g, '-')}`] = `${byMode[componentSize]}px`;
     }
+    /* The page's side margin, which is the BAR's side padding too — it comes
+       from the breakpoint rather than the size mode, because it is a property
+       of the screen rather than of the components on it. */
+    if (current?.margin !== undefined) out['--Margin'] = `${current.margin}px`;
     return out as CSSProperties;
-  }, [componentSize]);
+  }, [componentSize, current?.margin]);
 
   const slotContent = useMemo(() => {
     const mark = brand ? (
@@ -1254,6 +1258,28 @@ export default function NavDesignerPage() {
                     );
                   },
                 )}
+                {/* Every OTHER condition this arrangement uses.
+                    
+                    The three above are special only because each is also a
+                    structural option — turning one on has to put the slot in
+                    the component as well as switch it on here. The rest are
+                    plain per-breakpoint switches, and they were not rendered
+                    at all: `otherConditions` was computed and never used, so
+                    Show-Rail had no control anywhere. Picking the rail layout
+                    at a width where the seed had it off gave you a rail
+                    layout with no rail and nothing to turn it back on. */}
+                {otherConditions
+                  .filter((n) => !['Adaptive-Nav/Show-Search', 'Adaptive-Nav/Show-Actions',
+                                   'Adaptive-Nav/Show-Avatar'].includes(n))
+                  .map((name) => (
+                    <SwitchInput
+                      key={name}
+                      checked={!!active[name]}
+                      onChange={(e: { target: { checked: boolean } }) =>
+                        setCondition(name, e.target.checked)}
+                      label={name.split('/').pop()!.replace(/^Show-/, '').replace(/-/g, ' ')}
+                    />
+                  ))}
               </HStack>
 
               {/* Only once the avatar is there. A menu behind a slot that does

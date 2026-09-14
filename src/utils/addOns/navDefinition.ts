@@ -265,7 +265,13 @@ function brandBlock(inRail: boolean): NodeDef {
 
 const GAP: TokenRef = t('Sizing-2');
 const PAD_Y: TokenRef = t('Sizing-2');
-const PAD_X: TokenRef = t('Sizing-3');
+/* The bar's side padding is the page's own MARGIN, not a spacing step.
+ *
+ * A bar whose contents start at a different x from the page's contents reads
+ * as misaligned however carefully each one is padded — and Sizing-3 is 24
+ * where a desktop page's margin is 64, so on a wide screen the brand sat 40px
+ * inside the first thing under it. One number, both. */
+const PAD_X: TokenRef = t('Margin');
 
 /** The end slot is the same in all three layouts — only its contents vary. */
 function endSlot(o: NavOptions): NodeDef {
@@ -458,8 +464,13 @@ function bar(o: NavOptions): NodeDef {
        it. Padding would inset it and the two would miss each other by exactly
        Sizing-3, which reads as the rail being misaligned rather than the bar
        being padded. */
+    /* NO vertical padding. The bar is a fixed App-Bar Height and centres its
+       contents, so padding on top of that only fights the height — it made the
+       hero's tab strip 96px where the token says 64, and the strip is the one
+       place that extra height is most visible because the tabs have their own
+       padding underneath it. */
     padding: {
-      top: PAD_Y, bottom: PAD_Y, right: PAD_X,
+      right: PAD_X,
       ...(o.layout === 'rail' && o.barPosition === 'above-rail' ? {} : { left: PAD_X }),
     },
     width: 'fill',
