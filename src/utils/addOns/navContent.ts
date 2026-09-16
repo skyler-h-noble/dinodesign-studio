@@ -136,10 +136,40 @@ export function setDecorator(item: NavItem, end: 'start' | 'end', to: Decorator)
   return next;
 }
 
+/**
+ * Which session a button belongs to.
+ *
+ * Signed out and signed in are two navs, not one nav with a hidden button —
+ * keeping both asks someone who already signed up to do it again while
+ * offering an account menu to someone who has none.
+ *
+ * But it is not a clean swap either, which is the part a two-state model gets
+ * wrong: a shopping cart, a search field and a "Docs" link belong to the PAGE
+ * and stay put across the switch. Three groups rather than two, so the thing
+ * that survives does not have to be duplicated into both and then kept in
+ * step by hand.
+ *
+ * `always` is the default because it is the safe one: a button that should
+ * have swapped and did not is visible and obviously wrong, where a button
+ * that should have stayed and vanished is invisible and looks like a bug.
+ */
+export const SESSIONS = ['always', 'signed-out', 'signed-in'] as const;
+export type Session = (typeof SESSIONS)[number];
+
+export const SESSION_LABEL: Record<Session, string> = {
+  always: 'Always',
+  'signed-out': 'Signed out',
+  'signed-in': 'Signed in',
+};
+
 export interface NavButtonItem extends NavItem {
   colour: string;
   treatment: ButtonTreatment;
+  session?: Session;
 }
+
+/** The session a button belongs to, defaulted. */
+export const sessionOf = (item: NavButtonItem): Session => item.session ?? 'always';
 
 /* A TAB IS NOT A BUTTON, and the distinction is visual rather than semantic.
    
@@ -161,8 +191,17 @@ export const DEFAULT_TABS: NavItem[] = [
 ];
 
 export const DEFAULT_ACTIONS: NavButtonItem[] = [
-  { id: 'act-1', label: 'Sign in', text: true, colour: 'default', treatment: 'text' },
-  { id: 'act-2', label: 'Get started', text: true, colour: 'default', treatment: 'solid' },
+  /* A cart is the example that makes the three groups obvious: it belongs to
+     the page, so it survives signing in rather than being duplicated into
+     both sessions. */
+  { id: 'act-0', label: 'Cart', startIcon: true, startIconName: 'ShoppingCart',
+    colour: 'default', treatment: 'ghost', session: 'always' },
+  { id: 'act-1', label: 'Sign in', text: true, colour: 'default', treatment: 'text',
+    session: 'signed-out' },
+  { id: 'act-2', label: 'Get started', text: true, colour: 'default', treatment: 'solid',
+    session: 'signed-out' },
+  { id: 'act-3', label: 'Notifications', startIcon: true, startIconName: 'Notifications',
+    colour: 'default', treatment: 'ghost', session: 'signed-in' },
 ];
 
 export const newId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;

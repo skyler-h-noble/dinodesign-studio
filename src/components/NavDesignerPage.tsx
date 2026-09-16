@@ -39,8 +39,8 @@ import {
   loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
 } from '../utils/addOns/brandAsset';
 import {
-  DEFAULT_TABS, DEFAULT_ACTIONS, buttonVariant, itemProblems,
-  type NavItem, type NavButtonItem,
+  DEFAULT_TABS, DEFAULT_ACTIONS, buttonVariant, itemProblems, sessionOf,
+  type NavItem, type NavButtonItem, type Session,
 } from '../utils/addOns/navContent';
 import {
   DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, type AccountMenuItem,
@@ -404,9 +404,14 @@ export default function NavDesignerPage() {
       </Tabs>
     );
 
-    const actionGroup = (
+    /* One renderer, three groups. The buttons differ only in which session
+       they belong to, so splitting the LIST rather than writing three
+       renderers keeps a change to a button's look in one place. */
+    const groupFor = (which: Session) => actions.filter((a) => sessionOf(a) === which);
+
+    const renderActions = (list: NavButtonItem[]) => (
       <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
-        {actions.map((a) => {
+        {list.map((a) => {
           const problems = itemProblems(a);
           const start = deco(a, 'start');
           const end = deco(a, 'end');
@@ -660,7 +665,9 @@ export default function NavDesignerPage() {
 
     const out: Record<string, React.ReactNode> = {
       Tabs: tabStrip,
-      Actions: actionGroup,
+      Actions: renderActions(groupFor('always')),
+      'Signed-Out-Actions': renderActions(groupFor('signed-out')),
+      'Signed-In-Actions': renderActions(groupFor('signed-in')),
       Avatar: avatar,
       'Account-Menu': accountMenu,
       Page: page,

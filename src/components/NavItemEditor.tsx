@@ -14,6 +14,7 @@ import {
 import {
   BUTTON_VARIANTS, BUTTON_TREATMENTS, AVATAR_TYPES, ICON_REFERENCE_URL,
   itemProblems, itemRendersNothing, buttonVariant, decoratorAt, setDecorator,
+  SESSIONS, SESSION_LABEL, sessionOf,
   type NavItem, type NavButtonItem, type ButtonTreatment, type AvatarType,
   type Decorator,
 } from '../utils/addOns/navContent';
@@ -249,6 +250,29 @@ export default function NavItemEditor(
             here would produce a solid tab, which the design system does not have. */}
         {kind === 'button' && (
           <>
+            <Divider />
+            <Label>Shown when</Label>
+            <HStack gap="var(--Sizing-2)" style={{ flexWrap: 'wrap' }}>
+              {SESSIONS.map((sess) => (
+                <Button
+                  key={sess}
+                  size="small"
+                  variant={sessionOf(asButton) === sess ? 'default' : 'default-outline'}
+                  onClick={() => set('session', sess)}
+                >
+                  {SESSION_LABEL[sess]}
+                </Button>
+              ))}
+            </HStack>
+            <Caption color="quiet">
+              Signed out and signed in are two navs, not one with a hidden button —
+              keeping both asks someone who already signed up to do it again while
+              offering an account menu to someone who has none. But a cart, a search
+              field or a Docs link belongs to the PAGE and survives the switch, which
+              is why there are three groups rather than two: the thing that stays
+              does not have to be duplicated into both and kept in step by hand.
+            </Caption>
+
             <Divider />
             <Label>Colour</Label>
             <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>

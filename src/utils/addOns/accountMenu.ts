@@ -33,10 +33,20 @@ export const ACCOUNT_MENU_CONDITION = 'Adaptive-Nav/Show-Account-Menu';
  *  Here it gates the account. */
 export const SIGNED_IN_CONDITION = 'Adaptive-Nav/Signed-In';
 
+/** And its counterpart. TWO booleans rather than one, because Figma binds a
+ *  layer's `visible` to a boolean and cannot invert it — the same reason
+ *  Show-Tabs and Show-Menu-Button are a pair rather than one flag. */
+export const SIGNED_OUT_CONDITION = 'Adaptive-Nav/Signed-Out';
+
 export const ACCOUNT_MENU_CONDITIONS: Record<string, ConditionDef> = {
   [SIGNED_IN_CONDITION]: {
     description:
       'Someone is signed in. Off shows the nav as a visitor sees it, with no account.',
+    trigger: 'session',
+  },
+  [SIGNED_OUT_CONDITION]: {
+    description:
+      'Nobody is signed in. Shows the nav a visitor sees — sign in, get started.',
     trigger: 'session',
   },
   [ACCOUNT_MENU_CONDITION]: {
@@ -143,6 +153,10 @@ export function accountNode(opts: { withMenu?: boolean; when?: string }): NodeDe
  *
  *  Named for what it gates rather than for what it holds, so the layer list
  *  reads as the decision: Signed-In › Account › Avatar. */
+export function signedOutOnly(node: NodeDef): NodeDef {
+  return { ...signedInOnly(node), name: 'Signed-Out', presence: { when: SIGNED_OUT_CONDITION } };
+}
+
 export function signedInOnly(node: NodeDef): NodeDef {
   return {
     name: 'Signed-In',

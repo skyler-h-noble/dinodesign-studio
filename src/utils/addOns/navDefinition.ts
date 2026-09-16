@@ -26,7 +26,7 @@
  * than a fake frame that pretends to mean something.
  */
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef, type TokenRef } from './defineComponent';
-import { accountNode, signedInOnly, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
+import { accountNode, signedInOnly, signedOutOnly, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
 
 export type NavLayout = 'brand-left' | 'brand-centre' | 'rail' | 'hero';
 
@@ -300,7 +300,21 @@ const PAD_X: TokenRef = t('Margin');
 function endSlot(o: NavOptions): NodeDef {
   const children: NodeDef[] = [];
   if (o.search) children.push(slot('Search', 'hug', 'Adaptive-Nav/Show-Search'));
-  if (o.actions) children.push(slot('Actions', 'hug', 'Adaptive-Nav/Show-Actions'));
+  /* THREE action groups, and the third is the one a straight swap gets wrong.
+     
+     A shopping cart, a "Docs" link, a help button belong to the PAGE and
+     survive signing in. Modelled as a two-way swap they have to be duplicated
+     into both sessions and kept in step by hand, and the copy that falls
+     behind is the one nobody is looking at.
+     
+     Each is still gated on Show-Actions as well, so the width can take all
+     three away at once — the session decides WHICH actions, the breakpoint
+     decides whether there is room for any. */
+  if (o.actions) {
+    children.push(slot('Actions', 'hug', 'Adaptive-Nav/Show-Actions'));
+    children.push(signedOutOnly(slot('Signed-Out-Actions', 'hug', 'Adaptive-Nav/Show-Actions')));
+    children.push(signedInOnly(slot('Signed-In-Actions', 'hug', 'Adaptive-Nav/Show-Actions')));
+  }
   /* The avatar, or the avatar and the panel it opens. One builder for both
      ends of that choice, shared with the mobile bar, because the menu under a
      mobile avatar is the same panel and two copies would agree only until the

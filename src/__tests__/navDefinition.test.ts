@@ -297,7 +297,11 @@ describe('the condensed state is scroll-driven, not width-driven', () => {
     const notWidthDriven = new Set([
       'Adaptive-Nav/Show-Condensed',
       'Adaptive-Nav/Show-Account-Menu',
+      /* Session, not width, and a PAIR — Figma binds `visible` to a boolean
+         and cannot invert one, so "signed out" needs its own name rather than
+         being the absence of the other. */
       'Adaptive-Nav/Signed-In',
+      'Adaptive-Nav/Signed-Out',
     ]);
     for (const name of Object.keys(NAV_CONDITIONS)) {
       if (notWidthDriven.has(name)) {
