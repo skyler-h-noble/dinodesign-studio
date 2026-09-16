@@ -52,6 +52,7 @@ import { DEFAULT_SPEED_DIAL, type SpeedDialItem } from '../utils/addOns/speedDia
 import NavIconGlyph from './NavIconGlyph';
 import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import { contentInsets, contentInsetCSS } from '../utils/addOns/contentInsets';
+import { tabsFit } from '../utils/addOns/barFit';
 import { NAV_METRICS } from '../utils/componentSize';
 import NavLayoutPreview from './NavLayoutPreview';
 import DefinitionRenderer from './DefinitionRenderer';
@@ -333,6 +334,14 @@ export default function NavDesignerPage() {
       <img src={brand.url} alt="" style={{ height: 24, width: 'auto', display: 'block' }} />
     ) : null;
 
+    /* COMPONENT SIZE REACHES EVERY PART. Size is a Component-Size MODE — one
+       setting for the whole nav — so every lib component in the preview takes
+       it: tabs, action buttons, the avatar, the menu button, search, the rail.
+       The tabs, actions and avatar were pinned to "small", so the picker
+       moved the bar's height and the rail's width and left the controls in
+       them exactly as they were, which read as the picker doing nothing.
+       Button sizes the avatar inside it for its own size, so the face needs
+       no mapping of its own. */
     /* The library's own Tabs, not buttons dressed up. A tab's treatment is a
        SELECTOR — an indicator bar on one edge and a track along the rest, with
        the selected one carrying --Text and the others --Quiet — and none of
@@ -363,6 +372,7 @@ export default function NavDesignerPage() {
     const tabStrip = (
       <Tabs
         value={selectedTab}
+        size={componentSize}
         onChange={(v: string) => {
           setSelectedTab(v);
           setEditing({ kind: 'tab', id: v });
@@ -404,7 +414,7 @@ export default function NavDesignerPage() {
             <Button
               key={a.id}
               variant={buttonVariant(a.colour, a.treatment)}
-              size="small"
+              size={componentSize}
               iconOnly={!a.text}
               aria-label={!a.text ? a.label || 'Unnamed button' : undefined}
               onClick={() => setEditing({ kind: 'button', id: a.id })}
@@ -423,7 +433,12 @@ export default function NavDesignerPage() {
        size, radius and border, and would drift from the real one the moment
        either changed — the preview's whole claim is that it renders the same
        components the nav will. */
-    const face = <Avatar size="x-small" alt="" />;
+    /* The same avatar size Button gives an avatar inside it at this size
+       (small → 16, medium → 24, large → 40), so the face is the same whether
+       or not it opens a menu — otherwise switching the menu on changed the
+       avatar's size, which is not what the switch means. */
+    const faceSize = ({ small: 'xxx-small', medium: 'xx-small', large: 'small' } as const)[componentSize];
+    const face = <Avatar size={faceSize} alt="" />;
 
     /* With a menu behind it the avatar stops being a picture and becomes a
        control, so it is rendered as one: Button's `avatar` Type, which is the
@@ -440,7 +455,7 @@ export default function NavDesignerPage() {
       <Button
         avatar
         variant="ghost"
-        size="small"
+        size={componentSize}
         aria-label="Your account"
         aria-expanded={menuOpen}
         aria-haspopup="menu"
@@ -693,9 +708,25 @@ export default function NavDesignerPage() {
        condition put a Show-Rail switch on a layout with no rail — and worse,
        switched ON, saying a part exists when it does not. */
     const names = conditionsUsedBy(definition);
-    const seed = defaultNavMatrix(names, sorted);
+    /* Seeded from the bar's own CONTENT, not from the width alone. Four long
+       labels beside a search field and two actions overlap at 900 where four
+       short ones fit comfortably — same breakpoint, different answer — so the
+       threshold is a floor and this decides the rest. */
+    const seed = defaultNavMatrix(names, sorted, (bp) => {
+      const b = sorted.find((x) => x.id === bp.id);
+      const available = bp.minWidth - 2 * (b?.margin ?? 24);
+      return tabsFit({
+        tabs,
+        actions: options.actions ? actions : [],
+        hasSearch: !!options.search,
+        hasAvatar: !!options.avatar,
+        hasBrand: options.layout !== 'hero',
+        size: componentSize,
+      }, available);
+    });
     return completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true);
-  }, [definition, matrix, sorted]);
+  }, [definition, matrix, sorted, tabs, actions, options.actions, options.search,
+      options.avatar, options.layout, componentSize]);
 
   const matrixActive = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
 

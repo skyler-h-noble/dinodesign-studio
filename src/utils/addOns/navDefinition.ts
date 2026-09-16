@@ -516,8 +516,14 @@ function bar(o: NavOptions): NodeDef {
        against the bar's surface rather than the page's. */
     surface: o.surface ?? 'Surface',
     theme: o.theme,
-    // Paints edge to edge; its content respects the page's ceiling.
-    band: true,
+    /* Paints edge to edge; its content respects the page's ceiling — EXCEPT
+       above the rail. There the bar is application chrome, not a band over a
+       page: its brand block has to sit on the rail's rectangle at x=0, and
+       capping its contents to a centred 1440 column put the block 240px in
+       from the rail it exists to line up with. So no cap — the contents start
+       at the left edge and run to the right padding, the way the rail beneath
+       does. */
+    band: !(o.layout === 'rail' && o.barPosition === 'above-rail'),
     children,
   };
 }
@@ -754,6 +760,10 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
 export function defaultNavMatrix(
   conditionNames: string[],
   breakpoints: { id: string; minWidth: number }[],
+  /** Whether the tabs FIT at a given breakpoint, measured from the bar's own
+   *  content. Optional: without it the width threshold decides alone, which
+   *  is the right answer when there is no content to measure yet. */
+  tabsFitAt?: (bp: { id: string; minWidth: number }) => boolean,
 ): Record<string, Record<string, boolean>> {
   const sorted = [...breakpoints].sort((a, b) => a.minWidth - b.minWidth);
   const narrowest = sorted[0]?.id;
@@ -777,8 +787,15 @@ export function defaultNavMatrix(
            search field do not fit — and adding a breakpoint below xs would
            have moved the whole rule. A threshold holds wherever the user puts
            their breakpoints. */
-        : name === 'Adaptive-Nav/Show-Menu-Button' ? bp.minWidth < TABS_MIN_WIDTH
-        : name === 'Adaptive-Nav/Show-Tabs' ? bp.minWidth >= TABS_MIN_WIDTH
+        /* Below the threshold the tabs never fit, whatever they say. At or
+           above it they usually do — but "usually" is not good enough at the
+           bottom of the range, where four long labels beside a search field
+           and two actions overlap rather than wrap. So the threshold is a
+           floor and the measurement decides the rest. */
+        : name === 'Adaptive-Nav/Show-Menu-Button'
+          ? bp.minWidth < TABS_MIN_WIDTH || !(tabsFitAt?.(bp) ?? true)
+        : name === 'Adaptive-Nav/Show-Tabs'
+          ? bp.minWidth >= TABS_MIN_WIDTH && (tabsFitAt?.(bp) ?? true)
         : name === 'Adaptive-Nav/Show-Rail' ? bp.id === widest
         : name === 'Adaptive-Nav/Show-Search' ? bp.id !== narrowest
         : name === 'Adaptive-Nav/Show-Actions' ? bp.id !== narrowest

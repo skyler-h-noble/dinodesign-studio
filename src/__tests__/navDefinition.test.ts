@@ -695,6 +695,18 @@ describe('the brand occupies the same rectangle either way', () => {
       .toEqual({ fixed: { token: 'Other/App-Bar Height' } });
   });
 
+  it('above the rail, the bar is not a band — nothing caps its contents', () => {
+    /* A band's contents respect the page's ceiling, and at xl that ceiling
+       is a 1440 column centred in 1920. Capped, the brand block landed 240px
+       in from the rail it exists to sit over. Application chrome lines up
+       with the rail, not with the page. */
+    const above = find(navDefinition({ layout: 'rail', barPosition: 'above-rail' }).root, 'Bar')!;
+    const beside = find(navDefinition({ layout: 'rail', barPosition: 'beside-rail' }).root, 'Bar')!;
+    expect(above.band).toBe(false);
+    expect(above.padding?.left).toBeUndefined();
+    expect(beside.band).toBe(true);
+  });
+
   it('centres the brand in it, both ways', () => {
     for (const pos of ['beside-rail', 'above-rail'] as const) {
       expect([pos, block(pos).justify]).toEqual([pos, 'center']);
