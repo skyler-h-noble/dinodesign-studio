@@ -651,9 +651,25 @@ function railNode(fullHeight: boolean): NodeDef {
     children: fullHeight
       ? [
           brandBlock(true),
-          slot('Rail-Items', 'hug'),
+          {
+            /* FILL, not hug. The rail runs the full height of the frame — that
+               is what makes it a rail rather than a stack of icons at the top
+               — and the component inside it can only stretch to a slot that
+               gives it the room. Hugging left the rail's own surface stopping
+               just past the last item, with the column below it bare. */
+            name: 'Rail-Items', kind: 'slot',
+            width: 'fill', height: 'fill',
+          },
         ]
-      : [slot('Rail-Items', 'hug')],
+      : [{
+            /* FILL, not hug. The rail runs the full height of the frame — that
+               is what makes it a rail rather than a stack of icons at the top
+               — and the component inside it can only stretch to a slot that
+               gives it the room. Hugging left the rail's own surface stopping
+               just past the last item, with the column below it bare. */
+            name: 'Rail-Items', kind: 'slot',
+            width: 'fill', height: 'fill',
+          }],
   };
 }
 
