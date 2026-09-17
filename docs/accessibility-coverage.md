@@ -257,6 +257,38 @@ the string supplies another, shown twice and announced twice.
 No lib gap blocks any of this: `<List>` already renders `<ul role="list">` with
 `<li>` children and takes `component="ol"` (`List.js:343`).
 
+### `handmade-state` — an empty or error state composed by hand
+
+The same failure shape as `raw-interactive`: it looks correct and announces
+nothing. A centred `Icon` + heading + body built from `Box` has no role, no
+accessible name and no live region, so a screen-reader user tabbing past a
+table hears "group" and must enter it to learn the query found nothing — and a
+failed load is not announced at all.
+
+The check fires on a **short headline** (≤ 60 characters) in a heading
+component whose text opens with a state phrase — `no`, `nothing`, `not found`,
+`couldn't`, `failed`, `something went wrong` — in JSX that contains no
+`<StateMessage>`. Both conditions matter: "No" is unremarkable mid-paragraph,
+and a long heading that merely starts with the word is a section title, not a
+state.
+
+It is a **warning**, deliberately, and the reason is the difference from
+`prose-list`. A typed bullet can only be a typed bullet. "No archived items"
+could be a real section heading — so this is a judgement about intent, and a
+false positive at error severity trains people to ignore the whole report.
+
+The message points at the **component**, not at the attributes, because
+`<StateMessage>` carries all of them: `aria-labelledby` from its own headline,
+`role="alert"` on the error type only (empty and no-results are the ordinary
+outcome of an ordinary query, and announcing those assertively talks over
+whatever the user was reading), and an `aria-hidden` icon.
+
+**The converter cannot add this itself.** There is no Figma property that says
+"this frame is an error state", so inferring it would mean guessing on
+something whose failure is silent — which is the reason `DERIVED-ARIA-LABEL`
+exists. Putting the ARIA in the component turns the converter's job into
+"recognise this and emit `<StateMessage>`", and correctness follows.
+
 ---
 
 ## Why the pairing matters more than the count

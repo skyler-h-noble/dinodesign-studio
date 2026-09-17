@@ -248,3 +248,59 @@ describe('lists the converter had to infer', () => {
     expect(kinds('<List><ListItem>First</ListItem><ListItem>Second</ListItem></List>')).toEqual([]);
   });
 });
+
+describe('empty and error states built by hand', () => {
+  /* Same shape as raw-interactive: it LOOKS right and announces nothing. A
+     centred Icon + heading + body composed from Box has no role, no accessible
+     name and no live region, so a failed load is silent and an empty table
+     reads as "group". */
+  it('flags a headline that reads as an empty state', () => {
+    for (const h of [
+      '<H3>No invoices yet</H3>',
+      '<Subtitle>Nothing here</Subtitle>',
+      '<H4>No results for that filter</H4>',
+      '<H3>Couldn\'t load invoices</H3>',
+      '<H3>Something went wrong</H3>',
+    ]) expect(kinds(h), h).toContain('handmade-state');
+  });
+
+  it('stays quiet once StateMessage is used', () => {
+    /* The component carries the role, the name and the live region, so there
+       is nothing left to report — and reporting it anyway would train people
+       to ignore the finding. */
+    const jsx = '<StateMessage type="empty" title="No invoices yet" />';
+    expect(kinds(jsx)).toEqual([]);
+  });
+
+  it('does not flag an ordinary section heading', () => {
+    for (const h of [
+      '<H2>Recent activity</H2>',
+      '<H3>Billing</H3>',
+      '<Subtitle>Team members</Subtitle>',
+    ]) expect(kinds(h), h).toEqual([]);
+  });
+
+  it('ignores the same words in body copy', () => {
+    // "No" is unremarkable mid-paragraph; the tell is the shape of a TITLE.
+    expect(kinds('<Body>No changes are needed to your plan.</Body>')).toEqual([]);
+  });
+
+  it('ignores a long heading that merely starts with the word', () => {
+    const long = '<H3>No single metric captures how a team is actually performing over time</H3>';
+    expect(kinds(long)).toEqual([]);
+  });
+
+  it('is a warning, not an error', () => {
+    /* Unlike prose-list, this is a judgement about intent — "No archived
+       items" could be a real section heading. A false positive at error
+       severity trains people to ignore the whole report. */
+    const f = computeA11y('<H3>No invoices yet</H3>');
+    expect(f[0].severity).toBe('warning');
+  });
+
+  it('says which element it came from', () => {
+    const f = computeA11y('<H3>No invoices yet</H3>');
+    expect(f[0].where).toBe('H3');
+    expect(f[0].message).toContain('StateMessage');
+  });
+});

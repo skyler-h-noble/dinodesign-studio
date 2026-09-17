@@ -79,6 +79,21 @@ const TYPED_MARKER = /^\s*(?:[•·▪◦‣∙*]|[-–—]\s|\d+[.)]\s|[a-z][.)
 /** Typography components — the ones a stray bullet would land in. */
 const TYPOGRAPHY = /^(Body|BodySmall|BodyLarge|Subtitle|SubtitleLarge|Caption|Label|Overline|Typography|p|span)$/;
 
+/** The components an empty-state HEADLINE is written in. Deliberately narrower
+ *  than TYPOGRAPHY: "No results" is unremarkable mid-paragraph and telling is
+ *  only as a heading. */
+const HEADLINE = /^(H1|H2|H3|H4|H5|H6|Subtitle|SubtitleLarge|DisplaySmall|h1|h2|h3|h4|h5|h6)$/;
+
+/** Headline text that reads as "there is no data here" or "it went wrong".
+ *
+ *  Anchored at the start and applied only to SHORT headings, because the tell
+ *  is the shape of an empty-state title, not the words appearing anywhere. */
+const STATE_PHRASE =
+  /^(no\b|none\b|nothing\b|not found|0\s|zero\b|empty\b|couldn'?t\b|could not\b|unable to\b|failed\b|something went wrong|oops\b|try again)/i;
+
+/** A headline is a state message, not a section title, only if it is short. */
+const HEADLINE_MAX = 60;
+
 /** Opening tags, with their attribute blob. Good enough for emitted JSX, which
  *  is machine-written and regular — the same assumption conversionDrift makes. */
 const TAG = /<([A-Za-z][\w.]*)((?:\s+[^<>]*?)?)(\/?)>/g;
@@ -230,6 +245,39 @@ export function computeA11y(jsx: string, notes?: string): DriftFinding[] {
           kind: 'prose-list',
           message: `<${t.name}> starts with a list marker, so the text is a list item that was emitted as a paragraph. A screen reader announces no list and no item count, and reads the marker as content. Use <List> + <ListItem>, which render <ul role="list"> with <li> children.`,
           detail: body.slice(0, 60),
+          where: t.name,
+        });
+      }
+    }
+
+    /* ── An empty or error state built by hand ─────────────────────────────
+
+       The failure this catches is the same shape as raw-interactive: it LOOKS
+       right and announces nothing. A centred Icon + heading + body composed
+       from Box has no role, no accessible name and no live region, so a
+       screen-reader user tabbing past a table hears "group" — or hears
+       nothing at all — and has to enter it to learn the query found nothing.
+       A failed load announces not at all.
+
+       <StateMessage> carries all of that: aria-labelledby from its own
+       headline, role="alert" for the error type only, and an aria-hidden
+       icon. So the fix is to use the component, not to add attributes by
+       hand — which is why this points at the component rather than listing
+       the attributes.
+
+       A warning, not an error, because the detection is a JUDGEMENT about
+       intent in a way prose-list is not: a typed bullet can only be a typed
+       bullet, but "No archived items" could be a real section heading. A
+       false positive at error severity trains people to ignore the whole
+       report. */
+    if (HEADLINE.test(t.name) && !/<StateMessage\b/.test(jsx)) {
+      const headline = innerText(jsx, t);
+      if (headline && headline.length <= HEADLINE_MAX && STATE_PHRASE.test(headline)) {
+        findings.push({
+          severity: 'warning',
+          kind: 'handmade-state',
+          message: `<${t.name}>"${headline.slice(0, 40)}" reads as an empty or error state, but it is composed by hand. A hand-built one has no role, no accessible name and no live region — it looks correct and announces nothing. Use <StateMessage type="empty|no-results|error" title=… />, which names the region from its own headline and makes only the error type an alert.`,
+          detail: headline.slice(0, 60),
           where: t.name,
         });
       }

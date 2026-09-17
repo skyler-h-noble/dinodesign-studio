@@ -130,6 +130,34 @@ export interface RadiiForSize {
  * would match nothing and leave the variable at whatever was last typed by
  * hand, reporting success the whole time.
  */
+/**
+ * How faded an unavailable control is.
+ *
+ * ONE number, and stating it is the whole point: the library decided this ten
+ * separate times — 0.6 twenty-six times, 0.5 twenty-four, and 0.85, 0.7, 0.45,
+ * 0.4, 0.38, 0.3, 0.25 between them — with Autocomplete and NumberField each
+ * using two different values in the same file. Nothing chose between them
+ * because nothing was asked to.
+ *
+ * 0.38 is the value Figma already binds (the Rail's Disabled variant), and it
+ * is a LEGIBILITY figure rather than a taste one: far enough down to read as
+ * unavailable, not so far that the label stops being readable. 0.25 on a dim
+ * surface is not.
+ *
+ * ── Why a token and not a constant in the lib ─────────────────────────────
+ * It needs no per-theme or per-surface derivation the way --Hover does, which
+ * makes it a thinner token than the rest — but Figma binds to it, and a value
+ * that exists there and not in CSS is the divergence this codebase keeps
+ * paying for. A brand with a high-contrast requirement also has a real reason
+ * to raise it, which is what a token is for.
+ *
+ * ── Scale ─────────────────────────────────────────────────────────────────
+ * Figma stores 38 because its UI expresses opacity in percent; CSS opacity is
+ * 0–1. The two are the same decision at different scales, so the CSS side
+ * emits the ratio and nothing has to remember to divide.
+ */
+export const DISABLED_OPACITY = 0.38;
+
 export const NAV_METRICS = {
   'Rail-Width': { medium: 80, small: 72, large: 96 },
   'App-Bar Height': { medium: 64, small: 56, large: 72 },
@@ -162,7 +190,7 @@ export function navMetricsFlat(): Record<string, number> {
  *  hyphenated form is the CSS name even where the Figma variable has a space:
  *  a custom property cannot contain one. */
 export function navMetricsCSS(indent = '  '): string[] {
-  const out: string[] = [];
+  const out: string[] = [`${indent}--Disabled: ${DISABLED_OPACITY};`];
   for (const [name, byMode] of Object.entries(NAV_METRICS)) {
     const css = name.replace(/ /g, '-');
     out.push(`${indent}--${css}: ${byMode.medium}px;`);

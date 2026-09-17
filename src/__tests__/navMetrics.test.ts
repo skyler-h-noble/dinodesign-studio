@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   NAV_METRICS, navMetricsFlat, navMetricsCSS,
-  componentSizeGroup, componentSizeNames,
+  componentSizeGroup, componentSizeNames, DISABLED_OPACITY,
 } from '../utils/componentSize';
 
 /* The rail's width and the app bar's height are the first metrics here that
@@ -73,5 +73,31 @@ describe('the sizes are a real ladder', () => {
       expect(byMode.small, name).toBeLessThan(byMode.medium);
       expect(byMode.large, name).toBeGreaterThan(byMode.medium);
     }
+  });
+});
+
+describe('one disabled opacity, not ten', () => {
+  /* The library decided this ten separate times — 0.6 twenty-six times, 0.5
+     twenty-four, and 0.85 / 0.7 / 0.45 / 0.4 / 0.38 / 0.3 / 0.25 between them
+     — with Autocomplete and NumberField each using two different values in
+     the same file. Nothing chose between them because nothing was asked to. */
+  it('is emitted, so the CSS has the name Figma binds', () => {
+    expect(navMetricsCSS('').join('\n')).toContain('--Disabled: 0.38;');
+  });
+
+  it('is a RATIO, because CSS opacity is 0-1', () => {
+    /* Figma stores 38 — its UI expresses opacity in percent. Emitting that
+       number verbatim would make every consumer divide by 100, and the one
+       that forgets gets opacity:38, which clamps to 1 and renders a disabled
+       control at full strength. */
+    expect(DISABLED_OPACITY).toBeGreaterThan(0);
+    expect(DISABLED_OPACITY).toBeLessThan(1);
+  });
+
+  it('is faded enough to read as unavailable and not so far it stops being readable', () => {
+    // A legibility figure rather than a taste one. 0.25 on a dim surface is
+    // not readable; 0.6 does not read as disabled.
+    expect(DISABLED_OPACITY).toBeGreaterThanOrEqual(0.3);
+    expect(DISABLED_OPACITY).toBeLessThanOrEqual(0.5);
   });
 });
