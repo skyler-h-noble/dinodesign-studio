@@ -63,6 +63,8 @@ export interface ComputedRadii {
   // Card
   cardPadding: number;
   accordionRadius: number;
+  accordionFocusRadius: number;
+  accordionInnerFocusRadius: number;
   cardRadius: number;
   smCardRadius: number;
   lgCardRadius: number;
@@ -181,6 +183,22 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
    * the token exists to prevent. */
   const accordionRadius = Math.min(buttonRadius, Math.floor(cs.buttonHeight / 2));
 
+  /* The accordion's focus ring, for FIGMA's benefit only.
+   *
+   * CSS needs neither of these: the ring is an `outline`, and a browser draws
+   * an outline concentric with the element's border-radius, so an inset ring
+   * inside an 8px corner emerges at 5px with nobody computing it. Figma cannot
+   * do arithmetic on a variable, so the two values have to be stated.
+   *
+   * The inset is 3, not the 1 that `inner()` applies to Input. Input's inner
+   * focus sits 1px in; the accordion's sits 3px in, matching the lib's
+   * outlineOffset: -3px. Reusing inner() here would emit 7 and put Figma's
+   * ring a step off what the CSS actually draws — the two would look
+   * concentric in neither place. */
+  const ACCORDION_FOCUS_INSET = 3;
+  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_INSET;
+  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_FOCUS_INSET);
+
   const CARD_RADIUS_MAX = 24;
   const cardRadius = Math.min(cardCornerBase + cardPadding, CARD_RADIUS_MAX);
 
@@ -259,6 +277,8 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
 
     cardPadding,
     accordionRadius,
+    accordionFocusRadius,
+    accordionInnerFocusRadius,
     cardRadius,
     smCardRadius,
     lgCardRadius,

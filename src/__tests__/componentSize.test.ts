@@ -101,8 +101,32 @@ describe('the payload uses the names that are IN THE FILE', () => {
     cardFocusRadius: 19, cardPadding: 16,
     inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
     inputFocusRadius: 7, inputInnerRadius: 2,
-    accordionRadius: 8, modalRadius: 32, dropdownFrameRadius: 0,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, dropdownFrameRadius: 0,
   };
+
+  it('writes the accordion radii under the CORRECTED spelling', () => {
+    /* The file carried "Accordian-Radius" (sic) and this writer deliberately
+       matched it, because populateComponentSize is UPDATE-ONLY: it writes by
+       name, and a name the file does not have is skipped in silence. The Figma
+       rename landed on 2026-09-18, so the misspelling here had to go with it —
+       otherwise the writer would have kept looking for a variable that no
+       longer exists and quietly stopped updating the value. */
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Accordion/Accordion-Radius']).toBe(8);
+    expect(p.medium['Accordion/Accordian-Radius']).toBeUndefined();
+  });
+
+  it('emits the focus radii Figma cannot derive for itself', () => {
+    /* CSS needs neither: an outline is drawn concentric with the border
+       radius, so the browser works them out. Figma cannot do arithmetic on a
+       variable, so both were hand-typed — and would have drifted the moment
+       the brand radius moved. 8 + 3 and 8 - 3, matching the lib's
+       outlineOffset: -3px. */
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Accordion/Accordion-Focus-Radius']).toBe(11);
+    expect(p.medium['Accordion/Accordion-Inner-Focus-Radius']).toBe(5);
+  });
 
   it('Card focus is Card-Focus-Radius, not Card-Focus-Border-Radius', () => {
     // The flat payload used the longer name; the file does not have it.
@@ -111,15 +135,6 @@ describe('the payload uses the names that are IN THE FILE', () => {
     expect(p.medium['Card/Card-Focus-Border-Radius']).toBeUndefined();
   });
 
-  it('Accordion keeps the file typo, Accordian', () => {
-    /* Deliberate. Renaming the Figma variable to fix the spelling would
-       unbind every layer using it, so that rename is a decision to make in
-       Figma — not one to force from here by writing a name that matches
-       nothing. The GROUP is spelt correctly; only the variable carries it. */
-    const p = componentSizePayload(R, {});
-    expect(p.medium['Accordion/Accordian-Radius']).toBe(8);
-    expect(p.medium['Accordion/Accordion-Radius']).toBeUndefined();
-  });
 
   it('computes the focus radius rather than trusting the file', () => {
     // r + 3. The file had 3125 at large where this gives 31 — a hand-typed

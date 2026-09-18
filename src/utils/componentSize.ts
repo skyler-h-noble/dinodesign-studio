@@ -110,7 +110,8 @@ export interface RadiiForSize {
   cardFocusRadius: number; cardPadding: number;
   inputRadius: number; smInputRadius: number; lgInputRadius: number;
   inputFocusRadius: number; inputInnerRadius: number;
-  accordionRadius: number; modalRadius: number; dropdownFrameRadius: number;
+  accordionRadius: number; accordionFocusRadius: number; accordionInnerFocusRadius: number;
+  modalRadius: number; dropdownFrameRadius: number;
 }
 
 /* ── Nav chrome: three sizes, and not derived from anything ───────────────
@@ -242,10 +243,22 @@ export function componentSizePayload(
       'Input-Focus-Radius': r.inputFocusRadius,
       'Input-Inner-Focus-Radius': r.inputInnerRadius,
     },
-    // Misspelt in the file. Matching the typo is deliberate: renaming a Figma
-    // variable to fix it would unbind every layer using it (invariant 8), so
-    // the rename has to be a decision made in Figma, not forced from here.
-    Accordion: { 'Accordian-Radius': r.accordionRadius },
+    /* Was 'Accordian-Radius' (sic), deliberately matching a misspelling in the
+       file — populateComponentSize is UPDATE-ONLY, so it writes by name and a
+       name that does not exist is skipped silently. The rename happened in
+       Figma on 2026-09-18, so this had to move in the same pass or the writer
+       would have gone quietly dead against the old name.
+
+       The two focus radii are new here. They are not needed by the CSS — an
+       `outline` is drawn concentric with the border-radius, so the browser
+       derives them — but Figma cannot do arithmetic on a variable, so they had
+       been hand-typed at 11 and 5 and would have stopped matching the moment
+       the brand's radius moved. */
+    Accordion: {
+      'Accordion-Radius': r.accordionRadius,
+      'Accordion-Focus-Radius': r.accordionFocusRadius,
+      'Accordion-Inner-Focus-Radius': r.accordionInnerFocusRadius,
+    },
     Other: {
       'Modal-Radius': r.modalRadius,
       'Dropdown-Frame-Radius': r.dropdownFrameRadius,
