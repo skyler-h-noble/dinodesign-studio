@@ -442,8 +442,12 @@ export default function NavDesignerPage() {
        (small → 16, medium → 24, large → 40), so the face is the same whether
        or not it opens a menu — otherwise switching the menu on changed the
        avatar's size, which is not what the switch means. */
-    const faceSize = ({ small: 'xxx-small', medium: 'xx-small', large: 'small' } as const)[componentSize];
-    const face = <Avatar size={faceSize} alt="" />;
+    /* Pixel sizes, matching Figma's Button-Avatar ramp (16 / 20 / 40). These
+       named standalone sizes before, and 20 is not one of them — a medium
+       component drew a 24px face where the design says 20. xxx-small has since
+       been removed from the library for the same reason. */
+    const faceSize = ({ small: 16, medium: 20, large: 40 } as const)[componentSize];
+    const face = <Avatar size="custom" customSize={faceSize} alt="" />;
 
     /* With a menu behind it the avatar stops being a picture and becomes a
        control, so it is rendered as one: Button's `avatar` Type, which is the
