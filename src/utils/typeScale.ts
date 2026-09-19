@@ -384,12 +384,21 @@ export const SYSTEM_STYLES: SystemStyleSpec[] = [
   // platform. This is the per-step token the Figma variables are named after.
   { token: 'Button-Standard', group: 'Button', step: 'Standard', size: 16, weight: 600, lh: 16 },
   { token: 'Button-Large', group: 'Button', step: 'Large', size: 24, weight: 600, lh: 24 },
+
+  /* Badge — the counter's digits. Its own style, not a Button step.
+     11/12 sits between Button Extra Small (11/11) and the Button-Numbers
+     ladder's rungs (10 / 12 / 16), so no existing token carries it: the lib
+     was reading --Sm-Button-Numbers (10) and --Button-Small-Line-Height (14)
+     and rendering a badge a pixel small on a leading four too loose.
+     Face, weight and tracking still come from the Buttons/Small role, which is
+     what the Figma style binds — only the size and leading are its own. */
+  { token: 'Badge', group: 'Badge', step: 'Standard', size: 11, weight: 600, lh: 12 },
 ];
 
 /** Order the exports and the Figma payload use. */
 export const GROUP_ORDER = [
   'Display', 'Header', 'Subtitle', 'Body', 'Caption',
-  'Label', 'Legal', 'Eyebrow', 'Number', 'Button',
+  'Label', 'Legal', 'Eyebrow', 'Number', 'Button', 'Badge',
 ];
 
 /** Usage guidance per group. Travels into the Figma text-style description so
