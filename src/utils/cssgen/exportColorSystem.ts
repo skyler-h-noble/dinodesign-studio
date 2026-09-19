@@ -6358,11 +6358,17 @@ export function exportColorSystemToJSON(
             hex = m ? (colors?.[m[1]]?.[m[2]]?.value || '') : '';
           }
           if (!hex.startsWith('#')) continue;
-          // colorKey indexes the BACKGROUND tone, so the palette entry at that
-          // key is the surface the icon sits on.
-          const surfaceHex = colors?.[palette]?.[colorKey]?.value;
+          /* FLAT, and the omitted background argument is what makes it flat
+             (variantHex8 falls back to the base alpha with no background to
+             measure against). Deliberate, not an oversight: in Figma an
+             Icon-Variant is an alias whose opacity is bound to ONE
+             Colors/Icon-Variant-Opacity float, and a single number cannot vary
+             per theme/surface pairing. Keeping the adaptive lift here would
+             leave the CSS and the file disagreeing while both looked correct
+             — invariant 5. Border-Variant still passes its surface and stays
+             adaptive; see variantAlpha.ts for why only this token flattened. */
           sect[palette][colorKey] = {
-            value: variantHex8(hex, ICON_VARIANT_ALPHA, surfaceHex),
+            value: variantHex8(hex, ICON_VARIANT_ALPHA),
             type: 'color',
           };
           count++;

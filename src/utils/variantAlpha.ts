@@ -34,7 +34,27 @@
 
 /** Per-token base alpha. TUNABLE. */
 export const BORDER_VARIANT_ALPHA = 0.20;
-export const ICON_VARIANT_ALPHA = 0.50;
+
+/* Icon-Variant is FLAT, not adaptive — the one exception to everything above.
+ *
+ * In Figma it is now an alias to Surface/Icons/<palette> whose opacity is
+ * bound to a single Colors/Icon-Variant-Opacity float, the same colour +
+ * sibling-float split Drop-Colors uses. One number cannot vary per
+ * theme/surface pairing, so the adaptive lift is not expressible there, and a
+ * CSS side that stayed adaptive would silently disagree with the file
+ * (invariant 5 — both self-consistent, both wrong about each other).
+ *
+ * Accepted because Icon-Variant's one consumer is the LineChart area gradient,
+ * which already fades to stopOpacity 0 over a large fill. A large area reads at
+ * a far lower alpha than the 1px divider Border-Variant draws, so the weak end
+ * of the flat spread costs much less here. Border-Variant keeps the adaptive
+ * treatment and its measurements are unchanged.
+ *
+ * PERCENT for Figma, RATIO for CSS — they are the same number in two units,
+ * kept adjacent so they cannot drift apart. (Same trap as --Disabled: 0.38 in
+ * CSS, 38 in Figma.) */
+export const ICON_VARIANT_OPACITY_PCT = 50;
+export const ICON_VARIANT_ALPHA = ICON_VARIANT_OPACITY_PCT / 100;
 
 /** Never let a variant become effectively opaque. */
 const ALPHA_CAP = 0.95;

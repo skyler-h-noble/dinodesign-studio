@@ -254,3 +254,81 @@ describe('the Figma payload resolves too', () => {
     });
   }
 });
+
+/* ─── Icon-Variant is an ALIAS in Figma, a baked alpha in CSS ─────────────────
+ *
+ * Two mechanisms for one number, and the payload can fail into a shape that
+ * looks completely valid. Icon-Variant was removed from the Modes collection:
+ * in the file a `<Palette>-Variant` is an alias to its Surface/Icons/<palette>
+ * sibling whose OPACITY is bound to Colors/Icon-Variant-Opacity. CSS cannot
+ * bind an opacity to a custom property, so it keeps baking a flat 50% hex8.
+ *
+ * When the group left Modes, `{Icon-Variant.Surfaces.…}` stopped matching
+ * MODES_GROUPS, fell through to resolveToHex, and the payload emitted a LITERAL
+ * `#rrggbb80` for every non-Default theme and for Containers in all of them.
+ * A literal is a legal variable value carrying the right colour at the right
+ * alpha — nothing dangled, every existing test passed — but writing it would
+ * have detached the alias AND the opacity binding on the next plugin run, in
+ * ~96 variables, silently. The same detach the Drop-Color tint avoids by never
+ * being written.
+ *
+ * So the assertion is on the SHAPE, not the value: a `-Variant` must still be
+ * a reference. Asserting the colour would have passed throughout. */
+describe('Icon-Variant survives as an alias', () => {
+  const build = () => {
+    const sel = { background: 'primary', button: 'primary',
+      cardColoring: 'tonal', textColoring: 'tonal' } as never;
+    const { json } = buildAll(SCHEME, sel, 'light') as never as { json: never };
+    const j = JSON.parse(JSON.stringify(json));
+    j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100,
+      cardPadding: 24, bevelOpacity: 50, shadowResolution: 3 };
+    return { figma: generateFigmaJSON(j) as never as Record<string, never>, j };
+  };
+
+  it('is gone from Modes, replaced by one opacity float', () => {
+    const { figma } = build();
+    const modes = (figma as never as { Modes: Record<string, never> }).Modes;
+    for (const mode of Object.keys(modes)) {
+      const m = modes[mode] as never as Record<string, never>;
+      expect(`${mode}: Icon-Variant section present = ${!!m['Icon-Variant']}`)
+        .toBe(`${mode}: Icon-Variant section present = false`);
+      /* PERCENT, not a 0..1 ratio: Figma renders a number bound to an opacity
+         by appending "%", so 0.5 would display as "0.5%" and paint nothing. */
+      expect((m.Colors as never as Record<string, { value: number; type: string }>)['Icon-Variant-Opacity'])
+        .toEqual({ value: 50, type: 'number' });
+    }
+  });
+
+  it('never writes a literal colour into a Theme -Variant icon', () => {
+    const { figma } = build();
+    const themes = (figma as never as { Themes: Record<string, never> }).Themes;
+    const literals: string[] = [];
+    for (const [mode, modeVal] of Object.entries(themes)) {
+      for (const [level, levelVal] of Object.entries(modeVal as never as Record<string, never>)) {
+        const icons = (levelVal as never as Record<string, never>)?.Icons;
+        if (!icons) continue;
+        for (const [key, val] of Object.entries(icons as never as Record<string, { value: unknown }>)) {
+          if (!key.endsWith('-Variant')) continue;
+          const v = val?.value;
+          if (typeof v === 'string' && !v.startsWith('{')) {
+            literals.push(`${mode}.${level}.Icons.${key} = ${v}`);
+          }
+        }
+      }
+    }
+    expect(literals).toEqual([]);
+  });
+
+  it('and CSS still bakes the same 50%, because it cannot bind one', () => {
+    const { j } = build();
+    const css = Object.values(generateCSSFiles(j) as never as Record<string, string>).join('\n');
+    const baked = css.split('\n')
+      .map((l) => l.trim())
+      .filter((l) => /^--Icons-[A-Za-z]+-Variant:\s*#/.test(l));
+    expect(baked.length > 0).toBe(true);
+    /* 0x80 = 128/255 = 50.2% — the same number the Figma float holds, reached
+       the other way. A value that is NOT 80 means the two sides have drifted. */
+    const wrongAlpha = baked.filter((l) => !/#[0-9a-f]{6}80;$/i.test(l));
+    expect(wrongAlpha).toEqual([]);
+  });
+});

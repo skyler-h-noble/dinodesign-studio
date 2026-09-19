@@ -23,7 +23,7 @@ import {
  *  Resolution can change the layer count by zeroing the tail instead of
  *  requiring the styles to be rebuilt. */
 const FIGMA_SHADOW_SLOTS = 10;
-import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
+import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_OPACITY_PCT } from './variantAlpha';
 import {
   buildTypeScale, resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR,
   type TypeStyle, type FamilyRole,
@@ -678,7 +678,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     const MODES_SECTIONS = [
       'Colors', 'Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
       'Hover', 'Pressed', 'Focus-Visible',
-      'Icon', 'Icon-Variant', 'Tag',
+      'Icon', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
       'Backgrounds',
     ];
@@ -725,6 +725,17 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     };
     modeSection.Colors['Transparent'] = {
       'Color-1': { value: '#00000000', type: 'color' },
+    };
+    /* A FLOAT, not a colour: Figma binds a colour variable's opacity to a
+       number, which is how an Icon-Variant alias gets dimmed without the
+       payload having to bake an alpha into it.
+       PERCENT (0..100), never a 0..1 fraction — a number bound to an opacity
+       renders by appending "%", so 0.5 would display as "0.5%" and paint
+       nothing. Same rule as the Drop-Colors Level-<n>/Opacity floats.
+       Flat across both modes: unlike Border-Variant there is no adaptive lift,
+       so light and dark hold the same 50. */
+    modeSection.Colors['Icon-Variant-Opacity'] = {
+      value: ICON_VARIANT_OPACITY_PCT, type: 'number',
     };
 
     // Add computed Button-Hover, Button-Pressed, Button-Highlight, Button-Lowlight,
@@ -1000,36 +1011,32 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         }
       }
 
-      // Icon-Variant: the icon colour at reduced opacity (adaptive, base 50%).
-      //
-      // Icon-Variant previously duplicated Icon exactly — 208 variables with
-      // identical values and no differentiation, in Figma and in CSS alike. It
-      // is the de-emphasised form of an icon, so it relates to Icon the way
-      // Border-Variant relates to Border.
-      //
-      // Computed here rather than aliased because a token reference cannot
-      // carry an alpha channel — it has to be baked as an 8-digit hex.
-      const iconData = modeSection.Icon || {};
-      modeSection['Icon-Variant'] = {};
-      for (const section of ['Surfaces', 'Containers']) {
-        modeSection['Icon-Variant'][section] = {};
-        const iconSection = iconData[section] || {};
-        for (const palette of palettes) {
-          modeSection['Icon-Variant'][section][palette] = {};
-          const iconPalette = iconSection[palette] || {};
-          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
-            const iconToken = iconPalette[colorKey] as any;
-            const iconHex = iconToken?.value || (colorVal as any).value;
-            if (iconHex && iconHex.startsWith('#')) {
-              modeSection['Icon-Variant'][section][palette][colorKey] = {
-                value: variantHex8(iconHex, ICON_VARIANT_ALPHA, (colorVal as any).value),
-                type: 'color',
-              };
-            }
-          }
-        }
-      }
+      /* Icon-Variant — NOTHING is generated for it here, by design.
+       *
+       * It used to be 192 baked hex8 variables: the icon colour at an ADAPTIVE
+       * alpha (variantAlpha.ts, floor 0.50 lifted toward a 0.95 cap as the
+       * colour approached its background), because a token reference cannot
+       * carry an alpha channel.
+       *
+       * Figma can now bind a colour's OPACITY to a number variable, which is
+       * the same split Drop-Colors already uses — see the Drop-Colors block
+       * below. So in the file an Icon-Variant is an ALIAS to its sibling
+       * Surface/Icons/<palette> with its opacity bound to the single
+       * Colors/Icon-Variant-Opacity float written just above. The alias
+       * carries the whole Modes -> Theme -> Surface chain, so the variant
+       * follows theme, surface level and light/dark for free.
+       *
+       * Those aliases and the opacity binding live in the FILE, not in this
+       * payload — a plugin cannot express "this alias, dimmed" (a variable's
+       * value is one RGBA or one pointer, with no modifier field). Writing
+       * baked hex here would OVERWRITE the binding on every regenerate, which
+       * is exactly why the Drop-Color tint is not generated either.
+       *
+       * Trade accepted deliberately: the file's flat 50% replaces the adaptive
+       * alpha. The CSS side keeps computing a concrete value — CSS has no way
+       * to bind an opacity to a custom property — so exportColorSystem bakes
+       * the same FLAT 50%, and the two agree. Border-Variant is unaffected and
+       * stays adaptive. */
 
       /* Dropshadow-Color — ONE colour per surface.
          This was Dropshadow-Color-1..5: five colours per palette per tone per
@@ -1211,7 +1218,30 @@ export function generateFigmaJSON(designSystemJSON: any): any {
               // are all now in Modes and get kept as token refs via MODES_GROUPS check.
 
               if (val && typeof val === 'object' && 'value' in val && 'type' in val) {
-                const tokenVal = (val as any).value;
+                /* {Icon-Variant.X} -> {Icon.X} for the FIGMA payload only.
+                 *
+                 * The CSS side still needs Icon-Variant: it has to bake a
+                 * concrete 50% hex8, because CSS cannot bind an opacity to a
+                 * custom property. So generateCompleteThemes keeps emitting
+                 * {Icon-Variant.Surfaces.<pal>.Color-<n>} and exportColorSystem
+                 * keeps computing those values.
+                 *
+                 * Figma does the same job the other way round: the variable is
+                 * an ALIAS to its Surface/Icons/<pal> sibling with its opacity
+                 * bound to Colors/Icon-Variant-Opacity. Rewriting the reference
+                 * here is what preserves that alias. Without it the ref matches
+                 * no MODES_GROUPS entry (Icon-Variant is no longer a Modes
+                 * group), falls through to resolveToHex, and the payload writes
+                 * a LITERAL #rrggbb80 — which detaches the alias and the
+                 * opacity binding on the next plugin run. Same failure the
+                 * Drop-Color tint avoids by never being written at all.
+                 *
+                 * Safe because Icon-Variant was built from Icon with identical
+                 * keys, so every coordinate that resolved before still does. */
+                const rawVal = (val as any).value;
+                const tokenVal = typeof rawVal === 'string'
+                  ? rawVal.replace('{Icon-Variant.', '{Icon.')
+                  : rawVal;
 
                 // Try to resolve to a Modes-aliasable reference:
                 // 1. {Colors.Palette.Color-N} → direct alias
@@ -1223,7 +1253,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                   const modesRef = tokenVal.replace(/[{}]/g, '');
                   const topLevel = modesRef.split('.')[0];
                   const MODES_GROUPS = ['Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
-                    'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
+                    'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Tag',
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
                     'Dropshadow-Color',
@@ -1652,7 +1682,13 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         // 20); Default must not be the exception. Its -Variant is the alpha
         // form, matching generateSingleTheme's non-BW branch.
         { role: 'Icons-Default', section: 'Text', pal: null },
-        { role: 'Icons-Default-Variant', section: 'Icon-Variant', pal: null },
+        /* Same source as Icons-Default, at FULL strength. It used to read the
+           'Icon-Variant' section for a baked alpha; that section no longer
+           exists in Modes, and the dimming now lives on the file's opacity
+           binding to Colors/Icon-Variant-Opacity. Still written, because the
+           Default theme aliases {Default-Background.<prefix>Icons-Default-
+           Variant} at all four surface prefixes. */
+        { role: 'Icons-Default-Variant', section: 'Text', pal: null },
         ...ACCENT_PALETTES.map(pal => ({ role: `Text-${pal}`, section: 'Text', pal })),
         ...ACCENT_PALETTES.map(pal => ({ role: `Header-${pal}`, section: 'Header', pal })),
         // Text-BW resolves from the BlackWhite map rather than a palette family
@@ -1703,7 +1739,20 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       };
 
       const writeExtras = (prefix: string, tone: number) => {
-        for (const [section, suffix] of [['Icon', ''], ['Icon-Variant', '-Variant']]) {
+        /* Both, and the -Variant twin reads the SAME 'Icon' section — it is the
+           icon colour at full strength, not a dimmed copy.
+           The dimming is no longer in the value. In the file an Icon-Variant is
+           an alias to its Surface/Icons/<palette> sibling whose OPACITY is
+           bound to Colors/Icon-Variant-Opacity, so baking an alpha here would
+           dim it twice. These keys still have to be WRITTEN, though: the
+           Default theme routes its icons through {Default-Background.Icons-
+           <pal>-Variant} (generateCompleteThemes, DEFAULT_ICON_KEYS), and
+           dropping them left 36 dangling references per mode — caught by
+           referenceResolution.test.ts, which is the invariant-1 shape.
+           The CSS side does NOT come through here; it resolves the same key via
+           exportToCSS's tokenLookup to a flat 50% hex8, because CSS cannot bind
+           an opacity to a custom property. */
+        for (const [section, suffix] of [['Icon', ''], ['Icon', '-Variant']]) {
           const sec = modeData[section];
           if (!sec?.Surfaces) continue;
           for (const pal of ACCENT_PALETTES) {
