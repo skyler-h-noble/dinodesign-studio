@@ -34,7 +34,7 @@ TYPOGRAPHY (each has an optional color prop: quiet|primary|secondary|...):
   - <Label>, <Overline>, <OverlineSmall>, <Caption>
 
 CONTROLS:
-  - <Button variant="primary|secondary|tertiary|...|-outline|-light|ghost|text">
+  - <Button variant="primary|secondary|tertiary|...|-outline|ghost|text">
   - <ButtonGroup>, <Fab>
   - <Checkbox>, <Radio>, <RadioGroup>, <SwitchInput>, <Slider>, <Rating>
   - <TextField>, <TextInput>, <EmailTextField>, <PasswordTextField>,
@@ -211,7 +211,7 @@ CONVERSION RULES:
        a Checkbox. Those shapes were removed from the lib; they still resolve to
        their colour but warn. The shape rule below applies to Button ONLY.
        On a BUTTON, a Style/Appearance VARIANT property still selects the SHAPE
-       — solid vs -outline vs -light vs ghost vs text — and composes with the
+       — solid vs -outline vs ghost vs text — and composes with the
        mode:
            modes.Buttons "Error" + variant Style "Outline" → variant="error-outline"
        If a colour appears BOTH as a mode and as a variant property, the MODE
@@ -921,7 +921,10 @@ CONVERSION RULES:
     FILL STYLE (combines with the palette above):
       - Solid / filled background  → variant="<palette>"            (e.g. "default")
       - Outlined (border, no fill) → variant="<palette>-outline"
-      - Tonal / light fill         → variant="<palette>-light"
+      - Tonal / light fill         → variant="<palette>". There is no -light
+                                     shape on Button; a tonal fill is the SOLID
+                                     button of that palette. Never emit
+                                     "<palette>-light" — see the STYLE rule below.
       - NO fill AND no border (bare label only) → variant="text" or "ghost"
 
     variant="text" renders as a HOTLINK, not a button. NEVER use it for a

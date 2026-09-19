@@ -445,12 +445,11 @@ import {
 ### Button
 
 \`\`\`jsx
-{/* Variant pattern: {color}, {color}-outline, {color}-light */}
+{/* Variant pattern: {color}, {color}-outline */}
 {/* Colors: primary, secondary, tertiary, neutral, info, success, warning, error */}
 
 <Button variant="primary">Solid primary</Button>
 <Button variant="primary-outline">Outlined primary</Button>
-<Button variant="primary-light">Light primary</Button>
 <Button variant="neutral-outline">Outlined neutral</Button>
 <Button variant="error">Solid error</Button>
 <Button variant="ghost">Ghost (no background)</Button>

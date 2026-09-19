@@ -456,17 +456,20 @@ export function dropshadowHex8(surfaceHex: string, level: ShadowLevel, layer = 0
  *  The selector also covers every MUI-backed field, not only TextArea, so
  *  audit the others before assuming one component's fix retires the rule. */
 export function libRadiusOverrideCSS(): string {
-  /* Chip's `-light` variants are built as `{bg: --Buttons-{C}-Button, text:
-     --Buttons-{C}-Text, border: 1px solid --Buttons-{C}-Border}` — the SAME
-     fill as solid, differing only by a border. So `success-light` paints the
-     solid button green instead of the light surface it names.
-     In this system `-light` means data-theme="{C}" + data-surface
-     "Surface-Brightest". Repointed at the PAIRED tokens rather than a guessed
-     tone: the caller sets those two attributes on the chip and the cascade
-     supplies --Background / --Text for whichever palette and surface it named.
-     Naming a tone here (--Success-Color-11) would paint the box but leave the
-     label on the parent's tone, which is the exact failure the data-surface
-     contract exists to prevent. */
+  /* BACK-COMPAT ONLY — the current lib no longer emits this class.
+     Chip's `-light` shape has been removed: normalizeChipVariant strips the
+     suffix and the className is built from the NORMALISED variant, so a
+     `success-light` call site now renders `.chip-success`. A light chip is
+     `-outline` plus data-theme + data-surface="Surface-Brightest", which needs
+     no override at all — outlineStyles already paints var(--Background) with
+     var(--Text).
+
+     The rule stays because generated CSS is frozen per design system and can
+     pair with an OLDER lib that still emits `.chip-success-light`. There it is
+     still load-bearing: that chip carries the SAME --Buttons-{C}-Button fill
+     as the solid one, so without this it paints solid green for a name that
+     promises a light surface. Retire it under the gate above — published lib,
+     and no supported system pairing new CSS with an older lib. */
   const chipLight = [
     '[class*="chip-"][class*="-light"][data-surface] {',
     '  background-color: var(--Background);',

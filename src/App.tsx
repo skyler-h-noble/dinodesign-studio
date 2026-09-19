@@ -920,9 +920,12 @@ function MainApp() {
       `}} />
       {/* Per-variant bevel shadow. Each variant exposes its palette's
           Highlight/Lowlight RGB triples via --Current-Bevel-*; one rule
-          applies the shadow, skipping ghost/text (flat by design). */}
+          applies the shadow, skipping ghost/text (flat by design).
+          No .btn-*-light selectors: the -light shape was removed from the
+          lib and Button now builds its class from the NORMALISED variant,
+          so `primary-light` renders .btn-primary and is already covered. */}
       <style id="dino-button-bevel" dangerouslySetInnerHTML={{ __html: `
-        .btn-primary, .btn-primary-outline, .btn-primary-light, .btn-outline {
+        .btn-primary, .btn-primary-outline, .btn-outline {
           --Current-Bevel-Highlight: var(--Buttons-Primary-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Primary-Lowlight, black);
         }
@@ -930,31 +933,31 @@ function MainApp() {
           --Current-Bevel-Highlight: var(--Buttons-Default-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Default-Lowlight, black);
         }
-        .btn-secondary, .btn-secondary-outline, .btn-secondary-light {
+        .btn-secondary, .btn-secondary-outline {
           --Current-Bevel-Highlight: var(--Buttons-Secondary-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Secondary-Lowlight, black);
         }
-        .btn-tertiary, .btn-tertiary-outline, .btn-tertiary-light {
+        .btn-tertiary, .btn-tertiary-outline {
           --Current-Bevel-Highlight: var(--Buttons-Tertiary-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Tertiary-Lowlight, black);
         }
-        .btn-neutral, .btn-neutral-outline, .btn-neutral-light {
+        .btn-neutral, .btn-neutral-outline {
           --Current-Bevel-Highlight: var(--Buttons-Neutral-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Neutral-Lowlight, black);
         }
-        .btn-info, .btn-info-outline, .btn-info-light {
+        .btn-info, .btn-info-outline {
           --Current-Bevel-Highlight: var(--Buttons-Info-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Info-Lowlight, black);
         }
-        .btn-success, .btn-success-outline, .btn-success-light {
+        .btn-success, .btn-success-outline {
           --Current-Bevel-Highlight: var(--Buttons-Success-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Success-Lowlight, black);
         }
-        .btn-warning, .btn-warning-outline, .btn-warning-light {
+        .btn-warning, .btn-warning-outline {
           --Current-Bevel-Highlight: var(--Buttons-Warning-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Warning-Lowlight, black);
         }
-        .btn-error, .btn-error-outline, .btn-error-light, .btn-danger {
+        .btn-error, .btn-error-outline, .btn-danger {
           --Current-Bevel-Highlight: var(--Buttons-Error-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Error-Lowlight, black);
         }

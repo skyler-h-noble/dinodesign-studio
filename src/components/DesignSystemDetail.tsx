@@ -1313,13 +1313,13 @@ function VersionsTab({
                   <HStack spacing={1} style={{ alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 700 }}>v{v.version}</BodySmall>
                     {/* data-theme + data-surface, not a guessed colour: `-light` in this
-                        system means the palette's Surface-Brightest, and the lib's own
-                        `-light` chip fill is identical to its solid one. The attributes
-                        give the chip the paired --Background / --Text for that zone;
-                        libRadiusOverrideCSS points the chip at them. */}
+                        system means the palette's Surface-Brightest. The lib's `-light`
+                        chip shape is gone — it painted the SOLID button fill — so this
+                        is a `-outline` chip, whose bg is var(--Background) and label
+                        var(--Text); the zone supplies both, with no override CSS. */}
                     {isCurrent && (
                       <Chip
-                        variant="success-light"
+                        variant="success-outline"
                         size="small"
                         label="Current"
                         data-theme="Success"
