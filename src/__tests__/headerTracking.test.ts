@@ -8,16 +8,20 @@
 import { describe, it, expect } from 'vitest';
 import {
   suggestedHeaderTracking, HEADER_TRACKING_ANCHOR_PX, HEADER_STEPS, buildTypeScale,
+  faceTrackingDelta,
 } from '../utils/typeScale';
+import { MOOD_AXES } from '../utils/moodAxes';
+import { buildTypographyTokensCSS } from '../utils/typographyTokens';
 
 const mixed = { caps: false, opszTracksSize: false };
 const caps = { caps: true, opszTracksSize: false };
 const em = (v: string) => parseFloat(v);
 
 describe('the anchor', () => {
-  it('returns the user value untouched at the anchor size', () => {
-    /* The user sees the number they typed on at least one step, which is what
-       keeps "anchor" an honest description of it. */
+  it('applies no SIZE delta at the anchor size', () => {
+    /* With no face axes in play this is the user's value verbatim. With axes
+       it is the baseline the face delta is measured from — the anchor is
+       where the size curve is zero, not where the output equals the input. */
     expect(suggestedHeaderTracking('0.02em', HEADER_TRACKING_ANCHOR_PX, mixed)).toBe('0.02em');
     expect(suggestedHeaderTracking('0em', HEADER_TRACKING_ANCHOR_PX, mixed)).toBe('0em');
   });
@@ -138,11 +142,120 @@ describe('the real ramp', () => {
     expect(new Set(headersOf('Fraunces').map((h) => h.letterSpacing)).size).toBe(6);
   });
 
-  it('tightens down the ramp for a face without opsz', () => {
-    const headers = headersOf('Lato');
-    const byToken = Object.fromEntries(headers.map((h) => [h.token, parseFloat(h.letterSpacing)]));
-    expect(byToken.H6).toBe(0);
+  it('tightens monotonically down the ramp', () => {
+    /* H6 is where the SIZE delta is zero, NOT where the output equals the
+       user's input: the face adjustment applies at every step including this
+       one, because it is about the face and not the size. Exempting H6 would
+       make it the only header ignoring the weight. */
+    const byToken = Object.fromEntries(
+      headersOf('Lato').map((h) => [h.token, parseFloat(h.letterSpacing)]));
     expect(byToken.H1).toBeLessThan(byToken.H3);
     expect(byToken.H3).toBeLessThan(byToken.H6);
+  });
+});
+
+/* ── The face's own settings ─────────────────────────────────────────────
+ *
+ * The Header is always Google Sans Flex, so "which face did the user pick" is
+ * really "where are wght, wdth and GRAD set" — the mood moves the axes.
+ */
+describe('the face axes shift the tracking', () => {
+  it('a heavier face asks for MORE air, not less', () => {
+    /* The opposite of the usual shorthand about tightening bold headlines —
+       that advice is about SIZE, which the size curve already handles.
+       Picture "AV" at 48px in Thin and in Black: in Black the stems are thick
+       and the letters nearly touch, so pulling them closer makes them
+       collide; in Thin the gap yawns and wants closing. The sidebearings are
+       drawn for the middle of the range and the stroke eats into them as
+       weight climbs. */
+    expect(faceTrackingDelta(MOOD_AXES.Bold))
+      .toBeGreaterThan(faceTrackingDelta(MOOD_AXES.Elegant));
+    expect(faceTrackingDelta({ wght: 800 })).toBeGreaterThan(0);
+    expect(faceTrackingDelta({ wght: 250 })).toBeLessThan(0);
+  });
+
+  it('a condensed face asks for more air too', () => {
+    /* Narrower letterforms come with proportionally tighter sidebearings, so
+       they crowd sooner. Tech sits at wdth 72, the most condensed setting any
+       mood uses. */
+    expect(MOOD_AXES.Tech.wdth).toBe(72);
+    expect(faceTrackingDelta({ wdth: 72 })).toBeGreaterThan(faceTrackingDelta({ wdth: 108 }));
+  });
+
+  it('grade counts for more per unit than weight does', () => {
+    /* Grade thickens the stems WITHOUT changing the advance width — that is
+       the point of the axis. So nothing compensates: the ink grows and the
+       gap shrinks by exactly that much, where a weight change at least moves
+       the metrics with it. */
+    expect(faceTrackingDelta({ GRAD: 100 })).toBeGreaterThan(faceTrackingDelta({ wght: 500 }));
+  });
+
+  it('defaults to no shift when there are no axes', () => {
+    expect(faceTrackingDelta(undefined)).toBe(0);
+    expect(faceTrackingDelta({ wght: 400, wdth: 100, GRAD: 0 })).toBe(0);
+  });
+
+  it('stays smaller than the size curve, so size still leads', () => {
+    /* These are heuristics with a defensible direction, not measured values.
+       If the face could out-vote the optical curve, a Bold mood would undo
+       the tightening a 48px heading needs. */
+    const sizeSpan = Math.abs(parseFloat(suggestedHeaderTracking('0em', 48, mixed)));
+    for (const axes of Object.values(MOOD_AXES)) {
+      expect(`${Math.abs(faceTrackingDelta(axes)) < sizeSpan}`).toBe('true');
+    }
+  });
+
+  it('reaches the built ramp', () => {
+    /* Asserting the OUTPUT, not the helper. */
+    const withAxes = (axes: Record<string, number>) => buildTypeScale([
+      { type: 'header', family: 'X', weight: String(axes.wght), letterSpacing: '0em',
+        allCaps: false, axes },
+      { type: 'body', family: 'Lato', weight: '400', letterSpacing: '0em', allCaps: false },
+      { type: 'decorative', family: 'Lato', weight: '600', letterSpacing: '0em', allCaps: false },
+    ] as never).filter((s) => s.group === 'Header');
+
+    const bold = withAxes(MOOD_AXES.Bold).find((h) => h.token === 'H1')!;
+    const elegant = withAxes(MOOD_AXES.Elegant).find((h) => h.token === 'H1')!;
+    expect(parseFloat(bold.letterSpacing)).toBeGreaterThan(parseFloat(elegant.letterSpacing));
+  });
+});
+
+describe('every Google Sans Flex axis reaches the stylesheet', () => {
+  /* font-variation-settings references these by var(). An undefined custom
+     property with no fallback invalidates the WHOLE declaration — the browser
+     drops it — so a missing axis variable does not lose one axis, it loses
+     the face's entire variation string. */
+  const css = buildTypographyTokensCSS([
+    { type: 'header', family: 'X', weight: '800', letterSpacing: '0em', allCaps: false,
+      axes: { wght: 800, wdth: 104, opsz: 144, slnt: 0, GRAD: 80, ROND: 0 } },
+    { type: 'body', family: 'Lato', weight: '400', letterSpacing: '0em', allCaps: false },
+    { type: 'decorative', family: 'Lato', weight: '600', letterSpacing: '0em', allCaps: false },
+  ] as never);
+
+  it.each([
+    ['--Font-Weight-Header', '800'],
+    ['--Font-Width-Header', '104'],
+    ['--Font-Optical-Size-Header', '144'],
+    ['--Font-Slant-Header', '0'],
+    ['--Font-Grade-Header', '80'],
+    ['--Font-Roundness-Header', '0'],
+  ])('%s is defined as %s', (name, value) => {
+    const decl = css.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
+    expect(decl).toBe(`${name}: ${value};`);
+  });
+
+  it('builds the variation string out of those variables', () => {
+    const decl = css.split('\n').map((l) => l.trim())
+      .find((l) => l.startsWith('--Font-Variation-Header:'));
+    for (const tag of ['wdth', 'opsz', 'slnt', 'GRAD', 'ROND']) {
+      expect(`${tag} in string: ${decl?.includes(`"${tag}"`)}`).toBe(`${tag} in string: true`);
+    }
+    /* wght is deliberately absent: it is spelled as font-weight, which maps to
+       the same axis. Putting it in both places lets them disagree. */
+    expect(decl).not.toContain('"wght"');
+  });
+
+  it('actually applies the string somewhere', () => {
+    expect(css).toContain('font-variation-settings: var(--Font-Variation-Header);');
   });
 });

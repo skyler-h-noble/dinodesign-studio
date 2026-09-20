@@ -511,9 +511,14 @@ const pxToEm = (px: number | undefined, size: number): string =>
  * Anchoring at H6 means "this is my tracking at small header sizes" and
  * everything larger tightens from there. Anchoring at H1 would make their
  * value describe the display end and loosen the small ones — worse, because a
- * wrong value costs more readability at 18px than at 48px. Nothing in the
- * output changes for H6 itself, which keeps the anchor honest: the user sees
- * the number they typed on at least one step.
+ * wrong value costs more readability at 18px than at 48px.
+ *
+ * H6 is where the SIZE delta is zero, not where the output equals the input.
+ * The face adjustment below applies at every step including this one, because
+ * it is about the face and not about the size: a Bold H6 wants different
+ * tracking from a Thin H6, and exempting one step would make that step the
+ * only one ignoring the weight. So the anchor is the baseline the two deltas
+ * are measured from, not a value that survives to the stylesheet verbatim.
  *
  * ── Derived from the SIZE, not from the token ─────────────────────────────
  *
@@ -540,6 +545,56 @@ const MIXED_CASE_RATE = 1 / 1500;
    mixed case would undo the one thing caps actually need. */
 const CAPS_RATE = 1 / 15000;
 
+/* ── The face's own axes shift the curve ──────────────────────────────────
+ *
+ * The Header is always Google Sans Flex and its character comes from the
+ * axes, so "which face did the user pick" is really "where are wght, wdth and
+ * GRAD set". All three change how much air a line needs, and the direction is
+ * worth stating because it is the opposite of the usual shorthand about
+ * tightening bold headlines — that advice is about SIZE, which the curve above
+ * already handles.
+ *
+ * WEIGHT. Picture "AV" at 48px in Thin and in Black. In Black the stems are
+ * thick and the letters nearly touch: pull them further together and they
+ * collide. In Thin the stems are hairlines and the gap yawns: it wants
+ * closing. So HEAVIER asks for MORE tracking and LIGHTER for less — the
+ * sidebearings are drawn for the middle of the range and the stroke eats into
+ * them as weight climbs. Across the moods that is Elegant at 250 against Bold
+ * at 800, which is most of the axis.
+ *
+ * WIDTH. A condensed face has narrower letterforms AND proportionally tighter
+ * sidebearings, so it crowds sooner. Tech sits at 72 — well below the 100
+ * default and the most condensed setting any mood uses — and wants the air
+ * back. Expanded needs slightly less.
+ *
+ * GRADE. Grade thickens the stems WITHOUT changing the advance width, which is
+ * the whole point of the axis. So unlike weight, nothing compensates: the ink
+ * grows and the gap shrinks by exactly that much. Per unit it therefore counts
+ * for more than weight does, and Bold's GRAD of 80 is the largest in the
+ * table.
+ *
+ * The three together stay deliberately smaller than the size curve — roughly
+ * half its magnitude at the extremes — so size still leads and the face
+ * adjusts. These are heuristics with a defensible direction, not measured
+ * values, and they are meant to be looked at.
+ */
+const WEIGHT_REF = 400;
+const WEIGHT_RATE = 1 / 60000;   // Bold's 800 -> +0.0067em; Elegant's 250 -> -0.0025em
+const WIDTH_REF = 100;
+const WIDTH_RATE = 1 / 12000;    // Tech's 72 -> +0.0023em
+const GRADE_RATE = 1 / 25000;    // Bold's 80 -> +0.0032em
+
+/** How far the face's own settings move the tracking, in em. */
+export function faceTrackingDelta(axes?: Record<string, number>): number {
+  if (!axes) return 0;
+  const wght = axes.wght ?? WEIGHT_REF;
+  const wdth = axes.wdth ?? WIDTH_REF;
+  const grad = axes.GRAD ?? 0;
+  return (wght - WEIGHT_REF) * WEIGHT_RATE
+       + (WIDTH_REF - wdth) * WIDTH_RATE
+       + grad * GRADE_RATE;
+}
+
 /* Guard rails, in em. Not opinions about good tracking — just a floor and a
    ceiling so a pathological anchor cannot produce unreadable type at the far
    end of the ramp. */
@@ -565,6 +620,12 @@ export interface TrackingContext {
    * corrections stack.
    */
   opszTracksSize: boolean;
+  /**
+   * The face's variable axes. For the Header this is always Google Sans Flex's
+   * set, where the user's pick lives — the family is fixed, so wght / wdth /
+   * GRAD are what "which face" actually means here.
+   */
+  axes?: Record<string, number>;
 }
 
 /** Split "0.02em" / "1.25px" / "0" into a number and its unit. */
@@ -602,7 +663,9 @@ export function suggestedHeaderTracking(
   const anchorEm = unit === 'px' ? n / HEADER_TRACKING_ANCHOR_PX : n;
   const rate = ctx.caps ? CAPS_RATE : MIXED_CASE_RATE;
   const em = Math.min(TRACKING_MAX_EM, Math.max(TRACKING_MIN_EM,
-    anchorEm - (size - HEADER_TRACKING_ANCHOR_PX) * rate));
+    anchorEm
+      - (size - HEADER_TRACKING_ANCHOR_PX) * rate
+      + faceTrackingDelta(ctx.axes)));
 
   return unit === 'px'
     ? `${+(em * size).toFixed(3)}px`
@@ -664,6 +727,10 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
            function a no-op for every brand, which is how it was written
            first. */
         opszTracksSize: false,
+        /* Google Sans Flex's settings — where the user's header choice
+           actually lives, since the family is fixed and the mood moves the
+           axes. */
+        axes: roles.header.axes,
       }),
       textTransform: roles.header.textTransform,
       paragraphSpacing: 0,
