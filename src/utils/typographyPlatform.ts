@@ -276,7 +276,7 @@ export function blockSelector(device: DeviceType, face: FaceMode): string {
 
 import { SYSTEM_FAMILY_OF, systemTracking, systemWeight, systemLineHeight } from './systemTypography';
 import type { FamilyRole, ResolvedRoles } from './typeScale';
-import { buildTypeScale } from './typeScale';
+import { buildTypeScale, BODY_LINE_HEIGHT } from './typeScale';
 
 export interface TypeValue { value: string | number; type: string }
 export type VarBag = Record<string, TypeValue>;
@@ -771,8 +771,35 @@ export function typographyVariablePayload(
          * Desktop, where the undeclared value was simply skipped, and the seven
          * devices stopped carrying the same names. A style missing a variable
          * on one device resolves to nothing there, silently. */
-        const v = prop === 'Line-Height' && platform !== 'desktop' && declared !== undefined
-          ? systemLineHeight(platform, size)
+        /* BODY IS 1.5 EVERYWHERE, ahead of the platform table.
+         *
+         * Apple sets its body at 17/22 — 1.29 — and Material at 16/24, which is
+         * 1.5 only because the numbers happen to meet there; its 14/20 is 1.43.
+         * Running either table over Body would have made the brand's running
+         * text tighter on iOS than on Desktop, on the same design, and the one
+         * thing that must not change between devices is how a paragraph reads.
+         *
+         * BODY_LINE_HEIGHT is the same constant the Desktop ramp is built from,
+         * read rather than restated, so the two cannot answer differently.
+         *
+         * It is also the accessible answer, and the two WCAG criteria that
+         * mention 1.5 say different things:
+         *
+         *   1.4.8 Visual Presentation (AAA)  line spacing IS at least
+         *     space-and-a-half WITHIN PARAGRAPHS. A rule about the default.
+         *   1.4.12 Text Spacing (AA)  nothing breaks WHEN A USER sets line
+         *     height to 1.5. A rule about adaptability, not about the default.
+         *
+         * Body at 1.5 meets the first and makes the second trivially true. And
+         * "within paragraphs" is why the headings are left on the platform
+         * curve rather than dragged up with them: 1.4.8 scopes its leading
+         * clause to blocks of text, so an H1 at 1.21 is the criterion applied,
+         * not an exception to it. */
+        const isBody = styleFolder(style) === 'Body';
+        const v = prop !== 'Line-Height' || declared === undefined
+          ? declared
+          : isBody ? Math.round(size * BODY_LINE_HEIGHT * 100) / 100
+          : platform !== 'desktop' ? systemLineHeight(platform, size)
           : declared;
         if (v !== undefined) bag[`Typography/${groupedProp(style, prop)}`] = { value: v, type: 'number' };
       }

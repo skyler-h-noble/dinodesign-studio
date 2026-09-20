@@ -21,7 +21,7 @@ import {
    indistinguishable from a file with no platform blocks in it. Every
    assertion below would have passed on nothing. */
 import { typographyTokensCSS, buildTypographyTokensCSS } from '../utils/typographyTokens';
-import { resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR } from '../utils/typeScale';
+import { resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR, BODY_LINE_HEIGHT } from '../utils/typeScale';
 
 /* The four faces, resolved. `resolveRoles(null)` is the real defaulting path,
    not a stub: it returns the fallback family for each role and pins Header to
@@ -272,6 +272,30 @@ describe('the Devices-Type source', () => {
     for (const d of DEVICE_TYPES)
       for (const name of Object.keys(P.devices[d]))
         expect(name).not.toContain('Paragraph');
+  });
+
+  it('sets body at 1.5 on every device, ahead of the platform table', () => {
+    /* Apple's body is 17/22 (1.29) and Material's 14/20 (1.43); Material's
+       16/24 is 1.5 only because the numbers meet there. Letting either table
+       govern Body would make the same design's running text tighter on iOS
+       than on Desktop, and how a paragraph reads is the one thing that must
+       not change between devices.
+
+       It is also WCAG 1.4.8 (AAA), which asks for space-and-a-half WITHIN
+       PARAGRAPHS. That scope is why the headings stay on the platform curve —
+       an H1 at 1.21 is the criterion applied, not an exception to it. */
+    for (const d of DEVICE_TYPES) {
+      const bag = P.devices[d];
+      for (const step of ['Small', 'Medium', 'Large']) {
+        const size = Number(bag[`Typography/Body/Body-${step}-Font-Size`].value);
+        const lh = Number(bag[`Typography/Body/Body-${step}-Line-Height`].value);
+        expect(lh / size, `${d} Body-${step}`).toBeCloseTo(BODY_LINE_HEIGHT, 5);
+      }
+      /* And a non-body style is still the platform's, or the split did nothing. */
+      const h1 = Number(bag['Typography/Headers/H1-Line-Height'].value)
+               / Number(bag['Typography/Headers/H1-Font-Size'].value);
+      if (d !== 'Desktop') expect(h1, `${d} H1`).toBeLessThan(BODY_LINE_HEIGHT);
+    }
   });
 
   it('gives Desktop the same System values as Omni', () => {
