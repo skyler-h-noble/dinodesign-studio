@@ -10,7 +10,7 @@ import {
   DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, DEVICE_PROPS, SEEDS_FROM, SYSTEM_FACE,
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
-  faceRootName, faceRootAlias, FAMILY_ROLE_OF, NON_STYLE_SECTIONS,
+  familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS,
 } from '../utils/typographyPlatform';
 /* The same `?raw` import the app uses, so this exercises the real path.
    It returned an EMPTY STRING until `test: { css: true }` was set in
@@ -94,36 +94,38 @@ describe('the Devices-Type source', () => {
    * bindable by nothing, and pointing at a collection that is being removed.
    * The test passed for as long as the bug survived, which is the whole of its
    * usefulness as a warning. */
-  it('puts the literal family on the face root, never a var()', () => {
+  it('puts a literal family on each of the three roots, never a var()', () => {
     for (const d of DEVICE_TYPES) {
       for (const face of FACE_MODES) {
-        for (const role of ['display', 'header', 'eyebrow', 'body'] as const) {
-          const root = P.devices[d][faceRootName(face, role)];
-          expect(root, `${d} ${face} ${role}`).toBeDefined();
-          expect(String(root.value)).not.toContain('var(');
+        for (const root of Object.keys(ROOT_ROLE)) {
+          const v = P.devices[d][familyName(face, root)];
+          expect(v, `${d} ${face} ${root}`).toBeDefined();
+          expect(String(v.value)).not.toContain('var(');
+          expect(String(v.value)).not.toContain('{');   // a literal, not a link
         }
       }
     }
   });
 
-  it('aliases every style family to the face it wears', () => {
-    const android = P.devices['Android-Mobile'];
-    /* Caption and Subtitle wear Body; H1-H6 wear Header — the two the user
-       called out, and the two the stylesheet had wrong on mobile. */
-    for (const style of ['Body', 'Caption', 'Subtitle', 'Label']) {
-      expect(android[sourceName('Omni', `${style}-Font-Family`)].value)
-        .toBe(faceRootAlias('Omni', 'body'));
+  it('points every other style at the root it wears', () => {
+    /* The structure built by hand in the file: Display, Headers and Body hold
+       a name; Subtitle, Caption, Label, Legal, Number, Button and Overline all
+       link to Body. */
+    for (const d of DEVICE_TYPES) {
+      const bag = P.devices[d];
+      for (const style of ['Subtitle', 'Caption', 'Label', 'Legal', 'Number', 'Button', 'Overline']) {
+        const v = bag[familyName('Omni', style)];
+        if (!v) continue;   // a device whose block does not declare that section
+        expect(v.value, `${d} ${style}`).toBe(familyAlias('Omni', 'Body'));
+      }
     }
-    expect(android[sourceName('Omni', 'Headers-Font-Family')].value)
-      .toBe(faceRootAlias('Omni', 'header'));
-    expect(android[sourceName('Omni', 'Overline-Font-Family')].value)
-      .toBe(faceRootAlias('Omni', 'eyebrow'));
   });
 
-  it('gives System the platform face, on the root', () => {
-    expect(P.devices['Android-Mobile'][faceRootName('System', 'body')].value).toBe('Roboto');
-    expect(P.devices['IOS-Mobile'][faceRootName('System', 'body')].value).toBe('"SF Pro"');
-    expect(String(P.devices.Desktop[faceRootName('System', 'body')].value)).toContain('system-ui');
+  it('gives System the platform face on all three roots', () => {
+    expect(P.devices['Android-Mobile'][familyName('System', 'Body')].value).toBe('Roboto');
+    expect(P.devices['Android-Mobile'][familyName('System', 'Headers')].value).toBe('Roboto');
+    expect(P.devices['IOS-Mobile'][familyName('System', 'Body')].value).toBe('"SF Pro"');
+    expect(String(P.devices.Desktop[familyName('System', 'Body')].value)).toContain('system-ui');
   });
 
   it('skips the Omni roots when no faces are given, rather than inventing one', () => {
@@ -131,8 +133,8 @@ describe('the Devices-Type source', () => {
        a missing variable is visible in the panel. Absence is the safer failure,
        so the payload declines to guess. */
     const bare = typographyVariablePayload(typographyTokensCSS);
-    expect(bare.devices.Desktop[faceRootName('Omni', 'body')]).toBeUndefined();
-    expect(bare.devices.Desktop[faceRootName('System', 'body')]).toBeDefined();
+    expect(bare.devices.Desktop[familyName('Omni', 'Body')]).toBeUndefined();
+    expect(bare.devices.Desktop[familyName('System', 'Body')]).toBeDefined();
   });
 
   it('never reads a face-definition section as a style', () => {
@@ -146,14 +148,14 @@ describe('the Devices-Type source', () => {
     }
   });
 
-  it('has a face for every section the stylesheet declares', () => {
+  it('has a root for every section the stylesheet declares', () => {
     /* The role table is stated, not derived — this is what stops the two
        drifting apart when a section is added on one side only. */
     for (const d of DEVICE_TYPES) {
       const { families } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
       for (const section of Object.keys(families)) {
         if (NON_STYLE_SECTIONS.has(section)) continue;
-        expect(FAMILY_ROLE_OF[section], `no face for section "${section}"`).toBeDefined();
+        expect(FAMILY_ROOT_OF[section], `no root for section "${section}"`).toBeDefined();
       }
     }
   });

@@ -349,72 +349,80 @@ const LENGTH_PROPS = new Set(['Letter-Spacing', 'Line-Height', 'Font-Size']);
 const FLOAT_PROPS = new Set(['Font-Weight', 'Line-Height', 'Letter-Spacing', 'Font-Size']);
 
 /**
- * Which FACE each type-style section wears.
+ * Which family each type-style section wears, by the name of the variable that
+ * holds it.
  *
- * Stated here rather than parsed out of the stylesheet, and that is a departure
- * from the rule the rest of this file follows — worth being explicit about.
+ * Three roots carry a literal family name — Display, Headers, Body — and every
+ * other style points at one of them. The roots are ordinary style names rather
+ * than a separate `Faces/` group, because the Display style wears the Display
+ * face and there is no third thing for the extra name to mean. It is also the
+ * structure already built by hand in the file, and the file is the authority:
+ * a name invented here that the file does not have is a silent no-op that
+ * reports success, which has happened twice already (`Radio-Size` against the
+ * file's `Radio`, `Checkbox-Size` against `Checkbox-Width`).
+ *
+ * Stated here rather than parsed out of the stylesheet, which departs from the
+ * rest of this file — worth being explicit about.
  *
  * Invariant 5 says derive from the CSS so the two cannot disagree about a
  * VALUE. This is not a value; it is an assignment, and the stylesheet's copy of
- * it is demonstrably wrong in two places:
+ * it is wrong in two places:
  *
  *   mobile   Headers  -> --Font-Family-Body: var(--Platform-Font-Families-Decorative)
  *                        wrong token AND wrong face; Desktop has it right
- *   Overline          -> Decorative on Desktop, Body on mobile, eyebrow in neither
+ *   Overline          -> Decorative on Desktop, Body on mobile
  *
- * Deriving from that would carry both bugs into Figma, which is exactly what
- * the previous pass did. The stylesheet's Platform vars are also on their way
- * out, so there will shortly be nothing there to derive from.
+ * Deriving from that carried both bugs into Figma, which is what the previous
+ * pass did. The stylesheet's Platform vars are also being removed, so there
+ * will shortly be nothing there to derive from.
  *
- * `everySectionHasARole()` below holds this table against the sections the CSS
+ * `hasARootForEverySection` holds this table against the sections the CSS
  * actually declares, so a new section cannot be added on one side alone — the
  * drift invariant 5 guards against is caught by a test instead of by shared
  * derivation.
  */
-export const FAMILY_ROLE_OF: Record<string, FamilyRole> = {
+export const FAMILY_ROOT_OF: Record<string, string> = {
+  Display: 'Display',
+  Headers: 'Headers',
+  Body: 'Body',
+  /* Everything below is the Body face. Overline included: the eyebrow has no
+     picker of its own (resolveRoles maps the eyebrow role at the Body family),
+     and the file links it to Body. */
+  Subtitle: 'Body',
+  Caption: 'Body',
+  Label: 'Body',
+  Legal: 'Body',
+  Number: 'Body',
+  Button: 'Body',
+  Overline: 'Body',
+};
+
+/** The three roots, and the face whose literal family each one holds. */
+export const ROOT_ROLE: Record<string, FamilyRole> = {
   Display: 'display',
   Headers: 'header',
-  Subtitle: 'body',
   Body: 'body',
-  Caption: 'body',
-  Label: 'body',
-  Legal: 'body',
-  Number: 'body',
-  Button: 'body',
-  Overline: 'eyebrow',
 };
 
 /**
  * Sections the stylesheet declares that are NOT type styles.
  *
- * The generated Desktop block opens with a `/* Faces *\/` group defining the
- * four face tokens themselves, and the parse — which keys families by whatever
- * section comment preceded them — read it as a style and produced
- * `Faces-Font-Family`, holding a var() reference to a collection that is being
- * removed. It was the first thing anyone noticed in the variables panel.
+ * The generated Desktop block opens with a Faces group defining the four face
+ * tokens themselves, and the parse — which keys families by whatever section
+ * comment preceded them — read it as a style and produced `Faces-Font-Family`,
+ * holding a var() reference to a collection that is being removed. It was the
+ * first thing anyone noticed in the variables panel.
  */
 export const NON_STYLE_SECTIONS = new Set(['Faces', 'Face weights']);
 
-/** The four faces, spelled for a variable name. */
-const ROLE_TOKEN: Record<FamilyRole, string> = {
-  display: 'Display', header: 'Header', eyebrow: 'Eyebrow', body: 'Body',
-};
-
-/**
- * Where a face's literal family name lives.
- *
- * Grouped under `Faces/` so the FACE and the STYLE that wears it stay
- * distinguishable: `Body-Font-Family` would otherwise have to mean both "the
- * Body style's family" and "the Body face", and Caption/Subtitle/Label all
- * pointing at a name that looks like another style reads as a mistake.
- */
-export function faceRootName(face: FaceMode, role: FamilyRole): string {
-  return GROUPED('Typography', face, 'Faces', `${ROLE_TOKEN[role]}-Font-Family`);
+/** The variable that holds one section's family. */
+export function familyName(face: FaceMode, section: string): string {
+  return sourceName(face, `${section}-Font-Family`);
 }
 
-/** The alias a style's family stores, pointing at its face root. */
-export function faceRootAlias(face: FaceMode, role: FamilyRole): string {
-  return `{${faceRootName(face, role).replace(/\//g, '.')}}`;
+/** The alias a non-root style stores, pointing at its root. */
+export function familyAlias(face: FaceMode, root: string): string {
+  return `{${familyName(face, root).replace(/\//g, '.')}}`;
 }
 
 /**
@@ -517,27 +525,24 @@ export function typographyVariablePayload(
      * follow. It is the shape the CSS already had, moved into the collection
      * because the collection it used to lean on is going away.
      */
-    for (const [face, literal] of [
-      ['Omni', (role: FamilyRole) => faces && faces[role].family],
-      ['System', () => SYSTEM_FACE[device]],
-    ] as [FaceMode, (role: FamilyRole) => string | undefined][]) {
-      for (const role of Object.keys(ROLE_TOKEN) as FamilyRole[]) {
-        const value = literal(role);
+    for (const face of FACE_MODES) {
+      /* The three roots, each holding a literal family name. Omni is the
+         brand's, already resolved; System is the platform's, one per device. */
+      for (const [root, role] of Object.entries(ROOT_ROLE)) {
+        const value = face === 'System' ? SYSTEM_FACE[device] : faces && faces[role].family;
         if (!value) continue;
-        bag[faceRootName(face, role)] = { value, type: 'string' };
+        bag[familyName(face, root)] = { value, type: 'string' };
       }
-    }
 
-    for (const section of Object.keys(families)) {
-      /* `Faces` and `Face weights` are the face DEFINITIONS, not styles. The
-         parse keys families by the preceding section comment and so read them
-         as one, which is where `Faces-Font-Family` came from. */
-      if (NON_STYLE_SECTIONS.has(section)) continue;
-      const role = FAMILY_ROLE_OF[section];
-      if (!role) continue;
-      for (const face of FACE_MODES) {
-        bag[sourceName(face, `${section}-Font-Family`)] =
-          { value: faceRootAlias(face, role), type: 'string' };
+      /* Every other style points at the root it wears. */
+      for (const section of Object.keys(families)) {
+        /* `Faces` and `Face weights` are the face DEFINITIONS, not styles. The
+           parse keys families by the preceding section comment and so read
+           them as one, which is where `Faces-Font-Family` came from. */
+        if (NON_STYLE_SECTIONS.has(section)) continue;
+        const root = FAMILY_ROOT_OF[section];
+        if (!root || root === section) continue;   // a root holds its own literal
+        bag[familyName(face, section)] = { value: familyAlias(face, root), type: 'string' };
       }
     }
     devices[device] = bag;
@@ -547,11 +552,6 @@ export function typographyVariablePayload(
      the same names by construction, so any of them would do; asserting that
      is cheaper than trusting it, and the test does. */
   for (const name of Object.keys(devices.Desktop)) {
-    /* The face roots stay in Devices-Type. A text style binds to a STYLE's
-       family, and the style's family already aliases its face — surfacing the
-       four roots here as well would offer a second, equivalent thing to bind
-       to, with nothing to say which is meant. */
-    if (/^Typography\/(Omni|System)\/Faces\//.test(name)) continue;
     const token = name.replace(/^Typography\/(Omni|System)\//, '').replace(/^Typography\//, '');
     if (/^Typography\/(Omni|System)\//.test(name)) {
       const isFamily = name.endsWith('-Font-Family');
