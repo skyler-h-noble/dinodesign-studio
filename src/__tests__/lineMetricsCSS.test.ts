@@ -309,6 +309,13 @@ describe('the nav chrome and accordion focus radii reach the stylesheet', () => 
       '--Step-Bar', '--Sm-Step-Bar', '--Lg-Step-Bar',
       '--No-Count-Step', '--Sm-No-Count-Step', '--Lg-No-Count-Step',
       '--Accordion-Focus-Radius', '--Accordion-Inner-Focus-Radius',
+      '--Radio-Size', '--Sm-Radio-Size', '--Lg-Radio-Size',
+      '--Radio-Dot', '--Sm-Radio-Dot', '--Lg-Radio-Dot',
+      '--Radio-Gap', '--Sm-Radio-Gap', '--Lg-Radio-Gap',
+      '--Checkbox-Size', '--Sm-Checkbox-Size', '--Lg-Checkbox-Size',
+      '--Checkbox-Icon', '--Sm-Checkbox-Icon', '--Lg-Checkbox-Icon',
+      '--Checkbox-Gap', '--Sm-Checkbox-Gap', '--Lg-Checkbox-Gap',
+      '--Touch-Target',
     ];
     const counts = names.map((name) => {
       const n = out.split('\n').map((l) => l.trim())
@@ -337,5 +344,60 @@ describe('the nav chrome and accordion focus radii reach the stylesheet', () => 
       const name = l.slice(0, l.indexOf(':'));
       expect(`${name} has a space: ${name.includes(' ')}`).toBe(`${name} has a space: false`);
     }
+  });
+});
+
+/* Radio and Checkbox were the last controls holding their whole sizing table
+ * as literals. The gap is the one that proves why it matters: Checkbox shipped
+ * 6 / 8 / 10 against Radio's 4 / 8 / 12, so the two controls in one form sat
+ * at different distances from their labels at small and large, and nothing
+ * could see it because nothing wrote either number.
+ */
+describe('Radio and Checkbox sizing reaches the stylesheet', () => {
+  const css = () => {
+    const sel = { background: 'primary', button: 'primary',
+      cardColoring: 'tonal', textColoring: 'tonal' } as never;
+    const { json } = buildAll(SCHEME, sel, 'light') as never as { json: never };
+    const j = JSON.parse(JSON.stringify(json));
+    j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100,
+      cardPadding: 24, bevelOpacity: 50, shadowResolution: 3 };
+    return Object.values(generateCSSFiles(j) as never as Record<string, string>).join('\n');
+  };
+  const decl = (out: string, name: string) =>
+    out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
+
+  it.each([
+    ['--Sm-Radio-Size', '16px'],    ['--Radio-Size', '20px'],    ['--Lg-Radio-Size', '24px'],
+    ['--Sm-Radio-Dot', '8px'],      ['--Radio-Dot', '9.5px'],    ['--Lg-Radio-Dot', '9.5px'],
+    ['--Sm-Radio-Gap', '4px'],      ['--Radio-Gap', '8px'],      ['--Lg-Radio-Gap', '12px'],
+    ['--Sm-Checkbox-Size', '16px'], ['--Checkbox-Size', '20px'], ['--Lg-Checkbox-Size', '24px'],
+    ['--Sm-Checkbox-Icon', '12px'], ['--Checkbox-Icon', '14px'], ['--Lg-Checkbox-Icon', '18px'],
+    ['--Sm-Checkbox-Gap', '4px'],   ['--Checkbox-Gap', '8px'],   ['--Lg-Checkbox-Gap', '12px'],
+    ['--Touch-Target', '24px'],
+  ])('%s is %s', (name, value) => {
+    expect(decl(css(), name)).toBe(`${name}: ${value};`);
+  });
+
+  it('the box and the gap are the SAME at every size for both controls', () => {
+    /* The assertion is on the shipped stylesheet, not on the table, because
+     * the table being right is not the thing that failed — Checkbox's 6/8/10
+     * and Radio's 4/8/12 were each internally consistent. What a form needs is
+     * that the two agree where they stand side by side. */
+    const out = css();
+    for (const p of ['Sm-', '', 'Lg-']) {
+      expect(decl(out, `--${p}Radio-Size`)?.split(':')[1])
+        .toBe(decl(out, `--${p}Checkbox-Size`)?.split(':')[1]);
+      expect(decl(out, `--${p}Radio-Gap`)?.split(':')[1])
+        .toBe(decl(out, `--${p}Checkbox-Gap`)?.split(':')[1]);
+    }
+  });
+
+  it('the touch target has no size modes', () => {
+    /* 24 is a WCAG minimum, not a density choice — a Sm- sibling holding the
+     * same 24 would imply a choice that does not exist, and a SMALLER one
+     * would put the smallest control under the requirement. */
+    const out = css();
+    expect(decl(out, '--Sm-Touch-Target')).toBeUndefined();
+    expect(decl(out, '--Lg-Touch-Target')).toBeUndefined();
   });
 });

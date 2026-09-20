@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, lineMetricsVars, SIZE_MODES } from '../utils/componentSize';
+import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, lineMetricsVars, selectionMetricsVars, SIZE_MODES } from '../utils/componentSize';
 
 /* Component-Size carries medium/small/large as MODES, so one library component
    needs one variant and the size switches the mode. The payload has always
@@ -282,5 +282,77 @@ describe('the line weights emit as CSS custom properties', () => {
       expect(v[`--${css}`]).toBe(`${p.medium[figma]}px`);
       expect(v[`--Lg-${css}`]).toBe(`${p.large[figma]}px`);
     }
+  });
+});
+
+/* Radio and Checkbox. The writer is UPDATE-ONLY and matches by name, so these
+ * names have to be the ones in the file — a group Figma does not have is not
+ * an error, it is a silent no-op, and the value stays at whatever was last
+ * typed by hand while the run reports success.
+ */
+describe('the Radio and Checkbox groups', () => {
+  const R = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, cardPadding: 16,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, dropdownFrameRadius: 0,
+  };
+
+  it('writes the ramps under the component group names', () => {
+    const p = componentSizePayload(R, {});
+    expect(p.small['Radio/Radio-Size']).toBe(16);
+    expect(p.medium['Radio/Radio-Size']).toBe(20);
+    expect(p.large['Radio/Radio-Size']).toBe(24);
+    expect(p.small['Radio/Radio-Dot']).toBe(8);
+    expect(p.large['Radio/Radio-Dot']).toBe(9.5);
+    expect(p.small['Checkbox/Checkbox-Icon']).toBe(12);
+    expect(p.large['Checkbox/Checkbox-Icon']).toBe(18);
+  });
+
+  it('gives the two controls the same box and gap at every size', () => {
+    /* One literal, two names. Checkbox shipped a 6/8/10 gap against Radio's
+       4/8/12 for as long as both were hand-typed. */
+    const p = componentSizePayload(R, {});
+    for (const mode of SIZE_MODES) {
+      expect(p[mode]['Radio/Radio-Size']).toBe(p[mode]['Checkbox/Checkbox-Size']);
+      expect(p[mode]['Radio/Radio-Gap']).toBe(p[mode]['Checkbox/Checkbox-Gap']);
+    }
+  });
+
+  it('puts the touch target in Other, at one value for all three modes', () => {
+    const p = componentSizePayload(R, {});
+    for (const mode of SIZE_MODES) expect(p[mode]['Other/Touch-Target']).toBe(24);
+  });
+
+  it('Figma and CSS carry the same numbers', () => {
+    /* Invariant 5 in its narrowest form: the payload and the stylesheet are
+       two emitters reading one table, and this is the assertion that they did
+       not each read it their own way. */
+    const p = componentSizePayload(R, {});
+    const css = selectionMetricsVars();
+    const pairs: [string, string][] = [
+      ['Radio/Radio-Size', 'Radio-Size'], ['Radio/Radio-Dot', 'Radio-Dot'],
+      ['Radio/Radio-Gap', 'Radio-Gap'], ['Checkbox/Checkbox-Size', 'Checkbox-Size'],
+      ['Checkbox/Checkbox-Icon', 'Checkbox-Icon'], ['Checkbox/Checkbox-Gap', 'Checkbox-Gap'],
+    ];
+    for (const [figma, base] of pairs) {
+      expect(`${base} sm ${css[`--Sm-${base}`]}`).toBe(`${base} sm ${p.small[figma]}px`);
+      expect(`${base} md ${css[`--${base}`]}`).toBe(`${base} md ${p.medium[figma]}px`);
+      expect(`${base} lg ${css[`--Lg-${base}`]}`).toBe(`${base} lg ${p.large[figma]}px`);
+    }
+  });
+
+  it('every mode still carries the same names', () => {
+    const p = componentSizePayload(R, {});
+    const keys = SIZE_MODES.map((m) => Object.keys(p[m]).sort().join('|'));
+    expect(new Set(keys).size).toBe(1);
   });
 });
