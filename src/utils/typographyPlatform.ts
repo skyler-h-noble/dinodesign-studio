@@ -306,7 +306,21 @@ export function parsePlatformBlock(css: string, platform: string):
        record a value the browser never uses. */
     if (fam) { families[section] = value; continue; }
     const prop = name.match(/^(.+?)-(Font-Size|Font-Weight|Line-Height|Letter-Spacing)$/);
-    if (prop) (styles[prop[1]] ??= {})[prop[2]] = value;
+    if (prop) {
+      const style = styleVariable(prop[1]);
+      const into = (styles[style] ??= {});
+      /* A pure `var(...)` is a BACK-COMPAT ALIAS, never a value.
+       *
+       * The generated Desktop block emits the canonical token and then
+       * --Overline-<prop>: var(--Eyebrow-<prop>) right behind it. Folding the
+       * two names together without this would let the alias land last and
+       * overwrite the number it points at — and since a var() string parses to
+       * NaN, the property would then be dropped entirely and the variable would
+       * keep whatever it held before. That is how Overline-Small-Font-Weight
+       * came to read 0 on Desktop and 500 on the tablets. */
+      if (into[prop[2]] !== undefined && /^var\(/.test(value)) continue;
+      into[prop[2]] = value;
+    }
   }
   return { styles, families };
 }
@@ -422,6 +436,53 @@ export function variableForSection(section: string): string {
   return SECTION_VARIABLE[section] ?? section;
 }
 
+/**
+ * The variable a stylesheet STYLE lands in. Overline is spelled Eyebrow.
+ *
+ * The two blocks disagree about the name and each carries half the ramp: the
+ * generated Desktop block is post-rename and writes Eyebrow-*, while the static
+ * mobile blocks still write Overline-*. Reading them as separate styles
+ * produced two variables per property, each populated on the devices whose
+ * block happened to use its spelling and untouched — so showing a stale 0 — on
+ * the rest.
+ *
+ * Folding them here means one name, filled on all seven. The CSS keeps emitting
+ * both spellings forever, for the frozen-stylesheet reason in
+ * generateTypographyTokensCSS; Figma takes only the canonical one.
+ */
+export function styleVariable(style: string): string {
+  return style.replace(/^Overline-/, 'Eyebrow-');
+}
+
+/**
+ * A family name as FIGMA wants it.
+ *
+ * CSS quotes a family whose name has a space — `"SF Pro"` — and Figma does not:
+ * it stores a font NAME, and the quotes would be part of it, so the font simply
+ * would not match. Nothing reports that; the text renders in a fallback and
+ * looks like a font choice.
+ */
+export function figmaFamily(cssFamily: string): string {
+  return cssFamily.trim().replace(/^["']|["']$/g, '');
+}
+
+/**
+ * Devices whose System face is the same as their Omni one.
+ *
+ * Desktop. "The system font" is not one font there — it is Segoe on Windows, SF
+ * on macOS, whatever the distro picked on Linux — so the CSS answers with a
+ * stack, and a stack is not something a Figma variable can hold: the field
+ * takes one font name. Writing the stack in produced a variable no text style
+ * could use.
+ *
+ * Desktop is also the brand's own surface, which is the substantive reason
+ * rather than the mechanical one: there is nothing for System to mean there
+ * that Omni does not already say.
+ */
+export function mirrorsOmni(device: DeviceType): boolean {
+  return device === 'Desktop';
+}
+
 /** The three roots, and the face whose literal family each one holds. */
 export const ROOT_ROLE: Record<string, FamilyRole> = {
   Display: 'display',
@@ -530,9 +591,11 @@ export function typographyVariablePayload(
         /* The platform's tables are in em — size-relative, because the seven
            devices do not share one scale — and land in px like everything
            else here. */
-        const sys = prop === 'Font-Weight'
-          ? systemWeight(fam, style)
-          : +(systemTracking(fam, size) * size).toFixed(4);
+        const sys = mirrorsOmni(device)
+          ? omni
+          : prop === 'Font-Weight'
+            ? systemWeight(fam, style)
+            : +(systemTracking(fam, size) * size).toFixed(4);
         bag[sourceName('System', `${style}-${prop}`)] = { value: sys, type: 'number' };
       }
     }
@@ -554,9 +617,10 @@ export function typographyVariablePayload(
       /* The three roots, each holding a literal family name. Omni is the
          brand's, already resolved; System is the platform's, one per device. */
       for (const [root, role] of Object.entries(ROOT_ROLE)) {
-        const value = face === 'System' ? SYSTEM_FACE[device] : faces && faces[role].family;
+        const brand = faces && faces[role].family;
+        const value = face === 'System' && !mirrorsOmni(device) ? SYSTEM_FACE[device] : brand;
         if (!value) continue;
-        bag[familyName(face, root)] = { value, type: 'string' };
+        bag[familyName(face, root)] = { value: figmaFamily(value), type: 'string' };
       }
 
       /* Every other name points at what it wears.

@@ -11,6 +11,7 @@ import {
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
   familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS,
+  mirrorsOmni, figmaFamily,
   variableForSection,
 } from '../utils/typographyPlatform';
 /* The same `?raw` import the app uses, so this exercises the real path.
@@ -122,11 +123,14 @@ describe('the Devices-Type source', () => {
     }
   });
 
-  it('gives System the platform face on all three roots', () => {
+  it('gives System the platform face on all three roots, unquoted', () => {
     expect(P.devices['Android-Mobile'][familyName('System', 'Body')].value).toBe('Roboto');
     expect(P.devices['Android-Mobile'][familyName('System', 'Headers')].value).toBe('Roboto');
-    expect(P.devices['IOS-Mobile'][familyName('System', 'Body')].value).toBe('"SF Pro"');
-    expect(String(P.devices.Desktop[familyName('System', 'Body')].value)).toContain('system-ui');
+    expect(P.devices['IOS-Mobile'][familyName('System', 'Body')].value).toBe('SF Pro');
+    /* Desktop's System face is Omni's — see mirrorsOmni. It used to be the CSS
+       stack, which no Figma family variable can hold. */
+    expect(P.devices.Desktop[familyName('System', 'Body')].value)
+      .toBe(P.devices.Desktop[familyName('Omni', 'Body')].value);
   });
 
   it('skips the Omni roots when no faces are given, rather than inventing one', () => {
@@ -135,7 +139,11 @@ describe('the Devices-Type source', () => {
        so the payload declines to guess. */
     const bare = typographyVariablePayload(typographyTokensCSS);
     expect(bare.devices.Desktop[familyName('Omni', 'Body')]).toBeUndefined();
-    expect(bare.devices.Desktop[familyName('System', 'Body')]).toBeDefined();
+    /* Desktop's System root is the brand face too, so it goes with it. A device
+       whose System face is the PLATFORM's still gets one — that value never
+       depended on the design. */
+    expect(bare.devices.Desktop[familyName('System', 'Body')]).toBeUndefined();
+    expect(bare.devices['Android-Mobile'][familyName('System', 'Body')].value).toBe('Roboto');
   });
 
   it('never reads a face-definition section as a style', () => {
@@ -147,6 +155,77 @@ describe('the Devices-Type source', () => {
         expect(name).not.toContain('Face weights');
       }
     }
+  });
+
+  it('gives Desktop the same System values as Omni', () => {
+    /* "The system font" is not one font on Desktop — Segoe, SF, whatever the
+       distro picked — so the CSS answers with a stack, and a Figma family
+       variable holds one NAME. Desktop is also the brand's own surface, so
+       there is nothing for System to mean there that Omni does not say. */
+    expect(mirrorsOmni('Desktop')).toBe(true);
+    const d = P.devices.Desktop;
+    const resolve = (v: unknown): unknown => {
+      const m = String(v).match(/^\{Typography\.(Omni|System)\.(.+)\}$/);
+      return m ? d[sourceName(m[1] as 'Omni' | 'System', m[2])].value : v;
+    };
+    for (const key of Object.keys(d)) {
+      if (!key.startsWith('Typography/Omni/')) continue;
+      const sys = d[key.replace('/Omni/', '/System/')];
+      if (!sys) continue;
+      /* Resolved, not literal: a family is an alias on either side and the two
+         point at their OWN root, which is correct — flattening System's styles
+         onto Omni's root would break the switch on every other device. What has
+         to match is what they resolve TO. */
+      expect(resolve(sys.value), key).toEqual(resolve(d[key].value));
+    }
+  });
+
+  it('writes a font NAME, never a CSS stack or a quoted family', () => {
+    /* Figma stores a font name. `"SF Pro"` keeps its quotes and matches
+       nothing; a comma-separated stack matches nothing either. Both render in a
+       fallback and look like a deliberate choice. */
+    expect(figmaFamily('"SF Pro"')).toBe('SF Pro');
+    for (const dev of DEVICE_TYPES) {
+      for (const face of FACE_MODES) {
+        for (const root of Object.keys(ROOT_ROLE)) {
+          const v = String(P.devices[dev][familyName(face, root)].value);
+          expect(v, `${dev} ${face} ${root}`).not.toContain(',');
+          expect(v, `${dev} ${face} ${root}`).not.toContain('"');
+        }
+      }
+    }
+  });
+
+  it('spells the eyebrow Eyebrow everywhere, and never Overline', () => {
+    /* The two blocks disagreed: the generated Desktop one is post-rename and
+       writes Eyebrow-*, the static mobile ones still write Overline-*. Read as
+       separate styles that produced two variables per property, each filled on
+       the devices whose block used its spelling and left at a stale 0 on the
+       rest — Overline-Small-Font-Weight read 0 on Desktop and 500 on the
+       tablets. */
+    for (const d of DEVICE_TYPES) {
+      const bag = P.devices[d];
+      for (const name of Object.keys(bag)) expect(name, d).not.toContain('Overline');
+      for (const step of ['Small', 'Medium', 'Large']) {
+        for (const face of FACE_MODES) {
+          const w = bag[sourceName(face, `Eyebrow-${step}-Font-Weight`)];
+          expect(w, `${d} ${face} ${step}`).toBeDefined();
+          expect(Number(w.value)).toBeGreaterThan(0);
+        }
+        expect(Number(bag[`Typography/Eyebrow-${step}-Font-Size`].value)).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('never lets a back-compat var() alias overwrite the value it points at', () => {
+    /* --Overline-<prop>: var(--Eyebrow-<prop>) is emitted right after the
+       canonical token. Folding the names without this rule would land the alias
+       last; a var() string parses to NaN, the property would be dropped, and
+       the Figma variable would silently keep whatever it held before. */
+    const { styles } = parsePlatformBlock(typographyTokensCSS, 'Desktop');
+    for (const [style, props] of Object.entries(styles))
+      for (const [prop, value] of Object.entries(props))
+        expect(String(value), `${style} ${prop}`).not.toContain('var(');
   });
 
   it('emits Eyebrow as the seam, and no Overline family at all', () => {
