@@ -317,7 +317,21 @@ function num(v: string | undefined): number | undefined {
 
 const FLOAT_PROPS = new Set(['Font-Weight', 'Line-Height', 'Letter-Spacing', 'Font-Size']);
 
-/** Everything this writes into Devices-Type sits under this prefix. */
+/**
+ * The collection's name in the file, EXACTLY as Figma spells it.
+ *
+ * One constant because a wrong collection name is the quietest failure in this
+ * system: the write lands nowhere and the run reports success. That has
+ * already happened twice — `Radio-Size` against the file's `Radio`, and
+ * `Checkbox-Size` against `Checkbox-Width`.
+ *
+ * Read off the variables panel on 2026-09-20 as "Devices-Type", plural on the
+ * first word. It is NOT used inside the alias strings — those carry a path and
+ * no collection — so this affects only the payload key.
+ */
+export const DEVICES_COLLECTION = 'Devices-Type';
+
+/** Everything this writes into that collection sits under this prefix. */
 export const DEVICES_TYPE_PREFIX = 'Typography/';
 
 /**

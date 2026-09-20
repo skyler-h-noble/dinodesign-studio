@@ -33,7 +33,8 @@ import type { TypographyStyle } from '../types';
 import { motionJSON } from './motion';
 import { componentElevationGeometryFigma } from './componentElevation';
 import {
-  DEVICE_TYPES, FACE_MODES, typographyVariablePayload, type VarBag,
+  DEVICE_TYPES, FACE_MODES, DEVICES_COLLECTION, typographyVariablePayload,
+  type VarBag,
 } from './typographyPlatform';
 
 interface ColorToken {
@@ -2071,7 +2072,7 @@ export function generateFigmaJSON(
       /* ADDED to Devices-Type, not defining it. The collection already holds
          ~100 variables that are not typography; every name here sits under
          `Typography/`, so a create-or-update import leaves them alone. */
-      figma['Devices-Type'] = collections.devicesType;
+      figma[DEVICES_COLLECTION] = collections.devicesType;
       figma['Typography-Variables'] = collections.typographyModes;
     } else {
       /* Loud, because the failure is otherwise invisible: the payload imports
