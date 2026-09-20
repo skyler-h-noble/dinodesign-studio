@@ -287,19 +287,30 @@ export const CHECKBOX_METRICS = {
   'Checkbox-Radius': { medium: 4, small: 3.2, large: 4.8 },
   /* The checkmark glyph. Inset 2 / 3 / 3 a side inside the box.
      
-     It lives HERE rather than in the icon ramp, and the reason is structural:
-     12/14/18 is a per-size ramp, and Component-Size is the only collection
-     with small/medium/large modes. The icon ramp is at Figma's mode cap and
-     cannot take another, so an `in-checkbox` there could hold exactly one
-     number — and one number cannot be 12 inside a 16 box and 18 inside a 24
-     box. The component's Icons & Avatars field binds to this variable instead,
-     which gets the size modes for free.
+     It lives HERE, in Component-Size, and not in the icon collection — which
+     matters because the icon collection is where you would expect it.
      
-     That is also why it is not bound to `in-button`. Button-Icon is
-     snap(0.625 x button height) and the button height is USER input, so the
-     checkmark would resize whenever someone changed their buttons, inside a
-     box that did not move. ICON_RAMP starts at 16 besides, and the small box
-     IS 16.
+     Icons & Avatars has `in-check` and `in-button` as its two MODES, and one
+     variable `Icon-Size` that ALIASES per mode:
+     
+         Icon-Size   in-check  -> Checkbox/Checkbox-Icon
+                     in-button -> Button/Button-Icon
+     
+     That is what makes the arrangement work. Icons & Avatars cannot take a
+     third mode, so a size ramp cannot live there — but it does not have to.
+     The alias lands in Component-Size, which HAS small/medium/large, so the
+     ramp is inherited through the pointer. Reading a checkbox node resolves
+     Icon-Size to 14 at medium with nothing in the icon collection knowing
+     anything about sizes.
+     
+     So this variable is the one the alias points AT, and renaming it breaks
+     the alias rather than just a lookup.
+     
+     Not bound to Button-Icon for the same reason it is not a constant: that
+     is snap(0.625 x button height) and the button height is USER input, so
+     the checkmark would resize whenever someone changed their buttons, inside
+     a box that did not move. ICON_RAMP starts at 16 besides, and the small
+     box IS 16.
      
      Values are the lib's, unchanged: medium sits at 70% of the box where small
      and large are 75%. Left as it ships rather than rounded to a flat
@@ -431,11 +442,12 @@ export function navMetricsVars(): Record<string, string> {
 
 /** Radio and Checkbox as CSS custom properties.
  *
- *  The 24px minimum hit area is NOT here yet. Both controls centre their box
- *  inside a constant 24 frame (WCAG 2.2 2.5.8), so the number is real and
- *  wants one home — but Component-Size/Other has not been checked for an
- *  existing variable, and inventing a name that the file does not have writes
- *  nothing while reporting success. Confirm the name, then add it. */
+ *  The 24px minimum hit area is deliberately NOT here. Both controls centre
+ *  their box inside a constant 24 frame (WCAG 2.2 2.5.8), and it was tempting
+ *  to give that its own Touch-Target variable — but the file already expresses
+ *  it as `Sizing-3`, the 24 rung of the Sizing scale, and the CSS side already
+ *  emits --Sizing-3: 24px (generateDesignSystem.ts). Both sides have a home
+ *  for it, so a new name would be a third spelling of a number that has two. */
 export function selectionMetricsVars(): Record<string, string> {
   return metricsVars(SELECTION_METRICS as never, SELECTION_METRIC_CSS);
 }

@@ -312,20 +312,15 @@ describe('the Radio and Checkbox groups', () => {
      rather than trusted. An earlier pass here invented Radio-Size, Radio-Dot
      and Checkbox-Size; all three would have gone silently nowhere. */
   const IN_THE_FILE = [
-    'Checkbox/Checkbox-Gap', 'Checkbox/Checkbox-Radius', 'Checkbox/Checkbox-Width',
+    'Checkbox/Checkbox-Gap', 'Checkbox/Checkbox-Icon', 'Checkbox/Checkbox-Radius',
+    'Checkbox/Checkbox-Width',
     'Radio/Dot', 'Radio/Radio', 'Radio/Radio-Gap',
   ];
-  /* Checkbox-Icon is the one name NOT yet in the file. It goes in
-     Component-Size/Checkbox rather than the icon ramp because 12/14/18 is a
-     per-size ramp and Component-Size is the only collection with the modes —
-     the icon ramp is at Figma's mode cap. Until it is created, this one write
-     is a no-op; the other six land. */
 
   it('writes only names the file actually has', () => {
     const p = componentSizePayload(R, {});
     const mine = Object.keys(p.medium)
       .filter((k) => k.startsWith('Radio/') || k.startsWith('Checkbox/'))
-      .filter((k) => k !== 'Checkbox/Checkbox-Icon')   // not in the file yet — see above
       .sort();
     expect(mine).toEqual(IN_THE_FILE);
   });
@@ -376,11 +371,13 @@ describe('the Radio and Checkbox groups', () => {
   });
 
   it('keeps the checkmark independent of the button icon size', () => {
-    /* Button-Icon is snap(0.625 x button height) and the button height is USER
-       input, so binding the checkmark to `in-button` would resize it whenever
-       someone changed their buttons — inside a box that did not move. It could
-       not hold these values anyway: ICON_RAMP starts at 16 and the small box
-       IS 16. */
+    /* Icons & Avatars aliases Icon-Size per mode — in-check to this variable,
+       in-button to Button/Button-Icon — so the two are siblings, not one
+       value. They must not be collapsed: Button-Icon is snap(0.625 x button
+       height) and the button height is USER input, so a shared value would
+       resize the checkmark whenever someone changed their buttons, inside a
+       box that did not move. ICON_RAMP starts at 16 besides, and the small
+       box IS 16. */
     const p = componentSizePayload(R, {});
     expect([p.small['Checkbox/Checkbox-Icon'], p.medium['Checkbox/Checkbox-Icon'],
             p.large['Checkbox/Checkbox-Icon']]).toEqual([12, 14, 18]);
