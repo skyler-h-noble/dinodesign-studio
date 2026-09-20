@@ -237,3 +237,135 @@ export function blockSelector(device: DeviceType, face: FaceMode): string {
     .map((f) => deviceSelector(device, f))
     .join(',\n');
 }
+
+/* ── Values ───────────────────────────────────────────────────────────────
+ *
+ * Parsed out of the GENERATED stylesheet rather than computed again here.
+ *
+ * That direction is deliberate. Invariant 5 is that the preview and the export
+ * are separate implementations and drift silently, and this file would have
+ * been a third. Deriving the Figma payload FROM the CSS means the two cannot
+ * disagree about a number — not "are kept in sync", but cannot disagree, since
+ * there is only one computation and Figma reads its output.
+ *
+ * It also picks up the live Desktop ramp for free: buildTypographyTokensCSS
+ * splices the user's chosen scale into the Desktop block, so parsing the
+ * result gives the brand's real Desktop values and the static mobile ones in
+ * a single pass.
+ */
+
+export interface TypeValue { value: string | number; type: string }
+export type VarBag = Record<string, TypeValue>;
+
+/** One style's properties, keyed by the property suffix. */
+type StyleProps = Record<string, string>;
+
+/** Parse one `[data-platform="X"] { … }` block into style -> prop -> value. */
+export function parsePlatformBlock(css: string, platform: string):
+  { styles: Record<string, StyleProps>; families: Record<string, string> } {
+  const re = new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`);
+  const m = css.match(re);
+  const styles: Record<string, StyleProps> = {};
+  const families: Record<string, string> = {};
+  if (!m) return { styles, families };
+  let section = '';
+  for (const raw of m[1].split('\n')) {
+    const line = raw.trim();
+    const sec = line.match(/^\/\*\s*(.+?)\s*\*\/$/);
+    if (sec) { section = sec[1]; continue; }
+    const decl = line.match(/^--([\w-]+):\s*(.+?);$/);
+    if (!decl) continue;
+    const [, name, value] = decl;
+    const fam = name.match(/^Font-Family-(\w+)$/);
+    /* Last one wins, matching the cascade. The mobile blocks declare
+       --Font-Family-Body twice — once in Headers pointing at the DECORATIVE
+       family, then again in Body pointing at Body — so reading the first would
+       record a value the browser never uses. */
+    if (fam) { families[section] = value; continue; }
+    const prop = name.match(/^(.+?)-(Font-Size|Font-Weight|Line-Height|Letter-Spacing)$/);
+    if (prop) (styles[prop[1]] ??= {})[prop[2]] = value;
+  }
+  return { styles, families };
+}
+
+/** px / unitless string to a bare number, for Figma's FLOAT variables. */
+function num(v: string | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+const FLOAT_PROPS = new Set(['Font-Weight', 'Line-Height', 'Letter-Spacing', 'Font-Size']);
+
+/**
+ * The two collections, ready for the payload.
+ *
+ * `devices` is keyed by device type — each key is a MODE of Devices-Type, not
+ * a group, so the variable names inside are identical across all seven and
+ * only the values differ. That is what lets one alias serve every device.
+ */
+export function typographyVariablePayload(generatedCSS: string): {
+  devices: Record<DeviceType, VarBag>;
+  typography: Record<FaceMode, VarBag>;
+} {
+  const devices = {} as Record<DeviceType, VarBag>;
+  const typography = { Omni: {} as VarBag, System: {} as VarBag };
+
+  for (const device of DEVICE_TYPES) {
+    const bag: VarBag = {};
+    const { styles, families } = parsePlatformBlock(generatedCSS, SEEDS_FROM[device]);
+
+    for (const [style, props] of Object.entries(styles)) {
+      /* Font-Size is a DEVICE decision, not a face one — it sits outside the
+         Omni/System split so that switching faces never reflows a layout. */
+      const size = num(props['Font-Size']);
+      if (size !== undefined) bag[`Typography/${style}-Font-Size`] = { value: size, type: 'number' };
+
+      for (const prop of SWITCHED_PROPS) {
+        const v = num(props[prop]);
+        if (v === undefined) continue;
+        /* Both faces start from the same metrics. The System side is seeded,
+           not derived — a system face genuinely wants its own leading and
+           tracking, and those are design decisions rather than arithmetic.
+           Seeding means this lands without changing a rendered value, and the
+           System column is then tuned in Figma. */
+        for (const face of FACE_MODES) {
+          bag[sourceName(face, `${style}-${prop}`)] = { value: v, type: 'number' };
+        }
+      }
+    }
+
+    for (const [section, family] of Object.entries(families)) {
+      bag[sourceName('Omni', `${section}-Font-Family`)] = { value: family, type: 'string' };
+      bag[sourceName('System', `${section}-Font-Family`)] =
+        { value: SYSTEM_FACE[device], type: 'string' };
+    }
+    devices[device] = bag;
+  }
+
+  /* The alias collection. Built off Desktop's key set — every device carries
+     the same names by construction, so any of them would do; asserting that
+     is cheaper than trusting it, and the test does. */
+  for (const name of Object.keys(devices.Desktop)) {
+    const token = name.replace(/^Typography\/(Omni|System)\//, '').replace(/^Typography\//, '');
+    if (/^Typography\/(Omni|System)\//.test(name)) {
+      const isFamily = name.endsWith('-Font-Family');
+      for (const face of FACE_MODES) {
+        typography[face][token] =
+          { value: `{${sourceName(face, token).replace(/\//g, '.')}}`,
+            type: isFamily ? 'string' : 'number' };
+      }
+    } else {
+      /* Font-Size does not switch, so BOTH modes alias the one value. Nothing
+         selects between them — but a text style binds to the Typography
+         collection only, so the size has to be reachable from there too. */
+      for (const face of FACE_MODES) {
+        typography[face][token] = { value: `{Typography.${token}}`, type: 'number' };
+      }
+    }
+  }
+  return { devices, typography };
+}
+
+/** Every mode carries the same names, or a style resolves to nothing at a size. */
+export function payloadNames(bag: VarBag): string[] { return Object.keys(bag).sort(); }

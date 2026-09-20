@@ -32,6 +32,9 @@ import { nearestAvailableWeight } from './googleFontWeights';
 import type { TypographyStyle } from '../types';
 import { motionJSON } from './motion';
 import { componentElevationGeometryFigma } from './componentElevation';
+import {
+  DEVICE_TYPES, FACE_MODES, typographyVariablePayload, type VarBag,
+} from './typographyPlatform';
 
 interface ColorToken {
   value: string;
@@ -475,6 +478,39 @@ const emToPercent = (em: string): number => +((parseFloat(em) || 0) * 100).toFix
  * the Display and Header steps are chosen so every computed line height lands
  * on a 4px multiple, and a percent round-trip loses that (48px × 117% = 56.16).
  */
+/* ── Devices-Type and the Typography alias collection ─────────────────────
+ *
+ * ADDITIVE. Nothing existing moves in this pass.
+ *
+ * Note the payload key: `figma.Typography` is ALREADY TAKEN, and not by a
+ * variable collection — it carries the TEXT STYLE descriptors, the
+ * {platform, version, meta, styles} shape the plugin reads to create styles,
+ * each with a `variablePath` pointing into the Platform collection. The new
+ * variable collection therefore ships under its own key and the plugin maps
+ * it to a Figma collection named Typography.
+ *
+ * The switchover — repointing every style's variablePath from
+ * Platform/Typography/<group>/<step> at the new collection — is deliberately
+ * NOT done here. The collections have to exist and be verified in the file
+ * first; repointing them in the same pass would mean a style bound to a
+ * variable that may not have imported, and an unbound text style renders as
+ * whatever it was last set to, with nothing to see.
+ */
+function buildTypographyCollections(css: string) {
+  const { devices, typography } = typographyVariablePayload(css);
+  const toEntries = (bag: VarBag) => {
+    const out: Record<string, unknown> = {};
+    for (const [name, v] of Object.entries(bag)) out[name] = { value: v.value, type: v.type };
+    return out;
+  };
+  return {
+    devicesType: Object.fromEntries(
+      DEVICE_TYPES.map((d) => [d, toEntries(devices[d])])),
+    typographyModes: Object.fromEntries(
+      FACE_MODES.map((f) => [f, toEntries(typography[f])])),
+  };
+}
+
 function buildFigmaTypeScale(typo: any): any {
   const roles = rolesFromTokensJSON(typo);
   const resolved = resolveRoles(roles);
@@ -537,7 +573,15 @@ function buildFigmaTypeScale(typo: any): any {
   };
 }
 
-export function generateFigmaJSON(designSystemJSON: any): any {
+export function generateFigmaJSON(
+  designSystemJSON: any,
+  /* The generated typography-tokens.css, passed IN rather than imported.
+     A static import here pulls the 25KB stylesheet into the main bundle and
+     collapses the code-split chunk that generateDesignSystem's dynamic import
+     creates — rolldown says so out loud (INEFFECTIVE_DYNAMIC_IMPORT). The one
+     caller already has the string in hand. */
+  typographyCSS?: string,
+): any {
   /* The user's chosen theme leads the Theme collection, making it Figma's
      default mode — see themeOrder. Read here so every use below shares it. */
   const pickedTheme: string | undefined =
@@ -2018,6 +2062,19 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // noticing. This section is the same scale the CSS is generated from, in
     // Figma's units.
     figma.Typography = buildFigmaTypeScale(typo);
+
+    /* The device ramps and the Omni / System switch. Derived from the
+       GENERATED stylesheet, so the numbers Figma gets are the numbers the CSS
+       emits — not a second computation that agrees today (invariant 5). */
+    if (typographyCSS) {
+      const collections = buildTypographyCollections(typographyCSS);
+      figma['Devices-Type'] = collections.devicesType;
+      figma['Typography-Variables'] = collections.typographyModes;
+    } else {
+      /* Loud, because the failure is otherwise invisible: the payload imports
+         fine and every text style keeps whatever it was last bound to. */
+      console.warn('\u26A0\uFE0F [Figma] no typography CSS passed; Devices-Type and the Typography modes were NOT written.');
+    }
   }
 
   // ── Component Style (Button, Card) ──

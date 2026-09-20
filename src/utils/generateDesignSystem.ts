@@ -1439,7 +1439,7 @@ ${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
       try {
         if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations;
         designSystemJSON._userSelections = input.userSelections;
-        const figmaPayload = generateFigmaJSON(designSystemJSON);
+        const figmaPayload = generateFigmaJSON(designSystemJSON, typographyTokensCSS);
         // Metadata that the Figma plugin reads to detect updates since its
         // last import. version is monotonic; lastModified is ISO 8601.
         figmaPayload.Metadata = {
