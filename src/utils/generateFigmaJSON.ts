@@ -2068,6 +2068,9 @@ export function generateFigmaJSON(
        emits — not a second computation that agrees today (invariant 5). */
     if (typographyCSS) {
       const collections = buildTypographyCollections(typographyCSS);
+      /* ADDED to Devices-Type, not defining it. The collection already holds
+         ~100 variables that are not typography; every name here sits under
+         `Typography/`, so a create-or-update import leaves them alone. */
       figma['Devices-Type'] = collections.devicesType;
       figma['Typography-Variables'] = collections.typographyModes;
     } else {

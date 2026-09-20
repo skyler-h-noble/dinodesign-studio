@@ -317,12 +317,29 @@ function num(v: string | undefined): number | undefined {
 
 const FLOAT_PROPS = new Set(['Font-Weight', 'Line-Height', 'Letter-Spacing', 'Font-Size']);
 
+/** Everything this writes into Devices-Type sits under this prefix. */
+export const DEVICES_TYPE_PREFIX = 'Typography/';
+
 /**
  * The two collections, ready for the payload.
  *
  * `devices` is keyed by device type — each key is a MODE of Devices-Type, not
  * a group, so the variable names inside are identical across all seven and
  * only the values differ. That is what lets one alias serve every device.
+ *
+ * ── Devices-Type is ADDED TO, never replaced ──────────────────────────────
+ *
+ * The collection already holds ~100 variables that have nothing to do with
+ * typography. This function names ONLY variables under `Typography/`, so an
+ * importer that creates-or-updates by name leaves every other variable
+ * untouched. `payloadIsAdditive()` asserts that and a test holds it, because
+ * the failure mode is not a broken import — it is a silently emptied
+ * collection, and a deleted Figma variable cannot be recovered by
+ * re-importing (invariant 8): the recreated one gets a new id and every layer
+ * bound to the old one stays unbound.
+ *
+ * The import itself has to be create-or-update rather than replace-collection.
+ * Nothing here can enforce that; it is a property of the plugin.
  */
 export function typographyVariablePayload(generatedCSS: string): {
   devices: Record<DeviceType, VarBag>;
@@ -392,3 +409,15 @@ export function typographyVariablePayload(generatedCSS: string): {
 
 /** Every mode carries the same names, or a style resolves to nothing at a size. */
 export function payloadNames(bag: VarBag): string[] { return Object.keys(bag).sort(); }
+
+/**
+ * True when a bag touches nothing outside the Typography group.
+ *
+ * The guarantee this gives is narrow and worth stating exactly: it proves the
+ * payload never NAMES another variable. It cannot prove the import is
+ * non-destructive — an importer that replaces a whole collection would still
+ * take the other hundred with it.
+ */
+export function payloadIsAdditive(bag: VarBag): boolean {
+  return Object.keys(bag).every((n) => n.startsWith(DEVICES_TYPE_PREFIX));
+}

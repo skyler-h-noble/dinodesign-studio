@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, DEVICE_PROPS, SEEDS_FROM, SYSTEM_FACE,
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
-  blockSelector, faceSelector, LEGACY_DEVICE_ALIAS,
+  blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
 } from '../utils/typographyPlatform';
 /* The same `?raw` import the app uses, so this exercises the real path.
    It returned an EMPTY STRING until `test: { css: true }` was set in
@@ -94,6 +94,22 @@ describe('the Devices-Type source', () => {
       const { styles } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
       expect(P.devices[d]['Typography/H1-Font-Size'].value)
         .toBe(parseFloat(styles['H1']['Font-Size']));
+    }
+  });
+
+  it('names nothing outside the Typography group', () => {
+    /* Devices-Type already holds ~100 variables that are not typography. This
+       payload must ADD to the collection, never define it — an importer that
+       creates-or-updates by name then leaves the rest alone.
+       
+       The consequence of getting it wrong is not a failed import. It is a
+       quietly emptied collection, and a deleted Figma variable cannot be
+       recovered by re-importing: the recreated one gets a new id and every
+       layer bound to the old one stays unbound (invariant 8). */
+    for (const d of DEVICE_TYPES) {
+      const stray = payloadNames(P.devices[d]).filter((n) => !n.startsWith('Typography/'));
+      expect(`${d} stray names: ${stray.join(',') || 'none'}`).toBe(`${d} stray names: none`);
+      expect(payloadIsAdditive(P.devices[d])).toBe(true);
     }
   });
 
