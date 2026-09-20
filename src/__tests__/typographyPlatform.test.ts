@@ -190,6 +190,35 @@ describe('the Devices-Type source', () => {
     expect(() => resolveVar('var(--X)', { X: 'var(--Y)', Y: 'var(--X)' })).not.toThrow();
   });
 
+  it("relays the user's Display and Header weights all the way to Figma", () => {
+    /* The whole point of the collection. These read 0 until var() resolution
+       landed, because the generated block states each weight once and
+       references it per step. */
+    const picked: any = [
+      { type: 'decorative', family: 'Playfair Display', weight: '800' },
+      { type: 'header', family: 'Whatever', weight: '250' },
+      { type: 'body', family: 'Source Sans 3', weight: '300' },
+    ];
+    const css = buildTypographyTokensCSS(picked);
+    const roles = resolveRoles(picked);
+    const D = typographyVariablePayload(css, roles).devices.Desktop;
+    const weight = (k: string) => D[sourceName('Omni', `${k}-Font-Weight`)].value;
+
+    expect(weight('Display-Large')).toBe(800);   // the Decorative pick
+    expect(weight('H1')).toBe(250);              // the Header pick
+    expect(weight('H3')).toBe(250);
+    expect(weight('Body-Medium')).toBe(300);
+
+    /* H4-H6 read --Header-Clamped-Weight, which only ever RAISES: a 250 that
+       reads elegant at 48px reads washed out at 18px. Not the header pick, and
+       not a bug. */
+    expect(Number(weight('H4'))).toBeGreaterThan(250);
+
+    /* And the families the user picked, as literals. */
+    expect(D[familyName('Omni', 'Display')].value).toBe('Playfair Display');
+    expect(D[familyName('Omni', 'Body')].value).toBe('Source Sans 3');
+  });
+
   it('gives Desktop the same System values as Omni', () => {
     /* "The system font" is not one font on Desktop — Segoe, SF, whatever the
        distro picked — so the CSS answers with a stack, and a Figma family
