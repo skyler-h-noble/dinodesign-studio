@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { generateFigmaJSON } from '../utils/generateFigmaJSON';
-import { typographyTokensCSS } from '../utils/typographyTokens';
+import { typographyTokensCSS, buildTypographyTokensCSS } from '../utils/typographyTokens';
 import { DEVICE_TYPES, FACE_MODES, DEVICES_COLLECTION } from '../utils/typographyPlatform';
 
 /* The smallest input that reaches the typography branch: it is gated on
@@ -112,6 +112,60 @@ describe('the downloaded figma.json', () => {
         expect(`${face}/${token} -> ${have.has(path)}`).toBe(`${face}/${token} -> true`);
       }
     }
+  });
+
+  it('gives Display a real three-step ramp on every device', () => {
+    /* Built from the GENERATED stylesheet, not the static import the rest of
+       this file uses. generateDesignSystem passes buildTypographyTokensCSS()
+       (see its line 1428), and the difference is the whole point here: the
+       Desktop block is spliced per design, the device blocks pass through. A
+       test reading the static asset would assert a Desktop ramp the download
+       never contains — the failure this suite exists to catch.
+
+       Display-Medium is the case that motivated it. No device block declared
+       it, and absent did not read as absent: the device-floor merge filled it
+       from Desktop, so Medium reported Desktop's size on every phone and
+       tablet and did not move when the device did. Asserting the three steps
+       DIFFER per device is what catches a step silently inheriting again. */
+    const live = generateFigmaJSON(DS, buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never));
+    const ramp = (device: string) =>
+      (['Small', 'Medium', 'Large'] as const).map((step) =>
+        live[DEVICES_COLLECTION][device][`Typography/Displays/Display-${step}-Font-Size`]?.value);
+
+    expect(ramp('Desktop')).toEqual([48, 60, 72]);
+    expect(ramp('IOS-Mobile')).toEqual([34, 40, 48]);
+    expect(ramp('Android-Mobile')).toEqual([36, 45, 57]);
+
+    for (const device of DEVICE_TYPES) {
+      const steps = ramp(device);
+      /* Every step present, and strictly increasing. Equal steps is the bug
+         that shipped for months: Small and Large both sat at 28px, which is
+         also H1's size, so the display styles were indistinguishable from a
+         heading and from each other. */
+      expect(`${device}: ${steps.join(',')}`)
+        .toBe(`${device}: ${[...steps].sort((a, b) => Number(a) - Number(b)).join(',')}`);
+      expect(new Set(steps).size).toBe(3);
+    }
+  });
+
+  it('gives every Display step a line height that matches the platform table', () => {
+    /* The payload recomputes non-Body line heights through systemLineHeight().
+       The CSS declares its own. Two implementations, so assert they land on
+       the same number rather than trusting that they do (invariant 5). */
+    const live = generateFigmaJSON(DS, buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never));
+    const lh = (device: string, step: string) =>
+      live[DEVICES_COLLECTION][device][`Typography/Displays/Display-${step}-Line-Height`]?.value;
+
+    expect(['Small', 'Medium', 'Large'].map((s) => lh('IOS-Mobile', s))).toEqual([41, 48, 58]);
+    expect(['Small', 'Medium', 'Large'].map((s) => lh('Android-Mobile', s))).toEqual([44, 52, 64]);
   });
 
   it('does not clobber the text-style descriptors', () => {
