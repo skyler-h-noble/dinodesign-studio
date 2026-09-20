@@ -9,7 +9,7 @@
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
-import { componentSizePayload } from './componentSize';
+import { componentSizePayload, desktopButtonMetrics } from './componentSize';
 import { THEME_MODES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
@@ -2139,7 +2139,18 @@ const BUTTON_BORDER_WIDTH = 1;
      * payload below is REGROUPED from the same computed values, never
      * recomputed, so they cannot disagree.
      */
-    figma['Component-Size'] = componentSizePayload(r as never, buttonModeMetricFigma(cs));
+    const buttonFigmaMetrics = buttonModeMetricFigma(cs);
+    figma['Component-Size'] = componentSizePayload(r as never, buttonFigmaMetrics);
+
+    /* The DESKTOP column of the Devices-Type button variables that
+       Component-Size/Button/Button-Height and -Icon now alias into. Desktop is
+       the one column the studio owns; the platform columns are hand-authored
+       from Apple's and Google's specs, so only this mode is written. */
+    if (figma[DEVICES_COLLECTION]?.Desktop) {
+      Object.assign(figma[DEVICES_COLLECTION].Desktop,
+        Object.fromEntries(Object.entries(desktopButtonMetrics(buttonFigmaMetrics))
+          .map(([n, v]) => [n, { value: v, type: 'number' }])));
+    }
 
     figma.Components = {
       Button: {

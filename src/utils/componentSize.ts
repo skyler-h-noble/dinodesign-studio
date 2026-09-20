@@ -473,13 +473,97 @@ export function navMetricsCSS(indent = '  '): string[] {
   return out;
 }
 
+/**
+ * Metrics Component-Size no longer owns, because Devices-Type does.
+ *
+ * Button-Height and Button-Icon are ALIASES in the file now:
+ *
+ *   Component-Size/Button/Button-Height  ->  Devices-Type/{Small,Medium,Large} Button
+ *   Component-Size/Button/Button-Icon    ->  Devices-Type/{...} Button Icon
+ *
+ * which is what makes a button size resolve through the DEVICE as well as the
+ * size mode — the same composition Icon-Size uses. A button is then 32 tall on
+ * Desktop, 44 on iOS and 48 on Android from one variable.
+ *
+ * populateComponentSize writes by name and cannot tell an alias from a number.
+ * Left in the payload, it overwrites both with literals on the next import and
+ * the links are simply gone — no error, no warning, and the platform heights
+ * silently collapse back to the Desktop ones. That is why this list exists
+ * rather than the entries just being deleted: the names have to be stated
+ * somewhere so a future metric added upstream cannot quietly rejoin the
+ * payload and clobber an alias.
+ *
+ * The user's Desktop values still reach Figma — they are written to the
+ * Desktop MODE of the Devices-Type variables these point at, which is the one
+ * column the studio owns. The platform columns are hand-authored constants.
+ */
+export const DEVICE_OWNED_METRICS = ['Button-Height', 'Button-Icon'] as const;
+
+function withoutDeviceOwned(flat: Record<string, number>): Record<string, number> {
+  const out = { ...flat };
+  for (const base of DEVICE_OWNED_METRICS) {
+    delete out[base];
+    delete out[`Sm-${base}`];
+    delete out[`Lg-${base}`];
+  }
+  return out;
+}
+
+/**
+ * The Devices-Type variables the aliases above point AT, keyed by size mode.
+ *
+ * Names as the file spells them — spaces included, at the root of the
+ * collection rather than in a group. Same rule as `App-Bar Height`: a tidier
+ * name matches nothing and the write is a silent no-op.
+ */
+const DEVICE_BUTTON_NAMES: Record<string, Record<SizeMode, string>> = {
+  'Button-Height': {
+    medium: 'Medium Button', small: 'Small Button', large: 'Large Button',
+  },
+  'Button-Icon': {
+    medium: 'Medium Button Icon', small: 'Small Button Icon', large: 'Large Button Icon',
+  },
+};
+
+/**
+ * The DESKTOP column of those variables, from the user's chosen heights.
+ *
+ * Desktop is the one column the studio owns. The platform columns are
+ * hand-authored constants — iOS 44/32/50, Android 48/32/56 — because they come
+ * from Apple's and Google's specs rather than from anything the user picks,
+ * and writing all seven modes would overwrite them with the brand's numbers on
+ * every import.
+ *
+ * So this returns ONE mode's worth. The caller merges it into the Desktop mode
+ * and leaves the other six alone, which is the whole point of the split: the
+ * brand decides how tall its own buttons are, the platforms decide how tall
+ * theirs are, and Component-Size aliases into whichever device is in play.
+ */
+export function desktopButtonMetrics(
+  buttonMetrics: Record<string, number>,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [base, names] of Object.entries(DEVICE_BUTTON_NAMES)) {
+    const byMode: Record<SizeMode, number | undefined> = {
+      medium: buttonMetrics[base],
+      small: buttonMetrics[`Sm-${base}`],
+      large: buttonMetrics[`Lg-${base}`],
+    };
+    for (const mode of SIZE_MODES) {
+      const v = byMode[mode];
+      if (typeof v === 'number') out[names[mode]] = v;
+    }
+  }
+  return out;
+}
+
 export function componentSizePayload(
   r: RadiiForSize,
   buttonMetrics: Record<string, number>,
 ): ComponentSizePayload {
   return componentSizeFigma({
     Button: {
-      ...buttonMetrics,                       // Name / Sm-Name / Lg-Name triples
+      ...withoutDeviceOwned(buttonMetrics),   // Name / Sm-Name / Lg-Name triples
       'Button-Radius': r.buttonRadius,
       'Sm-Button-Radius': r.smButtonRadius,
       'Lg-Button-Radius': r.lgButtonRadius,
