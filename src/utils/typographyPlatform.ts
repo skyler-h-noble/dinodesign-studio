@@ -94,15 +94,35 @@ export const SYSTEM_FACE: Record<DeviceType, string> = {
   'Android-Tablet-Horizontal': 'Roboto',
 };
 
-/** The properties that switch with the face. Font-Size is NOT one — see above. */
+/**
+ * The properties that switch with the face.
+ *
+ * Family, weight and tracking. A face has its own colour and its own natural
+ * weight at a given size, and tracking is tuned per face.
+ */
 export const SWITCHED_PROPS = [
   'Font-Weight',
-  'Line-Height',
   'Letter-Spacing',
 ] as const;
 
-/** The property that stays with the device regardless of face. */
-export const DEVICE_PROPS = ['Font-Size'] as const;
+/**
+ * The properties that stay with the DEVICE, identical across both faces.
+ *
+ * Size and line-height together are the vertical rhythm, and holding them
+ * fixed is what makes the switch safe: toggling Omni / System reshapes the
+ * glyphs and moves nothing. Every line box keeps its height, every baseline
+ * stays on the grid, and no screen reflows vertically.
+ *
+ * The sizes on the mobile devices are the PLATFORM's — Apple's and Material's
+ * own ramps — not the brand's, and both faces sit on them. Desktop's come from
+ * the user's chosen scale, because Desktop is the brand's own surface.
+ *
+ * Letter-spacing is the one switched property that does affect layout, and it
+ * only affects it horizontally: a line gets wider or narrower, it does not
+ * move down the page. That is a deliberate line — horizontal give is absorbed
+ * by wrapping, vertical give breaks a grid.
+ */
+export const DEVICE_PROPS = ['Font-Size', 'Line-Height'] as const;
 
 /* ── The device axis has to be MODES, not groups ───────────────────────────
  *
@@ -317,9 +337,12 @@ export function typographyVariablePayload(generatedCSS: string): {
 
     for (const [style, props] of Object.entries(styles)) {
       /* Font-Size is a DEVICE decision, not a face one — it sits outside the
-         Omni/System split so that switching faces never reflows a layout. */
-      const size = num(props['Font-Size']);
-      if (size !== undefined) bag[`Typography/${style}-Font-Size`] = { value: size, type: 'number' };
+         Omni/System split, together with Line-Height: the two are the vertical
+         rhythm, and holding them fixed is what makes the switch safe. */
+      for (const prop of DEVICE_PROPS) {
+        const v = num(props[prop]);
+        if (v !== undefined) bag[`Typography/${style}-${prop}`] = { value: v, type: 'number' };
+      }
 
       for (const prop of SWITCHED_PROPS) {
         const v = num(props[prop]);

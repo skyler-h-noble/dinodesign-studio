@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, SEEDS_FROM, SYSTEM_FACE,
+  DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, DEVICE_PROPS, SEEDS_FROM, SYSTEM_FACE,
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS,
 } from '../utils/typographyPlatform';
@@ -57,13 +57,25 @@ describe('the Devices-Type source', () => {
     }
   });
 
-  it('keeps Font-Size OUT of the face split', () => {
-    /* The size ramp is a device decision. If it switched, flipping Omni /
-       System would reflow every layout instead of only reshaping glyphs. */
-    expect(P.devices.Desktop['Typography/H1-Font-Size']).toBeDefined();
-    for (const face of FACE_MODES) {
-      expect(P.devices.Desktop[sourceName(face, 'H1-Font-Size')]).toBeUndefined();
+  it('keeps the vertical rhythm OUT of the face split', () => {
+    /* Size AND line-height are the device's, identical across both faces.
+       Together they are the vertical rhythm: holding them fixed means
+       toggling Omni / System reshapes glyphs and moves nothing down the page.
+       Letter-spacing is the one switched property that touches layout, and it
+       only widens or narrows a line — horizontal give is absorbed by
+       wrapping, vertical give breaks a grid. */
+    for (const prop of DEVICE_PROPS) {
+      expect(P.devices.Desktop[`Typography/H1-${prop}`]).toBeDefined();
+      for (const face of FACE_MODES) {
+        expect(`${prop} switched: ${P.devices.Desktop[sourceName(face, `H1-${prop}`)] !== undefined}`)
+          .toBe(`${prop} switched: false`);
+      }
     }
+  });
+
+  it('switches only family, weight and tracking', () => {
+    expect([...SWITCHED_PROPS]).toEqual(['Font-Weight', 'Letter-Spacing']);
+    expect([...DEVICE_PROPS]).toEqual(['Font-Size', 'Line-Height']);
   });
 
   it('gives System the platform face and Omni the brand one', () => {
@@ -101,19 +113,23 @@ describe('the Typography alias collection', () => {
   });
 
   it('points each mode at its own face', () => {
-    expect(P.typography.Omni['H1-Line-Height'].value)
-      .toBe('{Typography.Omni.H1-Line-Height}');
-    expect(P.typography.System['H1-Line-Height'].value)
-      .toBe('{Typography.System.H1-Line-Height}');
+    expect(P.typography.Omni['H1-Font-Weight'].value)
+      .toBe('{Typography.Omni.H1-Font-Weight}');
+    expect(P.typography.System['H1-Font-Weight'].value)
+      .toBe('{Typography.System.H1-Font-Weight}');
+    expect(P.typography.Omni['H1-Letter-Spacing'].value)
+      .toBe('{Typography.Omni.H1-Letter-Spacing}');
   });
 
   it('exposes the size too, identically in both modes', () => {
     /* A text style binds to this collection and nothing else, so the size has
        to be reachable here — but it does not switch, so both modes point at
        the one value. */
-    expect(P.typography.Omni['H1-Font-Size'].value).toBe('{Typography.H1-Font-Size}');
-    expect(P.typography.System['H1-Font-Size'].value)
-      .toBe(P.typography.Omni['H1-Font-Size'].value);
+    for (const prop of DEVICE_PROPS) {
+      expect(P.typography.Omni[`H1-${prop}`].value).toBe(`{Typography.H1-${prop}}`);
+      expect(P.typography.System[`H1-${prop}`].value)
+        .toBe(P.typography.Omni[`H1-${prop}`].value);
+    }
   });
 
   it('every alias resolves to a name that exists in Devices-Type', () => {
