@@ -1444,7 +1444,11 @@ ${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
            the only way to tell "the export omitted it" from "the plugin
            ignored it" is to open the uploaded file by hand — and those two
            have completely different fixes. */
-        console.log('📦 [figma.json] collections:',
+        /* warn, not log: Vite's dev server forwards console.warn and
+           console.error to the terminal but NOT console.log, so a diagnostic
+           written with log() is invisible to anyone reading the server output
+           — which is most of the value of having it. */
+        console.warn('📦 [figma.json] collections:',
           Object.keys(figmaPayload).map((k) => {
             const v = (figmaPayload as Record<string, unknown>)[k];
             const n = v && typeof v === 'object' ? Object.keys(v as object).length : 0;
