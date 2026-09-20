@@ -594,6 +594,59 @@ export const FAMILY_FOLDER: Record<string, string> = {
   Number: 'Numbers', Button: 'Buttons',
 };
 
+/**
+ * Which steps take their weight FROM THE FACE, and from which one.
+ *
+ * The weight half of what the families already do: three roots carrying a
+ * number, and every step that follows a face pointing at its root instead of
+ * restating it. Change the Display face's weight and all three Display steps
+ * move, the way the stylesheet already behaves —
+ * `--Display-Large-Font-Weight: var(--Font-Weight-Display)`.
+ *
+ * Derived from buildTypeScale rather than listed, because the scale is what
+ * decides it: a step sets weightFromFace, or names a different variable, or
+ * states a number. Reading that means a step which changes its mind is
+ * followed automatically instead of quietly keeping a stale alias.
+ *
+ * Deliberately NOT everything. H4-H6 read --Header-Clamped-Weight, which only
+ * ever raises a light pick and is a different value by design; Subtitle, Label,
+ * Number, Button and Badge state their own. Pointing those at a face root would
+ * make the root look like it governs the group and then surprise whoever moved
+ * it.
+ */
+const WEIGHT_ROOT_OF_ROLE: Record<string, string> = {
+  display: 'Display', header: 'Headers', body: 'Body',
+};
+
+function buildWeightFaces(): { root: Record<string, string>; sample: Record<string, string> } {
+  const root: Record<string, string> = {};
+  const sample: Record<string, string> = {};
+  for (const st of buildTypeScale(null) as any[]) {
+    if (!st.weightFromFace || st.weightVar) continue;
+    const r = WEIGHT_ROOT_OF_ROLE[st.familyRole];
+    if (!r) continue;
+    root[st.token] = r;
+    if (!sample[r]) sample[r] = st.token;   // any step of that face; they agree
+  }
+  return { root, sample };
+}
+const WEIGHT_FACES = buildWeightFaces();
+
+/** The root a step's weight follows, or undefined when it states its own. */
+export function weightRootOf(token: string): string | undefined {
+  return WEIGHT_FACES.root[token];
+}
+
+/** The variable holding one face's weight. */
+export function weightRootName(face: FaceMode, root: string): string {
+  return sourceName(face, `${FAMILY_FOLDER[root]}/${root}-Font-Weight`);
+}
+
+/** The alias a step stores, pointing at its face's weight. */
+export function weightRootAlias(face: FaceMode, root: string): string {
+  return `{${weightRootName(face, root).replace(/\//g, '.')}}`;
+}
+
 /** The variable a stylesheet section's family lands in. */
 export function variableForSection(section: string): string {
   return SECTION_VARIABLE[section] ?? section;
@@ -679,6 +732,25 @@ export function figmaFamily(cssFamily: string): string {
  */
 export function mirrorsOmni(device: DeviceType): boolean {
   return device === 'Desktop';
+}
+
+/**
+ * Will this face's ROOTS be written for this device?
+ *
+ * Everything that points at a root has to ask, because a pointer to a name
+ * that was never written is the worst of the three outcomes: Figma does not
+ * report it, the variable exists, and it resolves to nothing.
+ *
+ * Omni's roots are the brand's and need the resolved faces. System's are the
+ * platform's and are always available — except on Desktop, where System
+ * mirrors Omni and so needs them too.
+ *
+ * Both the family aliases and the weight aliases got this wrong independently,
+ * the second one caught by a test written for the first. One predicate now, so
+ * the next thing to gain a root cannot get it wrong a third time.
+ */
+export function rootsWritten(face: FaceMode, device: DeviceType, hasFaces: boolean): boolean {
+  return face === 'System' && !mirrorsOmni(device) ? true : hasFaces;
 }
 
 /** The three roots, and the face whose literal family each one holds. */
@@ -865,7 +937,24 @@ export function typographyVariablePayload(
       for (const prop of SWITCHED_PROPS) {
         const omni = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
         if (omni === undefined) continue;
-        bag[sourceName('Omni', groupedProp(style, prop))] = { value: omni, type: 'number' };
+        /* A step that follows its face points at the face's root rather than
+           restating the number, so moving the face moves every step wearing
+           it. Exactly what the stylesheet does; Figma was flattening it. */
+        /* Alias ONLY when the root will actually be written.
+         *
+         * The Omni roots come from the resolved faces and are skipped when
+         * those are absent (an older caller, or the parse-shape tests). Without
+         * this guard the steps still pointed at them, leaving nine dangling
+         * aliases per device — which Figma does not report: the variable exists
+         * and resolves to nothing. System's roots are the platform's and are
+         * always available, except on Desktop where System mirrors Omni. */
+        const root = prop === 'Font-Weight' ? weightRootOf(style) : undefined;
+        const omniRoot = rootsWritten('Omni', device, !!faces) ? root : undefined;
+        const systemRoot = rootsWritten('System', device, !!faces) ? root : undefined;
+
+        bag[sourceName('Omni', groupedProp(style, prop))] = omniRoot
+          ? { value: weightRootAlias('Omni', omniRoot), type: 'string' }
+          : { value: omni, type: 'number' };
 
         /* The platform's tables are in em — size-relative, because the seven
            devices do not share one scale — and land in px like everything
@@ -875,7 +964,9 @@ export function typographyVariablePayload(
           : prop === 'Font-Weight'
             ? systemWeight(fam, style)
             : +(systemTracking(fam, size) * size).toFixed(4);
-        bag[sourceName('System', groupedProp(style, prop))] = { value: sys, type: 'number' };
+        bag[sourceName('System', groupedProp(style, prop))] = systemRoot
+          ? { value: weightRootAlias('System', systemRoot), type: 'string' }
+          : { value: sys, type: 'number' };
       }
     }
 
@@ -898,8 +989,22 @@ export function typographyVariablePayload(
       for (const [root, role] of Object.entries(ROOT_ROLE)) {
         const brand = faces && faces[role].family;
         const value = face === 'System' && !mirrorsOmni(device) ? SYSTEM_FACE[device] : brand;
-        if (!value) continue;
-        bag[familyName(face, root)] = { value: figmaFamily(value), type: 'string' };
+        if (value) bag[familyName(face, root)] = { value: figmaFamily(value), type: 'string' };
+
+        /* The face's WEIGHT, beside its family. Omni is the user's pick for
+           that face; System is the platform's for the same role, taken through
+           systemWeight against a step that follows this face rather than
+           restated — so the root cannot disagree with the steps pointing at
+           it. Desktop's System mirrors Omni, as everywhere else. */
+        const sample = WEIGHT_FACES.sample[root];
+        if (!sample) continue;
+        const omniWeight = faces && faces[role].weight;
+        const weight = face === 'System' && !mirrorsOmni(device)
+          ? systemWeight(SYSTEM_FAMILY_OF[device], sample)
+          : omniWeight;
+        if (typeof weight === 'number') {
+          bag[weightRootName(face, root)] = { value: weight, type: 'number' };
+        }
       }
 
       /* Every other name points at what it wears.
@@ -911,6 +1016,7 @@ export function typographyVariablePayload(
        * the sections the CSS does declare. */
       for (const [name, target] of Object.entries(FAMILY_ROOT_OF)) {
         if (target === name) continue;             // a root holds its own literal
+        if (!rootsWritten(face, device, !!faces)) continue;
         bag[familyName(face, name)] = { value: familyAlias(face, target), type: 'string' };
       }
     }

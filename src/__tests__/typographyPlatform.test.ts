@@ -11,6 +11,7 @@ import {
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
   familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS, groupedProp,
+  weightRootName, weightRootAlias,
   resolveVar,
   mirrorsOmni, figmaFamily,
   variableForSection,
@@ -27,6 +28,20 @@ import { resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR, BODY_LINE_HEIGHT } from '../
    not a stub: it returns the fallback family for each role and pins Header to
    Google Sans Flex, which is what a design with no picked faces actually
    gets. */
+/**
+ * Follow one alias hop inside a device bag.
+ *
+ * Nine steps take their weight from their face and store a pointer at it —
+ * Display-Large -> Displays/Display-Font-Weight — so a weight assertion has to
+ * resolve before it compares. What it resolves TO is the whole point of the
+ * indirection, and is what these tests are about.
+ */
+function resolved(bag: Record<string, { value: unknown }>, name: string): unknown {
+  const v = bag[name]?.value;
+  const m = typeof v === 'string' && v.match(/^\{(.+)\}$/);
+  return m ? bag[m[1].split('.').join('/')]?.value : v;
+}
+
 const FACES = resolveRoles(null);
 const P = typographyVariablePayload(typographyTokensCSS, FACES);
 
@@ -203,7 +218,7 @@ describe('the Devices-Type source', () => {
     const G = typographyVariablePayload(GEN, resolveRoles(null));
     const weights = Object.keys(G.devices.Desktop).filter((k) => k.includes('Font-Weight'));
     expect(weights.length).toBeGreaterThan(0);
-    for (const k of weights) expect(Number(G.devices.Desktop[k].value), k).toBeGreaterThan(0);
+    for (const k of weights) expect(Number(resolved(G.devices.Desktop, k)), k).toBeGreaterThan(0);
   });
 
   it('resolves only what the block itself declares', () => {
@@ -230,7 +245,7 @@ describe('the Devices-Type source', () => {
     const css = buildTypographyTokensCSS(picked);
     const roles = resolveRoles(picked);
     const D = typographyVariablePayload(css, roles).devices.Desktop;
-    const weight = (k: string) => D[sourceName('Omni', groupedProp(k, 'Font-Weight'))].value;
+    const weight = (k: string) => resolved(D, sourceName('Omni', groupedProp(k, 'Font-Weight')));
 
     expect(weight('Display-Large')).toBe(800);   // the Decorative pick
     expect(weight('H1')).toBe(250);              // the Header pick
@@ -263,7 +278,7 @@ describe('the Devices-Type source', () => {
     const D = typographyVariablePayload(
       buildTypographyTokensCSS(bold), resolveRoles(bold)).devices.Desktop;
     for (const step of ['H1', 'H3', 'H4', 'H6'])
-      expect(D[sourceName('Omni', groupedProp(step, 'Font-Weight'))].value, step).toBe(700);
+      expect(resolved(D, sourceName('Omni', groupedProp(step, 'Font-Weight'))), step).toBe(700);
   });
 
   it('offers Body as Semibold, never as Bold', () => {
@@ -338,6 +353,57 @@ describe('the Devices-Type source', () => {
         .map((k) => k.replace(`Typography/${face}/`, ''))
         .sort();
       expect(strip('System'), d).toEqual(strip('Omni'));
+    }
+  });
+
+  it('points a face-following step at its face weight, and nothing else', () => {
+    /* Nine steps take their weight from a face, so the face carries the number
+       once and they point at it: move Display's weight and all three Display
+       steps follow, which is what the stylesheet already does
+       (--Display-Large-Font-Weight: var(--Font-Weight-Display)) and what Figma
+       was flattening into nine copies.
+
+       The others must NOT point at it. H4-H6 read --Header-Clamped-Weight,
+       which only ever raises a light pick, and Subtitle / Label / Number /
+       Button / Badge state their own. Aliasing those would make the root look
+       like it governs the whole group and then surprise whoever moved it. */
+    const picked: any = [
+      { type: 'decorative', family: 'P', weight: '800' },
+      { type: 'header', family: 'X', weight: '250' },
+      { type: 'body', family: 'S', weight: '300' },
+    ];
+    const D = typographyVariablePayload(
+      buildTypographyTokensCSS(picked), resolveRoles(picked)).devices.Desktop;
+    const raw = (k: string) => D[sourceName('Omni', groupedProp(k, 'Font-Weight'))].value;
+
+    expect(D[weightRootName('Omni', 'Display')].value).toBe(800);
+    expect(D[weightRootName('Omni', 'Headers')].value).toBe(250);
+    expect(D[weightRootName('Omni', 'Body')].value).toBe(300);
+
+    for (const step of ['Display-Large', 'Display-Medium', 'Display-Small'])
+      expect(raw(step), step).toBe(weightRootAlias('Omni', 'Display'));
+    for (const step of ['H1', 'H2', 'H3'])
+      expect(raw(step), step).toBe(weightRootAlias('Omni', 'Headers'));
+    for (const step of ['Body-Small', 'Body-Medium', 'Body-Large'])
+      expect(raw(step), step).toBe(weightRootAlias('Omni', 'Body'));
+
+    for (const step of ['H4', 'H6', 'Subtitle-Medium', 'Label-Large', 'Number-Small'])
+      expect(typeof raw(step), step).toBe('number');
+  });
+
+  it('never points a step at a face weight that was not written', () => {
+    /* The Omni roots come from the resolved faces and are skipped when those
+       are absent. Without a guard the steps still pointed at them — nine
+       dangling aliases per device, which Figma does not report: the variable
+       exists and resolves to nothing. */
+    const bare = typographyVariablePayload(typographyTokensCSS);
+    for (const d of DEVICE_TYPES) {
+      const bag = bare.devices[d];
+      for (const [name, v] of Object.entries(bag)) {
+        if (typeof v.value !== 'string' || !v.value.startsWith('{')) continue;
+        const target = v.value.slice(1, -1).split('.').join('/');
+        expect(bag[target], `${d}: ${name} -> ${target}`).toBeDefined();
+      }
     }
   });
 
@@ -467,6 +533,12 @@ describe('the Devices-Type source', () => {
        not at all. */
     for (const [name, v] of Object.entries(P.devices.Desktop)) {
       if (name.endsWith('-Font-Family')) continue;
+      /* An alias is a reference string by design — it is the pointer, not the
+         value. What it points AT still has to be a bare number. */
+      if (typeof v.value === 'string' && v.value.startsWith('{')) {
+        expect(`${name}: ${typeof resolved(P.devices.Desktop, name)}`).toBe(`${name}: number`);
+        continue;
+      }
       expect(`${name}: ${typeof v.value}`).toBe(`${name}: number`);
     }
   });

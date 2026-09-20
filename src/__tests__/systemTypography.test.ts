@@ -17,7 +17,14 @@ import { typographyTokensCSS } from '../utils/typographyTokens';
 
 const P = typographyVariablePayload(typographyTokensCSS);
 const byDevice = P.devices as Record<string, VarBag>;
-const val = (dev: string, n: string) => byDevice[dev][n]?.value as number;
+/* Resolves one alias hop: nine steps take their weight from their face and
+   store a pointer at it, so a weight assertion has to follow the link before it
+   can compare. What it resolves TO is the point of the indirection. */
+const val = (dev: string, n: string): number => {
+  const v = byDevice[dev][n]?.value;
+  const m = typeof v === 'string' && v.match(/^\{(.+)\}$/);
+  return (m ? byDevice[dev][m[1].split('.').join('/')]?.value : v) as number;
+};
 
 describe('the platforms disagree about small text, and that is the point', () => {
   it('tracks a label OUT on Android and IN on iOS', () => {
