@@ -494,6 +494,121 @@ export function resolveRoles(styles: TypographyStyle[] | undefined | null): Reso
 const pxToEm = (px: number | undefined, size: number): string =>
   px ? `${+(px / size).toFixed(4)}em` : '0em';
 
+/* ── Header tracking follows optical size ─────────────────────────────────
+ *
+ * The header ramp spans H1 to H6 — 48px down to 18px by default, a 2.7x range
+ * — and every step used to take ONE letter-spacing value, the user's pick,
+ * applied flat. There is no number that is right at both ends of that range.
+ * Type tightens as it grows: a value tuned at 18px reads visibly loose at
+ * 48px, and one tuned at 48px looks cramped at 18px.
+ *
+ * So the user's value becomes an ANCHOR rather than the answer, and each step
+ * takes a delta off it. Their choice still decides the character of the
+ * tracking; the size decides how much of it each step gets.
+ *
+ * ── Why the anchor is the SMALLEST header ─────────────────────────────────
+ *
+ * Anchoring at H6 means "this is my tracking at small header sizes" and
+ * everything larger tightens from there. Anchoring at H1 would make their
+ * value describe the display end and loosen the small ones — worse, because a
+ * wrong value costs more readability at 18px than at 48px. Nothing in the
+ * output changes for H6 itself, which keeps the anchor honest: the user sees
+ * the number they typed on at least one step.
+ *
+ * ── Derived from the SIZE, not from the token ─────────────────────────────
+ *
+ * A table keyed by H1..H6 would be simpler and would quietly stop being right
+ * the moment the scale moves — H1_SIZE is configurable, and the Display ramp
+ * hands off to it. Keying on the actual size means the curve follows the
+ * scale wherever the user puts it.
+ */
+
+/** The step the user's own value lands on, unmodified: H6's size. */
+export const HEADER_TRACKING_ANCHOR_PX = 18;
+
+/* em of tightening per px of size above the anchor.
+   1/1500 puts H1 at -0.02em when H1 is 48 — about -1px. Enough to take the
+   looseness off a large heading, not so much that a face which never needed
+   it looks mannered. */
+const MIXED_CASE_RATE = 1 / 1500;
+
+/* All-caps barely moves, and this is the conditional that matters most.
+   Capitals are uniform in width and have no descenders, so they read CRAMPED
+   at the tracking that suits mixed case — they want air, at every size. The
+   optical-size effect is real for caps too but much weaker, so the curve
+   flattens to a tenth rather than inverting. A caps ramp that tightened like
+   mixed case would undo the one thing caps actually need. */
+const CAPS_RATE = 1 / 15000;
+
+/* Guard rails, in em. Not opinions about good tracking — just a floor and a
+   ceiling so a pathological anchor cannot produce unreadable type at the far
+   end of the ramp. */
+const TRACKING_MIN_EM = -0.05;
+const TRACKING_MAX_EM = 0.2;
+
+export interface TrackingContext {
+  /** roles.<role>.textTransform === 'uppercase' */
+  caps: boolean;
+  /**
+   * The face's `opsz` axis VARIES WITH THE RENDERED SIZE.
+   *
+   * Not "the face has an opsz axis" — that was the first version of this flag
+   * and it was wrong in a way that made the whole function a no-op. An
+   * optical-size axis only compensates when its value follows the size it is
+   * set at. The header role pins ONE opsz for the whole ramp (moodToAxes
+   * supplies 72 and every step inherits it), so across 48px down to 18px the
+   * font is held at a single optical size and compensates for nothing.
+   *
+   * Every header therefore passes `false` today. The flag stays because the
+   * real fix is to emit `opsz` per step — that is what the axis is for — and
+   * on the day that happens this tracking curve must back off or the two
+   * corrections stack.
+   */
+  opszTracksSize: boolean;
+}
+
+/** Split "0.02em" / "1.25px" / "0" into a number and its unit. */
+function parseTracking(value: string): { n: number; unit: 'em' | 'px' } {
+  const m = String(value ?? '').trim().match(/^(-?[\d.]+)\s*(em|px)?$/);
+  if (!m) return { n: 0, unit: 'em' };
+  return { n: parseFloat(m[1]) || 0, unit: (m[2] as 'em' | 'px') || 'em' };
+}
+
+/**
+ * The user's tracking, adjusted for one header size.
+ *
+ * Returns the value in the SAME UNIT it arrived in. That is deliberate: em is
+ * the better unit for tracking and px is what the current export emits, and
+ * quietly switching the unit would change every brand's stylesheet shape on
+ * top of changing the number. One change at a time.
+ *
+ * Note what a flat PX value means in the first place — 1.25px is 0.069em at
+ * 18px and 0.026em at 48px. So a px anchor applied flat is ALREADY
+ * size-dependent, in the right direction but by an accident of the unit and
+ * by far too much. Converting through em is what makes the curve deliberate.
+ */
+export function suggestedHeaderTracking(
+  anchor: string,
+  size: number,
+  ctx: TrackingContext,
+): string {
+  const { n, unit } = parseTracking(anchor);
+
+  /* A face whose opsz FOLLOWS the size is already tightening itself as it
+     scales. Adding this on top double-corrects and the large end comes out
+     too tight — the one case where doing nothing is the correct answer. */
+  if (ctx.opszTracksSize) return anchor;
+
+  const anchorEm = unit === 'px' ? n / HEADER_TRACKING_ANCHOR_PX : n;
+  const rate = ctx.caps ? CAPS_RATE : MIXED_CASE_RATE;
+  const em = Math.min(TRACKING_MAX_EM, Math.max(TRACKING_MIN_EM,
+    anchorEm - (size - HEADER_TRACKING_ANCHOR_PX) * rate));
+
+  return unit === 'px'
+    ? `${+(em * size).toFixed(3)}px`
+    : `${+em.toFixed(4)}em`;
+}
+
 /**
  * Build the full scale from the chosen faces.
  *
@@ -535,7 +650,21 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
         ? { weightVar: 'Header-Clamped-Weight' }
         : {}),
       size: step.size, weight: roles.header.weight, lineHeight: step.lineHeight,
-      letterSpacing: roles.header.letterSpacing,
+      /* The user's value is the ANCHOR at H6, not a flat answer for all six —
+         see suggestedHeaderTracking. Type tightens as it grows, and one value
+         across a 48-to-18 ramp is wrong at whichever end it was not tuned
+         for. Caps flatten the curve rather than inverting it, and a face with
+         an opsz axis is left alone because it is already compensating. */
+      letterSpacing: suggestedHeaderTracking(roles.header.letterSpacing, step.size, {
+        caps: roles.header.textTransform === 'uppercase',
+        /* FALSE on purpose, even though the header face always has an opsz
+           axis. The axis is pinned to one value for the whole role, so it is
+           not tracking the size and is compensating for nothing — see
+           TrackingContext. Reading `axes.opsz !== undefined` here made this
+           function a no-op for every brand, which is how it was written
+           first. */
+        opszTracksSize: false,
+      }),
       textTransform: roles.header.textTransform,
       paragraphSpacing: 0,
       axes: roles.header.axes,
