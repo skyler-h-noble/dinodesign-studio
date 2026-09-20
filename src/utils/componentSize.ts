@@ -235,6 +235,43 @@ export function lineMetricsFlat(): Record<string, number> {
   return flattenByMode(LINE_METRICS as never);
 }
 
+/* Figma name -> CSS custom-property base.
+ *
+ * The two differ HERE and only here. A Figma variable may carry spaces
+ * ("Step bar", "No Count Step"); a CSS custom property cannot, so one of the
+ * two names has to bend and it is this one. Stated as a MAP rather than
+ * derived by replacing spaces, because a derivation would silently invent a
+ * name the moment a Figma variable is renamed — and the lib reads these by
+ * name, so an invented one resolves to nothing and the fallback paints
+ * forever with no error.
+ *
+ * If the Figma variables are ever renamed to Step-Bar / No-Count-Step, this
+ * map collapses to identity and LINE_METRICS' keys move with them. */
+const LINE_METRIC_CSS: Record<string, string> = {
+  'Divider': 'Divider',
+  'Step bar': 'Step-Bar',
+  'No Count Step': 'No-Count-Step',
+};
+
+/**
+ * The line weights as CSS custom properties, `--X` / `--Sm-X` / `--Lg-X`.
+ *
+ * ONE source for both emitters. The preview and the export are separate
+ * implementations (invariant 5) and have diverged before while both looked
+ * self-consistent, so the values come from here rather than being written
+ * twice.
+ */
+export function lineMetricsVars(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [figmaName, byMode] of Object.entries(LINE_METRICS)) {
+    const css = LINE_METRIC_CSS[figmaName];
+    out[`--${css}`] = `${byMode.medium}px`;
+    out[`--Sm-${css}`] = `${byMode.small}px`;
+    out[`--Lg-${css}`] = `${byMode.large}px`;
+  }
+  return out;
+}
+
 /** The same table as CSS custom properties.
  *
  *  CSS has no modes, so a mode becomes the Sm-/Lg- prefix — the idiom Button

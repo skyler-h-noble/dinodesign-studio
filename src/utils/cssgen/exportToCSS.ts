@@ -29,6 +29,7 @@ import {
   generateChartsVariables
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
+import { lineMetricsVars } from '../componentSize';
 
 /**
  * Determine the correct CSS font fallback category for a given font name
@@ -4924,6 +4925,17 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;`);
     lines.push(`  --Card-Radius: ${cappedCardRadius}px;`);
     lines.push(`  --Accordion-Radius: ${r.accordionRadius}px;`);
+    /* Divider / Step bar / No Count Step, from the one table componentSize
+       owns — the same one the preview reads (invariant 5: the two are
+       separate implementations and have drifted before while both looked
+       self-consistent).
+       These go HERE, in generateBaseCSS, not in generateStyleCSS: that
+       function emits its own --Card-Radius / --Button-Radius / --Card-Padding
+       and is NEVER CALLED. Adding to it looks right, typechecks, passes a
+       unit test on the helper, and emits nothing. */
+    for (const [name, value] of Object.entries(lineMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
     lines.push(`  --Sm-Card-Radius: ${Math.min(r.smCardRadius, buttonHeight)}px;`);
     lines.push(`  --Lg-Card-Radius: ${Math.min(r.lgCardRadius, buttonHeight)}px;`);
     lines.push(`  --Card-Inner-Radius: ${r.cardInnerRadius}px;`);

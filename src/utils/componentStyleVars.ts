@@ -21,6 +21,7 @@
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
 import { buttonModeMetricVars } from './buttonSizing';
+import { lineMetricsVars } from './componentSize';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -116,6 +117,11 @@ export function componentStyleVars(
     '--Lg-Button-Min-Width': `${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px`,
     '--Card-Radius': `${cardRadius}px`,
     '--Card-Padding': `${cardRadius >= 16 ? 20 : 16}px`,
+    /* Divider / Step bar / No Count Step, from the one source componentSize
+       owns. The lib reads these by name (Divider.js, Stepper.js) with the
+       design's numbers as fallbacks, so emitting them is what lets a brand
+       actually move the weights instead of the fallback painting forever. */
+    ...lineMetricsVars(),
   };
 }
 

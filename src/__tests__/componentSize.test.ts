@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, SIZE_MODES } from '../utils/componentSize';
+import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, lineMetricsVars, SIZE_MODES } from '../utils/componentSize';
 
 /* Component-Size carries medium/small/large as MODES, so one library component
    needs one variant and the size switches the mode. The payload has always
@@ -207,5 +207,80 @@ describe('the Other group writes the line and dot weights', () => {
     const p = payload() as unknown as Record<string, Record<string, number>>;
     expect(p.small['Other/Divider']).not.toBe(p.small['Other/Step bar']);
     expect(p.large['Other/Divider']).not.toBe(p.large['Other/Step bar']);
+  });
+});
+
+const R2 = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, cardPadding: 16,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, dropdownFrameRadius: 0,
+  };
+
+/* The line weights have to reach BOTH sides.
+ *
+ * The lib reads --Divider / --Step-Bar / --No-Count-Step by name (Divider.js
+ * SIZE_MAP, Stepper.js connectorThickness and dot) with the design's numbers
+ * as fallbacks. If nothing emits them the fallback paints forever and the
+ * brand cannot move the weight — which looks identical to working.
+ *
+ * Preview and export are separate implementations and have diverged before
+ * while both looked self-consistent (invariant 5), so they read one table.
+ * This asserts the table, the CSS spelling, and that a Figma name carrying
+ * SPACES does not leak into a custom property.
+ */
+describe('the line weights emit as CSS custom properties', () => {
+  it('names them the way the lib reads them', () => {
+    expect(Object.keys(lineMetricsVars()).sort()).toEqual([
+      '--Divider', '--Lg-Divider', '--Lg-No-Count-Step', '--Lg-Step-Bar',
+      '--No-Count-Step', '--Sm-Divider', '--Sm-No-Count-Step', '--Sm-Step-Bar',
+      '--Step-Bar',
+    ]);
+  });
+
+  it('carries the design ramps, with units', () => {
+    const v = lineMetricsVars();
+    expect([v['--Sm-Divider'], v['--Divider'], v['--Lg-Divider']])
+      .toEqual(['0.5px', '1px', '2px']);
+    expect([v['--Sm-Step-Bar'], v['--Step-Bar'], v['--Lg-Step-Bar']])
+      .toEqual(['1px', '2px', '4px']);
+    expect([v['--Sm-No-Count-Step'], v['--No-Count-Step'], v['--Lg-No-Count-Step']])
+      .toEqual(['8px', '12px', '16px']);
+  });
+
+  it('never emits a property name containing a space', () => {
+    /* The Figma variables are "Step bar" and "No Count Step". A custom
+       property with a space in it is invalid and silently dropped, so a
+       derivation that just prefixed the Figma name would produce tokens that
+       never resolve and a fallback that never stops painting. */
+    for (const name of Object.keys(lineMetricsVars())) {
+      expect(`${name} has a space: ${name.includes(' ')}`).toBe(`${name} has a space: false`);
+    }
+  });
+
+  it('matches the values written to Figma', () => {
+    /* Same numbers on both routes — the Figma payload and the stylesheet. If
+       these ever disagree, one of the two is lying about the design. */
+    const p = componentSizePayload(R2, {}) as unknown as Record<string, Record<string, number>>;
+    const v = lineMetricsVars();
+    const pairs: Array<[string, string]> = [
+      ['Other/Divider', 'Divider'],
+      ['Other/Step bar', 'Step-Bar'],
+      ['Other/No Count Step', 'No-Count-Step'],
+    ];
+    for (const [figma, css] of pairs) {
+      expect(`${css} small`).toBe(`${css} small`);
+      expect(v[`--Sm-${css}`]).toBe(`${p.small[figma]}px`);
+      expect(v[`--${css}`]).toBe(`${p.medium[figma]}px`);
+      expect(v[`--Lg-${css}`]).toBe(`${p.large[figma]}px`);
+    }
   });
 });
