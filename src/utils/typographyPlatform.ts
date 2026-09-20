@@ -124,6 +124,33 @@ export const SWITCHED_PROPS = [
  */
 export const DEVICE_PROPS = ['Font-Size', 'Line-Height'] as const;
 
+/* ── Why Devices-Type has THREE branches and not two ───────────────────────
+ *
+ *   Typography/<Section>/...          Font-Size, Line-Height          62
+ *   Typography/Omni/<Section>/...     Family, Weight, Letter-Spacing  77
+ *   Typography/System/<Section>/...   Family, Weight, Letter-Spacing  77
+ *
+ * It reads oddly in the panel: `Displays` appears at two different depths, so
+ * the tree implies a relationship between the two that does not exist. The
+ * obvious tidy-up is to move the sizes into both faces and leave a clean pair.
+ *
+ * DO NOT. That is 62 more variables, and the count is the smaller half of the
+ * cost: it would be two variables holding one number with nothing selecting
+ * between them. Nothing in Figma keeps them equal, and the first nudge to
+ * either makes Omni and System render at different SIZES — at which point
+ * switching face reflows the page, which is the one thing the split exists to
+ * prevent.
+ *
+ * Invariant 2, inverted. It was written for Light/Medium button shades, which
+ * held identical values while the Theme layer SELECTED between them, so
+ * collapsing them destroyed a real choice. Here nothing selects, so splitting
+ * them would manufacture a choice that should not exist.
+ *
+ * Naming the third branch — Typography/Shared/... — would make the tree
+ * symmetric for free, and was considered and skipped: it buys tidiness at the
+ * price of one more level to navigate on every size lookup.
+ */
+
 /* ── The device axis has to be MODES, not groups ───────────────────────────
  *
  * This is the constraint the whole structure turns on, and it is easy to get
