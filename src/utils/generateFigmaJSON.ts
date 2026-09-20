@@ -26,6 +26,7 @@ const FIGMA_SHADOW_SLOTS = 10;
 import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_OPACITY_PCT } from './variantAlpha';
 import {
   buildTypeScale, resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR,
+  type ResolvedRoles,
   type TypeStyle, type FamilyRole,
 } from './typeScale';
 import { nearestAvailableWeight } from './googleFontWeights';
@@ -497,8 +498,8 @@ const emToPercent = (em: string): number => +((parseFloat(em) || 0) * 100).toFix
  * variable that may not have imported, and an unbound text style renders as
  * whatever it was last set to, with nothing to see.
  */
-function buildTypographyCollections(css: string) {
-  const { devices, typography } = typographyVariablePayload(css);
+function buildTypographyCollections(css: string, faces: ResolvedRoles) {
+  const { devices, typography } = typographyVariablePayload(css, faces);
   const toEntries = (bag: VarBag) => {
     const out: Record<string, unknown> = {};
     for (const [name, v] of Object.entries(bag)) out[name] = { value: v.value, type: v.type };
@@ -2068,7 +2069,11 @@ export function generateFigmaJSON(
        GENERATED stylesheet, so the numbers Figma gets are the numbers the CSS
        emits — not a second computation that agrees today (invariant 5). */
     if (typographyCSS) {
-      const collections = buildTypographyCollections(typographyCSS);
+      /* The four faces, resolved to literal family names. Without them the
+         Omni roots carry a CSS var() reference, which Figma stores as text
+         and no text style can bind to. */
+      const collections = buildTypographyCollections(
+        typographyCSS, resolveRoles(rolesFromTokensJSON(typo)));
       /* ADDED to Devices-Type, not defining it. The collection already holds
          ~100 variables that are not typography; every name here sits under
          `Typography/`, so a create-or-update import leaves them alone. */

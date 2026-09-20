@@ -10,6 +10,7 @@ import {
   DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, DEVICE_PROPS, SEEDS_FROM, SYSTEM_FACE,
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
+  faceRootName, faceRootAlias, FAMILY_ROLE_OF, NON_STYLE_SECTIONS,
 } from '../utils/typographyPlatform';
 /* The same `?raw` import the app uses, so this exercises the real path.
    It returned an EMPTY STRING until `test: { css: true }` was set in
@@ -17,8 +18,14 @@ import {
    indistinguishable from a file with no platform blocks in it. Every
    assertion below would have passed on nothing. */
 import { typographyTokensCSS } from '../utils/typographyTokens';
+import { resolveRoles } from '../utils/typeScale';
 
-const P = typographyVariablePayload(typographyTokensCSS);
+/* The four faces, resolved. `resolveRoles(null)` is the real defaulting path,
+   not a stub: it returns the fallback family for each role and pins Header to
+   Google Sans Flex, which is what a design with no picked faces actually
+   gets. */
+const FACES = resolveRoles(null);
+const P = typographyVariablePayload(typographyTokensCSS, FACES);
 
 describe('the parse', () => {
   it('reads every style out of a platform block', () => {
@@ -78,14 +85,77 @@ describe('the Devices-Type source', () => {
     expect([...DEVICE_PROPS]).toEqual(['Font-Size', 'Line-Height']);
   });
 
-  it('gives System the platform face and Omni the brand one', () => {
-    const omni = P.devices['Android-Mobile'][sourceName('Omni', 'Body-Font-Family')];
-    const sys = P.devices['Android-Mobile'][sourceName('System', 'Body-Font-Family')];
-    expect(sys.value).toBe('Roboto');
-    expect(String(omni.value)).toContain('Font-Families-Body');
-    expect(P.devices['IOS-Mobile'][sourceName('System', 'Body-Font-Family')].value).toBe('"SF Pro"');
-    expect(String(P.devices.Desktop[sourceName('System', 'Body-Font-Family')].value))
-      .toContain('system-ui');
+  /* A family is a LITERAL on the face root and an ALIAS on every style.
+   *
+   * The previous version of this test asserted
+   *   expect(String(omni.value)).toContain('Font-Families-Body')
+   * which pinned `var(--Platform-Font-Families-Body)` in place as the correct
+   * answer. It is a CSS reference written into a Figma STRING: stored as text,
+   * bindable by nothing, and pointing at a collection that is being removed.
+   * The test passed for as long as the bug survived, which is the whole of its
+   * usefulness as a warning. */
+  it('puts the literal family on the face root, never a var()', () => {
+    for (const d of DEVICE_TYPES) {
+      for (const face of FACE_MODES) {
+        for (const role of ['display', 'header', 'eyebrow', 'body'] as const) {
+          const root = P.devices[d][faceRootName(face, role)];
+          expect(root, `${d} ${face} ${role}`).toBeDefined();
+          expect(String(root.value)).not.toContain('var(');
+        }
+      }
+    }
+  });
+
+  it('aliases every style family to the face it wears', () => {
+    const android = P.devices['Android-Mobile'];
+    /* Caption and Subtitle wear Body; H1-H6 wear Header — the two the user
+       called out, and the two the stylesheet had wrong on mobile. */
+    for (const style of ['Body', 'Caption', 'Subtitle', 'Label']) {
+      expect(android[sourceName('Omni', `${style}-Font-Family`)].value)
+        .toBe(faceRootAlias('Omni', 'body'));
+    }
+    expect(android[sourceName('Omni', 'Headers-Font-Family')].value)
+      .toBe(faceRootAlias('Omni', 'header'));
+    expect(android[sourceName('Omni', 'Overline-Font-Family')].value)
+      .toBe(faceRootAlias('Omni', 'eyebrow'));
+  });
+
+  it('gives System the platform face, on the root', () => {
+    expect(P.devices['Android-Mobile'][faceRootName('System', 'body')].value).toBe('Roboto');
+    expect(P.devices['IOS-Mobile'][faceRootName('System', 'body')].value).toBe('"SF Pro"');
+    expect(String(P.devices.Desktop[faceRootName('System', 'body')].value)).toContain('system-ui');
+  });
+
+  it('skips the Omni roots when no faces are given, rather than inventing one', () => {
+    /* A wrong family name in Figma renders as a real font and looks deliberate;
+       a missing variable is visible in the panel. Absence is the safer failure,
+       so the payload declines to guess. */
+    const bare = typographyVariablePayload(typographyTokensCSS);
+    expect(bare.devices.Desktop[faceRootName('Omni', 'body')]).toBeUndefined();
+    expect(bare.devices.Desktop[faceRootName('System', 'body')]).toBeDefined();
+  });
+
+  it('never reads a face-definition section as a style', () => {
+    /* `Faces-Font-Family` — the face DEFINITIONS block read as a type style,
+       carrying a var() into the panel. The first thing anyone noticed. */
+    for (const d of DEVICE_TYPES) {
+      for (const name of Object.keys(P.devices[d])) {
+        expect(name).not.toContain('Faces-Font-Family');
+        expect(name).not.toContain('Face weights');
+      }
+    }
+  });
+
+  it('has a face for every section the stylesheet declares', () => {
+    /* The role table is stated, not derived — this is what stops the two
+       drifting apart when a section is added on one side only. */
+    for (const d of DEVICE_TYPES) {
+      const { families } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
+      for (const section of Object.keys(families)) {
+        if (NON_STYLE_SECTIONS.has(section)) continue;
+        expect(FAMILY_ROLE_OF[section], `no face for section "${section}"`).toBeDefined();
+      }
+    }
   });
 
   it('seeds the values from the block each device inherits', () => {
