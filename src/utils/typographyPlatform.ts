@@ -274,6 +274,8 @@ export function blockSelector(device: DeviceType, face: FaceMode): string {
  * a single pass.
  */
 
+import { SYSTEM_FAMILY_OF, systemTracking, systemWeight } from './systemTypography';
+
 export interface TypeValue { value: string | number; type: string }
 export type VarBag = Record<string, TypeValue>;
 
@@ -314,6 +316,34 @@ function num(v: string | undefined): number | undefined {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : undefined;
 }
+
+/**
+ * Any length to PX, against the style's own size.
+ *
+ * The stylesheet mixes units for letter-spacing and it is not sloppiness —
+ * the mobile blocks are static and written in px, while the Desktop ramp is
+ * generated and the header tracking curve emits em. Reading both with
+ * parseFloat gives -0.018 and 0 and treats them as the same kind of number,
+ * which is how an em value ends up in Figma meaning 0.018 PIXELS.
+ *
+ * Everything is normalised to px here because that is the unit the existing
+ * mobile values are already in, and because Figma stores a bare float whose
+ * unit lives on the text style — so the two sides have to agree before they
+ * get there, not after.
+ */
+function toPx(v: string | undefined, size: number): number | undefined {
+  if (v === undefined) return undefined;
+  const m = String(v).trim().match(/^(-?[\d.]+)\s*(em|px|%)?$/);
+  if (!m) return undefined;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return undefined;
+  if (m[2] === 'em') return +(n * size).toFixed(4);
+  if (m[2] === '%') return +((n / 100) * size).toFixed(4);
+  return n;
+}
+
+/** Properties measured as a length, which therefore need unit normalising. */
+const LENGTH_PROPS = new Set(['Letter-Spacing', 'Line-Height', 'Font-Size']);
 
 const FLOAT_PROPS = new Set(['Font-Weight', 'Line-Height', 'Letter-Spacing', 'Font-Size']);
 
@@ -370,22 +400,30 @@ export function typographyVariablePayload(generatedCSS: string): {
       /* Font-Size is a DEVICE decision, not a face one — it sits outside the
          Omni/System split, together with Line-Height: the two are the vertical
          rhythm, and holding them fixed is what makes the switch safe. */
+      const size = num(props['Font-Size']) ?? 16;
       for (const prop of DEVICE_PROPS) {
-        const v = num(props[prop]);
+        const v = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
         if (v !== undefined) bag[`Typography/${style}-${prop}`] = { value: v, type: 'number' };
       }
 
+      /* Omni is the USER's — straight out of the stylesheet their choices
+         generated. System is the PLATFORM's, from Apple's and Google's own
+         conventions. The two have to actually differ or the switch shows
+         nothing: an earlier pass wrote the same numbers to both and changed
+         only the family, which made System a relabelled Omni. */
+      const fam = SYSTEM_FAMILY_OF[device];
       for (const prop of SWITCHED_PROPS) {
-        const v = num(props[prop]);
-        if (v === undefined) continue;
-        /* Both faces start from the same metrics. The System side is seeded,
-           not derived — a system face genuinely wants its own leading and
-           tracking, and those are design decisions rather than arithmetic.
-           Seeding means this lands without changing a rendered value, and the
-           System column is then tuned in Figma. */
-        for (const face of FACE_MODES) {
-          bag[sourceName(face, `${style}-${prop}`)] = { value: v, type: 'number' };
-        }
+        const omni = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
+        if (omni === undefined) continue;
+        bag[sourceName('Omni', `${style}-${prop}`)] = { value: omni, type: 'number' };
+
+        /* The platform's tables are in em — size-relative, because the seven
+           devices do not share one scale — and land in px like everything
+           else here. */
+        const sys = prop === 'Font-Weight'
+          ? systemWeight(fam, style)
+          : +(systemTracking(fam, size) * size).toFixed(4);
+        bag[sourceName('System', `${style}-${prop}`)] = { value: sys, type: 'number' };
       }
     }
 
