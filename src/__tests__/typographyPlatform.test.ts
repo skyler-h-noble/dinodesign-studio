@@ -33,7 +33,9 @@ const P = typographyVariablePayload(typographyTokensCSS, FACES);
 describe('the parse', () => {
   it('reads every style out of a platform block', () => {
     const { styles } = parsePlatformBlock(typographyTokensCSS, 'IOS-Mobile');
-    expect(Object.keys(styles).length).toBe(36);
+    /* 33, not 36: the three --Body-<step>-Bold-Font-Weight tokens are excluded
+       (see EXCLUDED_STYLES) because Body has no bold. */
+    expect(Object.keys(styles).length).toBe(33);
     expect(styles['H1']).toEqual({
       'Font-Size': '28px', 'Font-Weight': '600',
       'Line-Height': '28px', 'Letter-Spacing': '0px',
@@ -236,6 +238,39 @@ describe('the Devices-Type source', () => {
       buildTypographyTokensCSS(bold), resolveRoles(bold)).devices.Desktop;
     for (const step of ['H1', 'H3', 'H4', 'H6'])
       expect(D[sourceName('Omni', `${step}-Font-Weight`)].value, step).toBe(700);
+  });
+
+  it('offers Body as Semibold, never as Bold', () => {
+    /* Body ships standard and semibold; bold at body sizes is what Subtitle is
+       for, and the lib resolves variant="body-bold" to the SEMIBOLD style. The
+       static mobile blocks still declare --Body-<step>-Bold-Font-Weight: 700,
+       and the CSS must keep emitting it because a published stylesheet cannot
+       be regenerated. Figma must not: a variable there is an offer, and a
+       designer picking Body-Large-Bold would get 700 in the mock against
+       semibold in the build, with nothing reporting the difference. */
+    for (const d of DEVICE_TYPES) {
+      for (const face of FACE_MODES) {
+        for (const step of ['Small', 'Medium', 'Large']) {
+          expect(P.devices[d][sourceName(face, `Body-${step}-Semibold-Font-Weight`)], `${d} ${step}`)
+            .toBeDefined();
+          expect(P.devices[d][sourceName(face, `Body-${step}-Bold-Font-Weight`)], `${d} ${step}`)
+            .toBeUndefined();
+        }
+        /* Caption and Legal really do ship those weights, so their names mean
+           what they say and must survive the exclusion. */
+        expect(P.devices[d][sourceName(face, 'Caption-Bold-Font-Weight')]).toBeDefined();
+      }
+    }
+  });
+
+  it('carries no paragraph spacing', () => {
+    /* Deliberate: the text styles do not take it from this collection. It falls
+       out of the parse rather than being filtered, so this is the thing holding
+       it — adding Paragraph-Spacing to the prop pattern would start emitting it
+       with nothing to say that was intended. */
+    for (const d of DEVICE_TYPES)
+      for (const name of Object.keys(P.devices[d]))
+        expect(name).not.toContain('Paragraph');
   });
 
   it('gives Desktop the same System values as Omni', () => {

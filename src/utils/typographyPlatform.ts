@@ -354,6 +354,7 @@ export function parsePlatformBlock(css: string, platform: string):
     const prop = name.match(/^(.+?)-(Font-Size|Font-Weight|Line-Height|Letter-Spacing)$/);
     if (prop) {
       const style = styleVariable(prop[1]);
+      if (EXCLUDED_STYLES.test(style)) continue;
       const into = (styles[style] ??= {});
       /* A pure `var(...)` is a BACK-COMPAT ALIAS, never a value.
        *
@@ -481,6 +482,26 @@ export const SECTION_VARIABLE: Record<string, string> = { Overline: 'Eyebrow' };
 export function variableForSection(section: string): string {
   return SECTION_VARIABLE[section] ?? section;
 }
+
+/**
+ * Styles the stylesheet declares that must NOT reach Figma.
+ *
+ * `--Body-<step>-Bold-Font-Weight: 700` is a legacy token. Body ships standard
+ * and SEMIBOLD only — bold at body sizes is what Subtitle is for — and the lib
+ * resolves `variant="body-bold"` to the semibold style, not to a 700. The
+ * generated Desktop block already knows this and emits only Semibold
+ * (BODY_EXTRA_WEIGHTS); the static mobile blocks are older and declare both.
+ *
+ * The CSS has to keep emitting it, for the frozen-stylesheet reason: a
+ * published system cannot be regenerated and a consumer may already read the
+ * name. Figma does not, because a variable there is an OFFER — a designer who
+ * picks Body-Large-Bold gets 700 in the mock and semibold in the build, and
+ * nothing anywhere reports the difference.
+ *
+ * Caption-Bold and Legal-Semibold are NOT here: those styles really do ship
+ * that weight (see SYSTEM_STYLES), so the name means what it says.
+ */
+export const EXCLUDED_STYLES = /^Body-(Small|Medium|Large)-Bold$/;
 
 /**
  * The variable a stylesheet STYLE lands in. Overline is spelled Eyebrow.
