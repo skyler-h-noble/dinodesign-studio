@@ -4925,6 +4925,12 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;`);
     lines.push(`  --Card-Radius: ${cappedCardRadius}px;`);
     lines.push(`  --Accordion-Radius: ${r.accordionRadius}px;`);
+    /* The two focus radii Figma cannot derive for itself. CSS does not strictly
+       need them — an outline is drawn concentric with the border-radius, so the
+       browser derives the ring — but the payload writes them to Figma, and a
+       value living on one side only is the drift this pass keeps finding. */
+    lines.push(`  --Accordion-Focus-Radius: ${r.accordionFocusRadius}px;`);
+    lines.push(`  --Accordion-Inner-Focus-Radius: ${r.accordionInnerFocusRadius}px;`);
     /* Divider / Step bar / No Count Step, from the one table componentSize
        owns — the same one the preview reads (invariant 5: the two are
        separate implementations and have drifted before while both looked

@@ -253,18 +253,29 @@ const LINE_METRIC_CSS: Record<string, string> = {
   'No Count Step': 'No-Count-Step',
 };
 
+/* Same job for the nav chrome. Two of the three carry spaces in Figma, so
+ * they need the map for the same reason the line weights do. */
+const NAV_METRIC_CSS: Record<string, string> = {
+  'Rail-Width': 'Rail-Width',
+  'App-Bar Height': 'App-Bar-Height',
+  'Nav-Bar Height': 'Nav-Bar-Height',
+};
+
 /**
- * The line weights as CSS custom properties, `--X` / `--Sm-X` / `--Lg-X`.
+ * A per-mode table as CSS custom properties, `--X` / `--Sm-X` / `--Lg-X`.
  *
  * ONE source for both emitters. The preview and the export are separate
  * implementations (invariant 5) and have diverged before while both looked
  * self-consistent, so the values come from here rather than being written
  * twice.
  */
-export function lineMetricsVars(): Record<string, string> {
+function metricsVars(
+  table: Record<string, { medium: number; small: number; large: number }>,
+  cssNames: Record<string, string>,
+): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [figmaName, byMode] of Object.entries(LINE_METRICS)) {
-    const css = LINE_METRIC_CSS[figmaName];
+  for (const [figmaName, byMode] of Object.entries(table)) {
+    const css = cssNames[figmaName];
     out[`--${css}`] = `${byMode.medium}px`;
     out[`--Sm-${css}`] = `${byMode.small}px`;
     out[`--Lg-${css}`] = `${byMode.large}px`;
@@ -272,19 +283,32 @@ export function lineMetricsVars(): Record<string, string> {
   return out;
 }
 
-/** The same table as CSS custom properties.
+export function lineMetricsVars(): Record<string, string> {
+  return metricsVars(LINE_METRICS as never, LINE_METRIC_CSS);
+}
+
+/** The nav chrome as a record — the form App.tsx spreads into inline style. */
+export function navMetricsVars(): Record<string, string> {
+  return metricsVars(NAV_METRICS as never, NAV_METRIC_CSS);
+}
+
+/** The same values as stylesheet lines, plus --Disabled.
  *
  *  CSS has no modes, so a mode becomes the Sm-/Lg- prefix — the idiom Button
  *  and Tabs already use, and what a component's SIZE_MAP picks between. The
  *  hyphenated form is the CSS name even where the Figma variable has a space:
- *  a custom property cannot contain one. */
+ *  a custom property cannot contain one.
+ *
+ *  This builds on navMetricsVars() rather than walking NAV_METRICS again.
+ *  It used to do its own walk, and the two coexisted long enough for a second
+ *  emitter to be added to exportToCSS against the record form — base.css got
+ *  all nine nav values TWICE, and the end-to-end check that was supposed to
+ *  prove the new emitter worked was reading the old one's output. Identical
+ *  values, so nothing looked wrong. One walk, two shapes. */
 export function navMetricsCSS(indent = '  '): string[] {
   const out: string[] = [`${indent}--Disabled: ${DISABLED_OPACITY};`];
-  for (const [name, byMode] of Object.entries(NAV_METRICS)) {
-    const css = name.replace(/ /g, '-');
-    out.push(`${indent}--${css}: ${byMode.medium}px;`);
-    out.push(`${indent}--Sm-${css}: ${byMode.small}px;`);
-    out.push(`${indent}--Lg-${css}: ${byMode.large}px;`);
+  for (const [name, value] of Object.entries(navMetricsVars())) {
+    out.push(`${indent}${name}: ${value};`);
   }
   return out;
 }

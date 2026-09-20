@@ -257,3 +257,85 @@ describe('Component-Size names match between Figma and CSS', () => {
       .toBe('--Input-Inner-Focus-Visible: var(--Input-Inner-Focus-Radius);');
   });
 });
+
+/* Everything the Component-Size payload writes to Figma must also reach the
+ * stylesheet. Five values lived in Figma only:
+ *
+ *   Rail-Width / App-Bar Height / Nav-Bar Height   the nav chrome
+ *   Accordion-Focus-Radius / -Inner-Focus-Radius   the concentric focus ring
+ *
+ * Rail.js is the visible symptom: it has read var(--Rail-Width, 80px) since it
+ * was written and always got the FALLBACK, so the design's 80/72/96 ramp never
+ * reached a consumer. A token that exists on one side only looks identical to
+ * one that works.
+ *
+ * The two nav heights carry SPACES in Figma ("App-Bar Height"), so they go
+ * through the same name map the line weights use — a custom property with a
+ * space is invalid and silently dropped.
+ */
+describe('the nav chrome and accordion focus radii reach the stylesheet', () => {
+  const css = () => {
+    const sel = { background: 'primary', button: 'primary',
+      cardColoring: 'tonal', textColoring: 'tonal' } as never;
+    const { json } = buildAll(SCHEME, sel, 'light') as never as { json: never };
+    const j = JSON.parse(JSON.stringify(json));
+    j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100,
+      cardPadding: 24, bevelOpacity: 50, shadowResolution: 3 };
+    return Object.values(generateCSSFiles(j) as never as Record<string, string>).join('\n');
+  };
+  const decl = (out: string, name: string) =>
+    out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
+
+  it.each([
+    ['--Sm-Rail-Width', '72px'], ['--Rail-Width', '80px'], ['--Lg-Rail-Width', '96px'],
+    ['--Sm-App-Bar-Height', '56px'], ['--App-Bar-Height', '64px'], ['--Lg-App-Bar-Height', '72px'],
+    ['--Sm-Nav-Bar-Height', '73px'], ['--Nav-Bar-Height', '83px'], ['--Lg-Nav-Bar-Height', '93px'],
+  ])('%s is %s', (name, value) => {
+    expect(decl(css(), name)).toBe(`${name}: ${value};`);
+  });
+
+  it('emits each nav value exactly once', () => {
+    /* navMetricsCSS() and navMetricsVars() are two shapes of ONE table, and
+     * for a while they were two walks of it wired into two emitters — base.css
+     * carried all nine twice. Identical values, so the duplicate was invisible
+     * in the rendered page AND in an end-to-end check that grepped for the
+     * name: the second copy just confirmed what the first already did. */
+    const out = css().replace(/\/\*[\s\S]*?\*\//g, '');
+    const names = [
+      '--Rail-Width', '--Sm-Rail-Width', '--Lg-Rail-Width',
+      '--App-Bar-Height', '--Sm-App-Bar-Height', '--Lg-App-Bar-Height',
+      '--Nav-Bar-Height', '--Sm-Nav-Bar-Height', '--Lg-Nav-Bar-Height',
+      '--Divider', '--Sm-Divider', '--Lg-Divider',
+      '--Step-Bar', '--Sm-Step-Bar', '--Lg-Step-Bar',
+      '--No-Count-Step', '--Sm-No-Count-Step', '--Lg-No-Count-Step',
+      '--Accordion-Focus-Radius', '--Accordion-Inner-Focus-Radius',
+    ];
+    const counts = names.map((name) => {
+      const n = out.split('\n').map((l) => l.trim())
+        .filter((l) => l.startsWith(name + ':')).length;
+      return `${name} x${n}`;
+    });
+    expect(counts).toEqual(names.map((n) => `${n} x1`));
+  });
+
+  it('emits both accordion focus radii', () => {
+    const out = css();
+    expect(decl(out, '--Accordion-Focus-Radius')).toBeDefined();
+    expect(decl(out, '--Accordion-Inner-Focus-Radius')).toBeDefined();
+  });
+
+  it('never emits a property name containing a space', () => {
+    /* "App-Bar Height" and "Nav-Bar Height" are the Figma spellings.
+     *
+     * Strip block comments first. dropshadow.ts writes a comment whose
+     * continuation line begins "   --Input-Radius. Repoint it..." — prose,
+     * not a declaration, and a scanner that keys on the leading "--" alone
+     * reports it as a malformed custom property. Require a trailing ";" too. */
+    const out = css().replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const l of out.split('\n').map((x) => x.trim())) {
+      if (!l.startsWith('--') || !l.endsWith(';') || !l.includes(':')) continue;
+      const name = l.slice(0, l.indexOf(':'));
+      expect(`${name} has a space: ${name.includes(' ')}`).toBe(`${name} has a space: false`);
+    }
+  });
+});
