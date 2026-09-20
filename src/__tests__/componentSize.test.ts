@@ -306,42 +306,103 @@ describe('the Radio and Checkbox groups', () => {
     modalRadius: 32, dropdownFrameRadius: 0,
   };
 
-  it('writes the ramps under the component group names', () => {
+  /* Read off Omni Designs-Aug12 on 2026-09-20. The writer is UPDATE-ONLY and
+     matches by name, so a name the file does not have writes NOTHING and the
+     run still reports success — which is why these are pinned as strings
+     rather than trusted. An earlier pass here invented Radio-Size, Radio-Dot
+     and Checkbox-Size; all three would have gone silently nowhere. */
+  const IN_THE_FILE = [
+    'Checkbox/Checkbox-Gap', 'Checkbox/Checkbox-Radius', 'Checkbox/Checkbox-Width',
+    'Radio/Dot', 'Radio/Radio', 'Radio/Radio-Gap',
+  ];
+  /* Checkbox-Icon is the one name NOT yet in the file. It goes in
+     Component-Size/Checkbox rather than the icon ramp because 12/14/18 is a
+     per-size ramp and Component-Size is the only collection with the modes —
+     the icon ramp is at Figma's mode cap. Until it is created, this one write
+     is a no-op; the other six land. */
+
+  it('writes only names the file actually has', () => {
     const p = componentSizePayload(R, {});
-    expect(p.small['Radio/Radio-Size']).toBe(16);
-    expect(p.medium['Radio/Radio-Size']).toBe(20);
-    expect(p.large['Radio/Radio-Size']).toBe(24);
-    expect(p.small['Radio/Radio-Dot']).toBe(8);
-    expect(p.large['Radio/Radio-Dot']).toBe(9.5);
-    expect(p.small['Checkbox/Checkbox-Icon']).toBe(12);
-    expect(p.large['Checkbox/Checkbox-Icon']).toBe(18);
+    const mine = Object.keys(p.medium)
+      .filter((k) => k.startsWith('Radio/') || k.startsWith('Checkbox/'))
+      .filter((k) => k !== 'Checkbox/Checkbox-Icon')   // not in the file yet — see above
+      .sort();
+    expect(mine).toEqual(IN_THE_FILE);
+  });
+
+  it('does not write the invented names', () => {
+    const p = componentSizePayload(R, {});
+    for (const gone of ['Radio/Radio-Size', 'Radio/Radio-Dot', 'Checkbox/Checkbox-Size']) {
+      expect(`${gone}: ${p.medium[gone]}`).toBe(`${gone}: undefined`);
+    }
+  });
+
+  it('carries the ring and dot ramps', () => {
+    const p = componentSizePayload(R, {});
+    expect([p.small['Radio/Radio'], p.medium['Radio/Radio'], p.large['Radio/Radio']])
+      .toEqual([16, 20, 24]);
+    expect([p.small['Radio/Dot'], p.medium['Radio/Dot'], p.large['Radio/Dot']])
+      .toEqual([8, 10, 12]);
+  });
+
+  it('keeps the dot at half the ring', () => {
+    /* Figma had 8/9.5/12 against a 16/20/20 ring and the lib 8/9.5/9.5 against
+       16/20/24 — 50%, then 60% or 40%. 9.5 is not on the Sizing scale and the
+       proportion changed with the size. */
+    const p = componentSizePayload(R, {});
+    for (const mode of SIZE_MODES) {
+      expect(p[mode]['Radio/Dot'] / p[mode]['Radio/Radio']).toBe(0.5);
+    }
   });
 
   it('gives the two controls the same box and gap at every size', () => {
-    /* One literal, two names. Checkbox shipped a 6/8/10 gap against Radio's
-       4/8/12 for as long as both were hand-typed. */
+    /* One literal, two names. The file had drifted both ways: Checkbox-Gap
+       4/4/12 against Radio-Gap 4/8/12 (different at MEDIUM, the default), and
+       Checkbox-Width 16/20/24 against Radio 16/20/20. */
     const p = componentSizePayload(R, {});
     for (const mode of SIZE_MODES) {
-      expect(p[mode]['Radio/Radio-Size']).toBe(p[mode]['Checkbox/Checkbox-Size']);
+      expect(p[mode]['Radio/Radio']).toBe(p[mode]['Checkbox/Checkbox-Width']);
       expect(p[mode]['Radio/Radio-Gap']).toBe(p[mode]['Checkbox/Checkbox-Gap']);
     }
   });
 
-  it('puts the touch target in Other, at one value for all three modes', () => {
+  it('writes Checkbox-Radius, which the lib has been reading all along', () => {
+    /* Checkbox.js: var(--Checkbox-Radius, 4px) and the Sm-/Lg- siblings. Figma
+       has had the variable; the studio never emitted it, so every brand ever
+       generated painted the FALLBACK. Invisible because the fallback is right. */
     const p = componentSizePayload(R, {});
-    for (const mode of SIZE_MODES) expect(p[mode]['Other/Touch-Target']).toBe(24);
+    expect([p.small['Checkbox/Checkbox-Radius'], p.medium['Checkbox/Checkbox-Radius'],
+            p.large['Checkbox/Checkbox-Radius']]).toEqual([3.2, 4, 4.8]);
+  });
+
+  it('keeps the checkmark independent of the button icon size', () => {
+    /* Button-Icon is snap(0.625 x button height) and the button height is USER
+       input, so binding the checkmark to `in-button` would resize it whenever
+       someone changed their buttons — inside a box that did not move. It could
+       not hold these values anyway: ICON_RAMP starts at 16 and the small box
+       IS 16. */
+    const p = componentSizePayload(R, {});
+    expect([p.small['Checkbox/Checkbox-Icon'], p.medium['Checkbox/Checkbox-Icon'],
+            p.large['Checkbox/Checkbox-Icon']]).toEqual([12, 14, 18]);
+    for (const mode of SIZE_MODES) {
+      expect(p[mode]['Checkbox/Checkbox-Icon'])
+        .toBeLessThan(p[mode]['Checkbox/Checkbox-Width']);
+    }
   });
 
   it('Figma and CSS carry the same numbers', () => {
-    /* Invariant 5 in its narrowest form: the payload and the stylesheet are
-       two emitters reading one table, and this is the assertion that they did
-       not each read it their own way. */
+    /* Invariant 5 at its narrowest: two emitters, one table, and this is the
+       assertion that they did not each read it their own way. The CSS name
+       differs from the Figma name for the two Radio metrics on purpose —
+       custom properties are flat, so `--Dot` would say nothing. */
     const p = componentSizePayload(R, {});
     const css = selectionMetricsVars();
     const pairs: [string, string][] = [
-      ['Radio/Radio-Size', 'Radio-Size'], ['Radio/Radio-Dot', 'Radio-Dot'],
-      ['Radio/Radio-Gap', 'Radio-Gap'], ['Checkbox/Checkbox-Size', 'Checkbox-Size'],
-      ['Checkbox/Checkbox-Icon', 'Checkbox-Icon'], ['Checkbox/Checkbox-Gap', 'Checkbox-Gap'],
+      ['Radio/Radio', 'Radio-Size'], ['Radio/Dot', 'Radio-Dot'],
+      ['Radio/Radio-Gap', 'Radio-Gap'], ['Checkbox/Checkbox-Width', 'Checkbox-Width'],
+      ['Checkbox/Checkbox-Radius', 'Checkbox-Radius'],
+      ['Checkbox/Checkbox-Icon', 'Checkbox-Icon'],
+      ['Checkbox/Checkbox-Gap', 'Checkbox-Gap'],
     ];
     for (const [figma, base] of pairs) {
       expect(`${base} sm ${css[`--Sm-${base}`]}`).toBe(`${base} sm ${p.small[figma]}px`);

@@ -312,10 +312,10 @@ describe('the nav chrome and accordion focus radii reach the stylesheet', () => 
       '--Radio-Size', '--Sm-Radio-Size', '--Lg-Radio-Size',
       '--Radio-Dot', '--Sm-Radio-Dot', '--Lg-Radio-Dot',
       '--Radio-Gap', '--Sm-Radio-Gap', '--Lg-Radio-Gap',
-      '--Checkbox-Size', '--Sm-Checkbox-Size', '--Lg-Checkbox-Size',
+      '--Checkbox-Width', '--Sm-Checkbox-Width', '--Lg-Checkbox-Width',
+      '--Checkbox-Radius', '--Sm-Checkbox-Radius', '--Lg-Checkbox-Radius',
       '--Checkbox-Icon', '--Sm-Checkbox-Icon', '--Lg-Checkbox-Icon',
       '--Checkbox-Gap', '--Sm-Checkbox-Gap', '--Lg-Checkbox-Gap',
-      '--Touch-Target',
     ];
     const counts = names.map((name) => {
       const n = out.split('\n').map((l) => l.trim())
@@ -367,15 +367,39 @@ describe('Radio and Checkbox sizing reaches the stylesheet', () => {
     out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
 
   it.each([
-    ['--Sm-Radio-Size', '16px'],    ['--Radio-Size', '20px'],    ['--Lg-Radio-Size', '24px'],
-    ['--Sm-Radio-Dot', '8px'],      ['--Radio-Dot', '9.5px'],    ['--Lg-Radio-Dot', '9.5px'],
-    ['--Sm-Radio-Gap', '4px'],      ['--Radio-Gap', '8px'],      ['--Lg-Radio-Gap', '12px'],
-    ['--Sm-Checkbox-Size', '16px'], ['--Checkbox-Size', '20px'], ['--Lg-Checkbox-Size', '24px'],
-    ['--Sm-Checkbox-Icon', '12px'], ['--Checkbox-Icon', '14px'], ['--Lg-Checkbox-Icon', '18px'],
-    ['--Sm-Checkbox-Gap', '4px'],   ['--Checkbox-Gap', '8px'],   ['--Lg-Checkbox-Gap', '12px'],
-    ['--Touch-Target', '24px'],
+    ['--Sm-Radio-Size', '16px'],     ['--Radio-Size', '20px'],     ['--Lg-Radio-Size', '24px'],
+    ['--Sm-Radio-Dot', '8px'],       ['--Radio-Dot', '10px'],      ['--Lg-Radio-Dot', '12px'],
+    ['--Sm-Radio-Gap', '4px'],       ['--Radio-Gap', '8px'],       ['--Lg-Radio-Gap', '12px'],
+    ['--Sm-Checkbox-Width', '16px'], ['--Checkbox-Width', '20px'], ['--Lg-Checkbox-Width', '24px'],
+    ['--Sm-Checkbox-Radius', '3.2px'], ['--Checkbox-Radius', '4px'], ['--Lg-Checkbox-Radius', '4.8px'],
+    ['--Sm-Checkbox-Icon', '12px'],  ['--Checkbox-Icon', '14px'],  ['--Lg-Checkbox-Icon', '18px'],
+    ['--Sm-Checkbox-Gap', '4px'],    ['--Checkbox-Gap', '8px'],    ['--Lg-Checkbox-Gap', '12px'],
   ])('%s is %s', (name, value) => {
     expect(decl(css(), name)).toBe(`${name}: ${value};`);
+  });
+
+  it('the dot is half the ring at every size', () => {
+    /* Figma grew the dot and held the ring flat at large; the lib did the
+     * reverse. Neither held a ratio — 50% at small, then 60% (Figma) or 40%
+     * (lib) at large. A radio that changes proportion as it scales does not
+     * look like one control at three sizes. */
+    const out = css();
+    const px = (n: string) => Number(decl(out, n)?.match(/([\d.]+)px/)?.[1]);
+    expect([px('--Sm-Radio-Dot') / px('--Sm-Radio-Size'),
+            px('--Radio-Dot') / px('--Radio-Size'),
+            px('--Lg-Radio-Dot') / px('--Lg-Radio-Size')]).toEqual([0.5, 0.5, 0.5]);
+  });
+
+  it('--Checkbox-Radius is spelled the way Checkbox.js reads it', () => {
+    /* Checkbox.js has var(--Checkbox-Radius, 4px) plus the Sm-/Lg- siblings,
+     * and Figma has had the variable all along — the studio simply never
+     * emitted it, so the FALLBACK painted in every brand. Nothing looked
+     * wrong, because the fallback is the right number. Renaming this breaks
+     * it silently again. */
+    const out = css();
+    for (const n of ['--Sm-Checkbox-Radius', '--Checkbox-Radius', '--Lg-Checkbox-Radius']) {
+      expect(`${n} present: ${decl(out, n) !== undefined}`).toBe(`${n} present: true`);
+    }
   });
 
   it('the box and the gap are the SAME at every size for both controls', () => {
@@ -386,18 +410,10 @@ describe('Radio and Checkbox sizing reaches the stylesheet', () => {
     const out = css();
     for (const p of ['Sm-', '', 'Lg-']) {
       expect(decl(out, `--${p}Radio-Size`)?.split(':')[1])
-        .toBe(decl(out, `--${p}Checkbox-Size`)?.split(':')[1]);
+        .toBe(decl(out, `--${p}Checkbox-Width`)?.split(':')[1]);
       expect(decl(out, `--${p}Radio-Gap`)?.split(':')[1])
         .toBe(decl(out, `--${p}Checkbox-Gap`)?.split(':')[1]);
     }
   });
 
-  it('the touch target has no size modes', () => {
-    /* 24 is a WCAG minimum, not a density choice — a Sm- sibling holding the
-     * same 24 would imply a choice that does not exist, and a SMALLER one
-     * would put the smallest control under the requirement. */
-    const out = css();
-    expect(decl(out, '--Sm-Touch-Target')).toBeUndefined();
-    expect(decl(out, '--Lg-Touch-Target')).toBeUndefined();
-  });
 });

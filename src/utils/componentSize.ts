@@ -214,46 +214,97 @@ export const LINE_METRICS = {
 
 /* ── Radio and Checkbox ───────────────────────────────────────────────────
  *
- * Static like NAV_METRICS and LINE_METRICS: not derived from the brand's
- * radius or type scale. A checkbox is 20 square at medium in every brand.
+ * Static, like NAV_METRICS and LINE_METRICS: not derived from the brand's
+ * radius, heights or type scale. A checkbox is 20 square at medium in every
+ * brand.
  *
- * Three of these values are SHARED, and shared on purpose — a checkbox and a
- * radio sit beside each other in one form, so a ring that is not the same
- * size as the box next to it reads as a mistake. They are written as ONE
- * literal under two names rather than two literals that happen to match.
+ * That word STATIC is the whole reason Checkbox-Icon is its own variable
+ * rather than the existing `in-button` icon size. Button-Icon is
+ * snap(0.625 x button height), and the button height is one of the values the
+ * USER sets. Binding the checkmark to it would mean a brand raising its button
+ * height to 56 gets a larger checkmark inside a box that did not move — the
+ * inset breaks, from a change that had nothing to do with checkboxes. Two
+ * unrelated things coupled through one token.
  *
- * That is not pedantry; it is the bug that already happened. Checkbox's gap
- * was 6 / 8 / 10 while Radio's was 4 / 8 / 12, so the two controls in the
- * same form sat at different distances from their labels at small and large —
- * and neither 6 nor 10 is even on the Sizing scale (the rungs are Quarter 2,
- * Half 4, 1 = 8, 1-and-Half 12). Two literals drifted because nothing held
- * them together. One literal cannot.
+ * It could not express the values anyway: Button-Icon snaps to ICON_RAMP,
+ * which starts at 16, and the small checkbox box IS 16. The smallest icon that
+ * ramp can produce fills the small box edge to edge.
  *
- * Invariant 2 asks the right question of a duplicate: not "do the copies
- * match" but "does anything SELECT between them". Nothing selects between a
- * radio's ring and a checkbox's box — they are one decision — so collapsing
- * them is correct. The two NAMES stay because Figma organises by component
- * and the lib reads by component; the single source is here.
+ * ── Names are the FILE's ──────────────────────────────────────────────────
+ * populateComponentSize is UPDATE-ONLY and matches by name, so a name the file
+ * does not have is not an error — it is a silent no-op that reports success.
+ * Checked against Omni Designs-Aug12 on 2026-09-20:
  *
- * Radio-Dot is Radio's alone and Checkbox-Icon is Checkbox's alone. Both are
- * carried at the lib's current values: this pass REGROUPS, it does not
- * recompute, for the reason in this file's header. Note the dot does not grow
- * from medium to large (9.5 both) while the ring goes 20 -> 24, and 9.5 is not
- * on the Sizing scale — a design question, not something to silently "fix"
- * here, because writing a different number would move every radio in every
- * brand on the way past.
+ *   Radio/Radio              Radio/Dot            Radio/Radio-Gap
+ *   Checkbox/Checkbox-Width  Checkbox/Checkbox-Radius  Checkbox/Checkbox-Gap
+ *
+ * An earlier pass here invented Radio-Size, Radio-Dot and Checkbox-Size. All
+ * three would have written nothing, and the run would have looked clean.
+ *
+ * Checkbox-Icon is the one NEW name, added deliberately — see above.
+ *
+ * ── The shared values ─────────────────────────────────────────────────────
+ * The box and the gap are ONE literal under two names. A checkbox and a radio
+ * sit beside each other in one form, so a ring that is not the size of the box
+ * next to it reads as a mistake, and a label that sits closer to one than the
+ * other reads as a misalignment.
+ *
+ * This is not hypothetical tidiness — the file had drifted both ways when it
+ * was read on 2026-09-20. Checkbox-Gap was 4/4/12 against Radio-Gap's 4/8/12,
+ * so the two controls sat at different distances from their labels at MEDIUM,
+ * the default size. Checkbox-Width was 16/20/24 while Radio was 16/20/20, so
+ * at large the ring was 4px smaller than the box beside it. The lib had a
+ * third set again. Nothing selects between a radio's ring and a checkbox's box
+ * — they are one decision — so invariant 2 says collapse them. The two NAMES
+ * stay because Figma organises by component and CSS is flat.
+ *
+ * ── Where the ramps came from ─────────────────────────────────────────────
+ * Ring and dot were the interesting disagreement. Figma grew the DOT
+ * (8/9.5/12) and held the ring flat at large (16/20/20); the lib grew the RING
+ * (16/20/24) and held the dot flat (8/9.5/9.5). Each was half right, and
+ * neither held a ratio: small was 50%, Figma's large 60%, the lib's large 40%.
+ *
+ * 16/20/24 with 8/10/12 is a flat 50% at every size, and 9.5 — which is not on
+ * the Sizing scale (Quarter 2, Half 4, 1 = 8, 1-and-Half 12) and never was —
+ * disappears. Decided 2026-09-20.
  */
 const SELECTION_BOX = { medium: 20, small: 16, large: 24 } as const;
 const SELECTION_GAP = { medium: 8,  small: 4,  large: 12 } as const;
 
 export const RADIO_METRICS = {
-  'Radio-Size': SELECTION_BOX,
-  'Radio-Dot':  { medium: 9.5, small: 8, large: 9.5 },
-  'Radio-Gap':  SELECTION_GAP,
+  'Radio':     SELECTION_BOX,
+  'Dot':       { medium: 10, small: 8, large: 12 },
+  'Radio-Gap': SELECTION_GAP,
 } as const;
 
 export const CHECKBOX_METRICS = {
-  'Checkbox-Size': SELECTION_BOX,
+  'Checkbox-Width': SELECTION_BOX,
+  /* 20% of the box, and the one metric here the lib ALREADY reads by name:
+     Checkbox.js has var(--Checkbox-Radius, 4px) and its Sm-/Lg- siblings.
+     Figma has had the variable all along and the studio never emitted it, so
+     the fallback has painted in every brand ever generated — the same shape as
+     --Rail-Width, and invisible for the same reason: the fallback is correct. */
+  'Checkbox-Radius': { medium: 4, small: 3.2, large: 4.8 },
+  /* The checkmark glyph. Inset 2 / 3 / 3 a side inside the box.
+     
+     It lives HERE rather than in the icon ramp, and the reason is structural:
+     12/14/18 is a per-size ramp, and Component-Size is the only collection
+     with small/medium/large modes. The icon ramp is at Figma's mode cap and
+     cannot take another, so an `in-checkbox` there could hold exactly one
+     number — and one number cannot be 12 inside a 16 box and 18 inside a 24
+     box. The component's Icons & Avatars field binds to this variable instead,
+     which gets the size modes for free.
+     
+     That is also why it is not bound to `in-button`. Button-Icon is
+     snap(0.625 x button height) and the button height is USER input, so the
+     checkmark would resize whenever someone changed their buttons, inside a
+     box that did not move. ICON_RAMP starts at 16 besides, and the small box
+     IS 16.
+     
+     Values are the lib's, unchanged: medium sits at 70% of the box where small
+     and large are 75%. Left as it ships rather than rounded to a flat
+     12/15/18 — this pass regroups and does not recompute, and 15 was not what
+     anyone chose. */
   'Checkbox-Icon': { medium: 14, small: 12, large: 18 },
   'Checkbox-Gap':  SELECTION_GAP,
 } as const;
@@ -264,23 +315,6 @@ export const SELECTION_METRICS = {
   ...CHECKBOX_METRICS,
 } as const;
 
-/**
- * The minimum hit area for a control, square, in px.
- *
- * ONE number for the same reason DISABLED_OPACITY is one number, and like it
- * this is a REQUIREMENT rather than a taste: WCAG 2.2 Target Size (Minimum),
- * 2.5.8, is 24 by 24 CSS pixels at AA.
- *
- * It does not vary by size mode, and that is the point — a small radio is the
- * one that needs the padding most. Radio and Checkbox both centre a 16 / 20 /
- * 24 box inside a constant 24 frame, so small pads by 4 a side, medium by 2,
- * large by 0.
- *
- * A brand may raise it (2.5.5 Target Size at AAA is 44) and nothing here
- * should stop them, which is what makes it a token rather than a constant in
- * the lib.
- */
-export const TOUCH_TARGET = 24;
 
 /** The flat Sm-/Lg- shape componentSizeGroup takes, from a per-mode table.
  *  The prefixes are INPUT only — componentSizeGroup regroups them into the
@@ -346,10 +380,20 @@ const NAV_METRIC_CSS: Record<string, string> = {
  * the day one of these is renamed with a space in it, the way Step bar and
  * App-Bar Height already are. */
 const SELECTION_METRIC_CSS: Record<string, string> = {
-  'Radio-Size': 'Radio-Size',
-  'Radio-Dot': 'Radio-Dot',
+  /* The two Radio names are where this map earns its keep. Figma's group
+     supplies the scope, so `Radio/Radio` and `Radio/Dot` read fine there. CSS
+     custom properties are FLAT — `--Dot` says nothing about what it belongs
+     to, and `--Radio` alone is no better. So the CSS side carries the scope in
+     the name, which is what the map is for. */
+  'Radio': 'Radio-Size',
+  'Dot': 'Radio-Dot',
   'Radio-Gap': 'Radio-Gap',
-  'Checkbox-Size': 'Checkbox-Size',
+  'Checkbox-Width': 'Checkbox-Width',
+  /* Must stay spelled exactly this way: Checkbox.js already reads
+     var(--Checkbox-Radius, 4px), --Sm-Checkbox-Radius and --Lg-Checkbox-Radius.
+     A "tidier" name here resolves to nothing and the fallback keeps painting,
+     silently, which is the state this has been in all along. */
+  'Checkbox-Radius': 'Checkbox-Radius',
   'Checkbox-Icon': 'Checkbox-Icon',
   'Checkbox-Gap': 'Checkbox-Gap',
 };
@@ -385,16 +429,15 @@ export function navMetricsVars(): Record<string, string> {
   return metricsVars(NAV_METRICS as never, NAV_METRIC_CSS);
 }
 
-/** Radio and Checkbox, plus the one constant they share.
+/** Radio and Checkbox as CSS custom properties.
  *
- *  --Touch-Target is not a per-mode triple, so it is stated here rather than
- *  run through metricsVars — a Sm-/Lg- pair holding the same 24 would imply a
- *  choice that does not exist. */
+ *  The 24px minimum hit area is NOT here yet. Both controls centre their box
+ *  inside a constant 24 frame (WCAG 2.2 2.5.8), so the number is real and
+ *  wants one home — but Component-Size/Other has not been checked for an
+ *  existing variable, and inventing a name that the file does not have writes
+ *  nothing while reporting success. Confirm the name, then add it. */
 export function selectionMetricsVars(): Record<string, string> {
-  return {
-    ...metricsVars(SELECTION_METRICS as never, SELECTION_METRIC_CSS),
-    '--Touch-Target': `${TOUCH_TARGET}px`,
-  };
+  return metricsVars(SELECTION_METRICS as never, SELECTION_METRIC_CSS);
 }
 
 /** The same values as stylesheet lines, plus --Disabled.
@@ -489,9 +532,6 @@ export function componentSizePayload(
     Checkbox: checkboxMetricsFlat(),
     Other: {
       'Modal-Radius': r.modalRadius,
-      /* WCAG 2.2 2.5.8. One value, no size modes — a small radio is the one
-         that needs the padding most. */
-      'Touch-Target': TOUCH_TARGET,
       'Dropdown-Frame-Radius': r.dropdownFrameRadius,
       /* Written, not left hand-authored. populateComponentSize is
          update-only, so these land on the variables already in the file —
