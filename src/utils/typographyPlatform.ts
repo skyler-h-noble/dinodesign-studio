@@ -274,8 +274,9 @@ export function blockSelector(device: DeviceType, face: FaceMode): string {
  * a single pass.
  */
 
-import { SYSTEM_FAMILY_OF, systemTracking, systemWeight } from './systemTypography';
+import { SYSTEM_FAMILY_OF, systemTracking, systemWeight, systemLineHeight } from './systemTypography';
 import type { FamilyRole, ResolvedRoles } from './typeScale';
+import { buildTypeScale } from './typeScale';
 
 export interface TypeValue { value: string | number; type: string }
 export type VarBag = Record<string, TypeValue>;
@@ -478,6 +479,94 @@ export const FAMILY_ROOT_OF: Record<string, string> = {
  */
 export const SECTION_VARIABLE: Record<string, string> = { Overline: 'Eyebrow' };
 
+/**
+ * The FOLDER a style's variables live in, as the Figma file spells it.
+ *
+ * ~90 names per face is one scroll; grouped it is a tree. The names are the
+ * file's, read off the variables panel on 2026-09-20 — Displays, Headers,
+ * Subtitles, Body, Captions, Labels, Legal, Eyebrows, Numbers, Buttons,
+ * Badges. Mostly plural, and Body and Legal are not, which is exactly why this
+ * is a table and not a pluralise() call.
+ *
+ * The file is the authority and the reason is mechanical: the importer matches
+ * by NAME. A folder invented here that the file does not have would not fail —
+ * it would CREATE a second set of variables beside the real ones, leaving the
+ * grouped originals still bound to every layer and never updated again. That is
+ * the same shape as `Radio-Size` against the file's `Radio`, except doubled.
+ *
+ * Keyed by the scale's own group, so the styles a group contains are derived
+ * rather than restated.
+ */
+export const GROUP_FOLDER: Record<string, string> = {
+  Display: 'Displays',
+  Header: 'Headers',
+  Subtitle: 'Subtitles',
+  Body: 'Body',
+  Caption: 'Captions',
+  Label: 'Labels',
+  Legal: 'Legal',
+  Eyebrow: 'Eyebrows',
+  Number: 'Numbers',
+  Button: 'Buttons',
+  Badge: 'Badges',
+};
+
+/** token -> the scale's group, plus the extra-weight suffixes that hang off one. */
+function buildStyleGroups(): { group: Record<string, string>; suffixes: string[] } {
+  const group: Record<string, string> = {};
+  const suffixes = new Set<string>();
+  for (const st of buildTypeScale(null)) {
+    group[st.token] = st.group;
+    for (const w of st.extraWeights || []) suffixes.add(w.suffix);
+  }
+  return { group, suffixes: [...suffixes] };
+}
+const STYLE_GROUPS = buildStyleGroups();
+
+/**
+ * Where one style's property lands.
+ *
+ * The LEAF keeps its whole name — `Body/Body-Small-Font-Weight`, not
+ * `Body/Small/Font-Weight`. That is the file's shape, and it also means the
+ * only thing that changes is a folder segment in front, so a variable stays
+ * recognisable to anyone reading a diff or hunting it in the panel.
+ *
+ * An extra weight belongs to its base step's group: Body-Small-Semibold is one
+ * more weight on Body/Small, not a group of its own.
+ *
+ * A token the scale does not know falls back to the flat name. That keeps it
+ * VISIBLE rather than dropping it, and a test holds the coverage so a real gap
+ * fails there instead of quietly scattering one style outside the tree.
+ */
+export function styleFolder(token: string): string | undefined {
+  const direct = STYLE_GROUPS.group[token];
+  if (direct) return GROUP_FOLDER[direct];
+  for (const suffix of STYLE_GROUPS.suffixes) {
+    if (!token.endsWith(`-${suffix}`)) continue;
+    const stem = STYLE_GROUPS.group[token.slice(0, -(suffix.length + 1))];
+    if (stem) return GROUP_FOLDER[stem];
+  }
+  return undefined;
+}
+
+/** A style property's name, grouped. */
+export function groupedProp(token: string, prop: string): string {
+  const folder = styleFolder(token);
+  return folder ? `${folder}/${token}-${prop}` : `${token}-${prop}`;
+}
+
+/**
+ * The folder a section's FAMILY sits in — with its styles, not beside them.
+ *
+ * `Displays` holds five variables in the file: two steps x two switched
+ * properties, and the family. So the family belongs inside the group.
+ */
+export const FAMILY_FOLDER: Record<string, string> = {
+  Display: 'Displays', Headers: 'Headers', Subtitle: 'Subtitles', Body: 'Body',
+  Caption: 'Captions', Label: 'Labels', Legal: 'Legal', Eyebrow: 'Eyebrows',
+  Number: 'Numbers', Button: 'Buttons',
+};
+
 /** The variable a stylesheet section's family lands in. */
 export function variableForSection(section: string): string {
   return SECTION_VARIABLE[section] ?? section;
@@ -498,10 +587,19 @@ export function variableForSection(section: string): string {
  * picks Body-Large-Bold gets 700 in the mock and semibold in the build, and
  * nothing anywhere reports the difference.
  *
+ * Display-Medium and Button-ExtraSmall are here for the design's own reason
+ * rather than a correctness one: the file carries Display Large and Small, and
+ * has no extra-small button. Both stay in the CSS, because the lib reads them
+ * — Typography.js:124-128 and :515-518 resolve their tokens — and pulling the
+ * tokens would render those components unstyled wherever they are already
+ * used. Withdrawing a Figma variable costs nothing; withdrawing a CSS token
+ * breaks a build. They leave the stylesheet when the lib stops exporting them.
+ *
  * Caption-Bold and Legal-Semibold are NOT here: those styles really do ship
  * that weight (see SYSTEM_STYLES), so the name means what it says.
  */
-export const EXCLUDED_STYLES = /^Body-(Small|Medium|Large)-Bold$/;
+export const EXCLUDED_STYLES =
+  /^(Body-(Small|Medium|Large)-Bold|Display-Medium|Button-ExtraSmall)$/;
 
 /**
  * The variable a stylesheet STYLE lands in. Overline is spelled Eyebrow.
@@ -570,7 +668,8 @@ export const NON_STYLE_SECTIONS = new Set(['Faces', 'Face weights']);
 
 /** The variable that holds one section's family. */
 export function familyName(face: FaceMode, section: string): string {
-  return sourceName(face, `${section}-Font-Family`);
+  const folder = FAMILY_FOLDER[section];
+  return sourceName(face, folder ? `${folder}/${section}-Font-Family` : `${section}-Font-Family`);
 }
 
 /** The alias a non-root style stores, pointing at its root. */
@@ -640,8 +739,42 @@ export function typographyVariablePayload(
          rhythm, and holding them fixed is what makes the switch safe. */
       const size = num(props['Font-Size']) ?? 16;
       for (const prop of DEVICE_PROPS) {
-        const v = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
-        if (v !== undefined) bag[`Typography/${style}-${prop}`] = { value: v, type: 'number' };
+        /* LINE HEIGHT is COMPUTED, not read.
+         *
+         * The stylesheet's mobile blocks set every heading solid — Display and
+         * H1-H6 all at 1.0 — which in Figma clips, because a text box IS its
+         * line height and a descender has nowhere to go. They also carry two
+         * values that cannot be right at all: Android's Button-ExtraSmall at
+         * 11px in a 28px box, and Number-Medium at 28px in a 16px one.
+         *
+         * So on those devices it comes from the platform's own published table
+         * instead — Apple's Dynamic Type on the iOS ones, Material 3 on the
+         * Android ones. Deriving it from the size means the two impossible
+         * values cannot recur: there is no longer a number to mistype.
+         *
+         * DESKTOP IS LEFT ALONE. Its block is generated, not static, and it is
+         * already right: body at 1.5 and headings on a ramp that turns out to
+         * be exactly max(size x 1.15, size + 8) — H1 48->56, H2 40->48,
+         * H3 32->40, H4 24->32, H5 20->28, all exact, without anybody having
+         * written the rule down. Running the curve over it anyway would have
+         * loosened Legal to 1.80 and Label-ExtraSmall to 1.73, because the +8
+         * was fitted to the middle of the range and the platforms add 2-5px at
+         * the bottom, not 8. The existing ramp is the better answer there. */
+        const platform = SYSTEM_FAMILY_OF[device];
+        const declared = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
+        /* Replace a declared value; never invent one where the style has none.
+         *
+         * The extra weights are the case that proves it. `Body-Small-Semibold`
+         * is not a style — it is one more weight on Body/Small — so the block
+         * declares a Font-Weight for it and nothing else. Computing a leading
+         * from its size gave it a Line-Height on iOS and Android and not on
+         * Desktop, where the undeclared value was simply skipped, and the seven
+         * devices stopped carrying the same names. A style missing a variable
+         * on one device resolves to nothing there, silently. */
+        const v = prop === 'Line-Height' && platform !== 'desktop' && declared !== undefined
+          ? systemLineHeight(platform, size)
+          : declared;
+        if (v !== undefined) bag[`Typography/${groupedProp(style, prop)}`] = { value: v, type: 'number' };
       }
 
       /* Omni is the USER's — straight out of the stylesheet their choices
@@ -653,7 +786,7 @@ export function typographyVariablePayload(
       for (const prop of SWITCHED_PROPS) {
         const omni = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
         if (omni === undefined) continue;
-        bag[sourceName('Omni', `${style}-${prop}`)] = { value: omni, type: 'number' };
+        bag[sourceName('Omni', groupedProp(style, prop))] = { value: omni, type: 'number' };
 
         /* The platform's tables are in em — size-relative, because the seven
            devices do not share one scale — and land in px like everything
@@ -663,7 +796,7 @@ export function typographyVariablePayload(
           : prop === 'Font-Weight'
             ? systemWeight(fam, style)
             : +(systemTracking(fam, size) * size).toFixed(4);
-        bag[sourceName('System', `${style}-${prop}`)] = { value: sys, type: 'number' };
+        bag[sourceName('System', groupedProp(style, prop))] = { value: sys, type: 'number' };
       }
     }
 
@@ -722,7 +855,13 @@ export function typographyVariablePayload(
          selects between them — but a text style binds to the Typography
          collection only, so the size has to be reachable from there too. */
       for (const face of FACE_MODES) {
-        typography[face][token] = { value: `{Typography.${token}}`, type: 'number' };
+        /* Dotted throughout, like every other alias here. The token now carries
+           its group, so it holds a slash — left in, the string reads
+           `{Typography.Headers/H1-Font-Size}` and only resolves because the
+           plugin turns dots into slashes and the two happen to meet at the
+           right name. Working by coincidence is not the same as working. */
+        typography[face][token] =
+          { value: `{Typography.${token.split('/').join('.')}}`, type: 'number' };
       }
     }
   }

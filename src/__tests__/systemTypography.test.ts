@@ -11,7 +11,7 @@ import {
   systemTracking, systemWeight, roleOf, SYSTEM_FAMILY_OF, SYSTEM_WEIGHT,
 } from '../utils/systemTypography';
 import {
-  typographyVariablePayload, sourceName, DEVICE_TYPES, type VarBag,
+  typographyVariablePayload, sourceName, DEVICE_TYPES, groupedProp, type VarBag,
 } from '../utils/typographyPlatform';
 import { typographyTokensCSS } from '../utils/typographyTokens';
 
@@ -31,8 +31,8 @@ describe('the platforms disagree about small text, and that is the point', () =>
 
   it('carries that all the way into the payload', () => {
     /* Asserting the OUTPUT, not the table. */
-    const ios = val('IOS-Mobile', sourceName('System', 'Label-Small-Letter-Spacing'));
-    const android = val('Android-Mobile', sourceName('System', 'Label-Small-Letter-Spacing'));
+    const ios = val('IOS-Mobile', sourceName('System', groupedProp('Label-Small', 'Letter-Spacing')));
+    const android = val('Android-Mobile', sourceName('System', groupedProp('Label-Small', 'Letter-Spacing')));
     expect(`ios ${ios < 0} android ${android > 0}`).toBe('ios true android true');
   });
 
@@ -52,14 +52,14 @@ describe('Material sets headlines in Regular', () => {
   });
 
   it('differs from the brand ramp where the brand runs 600', () => {
-    const omni = val('Android-Mobile', sourceName('Omni', 'H1-Font-Weight'));
-    const sys = val('Android-Mobile', sourceName('System', 'H1-Font-Weight'));
+    const omni = val('Android-Mobile', sourceName('Omni', groupedProp('H1', 'Font-Weight')));
+    const sys = val('Android-Mobile', sourceName('System', groupedProp('H1', 'Font-Weight')));
     expect(`omni ${omni} system ${sys}`).toBe('omni 600 system 400');
   });
 
   it('Apple keeps headings semibold', () => {
     expect(SYSTEM_WEIGHT.apple.heading).toBe(600);
-    expect(val('IOS-Mobile', sourceName('System', 'H1-Font-Weight'))).toBe(600);
+    expect(val('IOS-Mobile', sourceName('System', groupedProp('H1', 'Font-Weight')))).toBe(600);
   });
 });
 
@@ -93,8 +93,8 @@ describe('units are normalised to px before Figma sees them', () => {
        are static and written in px, while the generated Desktop header
        tracking is in em. Read with parseFloat, -0.018em and 0px are both
        "small numbers" — and the em one lands in Figma meaning 0.018 PIXELS. */
-    const h1 = val('Desktop', sourceName('Omni', 'H1-Letter-Spacing'));
-    const size = val('Desktop', 'Typography/H1-Font-Size');
+    const h1 = val('Desktop', sourceName('Omni', groupedProp('H1', 'Letter-Spacing')));
+    const size = val('Desktop', `Typography/${groupedProp('H1', 'Font-Size')}`);
     expect(Math.abs(h1)).toBeLessThan(size); // a px value, not a raw em
   });
 

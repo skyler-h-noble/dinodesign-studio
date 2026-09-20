@@ -125,6 +125,6 @@ describe('the downloaded figma.json', () => {
   it('is real JSON, and not the empty object the catch would produce', () => {
     const s = JSON.stringify(out);
     expect(s.length).toBeGreaterThan(1000);
-    expect(s).toContain('Typography/Omni/H1-Font-Weight');
+    expect(s).toContain('Typography/Omni/Headers/H1-Font-Weight');
   });
 });

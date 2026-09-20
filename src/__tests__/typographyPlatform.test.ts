@@ -10,7 +10,7 @@ import {
   DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, DEVICE_PROPS, SEEDS_FROM, SYSTEM_FACE,
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
-  familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS,
+  familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS, groupedProp,
   resolveVar,
   mirrorsOmni, figmaFamily,
   variableForSection,
@@ -33,9 +33,10 @@ const P = typographyVariablePayload(typographyTokensCSS, FACES);
 describe('the parse', () => {
   it('reads every style out of a platform block', () => {
     const { styles } = parsePlatformBlock(typographyTokensCSS, 'IOS-Mobile');
-    /* 33, not 36: the three --Body-<step>-Bold-Font-Weight tokens are excluded
-       (see EXCLUDED_STYLES) because Body has no bold. */
-    expect(Object.keys(styles).length).toBe(33);
+    /* 32, not 36: the three --Body-<step>-Bold-Font-Weight tokens are excluded
+       because Body has no bold, and Button-ExtraSmall because the design does
+       not use one. See EXCLUDED_STYLES. */
+    expect(Object.keys(styles).length).toBe(32);
     expect(styles['H1']).toEqual({
       'Font-Size': '28px', 'Font-Weight': '600',
       'Line-Height': '28px', 'Letter-Spacing': '0px',
@@ -64,7 +65,7 @@ describe('the Devices-Type source', () => {
   it('carries both faces for every switched property', () => {
     for (const prop of SWITCHED_PROPS) {
       for (const face of FACE_MODES) {
-        expect(P.devices.Desktop[sourceName(face, `H1-${prop}`)]).toBeDefined();
+        expect(P.devices.Desktop[sourceName(face, groupedProp('H1', prop))]).toBeDefined();
       }
     }
   });
@@ -77,9 +78,9 @@ describe('the Devices-Type source', () => {
        only widens or narrows a line — horizontal give is absorbed by
        wrapping, vertical give breaks a grid. */
     for (const prop of DEVICE_PROPS) {
-      expect(P.devices.Desktop[`Typography/H1-${prop}`]).toBeDefined();
+      expect(P.devices.Desktop[`Typography/${groupedProp('H1', prop)}`]).toBeDefined();
       for (const face of FACE_MODES) {
-        expect(`${prop} switched: ${P.devices.Desktop[sourceName(face, `H1-${prop}`)] !== undefined}`)
+        expect(`${prop} switched: ${P.devices.Desktop[sourceName(face, groupedProp('H1', prop))] !== undefined}`)
           .toBe(`${prop} switched: false`);
       }
     }
@@ -204,7 +205,7 @@ describe('the Devices-Type source', () => {
     const css = buildTypographyTokensCSS(picked);
     const roles = resolveRoles(picked);
     const D = typographyVariablePayload(css, roles).devices.Desktop;
-    const weight = (k: string) => D[sourceName('Omni', `${k}-Font-Weight`)].value;
+    const weight = (k: string) => D[sourceName('Omni', groupedProp(k, 'Font-Weight'))].value;
 
     expect(weight('Display-Large')).toBe(800);   // the Decorative pick
     expect(weight('H1')).toBe(250);              // the Header pick
@@ -237,7 +238,7 @@ describe('the Devices-Type source', () => {
     const D = typographyVariablePayload(
       buildTypographyTokensCSS(bold), resolveRoles(bold)).devices.Desktop;
     for (const step of ['H1', 'H3', 'H4', 'H6'])
-      expect(D[sourceName('Omni', `${step}-Font-Weight`)].value, step).toBe(700);
+      expect(D[sourceName('Omni', groupedProp(step, 'Font-Weight'))].value, step).toBe(700);
   });
 
   it('offers Body as Semibold, never as Bold', () => {
@@ -251,14 +252,14 @@ describe('the Devices-Type source', () => {
     for (const d of DEVICE_TYPES) {
       for (const face of FACE_MODES) {
         for (const step of ['Small', 'Medium', 'Large']) {
-          expect(P.devices[d][sourceName(face, `Body-${step}-Semibold-Font-Weight`)], `${d} ${step}`)
+          expect(P.devices[d][sourceName(face, groupedProp(`Body-${step}-Semibold`, 'Font-Weight'))], `${d} ${step}`)
             .toBeDefined();
-          expect(P.devices[d][sourceName(face, `Body-${step}-Bold-Font-Weight`)], `${d} ${step}`)
+          expect(P.devices[d][sourceName(face, groupedProp(`Body-${step}-Bold`, 'Font-Weight'))], `${d} ${step}`)
             .toBeUndefined();
         }
         /* Caption and Legal really do ship those weights, so their names mean
            what they say and must survive the exclusion. */
-        expect(P.devices[d][sourceName(face, 'Caption-Bold-Font-Weight')]).toBeDefined();
+        expect(P.devices[d][sourceName(face, groupedProp('Caption-Bold', 'Font-Weight'))]).toBeDefined();
       }
     }
   });
@@ -282,7 +283,8 @@ describe('the Devices-Type source', () => {
     const d = P.devices.Desktop;
     const resolve = (v: unknown): unknown => {
       const m = String(v).match(/^\{Typography\.(Omni|System)\.(.+)\}$/);
-      return m ? d[sourceName(m[1] as 'Omni' | 'System', m[2])].value : v;
+      /* The path is dotted in the alias and slashed in the name. */
+      return m ? d[sourceName(m[1] as 'Omni' | 'System', m[2].split('.').join('/'))].value : v;
     };
     for (const key of Object.keys(d)) {
       if (!key.startsWith('Typography/Omni/')) continue;
@@ -324,11 +326,11 @@ describe('the Devices-Type source', () => {
       for (const name of Object.keys(bag)) expect(name, d).not.toContain('Overline');
       for (const step of ['Small', 'Medium', 'Large']) {
         for (const face of FACE_MODES) {
-          const w = bag[sourceName(face, `Eyebrow-${step}-Font-Weight`)];
+          const w = bag[sourceName(face, groupedProp(`Eyebrow-${step}`, 'Font-Weight'))];
           expect(w, `${d} ${face} ${step}`).toBeDefined();
           expect(Number(w.value)).toBeGreaterThan(0);
         }
-        expect(Number(bag[`Typography/Eyebrow-${step}-Font-Size`].value)).toBeGreaterThan(0);
+        expect(Number(bag[`Typography/${groupedProp(`Eyebrow-${step}`, 'Font-Size')}`].value)).toBeGreaterThan(0);
       }
     }
   });
@@ -372,7 +374,7 @@ describe('the Devices-Type source', () => {
     /* Nothing rendered changes on the day this lands. */
     for (const d of DEVICE_TYPES) {
       const { styles } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
-      expect(P.devices[d]['Typography/H1-Font-Size'].value)
+      expect(P.devices[d][`Typography/${groupedProp('H1', 'Font-Size')}`].value)
         .toBe(parseFloat(styles['H1']['Font-Size']));
     }
   });
@@ -409,12 +411,12 @@ describe('the Typography alias collection', () => {
   });
 
   it('points each mode at its own face', () => {
-    expect(P.typography.Omni['H1-Font-Weight'].value)
-      .toBe('{Typography.Omni.H1-Font-Weight}');
-    expect(P.typography.System['H1-Font-Weight'].value)
-      .toBe('{Typography.System.H1-Font-Weight}');
-    expect(P.typography.Omni['H1-Letter-Spacing'].value)
-      .toBe('{Typography.Omni.H1-Letter-Spacing}');
+    const w = groupedProp('H1', 'Font-Weight');
+    const dotted = (face: string, n: string) => `{Typography.${face}.${n.split('/').join('.')}}`;
+    expect(P.typography.Omni[w].value).toBe(dotted('Omni', w));
+    expect(P.typography.System[w].value).toBe(dotted('System', w));
+    const ls = groupedProp('H1', 'Letter-Spacing');
+    expect(P.typography.Omni[ls].value).toBe(dotted('Omni', ls));
   });
 
   it('exposes the size too, identically in both modes', () => {
@@ -422,9 +424,10 @@ describe('the Typography alias collection', () => {
        to be reachable here — but it does not switch, so both modes point at
        the one value. */
     for (const prop of DEVICE_PROPS) {
-      expect(P.typography.Omni[`H1-${prop}`].value).toBe(`{Typography.H1-${prop}}`);
-      expect(P.typography.System[`H1-${prop}`].value)
-        .toBe(P.typography.Omni[`H1-${prop}`].value);
+      const key = groupedProp('H1', prop);
+      expect(P.typography.Omni[key].value)
+        .toBe(`{Typography.${key.split('/').join('.')}}`);
+      expect(P.typography.System[key].value).toBe(P.typography.Omni[key].value);
     }
   });
 
