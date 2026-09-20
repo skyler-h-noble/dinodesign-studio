@@ -283,6 +283,29 @@ export type VarBag = Record<string, TypeValue>;
 /** One style's properties, keyed by the property suffix. */
 type StyleProps = Record<string, string>;
 
+/**
+ * What a `var(--X)` resolves to inside its own block.
+ *
+ * Does what the browser does and nothing more: follow the name, and on a miss
+ * take the fallback. A reference that leads nowhere is returned unchanged — the
+ * caller's parseFloat then drops it, which is the honest outcome for a value
+ * this file genuinely cannot know (`--Set-Font-Family-Header` is the
+ * consumer's to define, not ours).
+ *
+ * Depth-bounded because a cycle in the stylesheet would otherwise hang the
+ * export rather than produce a wrong number.
+ */
+export function resolveVar(value: string, declared: Record<string, string>, depth = 0): string {
+  const v = String(value).trim();
+  if (depth > 8 || !v.startsWith('var(')) return v;
+  const m = v.match(/^var\(\s*--([\w-]+)\s*(?:,\s*([\s\S]+))?\)$/);
+  if (!m) return v;
+  const [, name, fallback] = m;
+  if (declared[name] !== undefined) return resolveVar(declared[name], declared, depth + 1);
+  if (fallback !== undefined) return resolveVar(fallback, declared, depth + 1);
+  return v;
+}
+
 /** Parse one `[data-platform="X"] { … }` block into style -> prop -> value. */
 export function parsePlatformBlock(css: string, platform: string):
   { styles: Record<string, StyleProps>; families: Record<string, string> } {
@@ -291,6 +314,29 @@ export function parsePlatformBlock(css: string, platform: string):
   const styles: Record<string, StyleProps> = {};
   const families: Record<string, string> = {};
   if (!m) return { styles, families };
+
+  /* Every custom property the block declares, so a reference can be resolved
+     against it.
+   *
+   * The generated Desktop block does not restate a weight per step — it writes
+   *   --H1-Font-Weight: var(--Font-Weight-Header);
+   * and declares the number once under `/* Face weights *\/`, which is the
+   * right thing for CSS: one number, and a step that reads a DIFFERENT weight
+   * (H4-H6 read --Header-Clamped-Weight) says so by naming it.
+   *
+   * Reading that with parseFloat gives NaN, the property is dropped, and the
+   * Figma variable silently keeps whatever it held — which is how every Desktop
+   * font weight came to read 0 while the mobile blocks, which are static and
+   * spell their numbers out, were fine.
+   *
+   * Collected in a separate pass so declaration ORDER cannot matter: the face
+   * weights are emitted after the styles that reference them. */
+  const declared: Record<string, string> = {};
+  for (const raw of m[1].split('\n')) {
+    const d = raw.trim().match(/^--([\w-]+):\s*(.+?);$/);
+    if (d) declared[d[1]] = d[2];   // last wins, matching the cascade
+  }
+
   let section = '';
   for (const raw of m[1].split('\n')) {
     const line = raw.trim();
@@ -319,7 +365,7 @@ export function parsePlatformBlock(css: string, platform: string):
        * keep whatever it held before. That is how Overline-Small-Font-Weight
        * came to read 0 on Desktop and 500 on the tablets. */
       if (into[prop[2]] !== undefined && /^var\(/.test(value)) continue;
-      into[prop[2]] = value;
+      into[prop[2]] = resolveVar(value, declared);
     }
   }
   return { styles, families };

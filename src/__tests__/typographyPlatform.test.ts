@@ -11,6 +11,7 @@ import {
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
   familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS,
+  resolveVar,
   mirrorsOmni, figmaFamily,
   variableForSection,
 } from '../utils/typographyPlatform';
@@ -19,7 +20,7 @@ import {
    vite.config.ts — vitest stubs CSS imports by default, and a stub is
    indistinguishable from a file with no platform blocks in it. Every
    assertion below would have passed on nothing. */
-import { typographyTokensCSS } from '../utils/typographyTokens';
+import { typographyTokensCSS, buildTypographyTokensCSS } from '../utils/typographyTokens';
 import { resolveRoles } from '../utils/typeScale';
 
 /* The four faces, resolved. `resolveRoles(null)` is the real defaulting path,
@@ -155,6 +156,38 @@ describe('the Devices-Type source', () => {
         expect(name).not.toContain('Face weights');
       }
     }
+  });
+
+  /* The GENERATED Desktop block, which is what actually ships — the static one
+     in the asset file is replaced per design system. Every test above reads the
+     static file and so never saw this. */
+  const GEN = buildTypographyTokensCSS(null);
+
+  it('resolves a weight that the block states once and references per step', () => {
+    /* The generated Desktop block writes
+         --H1-Font-Weight: var(--Font-Weight-Header);
+       and declares the number once under Face weights. parseFloat on that is
+       NaN, the property gets dropped, and the Figma variable keeps whatever it
+       held — every Desktop weight read 0, while the mobile blocks, which spell
+       their numbers out, were fine. */
+    const { styles } = parsePlatformBlock(GEN, 'Desktop');
+    expect(styles['H1']['Font-Weight']).toBe('600');
+    const G = typographyVariablePayload(GEN, resolveRoles(null));
+    const weights = Object.keys(G.devices.Desktop).filter((k) => k.includes('Font-Weight'));
+    expect(weights.length).toBeGreaterThan(0);
+    for (const k of weights) expect(Number(G.devices.Desktop[k].value), k).toBeGreaterThan(0);
+  });
+
+  it('resolves only what the block itself declares', () => {
+    const declared = { A: '600', B: 'var(--A)' };
+    expect(resolveVar('var(--B)', declared)).toBe('600');
+    expect(resolveVar('var(--Missing, 400)', declared)).toBe('400');
+    /* A name the block does not define is the consumer's to set — left alone so
+       the caller drops it, rather than guessed at. */
+    expect(resolveVar('var(--Set-Font-Family-Header)', declared))
+      .toBe('var(--Set-Font-Family-Header)');
+    /* A cycle must not hang the export. */
+    expect(() => resolveVar('var(--X)', { X: 'var(--Y)', Y: 'var(--X)' })).not.toThrow();
   });
 
   it('gives Desktop the same System values as Omni', () => {
