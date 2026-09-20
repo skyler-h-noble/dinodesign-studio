@@ -385,17 +385,42 @@ export const FAMILY_ROOT_OF: Record<string, string> = {
   Display: 'Display',
   Headers: 'Headers',
   Body: 'Body',
-  /* Everything below is the Body face. Overline included: the eyebrow has no
-     picker of its own (resolveRoles maps the eyebrow role at the Body family),
-     and the file links it to Body. */
+  /* Everything below resolves to the Body face. The eyebrow has no picker of
+     its own — resolveRoles maps the eyebrow role at the Body family — so there
+     is no third literal to hold. */
   Subtitle: 'Body',
   Caption: 'Body',
   Label: 'Body',
   Legal: 'Body',
   Number: 'Body',
   Button: 'Body',
-  Overline: 'Body',
+
+  /* Eyebrow is a SEAM, not a face: somewhere to change the eyebrow's family
+     without touching Body. It resolves to Body today and the text styles bind
+     to it, so a design that wants a distinct eyebrow face has one variable to
+     repoint and every eyebrow follows.
+
+     There is deliberately no `Overline-Font-Family`. Eyebrow is the name (the
+     lib's CSS keeps emitting --Overline-* forever because a published
+     stylesheet is frozen and cannot be regenerated — a Figma file is not, and
+     this one has already dropped it). */
+  Eyebrow: 'Body',
 };
+
+/**
+ * Stylesheet section -> the variable that holds its family.
+ *
+ * Only ever needed where the two names differ. The CSS block is still headed
+ * `/* Overline *\/` — the frozen-stylesheet reason that keeps --Overline-*
+ * alive on the web does not reach a live Figma file, so the variable is
+ * Eyebrow and only the section comment lags.
+ */
+export const SECTION_VARIABLE: Record<string, string> = { Overline: 'Eyebrow' };
+
+/** The variable a stylesheet section's family lands in. */
+export function variableForSection(section: string): string {
+  return SECTION_VARIABLE[section] ?? section;
+}
 
 /** The three roots, and the face whose literal family each one holds. */
 export const ROOT_ROLE: Record<string, FamilyRole> = {
@@ -534,15 +559,16 @@ export function typographyVariablePayload(
         bag[familyName(face, root)] = { value, type: 'string' };
       }
 
-      /* Every other style points at the root it wears. */
-      for (const section of Object.keys(families)) {
-        /* `Faces` and `Face weights` are the face DEFINITIONS, not styles. The
-           parse keys families by the preceding section comment and so read
-           them as one, which is where `Faces-Font-Family` came from. */
-        if (NON_STYLE_SECTIONS.has(section)) continue;
-        const root = FAMILY_ROOT_OF[section];
-        if (!root || root === section) continue;   // a root holds its own literal
-        bag[familyName(face, section)] = { value: familyAlias(face, root), type: 'string' };
+      /* Every other name points at what it wears.
+       *
+       * Driven by the TABLE rather than by the stylesheet's sections, because
+       * Eyebrow is not a section — no `/* Eyebrow *\/` block declares it — and
+       * iterating the CSS would drop the one name the text styles bind to. The
+       * opposite direction is still guarded: a test holds the table against
+       * the sections the CSS does declare. */
+      for (const [name, target] of Object.entries(FAMILY_ROOT_OF)) {
+        if (target === name) continue;             // a root holds its own literal
+        bag[familyName(face, name)] = { value: familyAlias(face, target), type: 'string' };
       }
     }
     devices[device] = bag;

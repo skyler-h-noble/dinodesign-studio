@@ -11,6 +11,7 @@ import {
   sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
   blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
   familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS,
+  variableForSection,
 } from '../utils/typographyPlatform';
 /* The same `?raw` import the app uses, so this exercises the real path.
    It returned an EMPTY STRING until `test: { css: true }` was set in
@@ -113,7 +114,7 @@ describe('the Devices-Type source', () => {
        link to Body. */
     for (const d of DEVICE_TYPES) {
       const bag = P.devices[d];
-      for (const style of ['Subtitle', 'Caption', 'Label', 'Legal', 'Number', 'Button', 'Overline']) {
+      for (const style of ['Subtitle', 'Caption', 'Label', 'Legal', 'Number', 'Button', 'Eyebrow']) {
         const v = bag[familyName('Omni', style)];
         if (!v) continue;   // a device whose block does not declare that section
         expect(v.value, `${d} ${style}`).toBe(familyAlias('Omni', 'Body'));
@@ -148,6 +149,17 @@ describe('the Devices-Type source', () => {
     }
   });
 
+  it('emits Eyebrow as the seam, and no Overline family at all', () => {
+    /* Eyebrow is where a design repoints the eyebrow face; the text styles bind
+       to it. Overline-Font-Family is gone from the file, so emitting one would
+       create a variable nothing references. */
+    for (const d of DEVICE_TYPES) {
+      expect(P.devices[d][familyName('Omni', 'Eyebrow')].value).toBe(familyAlias('Omni', 'Body'));
+      expect(P.devices[d][familyName('Omni', 'Overline')]).toBeUndefined();
+      expect(P.devices[d][familyName('System', 'Overline')]).toBeUndefined();
+    }
+  });
+
   it('has a root for every section the stylesheet declares', () => {
     /* The role table is stated, not derived — this is what stops the two
        drifting apart when a section is added on one side only. */
@@ -155,7 +167,8 @@ describe('the Devices-Type source', () => {
       const { families } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
       for (const section of Object.keys(families)) {
         if (NON_STYLE_SECTIONS.has(section)) continue;
-        expect(FAMILY_ROOT_OF[section], `no root for section "${section}"`).toBeDefined();
+        const v = variableForSection(section);
+        expect(FAMILY_ROOT_OF[v], `no root for section "${section}" (variable "${v}")`).toBeDefined();
       }
     }
   });
