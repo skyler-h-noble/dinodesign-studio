@@ -205,3 +205,55 @@ describe('the line weights reach the stylesheet', () => {
     }
   });
 });
+
+/* Figma name == CSS name, for the three that used to disagree.
+ *
+ * These were not missing — each described ONE value under TWO names, which is
+ * worse than a gap because both sides look complete and nothing can tell they
+ * are the same thing:
+ *
+ *   Figma Card-Inner-Border-Radius   CSS --Card-Inner-Radius
+ *   Figma Button-Inner-Focus-Radius  CSS --Button-Inner-Radius
+ *   Figma Input-Inner-Focus-Radius   CSS --Input-Inner-Radius
+ *
+ * Resolved on 2026-09-20: Card renamed in Figma, the other two renamed in CSS.
+ * This asserts the two sides agree AND carry the same number, so a rename on
+ * either side that forgets the other fails here rather than silently leaving a
+ * token that resolves to nothing.
+ */
+describe('Component-Size names match between Figma and CSS', () => {
+  const css = () => {
+    const sel = { background: 'primary', button: 'primary',
+      cardColoring: 'tonal', textColoring: 'tonal' } as never;
+    const { json } = buildAll(SCHEME, sel, 'light') as never as { json: never };
+    const j = JSON.parse(JSON.stringify(json));
+    j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100,
+      cardPadding: 24, bevelOpacity: 50, shadowResolution: 3 };
+    return Object.values(generateCSSFiles(j) as never as Record<string, string>).join('\n');
+  };
+
+  const decl = (out: string, name: string) =>
+    out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
+
+  it.each([
+    '--Card-Inner-Radius',
+    '--Button-Inner-Focus-Radius',
+    '--Input-Inner-Focus-Radius',
+  ])('%s is emitted under the name Figma uses', (name) => {
+    expect(decl(css(), name)).toBeDefined();
+  });
+
+  it.each(['--Button-Inner-Radius', '--Input-Inner-Radius', '--Card-Inner-Border-Radius'])(
+    'and the old name %s is gone', (name) => {
+      expect(decl(css(), name)).toBeUndefined();
+    });
+
+  it('keeps --Input-Inner-Focus-Visible as an alias, not a second calculation', () => {
+    /* List.js reads that name, and generated CSS is frozen per design system,
+       so an older sheet paired with a newer lib still has to resolve it. It
+       used to recompute max(0, inputRadius - 1) by hand — which is exactly
+       what inner() already does — so one value had two derivations. */
+    expect(decl(css(), '--Input-Inner-Focus-Visible'))
+      .toBe('--Input-Inner-Focus-Visible: var(--Input-Inner-Focus-Radius);');
+  });
+});

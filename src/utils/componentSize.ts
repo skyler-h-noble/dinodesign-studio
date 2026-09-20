@@ -316,9 +316,13 @@ export function componentSizePayload(
       'Card-Radius': r.cardRadius,
       'Sm-Card-Radius': r.smCardRadius,
       'Lg-Card-Radius': r.lgCardRadius,
-      'Card-Inner-Border-Radius': r.cardInnerRadius,
-      'Sm-Card-Inner-Border-Radius': r.smCardInnerRadius,
-      'Lg-Card-Inner-Border-Radius': r.lgCardInnerRadius,
+      /* Renamed in Figma on 2026-09-20, from Card-Inner-Border-Radius. The
+         CSS already spelled it --Card-Inner-Radius, so the two sides now
+         agree; before this they described one value under two names, which
+         is worse than a gap because both sides looked complete. */
+      'Card-Inner-Radius': r.cardInnerRadius,
+      'Sm-Card-Inner-Radius': r.smCardInnerRadius,
+      'Lg-Card-Inner-Radius': r.lgCardInnerRadius,
       // The file calls this Card-Focus-Radius; the flat payload called it
       // Card-Focus-Border-Radius and would have matched nothing.
       'Card-Focus-Radius': r.cardFocusRadius,

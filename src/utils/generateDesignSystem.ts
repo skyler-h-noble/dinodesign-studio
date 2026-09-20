@@ -1016,9 +1016,9 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Radius: ${r.buttonRadius}px;
   --Sm-Button-Radius: ${r.smButtonRadius}px;
   --Lg-Button-Radius: ${r.lgButtonRadius}px;
-  --Button-Inner-Radius: ${r.buttonInnerRadius}px;
-  --Sm-Button-Inner-Radius: ${r.smButtonInnerRadius}px;
-  --Lg-Button-Inner-Radius: ${r.lgButtonInnerRadius}px;
+  --Button-Inner-Focus-Radius: ${r.buttonInnerRadius}px;
+  --Sm-Button-Inner-Focus-Radius: ${r.smButtonInnerRadius}px;
+  --Lg-Button-Inner-Focus-Radius: ${r.lgButtonInnerRadius}px;
   --Button-Focus-Radius: ${r.buttonFocusRadius}px;
   --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;
   --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;
@@ -1067,7 +1067,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Input-Radius: ${r.inputRadius}px;
   --Sm-Input-Radius: ${r.smInputRadius}px;
   --Lg-Input-Radius: ${r.lgInputRadius}px;
-  --Input-Inner-Radius: ${r.inputInnerRadius}px;
+  --Input-Inner-Focus-Radius: ${r.inputInnerRadius}px;
   --Input-Focus-Radius: ${r.inputFocusRadius}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;

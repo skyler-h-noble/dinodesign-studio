@@ -4908,9 +4908,9 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Button-Radius: ${cappedButtonRadius}px;`);
     lines.push(`  --Sm-Button-Radius: ${cappedSmButtonRadius}px;`);
     lines.push(`  --Lg-Button-Radius: ${cappedLgButtonRadius}px;`);
-    lines.push(`  --Button-Inner-Radius: ${r.buttonInnerRadius}px;`);
-    lines.push(`  --Sm-Button-Inner-Radius: ${r.smButtonInnerRadius}px;`);
-    lines.push(`  --Lg-Button-Inner-Radius: ${r.lgButtonInnerRadius}px;`);
+    lines.push(`  --Button-Inner-Focus-Radius: ${r.buttonInnerRadius}px;`);
+    lines.push(`  --Sm-Button-Inner-Focus-Radius: ${r.smButtonInnerRadius}px;`);
+    lines.push(`  --Lg-Button-Inner-Focus-Radius: ${r.lgButtonInnerRadius}px;`);
     lines.push(`  --Button-Focus-Radius: ${r.buttonFocusRadius}px;`);
     lines.push(`  --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;`);
     lines.push(`  --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;`);
@@ -4955,12 +4955,18 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Input-Radius: ${r.inputRadius}px;`);
     lines.push(`  --Sm-Input-Radius: ${r.smInputRadius}px;`);
     lines.push(`  --Lg-Input-Radius: ${r.lgInputRadius}px;`);
-    lines.push(`  --Input-Inner-Radius: ${r.inputInnerRadius}px;`);
+    lines.push(`  --Input-Inner-Focus-Radius: ${r.inputInnerRadius}px;`);
     lines.push(`  --Input-Focus-Radius: ${r.inputFocusRadius}px;`);
-    // Inset focus-ring corner radius — Input-Radius minus 1px so the inset
-    // 3px focus indicator's corners visually match the chrome's outer
-    // corners. Used by ListItem, TextField, Select, etc.
-    lines.push(`  --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;`);
+    /* Inset focus-ring corner radius — the same number as
+       --Input-Inner-Focus-Radius above, not a second calculation of it.
+       inputInnerRadius IS inner(inputRadius), and inner() is
+       `max(0, r - 1)`, so `Math.max(0, r.inputRadius - 1)` was recomputing
+       it by hand: one value, two derivations, free to drift the moment
+       inner() changes.
+       Kept as an ALIAS rather than deleted — List.js reads this name, and
+       generated CSS is frozen per design system, so an older sheet paired
+       with a newer lib still has to resolve it. */
+    lines.push(`  --Input-Inner-Focus-Visible: var(--Input-Inner-Focus-Radius);`);
     lines.push(`  --Input-Swatch-Radius: ${r.inputSwatchRadius}px;`);
     lines.push(`  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;`);
     lines.push(`  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;`);
