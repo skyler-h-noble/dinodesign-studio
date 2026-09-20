@@ -10,11 +10,14 @@ import { describe, it, expect } from 'vitest';
 import {
   systemTracking, systemWeight, roleOf, SYSTEM_FAMILY_OF, SYSTEM_WEIGHT,
 } from '../utils/systemTypography';
-import { typographyVariablePayload, sourceName, DEVICE_TYPES } from '../utils/typographyPlatform';
+import {
+  typographyVariablePayload, sourceName, DEVICE_TYPES, type VarBag,
+} from '../utils/typographyPlatform';
 import { typographyTokensCSS } from '../utils/typographyTokens';
 
 const P = typographyVariablePayload(typographyTokensCSS);
-const val = (dev: string, n: string) => P.devices[dev as never][n]?.value as number;
+const byDevice = P.devices as Record<string, VarBag>;
+const val = (dev: string, n: string) => byDevice[dev][n]?.value as number;
 
 describe('the platforms disagree about small text, and that is the point', () => {
   it('tracks a label OUT on Android and IN on iOS', () => {
@@ -99,7 +102,7 @@ describe('units are normalised to px before Figma sees them', () => {
     /* A tracking under 0.05px is almost certainly an unconverted em: real px
        tracking at these sizes is tenths, not hundredths. Zero is fine. */
     for (const d of DEVICE_TYPES) {
-      for (const [name, v] of Object.entries(P.devices[d])) {
+      for (const [name, v] of Object.entries(byDevice[d])) {
         if (!name.endsWith('-Letter-Spacing')) continue;
         const n = v.value as number;
         expect(`${d}/${name} = ${n} suspicious: ${n !== 0 && Math.abs(n) < 0.02}`)
