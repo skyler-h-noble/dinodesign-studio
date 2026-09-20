@@ -150,3 +150,62 @@ describe('the payload uses the names that are IN THE FILE', () => {
     expect(new Set(keys).size).toBe(1);
   });
 });
+
+/* Divider / Step bar / No Count Step live in Component-Size → Other, and the
+ * LIB carries the same three numbers as literals (Divider.js SIZE_MAP,
+ * Stepper.js connectorThickness and dot). That is one value in two places,
+ * three times over — and they were caught disagreeing: the lib's Divider was
+ * wearing the STEP BAR's 1/2/4 while the connector sat pinned at 2 for every
+ * size. Nothing could detect it because nothing wrote them.
+ *
+ * These names are the ones IN THE FILE, spaces included. populateComponentSize
+ * is UPDATE-ONLY and writes by name, so a "tidier" Step-Bar or NoCountStep
+ * would match nothing and silently leave the value at whatever was last typed
+ * by hand — which is the failure this whole file exists to avoid.
+ */
+describe('the Other group writes the line and dot weights', () => {
+  const R = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, cardPadding: 16,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, dropdownFrameRadius: 0,
+  };
+
+  const payload = () => componentSizePayload(R, {});
+
+  it('carries all three at every size', () => {
+    const p = payload() as unknown as Record<string, Record<string, number>>;
+    for (const name of ['Other/Divider', 'Other/Step bar', 'Other/No Count Step']) {
+      for (const mode of ['small', 'medium', 'large'] as const) {
+        expect(`${mode} ${name}: ${typeof p[mode][name]}`)
+          .toBe(`${mode} ${name}: number`);
+      }
+    }
+  });
+
+  it('matches the ramps the lib renders', () => {
+    const p = payload() as unknown as Record<string, Record<string, number>>;
+    expect([p.small['Other/Divider'], p.medium['Other/Divider'], p.large['Other/Divider']])
+      .toEqual([0.5, 1, 2]);
+    expect([p.small['Other/Step bar'], p.medium['Other/Step bar'], p.large['Other/Step bar']])
+      .toEqual([1, 2, 4]);
+    expect([p.small['Other/No Count Step'], p.medium['Other/No Count Step'], p.large['Other/No Count Step']])
+      .toEqual([8, 12, 16]);
+  });
+
+  it('and the two ramps are not swapped', () => {
+    /* The specific mistake that was shipped: Divider wearing the step bar's
+       weights. They must differ at small and large. */
+    const p = payload() as unknown as Record<string, Record<string, number>>;
+    expect(p.small['Other/Divider']).not.toBe(p.small['Other/Step bar']);
+    expect(p.large['Other/Divider']).not.toBe(p.large['Other/Step bar']);
+  });
+});

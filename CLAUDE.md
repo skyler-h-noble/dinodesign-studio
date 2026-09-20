@@ -83,7 +83,7 @@ for token/theme details.)
 | Headings | `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `DisplayLarge`, `DisplaySmall` |
 | Body text | `Body`, `BodyLarge`, `BodySmall`, `Subtitle`, `SubtitleLarge` — Body has no bold; see [Body weights](#body-weights) |
 | Labels | `Label`, `Overline`, `Caption` |
-| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`-light`/`ghost`/`text`), `ButtonGroup`, `Fab` |
+| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
 | Selection | `Checkbox`, `Radio`, `RadioGroup`, `SwitchInput`, `Slider`/`SliderInput`, `RangeSlider`, `Rating` |
 | Layout | `VStack`, `HStack`, `Stack`, `Box`, `Grid`, `Container`, `Divider`, `Spacing` |
@@ -212,6 +212,29 @@ selected.
 their **surface**, not their theme — `data-theme="{Color}"` plus
 `data-surface="Surface-Brightest"`. It used to name a `{Color}-Light` theme,
 which no longer exists.
+
+### Button, Chip and Badge have no `-light` shape
+
+Removed in `@omni-design/components` 0.9.0. It painted `--<C>-Color-11`, a
+tinted fill that was never a shape in the design — shape there is solid /
+outline / ghost / text, and COLOUR arrives as a Buttons mode.
+
+`variant="{color}-light"` still renders: each component strips the suffix to
+the solid variant of that colour and warns once in development. Nothing breaks
+silently, but do not write new ones, and the converter must never emit one.
+
+The 16 convenience exports are **deleted** — `PrimaryLightChip`…`ErrorLightChip`
+and `PrimaryLightBadge`…`ErrorLightBadge`. A stale import now fails at build,
+which is better than a named export rendering something other than its name.
+
+A light chip or badge is a SURFACE: `{color}-outline` with `data-theme` +
+`data-surface="Surface-Brightest"`.
+
+Two `light`s are still real and are different things:
+
+- **`SwitchInput` `variant="{color}-light"`** — a tinted track.
+- **`ButtonGroup` `variant="light"`** — changes the unselected segments'
+  SURFACE, not their theme (see the ButtonGroup entry above).
 
 ### `Select`
 

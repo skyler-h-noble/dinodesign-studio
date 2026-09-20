@@ -86,18 +86,33 @@ export function componentSizeNames(payload: ComponentSizePayload): string[] {
 
 /* ── The groups the studio can fill ────────────────────────────────────────
  *
- * Component-Size in Figma holds more than the studio computes — Switch, FAB,
- * Slider, Rating and most of Other are authored by hand. This maps only what
- * the generator actually derives, and the writer leaves everything else alone.
+ * Component-Size in Figma holds more than the studio computes. Authored by
+ * hand, and NOT written by this payload: Switch, FAB, Slider, Rating, most of
+ * Other — and Divider, Step bar and No Count Step.
+ *
+ * Those last three matter more than the rest, because the LIB now carries the
+ * same numbers as literals:
+ *
+ *   Divider        0.5 / 1 / 2   Divider.js SIZE_MAP
+ *   Step bar       1 / 2 / 4     Stepper.js connectorThickness
+ *   No Count Step  8 / 12 / 16   Stepper.js dot (variant="noCount")
+ *
+ * They were caught disagreeing: the lib's Divider was wearing the STEP BAR's
+ * 1/2/4 while the connector sat pinned at 2 for every size — the two ramps
+ * had been swapped between the components, and nothing could detect it
+ * because nothing wrote them. They ARE written now (LINE_METRICS, into the
+ * Other group), so the Figma side has one source; the lib still holds the
+ * same numbers as literals until it consumes the generated tokens.
  *
  * Names are the ones IN THE FILE, not the ones the old flat payload used.
- * Two differ and both would have bound nothing:
  *   Card-Focus-Border-Radius  →  Card-Focus-Radius
- *   Accordion-*               →  Accordian-*   (misspelt in the file; the
- *                                GROUP is spelt correctly, so it is only the
- *                                variable name that carries the typo)
  * Matching the file is the whole job — a "correct" name that matches nothing
  * silently leaves the value at whatever was last typed by hand.
+ *
+ * The Accordion entry used to be listed here as a second such case: the file
+ * spelt it `Accordian-*` and this payload matched the typo deliberately. It
+ * was renamed in Figma on 2026-09-19 and the payload moved with it, so that
+ * exception is gone — see the note on the Accordion group below.
  */
 export interface RadiiForSize {
   buttonRadius: number; smButtonRadius: number; lgButtonRadius: number;
@@ -173,15 +188,51 @@ export const NAV_METRICS = {
   'Nav-Bar Height': { medium: 83, small: 73, large: 93 },
 } as const;
 
-/** The flat Sm-/Lg- shape componentSizeGroup takes, from the table above. */
-export function navMetricsFlat(): Record<string, number> {
+/* Line and dot weights. Static, like NAV_METRICS above: not derived from the
+ * user's radius or heights — these are the design's own weights, read off
+ * Component-Size / Other.
+ *
+ * They are here because the LIB carries the same three numbers as literals:
+ *
+ *   Divider        Divider.js      SIZE_MAP
+ *   Step bar       Stepper.js      connectorThickness
+ *   No Count Step  Stepper.js      dot (variant="noCount")
+ *
+ * One value in two places, three times over — and they were caught
+ * disagreeing: the lib's Divider was wearing the STEP BAR's 1/2/4 while the
+ * connector sat pinned at 2 for every size. The two ramps had been swapped
+ * between the components and nothing could detect it, because nothing wrote
+ * them. Writing them gives the number one home.
+ *
+ * 0.5 at small is a deliberate hairline — a true half-pixel on 2x, rounded by
+ * the browser on 1x, which is the usual hairline trade. */
+export const LINE_METRICS = {
+  'Divider':       { medium: 1,  small: 0.5, large: 2 },
+  'Step bar':      { medium: 2,  small: 1,   large: 4 },
+  'No Count Step': { medium: 12, small: 8,   large: 16 },
+} as const;
+
+/** The flat Sm-/Lg- shape componentSizeGroup takes, from a per-mode table.
+ *  The prefixes are INPUT only — componentSizeGroup regroups them into the
+ *  three modes under one variable name, which is how Figma stores them. */
+function flattenByMode(
+  table: Record<string, { medium: number; small: number; large: number }>,
+): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const [name, byMode] of Object.entries(NAV_METRICS)) {
+  for (const [name, byMode] of Object.entries(table)) {
     out[name] = byMode.medium;
     out[`Sm-${name}`] = byMode.small;
     out[`Lg-${name}`] = byMode.large;
   }
   return out;
+}
+
+export function navMetricsFlat(): Record<string, number> {
+  return flattenByMode(NAV_METRICS as never);
+}
+
+export function lineMetricsFlat(): Record<string, number> {
+  return flattenByMode(LINE_METRICS as never);
 }
 
 /** The same table as CSS custom properties.
@@ -267,6 +318,10 @@ export function componentSizePayload(
          which is the point: the number then has one home instead of living
          in Figma and being re-typed in CSS. */
       ...navMetricsFlat(),
+      /* Divider / Step bar / No Count Step — see LINE_METRICS. Same reason as
+         the nav metrics: the lib holds these as literals too, so writing them
+         keeps one number in one place. */
+      ...lineMetricsFlat(),
     },
   });
 }
