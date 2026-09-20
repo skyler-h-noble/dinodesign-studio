@@ -163,19 +163,14 @@ export const DEFAULT_DISPLAY_SIZE = 72;
  *  48 rather than 72 / 56 / 40, so the three are closer together.) */
 export const H1_SIZE = 48;
 
-/* Three steps here, two in Figma.
+/* Three steps, everywhere: the stylesheet, the Figma payload and the lib.
  *
- * The design file carries Large and Small only, so Display-Medium is dropped
- * from the Figma payload (EXCLUDED_STYLES in typographyPlatform.ts). It stays
- * in the CSS, because the lib READS it — Typography.js:124-128 resolves
- * --Display-Medium-Font-Size and friends for the DisplayMedium export, and
- * dropping the tokens would render that component unstyled on every page
- * already using it.
- *
- * That is the rule for all three of these: a CSS token is something a consumer
- * may already depend on, while a Figma variable is an OFFER. Withdrawing the
- * offer costs nothing; withdrawing the token breaks a build. The step leaves
- * the CSS when the lib stops exporting it, and not before.
+ * Medium was briefly cut from the Figma payload and then put back — the design
+ * file has all three. The detour is worth a line, because the first attempt cut
+ * it from THIS ramp rather than from the payload, and the lib reads
+ * --Display-Medium-* for its DisplayMedium export (Typography.js:124-128), so
+ * that would have rendered the component unstyled on every page already using
+ * it. A CSS token is a dependency; a Figma variable is only an offer.
  */
 const DISPLAY_STEP_TOKENS = {
   large: { token: 'Display-Large', step: 'Large' },

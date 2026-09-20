@@ -55,11 +55,36 @@ describe('the parse', () => {
 
 describe('the Devices-Type source', () => {
   it('gives every device the same variable names', () => {
-    /* They are MODES, so the names are one set and only the values differ.
-       A name present at one device and absent at another resolves to nothing
-       on that device, which is the silent half of this whole class of bug. */
-    const sets = DEVICE_TYPES.map((d) => payloadNames(P.devices[d]).join('|'));
+    /* Read against the GENERATED stylesheet, which is what ships. The static
+       asset has one block per platform and they agree; the real file splices a
+       Desktop block built from the scale, and that one carried five styles the
+       others did not — Badge, Button-Large, Display-Medium,
+       Label-Medium-All-Caps, Subtitle-Medium.
+     *
+     * The consequence is the quiet kind. The alias collection is built from
+     * Desktop's key set, so those variables get created and only the Desktop
+     * MODE is ever written; the other six keep Figma's default and a Badge on
+     * iOS renders at font-size 0. Nothing fails — the import succeeds and the
+     * variable exists.
+     *
+     * The previous version of this test read the static file, where Desktop is
+     * static too, so it agreed with itself and saw none of it. Same mistake as
+     * the Desktop weights: testing the input that is not shipped. */
+    const styles: any = [
+      { type: 'decorative', family: 'Playfair Display', weight: '800' },
+      { type: 'header', family: 'X', weight: '600' },
+      { type: 'body', family: 'Source Sans 3', weight: '400' },
+    ];
+    const G = typographyVariablePayload(buildTypographyTokensCSS(styles), resolveRoles(styles));
+    const sets = DEVICE_TYPES.map((d) => payloadNames(G.devices[d]).join('|'));
     expect(new Set(sets).size).toBe(1);
+    /* And the five are actually present off-Desktop, not merely consistent by
+       being absent everywhere. */
+    for (const d of DEVICE_TYPES)
+      for (const k of ['Typography/Badges/Badge-Font-Size',
+                       'Typography/Displays/Display-Medium-Font-Size',
+                       'Typography/Buttons/Button-Large-Font-Size'])
+        expect(Number(G.devices[d][k]?.value), `${d} ${k}`).toBeGreaterThan(0);
   });
 
   it('carries both faces for every switched property', () => {

@@ -614,19 +614,25 @@ export function variableForSection(section: string): string {
  * picks Body-Large-Bold gets 700 in the mock and semibold in the build, and
  * nothing anywhere reports the difference.
  *
- * Display-Medium and Button-ExtraSmall are here for the design's own reason
- * rather than a correctness one: the file carries Display Large and Small, and
- * has no extra-small button. Both stay in the CSS, because the lib reads them
- * — Typography.js:124-128 and :515-518 resolve their tokens — and pulling the
- * tokens would render those components unstyled wherever they are already
+ * Button-ExtraSmall is here for the design's own reason rather than a
+ * correctness one: the file has no extra-small button. It stays in the CSS,
+ * because the lib reads it — Typography.js:515-518 resolves its tokens — and
+ * pulling those would render the component unstyled wherever it is already
  * used. Withdrawing a Figma variable costs nothing; withdrawing a CSS token
- * breaks a build. They leave the stylesheet when the lib stops exporting them.
+ * breaks a build. It leaves the stylesheet when the lib stops exporting it.
+ *
+ * Display-Medium is NOT here. It was, briefly, on a reading of "we only have
+ * Display Large and Small" that turned out to be about a different collection
+ * — the file has all three. Worth the note: the lib exports DisplayMedium and
+ * resolves its tokens, so excluding it would have left a shipped component
+ * with no variables behind it, which is the same defect as Body-Bold with the
+ * sign reversed.
  *
  * Caption-Bold and Legal-Semibold are NOT here: those styles really do ship
  * that weight (see SYSTEM_STYLES), so the name means what it says.
  */
 export const EXCLUDED_STYLES =
-  /^(Body-(Small|Medium|Large)-Bold|Display-Medium|Button-ExtraSmall)$/;
+  /^(Body-(Small|Medium|Large)-Bold|Button-ExtraSmall)$/;
 
 /**
  * The variable a stylesheet STYLE lands in. Overline is spelled Eyebrow.
@@ -756,9 +762,28 @@ export function typographyVariablePayload(
   const devices = {} as Record<DeviceType, VarBag>;
   const typography = { Omni: {} as VarBag, System: {} as VarBag };
 
+  /* Desktop's styles, as the FLOOR every other device's set is filled up to.
+   *
+   * The Desktop block is generated from the scale and carries everything the
+   * system has; the other three blocks are static, older, and short by five
+   * styles — Badge, Button-Large, Display-Medium, Label-Medium-All-Caps and
+   * Subtitle-Medium. Left alone, each of those becomes a variable whose DESKTOP
+   * mode holds a value and whose other six hold Figma's default, so a Badge on
+   * iOS renders at font-size 0. Nothing reports it: the import succeeds, the
+   * variable exists, and only that one mode is empty.
+   *
+   * A device's OWN block always wins where it declares a style — mobile H1 stays
+   * 28px, not Desktop's 48 — so this fills gaps and overrides nothing. The
+   * inherited sizes then go through the same platform rules as everything else,
+   * because they are read as a size like any other.
+   */
+  const desktopStyles = parsePlatformBlock(generatedCSS, SEEDS_FROM['Desktop']).styles;
+
   for (const device of DEVICE_TYPES) {
     const bag: VarBag = {};
-    const { styles, families } = parsePlatformBlock(generatedCSS, SEEDS_FROM[device]);
+    const own = parsePlatformBlock(generatedCSS, SEEDS_FROM[device]);
+    const styles = { ...desktopStyles, ...own.styles };
+    const families = own.families;
 
     for (const [style, props] of Object.entries(styles)) {
       /* Font-Size is a DEVICE decision, not a face one — it sits outside the
