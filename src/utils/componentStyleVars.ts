@@ -110,9 +110,14 @@ export function componentStyleVars(
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
     '--Button-Bevel-Px': `${bevelPx}px`,
-    '--Button-Height': `${buttonHeight}px`,
-    '--Small-Button-Height': `${smallButtonHeight}px`,
-    '--Large-Button-Height': `${largeButtonHeight}px`,
+    /* Button-Height / Sm- / Lg- now come from buttonModeMetricVars above, so
+       they are not restated here — one source, matching Figma's names.
+       These two remain as ALIASES: ToggleButtonGroup, Autocomplete and Input
+       read the --Small-/--Large- spelling, and Tabs reads --Sm-. Two names for
+       one value in the library itself; the aliases keep the older reads
+       working rather than silently dropping them. */
+    '--Small-Button-Height': 'var(--Sm-Button-Height)',
+    '--Large-Button-Height': 'var(--Lg-Button-Height)',
     '--Button-Min-Width': `${minButtonWidth}px`,
     '--Lg-Button-Min-Width': `${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px`,
     '--Card-Radius': `${cardRadius}px`,

@@ -156,7 +156,25 @@ export function derivedTextMetrics(h: ButtonHeights): Record<string, ButtonModeM
 
 /** Every metric for one brand: the derived rows first, then the fixed table. */
 export function buttonModeMetrics(h: ButtonHeights = {}): Record<string, ButtonModeMetric> {
-  return { ...derivedTextMetrics(h), ...BUTTON_MODE_METRICS };
+  const hs = heightsOf(h);
+  return {
+    ...derivedTextMetrics(h),
+    ...BUTTON_MODE_METRICS,
+    /* The HEIGHT itself, not just what is derived from it.
+     *
+     * It was the one input that never came back out. The preview emitted it
+     * (componentStyleVars) and the CSS export did not, while the library reads
+     * `var(--Button-Height)` 94 times WITH NO FALLBACK — and a var() that is
+     * undefined and unfallbacked makes the whole declaration invalid, so those
+     * 94 rules were dropped entirely in any consumer's app. It looked fine in
+     * the studio because the preview is a separate implementation, which is
+     * invariant 5 in its most expensive form.
+     *
+     * Named Button-Height / Sm- / Lg- to match Figma's Component-Size exactly.
+     * The preview's --Small-/--Large- spellings are kept as aliases there,
+     * because three components read those names. */
+    'Button-Height': { medium: hs.medium, small: hs.small, large: hs.large },
+  };
 }
 
 /** `--Name`, `--Sm-Name` and `--Lg-Name` for every metric, as CSS text. */
@@ -169,6 +187,24 @@ export function buttonModeMetricCSS(h: ButtonHeights = {}, indent = '  '): strin
     `${indent}--Sm-${name}: ${m.small}px;`,
     `${indent}--Lg-${name}: ${m.large}px;`,
   ]);
+}
+
+/* Back-compat spellings for the button height.
+ *
+ * The library reads TWO names for one value: --Small-/--Large-Button-Height
+ * (ToggleButtonGroup, Autocomplete, Input) and --Sm-/--Lg- (Tabs). Figma's
+ * Component-Size uses the Sm-/Lg- form, so that is canonical and these alias
+ * onto it rather than restating the number.
+ *
+ * Emitted by BOTH the export and the preview. They lived only in the preview
+ * before, so the three components reading them resolved to nothing in a
+ * consumer's app while looking correct in the studio.
+ */
+export function buttonHeightAliasCSS(indent = '  '): string[] {
+  return [
+    `${indent}--Small-Button-Height: var(--Sm-Button-Height);`,
+    `${indent}--Large-Button-Height: var(--Lg-Button-Height);`,
+  ];
 }
 
 /** The same set as a flat object for the preview's inline-style path. */

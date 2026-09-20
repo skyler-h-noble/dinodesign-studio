@@ -9,7 +9,7 @@
  */
 
 import chroma from 'chroma-js';
-import { buttonModeMetricCSS } from '../buttonSizing';
+import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS } from '../componentSize';
 import { CSS_THEME_NAMES } from '../themes';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
@@ -4986,6 +4986,7 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Sm-Button-Padding: var(--Button-Padding);`);
     // Mode-scoped metrics (medium / --Sm- / --Lg-). See buttonSizing.ts.
     buttonModeMetricCSS(cs, '  ').forEach(l => lines.push(l));
+    buttonHeightAliasCSS('  ').forEach(l => lines.push(l));
     lines.push(`  --Lg-Button-Padding: ${LG_BUTTON_PADDING}px;`);
     lines.push(`  --Large-Button-Padding: var(--Lg-Button-Padding);`);
     // Bevel tokens — used by the lib Button to render its 3D inset shadow.

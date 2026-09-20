@@ -2114,9 +2114,11 @@ const BUTTON_BORDER_WIDTH = 1;
         // unmodified), so the two variables shared a name and meant different
         // things — 32 in one collection and 30 in the other. Binding a frame to
         // the wrong one produced a 2px error with nothing to explain it.
-        'Button-Height': cs.buttonHeight,
-        'Sm-Button-Height': cs.smallButtonHeight,
-        'Lg-Button-Height': cs.largeButtonHeight,
+        // The three height lines that stood here are gone: buttonModeMetricFigma
+        // above now carries Button-Height / Sm- / Lg-, so they arrive with the
+        // spread and with heightsOf()'s defaults behind them. Restating them
+        // here overrode that spread with cs.* directly, which wrote `undefined`
+        // whenever a height was unset.
         // Swatch tokens — square swatches inside each button size, 6px smaller
         // than the button height so they leave a 3px gap on every side (a touch
         // tighter than the icon tokens, matching the Select swatch spec).
