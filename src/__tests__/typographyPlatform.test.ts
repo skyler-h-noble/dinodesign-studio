@@ -298,6 +298,24 @@ describe('the Devices-Type source', () => {
     }
   });
 
+  it('carries exactly the same names in both faces', () => {
+    /* Not cosmetic. Every token in the Typography collection aliases into BOTH
+       faces — {Typography.Omni.X} for one mode and {Typography.System.X} for
+       the other — so a name present in only one resolves to NOTHING when the
+       mode flips. An unresolved binding does not error: the text style keeps
+       whatever it last rendered, on a switch that looked like it worked.
+
+       Counted by eye in the file before anything checked it here: Omni 83,
+       System 84. */
+    for (const d of DEVICE_TYPES) {
+      const strip = (face: 'Omni' | 'System') => Object.keys(P.devices[d])
+        .filter((k) => k.startsWith(`Typography/${face}/`))
+        .map((k) => k.replace(`Typography/${face}/`, ''))
+        .sort();
+      expect(strip('System'), d).toEqual(strip('Omni'));
+    }
+  });
+
   it('gives Desktop the same System values as Omni', () => {
     /* "The system font" is not one font on Desktop — Segoe, SF, whatever the
        distro picked — so the CSS answers with a stack, and a Figma family
