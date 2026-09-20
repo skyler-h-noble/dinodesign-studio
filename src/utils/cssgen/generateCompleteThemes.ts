@@ -897,6 +897,16 @@ function generateSingleTheme(config: ThemeConfig): any {
  * Generate all themes with Surfaces and Containers
  * Creates 28 themes total based on the specification
  */
+/** The flat names, kept because saved systems still carry them. */
+type FlatNavSelection =
+  | 'primary-light' | 'primary-light-bright' | 'primary-light-dim'
+  | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+
+/** What the studio writes today: a theme and one of its surface levels. */
+type ThemeLevelSelection = `${string}/${string}`;
+
+export type NavSelection = FlatNavSelection | ThemeLevelSelection;
+
 export function generateAllThemesWithSurfacesAndContainers(
   mode: 'Light-Mode' | 'Dark-Mode',
   extractedTones: { primary: number; secondary: number; tertiary: number },
@@ -909,9 +919,21 @@ export function generateAllThemesWithSurfacesAndContainers(
     // stopped matching, missing 'primary-medium'.
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
       | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    /* Two vocabularies, and the second is the one actually sent.
+     *
+     * These used to list only the flat names. The studio writes
+     * "<Theme>/<Surface-Level>" — "Tertiary/Surface-Bright" — which matched
+     * none of them, so every nav selection fell through navSelectionToSource's
+     * catch-all default and the App-Bar, Nav-Bar and Status themes were never
+     * generated at all.
+     *
+     * The type could not catch it because the call site reads
+     * `userSelections?.appBar as string`. A union that describes an input the
+     * code is never sent is worse than no union: it reads as a specification
+     * and is actually a record of what the vocabulary used to be. */
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
      *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
      *  Declaring only the family form described an input this code was never
@@ -1190,8 +1212,36 @@ export function generateAllThemesWithSurfacesAndContainers(
       case 'primary-dim':          return { theme: 'Primary', level: 'Surfaces-Dim' };
       case 'white':                return { theme: 'Neutral', level: 'Surfaces-Brightest' };
       case 'black':                return { theme: 'Neutral', level: 'Surfaces-Dimmest' };
-      default:                     return { theme: selection || 'Primary', level: 'Surfaces' };
     }
+
+    /* The vocabulary the studio actually writes now: "<Theme>/<Surface-Level>",
+       e.g. "Tertiary/Surface-Bright". None of the cases above match it, so
+       every nav selection was falling through to the default below and passing
+       the WHOLE string as a theme name — themes['Tertiary/Surface-Bright'] is
+       undefined, navThemeFrom returned null, and the App-Bar, Nav-Bar and
+       Status themes were simply never generated.
+       
+       Third time this exact shape has appeared here. moodAxes.ts:
+       "NONE of them matched before this: every one fell through to 'Modern'…
+       A catch-all default hides a vocabulary mismatch, because the fallback is
+       a real value that renders." Same again.
+       
+       The level also has to be translated: a theme object keys its levels
+       Surfaces / Surfaces-Bright / Surfaces-Dimmest (plural), while the
+       user-facing name is Surface-Bright (singular) — the pairing
+       overrideSurface() already spells out at line ~1107. */
+    const slash = String(selection ?? '').split('/');
+    if (slash.length === 2) {
+      const [theme, level] = slash.map((x) => x.trim());
+      return { theme, level: level === 'Surface' ? 'Surfaces' : level.replace(/^Surface-/, 'Surfaces-') };
+    }
+
+    /* Anything else really is unknown. Say so rather than resolving to a
+       plausible theme that renders and hides the mismatch. */
+    if (selection) {
+      console.warn(`  ⚠️ nav selection "${selection}" is not a known shape; falling back to Primary/Surfaces`);
+    }
+    return { theme: selection || 'Primary', level: 'Surfaces' };
   }
 
   /** Copy a theme, promoting one of its surface levels to be its Surface. */

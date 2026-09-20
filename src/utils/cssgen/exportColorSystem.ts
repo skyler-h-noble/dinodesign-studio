@@ -1,5 +1,6 @@
 // Button logic update - OB=8 when PC>=9 - 12-tone scale
 import { blendColors } from '../colorScale';
+import type { NavSelection } from './generateCompleteThemes';
 import { nearestAvailableWeight } from '../googleFontWeights';
 import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
 import { dropshadowBaseHex, effectLevelRecipe } from '../dropshadow';
@@ -1834,9 +1835,9 @@ function generateModesThemes(
   componentStyle?: 'professional' | 'modern' | 'bold' | 'playful',
   buttonStyle?: 'primary-adaptive' | 'primary-fixed' | 'black-white' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed',
   navigationSelections?: {
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
   },
   userSelections?: {
     /** Matches completeSimplifiedSystem.ts and generateFigmaJSON.ts. This copy
@@ -1855,9 +1856,9 @@ function generateModesThemes(
      *  reads of a field TypeScript believed did not exist went unchecked. */
     backgroundTheme?: 'Primary' | 'Neutral';
     backgroundN?: number;
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     button?: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
     buttonBehavior?: 'adaptive' | 'fixed';
     cardColoring?: 'tonal' | 'white' | 'black';
@@ -2808,9 +2809,9 @@ function generateThemesSection(
   extractedTones?: { primary: number; secondary: number; tertiary: number },
   backgroundSelection?: 'primary' | 'white' | 'black',
   navigationSelections?: {
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
   }
 ): any {
   // Convert extracted tones to Color-N positions using the 12-tone system
@@ -3236,9 +3237,9 @@ export function exportColorSystemToJSON(
      *  was missing them too — the same fields, the same silent undefined. */
     backgroundTheme?: 'Primary' | 'Neutral';
     backgroundN?: number;
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     button?: 'primary-adaptive' | 'primary-fixed' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
     /** Read below; declared in defaultThemeLogic.ts, which carries the legacy

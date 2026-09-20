@@ -4,6 +4,7 @@
  */
 
 import { generateBaseButtons, generateDefaultButton } from './generateButtonsSimplified';
+import type { NavSelection } from './generateCompleteThemes';
 import { generateAllThemesWithSurfacesAndContainers } from './generateCompleteThemes';
 import { generateLightModeTags, generateDarkModeTags } from './generateTagsSimplified';
 
@@ -98,9 +99,9 @@ export function getSimplifiedDefaultSettings(
     // made every caller passing the full union a type error at the call site.
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
       | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
      *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
      *  Declaring only the family form described an input this code was never
@@ -720,9 +721,9 @@ export function generateCompleteSimplifiedSystem(
     // made every caller passing the full union a type error at the call site.
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
       | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
      *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
      *  Declaring only the family form described an input this code was never

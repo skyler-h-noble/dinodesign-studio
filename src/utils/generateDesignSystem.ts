@@ -1440,6 +1440,16 @@ ${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
         if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations;
         designSystemJSON._userSelections = input.userSelections;
         const figmaPayload = generateFigmaJSON(designSystemJSON, typographyTokensCSS);
+        /* What the plugin is about to be handed, by collection. Without this
+           the only way to tell "the export omitted it" from "the plugin
+           ignored it" is to open the uploaded file by hand — and those two
+           have completely different fixes. */
+        console.log('📦 [figma.json] collections:',
+          Object.keys(figmaPayload).map((k) => {
+            const v = (figmaPayload as Record<string, unknown>)[k];
+            const n = v && typeof v === 'object' ? Object.keys(v as object).length : 0;
+            return `${k}(${n})`;
+          }).join(' '));
         // Metadata that the Figma plugin reads to detect updates since its
         // last import. version is monotonic; lastModified is ISO 8601.
         figmaPayload.Metadata = {
