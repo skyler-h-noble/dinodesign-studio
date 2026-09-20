@@ -21,7 +21,7 @@ import {
    indistinguishable from a file with no platform blocks in it. Every
    assertion below would have passed on nothing. */
 import { typographyTokensCSS, buildTypographyTokensCSS } from '../utils/typographyTokens';
-import { resolveRoles } from '../utils/typeScale';
+import { resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR } from '../utils/typeScale';
 
 /* The four faces, resolved. `resolveRoles(null)` is the real defaulting path,
    not a stub: it returns the fallback family for each role and pins Header to
@@ -209,14 +209,33 @@ describe('the Devices-Type source', () => {
     expect(weight('H3')).toBe(250);
     expect(weight('Body-Medium')).toBe(300);
 
-    /* H4-H6 read --Header-Clamped-Weight, which only ever RAISES: a 250 that
-       reads elegant at 48px reads washed out at 18px. Not the header pick, and
-       not a bug. */
-    expect(Number(weight('H4'))).toBeGreaterThan(250);
+    /* H4-H6 are the user's header weight too, with a FLOOR of 500. Only ever
+       raised, never lowered — a 250 that reads elegant at 48px reads washed out
+       at 18px — and snapped to a weight the face actually ships, since asking a
+       static 400/700 face for 500 gives 400 on some platforms and 700 on
+       others. Below the floor: */
+    expect(weight('H4')).toBe(HEADER_CLAMPED_WEIGHT_FLOOR);
+    expect(weight('H6')).toBe(HEADER_CLAMPED_WEIGHT_FLOOR);
 
     /* And the families the user picked, as literals. */
     expect(D[familyName('Omni', 'Display')].value).toBe('Playfair Display');
     expect(D[familyName('Omni', 'Body')].value).toBe('Source Sans 3');
+  });
+
+  it('passes a header weight AT or ABOVE the floor through to H4-H6 untouched', () => {
+    /* The other arm, and the one that says the clamp is a floor rather than a
+       value: a design that asked for 700 keeps 700 on every header step. This
+       rule exists to strengthen small headers, not to flatten bold ones — and
+       without this case a clamp that simply wrote 500 everywhere would pass. */
+    const bold: any = [
+      { type: 'decorative', family: 'Playfair Display', weight: '800' },
+      { type: 'header', family: 'Whatever', weight: '700' },
+      { type: 'body', family: 'Source Sans 3', weight: '300' },
+    ];
+    const D = typographyVariablePayload(
+      buildTypographyTokensCSS(bold), resolveRoles(bold)).devices.Desktop;
+    for (const step of ['H1', 'H3', 'H4', 'H6'])
+      expect(D[sourceName('Omni', `${step}-Font-Weight`)].value, step).toBe(700);
   });
 
   it('gives Desktop the same System values as Omni', () => {
