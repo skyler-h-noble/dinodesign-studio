@@ -48,14 +48,26 @@ const P = typographyVariablePayload(typographyTokensCSS, FACES);
 describe('the parse', () => {
   it('reads every style out of a platform block', () => {
     const { styles } = parsePlatformBlock(typographyTokensCSS, 'IOS-Mobile');
-    /* 32, not 36: the three --Body-<step>-Bold-Font-Weight tokens are excluded
+    /* 33, not 37: the three --Body-<step>-Bold-Font-Weight tokens are excluded
        because Body has no bold, and Button-ExtraSmall because the design does
        not use one. See EXCLUDED_STYLES. */
-    expect(Object.keys(styles).length).toBe(32);
+    expect(Object.keys(styles).length).toBe(33);
     expect(styles['H1']).toEqual({
       'Font-Size': '28px', 'Font-Weight': '600',
       'Line-Height': '28px', 'Letter-Spacing': '0px',
     });
+
+    /* Display is a three-step ramp on mobile too. It used to be two steps at
+       one size — Small and Large both 28px, which is H1's size, so the display
+       styles rendered identically to a heading and to each other, and Medium
+       was absent from every device block. Absent did not read as absent: the
+       device-floor merge filled it from Desktop, so Medium reported 60px on a
+       phone and never moved. Sizes are the platforms' own display tiers
+       (Material 3 for Android; Apple has no display tier, so iOS anchors at
+       Large Title 34/41 and steps up). */
+    const display = (step: string) => styles[`Display-${step}`]?.['Font-Size'];
+    expect([display('Small'), display('Medium'), display('Large')])
+      .toEqual(['34px', '40px', '48px']);
   });
 
   it('takes the LAST family declaration in a section, as the cascade does', () => {
