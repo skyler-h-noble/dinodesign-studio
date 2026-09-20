@@ -29,8 +29,10 @@
  *     Button-Icon(h)      = snap(0.625h)
  *     Button-Icon-Only(h) = snap(0.70h)
  *
- * Thirteen of the design's fifteen sampled values reproduce exactly. The two
- * that move are called out on their rows below.
+ * Fourteen of the design's fifteen sampled values now reproduce exactly. It
+ * was thirteen: Button-Icon's small was the second divergence, and the design
+ * moved to the formula's 16 on 2026-09-20 — so the only one left is
+ * Button-Numbers' medium, called out on its row below.
  *
  * Button-Text-Padding stays tabular: it is spacing, not a glyph size, and the
  * design repeats small and medium rather than scaling them, which no function
@@ -81,10 +83,13 @@ const TEXT_OFFSETS: Record<string, number> = {
 const ICON_RATIOS: Record<string, number> = {
   /**
    * Glyph beside a label.
-   * MOVED: the design's small is 20; snapping puts it at 16. That also settles
-   * an oddity in the table — at small the inline icon was LARGER (20) than the
-   * icon-only one (16), which is backwards, since an icon-only button has the
-   * whole button to fill and an inline icon is sharing it with text.
+   *
+   * This used to be a divergence: the design's small was 20 while snapping put
+   * it at 16, which left an oddity in the table — at small the inline icon was
+   * LARGER (20) than the icon-only one (16), backwards, since an icon-only
+   * button has the whole button to fill and an inline icon shares it with
+   * text. The design moved to 16 on 2026-09-20, so the ratio and the table
+   * agree and the inversion is gone.
    */
   'Button-Icon': 0.625,
   /** Glyph for an icon-ONLY button, which owns the whole button. */
