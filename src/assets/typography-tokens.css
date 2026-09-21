@@ -354,6 +354,22 @@
   --Button-Standard-Line-Height:   16px;
   --Button-Standard-Letter-Spacing: 0px;
 
+  /* Alt Display — mirrors Display step for step. The pairing sets one word
+     on one baseline ("Omni" + "Design"), so the two must not diverge in
+     size or leading; colour is what separates them. */
+  --Alt-Display-Small-Font-Size:     34px;
+  --Alt-Display-Small-Font-Weight:   600;
+  --Alt-Display-Small-Line-Height:   41px;
+  --Alt-Display-Small-Letter-Spacing: 0px;
+  --Alt-Display-Medium-Font-Size:     40px;
+  --Alt-Display-Medium-Font-Weight:   600;
+  --Alt-Display-Medium-Line-Height:   48px;
+  --Alt-Display-Medium-Letter-Spacing: 0px;
+  --Alt-Display-Large-Font-Size:     48px;
+  --Alt-Display-Large-Font-Weight:   600;
+  --Alt-Display-Large-Line-Height:   58px;
+  --Alt-Display-Large-Letter-Spacing: 0px;
+
 }
 
 [data-platform="IOS-Tablet"] {
@@ -535,6 +551,22 @@
   --Button-Standard-Line-Height:   16px;
   --Button-Standard-Letter-Spacing: 0px;
 
+  /* Alt Display — mirrors Display step for step. The pairing sets one word
+     on one baseline ("Omni" + "Design"), so the two must not diverge in
+     size or leading; colour is what separates them. */
+  --Alt-Display-Small-Font-Size:     34px;
+  --Alt-Display-Small-Font-Weight:   600;
+  --Alt-Display-Small-Line-Height:   41px;
+  --Alt-Display-Small-Letter-Spacing: 0px;
+  --Alt-Display-Medium-Font-Size:     40px;
+  --Alt-Display-Medium-Font-Weight:   600;
+  --Alt-Display-Medium-Line-Height:   48px;
+  --Alt-Display-Medium-Letter-Spacing: 0px;
+  --Alt-Display-Large-Font-Size:     48px;
+  --Alt-Display-Large-Font-Weight:   600;
+  --Alt-Display-Large-Line-Height:   58px;
+  --Alt-Display-Large-Letter-Spacing: 0px;
+
 }
 
 [data-platform="Android"] {
@@ -715,6 +747,22 @@
   --Button-Standard-Font-Weight:   600;
   --Button-Standard-Line-Height:   16px;
   --Button-Standard-Letter-Spacing: 0px;
+
+  /* Alt Display — mirrors Display step for step. The pairing sets one word
+     on one baseline ("Omni" + "Design"), so the two must not diverge in
+     size or leading; colour is what separates them. */
+  --Alt-Display-Small-Font-Size:     36px;
+  --Alt-Display-Small-Font-Weight:   600;
+  --Alt-Display-Small-Line-Height:   44px;
+  --Alt-Display-Small-Letter-Spacing: 0px;
+  --Alt-Display-Medium-Font-Size:     45px;
+  --Alt-Display-Medium-Font-Weight:   600;
+  --Alt-Display-Medium-Line-Height:   52px;
+  --Alt-Display-Medium-Letter-Spacing: 0px;
+  --Alt-Display-Large-Font-Size:     57px;
+  --Alt-Display-Large-Font-Weight:   600;
+  --Alt-Display-Large-Line-Height:   64px;
+  --Alt-Display-Large-Letter-Spacing: 0px;
 
 }
 

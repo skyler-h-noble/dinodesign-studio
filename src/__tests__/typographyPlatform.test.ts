@@ -48,10 +48,16 @@ const P = typographyVariablePayload(typographyTokensCSS, FACES);
 describe('the parse', () => {
   it('reads every style out of a platform block', () => {
     const { styles } = parsePlatformBlock(typographyTokensCSS, 'IOS-Mobile');
-    /* 33, not 37: the three --Body-<step>-Bold-Font-Weight tokens are excluded
+    /* 36, not 40: the three --Body-<step>-Bold-Font-Weight tokens are excluded
        because Body has no bold, and Button-ExtraSmall because the design does
-       not use one. See EXCLUDED_STYLES. */
-    expect(Object.keys(styles).length).toBe(33);
+       not use one. See EXCLUDED_STYLES.
+
+       36 rather than 33 since Alt-Display gained its three steps here. They
+       have to be IN the device blocks, not only in the generated Desktop one:
+       a style the block does not declare is filled from Desktop by the
+       device-floor merge, which had the Alt reporting Desktop's 72px on every
+       phone. */
+    expect(Object.keys(styles).length).toBe(36);
     expect(styles['H1']).toEqual({
       'Font-Size': '28px', 'Font-Weight': '600',
       'Line-Height': '28px', 'Letter-Spacing': '0px',

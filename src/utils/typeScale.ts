@@ -29,6 +29,8 @@
 
 import type { TypographyStyle } from '../types';
 import { HEADER_FAMILY, moodToAxes } from './moodAxes';
+import { altDisplayWeight } from './altDisplay';
+import { weightsFor } from './googleFontWeights';
 
 /** The eyebrow renders in the OS UI font, which has no Figma equivalent. Inter
  *  is the closest neutral stand-in and is always present. */
@@ -705,6 +707,41 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
       token: step.token, name: `Display/${step.step}`, group: 'Display', step: step.step,
       familyRole: 'display', weightFromFace: true,
       size: step.size, weight: roles.display.weight, lineHeight: step.lineHeight,
+      letterSpacing: roles.display.letterSpacing,
+      textTransform: roles.display.textTransform,
+      paragraphSpacing: 0,
+      axes: roles.display.axes,
+      noise: roles.display.noise || 0,
+      bounce: roles.display.bounce || 0,
+    });
+  }
+
+  /* Alt Display — the same face at the same sizes, set apart by COLOUR and,
+   * where the family allows it, by weight.
+   *
+   * Sizes, leading and tracking mirror Display exactly, and that is the
+   * point rather than laziness: the pairing "Omni" + "Design" is one word on
+   * one baseline with the second half in the Alt. Give the Alt its own ramp
+   * and the two halves stop lining up.
+   *
+   * The weight is an ENHANCEMENT, not the distinction. 56% of the curated
+   * display pool ships exactly one weight — Anton, Bangers, Lobster, Great
+   * Vibes, Alfa Slab One are all [400] — so altDisplayWeight returns undefined
+   * more often than not, and the style then simply reads the face's weight
+   * like Display does. Colour is what always separates them; see
+   * altDisplay.ts, which holds both decisions. */
+  const altWeight = altDisplayWeight(roles.display.weight, weightsFor(roles.display.family));
+  for (const step of displaySteps(roles.display.size ?? DEFAULT_DISPLAY_SIZE)) {
+    push({
+      token: `Alt-${step.token}`, name: `Display/Alt-${step.step}`,
+      group: 'Display', step: `Alt-${step.step}`,
+      familyRole: 'display',
+      /* Only when the family has no lighter weight to offer: then the Alt
+         tracks the face exactly as Display does, rather than pinning a number
+         that would stop following the user's slider. */
+      weightFromFace: altWeight === undefined,
+      size: step.size, weight: altWeight ?? roles.display.weight,
+      lineHeight: step.lineHeight,
       letterSpacing: roles.display.letterSpacing,
       textTransform: roles.display.textTransform,
       paragraphSpacing: 0,

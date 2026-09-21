@@ -119,3 +119,65 @@ describe('the colour family the Alt Display wears', () => {
     expect(ALT_DISPLAY_MIN_CONTRAST).toBe(3);
   });
 });
+
+describe('the Alt Display type styles', () => {
+  it('mirrors Display step for step, on every device', async () => {
+    /* The pairing sets ONE WORD on one baseline — "Omni" in Display, "Design"
+       in the Alt. Any divergence in size or leading and the two halves stop
+       lining up, which is the whole feature.
+
+       Checked through the payload, not the scale, because the device blocks
+       are where this breaks: a style the mobile blocks do not declare gets
+       filled from Desktop by the device-floor merge, so the Alt reported
+       Desktop's 72px on every phone until the static blocks carried it. Same
+       failure Display-Medium had. */
+    const { generateFigmaJSON } = await import('../utils/generateFigmaJSON');
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const { DEVICES_COLLECTION, DEVICE_TYPES } = await import('../utils/typographyPlatform');
+    const out = generateFigmaJSON(
+      {
+        Typography: {
+          'Set-Font-Family-Header': { value: 'Poppins' },
+          'Set-Font-Family-Body': { value: 'Inter' },
+          'Set-Font-Family-Decorative': { value: 'Playfair Display' },
+        },
+        _componentStyle: {
+          buttonRadius: 32, iconButtonRadius: 32, inputRadius: 4, cardPadding: 16,
+          bevelOpacity: 50, shadowResolution: 3,
+          buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+        },
+      },
+      buildTypographyTokensCSS([
+        { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+        { type: 'header', family: 'Poppins', weight: '600' },
+        { type: 'body', family: 'Inter', weight: '400' },
+      ] as never),
+    );
+    for (const device of DEVICE_TYPES) {
+      const bag = out[DEVICES_COLLECTION][device];
+      const ramp = (prefix: string) => (['Small', 'Medium', 'Large'] as const)
+        .map((s) => bag[`Typography/Displays/${prefix}Display-${s}-Font-Size`]?.value).join('/');
+      expect(`${device}: ${ramp('Alt-')}`).toBe(`${device}: ${ramp('')}`);
+      expect(ramp('Alt-')).not.toContain('undefined');
+    }
+  });
+
+  it('takes a lighter weight only when the family ships one', async () => {
+    const { buildTypeScale } = await import('../utils/typeScale');
+    const alt = (family: string, weight: string) =>
+      buildTypeScale([{ type: 'decorative', family, weight, displaySize: '72' }] as never)
+        .find((s) => s.token === 'Alt-Display-Large');
+
+    /* Playfair ships 400-900, so the Alt drops away from the Display's 800. */
+    const multi = alt('Playfair Display', '800');
+    expect(multi?.weight).toBe(500);
+    expect(multi?.weightFromFace).toBe(false);
+
+    /* Anton ships [400] alone. The Alt must track the FACE rather than pin a
+       number — pinning would stop it following the user's slider, and there is
+       no lighter weight to pin anyway. Colour carries the distinction here. */
+    const single = alt('Anton', '400');
+    expect(single?.weight).toBe(400);
+    expect(single?.weightFromFace).toBe(true);
+  });
+});
