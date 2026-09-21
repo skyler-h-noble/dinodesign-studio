@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   altDisplayGradient, altDisplayWeight, hueDelta, isAnalogous,
   ANALOGOUS_MAX_HUE_DELTA, ALT_DISPLAY_MIN_WEIGHT,
+  ALT_DISPLAY_COLOR_TOKENS, ALT_DISPLAY_MIN_CONTRAST,
 } from '../utils/altDisplay';
 
 describe('the analogous test', () => {
@@ -100,5 +101,21 @@ describe('the Alt Display weight', () => {
     /* 300 either side of the target: the point is to be visibly different, and
        the lighter of two equals is more different. */
     expect(altDisplayWeight(700, [300, 500])).toBe(300);
+  });
+});
+
+describe('the colour family the Alt Display wears', () => {
+  it('is Header, never Text', () => {
+    /* A Display is a heading. The two families are tuned to different
+       thresholds — Text 4.5:1, Header 3:1 — so they pick different tones, and
+       using the Text tokens would not be a stricter reading of the rule, it
+       would be a different colour on the page. */
+    expect(ALT_DISPLAY_COLOR_TOKENS.primary).toBe('--Header-Primary');
+    expect(ALT_DISPLAY_COLOR_TOKENS.secondary).toBe('--Header-Secondary');
+    expect(JSON.stringify(ALT_DISPLAY_COLOR_TOKENS)).not.toContain('Text-');
+  });
+
+  it('clamps at 3:1, the threshold for headers and for large text alike', () => {
+    expect(ALT_DISPLAY_MIN_CONTRAST).toBe(3);
   });
 });

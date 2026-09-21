@@ -9,6 +9,33 @@
 import chroma from 'chroma-js';
 
 /**
+ * The Alt Display wears the HEADER colour family, not the Text family.
+ *
+ * --Header-Primary / --Header-Secondary, never --Text-Primary /
+ * --Text-Secondary. A Display is a heading, and the two families are tuned to
+ * different thresholds: Text carries 4.5:1, Header 3:1. Reaching for the Text
+ * tokens would put body-text contrast on a 48px headline, which is not a
+ * stricter reading of the rule so much as a different colour — the tables pick
+ * different tones, so the headline would simply come out the wrong shade.
+ *
+ * 3:1 is also what WCAG asks of this text on its own terms: every Display size
+ * is large text (>=18.66px bold / >=24px), where 1.4.3 sets the threshold at
+ * 3:1. So the mono ramp's far end clamps to 3:1, not 4.5:1.
+ *
+ * Both are surface-aware, which is why the gradient must be written in terms of
+ * the TOKENS and never baked hexes: a baked pair stops following data-surface
+ * and the Alt goes wrong on every surface but the one it was sampled on.
+ */
+export const ALT_DISPLAY_COLOR_TOKENS = {
+  primary: '--Header-Primary',
+  secondary: '--Header-Secondary',
+} as const;
+
+/** Minimum contrast for the Alt Display against its surface. Header, and large
+ *  text, are both 3:1 — see the note above. */
+export const ALT_DISPLAY_MIN_CONTRAST = 3;
+
+/**
  * How far apart two hues may sit and still count as analogous, in degrees.
  *
  * 60 is the conventional span of an analogous set — adjacent positions on a
@@ -42,8 +69,8 @@ export function isAnalogous(a: string, b: string): boolean {
 
 export interface AltDisplayGradient {
   /**
-   * 'duo'  — Text-Primary to Text-Secondary. Two hues near enough to blend.
-   * 'mono' — Text-Primary to a lighter or darker shade of ITSELF, chosen
+   * 'duo'  — Header-Primary to Header-Secondary. Two hues near enough to blend.
+   * 'mono' — Header-Primary to a lighter or darker shade of ITSELF, chosen
    *          against the background. One hue, so it cannot collide.
    */
   kind: 'duo' | 'mono';
@@ -59,7 +86,7 @@ export interface AltDisplayGradient {
  * and Secondary sit far apart would make the feature a lottery; a same-hue
  * ramp gives those brands the same affordance without the collision.
  *
- * Solid Text-Secondary is the sibling VARIANT, not the failure case: the
+ * Solid Header-Secondary is the sibling VARIANT, not the failure case: the
  * designer picks between them. Two values are fine when something selects
  * between them — that is the whole of invariant 2 — and here the selector is
  * a person.
