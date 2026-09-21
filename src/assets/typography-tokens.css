@@ -177,6 +177,9 @@
 
 [data-platform="IOS-Mobile"] {
 
+  /* Platform */
+  --Platform-Spacer: 10px;
+
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     34px;
@@ -354,6 +357,9 @@
 
 [data-platform="IOS-Tablet"] {
 
+  /* Platform */
+  --Platform-Spacer: 10px;
+
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     34px;
@@ -530,6 +536,9 @@
 }
 
 [data-platform="Android"] {
+
+  /* Platform */
+  --Platform-Spacer: 12px;
 
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));

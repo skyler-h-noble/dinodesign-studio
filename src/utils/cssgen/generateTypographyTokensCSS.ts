@@ -27,6 +27,7 @@ import {
 } from '../typeScale';
 import { nearestAvailableWeight } from '../googleFontWeights';
 import type { TypographyStyle } from '../../types';
+import { platformMetricCSS } from '../platformMetrics';
 
 /**
  * What each face token resolves to. The Platform var is the Figma-side name and
@@ -135,6 +136,12 @@ export function typographyDeclarations(typography: TypographyStyle[] | null | un
 
   const roles = resolveRoles(typography);
   const out: string[] = [];
+
+  // Device-owned metrics, ahead of the type. Not typography, but this is the
+  // one stylesheet with a [data-platform] cascade, and a second file declaring
+  // the same selectors would make which value wins depend on load order.
+  platformMetricCSS('Desktop').forEach((l) => out.push(l));
+  out.push('');
 
   // The four faces. Every other family variable in the file is relative to
   // one of these, so re-pointing a face re-points everything wearing it.
