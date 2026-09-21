@@ -13,6 +13,8 @@ import type { SurfaceLevel } from '../surfaceWindow';
 /**
  * Theme configuration for generating Surfaces and Containers
  */
+import { altGradientKindForScheme } from '../altDisplay';
+
 interface ThemeConfig {
   themeName: string;
   theme: string; // Primary, Secondary, Tertiary, Neutral
@@ -52,6 +54,11 @@ interface ThemeConfig {
   surfaceScopedButton?: boolean;
   /** True for the black/white button style, whose border is its own fill. */
   blackWhiteButton?: boolean;
+  /** Which Alt Display gradient this brand gets — see altDisplay.ts.
+   *  'duo' blends Primary into Secondary; 'mono' steps Primary to Tertiary
+   *  because those two hues sit too far apart to blend without passing through
+   *  the desaturated middle. */
+  altGradientKind: 'duo' | 'mono';
 }
 
 /**
@@ -161,6 +168,24 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
     },
     'Header-Tertiary': {
       value: `{Header.Surfaces.Tertiary.Color-${n}}`,
+      type: 'color'
+    },
+    /* Alt Display. Aliases, not computed colours, so the Alt follows
+       data-surface exactly as the Header tokens it is built from do — and both
+       gradient stops are already contrast-checked for this surface, which a
+       baked pair would not be.
+       Figma has no gradient variable type, so the gradient is two bound stops;
+       VariableBindableColorStopField is 'color', so each stop takes one. */
+    'Alt-Display-Color': {
+      value: `{Header.Surfaces.Secondary.Color-${n}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-1': {
+      value: `{Header.Surfaces.Primary.Color-${n}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-2': {
+      value: `{Header.Surfaces.${config.altGradientKind === 'duo' ? 'Secondary' : 'Tertiary'}.Color-${n}}`,
       type: 'color'
     },
     'Header-Neutral': {
@@ -657,6 +682,21 @@ function generateSingleTheme(config: ThemeConfig): any {
       value: `{Header.Containers.Tertiary.Color-${config.contN}}`,
       type: 'color'
     },
+    /* Same three on the container side — a surface and a container resolve
+       different tones, so the Alt must be stated for both or it keeps the
+       surface's colour on a card. */
+    'Alt-Display-Color': {
+      value: `{Header.Containers.Secondary.Color-${config.contN}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-1': {
+      value: `{Header.Containers.Primary.Color-${config.contN}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-2': {
+      value: `{Header.Containers.${config.altGradientKind === 'duo' ? 'Secondary' : 'Tertiary'}.Color-${config.contN}}`,
+      type: 'color'
+    },
     'Header-Neutral': {
       value: `{Header.Containers.Neutral.Color-${config.contN}}`,
       type: 'color'
@@ -947,6 +987,10 @@ export function generateAllThemesWithSurfacesAndContainers(
     cardColoring?: 'tonal' | 'white' | 'black'; // CRITICAL FIX: Added to pass card coloring selection to generateModesThemes
   }
 ): any {
+  /* One reading of the scheme, shared by every theme and both groups. Derived
+     here rather than per config so all 17 themes cannot disagree about whether
+     this brand's Primary and Secondary are neighbours. */
+  const altGradientKind = altGradientKindForScheme(schemeType);
   
   const themes: any = {};
   
@@ -1027,6 +1071,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   
   // 1. Default Theme (from user/calculated settings)
   themes.Default = generateSingleTheme({
+    altGradientKind,
     themeName: 'Default',
     surfaceScopedButton: isSurfaceScopedButton,
     blackWhiteButton: isBlackWhiteButton,
@@ -1279,6 +1324,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
   // For other themes, use the default container settings
   const makeConfig = (themeName: string, theme: string, n: number): ThemeConfig => ({
+    altGradientKind,
     themeName,
     theme,
     n,

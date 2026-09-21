@@ -159,3 +159,30 @@ export function altDisplayWeight(
   return candidates.reduce((best, w) =>
     Math.abs(w - target) < Math.abs(best - target) ? w : best, candidates[0]);
 }
+
+/**
+ * Schemes in which Primary and Secondary are near neighbours on the wheel.
+ *
+ * Monochromatic is the same hue, so the distance is zero. Analogous is built
+ * as a base plus its two NEAREST hue neighbours (colorSchemes.ts), so Secondary
+ * is a neighbour by construction. Everything else — complementary, triadic,
+ * split-complementary, tetradic — spaces the hues apart on purpose.
+ */
+export const ANALOGOUS_SCHEMES: ReadonlySet<string> = new Set(['monochromatic', 'analogous']);
+
+/**
+ * Which gradient a scheme gets. The preferred entry point over hueDelta.
+ *
+ * The scheme type is the system's own record of what the user chose, so
+ * reading it cannot disagree with the palette that was actually built.
+ * Measuring the hues instead re-derives an answer the design already states,
+ * and two derivations of one fact drift — which is the failure this file's
+ * threshold comment warns about.
+ *
+ * altDisplayGradient() stays for the case where only the colours are known and
+ * no scheme is recorded. Both answer the same question; this one has better
+ * evidence.
+ */
+export function altGradientKindForScheme(schemeType?: string): 'duo' | 'mono' {
+  return schemeType && ANALOGOUS_SCHEMES.has(schemeType) ? 'duo' : 'mono';
+}

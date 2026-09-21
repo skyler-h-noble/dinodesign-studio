@@ -181,3 +181,62 @@ describe('the Alt Display type styles', () => {
     expect(single?.weightFromFace).toBe(true);
   });
 });
+
+describe('the Alt Display theme tokens', () => {
+  const gen = async () =>
+    (await import('../utils/cssgen/generateCompleteThemes'))
+      .generateAllThemesWithSurfacesAndContainers;
+
+  const build = async (scheme: string) =>
+    (await gen())('Light-Mode', { primary: 71, secondary: 71, tertiary: 71 },
+      'light-tonal', scheme as never) as any;
+
+  it('reaches every surface level AND the containers, on every theme', async () => {
+    /* Asserted on the OUTPUT of the live generator, not on the helper.
+       generateModesThemes in exportColorSystem.ts emits the same token shapes
+       and is DEAD CODE — nothing calls it, as the comment at its old call site
+       says. Adding these tokens there would have compiled, typechecked and
+       shipped nothing, which is the failure this repo has already paid for
+       once (a unit test passing while the emission sat in dead code). */
+    const themes = await build('analogous');
+    const names = Object.keys(themes);
+    expect(names.length).toBeGreaterThan(5);
+    for (const name of names) {
+      for (const [group, bag] of Object.entries<any>(themes[name])) {
+        if (!bag || typeof bag !== 'object' || !bag['Header-Primary']) continue;
+        for (const token of ['Alt-Display-Color', 'Alt-Color-Gradient-Stop-1',
+                             'Alt-Color-Gradient-Stop-2']) {
+          expect(`${name}/${group}/${token}`)
+            .toBe(bag[token] ? `${name}/${group}/${token}` : `MISSING ${name}/${group}/${token}`);
+        }
+      }
+    }
+  });
+
+  it('picks the second stop from the scheme, not from a re-measured hue', async () => {
+    /* duo blends Primary into Secondary; mono steps to Tertiary because those
+       hues are too far apart to blend without crossing the desaturated middle.
+       Read off the scheme the user chose, so it cannot disagree with the
+       palette that was actually built. */
+    const stop2 = (themes: any) =>
+      themes.Default.Surfaces['Alt-Color-Gradient-Stop-2'].value as string;
+
+    for (const scheme of ['analogous', 'monochromatic']) {
+      expect(`${scheme}: ${stop2(await build(scheme))}`).toContain('Secondary');
+    }
+    for (const scheme of ['complementary', 'triadic', 'split-complementary', 'tetradic']) {
+      expect(`${scheme}: ${stop2(await build(scheme))}`).toContain('Tertiary');
+    }
+  });
+
+  it('tracks the surface it sits on', async () => {
+    /* Every token is an ALIAS carrying the surface's own Color-N, never a baked
+       hex — a baked pair stops following data-surface and comes out wrong on
+       every surface but the one it was sampled on. Different levels must
+       therefore resolve to different tones. */
+    const d = (await build('analogous')).Default;
+    const at = (g: string) => d[g]['Alt-Color-Gradient-Stop-1'].value as string;
+    expect(at('Surfaces')).toMatch(/^\{Header\.Surfaces\.Primary\.Color-\d+\}$/);
+    expect(at('Surfaces')).not.toBe(at('Surfaces-Dimmest'));
+  });
+});
