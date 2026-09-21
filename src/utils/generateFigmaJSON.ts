@@ -10,6 +10,7 @@
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
 import { componentSizePayload, desktopButtonMetrics } from './componentSize';
+import { platformButtonMetrics } from './platformMetrics';
 import { THEME_MODES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
@@ -35,7 +36,7 @@ import { motionJSON } from './motion';
 import { componentElevationGeometryFigma } from './componentElevation';
 import {
   DEVICE_TYPES, FACE_MODES, DEVICES_COLLECTION, typographyVariablePayload,
-  type VarBag,
+  type VarBag, type DeviceType,
 } from './typographyPlatform';
 
 interface ColorToken {
@@ -2147,14 +2148,29 @@ const BUTTON_BORDER_WIDTH = 1;
     const buttonFigmaMetrics = buttonModeMetricFigma(cs);
     figma['Component-Size'] = componentSizePayload(r as never, buttonFigmaMetrics);
 
-    /* The DESKTOP column of the Devices-Type button variables that
-       Component-Size/Button/Button-Height and -Icon now alias into. Desktop is
-       the one column the studio owns; the platform columns are hand-authored
-       from Apple's and Google's specs, so only this mode is written. */
-    if (figma[DEVICES_COLLECTION]?.Desktop) {
-      Object.assign(figma[DEVICES_COLLECTION].Desktop,
-        Object.fromEntries(Object.entries(desktopButtonMetrics(buttonFigmaMetrics))
-          .map(([n, v]) => [n, { value: v, type: 'number' }])));
+    /* Every column of the Devices-Type button variables that
+       Component-Size/Button/Button-Height and -Icon alias into.
+     *
+     * Desktop is the studio's: the user's heights, and icons derived from them.
+     * The other six are the platforms': Apple's and Google's published sizes,
+     * stated in platformMetrics.ts rather than derived, because no brand ratio
+     * produces them (Android's 48px button carries an 18px glyph; the ratio
+     * gives 32, and 18 is not a rung of ICON_RAMP at all).
+     *
+     * This used to write Desktop alone, so the platform columns kept whatever
+     * the Figma file held. They are now stated from the same table the CSS
+     * reads — the point being that one number cannot feed the web and a
+     * different one feed Figma. */
+    const devicesBag = figma[DEVICES_COLLECTION];
+    if (devicesBag) {
+      for (const device of Object.keys(devicesBag) as DeviceType[]) {
+        const metrics = device === 'Desktop'
+          ? desktopButtonMetrics(buttonFigmaMetrics)
+          : platformButtonMetrics(device);
+        Object.assign(devicesBag[device],
+          Object.fromEntries(Object.entries(metrics)
+            .map(([n, v]) => [n, { value: v, type: 'number' }])));
+      }
     }
 
     figma.Components = {

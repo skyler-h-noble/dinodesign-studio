@@ -180,6 +180,7 @@
   /* Platform */
   --Platform-Spacer: 10px;
 
+
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     34px;
@@ -359,6 +360,7 @@
 
   /* Platform */
   --Platform-Spacer: 10px;
+
 
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
@@ -540,6 +542,7 @@
   /* Platform */
   --Platform-Spacer: 12px;
 
+
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
   --Display-Small-Font-Size:     36px;
@@ -713,4 +716,54 @@
   --Button-Standard-Line-Height:   16px;
   --Button-Standard-Letter-Spacing: 0px;
 
+}
+
+/* ── Platform button metrics ──────────────────────────────────────────────
+ *
+ * Apple's and Google's button sizes, overriding the brand's own on the touch
+ * platforms. Desktop is absent on purpose: there the brand's heights ARE the
+ * answer, and base.css already states them.
+ *
+ * :root[data-platform="…"], not the bare [data-platform="…"] the type ramps
+ * above use, and the difference is load-bearing. --Button-Height is declared
+ * at :root in base.css, which the provider injects at slot 5 — AFTER this file
+ * at slot 3. A bare attribute selector ties with :root at (0,1,0), so the later
+ * file would win and these overrides would do nothing, with no error anywhere.
+ * :root[data-platform] scores (0,2,0) and wins on specificity instead, which
+ * does not depend on anyone preserving the load order.
+ *
+ * The type ramps above can stay as they are: their :root counterpart is in
+ * core.css at slot 2, so they already load later and win.
+ *
+ * --Small-/--Large-Button-Height are NOT restated. base.css declares them as
+ * var(--Sm-Button-Height) / var(--Lg-Button-Height), and a var() in a custom
+ * property resolves against the element it lands on — so the back-compat
+ * spellings follow these overrides on their own.
+ */
+
+:root[data-platform="IOS-Mobile"] {
+  --Button-Height: 44px;
+  --Sm-Button-Height: 32px;
+  --Lg-Button-Height: 50px;
+  --Button-Icon: 20px;
+  --Sm-Button-Icon: 16px;
+  --Lg-Button-Icon: 24px;
+}
+
+:root[data-platform="IOS-Tablet"] {
+  --Button-Height: 44px;
+  --Sm-Button-Height: 32px;
+  --Lg-Button-Height: 50px;
+  --Button-Icon: 20px;
+  --Sm-Button-Icon: 16px;
+  --Lg-Button-Icon: 24px;
+}
+
+:root[data-platform="Android"] {
+  --Button-Height: 48px;
+  --Sm-Button-Height: 32px;
+  --Lg-Button-Height: 56px;
+  --Button-Icon: 18px;
+  --Sm-Button-Icon: 18px;
+  --Lg-Button-Icon: 24px;
 }

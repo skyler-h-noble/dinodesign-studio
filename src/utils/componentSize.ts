@@ -516,7 +516,7 @@ function withoutDeviceOwned(flat: Record<string, number>): Record<string, number
  * collection rather than in a group. Same rule as `App-Bar Height`: a tidier
  * name matches nothing and the write is a silent no-op.
  */
-const DEVICE_BUTTON_NAMES: Record<string, Record<SizeMode, string>> = {
+export const DEVICE_BUTTON_NAMES: Record<string, Record<SizeMode, string>> = {
   'Button-Height': {
     medium: 'Medium Button', small: 'Small Button', large: 'Large Button',
   },

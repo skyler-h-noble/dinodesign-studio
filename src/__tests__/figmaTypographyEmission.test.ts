@@ -48,8 +48,9 @@ describe('the downloaded figma.json', () => {
   });
 
   /* The six Devices-Type variables Component-Size/Button aliases into. The
-     studio owns the DESKTOP column only — the platform columns are
-     hand-authored from Apple's and Google's specs. */
+     studio owns the Desktop column (the user's heights, icons derived from
+     them); the other six modes come from platformMetrics.ts, which states
+     Apple's and Google's published sizes. Name kept for the diff. */
   const DESKTOP_BUTTONS = [
     'Small Button', 'Medium Button', 'Large Button',
     'Small Button Icon', 'Medium Button Icon', 'Large Button Icon',
@@ -69,16 +70,42 @@ describe('the downloaded figma.json', () => {
       .toEqual([24, 32, 56]);
   });
 
-  it('writes ONLY the Desktop column of those', () => {
-    /* Writing all seven would overwrite iOS's 44/32/50 and Android's 48/32/56
-       with the brand's numbers on every import — the platform heights would
-       silently collapse to Desktop's. */
+  it('writes every column, the platforms from their own table', () => {
+    /* This used to write Desktop alone and leave the platform columns to
+       whatever the Figma file held. The danger it guarded against was real —
+       writing the BRAND's numbers into all seven would collapse iOS and
+       Android to Desktop's heights — but the fix was to state the platform
+       numbers, not to skip them: one table now feeds the CSS and the payload,
+       so the web and Figma cannot disagree about how tall a button is.
+
+       Per-platform, not per-device: all three iOS modes carry one column and
+       all three Android modes another, transcribed from the Figma file. */
+    const expected: Record<string, number[]> = {
+      // [Small, Medium, Large, Small Icon, Medium Icon, Large Icon]
+      'Desktop': [24, 32, 56, 16, 20, 32],
+      'IOS-Mobile': [32, 44, 50, 16, 20, 24],
+      'IOS-Tablet-Vertical': [32, 44, 50, 16, 20, 24],
+      'IOS-Tablet-Horizontal': [32, 44, 50, 16, 20, 24],
+      'Android-Mobile': [32, 48, 56, 18, 18, 24],
+      'Android-Tablet-Vertical': [32, 48, 56, 18, 18, 24],
+      'Android-Tablet-Horizontal': [32, 48, 56, 18, 18, 24],
+    };
+    for (const d of DEVICE_TYPES) {
+      const bag = out[DEVICES_COLLECTION][d];
+      expect(`${d}: ${DESKTOP_BUTTONS.map((n) => bag[n]?.value).join(',')}`)
+        .toBe(`${d}: ${expected[d].join(',')}`);
+    }
+  });
+
+  it('does not give a touch platform the brand\'s desktop heights', () => {
+    /* The specific collapse the old policy feared. Desktop's medium is the
+       user's slider pick; if a platform column ever equals the whole desktop
+       row, the platform table has stopped being read. */
+    const desktop = DESKTOP_BUTTONS.map((n) => out[DEVICES_COLLECTION].Desktop[n]?.value).join(',');
     for (const d of DEVICE_TYPES) {
       if (d === 'Desktop') continue;
-      for (const n of DESKTOP_BUTTONS) {
-        expect(`${d}/${n}: ${out[DEVICES_COLLECTION][d][n] === undefined}`)
-          .toBe(`${d}/${n}: true`);
-      }
+      expect(`${d}: ${DESKTOP_BUTTONS.map((n) => out[DEVICES_COLLECTION][d][n]?.value).join(',')}`)
+        .not.toBe(`${d}: ${desktop}`);
     }
   });
 
