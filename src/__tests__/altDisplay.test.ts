@@ -479,3 +479,81 @@ describe('the Alt Display weight across devices', () => {
     expect(desktop).toMatch(/--Alt-Display-Large-Font-Weight:\s*var\(--Font-Weight-Display\)/);
   });
 });
+
+describe('the Display family weight in Devices-Type', () => {
+  it('is a NUMBER, so the Alt keeps the weight it worked out', async () => {
+    /* The bug this prevents: every Font-Weight became an alias to its face
+       root, so Alt-Display-*-Font-Weight pointed at Display-Font-Weight and
+       the two rendered identically — the distinction deleted by the very link
+       meant to keep them in step.
+
+       It was also decided by the wrong design. WEIGHT_FACES is built once from
+       buildTypeScale(null), the DEFAULT scale, while whether the Alt follows
+       its face depends on the user's own family — Raleway has a lighter weight
+       to drop to, Anton does not. A table computed from Open Sans cannot
+       answer that for either. */
+    const { generateFigmaJSON } = await import('../utils/generateFigmaJSON');
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const { DEVICES_COLLECTION, DEVICE_TYPES } = await import('../utils/typographyPlatform');
+    const out = generateFigmaJSON({
+      Typography: {
+        'Set-Font-Family-Header': { value: 'Poppins' },
+        'Set-Font-Family-Body': { value: 'Inter' },
+        'Set-Font-Family-Decorative': { value: 'Raleway' },
+      },
+      _componentStyle: {
+        buttonRadius: 32, iconButtonRadius: 32, inputRadius: 4, cardPadding: 16,
+        bevelOpacity: 50, shadowResolution: 3,
+        buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+      },
+    }, buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Raleway', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never));
+
+    for (const device of DEVICE_TYPES) {
+      for (const face of ['Omni', 'System'] as const) {
+        for (const step of ['Large', 'Medium', 'Small']) {
+          for (const token of [`Display-${step}`, `Alt-Display-${step}`]) {
+            const v = out[DEVICES_COLLECTION][device][
+              `Typography/${face}/Displays/${token}-Font-Weight`]?.value;
+            expect(`${device}/${face}/${token}: ${typeof v}`)
+              .toBe(`${device}/${face}/${token}: number`);
+          }
+        }
+      }
+    }
+
+    /* And the two differ, which is the whole point of the Alt. Raleway ships
+       a lighter weight, so the drop is real. */
+    const d = out[DEVICES_COLLECTION].Desktop;
+    const at = (t: string) => d[`Typography/Omni/Displays/${t}-Font-Weight`].value;
+    expect(at('Display-Large')).toBe(800);
+    expect(at('Alt-Display-Large')).toBe(500);
+  });
+
+  it('leaves Headers aliasing its root, which is the behaviour asked for', async () => {
+    const { generateFigmaJSON } = await import('../utils/generateFigmaJSON');
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const { DEVICES_COLLECTION } = await import('../utils/typographyPlatform');
+    const out = generateFigmaJSON({
+      Typography: {
+        'Set-Font-Family-Header': { value: 'Poppins' },
+        'Set-Font-Family-Body': { value: 'Inter' },
+        'Set-Font-Family-Decorative': { value: 'Raleway' },
+      },
+      _componentStyle: {
+        buttonRadius: 32, iconButtonRadius: 32, inputRadius: 4, cardPadding: 16,
+        bevelOpacity: 50, shadowResolution: 3,
+        buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+      },
+    }, buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Raleway', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never));
+    const h1 = out[DEVICES_COLLECTION].Desktop['Typography/Omni/Headers/H1-Font-Weight'].value;
+    expect(String(h1)).toContain('Headers-Font-Weight');
+  });
+});

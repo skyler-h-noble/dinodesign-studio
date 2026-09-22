@@ -150,6 +150,31 @@ export const DEVICE_PROPS = ['Font-Size', 'Line-Height'] as const;
  */
 export const WEIGHT_ONLY_STYLES = /^Alt-Display-/;
 
+/**
+ * Styles whose weight is a NUMBER in Devices-Type, never an alias.
+ *
+ * Devices-Type is the value layer: the Typography collection aliases INTO it,
+ * so a variable here pointing at another variable here adds a hop that leads
+ * back to the same collection.
+ *
+ * For the Display family it is worse than redundant. Alt Display exists to be
+ * a different weight from Display, and an alias to the Display root makes the
+ * two identical — the distinction deleted by the very link meant to keep
+ * things in step.
+ *
+ * It was also decided by the wrong design. WEIGHT_FACES is built once from
+ * buildTypeScale(null), the DEFAULT scale, while whether the Alt follows its
+ * face depends on the user's own family: Raleway ships a lighter weight to
+ * drop to, Anton does not. A table computed from Open Sans cannot answer that
+ * for either of them, so the alias could be applied to a step that had already
+ * worked out its own number.
+ *
+ * Headers and Body keep their roots. H1-H3 following Headers-Font-Weight is
+ * the behaviour asked for, and there is no Alt in those families to collide
+ * with.
+ */
+export const LITERAL_WEIGHT_STYLES = /^(?:Alt-)?Display-/;
+
 /* ── Why Devices-Type has THREE branches and not two ───────────────────────
  *
  *   Typography/<Section>/...          Font-Size, Line-Height          62
@@ -980,7 +1005,9 @@ export function typographyVariablePayload(
          * aliases per device — which Figma does not report: the variable exists
          * and resolves to nothing. System's roots are the platform's and are
          * always available, except on Desktop where System mirrors Omni. */
-        const root = prop === 'Font-Weight' ? weightRootOf(style) : undefined;
+        const root = prop === 'Font-Weight' && !LITERAL_WEIGHT_STYLES.test(style)
+          ? weightRootOf(style)
+          : undefined;
         const omniRoot = rootsWritten('Omni', device, !!faces) ? root : undefined;
         const systemRoot = rootsWritten('System', device, !!faces) ? root : undefined;
 

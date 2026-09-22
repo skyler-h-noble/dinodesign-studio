@@ -375,16 +375,24 @@ describe('the Devices-Type source', () => {
   });
 
   it('points a face-following step at its face weight, and nothing else', () => {
-    /* Nine steps take their weight from a face, so the face carries the number
-       once and they point at it: move Display's weight and all three Display
-       steps follow, which is what the stylesheet already does
-       (--Display-Large-Font-Weight: var(--Font-Weight-Display)) and what Figma
-       was flattening into nine copies.
+    /* A step that takes its weight from a face points at the face, so the
+       number lives once: move Headers' weight and H1-H3 follow, which is what
+       the stylesheet already does and what Figma was flattening into copies.
 
-       The others must NOT point at it. H4-H6 read --Header-Clamped-Weight,
-       which only ever raises a light pick, and Subtitle / Label / Number /
-       Button / Badge state their own. Aliasing those would make the root look
-       like it governs the whole group and then surprise whoever moved it. */
+       The DISPLAY family is the exception, and states its own number. Devices-
+       Type is the value layer — the Typography collection aliases into it — so
+       an alias here leads back to the same collection. For Display it is worse
+       than a wasted hop: Alt Display exists to be a DIFFERENT weight, and
+       pointing it at the Display root makes the two identical, the distinction
+       deleted by the link meant to keep them in step. Worse, the alias was
+       decided by buildTypeScale(null) — the default design — while whether the
+       Alt follows its face depends on the user's own family.
+
+       The others must NOT point at it either. H4-H6 read
+       --Header-Clamped-Weight, which only ever raises a light pick, and
+       Subtitle / Label / Number / Button / Badge state their own. Aliasing
+       those would make the root look like it governs the whole group and then
+       surprise whoever moved it. */
     const picked: any = [
       { type: 'decorative', family: 'P', weight: '800' },
       { type: 'header', family: 'X', weight: '250' },
@@ -398,8 +406,18 @@ describe('the Devices-Type source', () => {
     expect(D[weightRootName('Omni', 'Headers')].value).toBe(250);
     expect(D[weightRootName('Omni', 'Body')].value).toBe(300);
 
+    /* The Display root is still published — a designer may want to move the
+       face in Figma — but the steps hold numbers rather than following it. */
     for (const step of ['Display-Large', 'Display-Medium', 'Display-Small'])
-      expect(raw(step), step).toBe(weightRootAlias('Omni', 'Display'));
+      expect(raw(step), step).toBe(800);
+    /* The Alt states a number too, and here it is the SAME number: this
+       fixture's family is "P", which ships no weights this system knows, so
+       there is no lighter step to drop to and the Alt keeps the face's. The
+       point is that it is a VALUE either way — a real family with a lighter
+       weight resolves to that instead, where the old alias would have
+       overwritten it with Display's. */
+    for (const step of ['Alt-Display-Large', 'Alt-Display-Medium', 'Alt-Display-Small'])
+      expect(raw(step), step).toBe(800);
     for (const step of ['H1', 'H2', 'H3'])
       expect(raw(step), step).toBe(weightRootAlias('Omni', 'Headers'));
     for (const step of ['Body-Small', 'Body-Medium', 'Body-Large'])
