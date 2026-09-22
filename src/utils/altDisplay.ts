@@ -106,12 +106,31 @@ export function altDisplayGradient(primary?: string, secondary?: string): AltDis
 }
 
 /**
- * How far below the Display's weight the Alt aims.
+ * The Alt's weight is a CONTRAST with Display's, in whichever direction has
+ * room.
  *
- * Large enough to read as a different voice rather than a rendering
- * inconsistency. Two adjacent Google weights (400 to 500) is a difference only
- * a designer looking for it would see; 300 clears three rungs.
+ * A drop alone cannot work at both ends. Measured across the real families:
+ *
+ *     Display 800  drop 300 -> 500     plenty of room, clear contrast
+ *     Display 600  drop 300 -> 300     already light; thin at Alt-Display-Small
+ *     Display 400  drop 300 -> 200     Thin. Not a voice, a rendering fault.
+ *
+ * So a Display that is already Bold or heavier steps DOWN, and anything
+ * lighter steps UP to Bold. Either way the Alt reads as a deliberate second
+ * voice rather than a near-miss, and a light Display no longer produces a
+ * hairline.
+ *
+ * Note the drop is not a continuous dial: 250 and 300 produce identical
+ * results on every family checked, because the ramps are 100 apart and the
+ * pick snaps to a shipped weight. The meaningful settings are roughly "one
+ * rung" and "three rungs", which is why these are constants and not a curve.
  */
+export const ALT_BOLD_THRESHOLD = 700;
+
+/** Where a lighter Display's Alt aims when it steps UP. */
+export const ALT_BOLD_TARGET = 700;
+
+/** How far a Bold-or-heavier Display's Alt steps DOWN. */
 export const ALT_DISPLAY_WEIGHT_DROP = 300;
 
 /** The lightest weight the Alt will drop to, so it stays legible at size. */
@@ -147,17 +166,28 @@ export function altDisplayWeight(
   shipped: number[] | undefined,
 ): number | undefined {
   if (!shipped?.length) return undefined;
-  const target = displayWeight - ALT_DISPLAY_WEIGHT_DROP;
-  /* Only weights the family actually ships, strictly lighter than the Display's
-     own, and not so light they disappear at display size. */
+
+  const goesDown = displayWeight >= ALT_BOLD_THRESHOLD;
+  const target = goesDown ? displayWeight - ALT_DISPLAY_WEIGHT_DROP : ALT_BOLD_TARGET;
+
+  /* Only weights the family actually ships, on the side the Alt is headed,
+     and — going down — not so light they disappear at display size. */
   const candidates = shipped
-    .filter((w) => w < displayWeight && w >= ALT_DISPLAY_MIN_WEIGHT)
+    .filter((w) => (goesDown
+      ? w < displayWeight && w >= ALT_DISPLAY_MIN_WEIGHT
+      : w > displayWeight))
     .sort((a, b) => a - b);
   if (!candidates.length) return undefined;
-  /* Nearest to the target. Ties go to the LIGHTER one: the whole purpose is to
-     be visibly different, and the lighter of two equals is more different. */
-  return candidates.reduce((best, w) =>
-    Math.abs(w - target) < Math.abs(best - target) ? w : best, candidates[0]);
+
+  /* Nearest to the target. Ties go AWAY from the Display's own weight: the
+     whole purpose is to be visibly different, and of two equals the farther
+     one is more different. */
+  return candidates.reduce((best, w) => {
+    const d = Math.abs(w - target);
+    const b = Math.abs(best - target);
+    if (d !== b) return d < b ? w : best;
+    return goesDown ? Math.min(w, best) : Math.max(w, best);
+  }, candidates[0]);
 }
 
 /**

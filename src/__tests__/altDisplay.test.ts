@@ -90,11 +90,26 @@ describe('the Alt Display weight', () => {
     expect(altDisplayWeight(400, [])).toBeUndefined();
   });
 
-  it('never goes heavier, and never below the legibility floor', () => {
-    /* Heavier would read as emphasis, which is the opposite of the intent. */
-    expect(altDisplayWeight(300, [300, 400, 500])).toBeUndefined();
-    const w = altDisplayWeight(400, [100, 400]);
+  it('steps UP toward Bold when the Display is not already bold', () => {
+    /* A drop alone cannot work at both ends. Display 400 minus three rungs is
+       200 — Thin, which reads as a rendering fault rather than a second voice.
+       So a lighter Display goes the other way and the Alt is a contrast either
+       direction. */
+    expect(altDisplayWeight(400, [100, 200, 300, 400, 500, 600, 700, 800, 900])).toBe(700);
+    expect(altDisplayWeight(600, [100, 200, 300, 400, 500, 600, 700, 800, 900])).toBe(700);
+    /* Nearest to Bold among what the family actually ships. */
+    expect(altDisplayWeight(300, [300, 400, 500])).toBe(500);
+    /* Nothing heavier shipped — track the face rather than invent a weight. */
+    expect(altDisplayWeight(400, [100, 400])).toBeUndefined();
+  });
+
+  it('steps DOWN, and never below the legibility floor, once Display is bold', () => {
+    expect(altDisplayWeight(800, [100, 200, 300, 400, 500, 600, 700, 800, 900])).toBe(500);
+    expect(altDisplayWeight(700, [400, 500, 600, 700, 800, 900])).toBe(400);
+    /* The floor holds: 100 is shipped but below ALT_DISPLAY_MIN_WEIGHT. */
+    const w = altDisplayWeight(700, [100, 400]);
     expect(w === undefined || w >= ALT_DISPLAY_MIN_WEIGHT).toBe(true);
+    expect(altDisplayWeight(700, [100])).toBeUndefined();
   });
 
   it('breaks a tie toward the lighter weight', () => {
