@@ -213,20 +213,38 @@ describe('the Alt Display theme tokens', () => {
     }
   });
 
-  it('picks the second stop from the scheme, not from a re-measured hue', async () => {
-    /* duo blends Primary into Secondary; mono steps to Tertiary because those
-       hues are too far apart to blend without crossing the desaturated middle.
-       Read off the scheme the user chose, so it cannot disagree with the
-       palette that was actually built. */
-    const stop2 = (themes: any) =>
-      themes.Default.Surfaces['Alt-Color-Gradient-Stop-2'].value as string;
+  it('uses three distinct palettes, the same ones for every scheme', async () => {
+    /* Tertiary solid, Primary -> Secondary gradient, unconditionally.
+     *
+     * Three separate palettes rather than a computed shade of one: a shade has
+     * to be derived from somewhere, and at background tones 5 and 6 the ramp
+     * can run out, landing the derived colour on the base it came from. The
+     * gradient then renders as a flat fill with nothing to say it failed.
+     *
+     * Scheme-independent on purpose. A stop that moves per brand is a stop a
+     * designer cannot reason about, and the earlier analogous branch only ever
+     * chose which palette the second stop came from. */
+    for (const scheme of ['analogous', 'monochromatic', 'complementary',
+                          'triadic', 'split-complementary', 'tetradic']) {
+      const surfaces = (await build(scheme)).Default.Surfaces;
+      const at = (t: string) => String(surfaces[t].value);
+      expect(`${scheme} solid`).toBe(at('Alt-Display-Color').includes('.Tertiary.')
+        ? `${scheme} solid` : `${scheme} solid was ${at('Alt-Display-Color')}`);
+      expect(`${scheme} stop1`).toBe(at('Alt-Color-Gradient-Stop-1').includes('.Primary.')
+        ? `${scheme} stop1` : `${scheme} stop1 was ${at('Alt-Color-Gradient-Stop-1')}`);
+      expect(`${scheme} stop2`).toBe(at('Alt-Color-Gradient-Stop-2').includes('.Secondary.')
+        ? `${scheme} stop2` : `${scheme} stop2 was ${at('Alt-Color-Gradient-Stop-2')}`);
+    }
+  });
 
-    for (const scheme of ['analogous', 'monochromatic']) {
-      expect(`${scheme}: ${stop2(await build(scheme))}`).toContain('Secondary');
-    }
-    for (const scheme of ['complementary', 'triadic', 'split-complementary', 'tetradic']) {
-      expect(`${scheme}: ${stop2(await build(scheme))}`).toContain('Tertiary');
-    }
+  it('keeps the three on different palettes, so none can collapse into another', async () => {
+    /* The property that makes this safe at tones 5 and 6: the solid and the
+       two stops are drawn from three different palettes, so they cannot
+       resolve to one another however the ramp behaves. */
+    const s = (await build('analogous')).Default.Surfaces;
+    const vals = ['Alt-Display-Color', 'Alt-Color-Gradient-Stop-1', 'Alt-Color-Gradient-Stop-2']
+      .map((t) => String(s[t].value));
+    expect(new Set(vals).size).toBe(3);
   });
 
   it('tracks the surface it sits on', async () => {
