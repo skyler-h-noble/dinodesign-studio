@@ -127,8 +127,26 @@ export function altDisplayGradient(primary?: string, secondary?: string): AltDis
  */
 export const ALT_BOLD_THRESHOLD = 700;
 
-/** Where a lighter Display's Alt aims when it steps UP. */
-export const ALT_BOLD_TARGET = 700;
+/**
+ * Where a lighter Display's Alt aims when it steps UP, in order of preference:
+ * Black, then Extra Bold, then Bold.
+ *
+ * A preference ORDER rather than a single target with a nearest-match, because
+ * the two answer differently on a sparse ramp. Nearest-to-800 on a family
+ * shipping [400, 900] picks 900 — right — but on [700, 900] it picks 700,
+ * the lighter of two equals, which is the wrong way for a step whose whole
+ * job is to be heavier. Asking for the heaviest first cannot make that
+ * mistake.
+ *
+ * Bold alone would be too close: 600 is the default Display weight and 700 the
+ * threshold, so one rung is a difference only someone looking for it would
+ * see.
+ *
+ * These are preferences, not requirements. A family shipping none of them
+ * falls back to the heaviest weight it has above the Display's own, and a
+ * family with nothing heavier returns undefined so the Alt tracks the face.
+ */
+export const ALT_UP_PREFERENCE: readonly number[] = [900, 800, 700];
 
 /** How far a Bold-or-heavier Display's Alt steps DOWN. */
 export const ALT_DISPLAY_WEIGHT_DROP = 300;
@@ -189,7 +207,6 @@ export function altDisplayWeight(
   if (!shipped?.length) return undefined;
 
   const goesDown = displayWeight >= ALT_BOLD_THRESHOLD;
-  const target = goesDown ? displayWeight - ALT_DISPLAY_WEIGHT_DROP : ALT_BOLD_TARGET;
 
   /* Only weights the family actually ships, on the side the Alt is headed,
      and — going down — not so light they disappear at display size. */
@@ -200,14 +217,26 @@ export function altDisplayWeight(
     .sort((a, b) => a - b);
   if (!candidates.length) return undefined;
 
-  /* Nearest to the target. Ties go AWAY from the Display's own weight: the
-     whole purpose is to be visibly different, and of two equals the farther
-     one is more different. */
+  if (!goesDown) {
+    /* Black, then Extra Bold, then Bold. First one shipped wins. */
+    for (const want of ALT_UP_PREFERENCE) {
+      if (candidates.indexOf(want) !== -1) return want;
+    }
+    /* None of the three — take the heaviest there is, which is still a
+       contrast even if it is not one of the named weights. */
+    return candidates[candidates.length - 1];
+  }
+
+  /* Going down there is no named target: the Alt lands three rungs below
+     whatever the Display is, so the nearest shipped weight to that is the
+     answer. Ties go to the LIGHTER one, away from the Display's own weight,
+     since the point is to be visibly different. */
+  const target = displayWeight - ALT_DISPLAY_WEIGHT_DROP;
   return candidates.reduce((best, w) => {
     const d = Math.abs(w - target);
     const b = Math.abs(best - target);
     if (d !== b) return d < b ? w : best;
-    return goesDown ? Math.min(w, best) : Math.max(w, best);
+    return Math.min(w, best);
   }, candidates[0]);
 }
 

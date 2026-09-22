@@ -90,16 +90,35 @@ describe('the Alt Display weight', () => {
     expect(altDisplayWeight(400, [])).toBeUndefined();
   });
 
-  it('steps UP toward Bold when the Display is not already bold', () => {
+  it('steps UP to Black, then Extra Bold, then Bold', () => {
     /* A drop alone cannot work at both ends. Display 400 minus three rungs is
        200 — Thin, which reads as a rendering fault rather than a second voice.
-       So a lighter Display goes the other way and the Alt is a contrast either
-       direction. */
-    expect(altDisplayWeight(400, [100, 200, 300, 400, 500, 600, 700, 800, 900])).toBe(700);
-    expect(altDisplayWeight(600, [100, 200, 300, 400, 500, 600, 700, 800, 900])).toBe(700);
-    /* Nearest to Bold among what the family actually ships. */
+       So a lighter Display goes the other way.
+
+       Black first, because Bold alone is one rung above the commonest Display
+       weights — 600 is the default, 700 the threshold — and one rung is a
+       difference only someone looking for it would see. */
+    const FULL = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+    expect(altDisplayWeight(400, FULL)).toBe(900);
+    expect(altDisplayWeight(600, FULL)).toBe(900);
+
+    /* Preferences, not requirements — it walks down the list to what the
+       family actually ships. */
+    expect(altDisplayWeight(400, [400, 700, 800])).toBe(800);          // no Black
+    expect(altDisplayWeight(400, [400, 500, 600, 700])).toBe(700);     // Lora, Caveat
+    expect(altDisplayWeight(600, [200, 300, 400, 500, 600, 700])).toBe(700);  // Oswald
+
+    /* An ORDER, not a nearest-match, and this is the case that separates them:
+       nearest-to-Extra-Bold on [700, 900] picks 700 — the lighter of two
+       equals — for a step whose whole job is to be heavier. */
+    expect(altDisplayWeight(400, [700, 900])).toBe(900);
+
+    /* None of the three shipped — the heaviest there is, still a contrast. */
+    expect(altDisplayWeight(400, [400, 500, 600])).toBe(600);
     expect(altDisplayWeight(300, [300, 400, 500])).toBe(500);
-    /* Nothing heavier shipped — track the face rather than invent a weight. */
+
+    /* Nothing heavier shipped — track the face rather than invent a weight
+       the font cannot render. */
     expect(altDisplayWeight(400, [100, 400])).toBeUndefined();
   });
 
