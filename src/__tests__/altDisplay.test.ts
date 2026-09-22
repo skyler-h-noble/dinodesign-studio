@@ -368,3 +368,78 @@ describe('the Alt Display variable trim', () => {
     }
   });
 });
+
+describe('the Alt Display weight across devices', () => {
+  const FIG = async (family: string, weight: string) => {
+    const { generateFigmaJSON } = await import('../utils/generateFigmaJSON');
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const css = buildTypographyTokensCSS([
+      { type: 'decorative', family, weight, displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never);
+    return {
+      css,
+      figma: generateFigmaJSON({
+        Typography: {
+          'Set-Font-Family-Header': { value: 'Poppins' },
+          'Set-Font-Family-Body': { value: 'Inter' },
+          'Set-Font-Family-Decorative': { value: family },
+        },
+        _componentStyle: {
+          buttonRadius: 32, iconButtonRadius: 32, inputRadius: 4, cardPadding: 16,
+          bevelOpacity: 50, shadowResolution: 3,
+          buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+        },
+      }, css),
+    };
+  };
+
+  it('is the SAME on every device for Omni, and varies for System', async () => {
+    /* Omni is the brand's own face, so its weight is a property of the FAMILY:
+       Playfair's lighter step does not change because the reader is on a
+       phone. System is the PLATFORM's face, and Apple and Google answer for
+       themselves — Desktop excepted, where System mirrors Omni.
+
+       This failed before: the device blocks are static and cannot know which
+       family was picked, so they shipped the literal 600 the asset held while
+       the generated Desktop block carried the derived 500. One brand, two
+       answers, and no error. */
+    const { DEVICES_COLLECTION, DEVICE_TYPES } = await import('../utils/typographyPlatform');
+    const { figma } = await FIG('Playfair Display', '800');
+    const at = (device: string, face: string) =>
+      figma[DEVICES_COLLECTION][device][`Typography/${face}/Displays/Alt-Display-Large-Font-Weight`]?.value;
+
+    for (const device of DEVICE_TYPES) {
+      expect(`${device} Omni: ${at(device, 'Omni')}`).toBe(`${device} Omni: 500`);
+    }
+    expect(at('Desktop', 'System')).toBe(500);          // Desktop's System mirrors Omni
+    for (const device of DEVICE_TYPES) {
+      if (device === 'Desktop') continue;
+      expect(`${device} System: ${at(device, 'System')}`).toBe(`${device} System: 400`);
+    }
+  });
+
+  it('says the same number in the stylesheet as in the payload', async () => {
+    /* Fixed in the STYLESHEET, not patched in the payload. The payload is
+       derived from this CSS, so correcting it downstream would have left the
+       web rendering 600 and Figma showing 500 — invariant 5 introduced on
+       purpose, with convenience as the excuse. */
+    const { css } = await FIG('Playfair Display', '800');
+    for (const platform of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android']) {
+      const block = css.match(
+        new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+      const w = block.match(/--Alt-Display-Large-Font-Weight:\s*([^;]+);/)?.[1]?.trim();
+      expect(`${platform}: ${w}`).toBe(`${platform}: 500`);
+    }
+  });
+
+  it('leaves a one-weight family tracking its face rather than pinning a number', async () => {
+    /* Anton ships [400] alone, so there is no lighter step to drop to. The Alt
+       must follow the face — pinning 400 would stop it moving with the user's
+       slider — and colour carries the distinction instead. */
+    const { css } = await FIG('Anton', '400');
+    const desktop = css.match(/\[data-platform="Desktop"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(desktop).toMatch(/--Alt-Display-Large-Font-Weight:\s*var\(--Font-Weight-Display\)/);
+  });
+});

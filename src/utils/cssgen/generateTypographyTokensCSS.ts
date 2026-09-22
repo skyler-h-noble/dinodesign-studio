@@ -456,6 +456,36 @@ export function buildTypographyTokensCSS(
     return `${staticCSS}\n\n${generateDesktopTypographyBlock(typography)}\n\n${generateTypographyRules(typography)}\n`;
   }
   const before = staticCSS.slice(0, start);
-  const after = staticCSS.slice(end + 2);
+  const after = altWeightForAllPlatforms(staticCSS.slice(end + 2), typography);
   return `${before}${generateDesktopTypographyBlock(typography)}${after}\n\n${generateTypographyRules(typography)}\n`;
+}
+
+/**
+ * Give the Alt Display the SAME weight on every platform block.
+ *
+ * The Omni face is the brand's own, so its weight is a property of the FAMILY,
+ * not of the device: Playfair's lighter step does not change because the
+ * reader is on a phone. The device blocks are static and cannot know which
+ * family was picked, so they shipped whatever literal the asset held — 600,
+ * copied from Display when the Alt steps were added — while the generated
+ * Desktop block carried the derived 500. One brand, two answers.
+ *
+ * Rewritten here rather than fixed in the payload, because the payload is
+ * DERIVED from this stylesheet. Patching it there would have left the CSS
+ * saying 600 and Figma saying 500 — a divergence deliberately introduced,
+ * which is invariant 5 with the excuse of convenience.
+ *
+ * System is untouched and SHOULD differ per device: that face is the
+ * platform's, and systemWeight already answers it per platform in the payload.
+ */
+function altWeightForAllPlatforms(
+  css: string,
+  typography: TypographyStyle[] | null | undefined,
+): string {
+  const alt = buildTypeScale(typography).find((s) => s.token.startsWith('Alt-Display-'));
+  if (!alt || typeof alt.weight !== 'number') return css;
+  return css.replace(
+    /(--Alt-Display-(?:Small|Medium|Large)-Font-Weight:\s*)\d+(\s*;)/g,
+    `$1${alt.weight}$2`,
+  );
 }
