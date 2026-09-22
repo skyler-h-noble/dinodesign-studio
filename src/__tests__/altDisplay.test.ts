@@ -352,28 +352,67 @@ describe('the Alt Display CSS', () => {
     }
   });
 
-  it('defaults to solid and keeps the gradient opt-in, with a forced-colors way out', async () => {
-    /* background-clip: text needs color: transparent, so the glyphs are painted
-       by a background. In forced-colors the UA drops background-image — without
-       the fallback the headline is invisible to exactly the readers who turned
-       high contrast on. */
+  it('offers three variants from ONE pair of stops', async () => {
+    /* Mirrors the Figma Alt-Display collection: three modes pointing the same
+       two stop variables at different things.
+
+       The pair is the trick. Figma cannot bind a fill's TYPE — no variable
+       holds a gradient, and nothing flips SOLID to GRADIENT_LINEAR — so a mode
+       could never switch between a solid and a gradient. Two stops allowed to
+       be EQUAL can: a flat "gradient" is a solid, and one paint style serves
+       all three modes. */
     const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
     const css = buildTypographyTokensCSS([
-      { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+      { type: 'decorative', family: 'Raleway', weight: '600', displaySize: '72' },
       { type: 'header', family: 'Poppins', weight: '600' },
       { type: 'body', family: 'Inter', weight: '400' },
     ] as never);
 
-    // Solid on the bare class; the gradient only on .gradient.
-    expect(css).toMatch(/\.typography-alt-display-large,[\s\S]{0,200}?color: var\(--Alt-Display-Color/);
-    expect(css).toMatch(/\.typography-alt-display-large\.gradient[\s\S]{0,400}?background-clip: text/);
-    expect(css).toMatch(/@media \(forced-colors: active\)[\s\S]{0,400}?color: CanvasText/);
+    const scope = (name: string) =>
+      css.match(new RegExp(`\\[data-alt-display="${name}"\\] \\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
 
-    /* Every colour is a token read, never a literal — so an add-on can
-       re-point a stop per hero, and the Alt follows data-surface. */
+    /* default: both stops on --Header, so the Alt reads as a heading. */
+    const dflt = css.match(/:root,\n\[data-alt-display="default"\] \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(dflt).toContain('--Alt-Display-Color-Stop-1: var(--Header)');
+    expect(dflt).toContain('--Alt-Display-Color-Stop-2: var(--Header)');
+
+    /* colored: both stops on the Alt colour — equal, therefore flat. */
+    expect(scope('colored')).toContain('--Alt-Display-Color-Stop-1: var(--Alt-Display-Color');
+    expect(scope('colored')).toContain('--Alt-Display-Color-Stop-2: var(--Alt-Display-Color');
+
+    /* gradient: the two the theme publishes. */
+    expect(scope('gradient')).toContain('--Alt-Display-Color-Stop-1: var(--Alt-Color-Gradient-Stop-1');
+    expect(scope('gradient')).toContain('--Alt-Display-Color-Stop-2: var(--Alt-Color-Gradient-Stop-2');
+  });
+
+  it('clips only for the gradient, and always has a forced-colors way out', async () => {
+    /* Where CSS deliberately differs from Figma. Figma pays nothing for a flat
+       gradient; CSS does — background-clip: text needs color: transparent,
+       which costs the selection highlight, anything inheriting the text
+       colour, and the text itself in forced-colors. So the flat variants paint
+       with `color` and only the gradient clips. Invisible to a designer,
+       strictly better for a reader. */
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const css = buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Raleway', weight: '600', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never);
+
+    /* The bare class paints with colour, not a clipped background. */
+    const base = css.match(
+      /\.typography-alt-display-large,[\s\S]{0,400}?\n\}/)?.[0] ?? '';
+    expect(base).toContain('color: var(--Alt-Display-Color-Stop-1)');
+    expect(base).not.toContain('background-clip');
+
+    /* Clipping appears only under the gradient scope. */
+    expect(css).toMatch(/\[data-alt-display="gradient"\][\s\S]{0,1400}?background-clip: text/);
+    expect(css).toMatch(/@media \(forced-colors: active\)[\s\S]{0,1400}?color: CanvasText/);
+
+    /* No literal colour anywhere in the block — an add-on re-points a stop per
+       hero, and every variant follows data-surface. */
     const block = css.slice(css.indexOf('Alt Display colour'));
-    const upTo = block.slice(0, block.indexOf('forced-colors') + 400);
-    expect(upTo).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(block.slice(0, block.indexOf('forced-colors') + 400)).not.toMatch(/#[0-9a-f]{3,8}\b/i);
   });
 });
 

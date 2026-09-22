@@ -361,47 +361,78 @@ ${offsets.join('\n')}`;
 }
 
 /**
- * The Alt Display's colour: a solid by default, a gradient by opt-in.
+ * The Alt Display's colour, in three selectable variants.
  *
- * Both read the tokens the theme publishes per surface, never a baked colour,
- * so the Alt follows data-surface — and so an add-on can re-point a stop on one
- * hero without the core knowing how many gradients a brand has.
+ * Mirrors the Figma `Alt-Display` collection: one pair of stop variables,
+ * three modes deciding what they point at.
  *
- * Solid is the DEFAULT and the gradient is a modifier, because the gradient
- * costs something the solid does not: background-clip: text needs
- * `color: transparent`, so the glyphs are painted by a background. Anything
- * that relies on the text colour — a selection highlight, a nested link, a
- * print stylesheet — behaves differently, and in forced-colors mode the
- * background is dropped entirely and the text would vanish. Hence the
- * forced-colors block, which is not a nicety: without it the headline is
- * invisible to exactly the readers who turned high contrast on.
+ *     Default    both stops -> --Header            the Alt reads as a heading
+ *     Colored    both stops -> --Alt-Display-Color a flat Alt colour
+ *     Gradient   stop 1/2   -> the two stop tokens the themes publish
+ *
+ * The pair is the whole trick. Figma cannot bind a fill's TYPE — no variable
+ * holds a gradient, and nothing can flip SOLID to GRADIENT_LINEAR — so a mode
+ * could never switch between a solid and a gradient. Two stops that are
+ * allowed to be EQUAL can: a flat "gradient" is a solid, and one paint style
+ * serves all three modes. This file follows the same shape so the two cannot
+ * describe different things.
+ *
+ * Where the two deliberately differ is the painting. Figma pays no penalty for
+ * a flat gradient; CSS does. background-clip: text needs `color: transparent`,
+ * which costs the selection highlight, anything inheriting the text colour,
+ * and — without the block at the end — the text itself in forced-colors mode.
+ * So the flat variants paint with `color` and only the gradient variant clips,
+ * which is invisible to a designer and strictly better for a reader.
  */
 function altDisplayColorRules(styles: TypeStyle[]): string {
   const alt = styles.filter((s) => s.token.startsWith('Alt-Display-'));
   if (!alt.length) return '';
   const sel = alt.map((s) => `.${libClass(s.token)}`).join(',\n');
-  const gradSel = alt.map((s) => `.${libClass(s.token)}.gradient`).join(',\n');
+  const gradSel = alt.map((s) => `.${libClass(s.token)}[data-alt-display="gradient"],\n[data-alt-display="gradient"] .${libClass(s.token)}`).join(',\n');
   return `/* ---------------------------------------------------------------------------
-   Alt Display colour
-   Solid by default; add the \`gradient\` class for the two-stop version.
-   Both follow the surface — the tokens are re-published per theme and surface.
+   Alt Display colour — three variants, one pair of stops
+
+   Set data-alt-display on the element or any ancestor:
+     default   (or unset)  the Alt reads as a heading
+     colored               a flat Alt colour
+     gradient              the two stops the theme publishes
+
+   The stops are re-published per theme and surface, so every variant follows
+   data-surface without being restated.
 --------------------------------------------------------------------------- */
+:root,
+[data-alt-display="default"] {
+  --Alt-Display-Color-Stop-1: var(--Header);
+  --Alt-Display-Color-Stop-2: var(--Header);
+}
+
+[data-alt-display="colored"] {
+  --Alt-Display-Color-Stop-1: var(--Alt-Display-Color, var(--Header));
+  --Alt-Display-Color-Stop-2: var(--Alt-Display-Color, var(--Header));
+}
+
+[data-alt-display="gradient"] {
+  --Alt-Display-Color-Stop-1: var(--Alt-Color-Gradient-Stop-1, var(--Alt-Display-Color, var(--Header)));
+  --Alt-Display-Color-Stop-2: var(--Alt-Color-Gradient-Stop-2, var(--Alt-Display-Color, var(--Header)));
+}
+
 ${sel} {
-  color: var(--Alt-Display-Color, var(--Header));
+  /* Stop 1 alone: in the flat variants the two agree, and a plain colour keeps
+     the selection highlight, print, and forced-colors working. */
+  color: var(--Alt-Display-Color-Stop-1);
 }
 
 ${gradSel} {
   background-image: linear-gradient(
     90deg,
-    var(--Alt-Color-Gradient-Stop-1, var(--Alt-Display-Color, var(--Header))),
-    var(--Alt-Color-Gradient-Stop-2, var(--Alt-Display-Color, var(--Header)))
+    var(--Alt-Display-Color-Stop-1),
+    var(--Alt-Display-Color-Stop-2)
   );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  /* Painting the glyphs with a background means the box, not the text, carries
-     the paint. Keep it to the text's own box so a wrapped headline does not
-     stretch the ramp across empty trailing space. */
+  /* The box carries the paint, not the glyphs, so keep it to the text's own
+     box or a wrapped headline stretches the ramp across empty trailing space. */
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
