@@ -258,3 +258,69 @@ describe('the Alt Display theme tokens', () => {
     expect(at('Surfaces')).not.toBe(at('Surfaces-Dimmest'));
   });
 });
+
+describe('the Alt Display CSS', () => {
+  it('publishes the three colour tokens in the PREVIEW as well as the export', async () => {
+    /* Invariant 5. The export gets them free — processTokens walks the theme
+       JSON — while the preview builds its tokens by hand. A token in one and
+       not the other raises nothing: no error, no unresolved var, just an Alt
+       that is coloured in the export and inherits in the preview. */
+    const { buildPreviewCSS } = await import('../utils/buildPreviewCSS');
+    const chroma = (await import('chroma-js')).default;
+    const { generateSemanticLightModeScale, generateSemanticDarkModeScale } =
+      await import('../utils/colorScale');
+    const C: [string, string, string] = ['#7b3f9d', '#2563eb', '#b8329b'];
+    const css = buildPreviewCSS({
+      colorScheme: {
+        name: 'Alt', colors: C,
+        extractedTones: {
+          primary: chroma(C[0]).lch()[0], secondary: chroma(C[1]).lch()[0],
+          tertiary: chroma(C[2]).lch()[0],
+        },
+        tonePalettes: {
+          primary: generateSemanticLightModeScale(C[0], undefined, C[0]),
+          secondary: generateSemanticLightModeScale(C[1], undefined, C[1]),
+          tertiary: generateSemanticLightModeScale(C[2], undefined, C[2]),
+        },
+        darkModeTonePalettes: {
+          primary: generateSemanticDarkModeScale(C[0]),
+          secondary: generateSemanticDarkModeScale(C[1]),
+          tertiary: generateSemanticDarkModeScale(C[2]),
+        },
+      },
+      userSelections: { background: 'default', button: 'primary-fixed',
+                        cardColoring: 'tonal', textColoring: 'tonal' },
+      componentStyle: 'modern', mode: 'light',
+      typographyStyles: [{ type: 'body', family: 'Inter', weight: '400' }],
+    } as never);
+
+    for (const token of ['--Alt-Display-Color', '--Alt-Color-Gradient-Stop-1',
+                         '--Alt-Color-Gradient-Stop-2']) {
+      expect(`${token} in preview: ${css.includes(token)}`).toBe(`${token} in preview: true`);
+    }
+  });
+
+  it('defaults to solid and keeps the gradient opt-in, with a forced-colors way out', async () => {
+    /* background-clip: text needs color: transparent, so the glyphs are painted
+       by a background. In forced-colors the UA drops background-image — without
+       the fallback the headline is invisible to exactly the readers who turned
+       high contrast on. */
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const css = buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never);
+
+    // Solid on the bare class; the gradient only on .gradient.
+    expect(css).toMatch(/\.typography-alt-display-large,[\s\S]{0,200}?color: var\(--Alt-Display-Color/);
+    expect(css).toMatch(/\.typography-alt-display-large\.gradient[\s\S]{0,400}?background-clip: text/);
+    expect(css).toMatch(/@media \(forced-colors: active\)[\s\S]{0,400}?color: CanvasText/);
+
+    /* Every colour is a token read, never a literal — so an add-on can
+       re-point a stop per hero, and the Alt follows data-surface. */
+    const block = css.slice(css.indexOf('Alt Display colour'));
+    const upTo = block.slice(0, block.indexOf('forced-colors') + 400);
+    expect(upTo).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  });
+});

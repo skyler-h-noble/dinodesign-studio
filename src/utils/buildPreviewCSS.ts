@@ -55,9 +55,28 @@ function buildHeaderPaletteLines(backgroundN: number, isContainer: boolean): str
     ['Warning',   'Header-Warning'],
     ['Error',     'Header-Error'],
   ];
-  return palettes
-    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedHeaderToken(backgroundN, isContainer, palette))};`)
-    .join('\n');
+  const lines = palettes
+    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedHeaderToken(backgroundN, isContainer, palette))};`);
+
+  /* Alt Display, from the SAME helper as the Header roles above.
+   *
+   * The export gets these free — processTokens walks the theme JSON, so the
+   * three aliases generateCompleteThemes writes become CSS without anyone
+   * naming them. The preview builds its tokens by hand, so it does not, and a
+   * token present in one and absent from the other is invariant 5 exactly: no
+   * error, no unresolved var, just an Alt that is coloured in the export and
+   * inherits in the preview.
+   *
+   * Derived through getFixedHeaderToken rather than restated, so the preview
+   * cannot pick a different tone than the payload for the same surface. */
+  for (const [palette, varName] of [
+    ['Tertiary', 'Alt-Display-Color'],
+    ['Primary', 'Alt-Color-Gradient-Stop-1'],
+    ['Secondary', 'Alt-Color-Gradient-Stop-2'],
+  ] as const) {
+    lines.push(`  --${varName}: ${tokenRefToVar(getFixedHeaderToken(backgroundN, isContainer, palette))};`);
+  }
+  return lines.join('\n');
 }
 
 /**

@@ -360,12 +360,72 @@ ${displaySelectors('', ' > span')} { display: inline-block; transform-origin: 50
 ${offsets.join('\n')}`;
 }
 
+/**
+ * The Alt Display's colour: a solid by default, a gradient by opt-in.
+ *
+ * Both read the tokens the theme publishes per surface, never a baked colour,
+ * so the Alt follows data-surface — and so an add-on can re-point a stop on one
+ * hero without the core knowing how many gradients a brand has.
+ *
+ * Solid is the DEFAULT and the gradient is a modifier, because the gradient
+ * costs something the solid does not: background-clip: text needs
+ * `color: transparent`, so the glyphs are painted by a background. Anything
+ * that relies on the text colour — a selection highlight, a nested link, a
+ * print stylesheet — behaves differently, and in forced-colors mode the
+ * background is dropped entirely and the text would vanish. Hence the
+ * forced-colors block, which is not a nicety: without it the headline is
+ * invisible to exactly the readers who turned high contrast on.
+ */
+function altDisplayColorRules(styles: TypeStyle[]): string {
+  const alt = styles.filter((s) => s.token.startsWith('Alt-Display-'));
+  if (!alt.length) return '';
+  const sel = alt.map((s) => `.${libClass(s.token)}`).join(',\n');
+  const gradSel = alt.map((s) => `.${libClass(s.token)}.gradient`).join(',\n');
+  return `/* ---------------------------------------------------------------------------
+   Alt Display colour
+   Solid by default; add the \`gradient\` class for the two-stop version.
+   Both follow the surface — the tokens are re-published per theme and surface.
+--------------------------------------------------------------------------- */
+${sel} {
+  color: var(--Alt-Display-Color, var(--Header));
+}
+
+${gradSel} {
+  background-image: linear-gradient(
+    90deg,
+    var(--Alt-Color-Gradient-Stop-1, var(--Alt-Display-Color, var(--Header))),
+    var(--Alt-Color-Gradient-Stop-2, var(--Alt-Display-Color, var(--Header)))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Painting the glyphs with a background means the box, not the text, carries
+     the paint. Keep it to the text's own box so a wrapped headline does not
+     stretch the ramp across empty trailing space. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+@media (forced-colors: active) {
+${gradSel} {
+    /* The UA drops background-image here, and transparent text would leave
+       nothing on screen. Hand the glyphs back to the system colour. */
+    background-image: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: CanvasText;
+    forced-color-adjust: auto;
+  }
+}`;
+}
+
 /** Everything that follows the platform blocks. */
 export function generateTypographyRules(typography: TypographyStyle[] | null | undefined): string {
   const styles = buildTypeScale(typography);
   const roles = resolveRoles(typography);
   return [
     roleOverrideRules(),
+    altDisplayColorRules(styles),
     paragraphSpacingRules(styles),
     variationRules(styles, roles),
     noiseRules(roles.display.noise || 0),
