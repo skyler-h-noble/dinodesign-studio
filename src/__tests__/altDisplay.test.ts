@@ -205,38 +205,74 @@ describe('the Alt Display theme tokens', () => {
     }
   });
 
-  it('uses three distinct palettes, the same ones for every scheme', async () => {
-    /* Tertiary solid, Primary -> Secondary gradient, unconditionally.
-     *
-     * Three separate palettes rather than a computed shade of one: a shade has
-     * to be derived from somewhere, and at background tones 5 and 6 the ramp
-     * can run out, landing the derived colour on the base it came from. The
-     * gradient then renders as a flat fill with nothing to say it failed.
-     *
-     * Scheme-independent on purpose. A stop that moves per brand is a stop a
-     * designer cannot reason about, and the earlier analogous branch only ever
-     * chose which palette the second stop came from. */
-    for (const scheme of ['analogous', 'monochromatic', 'complementary',
-                          'triadic', 'split-complementary', 'tetradic']) {
-      const surfaces = (await build(scheme)).Default.Surfaces;
-      const at = (t: string) => String(surfaces[t].value);
-      expect(`${scheme} solid`).toBe(at('Alt-Display-Color').includes('.Tertiary.')
-        ? `${scheme} solid` : `${scheme} solid was ${at('Alt-Display-Color')}`);
-      expect(`${scheme} stop1`).toBe(at('Alt-Color-Gradient-Stop-1').includes('.Primary.')
-        ? `${scheme} stop1` : `${scheme} stop1 was ${at('Alt-Color-Gradient-Stop-1')}`);
-      expect(`${scheme} stop2`).toBe(at('Alt-Color-Gradient-Stop-2').includes('.Secondary.')
-        ? `${scheme} stop2` : `${scheme} stop2 was ${at('Alt-Color-Gradient-Stop-2')}`);
-    }
+  it('takes stop 2 from the cascade: Secondary, else Tertiary, else a Primary tone', async () => {
+    /* A two-hue gradient between distant hues cannot look right, and no
+       interpolation space rescues it — measured on a real brand, green (151)
+       to pink (350) is 160 degrees apart and the sRGB midpoint lands at
+       chroma 5, flat grey, against ends of 53 and 62. OKLCH keeps the chroma
+       but invents a third hue the brand does not own, and Figma interpolates
+       in sRGB anyway. So the fix is WHICH colours are blended. */
+    const gen = (await import('../utils/cssgen/generateCompleteThemes'))
+      .generateAllThemesWithSurfacesAndContainers;
+    const at = (stop2: string) => {
+      const themes: any = gen('Light-Mode', { primary: 71, secondary: 71, tertiary: 71 },
+        'light-tonal', 'complementary' as never, undefined, stop2 as never);
+      return String(themes.Default.Surfaces['Alt-Color-Gradient-Stop-2'].value);
+    };
+    expect(at('Secondary')).toContain('Header.Surfaces.Secondary');
+    expect(at('Tertiary')).toContain('Header.Surfaces.Tertiary');
+    /* mono is a tone of PRIMARY, and reaches past the Header table on purpose:
+       that table gives one tone per background, so a neighbouring index is
+       frequently the same colour — backgrounds 9-12 all resolve alike — and a
+       gradient whose stops collapse renders as a flat fill that looks like it
+       worked. */
+    expect(at('mono')).toMatch(/^\{Colors\.Primary\.Color-\d+\}$/);
   });
 
-  it('keeps the three on different palettes, so none can collapse into another', async () => {
-    /* The property that makes this safe at tones 5 and 6: the solid and the
-       two stops are drawn from three different palettes, so they cannot
-       resolve to one another however the ramp behaves. */
+  it('sends the mono stop AWAY from the background, never toward it', async () => {
+    /* Contrast is distance from the background, and stop 1 is already the
+       accessible Header colour for it — so moving further can only raise
+       contrast, and moving toward it is the only way to break 3:1.
+       Backgrounds 1-6 are dark, 7-12 light, per the background tables' own
+       comments. */
+    const { monoStopTone, MONO_STOP_TONE, DARK_BACKGROUND_MAX } =
+      await import('../utils/altDisplay');
+    for (let n = 1; n <= DARK_BACKGROUND_MAX; n++) {
+      expect(`bg ${n}: ${monoStopTone(n)}`).toBe(`bg ${n}: ${MONO_STOP_TONE.dark}`);
+    }
+    for (let n = DARK_BACKGROUND_MAX + 1; n <= 12; n++) {
+      expect(`bg ${n}: ${monoStopTone(n)}`).toBe(`bg ${n}: ${MONO_STOP_TONE.light}`);
+    }
+    /* Light on dark, dark on light — so the two must sit on opposite ends. */
+    expect(MONO_STOP_TONE.dark).toBeGreaterThan(MONO_STOP_TONE.light);
+  });
+
+  it('picks the cascade from the hues, not from the scheme name', async () => {
+    const { altStop2Palette } = await import('../utils/altDisplay');
+    /* Secondary wins when it is near. */
+    expect(altStop2Palette('#7b2d8e', '#5b2d9e', '#2e9e5b')).toBe('Secondary');
+    /* Tertiary is the fallback when Secondary is far but Tertiary is near. */
+    expect(altStop2Palette('#2e9e5b', '#e0559c', '#3f9e6e')).toBe('Tertiary');
+    /* Neither near — the real green/pink/blue case — so a Primary tone. */
+    expect(altStop2Palette('#2e9e5b', '#e0559c', '#3b5bd4')).toBe('mono');
+    /* Unanswerable resolves to mono, which needs no second hue. */
+    expect(altStop2Palette(undefined, '#5b2d9e', '#2e9e5b')).toBe('mono');
+    expect(altStop2Palette('#2e9e5b')).toBe('mono');
+  });
+
+  it('keeps the two STOPS on different palettes, so the gradient cannot go flat', async () => {
+    /* The solid and stop 1 are both Primary, deliberately: the gradient is the
+       solid extended, not a third colour. What must never collapse is the pair
+       of STOPS — equal stops render a flat fill that looks like a working
+       gradient and is not one.
+
+       Different PALETTES rather than derived shades is what guarantees it at
+       background tones 5 and 6, where a ramp can run out and a derived colour
+       lands back on the one it came from. */
     const s = (await build('analogous')).Default.Surfaces;
-    const vals = ['Alt-Display-Color', 'Alt-Color-Gradient-Stop-1', 'Alt-Color-Gradient-Stop-2']
-      .map((t) => String(s[t].value));
-    expect(new Set(vals).size).toBe(3);
+    expect(String(s['Alt-Display-Color'].value)).toBe(String(s['Alt-Color-Gradient-Stop-1'].value));
+    expect(String(s['Alt-Color-Gradient-Stop-1'].value))
+      .not.toBe(String(s['Alt-Color-Gradient-Stop-2'].value));
   });
 
   it('tracks the surface it sits on', async () => {

@@ -2,6 +2,7 @@
 import { blendColors } from '../colorScale';
 import type { NavSelection } from './generateCompleteThemes';
 import { nearestAvailableWeight } from '../googleFontWeights';
+import { altStop2Palette } from '../altDisplay';
 import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
 import { dropshadowBaseHex, effectLevelRecipe } from '../dropshadow';
 import { HEADER_FAMILY } from '../moodAxes';
@@ -5136,13 +5137,35 @@ export function exportColorSystemToJSON(
   
   console.log('🔍 [exportColorSystem] parsedUserSelections before generateCompleteSimplifiedSystem:', parsedUserSelections);
   
+  /* The Alt gradient's second stop, decided ONCE from the palettes' own hues.
+   *
+   * This is the only level that holds a hex — everything below takes tones and
+   * palette NAMES — so the hue question has to be answered here and carried
+   * down. Hue is constant along a tone ramp, so any entry represents the
+   * palette; the middle one is taken to avoid the near-black and near-white
+   * ends, where chroma collapses and the hue chroma reports is noise.
+   *
+   * Light mode's palettes are used for both modes on purpose: it is the same
+   * brand either way, and a brand whose Secondary is analogous in light mode
+   * does not stop being so in dark. Deciding per mode would let the two modes
+   * blend different palettes, which reads as a bug rather than a nuance. */
+  const hueOf = (palette: { tone: number; color: string }[] | undefined) =>
+    palette && palette.length ? palette[Math.floor(palette.length / 2)].color : undefined;
+  const altStop2 = altStop2Palette(
+    hueOf(tonePalettes.primary),
+    hueOf(tonePalettes.secondary),
+    hueOf(tonePalettes.tertiary),
+  );
+  console.log(`🎨 [Alt Display] gradient stop 2 → ${altStop2}`);
+
   modesForSystem.forEach(mode => {
     const system = generateCompleteSimplifiedSystem(
       mode,
       extractedTones!,
       surfaceStyle!,
       schemeType!,
-      parsedUserSelections
+      parsedUserSelections,
+      altStop2,
     );
     
     // Add all sections to the mode

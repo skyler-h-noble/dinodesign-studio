@@ -7,6 +7,7 @@ import { generateBaseButtons, generateDefaultButton } from './generateButtonsSim
 import type { NavSelection } from './generateCompleteThemes';
 import { generateAllThemesWithSurfacesAndContainers } from './generateCompleteThemes';
 import { generateLightModeTags, generateDarkModeTags } from './generateTagsSimplified';
+import type { AltStop2 } from '../altDisplay';
 
 /**
  * Helper to detect surface style based on extracted colors
@@ -735,7 +736,10 @@ export function generateCompleteSimplifiedSystem(
       | 'laddered-adaptive' | 'laddered-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
-  }
+  },
+  /* Passed straight through to the theme builder. Decided by altStop2Palette
+     where the palettes are, because nothing from here down holds a hex. */
+  altStop2: AltStop2 = 'mono',
 ): {
   Themes: any;
   'Default-Button': any;
@@ -768,7 +772,7 @@ export function generateCompleteSimplifiedSystem(
   const OB = 6;
   
   // Generate all sections with COMPLETE THEMES (includes Surfaces and Containers)
-  const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections);
+  const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections, altStop2);
   const buttons = generateBaseButtons(mode, extractedTones);
   const defaultButton = generateDefaultButton(config.buttonMode, config.textColoring, mode);
   const tag = mode === 'Light-Mode' 

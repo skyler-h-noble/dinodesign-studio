@@ -186,3 +186,63 @@ export const ANALOGOUS_SCHEMES: ReadonlySet<string> = new Set(['monochromatic', 
 export function altGradientKindForScheme(schemeType?: string): 'duo' | 'mono' {
   return schemeType && ANALOGOUS_SCHEMES.has(schemeType) ? 'duo' : 'mono';
 }
+
+/** Where the Alt gradient's second stop comes from. */
+export type AltStop2 = 'Secondary' | 'Tertiary' | 'mono';
+
+/**
+ * Which palette the second gradient stop should use.
+ *
+ * Secondary if it is analogous to Primary, else Tertiary if IT is, else
+ * another tone of Primary.
+ *
+ * The cascade exists because a two-hue gradient between distant hues cannot
+ * look right, and no interpolation space rescues it. Measured on a real brand:
+ * green (hue 151) to pink (hue 350) is 160 degrees apart, and the sRGB
+ * midpoint lands at chroma 5 — flat grey — against ends of 53 and 62. Moving
+ * the blend to OKLCH keeps the chroma but invents a third hue the brand does
+ * not own (green through ORANGE to pink), and Figma interpolates in sRGB
+ * regardless, so the two would then disagree. The fix has to be which colours
+ * are blended, not how.
+ *
+ * 'mono' is the honest last resort rather than a worse two-hue blend: one hue
+ * cannot collide with itself, and a tone of Primary is always available where
+ * a third brand hue may not be.
+ */
+export function altStop2Palette(
+  primary?: string,
+  secondary?: string,
+  tertiary?: string,
+): AltStop2 {
+  if (!primary) return 'mono';
+  try {
+    if (secondary && isAnalogous(primary, secondary)) return 'Secondary';
+    if (tertiary && isAnalogous(primary, tertiary)) return 'Tertiary';
+  } catch {
+    return 'mono';                 // not colours chroma can parse
+  }
+  return 'mono';
+}
+
+/**
+ * The Primary tone the 'mono' stop uses, given the background index.
+ *
+ * Backgrounds 1-6 are dark and 7-12 light — the background tables say so in
+ * their own comments. Contrast is distance from the background, and the first
+ * stop is already the accessible Header colour for it, so moving FURTHER from
+ * the background can only raise contrast; moving toward it is the only way to
+ * break 3:1. Hence light on dark, dark on light.
+ *
+ * 12 and 2 rather than a step either side of the header's own tone, because a
+ * near neighbour collapses. Header.Surfaces.Primary resolves backgrounds 9-12
+ * to one tone and 1-4 to another, so "the next index along" is frequently the
+ * SAME colour — a gradient that renders as a flat fill and looks like it
+ * worked. These two are distinct from every tone that table produces in their
+ * half (light: 3, 4, 5; dark: 10, 8, 2).
+ */
+export const MONO_STOP_TONE = { dark: 12, light: 2 } as const;
+export const DARK_BACKGROUND_MAX = 6;
+
+export function monoStopTone(backgroundN: number): number {
+  return backgroundN <= DARK_BACKGROUND_MAX ? MONO_STOP_TONE.dark : MONO_STOP_TONE.light;
+}

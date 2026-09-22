@@ -70,7 +70,7 @@ function buildHeaderPaletteLines(backgroundN: number, isContainer: boolean): str
    * Derived through getFixedHeaderToken rather than restated, so the preview
    * cannot pick a different tone than the payload for the same surface. */
   for (const [palette, varName] of [
-    ['Tertiary', 'Alt-Display-Color'],
+    ['Primary', 'Alt-Display-Color'],
     ['Primary', 'Alt-Color-Gradient-Stop-1'],
     ['Secondary', 'Alt-Color-Gradient-Stop-2'],
   ] as const) {

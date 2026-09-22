@@ -13,6 +13,8 @@ import type { SurfaceLevel } from '../surfaceWindow';
 /**
  * Theme configuration for generating Surfaces and Containers
  */
+import { monoStopTone, type AltStop2 } from '../altDisplay';
+
 interface ThemeConfig {
   themeName: string;
   theme: string; // Primary, Secondary, Tertiary, Neutral
@@ -52,6 +54,9 @@ interface ThemeConfig {
   surfaceScopedButton?: boolean;
   /** True for the black/white button style, whose border is its own fill. */
   blackWhiteButton?: boolean;
+  /** Which palette the Alt gradient's second stop draws from — see
+   *  altStop2Palette. 'mono' means another tone of Primary. */
+  altStop2: AltStop2;
 }
 
 /**
@@ -163,7 +168,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       value: `{Header.Surfaces.Tertiary.Color-${n}}`,
       type: 'color'
     },
-    /* Alt Display: Tertiary solid, Primary -> Secondary gradient.
+    /* Alt Display: Primary solid, Primary -> Secondary gradient.
      *
      * Three DISTINCT palettes rather than a computed shade of one. A shade has
      * to come from somewhere, and at background tones 5 and 6 the ramp can run
@@ -185,7 +190,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
      * Figma has no gradient variable type, so a gradient is two bound stops —
      * VariableBindableColorStopField is 'color', so each stop takes one. */
     'Alt-Display-Color': {
-      value: `{Header.Surfaces.Tertiary.Color-${n}}`,
+      value: `{Header.Surfaces.Primary.Color-${n}}`,
       type: 'color'
     },
     'Alt-Color-Gradient-Stop-1': {
@@ -193,7 +198,9 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       type: 'color'
     },
     'Alt-Color-Gradient-Stop-2': {
-      value: `{Header.Surfaces.Secondary.Color-${n}}`,
+      value: config.altStop2 === 'mono'
+        ? `{Colors.Primary.Color-${monoStopTone(n)}}`
+        : `{Header.Surfaces.${config.altStop2}.Color-${n}}`,
       type: 'color'
     },
     'Header-Neutral': {
@@ -694,7 +701,7 @@ function generateSingleTheme(config: ThemeConfig): any {
        different tones, so the Alt must be stated for both or it keeps the
        surface's colour on a card. */
     'Alt-Display-Color': {
-      value: `{Header.Containers.Tertiary.Color-${config.contN}}`,
+      value: `{Header.Containers.Primary.Color-${config.contN}}`,
       type: 'color'
     },
     'Alt-Color-Gradient-Stop-1': {
@@ -702,7 +709,9 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     'Alt-Color-Gradient-Stop-2': {
-      value: `{Header.Containers.Secondary.Color-${config.contN}}`,
+      value: config.altStop2 === 'mono'
+        ? `{Colors.Primary.Color-${monoStopTone(config.contN)}}`
+        : `{Header.Containers.${config.altStop2}.Color-${config.contN}}`,
       type: 'color'
     },
     'Header-Neutral': {
@@ -993,7 +1002,12 @@ export function generateAllThemesWithSurfacesAndContainers(
       | 'laddered-adaptive' | 'laddered-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black'; // CRITICAL FIX: Added to pass card coloring selection to generateModesThemes
-  }
+  },
+  /* Which palette the Alt gradient's second stop uses. Decided once, from the
+     palettes' own hues, by altStop2Palette — the theme layer never sees a hex,
+     so the question has to be answered where the colours are and carried in.
+     Defaults to 'mono', the answer that needs no second hue to be known. */
+  altStop2: AltStop2 = 'mono',
 ): any {
   
   const themes: any = {};
@@ -1075,6 +1089,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   
   // 1. Default Theme (from user/calculated settings)
   themes.Default = generateSingleTheme({
+    altStop2,
     themeName: 'Default',
     surfaceScopedButton: isSurfaceScopedButton,
     blackWhiteButton: isBlackWhiteButton,
@@ -1327,6 +1342,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
   // For other themes, use the default container settings
   const makeConfig = (themeName: string, theme: string, n: number): ThemeConfig => ({
+    altStop2,
     themeName,
     theme,
     n,
