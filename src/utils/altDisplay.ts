@@ -141,12 +141,19 @@ export const ALT_DISPLAY_WEIGHT_DROP = 300;
  * was chosen for, and on a decorative or script family it can break up
  * entirely.
  *
- * It only binds when the family's ramp is sparse. Stepping down requires the
- * Display to be 700 or heavier, so the TARGET is never under 400 — the floor
- * matters for a family that ships, say, [200, 800] and nothing between, where
- * the nearest candidate to 500 would otherwise be a 200. Such a family now
- * returns undefined instead, so the Alt tracks the face and colour carries the
- * distinction, which is the same answer a single-weight family gets.
+ * It is a GUARD, and on today's data it never fires. Measured across all 456
+ * families in googleFontWeights.json: 77 ship a 100 or 200, all 77 also ship a
+ * 700+, and in ZERO family-and-weight combinations does the floor change the
+ * answer. The reason is structural — stepping down requires Display at 700 or
+ * heavier, so the target is never under 400, and every family with a hairline
+ * also ships something nearer to 400 than 200 is.
+ *
+ * So do not tune this expecting an effect; 200 and 300 are indistinguishable
+ * on every real family. It exists for a ramp that is sparse in a way none
+ * currently are — [200, 800] with nothing between, where the nearest candidate
+ * to 500 would otherwise be a 200. Such a family returns undefined instead, so
+ * the Alt tracks the face and colour carries the distinction, which is the
+ * same answer a single-weight family gets.
  */
 export const ALT_DISPLAY_MIN_WEIGHT = 300;
 
