@@ -121,44 +121,36 @@ describe('the colour family the Alt Display wears', () => {
 });
 
 describe('the Alt Display type styles', () => {
-  it('mirrors Display step for step, on every device', async () => {
-    /* The pairing sets ONE WORD on one baseline — "Omni" in Display, "Design"
-       in the Alt. Any divergence in size or leading and the two halves stop
-       lining up, which is the whole feature.
-
-       Checked through the payload, not the scale, because the device blocks
-       are where this breaks: a style the mobile blocks do not declare gets
-       filled from Desktop by the device-floor merge, so the Alt reported
-       Desktop's 72px on every phone until the static blocks carried it. Same
-       failure Display-Medium had. */
-    const { generateFigmaJSON } = await import('../utils/generateFigmaJSON');
+  it('mirrors Display step for step, in every platform block', async () => {
     const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
-    const { DEVICES_COLLECTION, DEVICE_TYPES } = await import('../utils/typographyPlatform');
-    const out = generateFigmaJSON(
-      {
-        Typography: {
-          'Set-Font-Family-Header': { value: 'Poppins' },
-          'Set-Font-Family-Body': { value: 'Inter' },
-          'Set-Font-Family-Decorative': { value: 'Playfair Display' },
-        },
-        _componentStyle: {
-          buttonRadius: 32, iconButtonRadius: 32, inputRadius: 4, cardPadding: 16,
-          bevelOpacity: 50, shadowResolution: 3,
-          buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
-        },
-      },
-      buildTypographyTokensCSS([
-        { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
-        { type: 'header', family: 'Poppins', weight: '600' },
-        { type: 'body', family: 'Inter', weight: '400' },
-      ] as never),
-    );
-    for (const device of DEVICE_TYPES) {
-      const bag = out[DEVICES_COLLECTION][device];
-      const ramp = (prefix: string) => (['Small', 'Medium', 'Large'] as const)
-        .map((s) => bag[`Typography/Displays/${prefix}Display-${s}-Font-Size`]?.value).join('/');
-      expect(`${device}: ${ramp('Alt-')}`).toBe(`${device}: ${ramp('')}`);
-      expect(ramp('Alt-')).not.toContain('undefined');
+    /* The pairing sets ONE WORD on one baseline — "Omni" in Display, "Design"
+       in the Alt — so any divergence in size or leading and the halves stop
+       lining up.
+
+       Asserted in the STYLESHEET, not the payload, and that is the point of
+       the trim: Figma no longer offers Alt's size, leading or tracking,
+       because nothing may ever select between them and Display's. The CSS
+       still declares all four, since the lib reads them by name. So the
+       stylesheet is now the only place the pairing can be checked — and the
+       only place it can break. */
+    const css = buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never);
+
+    for (const platform of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android']) {
+      const block = css.match(
+        new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+      expect(`${platform} block found: ${block.length > 0}`).toBe(`${platform} block found: true`);
+      for (const step of ['Small', 'Medium', 'Large']) {
+        for (const prop of ['Font-Size', 'Line-Height']) {
+          const read = (name: string) =>
+            block.match(new RegExp(`--${name}-${step}-${prop}:\\s*([^;]+);`))?.[1]?.trim();
+          expect(`${platform}/${step}/${prop}: ${read('Alt-Display')}`)
+            .toBe(`${platform}/${step}/${prop}: ${read('Display')}`);
+        }
+      }
     }
   });
 
@@ -322,5 +314,57 @@ describe('the Alt Display CSS', () => {
     const block = css.slice(css.indexOf('Alt Display colour'));
     const upTo = block.slice(0, block.indexOf('forced-colors') + 400);
     expect(upTo).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  });
+});
+
+describe('the Alt Display variable trim', () => {
+  it('offers only the weight to Figma, and keeps every token in the CSS', async () => {
+    /* Invariant 2: the test is not "do the copies match" but "does anything
+       SELECT between them". Alt's size, leading and tracking are identical to
+       Display's on every device and in both faces, and the pairing REQUIRES
+       them equal — so publishing them twice manufactures a choice that must
+       never be exercised. Someone nudges Alt-Display-Large-Font-Size and
+       "Omni" + "Design" stops lining up, with no error anywhere.
+
+       The CSS keeps them because the two are different kinds of thing: a CSS
+       token is a DEPENDENCY the lib reads by name, a Figma variable is an
+       OFFER. Withdrawing an offer nobody should accept costs nothing;
+       withdrawing the token breaks a consumer's build. */
+    const { generateFigmaJSON } = await import('../utils/generateFigmaJSON');
+    const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
+    const { DEVICES_COLLECTION, DEVICE_TYPES } = await import('../utils/typographyPlatform');
+    const css = buildTypographyTokensCSS([
+      { type: 'decorative', family: 'Playfair Display', weight: '800', displaySize: '72' },
+      { type: 'header', family: 'Poppins', weight: '600' },
+      { type: 'body', family: 'Inter', weight: '400' },
+    ] as never);
+    const out = generateFigmaJSON(
+      {
+        Typography: {
+          'Set-Font-Family-Header': { value: 'Poppins' },
+          'Set-Font-Family-Body': { value: 'Inter' },
+          'Set-Font-Family-Decorative': { value: 'Playfair Display' },
+        },
+        _componentStyle: {
+          buttonRadius: 32, iconButtonRadius: 32, inputRadius: 4, cardPadding: 16,
+          bevelOpacity: 50, shadowResolution: 3,
+          buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+        },
+      }, css);
+
+    for (const device of DEVICE_TYPES) {
+      const alt = Object.keys(out[DEVICES_COLLECTION][device]).filter((k) => k.includes('Alt-Display'));
+      /* Three steps x two faces, weight only. */
+      expect(`${device}: ${alt.length}`).toBe(`${device}: 6`);
+      expect(`${device}: ${alt.every((k) => k.endsWith('-Font-Weight'))}`).toBe(`${device}: true`);
+    }
+
+    /* And the stylesheet still declares all four properties per step. */
+    for (const step of ['Large', 'Medium', 'Small']) {
+      for (const prop of ['Font-Size', 'Line-Height', 'Letter-Spacing', 'Font-Weight']) {
+        expect(`--Alt-Display-${step}-${prop}: ${css.includes(`--Alt-Display-${step}-${prop}`)}`)
+          .toBe(`--Alt-Display-${step}-${prop}: true`);
+      }
+    }
   });
 });

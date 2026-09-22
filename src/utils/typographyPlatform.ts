@@ -124,6 +124,32 @@ export const SWITCHED_PROPS = [
  */
 export const DEVICE_PROPS = ['Font-Size', 'Line-Height'] as const;
 
+/**
+ * Styles that offer only their WEIGHT as a Figma variable.
+ *
+ * Alt Display is the same face at the same sizes as Display — size, leading
+ * and tracking are identical on every device and in both faces, by design,
+ * because the pairing sets one word on one baseline ("Omni" + "Design") and a
+ * separate ramp would stop the halves lining up.
+ *
+ * Invariant 2 decides this, and the test is not "do the copies match" but
+ * "does anything SELECT between them". Nothing does, and nothing can: the
+ * requirement is that they stay equal. Publishing them twice would manufacture
+ * a choice that must never be exercised — someone nudges
+ * Alt-Display-Large-Font-Size and the pairing breaks with no error anywhere.
+ *
+ * The Alt text style binds those three fields to DISPLAY's variables instead.
+ * That is not a loss of expressiveness: it is the pairing stated in the file
+ * rather than merely hoped for.
+ *
+ * Note this is a FIGMA-only trim. The CSS keeps every token, because the two
+ * are different kinds of thing: a CSS token is a DEPENDENCY — the lib reads
+ * --Alt-Display-Large-Font-Size by name and a missing one breaks a consumer's
+ * build — while a Figma variable is an OFFER, and withdrawing an offer nobody
+ * should accept costs nothing.
+ */
+export const WEIGHT_ONLY_STYLES = /^Alt-Display-/;
+
 /* ── Why Devices-Type has THREE branches and not two ───────────────────────
  *
  *   Typography/<Section>/...          Font-Size, Line-Height          62
@@ -862,7 +888,12 @@ export function typographyVariablePayload(
          Omni/System split, together with Line-Height: the two are the vertical
          rhythm, and holding them fixed is what makes the switch safe. */
       const size = num(props['Font-Size']) ?? 16;
+      /* Size and leading still READ from the stylesheet — the line-height
+         computation below and the Alt's own weight both need the size — they
+         are simply not published. */
+      const weightOnly = WEIGHT_ONLY_STYLES.test(style);
       for (const prop of DEVICE_PROPS) {
+        if (weightOnly) continue;
         /* LINE HEIGHT is COMPUTED, not read.
          *
          * The stylesheet's mobile blocks set every heading solid — Display and
@@ -935,6 +966,7 @@ export function typographyVariablePayload(
          only the family, which made System a relabelled Omni. */
       const fam = SYSTEM_FAMILY_OF[device];
       for (const prop of SWITCHED_PROPS) {
+        if (weightOnly && prop !== 'Font-Weight') continue;
         const omni = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
         if (omni === undefined) continue;
         /* A step that follows its face points at the face's root rather than
