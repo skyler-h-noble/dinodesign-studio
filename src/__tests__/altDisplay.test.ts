@@ -106,10 +106,19 @@ describe('the Alt Display weight', () => {
   it('steps DOWN, and never below the legibility floor, once Display is bold', () => {
     expect(altDisplayWeight(800, [100, 200, 300, 400, 500, 600, 700, 800, 900])).toBe(500);
     expect(altDisplayWeight(700, [400, 500, 600, 700, 800, 900])).toBe(400);
-    /* The floor holds: 100 is shipped but below ALT_DISPLAY_MIN_WEIGHT. */
+    /* The floor is 300: Light is a display voice, Thin is not — at 34px on a
+       phone a 200 loses the stroke contrast the face was chosen for.
+
+       It only binds on a SPARSE ramp. Stepping down needs Display at 700+, so
+       the target is never under 400; the floor matters for a family that ships
+       nothing between a hairline and a heavy, where the nearest candidate
+       would otherwise be a 200. */
     const w = altDisplayWeight(700, [100, 400]);
     expect(w === undefined || w >= ALT_DISPLAY_MIN_WEIGHT).toBe(true);
     expect(altDisplayWeight(700, [100])).toBeUndefined();
+    expect(altDisplayWeight(800, [200, 800])).toBeUndefined();     // 200 refused
+    expect(altDisplayWeight(800, [300, 800])).toBe(300);           // 300 allowed
+    expect(ALT_DISPLAY_MIN_WEIGHT).toBe(300);
   });
 
   it('breaks a tie toward the lighter weight', () => {

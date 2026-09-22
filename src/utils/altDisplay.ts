@@ -133,8 +133,22 @@ export const ALT_BOLD_TARGET = 700;
 /** How far a Bold-or-heavier Display's Alt steps DOWN. */
 export const ALT_DISPLAY_WEIGHT_DROP = 300;
 
-/** The lightest weight the Alt will drop to, so it stays legible at size. */
-export const ALT_DISPLAY_MIN_WEIGHT = 200;
+/**
+ * The lightest weight the Alt will drop to.
+ *
+ * 300, not 200. Light is a legitimate display voice; Thin is not — at
+ * Alt-Display-Small (34px on a phone) a 200 loses the stroke contrast the face
+ * was chosen for, and on a decorative or script family it can break up
+ * entirely.
+ *
+ * It only binds when the family's ramp is sparse. Stepping down requires the
+ * Display to be 700 or heavier, so the TARGET is never under 400 — the floor
+ * matters for a family that ships, say, [200, 800] and nothing between, where
+ * the nearest candidate to 500 would otherwise be a 200. Such a family now
+ * returns undefined instead, so the Alt tracks the face and colour carries the
+ * distinction, which is the same answer a single-weight family gets.
+ */
+export const ALT_DISPLAY_MIN_WEIGHT = 300;
 
 /**
  * The Alt's weight — a lighter weight of the SAME family, or undefined.
