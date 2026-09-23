@@ -14,6 +14,7 @@ import { platformButtonMetrics } from './platformMetrics';
 import { THEME_MODES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
+  platformBevelJSON,
 } from './bevelGeometry';
 import {
   dropshadowBaseHex, dropshadowAlphas, shadowLayers, shadowOptionsFromStyle,
@@ -35,7 +36,7 @@ import type { TypographyStyle } from '../types';
 import { motionJSON } from './motion';
 import { componentElevationGeometryFigma } from './componentElevation';
 import {
-  DEVICE_TYPES, FACE_MODES, DEVICES_COLLECTION, typographyVariablePayload,
+  DEVICE_TYPES, FACE_MODES, DEVICES_COLLECTION, typographyVariablePayload, SEEDS_FROM,
   type VarBag, type DeviceType,
 } from './typographyPlatform';
 
@@ -2163,12 +2164,38 @@ const BUTTON_BORDER_WIDTH = 1;
      * different one feed Figma. */
     const devicesBag = figma[DEVICES_COLLECTION];
     if (devicesBag) {
+      /* The three heights the user picked. Non-Desktop devices substitute the
+         platform's own inside platformBevelCSS/JSON. */
+      const bevelHeights = {
+        medium: cs.buttonHeight,
+        small: cs.smallButtonHeight,
+        large: cs.largeButtonHeight,
+      };
       for (const device of Object.keys(devicesBag) as DeviceType[]) {
         const metrics = device === 'Desktop'
           ? desktopButtonMetrics(buttonFigmaMetrics)
           : platformButtonMetrics(device);
         Object.assign(devicesBag[device],
           Object.fromEntries(Object.entries(metrics)
+            .map(([n, v]) => [n, { value: v, type: 'number' }])));
+
+        /* Bevel geometry, all three sizes, for THIS device's platform.
+         *
+         * Devices-Type rather than the Platform collection: Platform is being
+         * retired, and the seven device modes are where the file now keeps
+         * anything that varies by hardware. SEEDS_FROM is the same map the
+         * typography payload uses to decide which platform block a device
+         * reads, so the bevel cannot disagree with the type about which
+         * platform a device is.
+         *
+         * Eight names per size, but only TWO distinct numbers: four slots take
+         * +B and four take -B. Figma cannot negate a variable, which is why the
+         * negative is written rather than derived. */
+        const bevel = platformBevelJSON(
+          SEEDS_FROM[device] as never, bevelHeights, bevelPct,
+        );
+        Object.assign(devicesBag[device],
+          Object.fromEntries(Object.entries(bevel)
             .map(([n, v]) => [n, { value: v, type: 'number' }])));
       }
     }

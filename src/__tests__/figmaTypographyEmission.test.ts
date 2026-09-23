@@ -56,11 +56,41 @@ describe('the downloaded figma.json', () => {
     'Small Button Icon', 'Medium Button Icon', 'Large Button Icon',
   ];
 
-  it('touches nothing outside Typography/ and the Desktop button column', () => {
+  it('touches nothing outside Typography/, the button columns and the bevel', () => {
+    /* The bevel joined this collection when the Platform collection was
+       retired: seven device modes are now where anything varying by hardware
+       lives, and the bevel varies by hardware because it is a fraction of a
+       button height that does. Eight slots per size, three sizes. */
+    const BEVEL = /^(?:Sm-|Lg-)?Button-(?:High|Low)light-(?:Offset-[xy]|Blur-Radius|Spread)$/;
     for (const d of DEVICE_TYPES) {
       const stray = Object.keys(out[DEVICES_COLLECTION][d])
-        .filter((n) => !n.startsWith('Typography/') && !DESKTOP_BUTTONS.includes(n));
+        .filter((n) => !n.startsWith('Typography/')
+          && !DESKTOP_BUTTONS.includes(n)
+          && !BEVEL.test(n));
       expect(`${d}: ${stray.join(',') || 'none'}`).toBe(`${d}: none`);
+    }
+  });
+
+  it('gives every device all 24 bevel values, sized to its own platform', () => {
+    /* Only the MEDIUM set used to be re-emitted per platform, so a small or
+       large button wore Desktop's bevel everywhere — an iOS large (50px)
+       carrying a Desktop large's (56px) geometry.
+
+       Eight names per size but only TWO numbers: four slots take +B and four
+       take -B. Figma cannot negate a variable, so the negative is written
+       rather than derived, and blur stays POSITIVE in both shadows because a
+       negative blur radius is invalid CSS and drops the whole shadow. */
+    for (const d of DEVICE_TYPES) {
+      const bag = out[DEVICES_COLLECTION][d];
+      for (const prefix of ['', 'Sm-', 'Lg-']) {
+        const at = (slot: string) => bag[`${prefix}Button-${slot}`]?.value;
+        const b = at('Highlight-Offset-x');
+        expect(`${d}/${prefix}: ${typeof b}`).toBe(`${d}/${prefix}: number`);
+        for (const pos of ['Highlight-Offset-y', 'Highlight-Blur-Radius', 'Lowlight-Blur-Radius'])
+          expect(`${d}/${prefix}${pos}`).toBe(at(pos) === b ? `${d}/${prefix}${pos}` : `MISMATCH ${at(pos)} vs ${b}`);
+        for (const neg of ['Highlight-Spread', 'Lowlight-Offset-x', 'Lowlight-Offset-y', 'Lowlight-Spread'])
+          expect(`${d}/${prefix}${neg}`).toBe(at(neg) === -b ? `${d}/${prefix}${neg}` : `MISMATCH ${at(neg)} vs ${-b}`);
+      }
     }
   });
 

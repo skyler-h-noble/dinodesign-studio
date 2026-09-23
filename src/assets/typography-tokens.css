@@ -177,8 +177,6 @@
 
 [data-platform="IOS-Mobile"] {
 
-  /* Platform */
-  --Platform-Spacer: 10px;
 
 
   /* Display */
@@ -374,8 +372,6 @@
 
 [data-platform="IOS-Tablet"] {
 
-  /* Platform */
-  --Platform-Spacer: 10px;
 
 
   /* Display */
@@ -571,8 +567,6 @@
 
 [data-platform="Android"] {
 
-  /* Platform */
-  --Platform-Spacer: 12px;
 
 
   /* Display */

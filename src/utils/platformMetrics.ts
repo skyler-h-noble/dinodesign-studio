@@ -1,4 +1,5 @@
 import { SEEDS_FROM, type DeviceType } from './typographyPlatform';
+import { PLATFORM_BUTTON_HEIGHT, type SizeTriple } from './bevelGeometry';
 import { DEVICE_BUTTON_NAMES, SIZE_MODES } from './componentSize';
 
 /**
@@ -22,43 +23,20 @@ export type CSSPlatform = 'Desktop' | 'IOS-Mobile' | 'IOS-Tablet' | 'Android';
 export const CSS_PLATFORMS: readonly CSSPlatform[] =
   ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android'] as const;
 
-/**
- * `--Platform-Spacer` — the gap between sibling controls, per platform.
+/* --Platform-Spacer is NOT here.
  *
- * The unit of separation a platform expects between two things that belong
- * together: the gap in a ButtonGroup, a toolbar, a row of chips. It is NOT a
- * general spacing scale and should not grow into one — a layout that wants
- * four sizes of gap wants a scale, and this is the one value that changes when
- * the same layout is rendered on a phone instead of a laptop.
+ * It already existed, in bevelGeometry.ts, and generateDesignSystem emits it
+ * into foundation.css beside --Target, --Min-Stack-Gap and the per-platform
+ * button height. A second copy was added here with a DIFFERENT Desktop value
+ * (8 against the incumbent's 4), so the stylesheet declared the same custom
+ * property twice and which one won depended on load order.
  *
- * Desktop is tightest because a pointer is precise. The touch platforms are
- * looser, and Android is loosest: Material's baseline grid is 4dp with 12dp
- * between grouped controls, against Apple's 8pt grid.
- *
- * These mirror the values hand-authored in the Figma file's Devices-Type
- * collection. Figma keeps its own copy on purpose — the payload does not write
- * this variable, exactly as it does not write the platform button columns.
- */
-export const PLATFORM_SPACER: Record<CSSPlatform, number> = {
-  'Desktop': 8,
-  'IOS-Mobile': 10,
-  'IOS-Tablet': 10,
-  'Android': 12,
-};
-
-/** The declaration for one platform block, section comment included. */
-export function platformMetricCSS(platform: CSSPlatform, indent = '  '): string[] {
-  return [
-    `${indent}/* Platform */`,
-    `${indent}--Platform-Spacer: ${PLATFORM_SPACER[platform]}px;`,
-  ];
-}
+ * The incumbent's 4 is deliberate and documented where it lives: Desktop
+ * "carries 4px of breathing room even though its target already equals the
+ * button height". Import it from there; do not restate it. */
 
 /** The platforms whose metrics are specified by Apple or Google, not by the brand. */
 export type TouchPlatform = Exclude<CSSPlatform, 'Desktop'>;
-
-/** A metric that has a value per button size. */
-export interface SizeTriple { medium: number; small: number; large: number }
 
 /**
  * Button height and glyph size, per touch platform.
@@ -81,16 +59,20 @@ export interface SizeTriple { medium: number; small: number; large: number }
  * which is why this is keyed by platform and not by the seven device modes.
  */
 export const PLATFORM_BUTTON: Record<TouchPlatform, { height: SizeTriple; icon: SizeTriple }> = {
+  /* Heights come from bevelGeometry's PLATFORM_BUTTON_HEIGHT rather than being
+     restated. The bevel is a fraction of the height, so the two tables
+     disagreeing would put a button's bevel out of proportion with the button —
+     and a duplicated constant is how that happens. */
   'IOS-Mobile': {
-    height: { medium: 44, small: 32, large: 50 },
+    height: PLATFORM_BUTTON_HEIGHT['IOS-Mobile'],
     icon:   { medium: 20, small: 16, large: 24 },
   },
   'IOS-Tablet': {
-    height: { medium: 44, small: 32, large: 50 },
+    height: PLATFORM_BUTTON_HEIGHT['IOS-Tablet'],
     icon:   { medium: 20, small: 16, large: 24 },
   },
   'Android': {
-    height: { medium: 48, small: 32, large: 56 },
+    height: PLATFORM_BUTTON_HEIGHT.Android,
     icon:   { medium: 18, small: 18, large: 24 },
   },
 };

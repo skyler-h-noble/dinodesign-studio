@@ -1,6 +1,7 @@
 import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from './firebase/storage';
 import {
   bevelCSS, bevelJSON, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
+  platformBevelCSS,
 } from './bevelGeometry';
 import { extractHeroImage } from './heroImage';
 import { STORAGE_BUCKET } from './firebase/client';
@@ -1006,6 +1007,10 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   // than a second number to keep in sync.
   const lgMinButtonWidth = minButtonWidth + 40;
   const bevelPercent = input.styleCustomizations?.bevel ?? 0;
+
+  /* The user's own three heights, in one object so every bevel emission
+     takes the same three rather than three separate arguments. */
+  const bevelHeights = { medium: buttonHeight, small: smallButtonHeight, large: largeButtonHeight };
   const bevelOpacity = input.styleCustomizations?.bevelOpacity ?? 50;
   const bevelPx = Math.round(buttonHeight * bevelPercent / 100);
   const r = computeRadii(sc);
@@ -1232,10 +1237,12 @@ ${typographyDeclarations(input.typographyStyles)}
   --Label-Paragraph-Spacing: 4px;
   --Button-Font-Size: 16px;
   --Button-Line-Height: 20px;
-  /* Medium bevel geometry — derived from THIS platform's button height, which
-     is why it lives beside the height rather than in foundation.css. Each
-     [data-platform] block below re-emits it for its own height. */
-${bevelCSS('', buttonHeight, bevelPercent)}
+  /* Bevel geometry for ALL THREE sizes — derived from THIS platform's button
+     heights, which is why it lives beside them rather than in foundation.css.
+     Each [data-platform] block below re-emits all three for its own heights.
+     It used to re-emit the MEDIUM set only, so a small or large button wore
+     Desktop's bevel on every platform. */
+${platformBevelCSS('Desktop', bevelHeights, bevelPercent)}
   /* Hit target. The SMALL button keeps its visual size on every platform; the
      lib wraps it in a box that grows to --Target using --Platform-Spacer, so
      the button looks identical while the tappable area meets the platform
@@ -1250,7 +1257,7 @@ ${bevelCSS('', buttonHeight, bevelPercent)}
   --Platform-Label: "IOS-Mobile";
   --Button-Height: ${platformButtonHeight('IOS-Mobile', buttonHeight)}px;
   --Min-Stack-Gap: 10px;
-${bevelCSS('', platformButtonHeight('IOS-Mobile', buttonHeight), bevelPercent)}
+${platformBevelCSS('IOS-Mobile', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['IOS-Mobile']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['IOS-Mobile']}px;
   --Body-Font-Size: 16px;
@@ -1295,7 +1302,7 @@ ${bevelCSS('', platformButtonHeight('IOS-Mobile', buttonHeight), bevelPercent)}
   --Platform-Label: "IOS-Tablet";
   --Button-Height: ${platformButtonHeight('IOS-Tablet', buttonHeight)}px;
   --Min-Stack-Gap: 10px;
-${bevelCSS('', platformButtonHeight('IOS-Tablet', buttonHeight), bevelPercent)}
+${platformBevelCSS('IOS-Tablet', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['IOS-Tablet']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['IOS-Tablet']}px;
   --Body-Font-Size: 17px;
@@ -1340,7 +1347,7 @@ ${bevelCSS('', platformButtonHeight('IOS-Tablet', buttonHeight), bevelPercent)}
   --Platform-Label: "Android";
   --Button-Height: ${platformButtonHeight('Android', buttonHeight)}px;
   --Min-Stack-Gap: 12px;
-${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
+${platformBevelCSS('Android', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['Android']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['Android']}px;
   --Body-Font-Size: 16px;

@@ -9,9 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildTypographyTokensCSS } from '../utils/typographyTokens';
-import {
-  CSS_PLATFORMS, PLATFORM_SPACER, PLATFORM_BUTTON, platformButtonMetrics,
-} from '../utils/platformMetrics';
+import { CSS_PLATFORMS, PLATFORM_BUTTON, platformButtonMetrics } from '../utils/platformMetrics';
 import { parsePlatformBlock } from '../utils/typographyPlatform';
 
 const CSS = buildTypographyTokensCSS([
@@ -25,33 +23,15 @@ const spacerIn = (platform: string): string | undefined => {
   return block?.[1].match(/--Platform-Spacer:\s*([^;]+);/)?.[1];
 };
 
-describe('--Platform-Spacer', () => {
-  it('is declared in every platform block, at the table\'s value', () => {
-    for (const platform of CSS_PLATFORMS) {
-      expect(`${platform}: ${spacerIn(platform)}`)
-        .toBe(`${platform}: ${PLATFORM_SPACER[platform]}px`);
-    }
-  });
-
-  it('is not the same number everywhere', () => {
-    /* A per-platform variable that holds one value is a constant wearing a
-       cascade. If these ever collapse, the [data-platform] blocks are dead
-       weight and the token should be a plain :root declaration instead. */
-    expect(new Set(Object.values(PLATFORM_SPACER)).size).toBeGreaterThan(1);
-  });
-
-  it('is invisible to the typography parser', () => {
-    /* parsePlatformBlock reads this same block for type styles. It matches on
-       a Font-Size / Font-Weight / Line-Height / Letter-Spacing suffix, so a
-       non-typographic property must not register as a style — a bogus
-       "Platform" style would ship to Figma as a variable group. */
-    for (const platform of CSS_PLATFORMS) {
-      const { styles, families } = parsePlatformBlock(CSS, platform);
-      expect(Object.keys(styles)).not.toContain('Platform');
-      expect(Object.keys(families)).not.toContain('Platform');
-    }
-  });
-});
+/* The --Platform-Spacer suite is gone.
+ *
+ * It tested a SECOND copy of a token that already existed in bevelGeometry.ts
+ * and already shipped in foundation.css — with a different Desktop value, so
+ * the stylesheet declared the same custom property twice and load order picked
+ * the winner. The tests passed because they asserted the duplicate against
+ * itself, which is the shape of a test that cannot fail and cannot help.
+ *
+ * The incumbent is the one to test, where it lives. */
 
 describe('platform button metrics', () => {
   const CSS_NAME: Record<string, string> = {
