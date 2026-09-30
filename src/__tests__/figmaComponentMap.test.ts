@@ -86,8 +86,20 @@ describe('the pairs that are not name matches', () => {
     expect(figmaMappingFor('Charts')!.page).toBe('Data Visualization');
   });
 
-  it('Menu lives on the Dropdown page', () => {
-    expect(figmaMappingFor('Menu')!.page).toBe('Dropdown');
+  it('Menu maps to the row, and Select to the control', () => {
+    /* The page was called Dropdown and held both. It is Select now, and
+       MenuItem has its own page — because the panel a Select opens IS a
+       TreeView built from Menu Items, so the row is shared and belongs to
+       neither exclusively. */
+    expect(figmaMappingFor('Menu')!.page).toBe('MenuItem');
+    expect(figmaMappingFor('Select')!.page).toBe('Select');
+    expect(figmaMappingFor('Select')!.sets).toContain('Select');
+  });
+
+  it('no longer calls Select undesigned', () => {
+    /* It was on the undesigned list while its design sat on the Dropdown page
+       under another name — which would have told an agent to build blind. */
+    expect(NO_FIGMA_PAGE.undesigned).not.toContain('Select');
   });
 
   it('BottomNavigation lives on NavBar', () => {

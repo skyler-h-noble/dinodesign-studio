@@ -65,8 +65,13 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Link:              { page: 'Link', sets: ['Link', 'Hotlink Group'] },
   List:              { page: 'List', sets: ['List', 'List Item'] },
   Loader:            { page: 'Loader', sets: ['Loader'] },
-  Menu:              { page: 'Dropdown', sets: ['Dropdown', 'Drop Down Menu'],
-                       note: 'The directory is Menu; it exports Dropdown, MenuButton, Menu, MenuItem and MenuDivider. The page is named for the thing you open.' },
+  /* The menu panel is composed, not drawn once — see the Select note below.
+     Menu maps to the ROW because that is the part the library owns as its own
+     component; the panel it opens into is shared with Select. */
+  Menu:              { page: 'MenuItem', sets: ['Menu Item'],
+                       note: 'The directory is Menu; it exports Dropdown, MenuButton, Menu, MenuItem and MenuDivider. `Menu Item` has its own page because TreeView and Drop Down Menu both build from it — a menu with submenus IS a tree.' },
+  Select:            { page: 'Select', sets: ['Select', 'SelectMenu'],
+                       note: '`Select` is the TRIGGER — a Button instance with type = default | multiselect | searchable, a form control holding a value. `SelectMenu` is the panel it opens, itself a TreeView instance built from Menu Item.' },
   Modal:             { page: 'Modal', sets: ['Modal', 'Modal with overlay'] },
   NumberField:       { page: 'NumberField', sets: ['Field Button'],
                        note: 'Only the increment button is a set; the field itself is drawn from Input.' },
@@ -89,7 +94,8 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Tag:               { page: 'Tag', sets: ['Tag'] },
   Tooltip:           { page: 'Tooltip', sets: ['Tooltip'] },
   TransferList:      { page: 'TransferList', sets: ['TransferList'] },
-  TreeView:          { page: 'TreeView', sets: ['TreeView', 'Menu Item'] },
+  TreeView:          { page: 'TreeView', sets: ['TreeView'],
+                       note: 'Its rows are `Menu Item`, which lives on its own page and is shared with the Select panel. Change it for tree reasons and menus inherit that.' },
   /* A FOUNDATION in Figma and a COMPONENT in code.
      The page carries text styles, not component sets — there is nothing to
      instance — while the library exports Typography, H1..H6, Body, Caption and
@@ -118,7 +124,7 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
  */
 export const NO_FIGMA_PAGE = {
   undesigned: [
-    'Autocomplete', 'Select', 'TextField', 'SearchField', 'Popover', 'Paper',
+    'Autocomplete', 'TextField', 'SearchField', 'Popover', 'Paper',
     'Sidebar', 'Toolbar', 'CodeBlock', 'IconBadge', 'DropZone', 'StateMessage',
   ],
   notDrawable: [

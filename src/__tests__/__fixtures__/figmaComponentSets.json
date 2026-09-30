@@ -1,6 +1,6 @@
 {
-  "_comment": "Captured from the library Figma file Qv2dqF7mYoAGY77EkdrwTv on 2026-09-30. Node ids are per COPY of the template and are NOT used for matching - the plugin reports the user's own at link time. They are captured so drift in this capture is visible. Page and set NAMES are what figmaComponentMap keys on. `pages` is every page; `sets` covers only the pages that hold component sets - Typography and ToggleButton have pages and no sets.",
-  "capturedAt": "2026-09-30",
+  "_comment": "Captured from the library Figma file Qv2dqF7mYoAGY77EkdrwTv on 2026-09-30. Node ids are per COPY of the template and are NOT used for matching - the plugin reports the user's own at link time. They are captured so drift in this capture is visible. Page and set NAMES are what figmaComponentMap keys on. `pages` is every page; `sets` covers component SETS plus the handful of lone COMPONENTs on pages that have no set. Pages with a set are not scanned for lone components: the Icon page holds ~600 individual glyphs, which are artwork.",
+  "capturedAt": "2026-09-30 (second capture: Dropdown page renamed Select, MenuItem split out)",
   "fileKey": "Qv2dqF7mYoAGY77EkdrwTv",
   "sets": [
     {
@@ -40,6 +40,12 @@
       "variants": 2
     },
     {
+      "page": "Brand",
+      "name": "Brand",
+      "id": "8818:12187",
+      "variants": 1
+    },
+    {
       "page": "Box",
       "name": "Box",
       "id": "7191:61860",
@@ -61,7 +67,7 @@
       "page": "Button",
       "name": "Button",
       "id": "5769:46293",
-      "variants": 60
+      "variants": 75
     },
     {
       "page": "ButtonGroup",
@@ -130,34 +136,10 @@
       "variants": 30
     },
     {
-      "page": "Dialog",
-      "name": "Dialog",
-      "id": "8122:6780",
-      "variants": 1
-    },
-    {
       "page": "Divider",
       "name": "Divider",
       "id": "6847:27685",
       "variants": 2
-    },
-    {
-      "page": "Drawer",
-      "name": "Drawer",
-      "id": "6911:36775",
-      "variants": 1
-    },
-    {
-      "page": "Dropdown",
-      "name": "Drop Down Menu",
-      "id": "8493:19531",
-      "variants": 1
-    },
-    {
-      "page": "Dropdown",
-      "name": "Dropdown",
-      "id": "8493:19536",
-      "variants": 15
     },
     {
       "page": "FAB",
@@ -166,16 +148,40 @@
       "variants": 5
     },
     {
+      "page": "Forms",
+      "name": "Form-Label",
+      "id": "8702:11037",
+      "variants": 1
+    },
+    {
+      "page": "Forms",
+      "name": "Message Icons",
+      "id": "8580:22896",
+      "variants": 4
+    },
+    {
+      "page": "Forms",
+      "name": "Input Message",
+      "id": "8580:22909",
+      "variants": 4
+    },
+    {
+      "page": "Forms",
+      "name": "Form-Helper",
+      "id": "8580:22922",
+      "variants": 1
+    },
+    {
+      "page": "Forms",
+      "name": "Form Elements",
+      "id": "8583:23375",
+      "variants": 13
+    },
+    {
       "page": "Icon",
       "name": "Icon",
       "id": "5669:49502",
       "variants": 2
-    },
-    {
-      "page": "Input",
-      "name": "Input Text Style",
-      "id": "8574:19724",
-      "variants": 4
     },
     {
       "page": "Input",
@@ -188,6 +194,12 @@
       "name": "Input Buttons",
       "id": "8590:24802",
       "variants": 10
+    },
+    {
+      "page": "Input",
+      "name": "Input Text Style",
+      "id": "8574:19724",
+      "variants": 4
     },
     {
       "page": "ImagePlaceholder",
@@ -226,16 +238,10 @@
       "variants": 4
     },
     {
-      "page": "Modal",
-      "name": "Modal",
-      "id": "8122:6781",
-      "variants": 1
-    },
-    {
-      "page": "Modal",
-      "name": "Modal with overlay",
-      "id": "8122:6940",
-      "variants": 1
+      "page": "MenuItem",
+      "name": "Menu Item",
+      "id": "8007:25355",
+      "variants": 10
     },
     {
       "page": "NavBar",
@@ -334,6 +340,18 @@
       "variants": 1
     },
     {
+      "page": "Select",
+      "name": "SelectMenu",
+      "id": "8493:19531",
+      "variants": 1
+    },
+    {
+      "page": "Select",
+      "name": "Select",
+      "id": "8493:19536",
+      "variants": 15
+    },
+    {
       "page": "Sheet",
       "name": "Sheet",
       "id": "8326:2842",
@@ -380,6 +398,72 @@
       "name": "SpeedDial",
       "id": "6843:25091",
       "variants": 20
+    },
+    {
+      "page": "Status Bar",
+      "name": "Status-Bar-Lower",
+      "id": "8430:37085",
+      "variants": 2
+    },
+    {
+      "page": "Status Bar",
+      "name": "Cellular Signal",
+      "id": "8351:3914",
+      "variants": 10
+    },
+    {
+      "page": "Status Bar",
+      "name": "Wifi",
+      "id": "8351:3959",
+      "variants": 6
+    },
+    {
+      "page": "Status Bar",
+      "name": "Battery",
+      "id": "8351:3984",
+      "variants": 8
+    },
+    {
+      "page": "Status Bar",
+      "name": "Time",
+      "id": "8351:4019",
+      "variants": 2
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Time",
+      "id": "8351:3702",
+      "variants": 1
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Battery",
+      "id": "8351:3719",
+      "variants": 8
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Cellular Signal",
+      "id": "8351:3746",
+      "variants": 12
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/WiFi",
+      "id": "8351:3821",
+      "variants": 10
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Bluetooth",
+      "id": "8351:3874",
+      "variants": 3
+    },
+    {
+      "page": "Status Bar",
+      "name": "Status Bar/iPadOS",
+      "id": "8351:4058",
+      "variants": 1
     },
     {
       "page": "Stepper",
@@ -436,18 +520,6 @@
       "variants": 9
     },
     {
-      "page": "Text Editor",
-      "name": "Text Editor",
-      "id": "8379:19337",
-      "variants": 1
-    },
-    {
-      "page": "TransferList",
-      "name": "TransferList",
-      "id": "6848:27865",
-      "variants": 1
-    },
-    {
       "page": "Tooltip",
       "name": "Tooltip",
       "id": "8829:27295",
@@ -460,10 +532,40 @@
       "variants": 1
     },
     {
-      "page": "TreeView",
-      "name": "Menu Item",
-      "id": "8007:25355",
-      "variants": 10
+      "page": "Dialog",
+      "name": "Dialog",
+      "id": "8122:6780",
+      "variants": 1
+    },
+    {
+      "page": "Drawer",
+      "name": "Drawer",
+      "id": "6911:36775",
+      "variants": 1
+    },
+    {
+      "page": "Modal",
+      "name": "Modal",
+      "id": "8122:6781",
+      "variants": 1
+    },
+    {
+      "page": "Modal",
+      "name": "Modal with overlay",
+      "id": "8122:6940",
+      "variants": 1
+    },
+    {
+      "page": "Text Editor",
+      "name": "Text Editor",
+      "id": "8379:19337",
+      "variants": 1
+    },
+    {
+      "page": "TransferList",
+      "name": "TransferList",
+      "id": "6848:27865",
+      "variants": 1
     }
   ],
   "pages": [
@@ -489,7 +591,6 @@
     "Dialog",
     "Divider",
     "Drawer",
-    "Dropdown",
     "FAB",
     "Forms",
     "Hero",
@@ -500,6 +601,7 @@
     "List",
     "Loader",
     "Modal",
+    "MenuItem",
     "NavBar",
     "NumberField",
     "Pagination",
@@ -509,6 +611,7 @@
     "Rail",
     "Ratio",
     "Rating",
+    "Select",
     "Shapes",
     "Sheet",
     "Slider",
