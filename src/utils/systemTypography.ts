@@ -88,6 +88,77 @@ export const SYSTEM_WEIGHT: Record<SystemFamily, Record<TypeRole, number>> = {
 };
 
 /**
+ * The weight an EXTRA WEIGHT takes on each platform.
+ *
+ * An extra weight is not a style with its own role — `Body-Small-Semibold` is
+ * one more weight on Body/Small, not a thing Apple or Google has an opinion
+ * about by that name. Asking `roleOf` for it returns the BASE step's role, so
+ * every semibold and bold was resolving to its base's weight and the emphasis
+ * was erased: Body-*-Semibold 600 -> 400, Caption-*-Bold 700 -> 500,
+ * Legal-Semibold 600 -> 500, on six of the seven devices. In System mode on a
+ * phone, semibold body rendered identical to body.
+ *
+ * Keyed by the SUFFIX instead, because that is what the weight actually means.
+ * The platforms differ and the difference is a fact about the faces, not a
+ * preference:
+ *
+ *   SF Pro   ships Semibold at 600 and Bold at 700.
+ *   Roboto   has no 600 at all — Thin 100, Light 300, Regular 400, Medium 500,
+ *            Bold 700, Black 900. Its emphasis weight IS 500, which is why
+ *            Material's own tables say Medium. Writing 600 there asks for a
+ *            weight the face does not have, and the renderer either snaps or
+ *            synthesises it.
+ *
+ * So Android's semibold landing at 500 is correct rather than a leftover of the
+ * bug. What was wrong is that iOS landed there too.
+ *
+ * Desktop never reaches this table — its System mirrors Omni, so the brand's
+ * own number is used.
+ */
+export const SYSTEM_EXTRA_WEIGHT: Record<SystemFamily, Record<string, number>> = {
+  apple:    { Semibold: 600, Bold: 700 },
+  material: { Semibold: 500, Bold: 700 },
+  desktop:  { Semibold: 600, Bold: 700 },
+};
+
+/**
+ * The weights each face actually ships, ascending.
+ *
+ * Needed because the table above can COLLIDE with the base step. Legal resolves
+ * to the `label` role, which both platforms set at 500 — so on Android its
+ * base is 500 and Material's emphasis weight is 500, and `Legal-Semibold`
+ * renders identically to `Legal`. The name promises a difference the file does
+ * not deliver, which is worse than no emphasis at all because nothing looks
+ * broken.
+ *
+ * SF Pro ships the full ramp. Roboto does not: there is nothing between Medium
+ * 500 and Bold 700, which is the same fact that puts Material's emphasis at 500
+ * in the first place.
+ */
+const SYSTEM_FACE_WEIGHTS: Record<SystemFamily, number[]> = {
+  apple:    [100, 200, 300, 400, 500, 600, 700, 800, 900],
+  material: [100, 300, 400, 500, 700, 900],
+  desktop:  [100, 200, 300, 400, 500, 600, 700, 800, 900],
+};
+
+/**
+ * The platform's weight for an extra weight, by its suffix.
+ *
+ * The table is the PREFERENCE; being heavier than the base step is the
+ * REQUIREMENT. Where the two conflict the requirement wins and this steps up to
+ * the next weight the face actually ships — 700 on Roboto, because there is no
+ * 600 to land on. A bolder emphasis than intended is a compromise; an emphasis
+ * that is not an emphasis is a bug.
+ */
+export function systemExtraWeight(
+  family: SystemFamily, suffix: string, omni: number, base: number,
+): number {
+  const preferred = SYSTEM_EXTRA_WEIGHT[family][suffix] ?? omni;
+  if (preferred > base) return preferred;
+  return SYSTEM_FACE_WEIGHTS[family].find((w) => w > base) ?? base;
+}
+
+/**
  * Tracking anchors: [size in px, tracking in em], ascending by size.
  *
  * em rather than px so the value means the same thing wherever the size ramp

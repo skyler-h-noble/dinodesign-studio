@@ -106,7 +106,7 @@ export interface ExtraWeight {
 
 export interface TypeStyle {
   /** Token base — the string the lib interpolates, e.g. 'H1', 'Display-Large',
-   *  'Eyebrow-Small', 'Button-Standard'. */
+   *  'Eyebrow-Small', 'Button-Medium'. */
   token: string;
   /** Slash name used by Figma text styles, e.g. 'Header/H1'. */
   name: string;
@@ -372,14 +372,92 @@ interface SystemStyleSpec {
 }
 
 export const SYSTEM_STYLES: SystemStyleSpec[] = [
-  { token: 'Caption', group: 'Caption', step: 'Standard', size: 14, weight: 500, lh: 21, cs: 0.1, ps: 28,
+  /* Caption is Body's ramp shifted down one step: 12 / 14 / 16 against Body's
+   * 14 / 16 / 18, leading at 1.5 throughout.
+   *
+   * The gap is the point. A caption and a body at the SAME size are separated
+   * only by weight (500 vs 400) and a 0.1px nudge of tracking — which held
+   * while Caption was a single 14 sitting beside Body-Medium's 16, but
+   * collapses the moment a card scales down: Body-Small is also 14, so the two
+   * would have rendered identically in a small card and the hierarchy between
+   * them would have vanished. One step below Body at EVERY mode keeps it.
+   *
+   * THE MIDDLE STEP KEEPS THE BARE NAME. The lib reads `--Caption-Font-Size`
+   * with no step (Typography.js:339), and generated CSS is frozen per design
+   * system, so renaming it to `-Medium` would leave both an old stylesheet and
+   * the shipped component resolving to nothing. Same trap as Button-Standard.
+   * So the ramp is Caption-Small / Caption / Caption-Large, and the asymmetry
+   * is deliberate rather than an oversight.
+   *
+   * Paragraph spacing scales with the size (2x, as the existing 14/28 already
+   * was). Tracking does not: 0.1px is an optical nudge, not a ramp, and the
+   * Eyebrow rule about small type needing more air does not reach a value this
+   * small. Bold stays on the middle step alone — `fw('Caption-Bold')` is one
+   * size-independent weight the lib pairs with any caption size. */
+  /* STEP is `Medium`, TOKEN is bare `Caption`, and the two disagreeing is the
+   * point. The step names the style in Figma — Caption/Medium, the middle of
+   * three, which is what a designer picking it needs to read. The token names
+   * the CSS custom property, and the lib reads `--Caption-Font-Size` with no
+   * step (Typography.js:339), so that half cannot move without breaking every
+   * shipped caption and every frozen stylesheet.
+   *
+   * `Standard` stays on Legal and Badge deliberately. There it means "this
+   * group has ONE size", and renaming those to Medium would advertise a Small
+   * and a Large that do not exist. Two meanings, so two words. */
+  { token: 'Caption-Small', group: 'Caption', step: 'Small', size: 12, weight: 500, lh: 18, cs: 0.1, ps: 24,
+    extraWeights: [{ suffix: 'Bold', weight: 700 }] },
+  { token: 'Caption', group: 'Caption', step: 'Medium', size: 14, weight: 500, lh: 21, cs: 0.1, ps: 28,
+    extraWeights: [{ suffix: 'Bold', weight: 700 }] },
+  { token: 'Caption-Large', group: 'Caption', step: 'Large', size: 16, weight: 500, lh: 24, cs: 0.1, ps: 32,
     extraWeights: [{ suffix: 'Bold', weight: 700 }] },
 
   { token: 'Label-ExtraSmall', group: 'Label', step: 'Extra Small', size: 11, weight: 600, lh: 16.5, cs: 0.5 },
+  /* All-Caps is a CASE VARIANT, not a step: each one mirrors its base step's
+   * size, leading and tracking exactly and adds nothing but the transform.
+   * Medium All Caps shipped alone for a long time, which made the group read
+   * as four sizes and one oddity; three sizes x two cases is the shape the
+   * design actually uses.
+   *
+   * Tracking is INHERITED from the base step rather than bumped for the caps.
+   * The instinct to add air to uppercase is right in general and is exactly
+   * what the Eyebrow ramp does — but Label already tracks its smaller steps
+   * (0.5 / 0.25 / 0) for the same optical reason, and Medium All Caps has
+   * always matched Medium at 0. Inventing a caps bump here would be a value
+   * derived from a rule of thumb rather than from the design, and it would
+   * make the two cases of one step disagree about a property that is not what
+   * distinguishes them.
+   *
+   * Reading this later and wanting caps tracking: change all three together,
+   * and change them because the design says so, not because caps usually want
+   * it. */
   { token: 'Label-Small', group: 'Label', step: 'Small', size: 12.5, weight: 600, lh: 18.75, cs: 0.25 },
+  { token: 'Label-Small-All-Caps', group: 'Label', step: 'Small All Caps', size: 12.5, weight: 600, lh: 18.75, cs: 0.25, uppercase: true },
   { token: 'Label-Medium', group: 'Label', step: 'Medium', size: 16, weight: 600, lh: 24 },
   { token: 'Label-Medium-All-Caps', group: 'Label', step: 'Medium All Caps', size: 16, weight: 600, lh: 24, uppercase: true },
   { token: 'Label-Large', group: 'Label', step: 'Large', size: 18, weight: 600, lh: 27 },
+  { token: 'Label-Large-All-Caps', group: 'Label', step: 'Large All Caps', size: 18, weight: 600, lh: 27, uppercase: true },
+
+  /* Mobile Nav Label — the label under a bottom-nav or rail icon.
+   *
+   * Its values are the ones Label-ExtraSmall holds (11 / 600 / 16.5 / 0.5),
+   * and that is deliberate rather than a copy waiting to be collapsed. The
+   * test invariant 2 sets is not "do the values match" but "does anything
+   * select between them", and something does: the lib reads
+   * --Label-ExtraSmall-* as the Label group's off-ramp step
+   * (Typography.js:361), while a nav label reads this. Two consumers, so two
+   * tokens.
+   *
+   * The point of the split is that they can now DIVERGE. Label is a three-step
+   * ramp that a brand can move; the label under a nav icon is sized by the
+   * target it sits in, not by where it falls in a type ramp, so it must not
+   * follow when Label-Small moves. Before this existed, Nav-Bar, Rail and
+   * Slider were all reaching for the extra-small label and getting whatever
+   * the Label ramp happened to be.
+   *
+   * `Standard` for the step, which in this file means "this group has ONE
+   * size" - the same contract Legal and Badge use. Naming it Medium would
+   * advertise a Small and a Large that do not exist. */
+  { token: 'Mobile-Nav-Label', group: 'Mobile-Nav-Label', step: 'Standard', size: 11, weight: 600, lh: 16.5, cs: 0.5 },
 
   { token: 'Legal', group: 'Legal', step: 'Standard', size: 10, weight: 400, lh: 15, ps: 20,
     extraWeights: [{ suffix: 'Semibold', weight: 600 }] },
@@ -393,7 +471,25 @@ export const SYSTEM_STYLES: SystemStyleSpec[] = [
   // The lib's `button` / `button-standard` styles read the aggregate
   // --Button-Font-Size / --Button-Line-Height, which core.css owns per
   // platform. This is the per-step token the Figma variables are named after.
-  { token: 'Button-Standard', group: 'Button', step: 'Standard', size: 16, weight: 600, lh: 16 },
+  /* Medium, not Standard. `Standard` in this file means "this group has ONE
+   * size" — the contract Legal and Badge use — and Button has four, so the
+   * word was always doing the wrong job here.
+   *
+   * --Button-Standard-* KEEPS BEING EMITTED as an alias onto this one. It is
+   * not tidiness to drop it: a design system's CSS is frozen in Storage and can
+   * never be regenerated, the lib reads
+   * `var(--Button-Standard-Font-Size, var(--Button-Font-Size))`
+   * (Typography.js:539), and consumers upgrade on their own schedule. Removing
+   * the old name leaves an unresolved var() that paints nothing and reports
+   * nothing — the trap this file names twice, at line 388 and in
+   * typeScaleRamps.test.ts.
+   *
+   * Direction is load-bearing and is Standard -> Medium: Medium holds the
+   * literal, Standard reads it. Pointed the other way it also cannot drift and
+   * looks identical in a diff, while quietly making Standard canonical again —
+   * exactly what eyebrowAlias.test.ts asserts in both directions for Overline,
+   * and what buttonMediumAlias.test.ts now asserts here. */
+  { token: 'Button-Medium', group: 'Button', step: 'Medium', size: 16, weight: 600, lh: 16 },
   { token: 'Button-Large', group: 'Button', step: 'Large', size: 24, weight: 600, lh: 24 },
 
   /* Badge — the counter's digits. Its own style, not a Button step.
@@ -409,7 +505,7 @@ export const SYSTEM_STYLES: SystemStyleSpec[] = [
 /** Order the exports and the Figma payload use. */
 export const GROUP_ORDER = [
   'Display', 'Header', 'Subtitle', 'Body', 'Caption',
-  'Label', 'Legal', 'Eyebrow', 'Number', 'Button', 'Badge',
+  'Label', 'Mobile-Nav-Label', 'Legal', 'Eyebrow', 'Number', 'Button', 'Badge',
 ];
 
 /** Usage guidance per group. Travels into the Figma text-style description so

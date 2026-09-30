@@ -119,6 +119,15 @@ function styleBlock(s: TypeStyle): string {
       lines.push(`  --${overline}-${prop}: var(--${s.token}-${prop});`);
     }
   }
+  /* Button-Medium was Button-Standard. Same rule as Overline above, same
+     direction: the new name holds the literal, the old one reads it.
+     The lib still asks for --Button-Standard-Font-Size (Typography.js:539), and
+     every stylesheet already in Storage names it. */
+  if (s.token === 'Button-Medium') {
+    for (const prop of ['Font-Size', 'Font-Weight', 'Line-Height', 'Letter-Spacing']) {
+      lines.push(`  --Button-Standard-${prop}: var(--Button-Medium-${prop});`);
+    }
+  }
   return lines.join('\n');
 }
 

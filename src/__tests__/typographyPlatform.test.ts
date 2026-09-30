@@ -57,7 +57,22 @@ describe('the parse', () => {
        a style the block does not declare is filled from Desktop by the
        device-floor merge, which had the Alt reporting Desktop's 72px on every
        phone. */
-    expect(Object.keys(styles).length).toBe(36);
+    /* 38 since Caption became a three-step ramp. Caption-Small and
+       Caption-Large have to be IN the device blocks rather than left to the
+       device-floor merge, because that merge replaces a style whole: a step
+       declared on Desktop only would carry Desktop's 1.5 leading on every
+       phone, which is the same trap Alt-Display fell into above. */
+    /* 39 since Mobile-Nav-Label was added. It is the one style in this file
+       whose values genuinely differ per platform rather than being restated:
+       Apple's tab-bar label is 10/10 untracked, Material's navigation label is
+       12/16 at 0.5, and Desktop keeps 11/16.5/0.5. So it MUST be declared in
+       every block — leaving it to the device-floor merge would put Desktop's
+       11px on both phones and erase the reason the style exists. */
+    expect(Object.keys(styles).length).toBe(39);
+    expect(styles['Mobile-Nav-Label']).toEqual({
+      'Font-Size': '10px', 'Font-Weight': '600',
+      'Line-Height': '10px', 'Letter-Spacing': '0px',
+    });
     expect(styles['H1']).toEqual({
       'Font-Size': '28px', 'Font-Weight': '600',
       'Line-Height': '28px', 'Letter-Spacing': '0px',
@@ -663,5 +678,74 @@ describe('the CSS selectors', () => {
   it('accepts the old face attribute too', () => {
     const sel = blockSelector('IOS-Mobile', 'System');
     expect(sel).toContain('[data-fonts="Default"]');
+  });
+});
+
+/* An extra weight must stay HEAVIER than the step it hangs off.
+ *
+ * `Body-Small-Semibold` is not a style the platforms have an opinion about by
+ * that name — it is one more weight on Body/Small. `roleOf` matched the BASE's
+ * prefix and answered for the base, so every semibold and bold was handed its
+ * own base's weight and the emphasis vanished: Body-*-Semibold 600 -> 400,
+ * Caption-*-Bold 700 -> 500, Legal-Semibold 600 -> 500, on six of the seven
+ * devices. Desktop was fine only because its System mirrors Omni.
+ *
+ * It was invisible in every obvious place. The CSS was correct throughout, the
+ * variable existed, the name was right, and the value was a plausible weight —
+ * so the only symptom was semibold body looking like body on a phone in System
+ * mode.
+ *
+ * Asserted as the RELATIONSHIP rather than against a table of numbers: what has
+ * to hold is that the emphasis survives, whatever each platform's number for it
+ * turns out to be.
+ */
+describe('extra weights stay heavier than their base step', () => {
+  const PAIRS: [string, string][] = [
+    ['Body/Body-Small', 'Body/Body-Small-Semibold'],
+    ['Body/Body-Medium', 'Body/Body-Medium-Semibold'],
+    ['Body/Body-Large', 'Body/Body-Large-Semibold'],
+    ['Captions/Caption-Small', 'Captions/Caption-Small-Bold'],
+    ['Captions/Caption', 'Captions/Caption-Bold'],
+    ['Captions/Caption-Large', 'Captions/Caption-Large-Bold'],
+    ['Legal/Legal', 'Legal/Legal-Semibold'],
+  ];
+
+  it.each(DEVICE_TYPES)('on %s, in both faces', (device) => {
+    const bag = P.devices[device] as Record<string, { value: unknown }>;
+    for (const face of FACE_MODES) {
+      for (const [base, extra] of PAIRS) {
+        const w = (n: string) => Number(resolved(bag, sourceName(face, `${n}-Font-Weight`)));
+        expect(`${face} ${extra}: ${w(extra)} > ${w(base)}`)
+          .toBe(`${face} ${extra}: ${w(extra)} > ${w(base)}`.replace(/: (\d+) > (\d+)$/,
+            (_m, a, b) => Number(a) > Number(b) ? `: ${a} > ${b}` : `: HEAVIER-THAN-${b} > ${b}`));
+      }
+    }
+  });
+
+  it('never invents a weight the face does not ship', () => {
+    /* Roboto has no 600 — Thin 100, Light 300, Regular 400, Medium 500, Bold
+       700, Black 900 — so Material's emphasis weight IS 500 and writing 600
+       there asks for a weight that has to be snapped or synthesised. Apple
+       ships Semibold at 600, so iOS keeps it. Android landing lower is the
+       face's constraint, not a leftover of the bug this describe block is
+       about. */
+    const android = P.devices['Android-Mobile'] as Record<string, { value: unknown }>;
+    const ios = P.devices['IOS-Mobile'] as Record<string, { value: unknown }>;
+    const w = (bag: Record<string, { value: unknown }>, n: string) =>
+      resolved(bag, sourceName('System', `${n}-Font-Weight`));
+    /* Legal is the case where the preference and the requirement conflict.
+       Its base resolves to the `label` role, which both platforms set at 500 —
+       so Material's 500 emphasis would have landed ON the base and rendered
+       Legal-Semibold identically to Legal. Roboto has nothing between 500 and
+       700, so 700 is the next weight that exists. Bolder than intended, and
+       the alternative was an emphasis that is not one. */
+    expect(w(android, 'Legal/Legal-Semibold')).toBe(700);
+    expect(w(ios, 'Legal/Legal-Semibold')).toBe(600);
+    /* Body's base is 400, so Material's 500 clears it and no escalation fires —
+       which is the check that the rule above is a fallback, not the norm. */
+    expect(w(android, 'Body/Body-Medium-Semibold')).toBe(500);
+    /* Bold is 700 on both — that one they agree on. */
+    expect(w(android, 'Captions/Caption-Bold')).toBe(700);
+    expect(w(ios, 'Captions/Caption-Bold')).toBe(700);
   });
 });

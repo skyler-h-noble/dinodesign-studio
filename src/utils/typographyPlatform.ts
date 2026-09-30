@@ -352,7 +352,7 @@ export function blockSelector(device: DeviceType, face: FaceMode): string {
  * a single pass.
  */
 
-import { SYSTEM_FAMILY_OF, systemTracking, systemWeight, systemLineHeight } from './systemTypography';
+import { SYSTEM_FAMILY_OF, systemTracking, systemWeight, systemExtraWeight, systemLineHeight } from './systemTypography';
 import type { FamilyRole, ResolvedRoles } from './typeScale';
 import { buildTypeScale, BODY_LINE_HEIGHT } from './typeScale';
 
@@ -531,6 +531,7 @@ export const FAMILY_ROOT_OF: Record<string, string> = {
   Subtitle: 'Body',
   Caption: 'Body',
   Label: 'Body',
+  'Mobile-Nav-Label': 'Body',
   Legal: 'Body',
   Number: 'Body',
   Button: 'Body',
@@ -627,6 +628,27 @@ export function styleFolder(token: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The extra-weight suffix a token carries, or undefined for a base step.
+ *
+ * Matched against the suffixes the SCALE declares rather than a literal list,
+ * so a weight added upstream is recognised here without this file being
+ * touched. The stem has to be a real style too — otherwise a style that merely
+ * ended in the word would be mistaken for one.
+ */
+export function extraWeightSuffix(token: string): string | undefined {
+  for (const suffix of STYLE_GROUPS.suffixes) {
+    if (!token.endsWith(`-${suffix}`)) continue;
+    if (STYLE_GROUPS.group[token.slice(0, -(suffix.length + 1))]) return suffix;
+  }
+  return undefined;
+}
+
+/** The step an extra weight hangs off — `Body-Small-Semibold` -> `Body-Small`. */
+export function baseOf(token: string, suffix: string): string {
+  return token.slice(0, -(suffix.length + 1));
+}
+
 /** A style property's name, grouped. */
 export function groupedProp(token: string, prop: string): string {
   const folder = styleFolder(token);
@@ -641,7 +663,8 @@ export function groupedProp(token: string, prop: string): string {
  */
 export const FAMILY_FOLDER: Record<string, string> = {
   Display: 'Displays', Headers: 'Headers', Subtitle: 'Subtitles', Body: 'Body',
-  Caption: 'Captions', Label: 'Labels', Legal: 'Legal', Eyebrow: 'Eyebrows',
+  Caption: 'Captions', Label: 'Labels', 'Mobile-Nav-Label': 'Mobile-Nav-Label',
+  Legal: 'Legal', Eyebrow: 'Eyebrows',
   Number: 'Numbers', Button: 'Buttons',
 };
 
@@ -736,7 +759,24 @@ export function variableForSection(section: string): string {
  * that weight (see SYSTEM_STYLES), so the name means what it says.
  */
 export const EXCLUDED_STYLES =
-  /^(Body-(Small|Medium|Large)-Bold|Button-ExtraSmall)$/;
+  /^(Body-(Small|Medium|Large)-Bold|Button-ExtraSmall|Button-Standard)$/;
+
+/* Button-Standard is here for a DIFFERENT reason than the other two.
+ *
+ * Body-*-Bold and Button-ExtraSmall are excluded because the design does not
+ * have them. Button-Standard is excluded because it is the same style as
+ * Button-Medium under its old name — the stylesheet emits
+ * `--Button-Standard-Font-Size: var(--Button-Medium-Font-Size)` so that frozen
+ * systems and un-upgraded consumers keep resolving, and the parser resolves
+ * var() against what the block already declared. Without this line that alias
+ * parses back into a second style holding the same numbers, and the Figma
+ * payload grows a Button-Standard group beside Button-Medium: two variables per
+ * property, a designer able to pick either, and no way to tell which a layer
+ * used.
+ *
+ * So: the CSS keeps the old name forever, and Figma never sees it. That split
+ * is the Overline -> Eyebrow precedent — a published stylesheet cannot be
+ * regenerated, a Figma file can. */
 
 /**
  * The variable a stylesheet STYLE lands in. Overline is spelled Eyebrow.
@@ -1018,10 +1058,17 @@ export function typographyVariablePayload(
         /* The platform's tables are in em — size-relative, because the seven
            devices do not share one scale — and land in px like everything
            else here. */
+        /* An extra weight resolves by its SUFFIX, not by the base step's role.
+           `roleOf('Legal-Semibold')` matches the Legal prefix and answers for
+           Legal, so every semibold and bold was being handed its own base's
+           weight and the emphasis disappeared. See SYSTEM_EXTRA_WEIGHT. */
+        const suffix = prop === 'Font-Weight' ? extraWeightSuffix(style) : undefined;
         const sys = mirrorsOmni(device)
           ? omni
           : prop === 'Font-Weight'
-            ? systemWeight(fam, style)
+            ? (suffix
+                ? systemExtraWeight(fam, suffix, omni, systemWeight(fam, baseOf(style, suffix)))
+                : systemWeight(fam, style))
             : +(systemTracking(fam, size) * size).toFixed(4);
         bag[sourceName('System', groupedProp(style, prop))] = systemRoot
           ? { value: weightRootAlias('System', systemRoot), type: 'string' }

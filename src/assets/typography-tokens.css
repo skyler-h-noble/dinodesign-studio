@@ -114,6 +114,23 @@
   --Label-Large-Line-Height:   27px;
   --Label-Large-Letter-Spacing: 0px;
 
+
+  /* Mobile Nav Label — the label under a bottom-nav or rail icon.
+   *
+   * The first style in this file that genuinely differs per platform, and it
+   * does so because the two vendors specify it and users know the difference:
+   * Apple's tab-bar label is 10pt with no tracking, Material's navigation
+   * label is 12sp on 16 with 0.5. Label-ExtraSmall — which nav labels used to
+   * borrow — is a flat 11 everywhere, a midpoint that matches neither.
+   *
+   * Desktop has no native spec to follow, so it keeps the 11/16.5/0.5 the
+   * Label ramp's smallest step carries. */
+  --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body);
+  --Mobile-Nav-Label-Font-Size:     11px;
+  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Line-Height:   16.5px;
+  --Mobile-Nav-Label-Letter-Spacing: 0.5px;
+
   /* Legal */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
   --Legal-Font-Size:     10px;
@@ -168,10 +185,15 @@
   --Button-Small-Line-Height:   14px;
   --Button-Small-Letter-Spacing: 0px;
   --Font-Family-Button: var(--Platform-Font-Families-Body);
-  --Button-Standard-Font-Size:     16px;
-  --Button-Standard-Font-Weight:   600;
-  --Button-Standard-Line-Height:   16px;
-  --Button-Standard-Letter-Spacing: 0px;
+  --Button-Medium-Font-Size:     16px;
+  --Button-Medium-Font-Weight:   600;
+  --Button-Medium-Line-Height:   16px;
+  --Button-Medium-Letter-Spacing: 0px;
+  /* was Button-Standard — kept so frozen stylesheets keep resolving. */
+  --Button-Standard-Font-Size:     var(--Button-Medium-Font-Size);
+  --Button-Standard-Font-Weight:   var(--Button-Medium-Font-Weight);
+  --Button-Standard-Line-Height:   var(--Button-Medium-Line-Height);
+  --Button-Standard-Letter-Spacing: var(--Button-Medium-Letter-Spacing);
 
 }
 
@@ -265,11 +287,42 @@
 
   /* Caption */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
+  /* Leading here is the PLATFORM's, not the brand's 1.5 — Apple's Dynamic Type's own
+     table at 12 / 14 / 16. The Figma payload computes these same numbers for
+     every non-Desktop device (typographyPlatform.ts, "LINE HEIGHT is COMPUTED,
+     not read"), while this block declared a flat 21 at every size, so one
+     caption read 19 in the file and 21 in the stylesheet and nothing could
+     see it. Declared rather than left to compute so the two sides state the
+     same value instead of arriving at it separately.
+
+     EVERY property is restated, tracking included, because the payload's
+     device-floor merge replaces a style WHOLE — `{...desktopStyles, ...own}`
+     keys on the STYLE, not on the property — so a step this block declares
+     partially loses whatever it leaves out instead of inheriting it from
+     Desktop. That variable then exists on Desktop and nowhere else, and one
+     missing on six of seven devices resolves to nothing there, silently. The
+     CSS cascade would have carried it; the payload does not, and the payload
+     is the half that fails without a sound.
+
+     The 0px is this block's existing answer for Caption, extended to the two
+     new steps rather than importing Desktop's 0.1px nudge — which would leave
+     the ramp reading 0.0996 / 0 / 0.1008, three steps of one style disagreeing
+     about whether the brand tracks captions at all. Whether mobile SHOULD zero
+     it is a brand decision and still open; this only stops the ramp from
+     contradicting itself. */
+  --Caption-Small-Font-Size:     12px;
+  --Caption-Small-Font-Weight:   500;
+  --Caption-Small-Letter-Spacing: 0px;
+  --Caption-Small-Line-Height:   16px;
   --Caption-Font-Size:     14px;
   --Caption-Font-Weight:   500;
-  --Caption-Line-Height:   21px;
+  --Caption-Line-Height:   19px;
   --Caption-Letter-Spacing: 0px;
   --Caption-Bold-Font-Weight: 700;
+  --Caption-Large-Font-Size:     16px;
+  --Caption-Large-Font-Weight:   500;
+  --Caption-Large-Letter-Spacing: 0px;
+  --Caption-Large-Line-Height:   21px;
 
   /* Label */
   --Font-Family-Label: var(--Platform-Font-Families-Body);
@@ -292,6 +345,14 @@
   --Label-Large-Font-Weight:   600;
   --Label-Large-Line-Height:   27px;
   --Label-Large-Letter-Spacing: 0px;
+
+
+  /* Mobile Nav Label — Apple's tab-bar label: 10pt, untracked. */
+  --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body);
+  --Mobile-Nav-Label-Font-Size:     10px;
+  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Line-Height:   10px;
+  --Mobile-Nav-Label-Letter-Spacing: 0px;
 
   /* Legal */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
@@ -347,10 +408,15 @@
   --Button-Small-Line-Height:   14px;
   --Button-Small-Letter-Spacing: 0px;
   --Font-Family-Button: var(--Platform-Font-Families-Body);
-  --Button-Standard-Font-Size:     16px;
-  --Button-Standard-Font-Weight:   600;
-  --Button-Standard-Line-Height:   16px;
-  --Button-Standard-Letter-Spacing: 0px;
+  --Button-Medium-Font-Size:     16px;
+  --Button-Medium-Font-Weight:   600;
+  --Button-Medium-Line-Height:   16px;
+  --Button-Medium-Letter-Spacing: 0px;
+  /* was Button-Standard — kept so frozen stylesheets keep resolving. */
+  --Button-Standard-Font-Size:     var(--Button-Medium-Font-Size);
+  --Button-Standard-Font-Weight:   var(--Button-Medium-Font-Weight);
+  --Button-Standard-Line-Height:   var(--Button-Medium-Line-Height);
+  --Button-Standard-Letter-Spacing: var(--Button-Medium-Letter-Spacing);
 
   /* Alt Display — mirrors Display step for step. The pairing sets one word
      on one baseline ("Omni" + "Design"), so the two must not diverge in
@@ -460,11 +526,42 @@
 
   /* Caption */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
+  /* Leading here is the PLATFORM's, not the brand's 1.5 — Apple's Dynamic Type's own
+     table at 12 / 14 / 16. The Figma payload computes these same numbers for
+     every non-Desktop device (typographyPlatform.ts, "LINE HEIGHT is COMPUTED,
+     not read"), while this block declared a flat 21 at every size, so one
+     caption read 19 in the file and 21 in the stylesheet and nothing could
+     see it. Declared rather than left to compute so the two sides state the
+     same value instead of arriving at it separately.
+
+     EVERY property is restated, tracking included, because the payload's
+     device-floor merge replaces a style WHOLE — `{...desktopStyles, ...own}`
+     keys on the STYLE, not on the property — so a step this block declares
+     partially loses whatever it leaves out instead of inheriting it from
+     Desktop. That variable then exists on Desktop and nowhere else, and one
+     missing on six of seven devices resolves to nothing there, silently. The
+     CSS cascade would have carried it; the payload does not, and the payload
+     is the half that fails without a sound.
+
+     The 0px is this block's existing answer for Caption, extended to the two
+     new steps rather than importing Desktop's 0.1px nudge — which would leave
+     the ramp reading 0.0996 / 0 / 0.1008, three steps of one style disagreeing
+     about whether the brand tracks captions at all. Whether mobile SHOULD zero
+     it is a brand decision and still open; this only stops the ramp from
+     contradicting itself. */
+  --Caption-Small-Font-Size:     12px;
+  --Caption-Small-Font-Weight:   500;
+  --Caption-Small-Letter-Spacing: 0px;
+  --Caption-Small-Line-Height:   16px;
   --Caption-Font-Size:     14px;
   --Caption-Font-Weight:   500;
-  --Caption-Line-Height:   21px;
+  --Caption-Line-Height:   19px;
   --Caption-Letter-Spacing: 0px;
   --Caption-Bold-Font-Weight: 700;
+  --Caption-Large-Font-Size:     16px;
+  --Caption-Large-Font-Weight:   500;
+  --Caption-Large-Letter-Spacing: 0px;
+  --Caption-Large-Line-Height:   21px;
 
   /* Label */
   --Font-Family-Label: var(--Platform-Font-Families-Body);
@@ -487,6 +584,14 @@
   --Label-Large-Font-Weight:   600;
   --Label-Large-Line-Height:   27px;
   --Label-Large-Letter-Spacing: 0px;
+
+
+  /* Mobile Nav Label — same as iPhone; the tab bar does not resize. */
+  --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body);
+  --Mobile-Nav-Label-Font-Size:     10px;
+  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Line-Height:   10px;
+  --Mobile-Nav-Label-Letter-Spacing: 0px;
 
   /* Legal */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
@@ -542,10 +647,15 @@
   --Button-Small-Line-Height:   16px;
   --Button-Small-Letter-Spacing: 0px;
   --Font-Family-Button: var(--Platform-Font-Families-Body);
-  --Button-Standard-Font-Size:     16px;
-  --Button-Standard-Font-Weight:   600;
-  --Button-Standard-Line-Height:   16px;
-  --Button-Standard-Letter-Spacing: 0px;
+  --Button-Medium-Font-Size:     16px;
+  --Button-Medium-Font-Weight:   600;
+  --Button-Medium-Line-Height:   16px;
+  --Button-Medium-Letter-Spacing: 0px;
+  /* was Button-Standard — kept so frozen stylesheets keep resolving. */
+  --Button-Standard-Font-Size:     var(--Button-Medium-Font-Size);
+  --Button-Standard-Font-Weight:   var(--Button-Medium-Font-Weight);
+  --Button-Standard-Line-Height:   var(--Button-Medium-Line-Height);
+  --Button-Standard-Letter-Spacing: var(--Button-Medium-Letter-Spacing);
 
   /* Alt Display — mirrors Display step for step. The pairing sets one word
      on one baseline ("Omni" + "Design"), so the two must not diverge in
@@ -655,11 +765,42 @@
 
   /* Caption */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
+  /* Leading here is the PLATFORM's, not the brand's 1.5 — Material 3's own
+     table at 12 / 14 / 16. The Figma payload computes these same numbers for
+     every non-Desktop device (typographyPlatform.ts, "LINE HEIGHT is COMPUTED,
+     not read"), while this block declared a flat 21 at every size, so one
+     caption read 20 in the file and 21 in the stylesheet and nothing could
+     see it. Declared rather than left to compute so the two sides state the
+     same value instead of arriving at it separately.
+
+     EVERY property is restated, tracking included, because the payload's
+     device-floor merge replaces a style WHOLE — `{...desktopStyles, ...own}`
+     keys on the STYLE, not on the property — so a step this block declares
+     partially loses whatever it leaves out instead of inheriting it from
+     Desktop. That variable then exists on Desktop and nowhere else, and one
+     missing on six of seven devices resolves to nothing there, silently. The
+     CSS cascade would have carried it; the payload does not, and the payload
+     is the half that fails without a sound.
+
+     The 0px is this block's existing answer for Caption, extended to the two
+     new steps rather than importing Desktop's 0.1px nudge — which would leave
+     the ramp reading 0.0996 / 0 / 0.1008, three steps of one style disagreeing
+     about whether the brand tracks captions at all. Whether mobile SHOULD zero
+     it is a brand decision and still open; this only stops the ramp from
+     contradicting itself. */
+  --Caption-Small-Font-Size:     12px;
+  --Caption-Small-Font-Weight:   500;
+  --Caption-Small-Letter-Spacing: 0px;
+  --Caption-Small-Line-Height:   16px;
   --Caption-Font-Size:     14px;
   --Caption-Font-Weight:   500;
-  --Caption-Line-Height:   21px;
+  --Caption-Line-Height:   20px;
   --Caption-Letter-Spacing: 0px;
   --Caption-Bold-Font-Weight: 700;
+  --Caption-Large-Font-Size:     16px;
+  --Caption-Large-Font-Weight:   500;
+  --Caption-Large-Letter-Spacing: 0px;
+  --Caption-Large-Line-Height:   24px;
 
   /* Label */
   --Font-Family-Label: var(--Platform-Font-Families-Body);
@@ -682,6 +823,14 @@
   --Label-Large-Font-Weight:   600;
   --Label-Large-Line-Height:   27px;
   --Label-Large-Letter-Spacing: 0px;
+
+
+  /* Mobile Nav Label — Material's navigation label: 12sp on 16, 0.5 tracking. */
+  --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body);
+  --Mobile-Nav-Label-Font-Size:     12px;
+  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Line-Height:   16px;
+  --Mobile-Nav-Label-Letter-Spacing: 0.5px;
 
   /* Legal */
   --Font-Family-Body: var(--Platform-Font-Families-Body);
@@ -737,10 +886,15 @@
   --Button-Small-Line-Height:   16px;
   --Button-Small-Letter-Spacing: 0px;
   --Font-Family-Button: var(--Platform-Font-Families-Body);
-  --Button-Standard-Font-Size:     16px;
-  --Button-Standard-Font-Weight:   600;
-  --Button-Standard-Line-Height:   16px;
-  --Button-Standard-Letter-Spacing: 0px;
+  --Button-Medium-Font-Size:     16px;
+  --Button-Medium-Font-Weight:   600;
+  --Button-Medium-Line-Height:   16px;
+  --Button-Medium-Letter-Spacing: 0px;
+  /* was Button-Standard — kept so frozen stylesheets keep resolving. */
+  --Button-Standard-Font-Size:     var(--Button-Medium-Font-Size);
+  --Button-Standard-Font-Weight:   var(--Button-Medium-Font-Weight);
+  --Button-Standard-Line-Height:   var(--Button-Medium-Line-Height);
+  --Button-Standard-Letter-Spacing: var(--Button-Medium-Letter-Spacing);
 
   /* Alt Display — mirrors Display step for step. The pairing sets one word
      on one baseline ("Omni" + "Design"), so the two must not diverge in
