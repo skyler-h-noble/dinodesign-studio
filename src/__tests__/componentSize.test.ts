@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, lineMetricsVars, selectionMetricsVars, SIZE_MODES } from '../utils/componentSize';
+import { PLATFORM_BUTTON_HEIGHT } from '../utils/bevelGeometry';
+import { computeRadii } from '../utils/componentRadii';
+import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, lineMetricsVars, selectionMetricsVars, SIZE_MODES,
+  FAB_SIZE, FAB_ICON } from '../utils/componentSize';
 
 /* Component-Size carries medium/small/large as MODES, so one library component
    needs one variant and the size switches the mode. The payload has always
@@ -96,13 +99,25 @@ describe('the payload uses the names that are IN THE FILE', () => {
     buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
     iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
     iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
     cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
     cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
-    cardFocusRadius: 19, cardPadding: 16,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
     inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
     inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
     accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
-    modalRadius: 32, dropdownFrameRadius: 0,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
   };
 
   it('writes the accordion radii under the CORRECTED spelling', () => {
@@ -170,13 +185,25 @@ describe('the Other group writes the line and dot weights', () => {
     buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
     iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
     iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
     cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
     cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
-    cardFocusRadius: 19, cardPadding: 16,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
     inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
     inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
     accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
-    modalRadius: 32, dropdownFrameRadius: 0,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
   };
 
   const payload = () => componentSizePayload(R, {});
@@ -216,13 +243,25 @@ const R2 = {
     buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
     iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
     iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
     cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
     cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
-    cardFocusRadius: 19, cardPadding: 16,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
     inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
     inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
     accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
-    modalRadius: 32, dropdownFrameRadius: 0,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
   };
 
 /* The line weights have to reach BOTH sides.
@@ -297,13 +336,25 @@ describe('the Radio and Checkbox groups', () => {
     buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
     iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
     iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
     cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
     cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
-    cardFocusRadius: 19, cardPadding: 16,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
     inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
     inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
     accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
-    modalRadius: 32, dropdownFrameRadius: 0,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
   };
 
   /* Read off Omni Designs-Aug12 on 2026-09-20. The writer is UPDATE-ONLY and
@@ -412,5 +463,68 @@ describe('the Radio and Checkbox groups', () => {
     const p = componentSizePayload(R, {});
     const keys = SIZE_MODES.map((m) => Object.keys(p[m]).sort().join('|'));
     expect(new Set(keys).size).toBe(1);
+  });
+});
+
+/**
+ * The FAB: fixed, the same on every device, and different from the button.
+ *
+ * Three claims worth pinning, because each was got wrong once while this was
+ * being wired.
+ *
+ * It is NOT the button's size ladder. A button is 32/44/50 on iOS and 32/48/56
+ * on Android; a FAB is 32/48/56 everywhere. Reusing the button's heights to
+ * derive a FAB bevel would be wrong on five of the seven device columns.
+ *
+ * It is NOT per device. Devices-Type carries no FAB width or height — only the
+ * bevels, which therefore hold one number across all seven columns.
+ *
+ * The ICON is stated, not derived. width / 2 gives 16 / 24 / 28 and the answer
+ * is 16 / 24 / 32: the large one is off by 4, and silently, because 28 is a
+ * perfectly plausible icon size.
+ */
+describe('FAB sizing', () => {
+  /* Radii are irrelevant to the FAB group — it reads none of them — so this
+     is computeRadii's own output rather than a hand-written fixture. */
+  const P = componentSizePayload(computeRadii({
+    buttonRadius: 20, iconButtonRadius: 50, inputRadius: 20, cardPadding: 16,
+    buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+  } as never) as never, {});
+
+  it('writes width, icon and focus radius, one variable per mode', () => {
+    /* Read back as modes rather than as Sm-/Lg- names: the prefix IS the mode,
+       and a prefix surviving into a name would give the collection two
+       spellings of one variable. */
+    expect([P.small['FAB/FAB-Width'], P.medium['FAB/FAB-Width'], P.large['FAB/FAB-Width']])
+      .toEqual([32, 48, 56]);
+    expect([P.small['FAB/FAB-Icon'], P.medium['FAB/FAB-Icon'], P.large['FAB/FAB-Icon']])
+      .toEqual([16, 24, 32]);
+  });
+
+  it('derives the focus radius as width + 6, exact at all three sizes', () => {
+    /* The ring sits 3px outside the button, so its box is 6px wider; a radius
+       of the full box width keeps it circular at any size. Asserted against
+       FAB_SIZE rather than against 38/54/62, so the two move together. */
+    for (const size of ['small', 'medium', 'large'] as const) {
+      const mode = size === 'medium' ? P.medium : size === 'small' ? P.small : P.large;
+      expect(`${size}: ${mode['FAB/FAB-Focus-Radius']}`).toBe(`${size}: ${FAB_SIZE[size] + 6}`);
+    }
+  });
+
+  it('does not reuse the BUTTON\'s ladder', () => {
+    /* The specific mistake this guards: deriving a FAB bevel from the button's
+       height. They agree at small (32) and nowhere else. */
+    expect(FAB_SIZE.small).toBe(PLATFORM_BUTTON_HEIGHT.Android.small);
+    expect(FAB_SIZE.medium).not.toBe(PLATFORM_BUTTON_HEIGHT['IOS-Mobile'].medium);
+    expect(FAB_SIZE.large).not.toBe(PLATFORM_BUTTON_HEIGHT['IOS-Mobile'].large);
+  });
+
+  it('states the icon rather than halving the width', () => {
+    /* width / 2 is right at small and medium and wrong at large — the shape of
+       a derivation that looks verified because two of three cases agree. */
+    expect(FAB_ICON.small).toBe(FAB_SIZE.small / 2);
+    expect(FAB_ICON.medium).toBe(FAB_SIZE.medium / 2);
+    expect(FAB_ICON.large).not.toBe(FAB_SIZE.large / 2);
+    expect(FAB_ICON.large).toBe(32);
   });
 });

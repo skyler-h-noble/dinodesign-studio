@@ -84,11 +84,69 @@ export function componentSizeNames(payload: ComponentSizePayload): string[] {
   return Object.keys(payload.medium).sort();
 }
 
+/**
+ * The FAB, all three sizes.
+ *
+ * FIXED, not a brand choice. A floating action button is 32 / 48 / 56 in every
+ * system the studio produces — the user's button-height sliders do not reach
+ * it — which is exactly why it belongs here as a literal rather than being
+ * derived from anything.
+ *
+ * It was hand-authored in Figma and mirrored here so the FAB's bevel could be
+ * computed (a bevel is a fraction of a height). A mirror of a fixed number is
+ * still two copies, and the way that ends is the copy nobody updates. Since
+ * nothing about it varies, the studio may as well own it and write it.
+ *
+ * The ICON is stated, not derived, and the large size is why: width / 2 gives
+ * 16 / 24 / 28, and the file holds 16 / 24 / **32**. The three are rungs of the
+ * icon ramp, which is a table Material and Apple publish rather than a curve —
+ * the same reason platformMetrics states its glyph sizes instead of running a
+ * ratio. Deriving these would silently shrink the large FAB's icon by 4px.
+ *
+ * The FOCUS RADIUS does derive: width + 6, exact at all three sizes. The ring
+ * sits 3px outside the button, so its box is 6px wider, and a radius of the
+ * full box width keeps it circular at any size.
+ *
+ * NOT per platform. Devices-Type carries no FAB width or height — only the
+ * bevels, which every device column therefore holds identically. If Apple and
+ * Google ever publish FAB sizes the way they do button heights, this becomes a
+ * per-platform table like PLATFORM_BUTTON and the columns are already there.
+ */
+export const FAB_SIZE = { small: 32, medium: 48, large: 56 } as const;
+export const FAB_ICON = { small: 16, medium: 24, large: 32 } as const;
+
+/** The focus ring's corner, one per size. Derived — see above. */
+export const FAB_FOCUS_RADIUS = {
+  small: FAB_SIZE.small + 6,
+  medium: FAB_SIZE.medium + 6,
+  large: FAB_SIZE.large + 6,
+} as const;
+
+/** The FAB group of Component-Size, in the Name / Sm- / Lg- shape. */
+export function fabMetricsFlat(): Record<string, number> {
+  return {
+    'FAB-Width': FAB_SIZE.medium,
+    'Sm-FAB-Width': FAB_SIZE.small,
+    'Lg-FAB-Width': FAB_SIZE.large,
+    'FAB-Icon': FAB_ICON.medium,
+    'Sm-FAB-Icon': FAB_ICON.small,
+    'Lg-FAB-Icon': FAB_ICON.large,
+    'FAB-Focus-Radius': FAB_FOCUS_RADIUS.medium,
+    'Sm-FAB-Focus-Radius': FAB_FOCUS_RADIUS.small,
+    'Lg-FAB-Focus-Radius': FAB_FOCUS_RADIUS.large,
+  };
+}
+
 /* ── The groups the studio can fill ────────────────────────────────────────
  *
  * Component-Size in Figma holds more than the studio computes. Authored by
- * hand, and NOT written by this payload: Switch, FAB, Slider, Rating, most of
+ * hand, and NOT written by this payload: Switch, Slider, Rating, most of
  * Other — and Divider, Step bar and No Count Step.
+ *
+ * FAB used to be on that list and no longer is. Its three sizes are FIXED,
+ * so there was never a reason for them to be typed rather than stated; they
+ * were only mirrored here to compute the bevel, which made two copies of a
+ * number that cannot vary.
  *
  * Those last three matter more than the rest, because the LIB now carries the
  * same numbers as literals:
@@ -120,13 +178,27 @@ export interface RadiiForSize {
   buttonFocusRadius: number; smButtonFocusRadius: number; lgButtonFocusRadius: number;
   iconButtonRadius: number; smIconButtonRadius: number; lgIconButtonRadius: number;
   iconButtonFocusRadius: number; smIconButtonFocusRadius: number; lgIconButtonFocusRadius: number;
+  iconButtonInnerRadius: number; smIconButtonInnerRadius: number; lgIconButtonInnerRadius: number;
   cardRadius: number; smCardRadius: number; lgCardRadius: number;
   cardInnerRadius: number; smCardInnerRadius: number; lgCardInnerRadius: number;
-  cardFocusRadius: number; cardPadding: number;
+  cardFocusRadius: number; smCardFocusRadius: number; lgCardFocusRadius: number;
+  listItemRadius: number; smListItemRadius: number; lgListItemRadius: number;
+  listItemFocusRadius: number; smListItemFocusRadius: number; lgListItemFocusRadius: number;
+  listItemPadding: number; smListItemPadding: number; lgListItemPadding: number;
+  listItemGap: number; smListItemGap: number; lgListItemGap: number;
+  listItemImageRadius: number;
+  listItemImageWidth: number; smListItemImageWidth: number; lgListItemImageWidth: number;
+  cardPadding: number;
+  smCardPadding: number; lgCardPadding: number;
   inputRadius: number; smInputRadius: number; lgInputRadius: number;
   inputFocusRadius: number; inputInnerRadius: number;
+  inputSwatchRadius: number; smInputSwatchRadius: number; lgInputSwatchRadius: number;
   accordionRadius: number; accordionFocusRadius: number; accordionInnerFocusRadius: number;
-  modalRadius: number; dropdownFrameRadius: number;
+  modalRadius: number; modalPadding: number;
+  smModalPadding: number; lgModalPadding: number;
+  modalInnerRadius: number; modalFocusRadius: number;
+  dropdownFrameRadius: number;
+  menuItemRadius: number; menuFocusRadius: number;
 }
 
 /* ── Nav chrome: three sizes, and not derived from anything ───────────────
@@ -141,10 +213,14 @@ export interface RadiiForSize {
  * has drifted here before, and it drifts silently because each copy is
  * self-consistent (invariant 5).
  *
- * The names are the FILE's, which is why one of them carries a space:
- * Component-Size holds `App-Bar Height`, not `App-Bar-Height`. A tidier name
- * would match nothing and leave the variable at whatever was last typed by
- * hand, reporting success the whole time.
+ * The names are the FILE's. `Nav-Bar Height` still carries a space because the
+ * file spells it that way; `App-Bar Height` did too until it was renamed to
+ * `App-Bar-Height` on 2026-09-30, and this table followed in the same pass.
+ *
+ * That is the whole hazard: a tidier name matches nothing, leaves the variable
+ * at whatever was last typed by hand, and reports success the whole time. Renaming
+ * in Figma is safe for the BINDINGS — the id is preserved, so layers stay wired —
+ * but it silently detaches this writer until the string here changes too.
  */
 /**
  * How faded an unavailable control is.
@@ -176,9 +252,9 @@ export const DISABLED_OPACITY = 0.38;
 
 export const NAV_METRICS = {
   'Rail-Width': { medium: 80, small: 72, large: 96 },
-  'App-Bar Height': { medium: 64, small: 56, large: 72 },
+  'App-Bar-Height': { medium: 64, small: 56, large: 72 },
   /* The bottom bar. 83 at medium is the design's own figure (Nav-Bar
-     7442:31305, 398x83); the other two follow App-Bar Height's proportions
+     7442:31305, 398x83); the other two follow App-Bar-Height's proportions
      rather than being measured, because the design has no small or large
      Nav-Bar to read.
      
@@ -380,7 +456,7 @@ const LINE_METRIC_CSS: Record<string, string> = {
  * they need the map for the same reason the line weights do. */
 const NAV_METRIC_CSS: Record<string, string> = {
   'Rail-Width': 'Rail-Width',
-  'App-Bar Height': 'App-Bar-Height',
+  'App-Bar-Height': 'App-Bar-Height',
   'Nav-Bar Height': 'Nav-Bar-Height',
 };
 
@@ -389,7 +465,7 @@ const NAV_METRIC_CSS: Record<string, string> = {
  * the Figma name and the CSS name are allowed to differ; a group that opts
  * out of the map today is a group that has nowhere to put the difference on
  * the day one of these is renamed with a space in it, the way Step bar and
- * App-Bar Height already are. */
+ * App-Bar-Height already are. */
 const SELECTION_METRIC_CSS: Record<string, string> = {
   /* The two Radio names are where this map earns its keep. Figma's group
      supplies the scope, so `Radio/Radio` and `Radio/Dot` read fine there. CSS
@@ -499,9 +575,25 @@ export function navMetricsCSS(indent = '  '): string[] {
  */
 export const DEVICE_OWNED_METRICS = ['Button-Height', 'Button-Icon'] as const;
 
+/**
+ * Button metrics the payload computes but does NOT write to Figma.
+ *
+ * Different reason from DEVICE_OWNED_METRICS above: those go to Devices-Type
+ * instead, so writing them here would put one name in two collections. These
+ * go nowhere, because the file has no variable for them and does not want one —
+ * the button's label size is covered by Dynamic-Typography/Dynamic-Button-
+ * Font-Size, and Component-Size holds Button-Text-Padding without a
+ * Button-Text beside it.
+ *
+ * Kept out rather than left to be skipped. The writer is update-only, so an
+ * unmatched name is dropped in silence either way; the difference is that a
+ * deliberate absence stated here cannot be mistaken later for an oversight.
+ */
+export const NOT_IN_FIGMA = ['Button-Text'] as const;
+
 function withoutDeviceOwned(flat: Record<string, number>): Record<string, number> {
   const out = { ...flat };
-  for (const base of DEVICE_OWNED_METRICS) {
+  for (const base of [...DEVICE_OWNED_METRICS, ...NOT_IN_FIGMA]) {
     delete out[base];
     delete out[`Sm-${base}`];
     delete out[`Lg-${base}`];
@@ -513,7 +605,7 @@ function withoutDeviceOwned(flat: Record<string, number>): Record<string, number
  * The Devices-Type variables the aliases above point AT, keyed by size mode.
  *
  * Names as the file spells them — spaces included, at the root of the
- * collection rather than in a group. Same rule as `App-Bar Height`: a tidier
+ * collection rather than in a group. Same rule as `Nav-Bar Height`: a tidier
  * name matches nothing and the write is a silent no-op.
  */
 export const DEVICE_BUTTON_NAMES: Record<string, Record<SizeMode, string>> = {
@@ -560,6 +652,16 @@ export function desktopButtonMetrics(
 export function componentSizePayload(
   r: RadiiForSize,
   buttonMetrics: Record<string, number>,
+  /**
+   * Input values the caller computes rather than deriving from radii.
+   *
+   * `Input-Padding` reads the user's own `inputPadding` with a radius-based
+   * fallback, so it cannot come from RadiiForSize. Its Button counterparts —
+   * swatch, min-width, border-width, padding and the bevel geometry — ride in
+   * through `buttonMetrics`, which is already a free-form Name / Sm-Name /
+   * Lg-Name bag; Input has no such bag, hence this parameter.
+   */
+  inputExtras: Record<string, number> = {},
 ): ComponentSizePayload {
   return componentSizeFigma({
     Button: {
@@ -579,6 +681,37 @@ export function componentSizePayload(
       'Button-Icon-Focus-Radius': r.iconButtonFocusRadius,
       'Sm-Button-Icon-Focus-Radius': r.smIconButtonFocusRadius,
       'Lg-Button-Icon-Focus-Radius': r.lgIconButtonFocusRadius,
+      /* No Button-Icon-Inner-Radius. It came across with the deleted
+         `Components` payload and was dropped on request: the file has
+         Button-Icon-Radius and Button-Icon-Focus-Radius, and an inner radius
+         for the icon button is not wanted. computeRadii still derives it for
+         the CSS. */
+    },
+    /* The bordered list row.
+       The group is `List-item` — lowercase i — because that is what the FILE
+       calls it. The writer is update-only and matches by name, so `List` would
+       have matched nothing and been skipped in silence, leaving all five
+       variables holding whatever was last typed by hand.
+       Radius, focus radius, padding and image radius have no Sm-/Lg- siblings,
+       so componentSizeGroup repeats each into all three size modes. The image
+       WIDTH does have them, and they become the modes. */
+    'List-item': {
+      'List-Item-Radius': r.listItemRadius,
+      'Sm-List-Item-Radius': r.smListItemRadius,
+      'Lg-List-Item-Radius': r.lgListItemRadius,
+      'List-Item-Focus-Radius': r.listItemFocusRadius,
+      'Sm-List-Item-Focus-Radius': r.smListItemFocusRadius,
+      'Lg-List-Item-Focus-Radius': r.lgListItemFocusRadius,
+      'List-Item-Padding': r.listItemPadding,
+      'Sm-List-Item-Padding': r.smListItemPadding,
+      'Lg-List-Item-Padding': r.lgListItemPadding,
+      'List-Item-Gap': r.listItemGap,
+      'Sm-List-Item-Gap': r.smListItemGap,
+      'Lg-List-Item-Gap': r.lgListItemGap,
+      'List-Item-Image-Radius': r.listItemImageRadius,
+      'List-Item-Default-Image-Width': r.listItemImageWidth,
+      'Sm-List-Item-Default-Image-Width': r.smListItemImageWidth,
+      'Lg-List-Item-Default-Image-Width': r.lgListItemImageWidth,
     },
     Card: {
       'Card-Radius': r.cardRadius,
@@ -591,10 +724,23 @@ export function componentSizePayload(
       'Card-Inner-Radius': r.cardInnerRadius,
       'Sm-Card-Inner-Radius': r.smCardInnerRadius,
       'Lg-Card-Inner-Radius': r.lgCardInnerRadius,
-      // The file calls this Card-Focus-Radius; the flat payload called it
-      // Card-Focus-Border-Radius and would have matched nothing.
+      /* The file calls this Card-Focus-Radius; the flat payload called it
+         Card-Focus-Border-Radius and would have matched nothing.
+
+         The Sm-/Lg- pair is not a new Figma variable: componentSizeGroup
+         strips the prefix and the size becomes the MODE, so these fill the
+         small and large columns of Card/Card-Focus-Radius, which were
+         echoing medium — a 21px ring on the 14px small card. */
       'Card-Focus-Radius': r.cardFocusRadius,
+      'Sm-Card-Focus-Radius': r.smCardFocusRadius,
+      'Lg-Card-Focus-Radius': r.lgCardFocusRadius,
+      /* Three real values instead of medium repeated three times. No new
+         variable in Figma: componentSizeGroup strips the Sm-/Lg- prefix and
+         the size becomes the MODE, so this fills the two columns of
+         Card/Card-Padding that were echoing medium. */
       'Card-Padding': r.cardPadding,
+      'Sm-Card-Padding': r.smCardPadding,
+      'Lg-Card-Padding': r.lgCardPadding,
     },
     Input: {
       'Input-Radius': r.inputRadius,
@@ -602,6 +748,34 @@ export function componentSizePayload(
       'Lg-Input-Radius': r.lgInputRadius,
       'Input-Focus-Radius': r.inputFocusRadius,
       'Input-Inner-Focus-Radius': r.inputInnerRadius,
+      ...inputExtras,
+      /* Input-Swatch-Radius is deliberately NOT here — it is a WEB-ONLY token.
+       *
+       * It came across with the rest of the deleted `Components` payload, and
+       * carrying it looked like part of the move. But nothing in Figma draws
+       * the thing it measures: the Dropdown and Input pages have no swatch
+       * node, and the Input component set has no colour mode — its properties
+       * are Input Buttons, Input Button Slot, State and Type.
+       *
+       * The library does have it. Select.js reads
+       * `var(--Input-Swatch-Radius, var(--Button-Radius))` for the colour-mode
+       * swatch, and exportToCSS and buildPreviewCSS both emit all three sizes.
+       * So the token is real and stays in the CSS; it simply has no Figma
+       * counterpart to write to.
+       *
+       * Emitting it anyway is not harmless. The writer is update-only, so a
+       * name the file lacks is skipped in SILENCE — which makes the payload
+       * look like it covers something it does not, and puts a permanent entry
+       * on the known-missing list where a real gap would be indistinguishable
+       * from this deliberate one.
+       *
+       * If a colour Select is ever built in Figma, this comes back with it. */
+      /* `Input-Inner-Focus-Visible` is deliberately NOT carried over. The flat
+         payload computed it as Math.max(0, inputRadius - 1), which is exactly
+         `inner(inputRadius)` — the same number as Input-Inner-Focus-Radius on
+         the line above, under a name that says a STATE where a radius belongs.
+         One value under two names is worse than a gap, because both sides look
+         complete. */
     },
     /* Was 'Accordian-Radius' (sic), deliberately matching a misspelling in the
        file — populateComponentSize is UPDATE-ONLY, so it writes by name and a
@@ -626,9 +800,41 @@ export function componentSizePayload(
        versions did. */
     Radio: radioMetricsFlat(),
     Checkbox: checkboxMetricsFlat(),
+    FAB: fabMetricsFlat(),
+    /* The dropdown panel, its rows and their focus ring — one group, because
+       the three are one derivation: the frame follows the brand and the other
+       two are concentric off it (componentRadii.ts).
+
+       Dropdown-Frame-Radius MOVED HERE from Other on 2026-09-23, matching the
+       file. It has to move in the same pass as the Figma group or the writer
+       goes quietly dead: populateComponentSize is UPDATE-ONLY and matches on
+       the full `Group/Name`, so `Other/Dropdown-Frame-Radius` against a file
+       holding `Menu/Dropdown-Frame-Radius` skips silently and leaves the value
+       at whatever was last typed by hand. Same shape as the `Accordian`
+       rename and `Radio-Size`. */
+    Menu: {
+      'Dropdown-Frame-Radius': r.dropdownFrameRadius,
+      'Menu-Item-Radius': r.menuItemRadius,
+      'Menu-Focus-Radius': r.menuFocusRadius,
+    },
     Other: {
       'Modal-Radius': r.modalRadius,
-      'Dropdown-Frame-Radius': r.dropdownFrameRadius,
+      /* Modal-Padding only, of the three that came off `Components`.
+       *
+       * A modal does not take focus — it is the thing that HOLDS the focusable
+       * controls, and the scrim beneath it means nothing outside it is
+       * reachable — so a focus radius describes a ring that is never drawn.
+       * An inner radius has no use either without one.
+       *
+       * Single value, no Sm-/Lg- triple: a modal is one size. componentSizeGroup
+       * writes the same number into all three modes, which is what the file
+       * already holds for Modal-Radius. */
+      /* Three values, so the three size modes differ. A single one gave a
+         720px-wide modal a 400px one's inset, which is what drove Modal.js to
+         hardcode its own 24 / 32 / 40 table. */
+      'Modal-Padding': r.modalPadding,
+      'Sm-Modal-Padding': r.smModalPadding,
+      'Lg-Modal-Padding': r.lgModalPadding,
       /* Written, not left hand-authored. populateComponentSize is
          update-only, so these land on the variables already in the file —
          which is the point: the number then has one home instead of living

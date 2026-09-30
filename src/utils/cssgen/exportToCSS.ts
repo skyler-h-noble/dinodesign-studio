@@ -4951,14 +4951,49 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Sm-Card-Radius: ${Math.min(r.smCardRadius, buttonHeight)}px;`);
     lines.push(`  --Lg-Card-Radius: ${Math.min(r.lgCardRadius, buttonHeight)}px;`);
     lines.push(`  --Card-Inner-Radius: ${r.cardInnerRadius}px;`);
+    /* Inner and focus radii at all three sizes.
+       Figma already held Sm-/Lg-Card-Inner-Radius while the CSS emitted only
+       the medium, and NEITHER side had a per-size focus radius — so a small
+       card drew a medium card's ring. Invariant 5: both sides, same pass. */
+    lines.push(`  --Sm-Card-Inner-Radius: ${r.smCardInnerRadius}px;`);
+    lines.push(`  --Lg-Card-Inner-Radius: ${r.lgCardInnerRadius}px;`);
     lines.push(`  --Card-Focus-Radius: ${r.cardFocusRadius}px;`);
+    lines.push(`  --Sm-Card-Focus-Radius: ${r.smCardFocusRadius}px;`);
+    lines.push(`  --Lg-Card-Focus-Radius: ${r.lgCardFocusRadius}px;`);
     lines.push(`  --Card-Padding: ${r.cardPadding}px;`);
+    // Padding scales with the card, now that the TYPE inside it does.
+    lines.push(`  --Sm-Card-Padding: ${r.smCardPadding}px;`);
+    lines.push(`  --Lg-Card-Padding: ${r.lgCardPadding}px;`);
     lines.push(`  --Modal-Padding: ${r.modalPadding}px;`);
+    lines.push(`  --Sm-Modal-Padding: ${r.smModalPadding}px;`);
+    lines.push(`  --Lg-Modal-Padding: ${r.lgModalPadding}px;`);
     lines.push(`  --Modal-Radius: ${cappedModalRadius}px;`);
     lines.push(`  --Modal-Inner-Radius: ${r.modalInnerRadius}px;`);
     lines.push(`  --Modal-Focus-Radius: ${r.modalFocusRadius}px;`);
+    /* The bordered list row and its inset ring. The ring is the row's radius
+       minus its 2px inset (1px clear + the row's own 1px border), so the two
+       stay concentric when the row's corner moves. */
+    lines.push(`  --List-Item-Radius: ${r.listItemRadius}px;`);
+    lines.push(`  --List-Item-Focus-Radius: ${r.listItemFocusRadius}px;`);
+    lines.push(`  --List-Item-Padding: ${r.listItemPadding}px;`);
+    lines.push(`  --List-Item-Gap: ${r.listItemGap}px;`);
+    lines.push(`  --Sm-List-Item-Padding: ${r.smListItemPadding}px;`);
+    lines.push(`  --Lg-List-Item-Padding: ${r.lgListItemPadding}px;`);
+    lines.push(`  --Sm-List-Item-Gap: ${r.smListItemGap}px;`);
+    lines.push(`  --Lg-List-Item-Gap: ${r.lgListItemGap}px;`);
+    lines.push(`  --Sm-List-Item-Radius: ${r.smListItemRadius}px;`);
+    lines.push(`  --Lg-List-Item-Radius: ${r.lgListItemRadius}px;`);
+    lines.push(`  --Sm-List-Item-Focus-Radius: ${r.smListItemFocusRadius}px;`);
+    lines.push(`  --Lg-List-Item-Focus-Radius: ${r.lgListItemFocusRadius}px;`);
+    lines.push(`  --List-Item-Image-Radius: ${r.listItemImageRadius}px;`);
+    lines.push(`  --List-Item-Default-Image-Width: ${r.listItemImageWidth}px;`);
+    lines.push(`  --Sm-List-Item-Default-Image-Width: ${r.smListItemImageWidth}px;`);
+    lines.push(`  --Lg-List-Item-Default-Image-Width: ${r.lgListItemImageWidth}px;`);
     // Dropdown / menu frame: min(Input-Radius, Card-Radius, 16).
     lines.push(`  --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;`);
+    // The row inside it, and its inset ring — concentric off the frame.
+    lines.push(`  --Menu-Item-Radius: ${r.menuItemRadius}px;`);
+    lines.push(`  --Menu-Focus-Radius: ${r.menuFocusRadius}px;`);
     /* Nav chrome — the rail's width and the app bar's height, one per size.
        Constants rather than derived: a rail is 80 wide in every brand, and
        the three sizes are a density decision. Emitted from the SAME table

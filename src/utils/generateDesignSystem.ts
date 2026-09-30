@@ -14,6 +14,7 @@ import { generateFigmaJSON } from './generateFigmaJSON';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { typographyDeclarations } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles, SYSTEM_UI_STACK } from './typeScale';
+import { overlayOffsetCSS } from './deviceChrome';
 
 /**
  * Returns a public download URL for a file in a design system.
@@ -850,52 +851,42 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     // which is AFTER this point in the same scope — reading it here would hit
     // the temporal dead zone. Read the same input the migration defaults from.
     const platformDesktopButtonHeight = input.styleCustomizations?.buttonHeight ?? 32;
-    designSystemJSON.Platform = {
-      Desktop: {
-        'Container-Padding': { value: 'var(--Sizing-4)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('Desktop', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Button-Width': { value: '80px', type: 'sizing' },
-        'Min-Stack-Gap': { value: '0px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET.Desktop}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER.Desktop}px`, type: 'spacing' },
-        'Platform-Label': { value: 'Desktop', type: 'string' },
-      },
-      'IOS-Mobile': {
-        'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('IOS-Mobile', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Stack-Gap': { value: '10px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET['IOS-Mobile']}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER['IOS-Mobile']}px`, type: 'spacing' },
-        'Platform-Label': { value: 'IOS-Mobile', type: 'string' },
-      },
-      'IOS-Tablet': {
-        'Container-Padding': { value: 'var(--Sizing-3)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('IOS-Tablet', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Stack-Gap': { value: '10px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET['IOS-Tablet']}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER['IOS-Tablet']}px`, type: 'spacing' },
-        'Platform-Label': { value: 'IOS-Tablet', type: 'string' },
-      },
-      Android: {
-        'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('Android', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Stack-Gap': { value: '12px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET.Android}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER.Android}px`, type: 'spacing' },
-        'Platform-Label': { value: 'Android', type: 'string' },
-      },
-    };
+    /* No Platform section, removed 2026-09-29 with the Figma collection.
+     *
+     * Four modes where Devices-Type has seven, and the collection no longer
+     * exists — so this reached the plugin (which reads tokens.json as well as
+     * figma.json) and had it recreated on every import, the same way Cognitive
+     * did.
+     *
+     * Button-Height, Min-Button-Width, Platform-Spacer and the overlay offsets
+     * are all written elsewhere already — Devices-Type or Component-Size. What
+     * had no other home: `Target`, `Min-Stack-Gap` and `Container-Padding`.
+     *
+     * All three are WEB-ONLY by decision, not by omission. They ship in
+     * foundation.css per platform block, which is what the library reads —
+     * Button.js grows a small button's tap target to `var(--Target)` at
+     * runtime — and none of them describes something a Figma layer binds to.
+     * See the fuller note in generateFigmaJSON beside the Platform removal. */
 
-    // Add Cognitive Accessibility section to JSON
-    designSystemJSON.Cognitive = {
-      Dyslexia: {
-        'Cognitive-Multiplier': { value: '1.5', type: 'number' },
-        'Body-Font-Family': { value: 'OpenDyslexic', type: 'fontFamily' },
-      },
-      ADHD: {
-        'Cognitive-Multiplier': { value: '1.5', type: 'number' },
-      },
-    };
+    /* No Cognitive section on tokens.json, removed 2026-09-29.
+     *
+     * It held a Dyslexia and an ADHD preset — a 1.5 line-height multiplier and
+     * OpenDyslexic — and nothing read it back. What it DID do was reach the
+     * Figma plugin, which reads tokens.json as well as figma.json and turned
+     * the section into a `Cognitive` variable collection. That collection was
+     * deleted by hand after every regenerate and recreated by the next one.
+     *
+     * The feature is not being removed, and this is the distinction worth
+     * keeping straight. `--Cognitive-Multiplier` is LIVE: foundation.css
+     * declares it at 1 and raises it to 1.5 under the accessibility overrides
+     * further down this file, and the library multiplies line heights by it —
+     * Link.js alone reads it five times. That is the whole mechanism. The JSON
+     * section was a second statement of the same two numbers, for a consumer
+     * that did not exist.
+     *
+     * If a Cognitive collection is ever wanted in Figma, it should come from
+     * generateFigmaJSON like every other collection, where
+     * figmaCollectionNames.test.ts would make someone confirm the file has one. */
   } catch (err) {
     console.error('❌❌❌ JSON generation FAILED:', err);
     console.error('❌ Stack:', (err as Error).stack);
@@ -1058,13 +1049,37 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Sm-Card-Radius: ${r.smCardRadius}px;
   --Lg-Card-Radius: ${r.lgCardRadius}px;
   --Card-Inner-Radius: ${r.cardInnerRadius}px;
+  --Sm-Card-Inner-Radius: ${r.smCardInnerRadius}px;
+  --Lg-Card-Inner-Radius: ${r.lgCardInnerRadius}px;
   --Card-Focus-Radius: ${r.cardFocusRadius}px;
+  --List-Item-Radius: ${r.listItemRadius}px;
+  --List-Item-Focus-Radius: ${r.listItemFocusRadius}px;
+  --List-Item-Padding: ${r.listItemPadding}px;
+  --List-Item-Gap: ${r.listItemGap}px;
+  --Sm-List-Item-Padding: ${r.smListItemPadding}px;
+  --Lg-List-Item-Padding: ${r.lgListItemPadding}px;
+  --Sm-List-Item-Gap: ${r.smListItemGap}px;
+  --Lg-List-Item-Gap: ${r.lgListItemGap}px;
+  --Sm-List-Item-Radius: ${r.smListItemRadius}px;
+  --Lg-List-Item-Radius: ${r.lgListItemRadius}px;
+  --Sm-List-Item-Focus-Radius: ${r.smListItemFocusRadius}px;
+  --Lg-List-Item-Focus-Radius: ${r.lgListItemFocusRadius}px;
+  --List-Item-Image-Radius: ${r.listItemImageRadius}px;
+  --List-Item-Default-Image-Width: ${r.listItemImageWidth}px;
+  --Sm-List-Item-Default-Image-Width: ${r.smListItemImageWidth}px;
+  --Lg-List-Item-Default-Image-Width: ${r.lgListItemImageWidth}px;
+  --Sm-Card-Focus-Radius: ${r.smCardFocusRadius}px;
+  --Lg-Card-Focus-Radius: ${r.lgCardFocusRadius}px;
   --Card-Padding: ${r.cardPadding}px;
+  --Sm-Card-Padding: ${r.smCardPadding}px;
+  --Lg-Card-Padding: ${r.lgCardPadding}px;
 
   /* Modal */
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${r.modalRadius}px;
   --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
+  --Menu-Item-Radius: ${r.menuItemRadius}px;
+  --Menu-Focus-Radius: ${r.menuFocusRadius}px;
   --Modal-Inner-Radius: ${r.modalInnerRadius}px;
   --Modal-Focus-Radius: ${r.modalFocusRadius}px;
 
@@ -1249,6 +1264,10 @@ ${platformBevelCSS('Desktop', bevelHeights, bevelPercent)}
      minimum. */
   --Target: ${PLATFORM_TARGET.Desktop}px;
   --Platform-Spacer: ${PLATFORM_SPACER.Desktop}px;
+  /* Floating overlays. Desktop reserves no system chrome, so these are the
+     clearance alone — stated rather than left to fall back, because an unset
+     custom property paints nothing and reports nothing. */
+${overlayOffsetCSS('Desktop').slice(1).join('\n')}
 }
 
 /* iOS Mobile */
@@ -1260,6 +1279,7 @@ ${platformBevelCSS('Desktop', bevelHeights, bevelPercent)}
 ${platformBevelCSS('IOS-Mobile', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['IOS-Mobile']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['IOS-Mobile']}px;
+${overlayOffsetCSS('IOS-Mobile').join('\n')}
   --Body-Font-Size: 16px;
   --Body-Letter-Spacing: -.5px;
   --Body-Line-Height: 24px;
@@ -1305,6 +1325,7 @@ ${platformBevelCSS('IOS-Mobile', bevelHeights, bevelPercent)}
 ${platformBevelCSS('IOS-Tablet', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['IOS-Tablet']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['IOS-Tablet']}px;
+${overlayOffsetCSS('IOS-Tablet').join('\n')}
   --Body-Font-Size: 17px;
   --Body-Letter-Spacing: -.5px;
   --Body-Line-Height: 25.5px;
@@ -1350,6 +1371,7 @@ ${platformBevelCSS('IOS-Tablet', bevelHeights, bevelPercent)}
 ${platformBevelCSS('Android', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['Android']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['Android']}px;
+${overlayOffsetCSS('Android').join('\n')}
   --Body-Font-Size: 16px;
   --Body-Line-Height: 24px;
   --Body-Letter-Spacing: .5px;
