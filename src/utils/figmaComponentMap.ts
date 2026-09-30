@@ -90,8 +90,12 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Tooltip:           { page: 'Tooltip', sets: ['Tooltip'] },
   TransferList:      { page: 'TransferList', sets: ['TransferList'] },
   TreeView:          { page: 'TreeView', sets: ['TreeView', 'Menu Item'] },
-  /* A page with no component sets: type specimens, not components. Mapped so
-     the doc can link the page, with nothing to link inside it. */
+  /* A FOUNDATION in Figma and a COMPONENT in code.
+     The page carries text styles, not component sets — there is nothing to
+     instance — while the library exports Typography, H1..H6, Body, Caption and
+     the rest as real components. So it is mapped (the page is worth linking:
+     it is where the type scale is) with no sets, and an empty `sets` here
+     means "styles, not components" rather than "not built yet". */
   Typography:        { page: 'Typography', sets: [] },
   BottomNavigation:  { page: 'NavBar', sets: ['Nav-Bar', 'Nav Item'],
                        note: 'The page is NavBar; its Nav-Bar set carries a "Floating +Raised FAB" style and a Nav Item at Default/Selected, which is a bottom navigation bar.' },

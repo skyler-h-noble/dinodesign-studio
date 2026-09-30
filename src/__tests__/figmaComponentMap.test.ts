@@ -117,10 +117,13 @@ describe('components made of several sets', () => {
   });
 
   it('allows a mapped page to hold no sets at all', () => {
-    /* Typography is type specimens: a page worth linking with nothing to link
-       inside it. */
+    /* Typography is a FOUNDATION in Figma and a COMPONENT in code: text styles
+       on the page, real exports in the library. An empty `sets` means "styles,
+       not components", not "not built yet" — so the page is still worth
+       linking, because that is where the type scale lives. */
     expect(figmaMappingFor('Typography')!.sets).toEqual([]);
     expect(REAL_PAGES.has('Typography')).toBe(true);
+    expect(REAL_SETS.some(s => s.page === 'Typography')).toBe(false);
   });
 
   it('leaves ToggleButton unmapped while its design is unsettled', () => {

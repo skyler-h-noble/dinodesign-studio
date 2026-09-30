@@ -1,0 +1,153 @@
+/**
+ * The doc is read by an agent, so the failures that matter are the ones that
+ * still LOOK like a document: a broken table row, a Figma link that resolves to
+ * the wrong node, a default that is quietly missing.
+ */
+import { describe, it, expect } from 'vitest';
+import { renderComponentDoc, renderFigmaSection } from '../utils/docs/componentDoc';
+import { BUTTON_DOC, TABS_DOC, CARD_DOC, COMPONENT_DOCS } from '../utils/docs/components';
+import type { LinkedFigmaFileEntry } from '../utils/figmaLink';
+
+/** A table row's cells, honouring the backslash escape a renderer respects. */
+const cells = (row: string) =>
+  row.split(/(?<!\\)\|/).map(c => c.trim()).filter(Boolean);
+
+const linked: LinkedFigmaFileEntry = {
+  fileKey: 'USERKEY0000000000000AB',
+  fileName: 'Lise Design System',
+  fileUrl: 'https://www.figma.com/design/USERKEY0000000000000AB/Lise-Design-System',
+  lastSeenAt: new Date('2026-09-30T12:00:00Z'),
+  components: [
+    { id: '8216:9719', name: 'Tabs', page: 'Tabs', variants: 3 },
+    { id: '8212:9219', name: 'Tab', page: 'Tabs', variants: 15 },
+  ],
+};
+const noMap: LinkedFigmaFileEntry = { ...linked, components: undefined };
+
+describe('the markdown survives its own content', () => {
+  it('escapes a pipe in a union type instead of splitting the row', () => {
+    /* `number | string` in a cell IS a column separator. Unescaped, the row
+       gains a column and every cell after it shifts left — the table still
+       renders, just wrong, which is the worst kind of wrong for a doc. */
+    const md = renderComponentDoc(TABS_DOC);
+    const row = md.split('\n').find(l => l.includes('value / defaultValue'))!;
+    expect(row).toContain('number \\| string');
+    // split on pipes that are NOT escaped — the same rule a renderer applies
+    expect(cells(row)).toHaveLength(4);
+  });
+
+  it('keeps every props row at four columns', () => {
+    for (const doc of COMPONENT_DOCS) {
+      const md = renderComponentDoc(doc);
+      const start = md.indexOf('### Props');
+      const rows = md.slice(start, md.indexOf('### States'))
+        .split('\n')
+        .filter(l => l.startsWith('|') && !l.includes('---'))
+        .map(l => cells(l).length);
+      for (const n of rows) expect(n, doc.name).toBe(4);
+    }
+  });
+});
+
+describe('what an agent gets wrong without being told', () => {
+  it('states a default for EVERY prop', () => {
+    /* The default is the single most-missed fact — Button defaults to
+       `default`, not `primary`, and an agent that guesses picks primary. */
+    for (const doc of COMPONENT_DOCS) {
+      for (const p of doc.props) expect(p.default, `${doc.name}.${p.name}`).toBeTruthy();
+    }
+  });
+
+  it('says Button defaults to default, not primary', () => {
+    const md = renderComponentDoc(BUTTON_DOC);
+    expect(md).toMatch(/default.*not.*`primary`/i);
+  });
+
+  it('marks interaction states as NOT props', () => {
+    /* Otherwise an agent writes state="hover". */
+    const md = renderComponentDoc(TABS_DOC);
+    expect(md).toContain('interaction — not a prop');
+  });
+
+  it('names a replacement for every wrong-component case', () => {
+    for (const doc of COMPONENT_DOCS) {
+      for (const i of doc.insteadUse) {
+        expect(i.use, `${doc.name}: "${i.when}"`).toBeTruthy();
+      }
+    }
+  });
+});
+
+describe('the Figma section', () => {
+  it('links each set to the USER file, with a hyphenated node id', () => {
+    const md = renderFigmaSection('Tabs', linked).join('\n');
+    expect(md).toContain('/design/USERKEY0000000000000AB/');
+    expect(md).toContain('node-id=8216-9719');
+    expect(md).not.toContain('8216:9719');
+  });
+
+  it('lists the parts, because a page is not one component', () => {
+    const md = renderFigmaSection('Tabs', linked).join('\n');
+    expect(md).toContain('[Tabs]');
+    expect(md).toContain('[Tab]');
+  });
+
+  it('tells a linked user to re-run the plugin, NOT to link their file', () => {
+    /* The state every existing user is in. Sending them to link a file they
+       already linked is how ten minutes disappear. */
+    const md = renderFigmaSection('Tabs', noMap).join('\n');
+    expect(md).toContain('Re-run the OmniDesign plugin');
+    expect(md).not.toContain('Get your design into Figma');
+    expect(md).toContain(linked.fileUrl);
+  });
+
+  it('tells an unlinked user to link, and offers no dead links', () => {
+    const md = renderFigmaSection('Tabs', null).join('\n');
+    expect(md).toContain('Get your design into Figma');
+    expect(md).not.toContain('node-id=');
+  });
+
+  it('says so when a set the map names is absent from the user file', () => {
+    /* They renamed or deleted it. Saying it beats a silently shorter list,
+       which reads as the component simply having fewer parts. */
+    const partial = { ...linked, components: [linked.components![0]] };
+    const md = renderFigmaSection('Tabs', partial).join('\n');
+    expect(md).toContain('**Tab** — not found in your file');
+  });
+
+  it('distinguishes undrawn from undrawable', () => {
+    expect(renderFigmaSection('Autocomplete', linked).join('\n')).toContain('No Figma counterpart yet');
+    expect(renderFigmaSection('Grid', linked).join('\n')).toContain('layout or infrastructure');
+  });
+
+  it('is omitted entirely for a component in neither list', () => {
+    expect(renderFigmaSection('NotAComponent', linked)).toEqual([]);
+  });
+});
+
+describe('the sections a human doc would not have', () => {
+  it.each(COMPONENT_DOCS)('$name says where a theme goes', (doc) => {
+    expect(doc.theming.length).toBeGreaterThan(0);
+  });
+
+  it.each(COMPONENT_DOCS)('$name lists the tokens a consumer must define', (doc) => {
+    expect(doc.tokens.length).toBeGreaterThan(0);
+  });
+
+  it('warns about theming a node that carries a shadow', () => {
+    /* The rule that is specific to this system and invisible everywhere else. */
+    expect(renderComponentDoc(BUTTON_DOC)).toMatch(/shadow/i);
+  });
+
+  it('explains a value that looks arbitrary rather than just stating it', () => {
+    const md = renderComponentDoc(TABS_DOC);
+    expect(md).toContain('outline-offset: -4px');
+    expect(md).toMatch(/INNER edge/);
+  });
+
+  it('gives Card the opposite sign from Tabs, and says why', () => {
+    /* Card's ring sits OUTSIDE and is radius + 3; Tabs' is inset. Getting the
+       sign wrong draws a ring across the component's own curve. */
+    expect(renderComponentDoc(CARD_DOC)).toContain('Card-Radius + 3');
+  });
+});
