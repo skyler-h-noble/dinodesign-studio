@@ -1452,6 +1452,25 @@ ${(() => {
   const contDefQuiet = contIsBW
     ? (isLight(contDefBg) ? NEUTRAL[5] : '#ffffff')
     : p(buttonModePalette, getAccessibleTones(contDefBg, buttonModeN, buttonModePalette).quiet);
+  /* NO --Background here, and its absence is the fix.
+   *
+   * This rule covers all five container levels, so setting --Background once
+   * painted every one of them the same colour — the value of Container-HIGHEST
+   * — while the published system gave each its own. A Container-Low card and a
+   * Container-Highest card looked identical in the studio and different once
+   * published.
+   *
+   * Both sides were self-consistent, which is why it survived: they reach the
+   * background by different routes. The published theme rule defines the five
+   * --Container-* VALUES and base.css maps each level to its own --Background
+   * ([data-surface="Container-Low"] { --Background: var(--Container-Low) }).
+   * The preview set --Background directly and never consulted the levels.
+   *
+   * The five values are already emitted above (--Container-Lowest through
+   * --Container-Highest), so dropping this line hands the mapping back to
+   * base.css — which the studio loads — and the two architectures agree.
+   * These selectors score (0,2,0) against base.css's (0,1,0), so anything set
+   * here would win; the only way to let the level decide is to say nothing. */
   return `[data-theme="Brand"][data-surface="Container"],
 [data-theme="Brand"][data-surface="Container-High"],
 [data-theme="Brand"][data-surface="Container-Highest"],
@@ -1467,7 +1486,6 @@ ${(() => {
 [data-surface] [data-surface="Container-Highest"],
 [data-surface] [data-surface="Container-Low"],
 [data-surface] [data-surface="Container-Lowest"] {
-  --Background: var(--${containerPaletteName}-Color-${containerN});
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
@@ -1710,6 +1728,26 @@ ${(() => {
   const dimBg = p(surfacePalette, dimN);
   const brightBg = p(surfacePalette, brightN);
   const dimmestBg = p(surfacePalette, dimmestN);
+  /* NO descendant arm for plain Surface below, and that is the rule rather
+     than an omission.
+     
+     The published CSS gives every one of its 12 themes a descendant arm for
+     Surface-Dim, -Dimmest, -Bright and -Brightest, and none at all for plain
+     Surface — exactly 48 and 0, measured off a real downloaded bundle.
+     data-surface="Surface" is the DEFAULT, so a descendant carrying it has not
+     opted into anything: it is inheriting, and custom properties already
+     inherit. A descendant explicitly marked Surface-Dim HAS opted in, which is
+     why those keep theirs.
+     
+     The arm that used to be here matched at (0,2,0) — the same score as
+     [data-theme="App-Bar"][data-surface="Surface"] — and was emitted 480 lines
+     later, so it won on source order and repainted the app bar with the page's
+     surface. In devtools the brand's App-Bar colour showed struck through,
+     which reads as a missing selector rather than an extra one.
+     
+     The App-Bar block above already warns about exactly this shape: "Keep this
+     narrow — matching [data-theme=Brand] descendants would also catch sibling
+     content." Same trap, one selector over. */
   return `[data-theme="Brand"] [data-surface="Surface-Dim"],
 [data-theme="Brand"][data-surface="Surface-Dim"] {
   --Background: var(--Surface-Dim);
@@ -1725,7 +1763,6 @@ ${buildScopeTokens(dimmestBg, dimmestN)}
   --Background: var(--Surface-Bright);
 ${buildScopeTokens(brightBg, brightN)}
 }
-[data-theme="Brand"] [data-surface="Surface"],
 [data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }`;
 })()}
 
@@ -1872,9 +1909,15 @@ ${(() => {
   --Sm-Card-Radius: ${Math.min(r.smCardRadius, buttonHeight)}px;
   --Lg-Card-Radius: ${Math.min(r.lgCardRadius, buttonHeight)}px;
   --Card-Padding: ${r.cardPadding}px;
+  --Sm-Card-Padding: ${r.smCardPadding}px;
+  --Lg-Card-Padding: ${r.lgCardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
+  --Sm-Modal-Padding: ${r.smModalPadding}px;
+  --Lg-Modal-Padding: ${r.lgModalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;
   --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
+  --Menu-Item-Radius: ${r.menuItemRadius}px;
+  --Menu-Focus-Radius: ${r.menuFocusRadius}px;
 ${navMetricsCSS('  ').join('\n')}
   --Accordion-Radius: ${cappedAccordionRadius}px;
   --Input-Radius: ${r.inputRadius}px;

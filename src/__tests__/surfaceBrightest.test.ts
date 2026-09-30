@@ -396,7 +396,22 @@ describe('Surface-Brightest', () => {
     expect(aliased, 'no Themes entry may still alias the absent BlackWhite variable').toBe(0);
   });
 
-  it('gives the black face pure black, and the white face Neutral Color-12', () => {
+  it('keeps the black bevel MODE-AWARE, and freezes only what cannot move', () => {
+    /* This used to assert a hard `#00000080` for the black face — a literal in
+       the Themes collection, whose modes are the nine THEMES rather than
+       light/dark. It was defensible at the time (a shadow can never come out
+       lighter than the button it sits under, so pure black is safe in both),
+       but it FROZE a value that genuinely moves: Button-Lowlight.BlackWhite
+       carries #04040480 in light and #0b0b0b80 in dark.
+     *
+     * Now that every BlackWhite role is repointed at a variable the file has,
+     * the black face can take the real one and the split comes back.
+     *
+     * WHITE stays a literal, and that is not the same compromise. White's
+     * Highlight and Lowlight are IDENTICAL in both modes — #ffffff80 and
+     * #b3b3b380 — because white does not move; the 70% dark-mode alpha lives in
+     * the fill's own colour, not in its bevel. Freezing a constant costs
+     * nothing. Freezing a variable costs dark mode. */
     const f: any = withStyle();
     const seen = new Set<string>();
     const walk = (n: any, path: string, d: number) => {
@@ -408,14 +423,52 @@ describe('Surface-Brightest', () => {
       for (const k of Object.keys(n)) if (k !== 'type') walk(n[k], path + '/' + k, d + 1);
     };
     walk({ Themes: f.Themes }, '', 0);
-    // Pure black specifically: it is at or below the fill in BOTH modes
-    // (#040404 light, #0b0b0b dark), so a literal frozen across the Themes
-    // collection's theme-modes can never render lighter than the button.
-    //
-    // The trailing 80 is the bevel alpha at the default 50% opacity, matching
-    // what the white face receives through Neutral Color-12. Opaque black would
-    // make the black button's shadow read twice as strong as the white one's.
-    expect([...seen].sort()).toEqual(['#00000080', '{Button-Lowlight.Neutral.Color-12}']);
+    expect([...seen].sort())
+      .toEqual(['#b3b3b380', '{Button-Lowlight.BlackWhite.Color-12}']);
+
+    /* The literal must never be the black one again. A frozen black bevel is
+       the specific regression this replaced. */
+    expect([...seen]).not.toContain('#00000080');
+  });
+
+  it('leaves no BlackWhite role pointing at a target Modes does not carry', () => {
+    /* The check that would have caught the original bug. Seven of the eight
+       roles aliased {Buttons.BlackWhite.Color-N.<Role>}, which Modes has never
+       held — and an alias to an absent target does not fail, it just does not
+       bind. Asserted against what the payload actually DEFINES rather than
+       against a list of role names, so a new role added upstream is covered
+       without this test knowing about it. */
+    const f: any = withStyle();
+    const defined = new Set<string>();
+    const walkDef = (n: any, p: string[]) => {
+      if (!n || typeof n !== 'object') return;
+      if ('value' in n && typeof n.value !== 'object') { defined.add(p.join('.')); return; }
+      for (const k of Object.keys(n)) if (k !== 'type') walkDef(n[k], [...p, k]);
+    };
+    walkDef(f.Modes?.['Light-Mode'], []);
+
+    /* Only references that target MODES are checked here. SurfacesContainers
+       legitimately aliases into the Theme collection — `Theme.Surface/Buttons/
+       BlackWhite/Button` — and those resolve in a different collection with a
+       different path syntax. Matching on the first dotted segment against the
+       Modes sections keeps this honest without modelling Theme's paths, which
+       would be a second implementation of the plugin's naming. */
+    const modeSections = new Set([...defined].map((x) => x.split('.')[0]));
+    const dangling: string[] = [];
+    const walk = (n: any, path: string, d: number) => {
+      if (!n || typeof n !== 'object' || d > 14) return;
+      if (typeof n.value === 'string') {
+        const m = String(n.value).match(/^\{(.+)\}$/);
+        if (m && /BlackWhite/.test(path)
+            && modeSections.has(m[1].split('.')[0]) && !defined.has(m[1])) {
+          dangling.push(`${path} -> ${m[1]}`);
+        }
+        return;
+      }
+      for (const k of Object.keys(n)) if (k !== 'type') walk(n[k], path + '/' + k, d + 1);
+    };
+    walk({ Themes: f.Themes, SurfacesContainers: f.SurfacesContainers }, '', 0);
+    expect(dangling).toEqual([]);
   });
 
   // Every theme the CSS emits must also reach Figma.
@@ -582,9 +635,13 @@ describe('Surface-Brightest', () => {
     expect(cssStd).toBe(MIN_W);
     expect(cssLg, 'large floor is the standard floor + 40').toBe(MIN_W + 40);
 
-    const comp: any = figmaGen(j).Components?.Button || {};
-    expect(comp['Button-Min-Width'], 'Figma and CSS must agree').toBe(cssStd);
-    expect(comp['Lg-Button-Min-Width'], 'Figma and CSS must agree').toBe(cssLg);
+    /* Component-Size, not the deleted `Components` — which named a collection
+       the library file does not have, so the plugin created a duplicate on
+       every import. Size is the MODE here, so the large floor is the `large`
+       column of one variable rather than a second `Lg-` name. */
+    const cs: any = figmaGen(j)['Component-Size'] || {};
+    expect(cs.medium?.['Button/Button-Min-Width'], 'Figma and CSS must agree').toBe(cssStd);
+    expect(cs.large?.['Button/Button-Min-Width'], 'Figma and CSS must agree').toBe(cssLg);
   });
 
   // The five surface levels must ASCEND in lightness, in BOTH modes.
@@ -653,12 +710,16 @@ describe('Surface-Brightest', () => {
     expect(base).toContain('--Sm-Button-Padding: var(--Button-Padding);');
     expect(base).toContain('--Large-Button-Padding: var(--Lg-Button-Padding);');
 
-    const comp: any = figmaGen(j).Components?.Button || {};
-    expect(comp['Button-Padding'], 'Figma and CSS must agree').toBe(8);
-    expect(comp['Lg-Button-Padding'], 'Figma and CSS must agree').toBe(16);
-    // Sm- stays out of Figma: it equals Button-Padding, so nothing selects
-    // between the copies. Lg- is a genuinely different number.
-    expect(comp['Sm-Button-Padding']).toBeUndefined();
+    const cs: any = figmaGen(j)['Component-Size'] || {};
+    expect(cs.medium?.['Button/Button-Padding'], 'Figma and CSS must agree').toBe(8);
+    expect(cs.large?.['Button/Button-Padding'], 'Figma and CSS must agree').toBe(16);
+    /* Small takes the standard padding rather than one of its own — same claim
+       the CSS makes by aliasing --Sm-Button-Padding to --Button-Padding.
+       Asserted as small EQUALLING medium now that size is a mode: there is no
+       `Sm-` name left to be absent, and a missing value would read as
+       inherited rather than as a gap. */
+    expect(cs.small?.['Button/Button-Padding']).toBe(cs.medium?.['Button/Button-Padding']);
+    expect(cs.medium?.['Button/Sm-Button-Padding']).toBeUndefined();
   });
 
   // Outline-Text is a Buttons-collection variable in Figma, not a per-theme one.
@@ -776,4 +837,39 @@ describe('Surface-Brightest', () => {
       expect(brightest?.[role]?.value, `Default Surfaces-Brightest missing ${role}`).toBeTruthy();
     }
   });
+
+  /* All five surface levels must reach the Surface collection.
+   *
+   * `surfaceToGroup` in generateFigmaJSON drives which Figma MODES get written,
+   * and Brightest was absent from it long after the level shipped —
+   * SURFACE_GROUPS_INTERNAL listed it, Themes emitted it, that map did not. So
+   * four modes were written and the fifth got nothing.
+   *
+   * The failure is silent in the worst way: the MODE still exists in the file, so
+   * a designer selects Surface-Brightest and every variable in it keeps whatever
+   * it last held. On Error that painted #ef5854 — Color-6, the BRIGHT value —
+   * where Color-11's #fff3ef was expected. A plausible colour, not a broken one.
+   *
+   * Asserted against the Theme groups rather than a hardcoded list, so a sixth
+   * level added to Themes fails here instead of quietly not being written.
+   */
+  describe('the Surface collection carries every level Themes defines', () => {
+    it('writes one mode per surface group, Brightest included', () => {
+      const f: any = withStyle();
+      const themeSurfaces = Object.keys(f.Themes?.[Object.keys(f.Themes)[0]] || {})
+        .filter((k) => k.startsWith('Surface'));
+      const written = Object.keys(f.SurfacesContainers || {}).filter((k) => k.startsWith('Surface'));
+      expect(written.sort()).toEqual(themeSurfaces.sort());
+    });
+    it('points each mode at its OWN level, not a neighbour', () => {
+      /* The off-by-one this would have caught: Brightest resolving to Bright.
+         Each mode's Background must reference the matching Theme group. */
+      const f: any = withStyle();
+      for (const level of Object.keys(f.SurfacesContainers || {}).filter((k) => k.startsWith('Surface'))) {
+        expect(`${level} -> ${f.SurfacesContainers[level]?.Background?.value}`)
+          .toBe(`${level} -> {Theme.${level}/Background}`);
+      }
+    });
+  });
+
 });
