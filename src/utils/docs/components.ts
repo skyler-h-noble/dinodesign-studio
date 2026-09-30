@@ -194,7 +194,9 @@ export const CARD_DOC: ComponentDoc = {
 import { FORM_DOCS } from './componentsForms';
 import { SURFACE_DOCS } from './componentsSurfaces';
 import { OVERLAY_DOCS } from './componentsOverlays';
+import { NAV_DOCS } from './componentsNav';
+import { DATA_DOCS } from './componentsData';
 
 export const COMPONENT_DOCS: ComponentDoc[] = [
-  BUTTON_DOC, TABS_DOC, CARD_DOC, ...FORM_DOCS, ...SURFACE_DOCS, ...OVERLAY_DOCS,
+  BUTTON_DOC, TABS_DOC, CARD_DOC, ...FORM_DOCS, ...SURFACE_DOCS, ...OVERLAY_DOCS, ...NAV_DOCS, ...DATA_DOCS,
 ];
