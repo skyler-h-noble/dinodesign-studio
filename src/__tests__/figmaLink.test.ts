@@ -9,7 +9,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseFigmaFileKey, figmaLinkState, figmaLinkLabel, parseFigmaFileLink,
-  upsertLinkedFile, removeLinkedFile, type LinkedFigmaFileEntry,
+  upsertLinkedFile, removeLinkedFile, hasComponentMap, figmaComponentUrl,
+  componentsOnPage, type FigmaComponentRef, type LinkedFigmaFileEntry,
   figmaLinkNeedsAttention,
 } from '../utils/figmaLink';
 
@@ -204,5 +205,101 @@ describe('removeLinkedFile', () => {
 
   it('is a no-op for a key that is not there', () => {
     expect(removeLinkedFile([at('aaa')], 'zzz').map(f => f.fileKey)).toEqual(['aaa']);
+  });
+});
+
+/* ── The component map ─────────────────────────────────────────────────── */
+
+const TABS: FigmaComponentRef = { id: '8216:9719', name: 'Tabs', page: 'Tabs', variants: 3 };
+const TAB: FigmaComponentRef = { id: '8212:9219', name: 'Tab', page: 'Tabs', variants: 15 };
+const FAB: FigmaComponentRef = { id: '6778:17180', name: 'FAB', page: 'FAB', variants: 5 };
+
+const entry = (components?: FigmaComponentRef[]): LinkedFigmaFileEntry => ({
+  fileKey: 'Qv2dqF7mYoAGY77EkdrwTv',
+  fileName: 'Omni Designs Aug12',
+  fileUrl: 'https://www.figma.com/design/Qv2dqF7mYoAGY77EkdrwTv/Omni-Designs-Aug12',
+  lastSeenAt: new Date('2026-09-30T14:00:00Z'),
+  components,
+});
+
+describe('whether a link can deep-link components', () => {
+  it('is false for a link written by a plugin that did not report them', () => {
+    /* The state EVERY user is in until they next run the plugin, because the
+       build that reports components shipped after the one that reports pages.
+       The default, not an edge case. */
+    expect(hasComponentMap(entry(undefined))).toBe(false);
+  });
+
+  it('is false for an empty map, not just a missing one', () => {
+    // A file with no components reported is as unlinkable as one with no field.
+    expect(hasComponentMap(entry([]))).toBe(false);
+  });
+
+  it('is true once the map arrives', () => {
+    expect(hasComponentMap(entry([TABS]))).toBe(true);
+  });
+
+  it('survives a null or undefined entry rather than throwing', () => {
+    expect(hasComponentMap(null)).toBe(false);
+    expect(hasComponentMap(undefined)).toBe(false);
+  });
+
+  it('is NOT the same question as the link state', () => {
+    /* figmaLinkState describes the push pipeline. A design system can be fully
+       synced and still have no component map, which is why this is a separate
+       predicate and not a fifth state. */
+    const synced = entry(undefined);
+    expect(synced.fileKey).toBeTruthy();
+    expect(hasComponentMap(synced)).toBe(false);
+  });
+});
+
+describe('the deep link', () => {
+  it('uses a HYPHEN in node-id, not the colon the API uses', () => {
+    /* `8216:9719` addresses the node; `8216-9719` addresses it in a URL. Figma
+       accepts only the latter, and a colon silently opens the file at no
+       particular node — the link works, it just goes nowhere useful. */
+    const url = figmaComponentUrl(entry([TABS]), TABS);
+    expect(url).toContain('node-id=8216-9719');
+    expect(url).not.toContain('8216:9719');
+  });
+
+  it('points at the USER file key, not a baked one', () => {
+    const mine = { ...entry([TABS]), fileKey: 'SOMEONEELSESKEY123456' };
+    expect(figmaComponentUrl(mine, TABS)).toContain('/design/SOMEONEELSESKEY123456/');
+  });
+
+  it('slugs the file name, because a URL path cannot carry spaces', () => {
+    expect(figmaComponentUrl(entry([TABS]), TABS)).toContain('/Omni-Designs-Aug12?');
+  });
+
+  it('still builds a usable link when the file name is missing', () => {
+    const noName = { ...entry([TABS]), fileName: '' };
+    const url = figmaComponentUrl(noName, TABS);
+    expect(url).toContain('/design/Qv2dqF7mYoAGY77EkdrwTv/');
+    expect(url).toContain('node-id=8216-9719');
+  });
+});
+
+describe('components on a page', () => {
+  it('returns every set on it — a page is not one component', () => {
+    /* 21 of 48 pages hold more than one set, and they map to separate library
+       exports: Tabs + Tab, List + List Item, Radio + Radio Group. Linking one
+       node per page would miss the part a consumer actually imports. */
+    const found = componentsOnPage(entry([TABS, TAB, FAB]), 'Tabs');
+    expect(found.map(c => c.name)).toEqual(['Tabs', 'Tab']);
+  });
+
+  it('matches on page NAME, because ids are per copy of the template', () => {
+    expect(componentsOnPage(entry([TABS, TAB, FAB]), 'FAB').map(c => c.id)).toEqual(['6778:17180']);
+  });
+
+  it('is empty for a page the user renamed, rather than wrong', () => {
+    // Visible failure beats an id that resolves to a different node.
+    expect(componentsOnPage(entry([TABS, TAB]), 'Tab Bar')).toEqual([]);
+  });
+
+  it('is empty rather than throwing when there is no map at all', () => {
+    expect(componentsOnPage(entry(undefined), 'Tabs')).toEqual([]);
   });
 });
