@@ -342,3 +342,73 @@ One thing is still provisional: the **blur ratio's slope**. All ten captures are
 at Crispness 0.5, so only the midpoint is measured. The −0.9 slope is carried
 over from the earlier pass, which also put the midpoint at 1.36 — contradicted
 here. Capture at Crispness 0 and 1 to settle it.
+
+---
+
+## Slot counts: capacity is per ROW, liveness is per Resolution
+
+Two separate reasons a `Shadow-n` slot can be empty, which looked like one
+problem when the Figma file was read back on 2026-09-28.
+
+### The bug: slot count was taken per mode
+
+`DROP_COLOR_SLOTS` is `{1:3, 2:4, 3:5, 4:8, 5:10}` — how many layers a level
+can use **at Resolution 1**. `componentElevationGeometryFigma` sized each row's
+slot loop from *that mode's* level, and `elevationFor` adds `ELEVATED_LIFT`, so
+a row's two modes sit at different levels — 8 rows do today.
+
+The consequence: Standard wrote fewer slots than Elevated, and the difference
+was written by neither. An unwritten Figma variable keeps its previous value,
+so those slots went on holding whatever had been authored there. In the real
+file, `FAB/Default/Shadow-6..8` held a live `Level-3/Drop-Color` alias in
+Standard where the generator intends `#00000000`.
+
+It was invisible from inside Figma: the stale slots have zero geometry, and a
+shadow with no blur, offset or spread paints nothing. The only trace was a
+style reporting more visible-alpha layers than its level has — which matters
+precisely because the alpha model is `TOTAL[level] / N` and `N` is a layer
+count. `FAB` reported 6; it has 3.
+
+Fixed by `componentElevationRowSlots`, which takes the **max across modes**, so
+a mode at a lower level still writes every slot the row has, zeroed and
+transparent. A level-0 mode now writes its row's slots too, rather than
+skipping — "no shadow here" is a value, and leaving the field blank is a
+different statement. Slot total went 93 → 106; the 13 extra are the ones that
+were being skipped.
+
+The hazard was already documented one axis over. The comment on `Drop-Color`
+says unused slots must be emitted rather than skipped, because "a slot dropped
+by a lower Resolution would go on painting what it held before". That is this
+bug exactly — Resolution was simply the axis it was noticed on first. Any axis
+that varies the slot count has it.
+
+### Not a bug: the top slots are Resolution-1 capacity
+
+Slots and live layers are only equal at Resolution 1. At the default 0.75:
+
+| Level | slots | layers @ 0.75 | layers @ 1.0 |
+| --- | --- | --- | --- |
+| 1 | 3 | 3 | 3 |
+| 2 | 4 | 4 | 4 |
+| 3 | 5 | 4 | 5 |
+| 4 | 8 | 6 | 7 |
+| 5 | 10 | 8 | 10 |
+
+So `Shadow-9` and `Shadow-10` being transparent is **correct** at the default
+Resolution — they are headroom, not an omission. They fill only at Resolution
+1. This is consistent with Resolution redistributing a level's opacity rather
+than changing it: more layers, each thinner, same total.
+
+Worth knowing for the Fab, whose hover shadow overflows into a second effect
+style (`+FAB Hover, Dialog & Modal`) bound to exactly `FAB/Hover/Shadow-9` and
+`Shadow-10`. Figma caps how many effects one style can hold, so the overflow
+style is the right structure — but at any Resolution below 1 it carries nothing,
+and the Fab's hover looks the same with or without it.
+
+### The file is behind the generator
+
+Live-layer counts read out of Figma are lower than the generator now produces
+at default Resolution — `FAB/Hover` Elevated holds 6 where Level-5 at 0.75
+gives 8. The file was last written by an older run, from before the shadow
+model was corrected against the captures. A regenerate and import will change
+the Fab's shadow, which is expected and correct, not a regression.
