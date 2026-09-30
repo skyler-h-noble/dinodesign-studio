@@ -18,6 +18,7 @@ import { useParams } from 'react-router';
 import { COMPONENT_DOCS } from '../utils/docs/components';
 import { renderComponentDoc, renderColourSystem } from '../utils/docs/componentDoc';
 import { docsSlug } from '../utils/docs/docsLink';
+import { renderFoundations } from '../utils/docs/foundations';
 
 const page: React.CSSProperties = {
   padding: '32px 24px',
@@ -54,6 +55,8 @@ export function ComponentDocsIndex() {
     '# Component reference',
     '',
     renderColourSystem(),
+    '',
+    renderFoundations(),
     '',
     '## Components',
     '',
