@@ -10,17 +10,15 @@
  * portal, and a half-working example is worse than none — it teaches a shape
  * that does not run. Those fall through to the props table, which is honest.
  *
- * Tag, Loader and Rating are absent for a different reason: the studio has
- * @omni-design/components 0.7.10 installed while the published library is
- * 0.11.0, and those three do not exist in 0.7.10. So an example here renders
- * the user's TOKENS through a four-version-old COMPONENT — a Tabs example
- * would not show the baseline, because that shipped in 0.11.0. Upgrading the
- * studio is the fix; until then the gap is real and worth knowing about.
+ * Tag and Loader have no example because the package does not export them,
+ * even at 0.11.0 — they exist as directories in the library but are not in its
+ * public index. That is a library gap rather than a docs one, and an example
+ * cannot import what is not exported.
  */
 import React from 'react';
 import {
   Button, Chip, Badge, Alert, Card, Avatar, Icon, Link, Divider,
-  Checkbox, Radio, RadioGroup, SwitchInput, Slider, Input, Breadcrumbs,
+  Checkbox, Radio, RadioGroup, SwitchInput, Slider, Rating, Input, Breadcrumbs,
   Pagination, Tabs, TabList, Tab, TabPanel, ButtonGroup, Accordion,
   Body, H3, VStack, HStack,
 } from '@omni-design/components';
@@ -105,6 +103,7 @@ export const EXAMPLES: Record<string, () => React.ReactElement> = {
     </VStack>
   ),
   Slider: () => <Slider defaultValue={40} />,
+  Rating: () => <Rating defaultValue={3} />,
   Input: () => <Input label="Email" placeholder="you@example.com" />,
   Breadcrumbs: () => (
     <Breadcrumbs>

@@ -100,6 +100,13 @@ declare module '@omni-design/components' {
   export const SwitchInput: FC<any>;
   export const SliderInput: FC<any>;
   export const RatingInput: FC<any>;
+  /* The package exports this as an alias of RatingInput. Declared here because
+     a `declare module` REPLACES the package's own types rather than extending
+     them — so an export missing from this shim is missing full stop, however
+     real it is upstream. The shim cannot be deleted: the library's generated
+     .d.ts marks every prop REQUIRED (tsc infers that from destructured params
+     in JS), which makes <Button>Save</Button> fail for want of startIcon. */
+  export const Rating: FC<any>;
   export const SearchField: FC<any>;
   /* Body at 700 — the bold weight Body itself does not have. Exported by
      the package and simply missing here, so using it failed to compile. */
