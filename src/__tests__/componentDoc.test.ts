@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { renderComponentDoc, renderFigmaSection } from '../utils/docs/componentDoc';
 import { BUTTON_DOC, TABS_DOC, CARD_DOC, COMPONENT_DOCS } from '../utils/docs/components';
 import type { LinkedFigmaFileEntry } from '../utils/figmaLink';
+import fixture from './__fixtures__/figmaComponentSets.json';
 
 /** A table row's cells, honouring the backslash escape a renderer respects. */
 const cells = (row: string) =>
@@ -145,15 +146,21 @@ describe('the sections a human doc would not have', () => {
     }
   });
 
-  it('names a real Figma variable, not a guess at one', () => {
+  it('names a real Figma GROUP, checked against the file', () => {
     /* The Figma column is the only place the CSS name and the variable name are
-       written together. A made-up one sends an agent looking for something that
-       is not there. */
-    const all = COMPONENT_DOCS.flatMap(d => d.tokens);
-    const scoped = all.filter(t => t.figma.includes('/'));
+       written together, so a made-up one sends an agent looking for something
+       that is not there.
+       Checked against groups captured from the file rather than a list kept
+       here — a hand-maintained allowlist is just a second thing to get wrong,
+       and it rejected `Sizing-3` (a collection, not a group) on the first run. */
+    const groups = new Set(fixture.componentSizeGroups as string[]);
+    const scoped = COMPONENT_DOCS.flatMap(d => d.tokens).filter(t => t.figma.includes('/'));
     expect(scoped.length).toBeGreaterThan(0);
     for (const t of scoped) {
-      expect(t.figma, t.name).toMatch(/^(Button|Card|List-item|Accordion|Input|Menu|Radio|Checkbox|FAB|Other)\//);
+      const prefix = t.figma.split('/')[0];
+      // `Modes → Theme → …` describes a chain, not a group path.
+      if (t.figma.includes('→')) continue;
+      expect(groups.has(prefix), `${t.name} -> "${t.figma}"`).toBe(true);
     }
   });
 

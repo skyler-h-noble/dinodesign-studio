@@ -190,4 +190,8 @@ export const CARD_DOC: ComponentDoc = {
   ],
 };
 
-export const COMPONENT_DOCS: ComponentDoc[] = [BUTTON_DOC, TABS_DOC, CARD_DOC];
+import { FORM_DOCS } from './componentsForms';
+
+export const COMPONENT_DOCS: ComponentDoc[] = [
+  BUTTON_DOC, TABS_DOC, CARD_DOC, ...FORM_DOCS,
+];

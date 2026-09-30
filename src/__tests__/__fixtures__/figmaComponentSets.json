@@ -527,5 +527,42 @@
     "TreeView",
     "Typography",
     "Design to Code Test"
+  ],
+  "componentSizeGroups": [
+    "Accordion",
+    "Button",
+    "Card",
+    "Checkbox",
+    "Data-Visualizations",
+    "Dynamic-Typography",
+    "FAB",
+    "Input",
+    "List-item",
+    "Menu",
+    "Other",
+    "Radio",
+    "Slider",
+    "Switch"
+  ],
+  "collections": [
+    "Add-Ons",
+    "Alt-Display",
+    "Buttons",
+    "Charts",
+    "Component-Size",
+    "Component-Elevations",
+    "Device-Sizes",
+    "Devices-Type",
+    "Drop-Colors",
+    "Elevation",
+    "Icons & Avatars",
+    "Menu-Levels",
+    "Modes",
+    "Sizing",
+    "Spacing",
+    "Surface",
+    "Theme",
+    "Typography",
+    "Cognitive"
   ]
 }
