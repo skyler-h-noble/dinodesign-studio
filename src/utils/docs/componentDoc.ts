@@ -13,11 +13,18 @@
  * And added three no human doc has, because they are where this system differs
  * from every other:
  *
- *   Theming       where data-theme goes, and where it must NOT. A themed node
- *                 that also carries a shadow tints the shadow.
- *   Tokens        the vars a consumer must define. The library's Link reads
- *                 --Link / --Link-Visited, which nothing emits.
- *   Gotchas       the "why" behind a value that looks arbitrary.
+ *   Theming       where the theme goes IN CODE and IN FIGMA, as two columns.
+ *                 Agents write in both, and the answers differ: `data-theme`
+ *                 on an element, versus a variable mode on one specific node.
+ *                 A themed node that also carries a shadow tints the shadow.
+ *   Tokens        what each one sets, whether it varies, and which Figma
+ *                 variable it comes from. That last column is written nowhere
+ *                 else in the system, and it is what an agent working in Figma
+ *                 needs to change a value rather than guess at one.
+ *   Gotchas       a value or behaviour that LOOKS wrong until explained, and
+ *                 that someone has already got wrong. Not a tip and not a
+ *                 preference — that rule is what stops it becoming a junk
+ *                 drawer, which is the failure mode of every section like it.
  *
  * Content is hand-authored rather than extracted. Props could be read from the
  * source, but "use TextArea for multiline" cannot, and a doc that is half
@@ -42,6 +49,24 @@ export interface PropDoc {
   note?: string;
 }
 
+/**
+ * One CSS custom property, and where it comes from.
+ *
+ * `variesWith` is the question an agent cannot answer from the name: a token
+ * that changes with the size mode has Sm-/Lg- siblings and must not be
+ * hardcoded, one that changes with theme+surface resolves differently inside
+ * every zone, and a fixed one is safe to reason about directly.
+ */
+export interface TokenDoc {
+  name: string;
+  /** What it sets, in a few words. */
+  sets: string;
+  /** '—' when fixed. Otherwise what moves it: size, theme, surface, device. */
+  variesWith: string;
+  /** The Figma variable it is generated from, or '—' when it has none. */
+  figma: string;
+}
+
 export interface StateDoc {
   state: string;
   /** 'prop' when the caller sets it, 'interaction' when the browser does. */
@@ -53,15 +78,26 @@ export interface ComponentDoc {
   name: string;
   /** One sentence. What it is for, not what it looks like. */
   summary: string;
-  useWhen: string[];
-  /** The wrong-component errors, which are the most common kind. */
+  /**
+   * The wrong-component errors, which are the most common kind an agent makes.
+   *
+   * There is deliberately no `useWhen`: it restated the summary a line above
+   * it, and two ways to say the same thing is how they drift apart.
+   */
   insteadUse: Array<{ when: string; use: string }>;
   props: PropDoc[];
   states: StateDoc[];
-  /** Where a theme goes on THIS component, and where it must not. */
-  theming: string[];
-  /** CSS custom properties it reads. */
-  tokens: string[];
+  /**
+   * Where the theme goes, in both tools.
+   *
+   * Two columns because the answers genuinely differ — `data-theme` on an
+   * element against a variable mode on one specific node — and an agent asked
+   * to theme a component in Figma cannot derive the node from the CSS.
+   */
+  theming: Array<{ inCode: string; inFigma: string }>;
+  /** Extra theming rules that are not a code/Figma pair. */
+  themingNotes?: string[];
+  tokens: TokenDoc[];
   composition: string[];
   accessibility: string[];
   gotchas: string[];
@@ -164,13 +200,9 @@ export function renderComponentDoc(
 ): string {
   const out: string[] = [`## ${doc.name}`, '', doc.summary, ''];
 
-  if (doc.useWhen.length || doc.insteadUse.length) {
-    out.push('### Use it when', '');
-    out.push(...doc.useWhen.map(u => `- ${u}`));
-    if (doc.insteadUse.length) {
-      out.push('', '**Reach for something else when:**', '');
-      out.push(...doc.insteadUse.map(i => `- ${i.when} → \`${i.use}\``));
-    }
+  if (doc.insteadUse.length) {
+    out.push('### Reach for something else when', '');
+    out.push(...doc.insteadUse.map(i => `- ${i.when} → \`${i.use}\``));
     out.push('');
   }
 
@@ -207,9 +239,23 @@ export function renderComponentDoc(
     out.push('');
   }
 
-  out.push(...bullets('Theming', doc.theming));
+  if (doc.theming.length) {
+    out.push('### Theming', '');
+    out.push(...table(['In code', 'In Figma'],
+      doc.theming.map(t => [t.inCode, t.inFigma])));
+    if (doc.themingNotes?.length) {
+      out.push('');
+      out.push(...doc.themingNotes.map(n => `- ${n}`));
+    }
+    out.push('');
+  }
+
   if (doc.tokens.length) {
-    out.push('### Tokens it reads', '', doc.tokens.map(t => `\`${t}\``).join(' · '), '');
+    out.push('### Tokens it reads', '');
+    out.push(...table(['Token', 'Sets', 'Varies with', 'Figma variable'],
+      doc.tokens.map(t => [`\`${t.name}\``, t.sets, t.variesWith,
+        t.figma === '—' ? '—' : `\`${t.figma}\``])));
+    out.push('');
   }
   out.push(...bullets('Composition', doc.composition));
   out.push(...bullets('Accessibility', doc.accessibility));

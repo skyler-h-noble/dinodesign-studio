@@ -10,10 +10,6 @@ import type { ComponentDoc } from './componentDoc';
 export const BUTTON_DOC: ComponentDoc = {
   name: 'Button',
   summary: 'Triggers an action. Not for navigation — a thing that changes the URL is a Link.',
-  useWhen: [
-    'The control performs an action: submit, save, open a dialog, run something.',
-    'You need an icon-only control — pass `iconOnly` and an `aria-label`.',
-  ],
   insteadUse: [
     { when: 'It navigates somewhere', use: 'Link' },
     { when: 'It is one of a set of mutually exclusive options', use: 'ButtonGroup' },
@@ -43,13 +39,23 @@ export const BUTTON_DOC: ComponentDoc = {
     { state: 'Selected', setBy: 'prop' },
   ],
   theming: [
-    'Put `data-theme` on the button, or on any ancestor — it inherits.',
-    '**Do not theme a wrapper that also carries the drop shadow.** A shadow falls on the page, so it has to read the page\'s theme; the fill and bevel read the component\'s. Theming one node does both and tints the shadow.',
-    'Colour is a `variant`, not a theme. `variant="success"` picks a palette; `data-theme` moves the whole surface.',
+    { inCode: '`data-theme` on the button, or on any ancestor — it inherits.',
+      inFigma: 'The Button component pins no Theme mode, so it inherits too. Set the mode on the frame it sits in.' },
+    { inCode: '`variant` picks the palette — `variant="success"`.',
+      inFigma: 'The Style / Type variant props. Colour is not a variant axis: it arrives as a mode.' },
+  ],
+  themingNotes: [
+    'Colour and theme are different things. `variant="success"` picks a palette; a theme moves the whole surface, including the text and border tones that have to stay readable on it.',
+    'A button carries no shadow at rest, so theming it is safe. Components that DO — Fab, Chip, AppBar — pin the theme on an inner node instead, so the shadow keeps reading the page.',
   ],
   tokens: [
-    '--Buttons-{Color}-Button', '--Buttons-{Color}-Border', '--Button-Height',
-    '--Button-Radius', '--Button-Focus-Radius', '--Button-Border-Width', '--Button-Padding',
+    { name: '--Buttons-{Color}-Button', sets: 'the fill', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
+    { name: '--Buttons-{Color}-Border', sets: 'the border', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
+    { name: '--Button-Height', sets: 'height', variesWith: 'size mode + device', figma: 'Button/Button-Height' },
+    { name: '--Button-Radius', sets: 'corner', variesWith: 'size mode', figma: 'Button/Button-Radius' },
+    { name: '--Button-Focus-Radius', sets: 'focus ring corner', variesWith: 'size mode', figma: 'Button/Button-Focus-Radius' },
+    { name: '--Button-Border-Width', sets: 'border thickness', variesWith: '—', figma: 'Button/Button-Border-Width' },
+    { name: '--Button-Padding', sets: 'horizontal padding', variesWith: 'size mode', figma: 'Button/Button-Padding' },
   ],
   composition: [
     'Icons go in `startIcon` / `endIcon`, not as children.',
@@ -69,10 +75,6 @@ export const BUTTON_DOC: ComponentDoc = {
 export const TABS_DOC: ComponentDoc = {
   name: 'Tabs',
   summary: 'Switches between views in the same place. The tab list stays put; only the panel changes.',
-  useWhen: [
-    'Two or more views share a context and the user picks one at a time.',
-    'The views are peers — no view is a step toward another.',
-  ],
   insteadUse: [
     { when: 'The views are sequential', use: 'Stepper' },
     { when: 'Selecting changes the page or URL', use: 'Link or a nav component' },
@@ -99,10 +101,21 @@ export const TABS_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop', note: 'On the individual `Tab`.' },
   ],
   theming: [
-    '`TabList` carries the zone. Pass `variant` other than `standard` and it sets `data-theme` + `data-surface` for every tab inside.',
-    'A `standard` TabList sets neither, so it inherits the surface it is dropped on — which is usually what you want inside a themed region.',
+    { inCode: '`TabList` carries the zone: a `variant` other than `standard` sets `data-theme` + `data-surface` for every tab inside.',
+      inFigma: 'Neither the Tabs nor the Tab set pins a Theme mode — both inherit. Set the mode on the frame holding the Tabs instance.' },
+    { inCode: '`standard` sets neither, so it inherits the surface it is dropped on.',
+      inFigma: 'Same behaviour, and the reason nothing is pinned: a tab bar usually belongs to the region around it.' },
   ],
-  tokens: ['--Border-Variant', '--Buttons-{Color}-Border', '--Text', '--Quiet', '--Hover', '--Pressed', '--Focus-Visible', '--Button-Height'],
+  tokens: [
+    { name: '--Border-Variant', sets: 'the 1px baseline', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Buttons-{Color}-Border', sets: 'the 2px indicator', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
+    { name: '--Text', sets: 'selected label', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Quiet', sets: 'unselected label', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Hover', sets: 'hover background', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Pressed', sets: 'pressed background', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Focus-Visible', sets: 'the 3px focus ring', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Button-Height', sets: "a tab's minimum height", variesWith: 'size mode + device', figma: 'Button/Button-Height' },
+  ],
   composition: [
     '`<Tabs>` wraps `<TabList>` with `<Tab>` children, then `<TabPanel>` per view.',
     'Icons go in `startDecorator` / `endDecorator` on a `Tab`.',
@@ -121,10 +134,6 @@ export const TABS_DOC: ComponentDoc = {
 export const CARD_DOC: ComponentDoc = {
   name: 'Card',
   summary: 'A surface that groups related content. Clickable only when the whole card is one target.',
-  useWhen: [
-    'Content belongs together and needs separating from what surrounds it.',
-    'The whole card is one link or action — then pass `clickable`.',
-  ],
   insteadUse: [
     { when: 'You only need a background', use: 'Section or Box' },
     { when: 'It is a row in a list', use: 'ListItem' },
@@ -150,11 +159,23 @@ export const CARD_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    'Put `data-theme` on the card, or use `<Section>` around it.',
-    'Use `surface` rather than writing `background:`. A card is a `Container` by default; naming the surface keeps `--Text`, `--Quiet` and `--Border` on the matching tone.',
-    'Never `style={{ background }}` — it paints the box and leaves the text and borders on the parent\'s tone, which breaks the moment the surface flips dark.',
+    { inCode: '`data-theme` on the card, or wrap it in `<Section>`.',
+      inFigma: 'The Card set pins no Theme mode — it inherits. Set the mode on the frame around it.' },
+    { inCode: '`surface="Surface"` when the card is a Surface-level region rather than a Container.',
+      inFigma: '`Card Content` pins `Surface=Container`, which is what makes the inner content read Container tones. That is the node to change if a card should be a Surface.' },
   ],
-  tokens: ['--Background', '--Text', '--Border', '--Card-Radius', '--Card-Padding', '--Card-Inner-Radius', '--Card-Focus-Radius'],
+  themingNotes: [
+    'Never `style={{ background }}`. It paints the box and leaves the text and borders on the parent\'s tone, which breaks the moment the surface flips dark.',
+  ],
+  tokens: [
+    { name: '--Background', sets: 'the card fill', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Text', sets: 'body copy', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Border', sets: 'the outline', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Card-Radius', sets: 'corner', variesWith: 'size mode', figma: 'Card/Card-Radius' },
+    { name: '--Card-Padding', sets: 'inner padding', variesWith: 'size mode', figma: 'Card/Card-Padding' },
+    { name: '--Card-Inner-Radius', sets: 'a nested surface corner', variesWith: 'size mode', figma: 'Card/Card-Inner-Radius' },
+    { name: '--Card-Focus-Radius', sets: 'focus ring corner', variesWith: 'size mode', figma: 'Card/Card-Focus-Radius' },
+  ],
   composition: [
     'Children are yours — the card adds padding and a surface, nothing else.',
     'A card inside a card should be `variant="outlined"`; two nested solid surfaces read as one.',

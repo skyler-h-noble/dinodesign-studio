@@ -126,16 +126,46 @@ describe('the Figma section', () => {
 });
 
 describe('the sections a human doc would not have', () => {
-  it.each(COMPONENT_DOCS)('$name says where a theme goes', (doc) => {
+  it.each(COMPONENT_DOCS)('$name answers the theme question in BOTH tools', (doc) => {
+    /* An agent asked to theme a component in Figma cannot derive the node from
+       the CSS, and vice versa. A row with one side filled is half an answer. */
     expect(doc.theming.length).toBeGreaterThan(0);
+    for (const t of doc.theming) {
+      expect(t.inCode, doc.name).toBeTruthy();
+      expect(t.inFigma, doc.name).toBeTruthy();
+    }
   });
 
-  it.each(COMPONENT_DOCS)('$name lists the tokens a consumer must define', (doc) => {
+  it.each(COMPONENT_DOCS)('$name says what each token does and where it comes from', (doc) => {
     expect(doc.tokens.length).toBeGreaterThan(0);
+    for (const t of doc.tokens) {
+      expect(t.sets, `${doc.name} ${t.name}`).toBeTruthy();
+      expect(t.variesWith, `${doc.name} ${t.name}`).toBeTruthy();
+      expect(t.figma, `${doc.name} ${t.name}`).toBeTruthy();
+    }
+  });
+
+  it('names a real Figma variable, not a guess at one', () => {
+    /* The Figma column is the only place the CSS name and the variable name are
+       written together. A made-up one sends an agent looking for something that
+       is not there. */
+    const all = COMPONENT_DOCS.flatMap(d => d.tokens);
+    const scoped = all.filter(t => t.figma.includes('/'));
+    expect(scoped.length).toBeGreaterThan(0);
+    for (const t of scoped) {
+      expect(t.figma, t.name).toMatch(/^(Button|Card|List-item|Accordion|Input|Menu|Radio|Checkbox|FAB|Other)\//);
+    }
+  });
+
+  it('marks a token that varies, because a varying one must not be hardcoded', () => {
+    const sized = COMPONENT_DOCS.flatMap(d => d.tokens).filter(t => /size mode/.test(t.variesWith));
+    expect(sized.length).toBeGreaterThan(0);
   });
 
   it('warns about theming a node that carries a shadow', () => {
-    /* The rule that is specific to this system and invisible everywhere else. */
+    /* The rule specific to this system and invisible everywhere else: Fab,
+       Chip and AppBar pin the theme on an inner node so the shadow keeps
+       reading the page. Button, Tabs and Card pin nothing and inherit. */
     expect(renderComponentDoc(BUTTON_DOC)).toMatch(/shadow/i);
   });
 
