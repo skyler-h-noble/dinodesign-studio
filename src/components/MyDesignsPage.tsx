@@ -11,6 +11,7 @@ import { getPublicFileUrl } from '../utils/firebase/storage';
 import { useAuth } from '../contexts/AuthContext';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import AppHeader from './AppHeader';
+import { figmaLinkLabel, figmaLinkNeedsAttention, type FigmaLinkInput } from '../utils/figmaLink';
 import {
   RenameDesignSystemModal, DeleteDesignSystemModal, RegenerateDesignSystemModal,
   RegenerateAllDesignSystemsModal, MenuButton,
@@ -35,10 +36,10 @@ interface DesignSystem {
   headerFontFamily: string | null;
   status: 'hosted' | 'expired';
   addOns: string[];
-  pendingChanges: number;
-  /** True before the very first Figma push, so the pill can read
-   *  "Not yet pushed to Figma" instead of "1 change not pushed". */
-  neverPushed: boolean;
+  /** Bothversion  numbers, so figmaLinkState can derive the pill rather than the
+   *  card carrying a pre-chewed one. */
+  version: number;
+  lastPushedVersion: number;
   linkedFigmaFiles: LinkedFigmaFile[];
   moodBoardUrl: string | null;
 }
@@ -51,6 +52,16 @@ const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
   { value: 'name-asc', label: 'Name (A–Z)' },
   { value: 'name-desc', label: 'Name (Z–A)' },
 ];
+
+/** The card's fields, as figmaLink.ts wants them. The file key comes from the
+ *  most recently seen linked file — the list is already sorted by lastSeenAt. */
+function figmaLinkOf(ds: DesignSystem): FigmaLinkInput {
+  return {
+    figmaFileKey: ds.linkedFigmaFiles[0]?.fileKey ?? null,
+    version: ds.version,
+    lastPushedVersion: ds.lastPushedVersion,
+  };
+}
 
 function figmaFileUrl(fileKey: string, fileName?: string): string {
   const slug = (fileName || 'design').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'design';
@@ -164,8 +175,8 @@ export default function MyDesignsPage() {
             headerFontFamily: data.headerFontFamily || null,
             status: data.plan === 'cancelled' || data.plan === 'expired' ? 'expired' : 'hosted',
             addOns,
-            pendingChanges: v > pushed ? v - pushed : 0,
-            neverPushed: pushed === 0,
+            version: v,
+            lastPushedVersion: pushed,
             linkedFigmaFiles: linked,
             moodBoardUrl,
           });
@@ -568,12 +579,17 @@ function DesignSystemCard({
           Design System Summary
         </Button>
 
-        {/* Pending changes — content-sized pill, centered, so the tag
-            background sits inset within the card padding rather than
-            filling the entire card content width. Two cases: never-pushed
-            (just-created) reads "Not yet pushed to Figma"; subsequent
-            updates show the change count. */}
-        {ds.pendingChanges > 0 && (
+        {/* Figma state — content-sized pill, centered, so the tag background
+            sits inset within the card padding rather than filling the entire
+            card content width.
+
+            FOUR states, not two. It used to key off pendingChanges alone,
+            which conflated a design system nobody had ever opened in Figma
+            with one that is linked but stale — both read "not pushed" — and
+            showed nothing at all for one that was never linked and has no
+            pending changes. Linked and pushed are separate facts; see
+            figmaLink.ts. */}
+        {figmaLinkNeedsAttention(figmaLinkOf(ds)) && (
           <div style={{
             color: 'var(--Text-Warning, #5d4037)',
             fontSize: 11,
@@ -583,9 +599,7 @@ function DesignSystemCard({
             alignSelf: 'center',
             maxWidth: '100%',
           }}>
-            {ds.neverPushed
-              ? 'Not yet pushed to Figma'
-              : `${ds.pendingChanges} ${ds.pendingChanges === 1 ? 'change' : 'changes'} not pushed`}
+            {figmaLinkLabel(figmaLinkOf(ds))}
           </div>
         )}
       </VStack>

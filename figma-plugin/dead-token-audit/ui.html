@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--figma-color-text);
+    background: var(--figma-color-bg);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 12px; border-bottom: 1px solid var(--figma-color-border); flex: 0 0 auto; }
+  .scopes { display: flex; gap: 4px; margin-bottom: 8px; }
+  .scopes button {
+    flex: 1; padding: 6px 4px; font: inherit; cursor: pointer; border-radius: 5px;
+    border: 1px solid var(--figma-color-border);
+    background: var(--figma-color-bg); color: var(--figma-color-text);
+  }
+  .scopes button[aria-pressed="true"] {
+    background: var(--figma-color-bg-brand); color: var(--figma-color-text-onbrand);
+    border-color: transparent;
+  }
+  #run {
+    width: 100%; padding: 8px; font: inherit; font-weight: 600; cursor: pointer;
+    border: 0; border-radius: 5px;
+    background: var(--figma-color-bg-brand); color: var(--figma-color-text-onbrand);
+  }
+  #run[disabled] { opacity: .5; cursor: default; }
+  #summary { padding: 8px 12px; border-bottom: 1px solid var(--figma-color-border);
+    color: var(--figma-color-text-secondary); flex: 0 0 auto; }
+  #summary b { color: var(--figma-color-text); }
+  #list { flex: 1 1 auto; overflow: auto; }
+  .row { padding: 9px 12px; border-bottom: 1px solid var(--figma-color-border); cursor: pointer; }
+  .row:hover { background: var(--figma-color-bg-hover); }
+  .token { font-weight: 600; word-break: break-all; }
+  .meta { color: var(--figma-color-text-secondary); margin-top: 3px; }
+  .tag {
+    display: inline-block; padding: 1px 5px; border-radius: 3px; margin-right: 4px;
+    background: var(--figma-color-bg-secondary);
+  }
+  .ships { background: var(--figma-color-bg-danger); color: var(--figma-color-text-ondanger); }
+  .missing { background: var(--figma-color-bg-warning); color: var(--figma-color-text-onwarning); }
+  footer { padding: 8px 12px; border-top: 1px solid var(--figma-color-border); flex: 0 0 auto; }
+  footer button { padding: 5px 10px; font: inherit; cursor: pointer; border-radius: 5px;
+    border: 1px solid var(--figma-color-border);
+    background: var(--figma-color-bg); color: var(--figma-color-text); }
+  .empty { padding: 32px 16px; text-align: center; color: var(--figma-color-text-secondary); }
+  textarea { width: 100%; height: 120px; font-family: monospace; font-size: 10px;
+    border: 1px solid var(--figma-color-border); border-radius: 5px;
+    background: var(--figma-color-bg-secondary); color: var(--figma-color-text); display: none; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="scopes">
+      <button data-scope="page" aria-pressed="true">This page</button>
+      <button data-scope="file" aria-pressed="false">Whole file</button>
+      <button data-scope="selection" aria-pressed="false">Selection</button>
+    </div>
+    <button id="run">Scan</button>
+  </header>
+  <div id="summary">Not scanned yet.</div>
+  <div id="list"><div class="empty">Pick a scope and hit Scan.<br />Whole file can take a minute.</div></div>
+  <footer>
+    <button id="copy">Copy report</button>
+    <button id="close">Close</button>
+    <textarea id="out" readonly></textarea>
+  </footer>
+<script>
+  var scope = 'page';
+  var rows = [];
+
+  document.querySelectorAll('.scopes button').forEach(function (b) {
+    b.onclick = function () {
+      scope = b.dataset.scope;
+      document.querySelectorAll('.scopes button').forEach(function (o) {
+        o.setAttribute('aria-pressed', String(o === b));
+      });
+    };
+  });
+
+  document.getElementById('run').onclick = function () {
+    parent.postMessage({ pluginMessage: { type: 'scan', scope: scope } }, '*');
+  };
+  document.getElementById('close').onclick = function () {
+    parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+  };
+  document.getElementById('copy').onclick = function () {
+    var out = document.getElementById('out');
+    out.style.display = 'block';
+    out.value = rows.map(function (r) {
+      return r.total + '\t' + (r.ships ? 'SHIPS ' + r.ships : 'furniture') +
+        '\t' + r.token + '\t(' + r.field + ')\t' + r.owners.join(', ') + '\t' + r.pages.join(', ');
+    }).join('\n');
+    out.select();
+  };
+
+  function label(kind) {
+    if (kind === 'missing-variable') return 'deleted variable';
+    if (kind === 'orphaned-style') return 'orphaned style';
+    return 'dead collection';
+  }
+
+  onmessage = function (e) {
+    var msg = e.data.pluginMessage;
+    if (!msg) return;
+    var list = document.getElementById('list');
+    var summary = document.getElementById('summary');
+    var run = document.getElementById('run');
+
+    if (msg.type === 'scanning') {
+      run.disabled = true;
+      summary.textContent = 'Scanning…';
+      list.innerHTML = '<div class="empty">Walking the tree…</div>';
+    }
+
+    if (msg.type === 'error') {
+      run.disabled = false;
+      summary.innerHTML = '<b>Error.</b> ' + msg.message;
+    }
+
+    if (msg.type === 'results') {
+      run.disabled = false;
+      rows = msg.rows;
+      var skipNote = msg.skipped
+        ? ' · <b title="Instance sublayers that were collected mid-scan. Re-run to catch them.">' +
+          msg.skipped + '</b> unreadable'
+        : '';
+      summary.innerHTML = '<b>' + msg.total + '</b> dead bindings · <b>' + msg.totalShips +
+        '</b> inside components · ' + msg.rows.length + ' distinct tokens · ' +
+        msg.nodesScanned + ' nodes, ' + msg.pages + ' page(s)' + skipNote;
+      if (!rows.length) {
+        list.innerHTML = '<div class="empty">Nothing dead here.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      rows.forEach(function (r) {
+        var div = document.createElement('div');
+        div.className = 'row';
+        var tags = '<span class="tag' + (r.ships ? ' ships' : '') + '">' +
+          (r.ships ? r.ships + ' in components' : r.furniture + ' board only') + '</span>' +
+          '<span class="tag' + (r.kind === 'missing-variable' ? ' missing' : '') + '">' + label(r.kind) + '</span>';
+        div.innerHTML =
+          '<div class="token">' + r.token + '</div>' +
+          '<div class="meta">' + tags + r.field + ' · ' + r.total + ' total</div>' +
+          '<div class="meta">' + (r.owners.length ? r.owners.join(', ') + ' · ' : '') + r.pages.join(', ') + '</div>';
+        div.onclick = function () {
+          parent.postMessage({ pluginMessage: { type: 'select', key: r.key } }, '*');
+        };
+        list.appendChild(div);
+      });
+    }
+  };
+</script>
+</body>
+</html>
