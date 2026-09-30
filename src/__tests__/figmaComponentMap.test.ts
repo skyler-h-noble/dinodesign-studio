@@ -46,7 +46,7 @@ describe('every row points at something that exists', () => {
 describe('the lists do not contradict each other', () => {
   it('no component is both mapped and listed as having no page', () => {
     const unmapped = [...NO_FIGMA_PAGE.undesigned, ...NO_FIGMA_PAGE.notDrawable,
-      ...NO_FIGMA_PAGE.retired];
+      ...NO_FIGMA_PAGE.deferred];
     const both = unmapped.filter(c => c in FIGMA_COMPONENT_MAP);
     expect(both).toEqual([]);
   });
@@ -117,10 +117,17 @@ describe('components made of several sets', () => {
   });
 
   it('allows a mapped page to hold no sets at all', () => {
-    /* Typography is type specimens and ToggleButton is drawn but not built as
-       a set. Both have a page worth linking and nothing to link inside it. */
+    /* Typography is type specimens: a page worth linking with nothing to link
+       inside it. */
     expect(figmaMappingFor('Typography')!.sets).toEqual([]);
     expect(REAL_PAGES.has('Typography')).toBe(true);
+  });
+
+  it('leaves ToggleButton unmapped while its design is unsettled', () => {
+    /* It has a Figma page but no component set — drawn, not built. Documenting
+       a component in flux teaches the wrong thing. */
+    expect(figmaMappingFor('ToggleButton')).toBeNull();
+    expect(NO_FIGMA_PAGE.deferred).toContain('ToggleButton');
   });
 
   it('covers the 21 multi-set pages rather than picking one each', () => {

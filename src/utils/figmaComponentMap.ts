@@ -95,9 +95,6 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Typography:        { page: 'Typography', sets: [] },
   BottomNavigation:  { page: 'NavBar', sets: ['Nav-Bar', 'Nav Item'],
                        note: 'The page is NavBar; its Nav-Bar set carries a "Floating +Raised FAB" style and a Nav Item at Default/Selected, which is a bottom navigation bar.' },
-  /* Likewise a page without sets — the toggle button is drawn but not yet
-     built as a component set. */
-  ToggleButton:      { page: 'ToggleButton', sets: [] },
 };
 
 /**
@@ -125,8 +122,16 @@ export const NO_FIGMA_PAGE = {
     'Showcase', 'Colors', 'BevelText', 'CurvedText', 'Copyright', 'Footer',
     'Gradient',
   ],
-  /** Retired: a shim onto ButtonGroup, and it should never get a page. */
-  retired: ['ToggleButtonGroup'],
+  /**
+   * Out of scope for now.
+   *
+   * ToggleButtonGroup is retired — a shim onto ButtonGroup, and it should
+   * never get a page. ToggleButton has a Figma page but no component set: it
+   * is drawn, not built, and the design is still being settled. Documenting a
+   * component whose design is in flux teaches the wrong thing, so it stays off
+   * the list until the set exists.
+   */
+  deferred: ['ToggleButtonGroup', 'ToggleButton'],
 } as const;
 
 /**
