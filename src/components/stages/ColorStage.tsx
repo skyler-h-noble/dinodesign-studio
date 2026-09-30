@@ -1176,7 +1176,7 @@ export default function ColorStage({
                     <Button
                       swatch
                       swatchColor={color.hex}
-                      size="large"
+                      size="medium"
                       className="dino-swatch"
                       style={{ ['--swatch-color' as any]: color.hex }}
                       // Single click SWITCHES the colour, double click opens the
@@ -1209,7 +1209,11 @@ export default function ColorStage({
                         '& .btn-swatch-inner': {
                           borderRadius: `${SWATCH_INNER_RADIUS} !important`,
                         },
+                        /* Capped: flex:1 + aspectRatio:1 let each swatch grow
+                           with the card, which pushed the scheme cards below the
+                           fold. The cap keeps them medium and the row compact. */
                         width: '100%',
+                        maxWidth: 56,
                         aspectRatio: '1',
                         height: 'auto',
                         overflow: 'hidden',
@@ -1265,7 +1269,7 @@ export default function ColorStage({
                     <Button
                       swatch
                       swatchColor={color.hex}
-                      size="large"
+                      size="medium"
                       className="dino-swatch"
                       style={{ ['--swatch-color' as any]: color.hex }}
                       onClick={() => {
@@ -1507,8 +1511,7 @@ export default function ColorStage({
             })}
           </div>
 
-          {/* Divider + Show/Hide Settings toggle */}
-          <Divider />
+          {/* Show/Hide Settings toggle */}
           <div
             onClick={() => setShowChromaSettings(!showChromaSettings)}
             style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
@@ -1522,24 +1525,22 @@ export default function ColorStage({
           {/* Expanded: per-color tones + chroma */}
           {showChromaSettings && (
             <VStack spacing={3}>
-              <HStack spacing={0}>
-                <Button
-                  variant={toneMode === 'light' ? 'default' : 'outline'}
-                  size="small"
-                  onClick={() => setToneMode('light')}
-                  sx={{ borderRadius: 'var(--Style-Border-Radius) 0 0 var(--Style-Border-Radius)', marginRight: '-1px', position: 'relative', zIndex: toneMode === 'light' ? 1 : 0 }}
-                >
-                  Light Mode
-                </Button>
-                <Button
-                  variant={toneMode === 'dark' ? 'default' : 'outline'}
-                  size="small"
-                  onClick={() => setToneMode('dark')}
-                  sx={{ borderRadius: '0 var(--Style-Border-Radius) var(--Style-Border-Radius) 0' }}
-                >
-                  Dark Mode
-                </Button>
-              </HStack>
+              {/* A real ButtonGroup, not two Buttons in an HStack faking one.
+                  The hand-rolled version set each child's borderRadius and a
+                  -1px margin inline, so the segments never got the group's own
+                  treatment: ButtonGroup squares the inner corners itself (its
+                  `spacing === 0` branch) and overlaps the borders by
+                  --Button-Border-Width. Setting variant on the children is also
+                  what re-introduces the double outline the group exists to
+                  avoid — the group derives selected vs unselected from `value`. */}
+              <ButtonGroup
+                value={toneMode}
+                onChange={(v: string) => setToneMode(v as 'light' | 'dark')}
+                size="small"
+              >
+                <Button value="light" size="small">Light Mode</Button>
+                <Button value="dark" size="small">Dark Mode</Button>
+              </ButtonGroup>
 
               <BodySmall style={{ fontSize: '0.75rem' }}>
                 Each row is the full 12-tone scale built from that colour.
@@ -1698,7 +1699,7 @@ export default function ColorStage({
               onClick={() => onSchemeSelected(scheme)}
             >
               <VStack spacing={2}>
-                <HStack spacing={2} alignItems="center">
+                <HStack spacing={2} alignItems="center" style={{ width: '100%' }}>
                   <Checkbox
                     checked={isSelected}
                     onChange={() => onSchemeSelected(scheme)}
@@ -1706,13 +1707,27 @@ export default function ColorStage({
                     size="small"
                   />
                   <Body style={{ fontWeight: 600 }}>{scheme.name}</Body>
+                  {/* Top-right, not under the swatches: below, it made Custom
+                      taller than the other five cards sharing its grid row. */}
+                  {isCustom && (
+                    <Link
+                      onClick={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCustomEditing(!customEditing);
+                      }}
+                      style={{ marginLeft: 'auto', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                    >
+                      {customEditing ? 'Done' : 'Edit Colors'}
+                    </Link>
+                  )}
                 </HStack>
 
                 {/* 3 color swatches — non-interactive. The whole card
                     handles selection; clicking a swatch directly did
                     nothing here, so the lib's Button variant was misleading.
                     For the Custom card the user still picks colors via the
-                    "Edit Colors" link below. */}
+                    "Edit Colors" toggle in the card header. */}
                 <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                   {(['primary', 'secondary', 'tertiary'] as const).map((role, i) => {
                     const displayColor = scheme.colors[i];
@@ -1723,7 +1738,7 @@ export default function ColorStage({
                           aria-hidden="true"
                           style={{
                             width: '100%',
-                            height: 56,
+                            height: 40,
                             background: displayColor,
                             borderRadius: SWATCH_RADIUS,
                             border: '1px solid var(--Border, rgba(0,0,0,0.1))',
@@ -1736,20 +1751,9 @@ export default function ColorStage({
                   })}
                 </div>
 
-                {/* Custom: edit toggle to pick colors */}
+                {/* Custom: the picker. Its toggle lives in the card header. */}
                 {isCustom && (
                   <VStack spacing={2}>
-                    <Link
-                      onClick={(e: React.MouseEvent) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setCustomEditing(!customEditing);
-                      }}
-                      style={{ fontSize: '0.75rem' }}
-                    >
-                      {customEditing ? 'Done' : 'Edit Colors'}
-                    </Link>
-
                     {customEditing && (
                       <VStack spacing={2}>
                         <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>

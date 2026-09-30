@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
@@ -13,6 +13,13 @@ export default defineConfig({
   define: {
     'process.env.NODE_ENV': JSON.stringify('development'),
     'process.env': '{}',
+  },
+  test: {
+    /* Vitest STUBS css imports by default, so `?raw` on a .css file resolved
+       to an empty string — typography-tokens.css came back as "" in every
+       test while working in a real build. A stub is indistinguishable from a
+       file with no content, so any test of that pipeline passed on nothing. */
+    css: true,
   },
   resolve: {
     preserveSymlinks: true,

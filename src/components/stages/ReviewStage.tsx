@@ -14,6 +14,10 @@ interface Props extends StageProps {
   userSelections: UserSelections;
   typographyStyles: TypographyStyle[];
   componentStyle: ComponentStyle;
+  /** The component-style sliders, Shadow included. Review comes after the
+   *  Shadow step, so its phone mock-up has to show the chosen shadows —
+   *  without this it previewed the defaults. */
+  styleCustomizations?: Record<string, unknown>;
   moodBoardUrl?: string | null;
   pendingReExport?: boolean;
   originalSnapshot?: {
@@ -94,7 +98,7 @@ const STYLE_LABELS: Record<ComponentStyle, string> = {
 
 export default function ReviewStage({
   onNext, designSystemName, colorScheme, userSelections,
-  typographyStyles, componentStyle, moodBoardUrl,
+  typographyStyles, componentStyle, styleCustomizations, moodBoardUrl,
   pendingReExport, originalSnapshot,
 }: Props) {
   const colors = colorScheme?.colors || [];
@@ -122,7 +126,14 @@ export default function ReviewStage({
       <div className="review-page">
         <VStack spacing={4} style={{ maxWidth: 1100, margin: '0 auto' }}>
           <VStack spacing={1}>
-            <H2 style={{ textAlign: 'center' }}>We see you have made some beautiful changes</H2>
+            {/* The heading has to agree with the card below it. `changes` is
+                already computed for that card, so claiming edits while the card
+                says "No changes detected" was the heading simply not asking. */}
+            <H2 style={{ textAlign: 'center' }}>
+              {changes.length > 0
+                ? 'We see you have made some beautiful changes'
+                : 'Your design system is up to date'}
+            </H2>
             <Overline
               style={{
                 color: 'var(--Text)',
@@ -133,7 +144,9 @@ export default function ReviewStage({
                 textTransform: 'none',
               }}
             >
-              Preview your updates and reprocess when ready.
+              {changes.length > 0
+                ? 'Preview your updates and reprocess when ready.'
+                : 'Reprocess any time to refresh the published files.'}
             </Overline>
           </VStack>
 
@@ -155,6 +168,7 @@ export default function ReviewStage({
                     colorScheme={colorScheme}
                     userSelections={userSelections}
                     componentStyle={componentStyle}
+                    styleCustomizations={styleCustomizations}
                     mode={previewMode}
                     typographyStyles={typographyStyles}
                     moodBoardUrl={moodBoardUrl}
@@ -248,6 +262,7 @@ export default function ReviewStage({
                   colorScheme={colorScheme}
                   userSelections={userSelections}
                   componentStyle={componentStyle}
+                  styleCustomizations={styleCustomizations}
                   mode={previewMode}
                   typographyStyles={typographyStyles}
                   moodBoardUrl={moodBoardUrl}

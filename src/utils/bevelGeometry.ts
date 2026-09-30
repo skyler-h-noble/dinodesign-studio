@@ -27,17 +27,33 @@ export const PLATFORMS = ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android'] as c
 export type Platform = (typeof PLATFORMS)[number];
 
 /**
- * Medium (default) button height per platform, in px.
+ * Button height per platform, per size, in px.
  *
- * Desktop is absent on purpose: it uses the design system's own chosen button
- * height, whatever the user picked. The others are the platform touch
- * minimums and are fixed.
+ * Desktop is absent on purpose: it uses the design system's own chosen
+ * heights, whatever the user picked. The others are the platforms' own — 44pt
+ * on iOS and 48dp on Android at medium are the published touch minimums, and
+ * the small and large steps are the design's, transcribed from the file's
+ * Devices-Type columns.
+ *
+ * This used to be medium alone, which meant the SMALL and LARGE bevels were
+ * computed from Desktop's heights on every platform: a 50px iOS large button
+ * wearing the bevel of a 56px Desktop one, and a 32px iOS small wearing a
+ * 24px Desktop one. The bevel is a fraction of the height, so a height table
+ * missing two thirds of its rows produces a bevel that is wrong by the same
+ * fraction.
  */
-export const PLATFORM_BUTTON_HEIGHT: Record<Exclude<Platform, 'Desktop'>, number> = {
-  'IOS-Mobile': 44,
-  'IOS-Tablet': 44,
-  Android: 48,
+export const PLATFORM_BUTTON_HEIGHT: Record<Exclude<Platform, 'Desktop'>, SizeTriple> = {
+  'IOS-Mobile': { medium: 44, small: 32, large: 50 },
+  'IOS-Tablet': { medium: 44, small: 32, large: 50 },
+  Android: { medium: 48, small: 32, large: 56 },
 };
+
+/** A metric that has a value per button size. */
+export interface SizeTriple { medium: number; small: number; large: number }
+
+/** The three size prefixes, in the spelling every Button token already uses. */
+export const SIZE_PREFIX = { medium: '', small: 'Sm-', large: 'Lg-' } as const;
+export type ButtonSize = keyof typeof SIZE_PREFIX;
 
 /**
  * Minimum hit target per platform, in px. The SMALL button keeps its visual
@@ -112,7 +128,90 @@ export function bevelJSON(prefix: string, height: number, percent: number): Reco
   return out;
 }
 
-/** The medium button's height on a platform, given the system's own height. */
-export function platformButtonHeight(platform: Platform, desktopHeight: number): number {
-  return platform === 'Desktop' ? desktopHeight : PLATFORM_BUTTON_HEIGHT[platform];
+/**
+ * A button's height on a platform, given the system's own height for that size.
+ *
+ * `size` defaults to medium so the existing two-argument callers keep working
+ * unchanged — the signature grew rather than moved.
+ */
+export function platformButtonHeight(
+  platform: Platform,
+  desktopHeight: number,
+  size: ButtonSize = 'medium',
+): number {
+  return platform === 'Desktop' ? desktopHeight : PLATFORM_BUTTON_HEIGHT[platform][size];
 }
+
+/** The system's own three button heights, as the user picked them. */
+export interface DesktopHeights { medium: number; small: number; large: number }
+
+/**
+ * All THREE sizes' bevel geometry for one platform — 24 custom properties.
+ *
+ * Emitted per size because the bevel is a fraction of the button's height and
+ * the three heights differ; emitted per platform because those heights differ
+ * again per platform. Only the medium set used to be re-emitted per platform,
+ * so a small or large button wore Desktop's bevel everywhere — an iOS large
+ * (50px) carrying the geometry of a Desktop large (56px), and an iOS small
+ * (32px) carrying a Desktop small's (24px).
+ *
+ * Desktop passes the user's own heights straight through; every other
+ * platform substitutes its own from PLATFORM_BUTTON_HEIGHT.
+ */
+export function platformBevelCSS(
+  platform: Platform,
+  heights: DesktopHeights,
+  percent: number,
+  indent = '  ',
+): string {
+  return (Object.keys(SIZE_PREFIX) as ButtonSize[])
+    .map((size) => bevelCSS(
+      SIZE_PREFIX[size],
+      platformButtonHeight(platform, heights[size], size),
+      percent,
+      indent,
+    ))
+    .join('\n');
+}
+
+/** The same 24 values as bare numbers, for the Figma payload. */
+export function platformBevelJSON(
+  platform: Platform,
+  heights: DesktopHeights,
+  percent: number,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const size of Object.keys(SIZE_PREFIX) as ButtonSize[]) {
+    Object.assign(out, bevelJSON(
+      SIZE_PREFIX[size],
+      platformButtonHeight(platform, heights[size], size),
+      percent,
+    ));
+  }
+  return out;
+}
+
+/**
+ * The bevel as the file now stores it: one number and its negative.
+ *
+ * `bevelGeometry` returns eight values, and all eight are `b` or `-b` —
+ * Highlight offsets and blur are `b`, its spread is `-b`, Lowlight offsets and
+ * spread are `-b`, its blur is `b`. So the eight are a presentation of two.
+ *
+ * Figma now holds the two, per size, per device, in Devices-Type, and
+ * Component-Size's eight `Button-Highlight-*` / `Button-Lowlight-*` variables
+ * ALIAS into them. That is 12 numbers per device instead of 48, and — the part
+ * that matters — the alias is what makes a bevel follow the device at all. A
+ * literal written into Component-Size would DETACH it, which is the one thing
+ * that must not happen here.
+ *
+ * Names are the file's, including the trailing `-Negative` rather than a
+ * leading one: `Button-Bevel-Negative`, `FAB-Sm-Bevel-Negative`. The writer is
+ * update-only and matches on the full name, so a tidier spelling would be
+ * skipped in silence.
+ */
+export function bevelPairs(prefix: string, height: number, percent: number): Record<string, number> {
+  const b = bevelSize(height, percent);
+  return { [`${prefix}Bevel`]: b, [`${prefix}Bevel-Negative`]: -b };
+}
+

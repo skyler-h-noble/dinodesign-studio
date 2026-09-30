@@ -9,13 +9,17 @@
  */
 
 import chroma from 'chroma-js';
+import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
+import { navMetricsCSS } from '../componentSize';
+import { CSS_THEME_NAMES } from '../themes';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
 import { computeRadii, migrateLegacyRadii } from '../componentRadii';
+import { motionCSS, motionModeCSS } from '../motion';
 import { solveThemeScrims, generateTextOverImageCSS } from './generateTextOverImage';
-import { dropshadowHex8, dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe } from '../dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
   generateHeaderVariables,
@@ -25,6 +29,7 @@ import {
   generateChartsVariables
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
+import { lineMetricsVars, selectionMetricsVars } from '../componentSize';
 
 /**
  * Determine the correct CSS font fallback category for a given font name
@@ -342,20 +347,19 @@ function resolveHoverActiveToken(tokenValue: string, colorsData: any): string | 
 /** Emit `  --Dropshadow-Color-N: #RRGGBBAA;` lines for a given surface bg.
  *  Used alongside the legacy `--Dropshadow-Color` so Effect-Level recipes
  *  inside the scope can pull a per-elevation color tuned to the surface. */
-function dropshadowLevelLines(bgHex: string): string[] {
-  return SHADOW_LEVELS.map(
-    level => `  --Dropshadow-Color-${level}: ${dropshadowHex8(bgHex, level)};`,
-  );
-}
+
 
 /** Derive the aggregate `--Dropshadow-Color` RGB triple from a surface hex.
  *  Uses the SAME Comeau math as the per-level `--Dropshadow-Color-N` tokens
  *  (shared `dropshadowBaseHex` in ../dropshadow) so every shadow color in the
  *  system comes from one model. Level 2 = the standard card elevation; the
- *  per-`.level` opacity is applied by the consumer via rgba(). Returns "r, g, b". */
-function deriveShadowRGB(hex: string): string | null {
+ *  per-layer opacity is applied by the Effect-Level recipe. Returns "r, g, b" —
+ *  COMMA separated, for rgba(var(--Dropshadow-Color), <alpha>), which is what
+ *  the component lib consumes. A space triple is invalid inside rgba() and
+ *  paints nothing, silently. */
+function deriveShadowRGB(hex: string, o?: ShadowOptions): string | null {
   try {
-    const baseHex = dropshadowBaseHex(hex, 2);
+    const baseHex = dropshadowBaseHex(hex, o);
     const n = parseInt(baseHex.replace('#', '').slice(0, 6), 16);
     return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
   } catch { return null; }
@@ -1095,6 +1099,10 @@ function generateThemeColorsVariables(modeData: any): string {
  * Returns the CSS outside of :root block (to be appended after :root closes)
  */
 function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: string): string {
+  /* Shadow controls, resolved once per call. dropshadowBaseHex depends on
+     INTENSITY, so a surface's shadow hex is wrong — not missing, wrong — if
+     these are not passed down. */
+  const shadowOpts = shadowOptionsFromStyle(fullJsonData?._componentStyle);
   console.log('🎨 [generateThemesVariables] Called');
   console.log('  ├─ Has modeData?', !!modeData);
   console.log('  ├─ Has modeData.Themes?', !!modeData?.Themes);
@@ -1729,12 +1737,13 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
               }
             }
             if (bgHex) {
-              const rgb = deriveShadowRGB(bgHex);
+              /* ONE colour per surface. --Dropshadow-Color-1..5 used to be
+                 emitted alongside it — five colours per surface, from the model
+                 where each elevation had its own hex. The Effect-Level recipes
+                 now reference this single var with per-layer alpha literals, so
+                 those five were dead output on every surface of every theme. */
+              const rgb = deriveShadowRGB(bgHex, shadowOpts);
               if (rgb) surfaceLines.push(`  --Dropshadow-Color: ${rgb};`);
-              // Per-level 8-digit hex shadow tokens — matches Figma's
-              // model and lets Effect-Level recipes stack distinct colors
-              // per elevation instead of one tinted color at varying alpha.
-              surfaceLines.push(...dropshadowLevelLines(bgHex));
             }
           }
         }
@@ -1787,9 +1796,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
             }
           }
           if (contHex) {
-            const rgb = deriveShadowRGB(contHex);
+            const rgb = deriveShadowRGB(contHex, shadowOpts);
             if (rgb) containerLines.push(`  --Dropshadow-Color: ${rgb};`);
-            containerLines.push(...dropshadowLevelLines(contHex));
           }
         }
       }
@@ -2286,8 +2294,18 @@ function generateThemeCSS(modeData: any, fullJsonData?: any): string {
   ];
   
   // Button types
-  const buttonTypes = ['Primary', 'Primary-Light', 'Secondary', 'Secondary-Light', 'Tertiary', 'Tertiary-Light', 'Neutral', 'Neutral-Light', 'Info', 'Info-Light', 'Success', 'Success-Light', 'Warning', 'Warning-Light', 'Error', 'Error-Light'];
-  const buttonProps = ['Button', 'Text', 'Border', 'Hover', 'Pressed', 'Highlight', 'Lowlight'];
+  /* The eight palettes. No -Light siblings: a button has no light SHADE any
+     more, the same removal the themes went through and for the same reason —
+     the surface the button sits on already carries that axis, and the Theme
+     layer picks the button's tokens per surface. Keeping a shade meant two
+     variants that resolved identically on most surfaces and differed on the
+     ones where the surface had already said it. */
+  const buttonTypes = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
+  /* 'Quiet' joins the slots: muted text ON the button fill, from the same
+     curated Quiet table the surfaces read, at the tone the button IS — so its
+     4.5:1 comes from the existing per-palette-per-tone guarantee rather than a
+     second contrast solver. */
+  const buttonProps = ['Button', 'Text', 'Border', 'Hover', 'Pressed', 'Highlight', 'Lowlight', 'Quiet'];
   
   // Icon types
   const iconTypes = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'];
@@ -3667,6 +3685,8 @@ function generateStyleCSS(jsonData: any): string {
       props.push(`${indent}--Button-Radius: ${borderRadius}px;`);
       props.push(`${indent}--Style-Border-Radius: ${cappedStyle}px;`);
       props.push(`${indent}--Card-Radius: ${cappedCard}px;`);
+      props.push(`${indent}--Sm-Card-Radius: ${Math.min(Math.round(cappedCard * 0.75), REFERENCE_BUTTON_HEIGHT)}px;`);
+      props.push(`${indent}--Lg-Card-Radius: ${Math.min(Math.round(cappedCard * 1.25), REFERENCE_BUTTON_HEIGHT)}px;`);
       props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
       // Button & Input tokens derived from --Button-Radius.
       props.push(`${indent}--Button-Border-Width: 1px;`);
@@ -3862,7 +3882,12 @@ function generateTypographyCSS(jsonData: any): string {
   lines.push(`  --Set-Body-Semibold-Font-Weight: ${typography['Set-Body-Semibold-Font-Weight']?.value || '600'};`);
   lines.push(`  --Set-Body-Bold-Font-Weight: ${typography['Set-Body-Bold-Font-Weight']?.value || '700'};`);
   lines.push(`  --Set-Header-Caps: ${typography['Set-Header-Caps']?.value || 'none'};`);
-  lines.push(`  --Set-Decorative-Caps: ${typography['Set-Decorative-Caps']?.value || 'uppercase'};`);
+  /* Default 'none', matching the Figma side. This read 'uppercase', so a
+     system whose token was missing came out UPPERCASE in the CSS and
+     textCase: ORIGINAL in figma.json — the same Display in caps on the web and
+     sentence case in Figma, from one absent value. The conservative default is
+     also the one that agrees with allCaps: false. */
+  lines.push(`  --Set-Decorative-Caps: ${typography['Set-Decorative-Caps']?.value || 'none'};`);
   lines.push(`  --Congative-Family-Body: ${congativeFont};`);
   lines.push('}');
   
@@ -4226,11 +4251,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Hover: var(--${prefix}-Buttons-Surfaces-Primary-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Pressed: var(--${prefix}-Buttons-Surfaces-Primary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Surfaces-Primary-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Surfaces-Primary-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Surfaces-Primary-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Surfaces-Primary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Primary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Button: var(--${prefix}-Buttons-Surfaces-Secondary-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Text: var(--${prefix}-Buttons-Surfaces-Secondary-Text);`);
@@ -4238,11 +4258,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Hover: var(--${prefix}-Buttons-Surfaces-Secondary-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Pressed: var(--${prefix}-Buttons-Surfaces-Secondary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Button: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Text: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Border: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Hover: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Secondary-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Secondary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Button: var(--${prefix}-Buttons-Surfaces-Tertiary-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Text: var(--${prefix}-Buttons-Surfaces-Tertiary-Text);`);
@@ -4250,11 +4265,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Hover: var(--${prefix}-Buttons-Surfaces-Tertiary-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Pressed: var(--${prefix}-Buttons-Surfaces-Tertiary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Button: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Text: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Border: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Hover: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Tertiary-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Tertiary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Button: var(--${prefix}-Buttons-Surfaces-Neutral-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Text: var(--${prefix}-Buttons-Surfaces-Neutral-Text);`);
@@ -4262,11 +4272,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Hover: var(--${prefix}-Buttons-Surfaces-Neutral-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Pressed: var(--${prefix}-Buttons-Surfaces-Neutral-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Button: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Text: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Border: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Hover: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Neutral-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Neutral-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Button: var(--${prefix}-Buttons-Surfaces-Info-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Text: var(--${prefix}-Buttons-Surfaces-Info-Text);`);
@@ -4274,11 +4279,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Hover: var(--${prefix}-Buttons-Surfaces-Info-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Pressed: var(--${prefix}-Buttons-Surfaces-Info-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Button: var(--${prefix}-Buttons-Surfaces-Info-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Text: var(--${prefix}-Buttons-Surfaces-Info-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Border: var(--${prefix}-Buttons-Surfaces-Info-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Hover: var(--${prefix}-Buttons-Surfaces-Info-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Info-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Info-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Button: var(--${prefix}-Buttons-Surfaces-Success-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Text: var(--${prefix}-Buttons-Surfaces-Success-Text);`);
@@ -4286,11 +4286,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Hover: var(--${prefix}-Buttons-Surfaces-Success-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Pressed: var(--${prefix}-Buttons-Surfaces-Success-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Button: var(--${prefix}-Buttons-Surfaces-Success-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Text: var(--${prefix}-Buttons-Surfaces-Success-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Border: var(--${prefix}-Buttons-Surfaces-Success-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Hover: var(--${prefix}-Buttons-Surfaces-Success-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Success-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Success-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Button: var(--${prefix}-Buttons-Surfaces-Warning-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Text: var(--${prefix}-Buttons-Surfaces-Warning-Text);`);
@@ -4298,11 +4293,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Hover: var(--${prefix}-Buttons-Surfaces-Warning-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Pressed: var(--${prefix}-Buttons-Surfaces-Warning-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Button: var(--${prefix}-Buttons-Surfaces-Warning-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Text: var(--${prefix}-Buttons-Surfaces-Warning-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Border: var(--${prefix}-Buttons-Surfaces-Warning-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Hover: var(--${prefix}-Buttons-Surfaces-Warning-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Warning-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Warning-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Button: var(--${prefix}-Buttons-Surfaces-Error-Button);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Text: var(--${prefix}-Buttons-Surfaces-Error-Text);`);
@@ -4310,11 +4300,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Hover: var(--${prefix}-Buttons-Surfaces-Error-Hover);`);
   lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Pressed: var(--${prefix}-Buttons-Surfaces-Error-Pressed);`);
   
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Button: var(--${prefix}-Buttons-Surfaces-Error-Light-Button);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Text: var(--${prefix}-Buttons-Surfaces-Error-Light-Text);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Border: var(--${prefix}-Buttons-Surfaces-Error-Light-Border);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Hover: var(--${prefix}-Buttons-Surfaces-Error-Light-Hover);`);
-  lines.push(`  --Theme-Light-Surfaces-Buttons-Error-Light-Pressed: var(--${prefix}-Buttons-Surfaces-Error-Light-Pressed);`);
   
   lines.push('');
   lines.push('  /* Surface Icons */');
@@ -4382,11 +4367,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Primary-Hover: var(--${prefix}-Buttons-Containers-Primary-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Primary-Pressed: var(--${prefix}-Buttons-Containers-Primary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Containers-Primary-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Containers-Primary-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Containers-Primary-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Containers-Primary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Containers-Primary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Button: var(--${prefix}-Buttons-Containers-Secondary-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Text: var(--${prefix}-Buttons-Containers-Secondary-Text);`);
@@ -4394,11 +4374,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Hover: var(--${prefix}-Buttons-Containers-Secondary-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Pressed: var(--${prefix}-Buttons-Containers-Secondary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Button: var(--${prefix}-Buttons-Containers-Secondary-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Text: var(--${prefix}-Buttons-Containers-Secondary-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Border: var(--${prefix}-Buttons-Containers-Secondary-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Hover: var(--${prefix}-Buttons-Containers-Secondary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Secondary-Light-Pressed: var(--${prefix}-Buttons-Containers-Secondary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Button: var(--${prefix}-Buttons-Containers-Tertiary-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Text: var(--${prefix}-Buttons-Containers-Tertiary-Text);`);
@@ -4406,11 +4381,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Hover: var(--${prefix}-Buttons-Containers-Tertiary-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Pressed: var(--${prefix}-Buttons-Containers-Tertiary-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Button: var(--${prefix}-Buttons-Containers-Tertiary-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Text: var(--${prefix}-Buttons-Containers-Tertiary-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Border: var(--${prefix}-Buttons-Containers-Tertiary-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Hover: var(--${prefix}-Buttons-Containers-Tertiary-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Tertiary-Light-Pressed: var(--${prefix}-Buttons-Containers-Tertiary-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Button: var(--${prefix}-Buttons-Containers-Neutral-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Text: var(--${prefix}-Buttons-Containers-Neutral-Text);`);
@@ -4418,11 +4388,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Hover: var(--${prefix}-Buttons-Containers-Neutral-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Pressed: var(--${prefix}-Buttons-Containers-Neutral-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Button: var(--${prefix}-Buttons-Containers-Neutral-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Text: var(--${prefix}-Buttons-Containers-Neutral-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Border: var(--${prefix}-Buttons-Containers-Neutral-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Hover: var(--${prefix}-Buttons-Containers-Neutral-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Neutral-Light-Pressed: var(--${prefix}-Buttons-Containers-Neutral-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Button: var(--${prefix}-Buttons-Containers-Info-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Text: var(--${prefix}-Buttons-Containers-Info-Text);`);
@@ -4430,11 +4395,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Hover: var(--${prefix}-Buttons-Containers-Info-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Info-Pressed: var(--${prefix}-Buttons-Containers-Info-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Button: var(--${prefix}-Buttons-Containers-Info-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Text: var(--${prefix}-Buttons-Containers-Info-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Border: var(--${prefix}-Buttons-Containers-Info-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Hover: var(--${prefix}-Buttons-Containers-Info-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Info-Light-Pressed: var(--${prefix}-Buttons-Containers-Info-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Button: var(--${prefix}-Buttons-Containers-Success-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Text: var(--${prefix}-Buttons-Containers-Success-Text);`);
@@ -4442,11 +4402,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Hover: var(--${prefix}-Buttons-Containers-Success-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Success-Pressed: var(--${prefix}-Buttons-Containers-Success-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Button: var(--${prefix}-Buttons-Containers-Success-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Text: var(--${prefix}-Buttons-Containers-Success-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Border: var(--${prefix}-Buttons-Containers-Success-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Hover: var(--${prefix}-Buttons-Containers-Success-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Success-Light-Pressed: var(--${prefix}-Buttons-Containers-Success-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Button: var(--${prefix}-Buttons-Containers-Warning-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Text: var(--${prefix}-Buttons-Containers-Warning-Text);`);
@@ -4454,11 +4409,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Hover: var(--${prefix}-Buttons-Containers-Warning-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Warning-Pressed: var(--${prefix}-Buttons-Containers-Warning-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Button: var(--${prefix}-Buttons-Containers-Warning-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Text: var(--${prefix}-Buttons-Containers-Warning-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Border: var(--${prefix}-Buttons-Containers-Warning-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Hover: var(--${prefix}-Buttons-Containers-Warning-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Warning-Light-Pressed: var(--${prefix}-Buttons-Containers-Warning-Light-Pressed);`);
   
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Button: var(--${prefix}-Buttons-Containers-Error-Button);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Text: var(--${prefix}-Buttons-Containers-Error-Text);`);
@@ -4466,11 +4416,6 @@ function generateThemeMappingVariables(jsonData: any): string {
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Hover: var(--${prefix}-Buttons-Containers-Error-Hover);`);
   lines.push(`  --Theme-Light-Containers-Buttons-Error-Pressed: var(--${prefix}-Buttons-Containers-Error-Pressed);`);
   
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Button: var(--${prefix}-Buttons-Containers-Error-Light-Button);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Text: var(--${prefix}-Buttons-Containers-Error-Light-Text);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Border: var(--${prefix}-Buttons-Containers-Error-Light-Border);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Hover: var(--${prefix}-Buttons-Containers-Error-Light-Hover);`);
-  lines.push(`  --Theme-Light-Containers-Buttons-Error-Light-Pressed: var(--${prefix}-Buttons-Containers-Error-Light-Pressed);`);
   
   lines.push('');
   lines.push('  /* Container Icons */');
@@ -4698,99 +4643,81 @@ export function generateBaseCSS(jsonData: any): string {
   // REMOVED: lines.push(`  --Buttons-Primary-Border: var(--Border-Surfaces-Neutral-Color-${primaryTone});`);
   lines.push(`  --Buttons-Primary-Hover: ${hoverHex('Primary', primaryTone)};`);
   lines.push(`  --Buttons-Primary-Pressed: ${pressedHex('Primary', primaryTone)};`);
-  lines.push('  --Buttons-Primary-Light-Button: var(--Primary-Color-12);');
-  lines.push('  --Buttons-Primary-Light-Text: var(--Text-Surfaces-Primary-Color-12);');
-  lines.push(`  --Buttons-Primary-Light-Border: var(--Border-Surfaces-Primary-Color-12);`);
-  lines.push(`  --Buttons-Primary-Light-Hover: ${hoverHex('Primary', 12)};`);
-  lines.push(`  --Buttons-Primary-Light-Pressed: ${pressedHex('Primary', 12)};`);
   lines.push(`  --Buttons-Secondary-Button: var(--Secondary-Color-${SC});`);
   lines.push(`  --Buttons-Secondary-Text: var(--Text-Surfaces-Secondary-Color-${SC});`);
   lines.push(`  --Buttons-Secondary-Border: var(--Border-Surfaces-Secondary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Secondary-Hover: ${hoverHex('Secondary', SC)};`);
   lines.push(`  --Buttons-Secondary-Pressed: ${pressedHex('Secondary', SC)};`);
-  lines.push('  --Buttons-Secondary-Light-Button: var(--Secondary-Color-12);');
-  lines.push('  --Buttons-Secondary-Light-Text: var(--Text-Surfaces-Secondary-Color-12);');
-  lines.push(`  --Buttons-Secondary-Light-Border: var(--Border-Surfaces-Secondary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Secondary-Light-Hover: ${hoverHex('Secondary', 12)};`);
-  lines.push(`  --Buttons-Secondary-Light-Pressed: ${pressedHex('Secondary', 12)};`);
   lines.push(`  --Buttons-Tertiary-Button: var(--Tertiary-Color-${TC});`);
   lines.push(`  --Buttons-Tertiary-Text: var(--Text-Surfaces-Tertiary-Color-${TC});`);
   lines.push(`  --Buttons-Tertiary-Border: var(--Border-Surfaces-Tertiary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Tertiary-Hover: ${hoverHex('Tertiary', TC)};`);
   lines.push(`  --Buttons-Tertiary-Pressed: ${pressedHex('Tertiary', TC)};`);
-  lines.push('  --Buttons-Tertiary-Light-Button: var(--Tertiary-Color-12);');
-  lines.push('  --Buttons-Tertiary-Light-Text: var(--Text-Surfaces-Tertiary-Color-12);');
-  lines.push(`  --Buttons-Tertiary-Light-Border: var(--Border-Surfaces-Tertiary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Tertiary-Light-Hover: ${hoverHex('Tertiary', 12)};`);
-  lines.push(`  --Buttons-Tertiary-Light-Pressed: ${pressedHex('Tertiary', 12)};`);
   // Container section for Primary buttons
   lines.push(`  --Buttons-Primary-Button: var(--Primary-Button-Containers-Background-${primaryTone}-Button);`);
   lines.push(`  --Buttons-Primary-Text: var(--Primary-Button-Containers-Background-${primaryTone}-Text);`);
   lines.push(`  --Buttons-Primary-Border: var(--Border-Containers-Primary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Primary-Hover: ${hoverHex('Primary', primaryTone)};`);
   lines.push(`  --Buttons-Primary-Pressed: ${pressedHex('Primary', primaryTone)};`);
-  lines.push('  --Buttons-Primary-Light-Border: var(--Border-Containers-Primary-Color-12);');
   lines.push(`  --Buttons-Secondary-Border: var(--Border-Containers-Secondary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Secondary-Light-Border: var(--Border-Containers-Secondary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Tertiary-Border: var(--Border-Containers-Tertiary-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Tertiary-Light-Border: var(--Border-Containers-Tertiary-Color-${primaryTone});`);
   lines.push(`  --Buttons-Neutral-Button: var(--Neutral-Color-${OB});`);
   lines.push(`  --Buttons-Neutral-Text: var(--Text-Surfaces-Neutral-Color-${OB});`);
   lines.push(`  --Buttons-Neutral-Border: var(--Border-Containers-Neutral-Color-${primaryTone});`);
   lines.push(`  --Buttons-Neutral-Hover: ${hoverHex('Neutral', OB)};`);
   lines.push(`  --Buttons-Neutral-Pressed: ${pressedHex('Neutral', OB)};`);
-  lines.push('  --Buttons-Neutral-Light-Button: var(--Neutral-Color-12);');
-  lines.push('  --Buttons-Neutral-Light-Text: var(--Text-Surfaces-Neutral-Color-12);');
-  lines.push(`  --Buttons-Neutral-Light-Border: var(--Border-Containers-Neutral-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Neutral-Light-Hover: ${hoverHex('Neutral', 12)};`);
-  lines.push(`  --Buttons-Neutral-Light-Pressed: ${pressedHex('Neutral', 12)};`);
   lines.push(`  --Buttons-Info-Button: var(--Info-Color-${OB});`);
   lines.push(`  --Buttons-Info-Text: var(--Text-Surfaces-Info-Color-${OB});`);
   lines.push(`  --Buttons-Info-Border: var(--Border-Containers-Info-Color-${primaryTone});`);
   lines.push(`  --Buttons-Info-Hover: ${hoverHex('Info', OB)};`);
   lines.push(`  --Buttons-Info-Pressed: ${pressedHex('Info', OB)};`);
-  lines.push('  --Buttons-Info-Light-Button: var(--Info-Color-12);');
-  lines.push('  --Buttons-Info-Light-Text: var(--Text-Surfaces-Info-Color-12);');
-  lines.push(`  --Buttons-Info-Light-Border: var(--Border-Containers-Info-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Info-Light-Hover: ${hoverHex('Info', 12)};`);
-  lines.push(`  --Buttons-Info-Light-Pressed: ${pressedHex('Info', 12)};`);
   lines.push(`  --Buttons-Success-Button: var(--Success-Color-${OB});`);
   lines.push(`  --Buttons-Success-Text: var(--Text-Surfaces-Success-Color-${OB});`);
   lines.push(`  --Buttons-Success-Border: var(--Border-Containers-Success-Color-${primaryTone});`);
   lines.push(`  --Buttons-Success-Hover: ${hoverHex('Success', OB)};`);
   lines.push(`  --Buttons-Success-Pressed: ${pressedHex('Success', OB)};`);
-  lines.push('  --Buttons-Success-Light-Button: var(--Success-Color-12);');
-  lines.push('  --Buttons-Success-Light-Text: var(--Text-Surfaces-Success-Color-12);');
-  lines.push(`  --Buttons-Success-Light-Border: var(--Border-Containers-Success-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Success-Light-Hover: ${hoverHex('Success', 12)};`);
-  lines.push(`  --Buttons-Success-Light-Pressed: ${pressedHex('Success', 12)};`);
   lines.push(`  --Buttons-Warning-Button: var(--Warning-Color-${OB});`);
   lines.push(`  --Buttons-Warning-Text: var(--Text-Surfaces-Warning-Color-${OB});`);
   lines.push(`  --Buttons-Warning-Border: var(--Border-Containers-Warning-Color-${primaryTone});`);
   lines.push(`  --Buttons-Warning-Hover: ${hoverHex('Warning', OB)};`);
   lines.push(`  --Buttons-Warning-Pressed: ${pressedHex('Warning', OB)};`);
-  lines.push('  --Buttons-Warning-Light-Button: var(--Warning-Color-12);');
-  lines.push('  --Buttons-Warning-Light-Text: var(--Text-Surfaces-Warning-Color-12);');
-  lines.push(`  --Buttons-Warning-Light-Border: var(--Border-Containers-Warning-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Warning-Light-Hover: ${hoverHex('Warning', 12)};`);
-  lines.push(`  --Buttons-Warning-Light-Pressed: ${pressedHex('Warning', 12)};`);
   lines.push(`  --Buttons-Error-Button: var(--Error-Color-${OB});`);
   lines.push(`  --Buttons-Error-Text: var(--Text-Surfaces-Error-Color-${OB});`);
   lines.push(`  --Buttons-Error-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
   lines.push(`  --Buttons-Error-Hover: ${hoverHex('Error', OB)};`);
   lines.push(`  --Buttons-Error-Pressed: ${pressedHex('Error', OB)};`);
-  lines.push('  --Buttons-Error-Light-Button: var(--Error-Color-12);');
-  lines.push('  --Buttons-Error-Light-Text: var(--Text-Surfaces-Error-Color-12);');
-  lines.push(`  --Buttons-Error-Light-Border: var(--Border-Containers-Error-Color-${primaryTone});`);
-  lines.push(`  --Buttons-Error-Light-Hover: ${hoverHex('Error', 12)};`);
-  lines.push(`  --Buttons-Error-Light-Pressed: ${pressedHex('Error', 12)};`);
+  // The Quiet table is consumed by reference inside the JSON and never
+  // flattened into `--Quiet-...` variables, so the BW faces cannot point at it
+  // by name the way they point at a palette. Read the row here and re-emit it
+  // as the palette variable it already resolves to.
+  //
+  // NOTE THE INDEX. Quiet.Surfaces.BW is keyed by the tone of the SURFACE the
+  // text sits on — low tones are dark backgrounds — whereas the sibling
+  // Text.Surfaces.BW-Button table one line up is keyed by the BUTTON's fill,
+  // which runs the other way. Copying the Text line's index gives a quiet that
+  // is one full ladder away from correct: it put #8b8b8b on the white face,
+  // 3.41:1. So the WHITE face reads the light-surface row (12) and the BLACK
+  // face the dark-surface row (1).
+  const bwQuietVar = (tone: number): string => {
+    const row = jsonData?.Modes?.['Light-Mode']?.Quiet?.Surfaces?.BW?.[`Color-${tone}`]?.value
+      ?? jsonData?.Quiet?.Surfaces?.BW?.[`Color-${tone}`]?.value;
+    const m = String(row ?? '').match(/^\{Colors\.(\w[\w-]*)\.(Color-[\w-]+)\}$/);
+    if (m) return `var(--${m[1]}-${m[2]})`;
+    if (String(row ?? '') === '{Colors.White}') return 'var(--White)';
+    // Nothing usable in the table — fall back to the surface's own quiet
+    // rather than emitting a name that resolves to nothing.
+    return 'var(--Quiet)';
+  };
+
   // Black and White buttons (were BlackWhite.Light / .Medium)
   lines.push('  --Buttons-White-Button: var(--White);');
   lines.push('  --Buttons-White-Text: var(--Text-Surfaces-BW-Button-Color-1);');
+  lines.push(`  --Buttons-White-Quiet: ${bwQuietVar(12)};`);
   lines.push(`  --Buttons-White-Hover: ${hoverHex('Neutral', 12)};`);
   lines.push(`  --Buttons-White-Pressed: ${pressedHex('Neutral', 12)};`);
   lines.push('  --Buttons-Black-Button: var(--Neutral-Color-1);');
   lines.push('  --Buttons-Black-Text: var(--Text-Surfaces-BW-Button-Color-12);');
+  lines.push(`  --Buttons-Black-Quiet: ${bwQuietVar(1)};`);
   lines.push(`  --Buttons-Black-Hover: ${hoverHex('Neutral', 1)};`);
   lines.push(`  --Buttons-Black-Pressed: ${pressedHex('Neutral', 1)};`);
   // Default button — border matches the palette that the Default button's
@@ -4812,6 +4739,7 @@ export function generateBaseCSS(jsonData: any): string {
   // so the Default button's 3D effect matches its body color.
   lines.push(`  --Buttons-Default-Highlight: var(--Buttons-${defaultBorderPalette}-Highlight);`);
   lines.push(`  --Buttons-Default-Lowlight: var(--Buttons-${defaultBorderPalette}-Lowlight);`);
+  lines.push(`  --Buttons-Default-Quiet: var(--Buttons-${defaultBorderPalette}-Quiet);`);
   // Resolve Default hover/active through the Buttons chain
   const defaultBtnData = jsonData?.Modes?.['Light-Mode']?.['Default-Button'] || jsonData?.['Default-Button'];
   const buttonsJsonData = jsonData?.Modes?.['Light-Mode']?.Buttons || jsonData?.Buttons;
@@ -4971,13 +4899,18 @@ export function generateBaseCSS(jsonData: any): string {
     // --Style-Border-Radius is what the lib's Card component consumes by
     // default. Emitting it explicitly here (the legacy export path stopped
     // writing it) ensures exported designs match the preview cap.
+    // Motion. Durations and easings come from src/utils/motion.ts so the CSS
+    // and the Figma export cannot drift apart. No overshoot curve is published:
+    // an easing token is an invitation to use it, and overshoot is out.
+    lines.push(`  /* Motion — durations by role, easings by where the motion starts and ends. */`);
+    lines.push(motionCSS('  '));
     lines.push(`  --Style-Border-Radius: ${cappedStyleRadius}px;`);
     lines.push(`  --Button-Radius: ${cappedButtonRadius}px;`);
     lines.push(`  --Sm-Button-Radius: ${cappedSmButtonRadius}px;`);
     lines.push(`  --Lg-Button-Radius: ${cappedLgButtonRadius}px;`);
-    lines.push(`  --Button-Inner-Radius: ${r.buttonInnerRadius}px;`);
-    lines.push(`  --Sm-Button-Inner-Radius: ${r.smButtonInnerRadius}px;`);
-    lines.push(`  --Lg-Button-Inner-Radius: ${r.lgButtonInnerRadius}px;`);
+    lines.push(`  --Button-Inner-Focus-Radius: ${r.buttonInnerRadius}px;`);
+    lines.push(`  --Sm-Button-Inner-Focus-Radius: ${r.smButtonInnerRadius}px;`);
+    lines.push(`  --Lg-Button-Inner-Focus-Radius: ${r.lgButtonInnerRadius}px;`);
     lines.push(`  --Button-Focus-Radius: ${r.buttonFocusRadius}px;`);
     lines.push(`  --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;`);
     lines.push(`  --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;`);
@@ -4991,24 +4924,96 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Sm-Button-Icon-Focus-Radius: ${r.smIconButtonFocusRadius}px;`);
     lines.push(`  --Lg-Button-Icon-Focus-Radius: ${r.lgIconButtonFocusRadius}px;`);
     lines.push(`  --Card-Radius: ${cappedCardRadius}px;`);
+    lines.push(`  --Accordion-Radius: ${r.accordionRadius}px;`);
+    /* The two focus radii Figma cannot derive for itself. CSS does not strictly
+       need them — an outline is drawn concentric with the border-radius, so the
+       browser derives the ring — but the payload writes them to Figma, and a
+       value living on one side only is the drift this pass keeps finding. */
+    lines.push(`  --Accordion-Focus-Radius: ${r.accordionFocusRadius}px;`);
+    lines.push(`  --Accordion-Inner-Focus-Radius: ${r.accordionInnerFocusRadius}px;`);
+    /* Divider / Step bar / No Count Step, from the one table componentSize
+       owns — the same one the preview reads (invariant 5: the two are
+       separate implementations and have drifted before while both looked
+       self-consistent).
+       These go HERE, in generateBaseCSS, not in generateStyleCSS: that
+       function emits its own --Card-Radius / --Button-Radius / --Card-Padding
+       and is NEVER CALLED. Adding to it looks right, typechecks, passes a
+       unit test on the helper, and emits nothing. */
+    /* Radio and Checkbox — the box, the dot, the check, the label gap, and
+       the shared 24px hit area. Literals in Radio.js and Checkbox.js until
+       now, which is how the two ended up with different label gaps. */
+    for (const [name, value] of Object.entries(selectionMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
+    for (const [name, value] of Object.entries(lineMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
+    lines.push(`  --Sm-Card-Radius: ${Math.min(r.smCardRadius, buttonHeight)}px;`);
+    lines.push(`  --Lg-Card-Radius: ${Math.min(r.lgCardRadius, buttonHeight)}px;`);
     lines.push(`  --Card-Inner-Radius: ${r.cardInnerRadius}px;`);
+    /* Inner and focus radii at all three sizes.
+       Figma already held Sm-/Lg-Card-Inner-Radius while the CSS emitted only
+       the medium, and NEITHER side had a per-size focus radius — so a small
+       card drew a medium card's ring. Invariant 5: both sides, same pass. */
+    lines.push(`  --Sm-Card-Inner-Radius: ${r.smCardInnerRadius}px;`);
+    lines.push(`  --Lg-Card-Inner-Radius: ${r.lgCardInnerRadius}px;`);
     lines.push(`  --Card-Focus-Radius: ${r.cardFocusRadius}px;`);
+    lines.push(`  --Sm-Card-Focus-Radius: ${r.smCardFocusRadius}px;`);
+    lines.push(`  --Lg-Card-Focus-Radius: ${r.lgCardFocusRadius}px;`);
     lines.push(`  --Card-Padding: ${r.cardPadding}px;`);
+    // Padding scales with the card, now that the TYPE inside it does.
+    lines.push(`  --Sm-Card-Padding: ${r.smCardPadding}px;`);
+    lines.push(`  --Lg-Card-Padding: ${r.lgCardPadding}px;`);
     lines.push(`  --Modal-Padding: ${r.modalPadding}px;`);
+    lines.push(`  --Sm-Modal-Padding: ${r.smModalPadding}px;`);
+    lines.push(`  --Lg-Modal-Padding: ${r.lgModalPadding}px;`);
     lines.push(`  --Modal-Radius: ${cappedModalRadius}px;`);
     lines.push(`  --Modal-Inner-Radius: ${r.modalInnerRadius}px;`);
     lines.push(`  --Modal-Focus-Radius: ${r.modalFocusRadius}px;`);
+    /* The bordered list row and its inset ring. The ring is the row's radius
+       minus its 2px inset (1px clear + the row's own 1px border), so the two
+       stay concentric when the row's corner moves. */
+    lines.push(`  --List-Item-Radius: ${r.listItemRadius}px;`);
+    lines.push(`  --List-Item-Focus-Radius: ${r.listItemFocusRadius}px;`);
+    lines.push(`  --List-Item-Padding: ${r.listItemPadding}px;`);
+    lines.push(`  --List-Item-Gap: ${r.listItemGap}px;`);
+    lines.push(`  --Sm-List-Item-Padding: ${r.smListItemPadding}px;`);
+    lines.push(`  --Lg-List-Item-Padding: ${r.lgListItemPadding}px;`);
+    lines.push(`  --Sm-List-Item-Gap: ${r.smListItemGap}px;`);
+    lines.push(`  --Lg-List-Item-Gap: ${r.lgListItemGap}px;`);
+    lines.push(`  --Sm-List-Item-Radius: ${r.smListItemRadius}px;`);
+    lines.push(`  --Lg-List-Item-Radius: ${r.lgListItemRadius}px;`);
+    lines.push(`  --Sm-List-Item-Focus-Radius: ${r.smListItemFocusRadius}px;`);
+    lines.push(`  --Lg-List-Item-Focus-Radius: ${r.lgListItemFocusRadius}px;`);
+    lines.push(`  --List-Item-Image-Radius: ${r.listItemImageRadius}px;`);
+    lines.push(`  --List-Item-Default-Image-Width: ${r.listItemImageWidth}px;`);
+    lines.push(`  --Sm-List-Item-Default-Image-Width: ${r.smListItemImageWidth}px;`);
+    lines.push(`  --Lg-List-Item-Default-Image-Width: ${r.lgListItemImageWidth}px;`);
     // Dropdown / menu frame: min(Input-Radius, Card-Radius, 16).
     lines.push(`  --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;`);
+    // The row inside it, and its inset ring — concentric off the frame.
+    lines.push(`  --Menu-Item-Radius: ${r.menuItemRadius}px;`);
+    lines.push(`  --Menu-Focus-Radius: ${r.menuFocusRadius}px;`);
+    /* Nav chrome — the rail's width and the app bar's height, one per size.
+       Constants rather than derived: a rail is 80 wide in every brand, and
+       the three sizes are a density decision. Emitted from the SAME table
+       the Figma payload reads, so the two cannot disagree. */
+    navMetricsCSS('  ').forEach(l => lines.push(l));
     lines.push(`  --Input-Radius: ${r.inputRadius}px;`);
     lines.push(`  --Sm-Input-Radius: ${r.smInputRadius}px;`);
     lines.push(`  --Lg-Input-Radius: ${r.lgInputRadius}px;`);
-    lines.push(`  --Input-Inner-Radius: ${r.inputInnerRadius}px;`);
+    lines.push(`  --Input-Inner-Focus-Radius: ${r.inputInnerRadius}px;`);
     lines.push(`  --Input-Focus-Radius: ${r.inputFocusRadius}px;`);
-    // Inset focus-ring corner radius — Input-Radius minus 1px so the inset
-    // 3px focus indicator's corners visually match the chrome's outer
-    // corners. Used by ListItem, TextField, Select, etc.
-    lines.push(`  --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;`);
+    /* Inset focus-ring corner radius — the same number as
+       --Input-Inner-Focus-Radius above, not a second calculation of it.
+       inputInnerRadius IS inner(inputRadius), and inner() is
+       `max(0, r - 1)`, so `Math.max(0, r.inputRadius - 1)` was recomputing
+       it by hand: one value, two derivations, free to drift the moment
+       inner() changes.
+       Kept as an ALIAS rather than deleted — List.js reads this name, and
+       generated CSS is frozen per design system, so an older sheet paired
+       with a newer lib still has to resolve it. */
+    lines.push(`  --Input-Inner-Focus-Visible: var(--Input-Inner-Focus-Radius);`);
     lines.push(`  --Input-Swatch-Radius: ${r.inputSwatchRadius}px;`);
     lines.push(`  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;`);
     lines.push(`  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;`);
@@ -5026,6 +5031,9 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Lg-Button-Min-Width: ${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px;`);
     lines.push(`  --Button-Padding: ${BUTTON_PADDING}px;`);
     lines.push(`  --Sm-Button-Padding: var(--Button-Padding);`);
+    // Mode-scoped metrics (medium / --Sm- / --Lg-). See buttonSizing.ts.
+    buttonModeMetricCSS(cs, '  ').forEach(l => lines.push(l));
+    buttonHeightAliasCSS('  ').forEach(l => lines.push(l));
     lines.push(`  --Lg-Button-Padding: ${LG_BUTTON_PADDING}px;`);
     lines.push(`  --Large-Button-Padding: var(--Lg-Button-Padding);`);
     // Bevel tokens — used by the lib Button to render its 3D inset shadow.
@@ -5043,16 +5051,20 @@ export function generateBaseCSS(jsonData: any): string {
     // at the consuming element so themed values still apply even though
     // these are defined statically here.
     lines.push(`  --Effect-Level-0: none;`);
-    // Each level stacks its own atmospheric shadow on the previous level's
-    // contact shadow (Comeau's layered-shadow pattern). Per-level colors
-    // are 8-digit hex tokens emitted per surface scope — the recipes here
-    // just reference them so the alpha + tint come from the surface.
-    lines.push(`  --Effect-Level-1: ${effectLevelRecipe(1)};`);
-    lines.push(`  --Effect-Level-2: ${effectLevelRecipe(2)};`);
-    lines.push(`  --Effect-Level-3: ${effectLevelRecipe(3)};`);
-    lines.push(`  --Effect-Level-4: ${effectLevelRecipe(4)};`);
-    lines.push(`  --Effect-Level-5: ${effectLevelRecipe(5)};`);
+    /* One --Dropshadow-Color per surface with per-layer alpha literals, which
+       is Comeau's shape. The geometry and the alpha ramp both come from the
+       user's Shadow controls, so these recipes change when the sliders move. */
+    const effOpts = shadowOptionsFromStyle(csRaw);
+    for (const lvl of SHADOW_LEVELS) {
+      lines.push(`  --Effect-Level-${lvl}: ${effectLevelRecipe(lvl, effOpts)};`);
+    }
     lines.push('}');
+    lines.push('');
+    lines.push(libRadiusOverrideCSS());
+    lines.push('');
+    // Motion mode, outside :root. data-motion="No-Motion" zeroes every
+    // duration; the OS preference is followed unless the attribute overrides it.
+    lines.push(motionModeCSS());
     lines.push('');
   }
   
@@ -5154,11 +5166,6 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     cssLines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
     cssLines.push(`  --Buttons-Primary-Outline-Hover: var(--${prefix}-Buttons-Primary-Outline-Hover);`);
     cssLines.push(`  --Buttons-Primary-Outline-Pressed: var(--${prefix}-Buttons-Primary-Outline-Pressed);`);
-    cssLines.push(`  --Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Primary-Light-Button);`);
-    cssLines.push(`  --Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Primary-Light-Text);`);
-    cssLines.push(`  --Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Primary-Light-Border);`);
-    cssLines.push(`  --Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Primary-Light-Hover);`);
-    cssLines.push(`  --Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Primary-Light-Pressed);`);
     cssLines.push(`  --Buttons-Secondary-Button: var(--${prefix}-Buttons-Secondary-Button);`);
     cssLines.push(`  --Buttons-Secondary-Text: var(--${prefix}-Buttons-Secondary-Text);`);
     cssLines.push(`  --Buttons-Secondary-Border: var(--${prefix}-Buttons-Secondary-Border);`);
@@ -5294,6 +5301,11 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Hover: var(--Surfaces-Hover);`);
     lines.push(`  --Pressed: var(--Surfaces-Pressed);`);
     lines.push(`  --Focus-Visible: var(--${prefix}-Focus-Visible);`);
+    /* Outline and ghost buttons have no fill — their text sits on the
+       SURFACE, so their muted tone is the surface's own --Quiet. One
+       alias rather than a per-palette token: there is nothing
+       palette-specific about it, and --Quiet already resolves per scope. */
+    lines.push(`  --Outline-Quiet: var(--Quiet);`);
     lines.push(`  --Effects: var(--${effects});`);
     lines.push(`  --Buttons-Primary-Button: var(--${prefix}-Buttons-Primary-Button);`);
     lines.push(`  --Buttons-Primary-Text: var(--${prefix}-Buttons-Primary-Text);`);
@@ -5302,16 +5314,12 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Primary-Pressed: var(--${prefix}-Buttons-Primary-Pressed);`);
     lines.push(`  --Buttons-Primary-Highlight: var(--${prefix}-Buttons-Primary-Highlight);`);
     lines.push(`  --Buttons-Primary-Lowlight: var(--${prefix}-Buttons-Primary-Lowlight);`);
+    lines.push(`  --Buttons-Primary-Quiet: var(--${prefix}-Buttons-Primary-Quiet);`);
     lines.push(`  --Buttons-Primary-Outline-Button: var(--${prefix}-Buttons-Primary-Outline-Button);`);
     lines.push(`  --Buttons-Primary-Outline-Text: var(--${prefix}-Buttons-Primary-Outline-Text);`);
     lines.push(`  --Buttons-Primary-Outline-Border: var(--${prefix}-Buttons-Primary-Outline-Border);`);
     lines.push(`  --Buttons-Primary-Outline-Hover: var(--${prefix}-Buttons-Primary-Outline-Hover);`);
     lines.push(`  --Buttons-Primary-Outline-Pressed: var(--${prefix}-Buttons-Primary-Outline-Pressed);`);
-    lines.push(`  --Buttons-Primary-Light-Button: var(--${prefix}-Buttons-Primary-Light-Button);`);
-    lines.push(`  --Buttons-Primary-Light-Text: var(--${prefix}-Buttons-Primary-Light-Text);`);
-    lines.push(`  --Buttons-Primary-Light-Border: var(--${prefix}-Buttons-Primary-Light-Border);`);
-    lines.push(`  --Buttons-Primary-Light-Hover: var(--${prefix}-Buttons-Primary-Light-Hover);`);
-    lines.push(`  --Buttons-Primary-Light-Pressed: var(--${prefix}-Buttons-Primary-Light-Pressed);`);
     lines.push(`  --Buttons-Secondary-Button: var(--${prefix}-Buttons-Secondary-Button);`);
     lines.push(`  --Buttons-Secondary-Text: var(--${prefix}-Buttons-Secondary-Text);`);
     lines.push(`  --Buttons-Secondary-Border: var(--${prefix}-Buttons-Secondary-Border);`);
@@ -5319,6 +5327,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Secondary-Pressed: var(--${prefix}-Buttons-Secondary-Pressed);`);
     lines.push(`  --Buttons-Secondary-Highlight: var(--${prefix}-Buttons-Secondary-Highlight);`);
     lines.push(`  --Buttons-Secondary-Lowlight: var(--${prefix}-Buttons-Secondary-Lowlight);`);
+    lines.push(`  --Buttons-Secondary-Quiet: var(--${prefix}-Buttons-Secondary-Quiet);`);
     lines.push(`  --Buttons-Tertiary-Button: var(--${prefix}-Buttons-Tertiary-Button);`);
     lines.push(`  --Buttons-Tertiary-Text: var(--${prefix}-Buttons-Tertiary-Text);`);
     lines.push(`  --Buttons-Tertiary-Border: var(--${prefix}-Buttons-Tertiary-Border);`);
@@ -5326,6 +5335,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Tertiary-Pressed: var(--${prefix}-Buttons-Tertiary-Pressed);`);
     lines.push(`  --Buttons-Tertiary-Highlight: var(--${prefix}-Buttons-Tertiary-Highlight);`);
     lines.push(`  --Buttons-Tertiary-Lowlight: var(--${prefix}-Buttons-Tertiary-Lowlight);`);
+    lines.push(`  --Buttons-Tertiary-Quiet: var(--${prefix}-Buttons-Tertiary-Quiet);`);
     lines.push(`  --Buttons-Neutral-Button: var(--${prefix}-Buttons-Neutral-Button);`);
     lines.push(`  --Buttons-Neutral-Text: var(--${prefix}-Buttons-Neutral-Text);`);
     lines.push(`  --Buttons-Neutral-Border: var(--${prefix}-Buttons-Neutral-Border);`);
@@ -5333,6 +5343,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Neutral-Pressed: var(--${prefix}-Buttons-Neutral-Pressed);`);
     lines.push(`  --Buttons-Neutral-Highlight: var(--${prefix}-Buttons-Neutral-Highlight);`);
     lines.push(`  --Buttons-Neutral-Lowlight: var(--${prefix}-Buttons-Neutral-Lowlight);`);
+    lines.push(`  --Buttons-Neutral-Quiet: var(--${prefix}-Buttons-Neutral-Quiet);`);
     lines.push(`  --Buttons-Info-Button: var(--${prefix}-Buttons-Info-Button);`);
     lines.push(`  --Buttons-Info-Text: var(--${prefix}-Buttons-Info-Text);`);
     lines.push(`  --Buttons-Info-Border: var(--${prefix}-Buttons-Info-Border);`);
@@ -5340,6 +5351,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Info-Pressed: var(--${prefix}-Buttons-Info-Pressed);`);
     lines.push(`  --Buttons-Info-Highlight: var(--${prefix}-Buttons-Info-Highlight);`);
     lines.push(`  --Buttons-Info-Lowlight: var(--${prefix}-Buttons-Info-Lowlight);`);
+    lines.push(`  --Buttons-Info-Quiet: var(--${prefix}-Buttons-Info-Quiet);`);
     const successPrefix = prefix.startsWith('Surface') ? 'Containers' : prefix;
     lines.push(`  --Buttons-Success-Button: var(--${successPrefix}-Buttons-Success-Button);`);
     lines.push(`  --Buttons-Success-Text: var(--${prefix}-Buttons-Success-Text);`);
@@ -5348,6 +5360,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Success-Pressed: var(--${prefix}-Buttons-Success-Pressed);`);
     lines.push(`  --Buttons-Success-Highlight: var(--${prefix}-Buttons-Success-Highlight);`);
     lines.push(`  --Buttons-Success-Lowlight: var(--${prefix}-Buttons-Success-Lowlight);`);
+    lines.push(`  --Buttons-Success-Quiet: var(--${prefix}-Buttons-Success-Quiet);`);
     lines.push(`  --Buttons-Warning-Button: var(--${prefix}-Buttons-Warning-Button);`);
     lines.push(`  --Buttons-Warning-Text: var(--${prefix}-Buttons-Warning-Text);`);
     lines.push(`  --Buttons-Warning-Border: var(--${prefix}-Buttons-Warning-Border);`);
@@ -5355,6 +5368,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Warning-Pressed: var(--${prefix}-Buttons-Warning-Pressed);`);
     lines.push(`  --Buttons-Warning-Highlight: var(--${prefix}-Buttons-Warning-Highlight);`);
     lines.push(`  --Buttons-Warning-Lowlight: var(--${prefix}-Buttons-Warning-Lowlight);`);
+    lines.push(`  --Buttons-Warning-Quiet: var(--${prefix}-Buttons-Warning-Quiet);`);
     lines.push(`  --Buttons-Error-Button: var(--${prefix}-Buttons-Error-Button);`);
     lines.push(`  --Buttons-Error-Text: var(--${prefix}-Buttons-Error-Text);`);
     lines.push(`  --Buttons-Error-Border: var(--${prefix}-Buttons-Error-Border);`);
@@ -5362,6 +5376,7 @@ function generateSurfaceDataAttributesCSS(jsonData: any): string {
     lines.push(`  --Buttons-Error-Pressed: var(--${prefix}-Buttons-Error-Pressed);`);
     lines.push(`  --Buttons-Error-Highlight: var(--${prefix}-Buttons-Error-Highlight);`);
     lines.push(`  --Buttons-Error-Lowlight: var(--${prefix}-Buttons-Error-Lowlight);`);
+    lines.push(`  --Buttons-Error-Quiet: var(--${prefix}-Buttons-Error-Quiet);`);
     // Map Default icons to Neutral since Default palette is not generated
     lines.push(`  --Icons-Default: var(--${prefix}-Icons-Neutral);`);
     lines.push(`  --Icons-Default-Variant: var(--${prefix}-Icons-Neutral-Variant);`);
@@ -5547,39 +5562,26 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
   };
   
   // All theme variants to generate
+  /* The nine, plus the three bars — generated from a list, not typed out.
+     
+     Thirty-three hand-written selectors is how four of them ended up naming
+     themes the generator had stopped producing, and how the four it DOES
+     produce (Info, Success, Warning, Error) ended up with no selector at all.
+     
+     Bare names only. The -Light / -Medium / -Dark shades are gone: what used
+     to be Primary-Light is data-theme="Primary" with
+     data-surface="Surface-Brightest", so the surface ladder reaches it and
+     the theme no longer has to name it.
+     
+     Both selector forms, as before. A theme with no surface stated resolves
+     to Surface, so the paired form has to carry the same block or that
+     combination falls through to :root. */
   const themeVariants = [
     { name: 'Default', selector: ':root' },
-    { name: 'Primary', selector: '[data-theme="Primary"],\n[data-theme="Primary"][data-surface="Surface"]' },
-    { name: 'Primary-Light', selector: '[data-theme="Primary-Light"],\n[data-theme="Primary-Light"][data-surface="Surface"]' },
-    { name: 'Primary-Medium', selector: '[data-theme="Primary-Medium"],\n[data-theme="Primary-Medium"][data-surface="Surface"]' },
-    { name: 'Primary-Dark', selector: '[data-theme="Primary-Dark"],\n[data-theme="Primary-Dark"][data-surface="Surface"]' },
-    { name: 'Secondary', selector: '[data-theme="Secondary"],\n[data-theme="Secondary"][data-surface="Surface"]' },
-    { name: 'Secondary-Light', selector: '[data-theme="Secondary-Light"],\n[data-theme="Secondary-Light"][data-surface="Surface"]' },
-    { name: 'Secondary-Medium', selector: '[data-theme="Secondary-Medium"],\n[data-theme="Secondary-Medium"][data-surface="Surface"]' },
-    { name: 'Secondary-Dark', selector: '[data-theme="Secondary-Dark"],\n[data-theme="Secondary-Dark"][data-surface="Surface"]' },
-    { name: 'Tertiary', selector: '[data-theme="Tertiary"],\n[data-theme="Tertiary"][data-surface="Surface"]' },
-    { name: 'Tertiary-Light', selector: '[data-theme="Tertiary-Light"],\n[data-theme="Tertiary-Light"][data-surface="Surface"]' },
-    { name: 'Tertiary-Medium', selector: '[data-theme="Tertiary-Medium"],\n[data-theme="Tertiary-Medium"][data-surface="Surface"]' },
-    { name: 'Tertiary-Dark', selector: '[data-theme="Tertiary-Dark"],\n[data-theme="Tertiary-Dark"][data-surface="Surface"]' },
-    { name: 'Neutral', selector: '[data-theme="Neutral"],\n[data-theme="Neutral"][data-surface="Surface"]' },
-    { name: 'Neutral-Light', selector: '[data-theme="Neutral-Light"],\n[data-theme="Neutral-Light"][data-surface="Surface"]' },
-    { name: 'Neutral-Medium', selector: '[data-theme="Neutral-Medium"],\n[data-theme="Neutral-Medium"][data-surface="Surface"]' },
-    { name: 'Neutral-Dark', selector: '[data-theme="Neutral-Dark"],\n[data-theme="Neutral-Dark"][data-surface="Surface"]' },
-    { name: 'Info-Light', selector: '[data-theme="Info-Light"],\n[data-theme="Info-Light"][data-surface="Surface"]' },
-    { name: 'Info-Medium', selector: '[data-theme="Info-Medium"],\n[data-theme="Info-Medium"][data-surface="Surface"]' },
-    { name: 'Info-Dark', selector: '[data-theme="Info-Dark"],\n[data-theme="Info-Dark"][data-surface="Surface"]' },
-    { name: 'Success-Light', selector: '[data-theme="Success-Light"],\n[data-theme="Success-Light"][data-surface="Surface"]' },
-    { name: 'Success-Medium', selector: '[data-theme="Success-Medium"],\n[data-theme="Success-Medium"][data-surface="Surface"]' },
-    { name: 'Success-Dark', selector: '[data-theme="Success-Dark"],\n[data-theme="Success-Dark"][data-surface="Surface"]' },
-    { name: 'Warning-Light', selector: '[data-theme="Warning-Light"],\n[data-theme="Warning-Light"][data-surface="Surface"]' },
-    { name: 'Warning-Medium', selector: '[data-theme="Warning-Medium"],\n[data-theme="Warning-Medium"][data-surface="Surface"]' },
-    { name: 'Warning-Dark', selector: '[data-theme="Warning-Dark"],\n[data-theme="Warning-Dark"][data-surface="Surface"]' },
-    { name: 'Error-Light', selector: '[data-theme="Error-Light"],\n[data-theme="Error-Light"][data-surface="Surface"]' },
-    { name: 'Error-Medium', selector: '[data-theme="Error-Medium"],\n[data-theme="Error-Medium"][data-surface="Surface"]' },
-    { name: 'Error-Dark', selector: '[data-theme="Error-Dark"],\n[data-theme="Error-Dark"][data-surface="Surface"]' },
-    { name: 'App-Bar', selector: '[data-theme="App-Bar"],\n[data-theme="App-Bar"][data-surface="Surface"]' },
-    { name: 'Nav-Bar', selector: '[data-theme="Nav-Bar"],\n[data-theme="Nav-Bar"][data-surface="Surface"]' },
-    { name: 'Status', selector: '[data-theme="Status"],\n[data-theme="Status"][data-surface="Surface"]' }
+    ...CSS_THEME_NAMES.map((name) => ({
+      name,
+      selector: `[data-theme="${name}"],\n[data-theme="${name}"][data-surface="Surface"]`,
+    })),
   ];
   
   themeVariants.forEach(({ name, selector }) => {

@@ -22,6 +22,7 @@ import {
   CodeBlock,
 } from '@omni-design/components';
 import ComputerIcon from '@mui/icons-material/Computer';
+import CloseIcon from '@mui/icons-material/Close';
 import CodeIcon from '@mui/icons-material/Code';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -34,6 +35,7 @@ import { LIB_DYNAMIC_CSS_FILES } from '../utils/cssgen/exportToCSS';
 import { loadGoogleFonts } from '../utils/googleFontsManager';
 import { useAuth } from '../contexts/AuthContext';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
+import { parseFigmaFileLink, upsertLinkedFile, removeLinkedFile, type LinkedFigmaFileEntry } from '../utils/figmaLink';
 import { componentStyleCSS } from '../utils/componentStyleVars';
 import { generateAndUploadDesignSystem, SHOWCASE_BASE } from '../utils/generateDesignSystem';
 import AppHeader from './AppHeader';
@@ -362,7 +364,7 @@ export default function DesignSystemDetail() {
         </Tabs>
 
         {tab === 'use' && <UseMyDesignTab id={id} record={record} onOpenFigmaImport={() => setShowFigmaImportModal(true)} />}
-        {tab === 'settings' && <SettingsTab id={id} record={record} payments={payments} />}
+        {tab === 'settings' && <SettingsTab id={id} record={record} payments={payments} onRecordChange={setRecord} />}
         {tab === 'history' && (
           <VersionsTab
             record={record}
@@ -508,6 +510,10 @@ function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
           componentStyle: style,
           mode: 'light',
           typographyStyles: snapshot.typographyStyles,
+          // Same reason the componentStyleCSS line below exists: the sliders
+          // are not colour or typography, so they have to be handed over
+          // explicitly. The Shadow step's controls ride here.
+          styleCustomizations: snapshot.styleCustomizations,
         }),
         componentStyleCSS(style, snapshot.styleCustomizations),
       ].join('\n\n');
@@ -687,8 +693,13 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
                   minWidth: 160,
                   background: 'var(--Background)',
                   border: '1px solid var(--Border)',
-                  borderRadius: 'var(--Style-Border-Radius, 6px)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06)',
+                  borderRadius: 'var(--Dropdown-Frame-Radius, var(--Style-Border-Radius, 6px))',
+                  /* Rows are full-bleed (the panel pads only vertically), so without
+                     this their hover highlight squares off the rounded corners and
+                     pokes out past the frame. Clipping is why Dropdown-Frame-Radius
+                     is capped at 16px in the first place. */
+                  overflow: 'hidden',
+                  boxShadow: 'var(--Effect-Level-3, 0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06))',
                   padding: '4px 0',
                   zIndex: 1300,
                   color: 'var(--Text)',
@@ -885,7 +896,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>Run in your terminal:</BodySmall>
-            <CodeBlock code={installCmd} language="bash" />
+            <CodeBlock code={installCmd} language="bash" wrap />
           </VStack>
         </VStack>
       </Card>
@@ -901,7 +912,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           </BodySmall>
           <VStack spacing={1} style={{ width: '100%' }}>
             <BodySmall style={{ fontWeight: 600 }}>CLAUDE.md URL:</BodySmall>
-            <CodeBlock code={claudeMdUrl} language="URL" />
+            <CodeBlock code={claudeMdUrl} language="URL" wrap />
           </VStack>
         </VStack>
       </Card>
@@ -1113,7 +1124,58 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
 // shared with ExportStage's first-time creation flow. Import added near the
 // other top-of-file imports.
 
-function SettingsTab({ id, record, payments }: { id: string; record: Record; payments: PaymentRecord[] }) {
+function SettingsTab({ id, record, payments, onRecordChange }: {
+  id: string; record: Record; payments: PaymentRecord[];
+  onRecordChange: (next: Record) => void;
+}) {
+  /* Linking from the studio as well as from the plugin.
+   *
+   * The plugin already links on every import (code.ts,
+   * linkFigmaFileToDesignSystem) and that stays the normal path — it knows the
+   * real file name and runs without anyone remembering. This is for when that
+   * has not happened or has gone wrong: the plugin skips linking in SILENCE
+   * when it is unpaired, when figma.fileKey is unavailable, and when the
+   * Firestore read fails, so "I imported and nothing appeared" has several
+   * indistinguishable causes and no way to fix it from here.
+   *
+   * Both writers use the same upsert rule, keyed on fileKey — see
+   * upsertLinkedFile. Two writers on one array that disagreed about identity
+   * would leave two rows for one file. */
+  const [figmaUrl, setFigmaUrl] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const writeLinks = async (next: LinkedFigmaFileEntry[]) => {
+    await setDoc(doc(db, 'designSystems', id), {
+      /* Dates, not serverTimestamp(): Firestore rejects a sentinel inside an
+         array element. The plugin writes an ISO string for the same reason and
+         both readers accept either. */
+      linkedFigmaFiles: next.map(f => ({
+        fileKey: f.fileKey, fileName: f.fileName,
+        fileUrl: f.fileUrl, lastSeenAt: f.lastSeenAt,
+      })),
+    }, { merge: true });
+    onRecordChange({ ...record, linkedFigmaFiles: next });
+  };
+
+  const handleLink = async () => {
+    const entry = parseFigmaFileLink(figmaUrl);
+    if (!entry) {
+      setLinkError('That does not look like a Figma file URL. Open the file and copy the address.');
+      return;
+    }
+    setLinking(true);
+    setLinkError(null);
+    try {
+      await writeLinks(upsertLinkedFile(record.linkedFigmaFiles as LinkedFigmaFileEntry[], entry));
+      setFigmaUrl('');
+    } catch (err: any) {
+      setLinkError(err?.message || 'Could not save the link.');
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const addOns = useMemo(() => {
     const list: string[] = [];
     if (record.monthlyAddOns?.playground) list.push('Playground');
@@ -1168,6 +1230,7 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
             <BodySmall color="quiet">
               No Figma files linked yet. Pair the OmniDesign plugin from your Account
               page, then run an import — the file you imported into will show up here.
+              Or paste the file's URL below.
             </BodySmall>
           ) : (
             <VStack spacing={0}>
@@ -1196,10 +1259,55 @@ function SettingsTab({ id, record, payments }: { id: string; record: Record; pay
                   >
                     Open in Figma
                   </Button>
+                  <Button
+                    iconOnly
+                    variant="ghost"
+                    size="small"
+                    aria-label={`Unlink ${f.fileName || 'this file'}`}
+                    onClick={() => writeLinks(
+                      removeLinkedFile(record.linkedFigmaFiles as LinkedFigmaFileEntry[], f.fileKey),
+                    )}
+                  >
+                    <CloseIcon style={{ fontSize: 16 }} />
+                  </Button>
                 </HStack>
               ))}
             </VStack>
           )}
+          <VStack spacing={1} style={{ width: '100%', paddingTop: 4 }}>
+            <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+              {record.linkedFigmaFiles.length ? 'Link another file' : 'Link a file'}
+            </BodySmall>
+            <HStack spacing={1} style={{ width: '100%', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <TextInput
+                  value={figmaUrl}
+                  size="small"
+                  fullWidth
+                  placeholder="https://www.figma.com/design/…"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    setFigmaUrl(e.target.value);
+                    if (linkError) setLinkError(null);
+                  }}
+                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') handleLink(); }}
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="small"
+                disabled={linking || !figmaUrl.trim()}
+                onClick={handleLink}
+              >
+                {linking ? 'Linking…' : 'Link'}
+              </Button>
+            </HStack>
+            {linkError && (
+              <BodySmall style={{ color: 'var(--Text-Error)', fontSize: 11 }}>{linkError}</BodySmall>
+            )}
+            <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+              The plugin re-links on every import and will correct the file name then.
+            </BodySmall>
+          </VStack>
         </VStack>
       </Card>
 
@@ -1303,8 +1411,19 @@ function VersionsTab({
                 <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
                   <HStack spacing={1} style={{ alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 700 }}>v{v.version}</BodySmall>
+                    {/* data-theme + data-surface, not a guessed colour: `-light` in this
+                        system means the palette's Surface-Brightest. The lib's `-light`
+                        chip shape is gone — it painted the SOLID button fill — so this
+                        is a `-outline` chip, whose bg is var(--Background) and label
+                        var(--Text); the zone supplies both, with no override CSS. */}
                     {isCurrent && (
-                      <Chip variant="success-light" size="small" label="Current" />
+                      <Chip
+                        variant="success-outline"
+                        size="small"
+                        label="Current"
+                        data-theme="Success"
+                        data-surface="Surface-Brightest"
+                      />
                     )}
                   </HStack>
                   <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>

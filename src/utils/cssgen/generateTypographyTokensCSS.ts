@@ -119,6 +119,15 @@ function styleBlock(s: TypeStyle): string {
       lines.push(`  --${overline}-${prop}: var(--${s.token}-${prop});`);
     }
   }
+  /* Button-Medium was Button-Standard. Same rule as Overline above, same
+     direction: the new name holds the literal, the old one reads it.
+     The lib still asks for --Button-Standard-Font-Size (Typography.js:539), and
+     every stylesheet already in Storage names it. */
+  if (s.token === 'Button-Medium') {
+    for (const prop of ['Font-Size', 'Font-Weight', 'Line-Height', 'Letter-Spacing']) {
+      lines.push(`  --Button-Standard-${prop}: var(--Button-Medium-${prop});`);
+    }
+  }
   return lines.join('\n');
 }
 
@@ -353,12 +362,103 @@ ${displaySelectors('', ' > span')} { display: inline-block; transform-origin: 50
 ${offsets.join('\n')}`;
 }
 
+/**
+ * The Alt Display's colour, in three selectable variants.
+ *
+ * Mirrors the Figma `Alt-Display` collection: one pair of stop variables,
+ * three modes deciding what they point at.
+ *
+ *     Default    both stops -> --Header            the Alt reads as a heading
+ *     Colored    both stops -> --Alt-Display-Color a flat Alt colour
+ *     Gradient   stop 1/2   -> the two stop tokens the themes publish
+ *
+ * The pair is the whole trick. Figma cannot bind a fill's TYPE — no variable
+ * holds a gradient, and nothing can flip SOLID to GRADIENT_LINEAR — so a mode
+ * could never switch between a solid and a gradient. Two stops that are
+ * allowed to be EQUAL can: a flat "gradient" is a solid, and one paint style
+ * serves all three modes. This file follows the same shape so the two cannot
+ * describe different things.
+ *
+ * Where the two deliberately differ is the painting. Figma pays no penalty for
+ * a flat gradient; CSS does. background-clip: text needs `color: transparent`,
+ * which costs the selection highlight, anything inheriting the text colour,
+ * and — without the block at the end — the text itself in forced-colors mode.
+ * So the flat variants paint with `color` and only the gradient variant clips,
+ * which is invisible to a designer and strictly better for a reader.
+ */
+function altDisplayColorRules(styles: TypeStyle[]): string {
+  const alt = styles.filter((s) => s.token.startsWith('Alt-Display-'));
+  if (!alt.length) return '';
+  const sel = alt.map((s) => `.${libClass(s.token)}`).join(',\n');
+  const gradSel = alt.map((s) => `.${libClass(s.token)}[data-alt-display="gradient"],\n[data-alt-display="gradient"] .${libClass(s.token)}`).join(',\n');
+  return `/* ---------------------------------------------------------------------------
+   Alt Display colour — three variants, one pair of stops
+
+   Set data-alt-display on the element or any ancestor:
+     default   (or unset)  the Alt reads as a heading
+     colored               a flat Alt colour
+     gradient              the two stops the theme publishes
+
+   The stops are re-published per theme and surface, so every variant follows
+   data-surface without being restated.
+--------------------------------------------------------------------------- */
+:root,
+[data-alt-display="default"] {
+  --Alt-Display-Color-Stop-1: var(--Header);
+  --Alt-Display-Color-Stop-2: var(--Header);
+}
+
+[data-alt-display="colored"] {
+  --Alt-Display-Color-Stop-1: var(--Alt-Display-Color, var(--Header));
+  --Alt-Display-Color-Stop-2: var(--Alt-Display-Color, var(--Header));
+}
+
+[data-alt-display="gradient"] {
+  --Alt-Display-Color-Stop-1: var(--Alt-Color-Gradient-Stop-1, var(--Alt-Display-Color, var(--Header)));
+  --Alt-Display-Color-Stop-2: var(--Alt-Color-Gradient-Stop-2, var(--Alt-Display-Color, var(--Header)));
+}
+
+${sel} {
+  /* Stop 1 alone: in the flat variants the two agree, and a plain colour keeps
+     the selection highlight, print, and forced-colors working. */
+  color: var(--Alt-Display-Color-Stop-1);
+}
+
+${gradSel} {
+  background-image: linear-gradient(
+    90deg,
+    var(--Alt-Display-Color-Stop-1),
+    var(--Alt-Display-Color-Stop-2)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* The box carries the paint, not the glyphs, so keep it to the text's own
+     box or a wrapped headline stretches the ramp across empty trailing space. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+@media (forced-colors: active) {
+${gradSel} {
+    /* The UA drops background-image here, and transparent text would leave
+       nothing on screen. Hand the glyphs back to the system colour. */
+    background-image: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: CanvasText;
+    forced-color-adjust: auto;
+  }
+}`;
+}
+
 /** Everything that follows the platform blocks. */
 export function generateTypographyRules(typography: TypographyStyle[] | null | undefined): string {
   const styles = buildTypeScale(typography);
   const roles = resolveRoles(typography);
   return [
     roleOverrideRules(),
+    altDisplayColorRules(styles),
     paragraphSpacingRules(styles),
     variationRules(styles, roles),
     noiseRules(roles.display.noise || 0),
@@ -389,6 +489,36 @@ export function buildTypographyTokensCSS(
     return `${staticCSS}\n\n${generateDesktopTypographyBlock(typography)}\n\n${generateTypographyRules(typography)}\n`;
   }
   const before = staticCSS.slice(0, start);
-  const after = staticCSS.slice(end + 2);
+  const after = altWeightForAllPlatforms(staticCSS.slice(end + 2), typography);
   return `${before}${generateDesktopTypographyBlock(typography)}${after}\n\n${generateTypographyRules(typography)}\n`;
+}
+
+/**
+ * Give the Alt Display the SAME weight on every platform block.
+ *
+ * The Omni face is the brand's own, so its weight is a property of the FAMILY,
+ * not of the device: Playfair's lighter step does not change because the
+ * reader is on a phone. The device blocks are static and cannot know which
+ * family was picked, so they shipped whatever literal the asset held — 600,
+ * copied from Display when the Alt steps were added — while the generated
+ * Desktop block carried the derived 500. One brand, two answers.
+ *
+ * Rewritten here rather than fixed in the payload, because the payload is
+ * DERIVED from this stylesheet. Patching it there would have left the CSS
+ * saying 600 and Figma saying 500 — a divergence deliberately introduced,
+ * which is invariant 5 with the excuse of convenience.
+ *
+ * System is untouched and SHOULD differ per device: that face is the
+ * platform's, and systemWeight already answers it per platform in the payload.
+ */
+function altWeightForAllPlatforms(
+  css: string,
+  typography: TypographyStyle[] | null | undefined,
+): string {
+  const alt = buildTypeScale(typography).find((s) => s.token.startsWith('Alt-Display-'));
+  if (!alt || typeof alt.weight !== 'number') return css;
+  return css.replace(
+    /(--Alt-Display-(?:Small|Medium|Large)-Font-Weight:\s*)\d+(\s*;)/g,
+    `$1${alt.weight}$2`,
+  );
 }

@@ -8,17 +8,42 @@
  */
 
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { buttonModeMetricFigma } from './buttonSizing';
+import { componentSizePayload, desktopButtonMetrics } from './componentSize';
+import { inputMetrics, floatingLabelLeading, FLOATING_LABEL_SIZES } from './inputMetrics';
+import { overlayOffsets, type DeviceMode } from './deviceChrome';
+import { SYSTEM_FAMILY_OF, systemLineHeight } from './systemTypography';
+import { platformButtonMetrics } from './platformMetrics';
+import { FAB_SIZE } from './componentSize';
+import { THEME_MODES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
+  PLATFORM_BUTTON_HEIGHT,
+  bevelPairs,
 } from './bevelGeometry';
-import { dropshadowHex8, SHADOW_LEVELS, type ShadowLevel } from './dropshadow';
-import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from './variantAlpha';
+import {
+  dropshadowBaseHex, dropshadowAlphas, shadowLayers, shadowOptionsFromStyle,
+  quantizeAlpha, shadowLevelOpacities, SHADOW_LEVELS, type ShadowLevel,
+} from './dropshadow';
+
+/** Effect-style slots premade in Figma per elevation. Fixed at the maximum so
+ *  Resolution can change the layer count by zeroing the tail instead of
+ *  requiring the styles to be rebuilt. */
+const FIGMA_SHADOW_SLOTS = 10;
+import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_OPACITY_PCT } from './variantAlpha';
 import {
   buildTypeScale, resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR,
+  type ResolvedRoles,
   type TypeStyle, type FamilyRole,
 } from './typeScale';
 import { nearestAvailableWeight } from './googleFontWeights';
 import type { TypographyStyle } from '../types';
+import { motionJSON } from './motion';
+import { componentElevationGeometryFigma } from './componentElevation';
+import {
+  DEVICE_TYPES, FACE_MODES, DEVICES_COLLECTION, typographyVariablePayload, SEEDS_FROM,
+  type VarBag, type DeviceType,
+} from './typographyPlatform';
 
 interface ColorToken {
   value: string;
@@ -39,10 +64,40 @@ interface ColorToken {
  *
  * assertThemesMatch below now fails that loudly instead.
  */
-const THEMES = [
-  'Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral',
-  'Info', 'Success', 'Warning', 'Error',
-];
+/* Imported, not restated. This list and the CSS exporter's had drifted —
+   four names here were produced by nobody — and each side looked right on
+   its own, which is the only way that survives. */
+const THEMES: string[] = [...THEME_MODES];
+
+/**
+ * The Theme collection's modes, in order. Default LEADS.
+ *
+ * Order is load-bearing: the plugin reads `Object.keys(data.Themes)` and makes
+ * the first one the collection's DEFAULT mode, which every layer inherits
+ * without setting one.
+ *
+ * Default was removed from this list on the theory that a background selection
+ * is a (theme, surface level) pair, so the two collections' default modes could
+ * say between them what Default said alone. That was WRONG, and the way it was
+ * wrong is worth keeping written down: the Surface collection carries only
+ * FOREGROUND roles. `createSCVars` skips the key outright — `if (varName ===
+ * 'Background') continue` — so the surface axis can never supply a background,
+ * and the theme axis alone resolves to the theme's own core tone. A user who
+ * picked Primary / Surface-Brightest got Primary at PC.
+ *
+ * So Default is not a duplicate. It holds the one thing neither axis can
+ * express: the RESOLVED background for the chosen pair, as a single bindable
+ * value. Invariant 2's test — does anything select between the copies — is
+ * answered by the Background role, which exists on one axis only.
+ *
+ * The user's pick still follows Default, which costs nothing and keeps the
+ * palette they chose next to the default that resolves it.
+ */
+export function themeOrder(defaultTheme?: string): string[] {
+  const rest = THEMES.filter((t) => t !== 'Default');
+  if (!defaultTheme || !rest.includes(defaultTheme)) return ['Default', ...rest];
+  return ['Default', defaultTheme, ...rest.filter((t) => t !== defaultTheme)];
+}
 
 const SURFACE_GROUPS_INTERNAL = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'];
 const SURFACE_GROUP_NAMES: Record<string, string> = {
@@ -432,6 +487,39 @@ const emToPercent = (em: string): number => +((parseFloat(em) || 0) * 100).toFix
  * the Display and Header steps are chosen so every computed line height lands
  * on a 4px multiple, and a percent round-trip loses that (48px × 117% = 56.16).
  */
+/* ── Devices-Type and the Typography alias collection ─────────────────────
+ *
+ * ADDITIVE. Nothing existing moves in this pass.
+ *
+ * Note the payload key: `figma.Typography` is ALREADY TAKEN, and not by a
+ * variable collection — it carries the TEXT STYLE descriptors, the
+ * {platform, version, meta, styles} shape the plugin reads to create styles,
+ * each with a `variablePath` pointing into the Platform collection. The new
+ * variable collection therefore ships under its own key and the plugin maps
+ * it to a Figma collection named Typography.
+ *
+ * The switchover — repointing every style's variablePath from
+ * Platform/Typography/<group>/<step> at the new collection — is deliberately
+ * NOT done here. The collections have to exist and be verified in the file
+ * first; repointing them in the same pass would mean a style bound to a
+ * variable that may not have imported, and an unbound text style renders as
+ * whatever it was last set to, with nothing to see.
+ */
+function buildTypographyCollections(css: string, faces: ResolvedRoles) {
+  const { devices, typography } = typographyVariablePayload(css, faces);
+  const toEntries = (bag: VarBag) => {
+    const out: Record<string, unknown> = {};
+    for (const [name, v] of Object.entries(bag)) out[name] = { value: v.value, type: v.type };
+    return out;
+  };
+  return {
+    devicesType: Object.fromEntries(
+      DEVICE_TYPES.map((d) => [d, toEntries(devices[d])])),
+    typographyModes: Object.fromEntries(
+      FACE_MODES.map((f) => [f, toEntries(typography[f])])),
+  };
+}
+
 function buildFigmaTypeScale(typo: any): any {
   const roles = rolesFromTokensJSON(typo);
   const resolved = resolveRoles(roles);
@@ -494,8 +582,89 @@ function buildFigmaTypeScale(typo: any): any {
   };
 }
 
-export function generateFigmaJSON(designSystemJSON: any): any {
+export function generateFigmaJSON(
+  designSystemJSON: any,
+  /* The generated typography-tokens.css, passed IN rather than imported.
+     A static import here pulls the 25KB stylesheet into the main bundle and
+     collapses the code-split chunk that generateDesignSystem's dynamic import
+     creates — rolldown says so out loud (INEFFECTIVE_DYNAMIC_IMPORT). The one
+     caller already has the string in hand. */
+  typographyCSS?: string,
+): any {
+  /* The user's chosen theme leads the Theme collection, making it Figma's
+     default mode — see themeOrder. Read here so every use below shares it. */
+  const pickedTheme: string | undefined =
+    designSystemJSON?.Metadata?.['Default-Settings']?.['Default-Theme']?.Theme?.value;
+  const THEME_MODES = themeOrder(pickedTheme);
   const figma: any = { Modes: {}, Themes: {}, SurfacesContainers: {} };
+
+  /* The user's Shadow controls. Same mapper the CSS exporter and the preview
+     use, so a surface's shadow colour cannot differ between the three —
+     INTENSITY moves the colour, not just the alpha, so this is not optional. */
+  const shadowOpts = shadowOptionsFromStyle(designSystemJSON?._componentStyle);
+
+
+  /* Elevation — geometry and opacity per (level, layer), GLOBAL.
+     These depend only on the level, the layer index and the layer count, never
+     on the surface, which is what lets one colour variable per surface serve
+     every elevation. Ten slots per level regardless of how many are in use:
+     the effect styles in Figma are built once at full width, and lowering
+     Resolution zeroes the tail rather than restructuring the style.
+
+     NAMED TO MATCH THE EXISTING FIGMA COLLECTION, deliberately and exactly.
+     The payload key is the collection, its first level is the MODES, and the
+     rest of the path is the variable name — the same shape figma.Platform
+     uses. So this produces:
+
+         collection  Elevation
+         modes       Level-0 .. Level-5
+         variables   Shadow-<n>/x, /y, /Blur, /Spread
+
+     It was previously emitted as `Shadow` / `Layer-<n>` / `X,Y,Blur,Spread`,
+     which matched no collection in the file — so the payload landed nowhere
+     and the Elevation numbers stayed hand-authored. Renaming the OUTPUT to
+     match the existing variables is what binds them; renaming the VARIABLES
+     would have given them new ids and unbound every layer using them
+     (invariant 8).
+
+     Level-0 is emitted as a full set of zeroed, zero-opacity slots rather than
+     omitted. The mode exists in the collection, and a mode with no values
+     inherits the previous one — an unstyled element would silently pick up
+     Level-1's shadow. */
+  figma.Elevation = {};
+  for (const level of [0, ...SHADOW_LEVELS]) {
+    const layers = level === 0 ? [] : shadowLayers(level as ShadowLevel, shadowOpts);
+    const alphas = level === 0 ? [] : dropshadowAlphas(level as ShadowLevel, shadowOpts);
+    const slots: any = {};
+    for (let i = 0; i < FIGMA_SHADOW_SLOTS; i++) {
+      const on = i < layers.length;
+      slots[`Shadow-${i + 1}`] = {
+        /* x / y / Blur / Spread, matching Component-Elevations. Both collections
+           name the same four fields the same way now; they used to disagree
+           (offset-x / blur-radius here), which is a mismatch that lands the
+           payload nowhere while reporting success. */
+        'x': { value: on ? layers[i][0] : 0, type: 'number' },
+        'y': { value: on ? layers[i][1] : 0, type: 'number' },
+        'Blur': { value: on ? layers[i][2] : 0, type: 'number' },
+        'Spread': { value: on ? layers[i][3] : 0, type: 'number' },
+        /* No `opacity`. The collection is 40 variables — 10 slots x 4 fields —
+           and the alpha now lives on Drop-Colors as a per-level Opacity that a
+           Drop-Color's opacity binds to. An opacity here would be a fifth field
+           the file has no variable for, and a second place for the same number
+           to drift from. Unused slots are marked by zeroed geometry alone; the
+           transparent marker lives on Component-Elevations' Drop-Color. */
+      };
+    }
+    figma.Elevation[`Level-${level}`] = slots;
+  }
+
+  /* Component-Elevations — which LEVEL each component sits at, per state.
+     Ten numbers replacing 150 geometry variables; see componentElevation.ts
+     for why the level is a number rather than an alias (a Figma alias cannot
+     pin a mode). Additive: the existing Shadow-N variables are left in place,
+     because renaming a Figma variable gives it a new id and unbinds every
+     layer using it. */
+  figma['Component-Elevations'] = componentElevationGeometryFigma(shadowOpts);
 
   // Carry the brand's tone positions through to Figma. Same three values the
   // CSS emits as --DPT / --DST / --DTT, read from the same place so the two
@@ -562,7 +731,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     const MODES_SECTIONS = [
       'Colors', 'Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
       'Hover', 'Pressed', 'Focus-Visible',
-      'Icon', 'Icon-Variant', 'Tag',
+      'Icon', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
       'Backgrounds',
     ];
@@ -574,6 +743,34 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       }
     }
 
+    /* Drop the anchored ends from every Background-N row.
+     *
+     * Surface-Dimmest and Surface-Brightest are one level per THEME — the
+     * darkest and lightest surface a theme offers — so a copy on all twelve
+     * rows of all eight palettes was 378 variables (208 light, 170 dark)
+     * expressing one value each. Nothing selects between the copies, which is
+     * the test invariant 2 actually sets: identical values are redundant only
+     * when nothing chooses among them.
+     *
+     * The Theme layer aliases {Colors.<palette>.Color-N} directly now, so
+     * these have no readers. Modes sits near its ~4,700-per-mode ceiling and
+     * the light rows alone were about 4% of it.
+     *
+     * Only the Figma payload is trimmed. The JSON and CSS pipelines keep
+     * computing the ends, so surfaceWindow stays the one definition and a
+     * future dark-mode remap still has them to work from. */
+    const bgSection = modeSection['Backgrounds'];
+    if (bgSection) {
+      for (const palette of Object.keys(bgSection)) {
+        for (const row of Object.keys(bgSection[palette] || {})) {
+          const surfaces = bgSection[palette][row]?.Surfaces;
+          if (!surfaces) continue;
+          delete surfaces['Surface-Dimmest'];
+          delete surfaces['Surface-Brightest'];
+        }
+      }
+    }
+
     // Add utility colors
     if (!modeSection.Colors) modeSection.Colors = {};
     modeSection.Colors['Image-Overlay'] = {
@@ -581,6 +778,17 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     };
     modeSection.Colors['Transparent'] = {
       'Color-1': { value: '#00000000', type: 'color' },
+    };
+    /* A FLOAT, not a colour: Figma binds a colour variable's opacity to a
+       number, which is how an Icon-Variant alias gets dimmed without the
+       payload having to bake an alpha into it.
+       PERCENT (0..100), never a 0..1 fraction — a number bound to an opacity
+       renders by appending "%", so 0.5 would display as "0.5%" and paint
+       nothing. Same rule as the Drop-Colors Level-<n>/Opacity floats.
+       Flat across both modes: unlike Border-Variant there is no adaptive lift,
+       so light and dark hold the same 50. */
+    modeSection.Colors['Icon-Variant-Opacity'] = {
+      value: ICON_VARIANT_OPACITY_PCT, type: 'number',
     };
 
     // Add computed Button-Hover, Button-Pressed, Button-Highlight, Button-Lowlight,
@@ -856,72 +1064,51 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         }
       }
 
-      // Icon-Variant: the icon colour at reduced opacity (adaptive, base 50%).
-      //
-      // Icon-Variant previously duplicated Icon exactly — 208 variables with
-      // identical values and no differentiation, in Figma and in CSS alike. It
-      // is the de-emphasised form of an icon, so it relates to Icon the way
-      // Border-Variant relates to Border.
-      //
-      // Computed here rather than aliased because a token reference cannot
-      // carry an alpha channel — it has to be baked as an 8-digit hex.
-      const iconData = modeSection.Icon || {};
-      modeSection['Icon-Variant'] = {};
-      for (const section of ['Surfaces', 'Containers']) {
-        modeSection['Icon-Variant'][section] = {};
-        const iconSection = iconData[section] || {};
-        for (const palette of palettes) {
-          modeSection['Icon-Variant'][section][palette] = {};
-          const iconPalette = iconSection[palette] || {};
-          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
-            const iconToken = iconPalette[colorKey] as any;
-            const iconHex = iconToken?.value || (colorVal as any).value;
-            if (iconHex && iconHex.startsWith('#')) {
-              modeSection['Icon-Variant'][section][palette][colorKey] = {
-                value: variantHex8(iconHex, ICON_VARIANT_ALPHA, (colorVal as any).value),
-                type: 'color',
-              };
-            }
-          }
-        }
-      }
+      /* Icon-Variant — NOTHING is generated for it here, by design.
+       *
+       * It used to be 192 baked hex8 variables: the icon colour at an ADAPTIVE
+       * alpha (variantAlpha.ts, floor 0.50 lifted toward a 0.95 cap as the
+       * colour approached its background), because a token reference cannot
+       * carry an alpha channel.
+       *
+       * Figma can now bind a colour's OPACITY to a number variable, which is
+       * the same split Drop-Colors already uses — see the Drop-Colors block
+       * below. So in the file an Icon-Variant is an ALIAS to its sibling
+       * Surface/Icons/<palette> with its opacity bound to the single
+       * Colors/Icon-Variant-Opacity float written just above. The alias
+       * carries the whole Modes -> Theme -> Surface chain, so the variant
+       * follows theme, surface level and light/dark for free.
+       *
+       * Those aliases and the opacity binding live in the FILE, not in this
+       * payload — a plugin cannot express "this alias, dimmed" (a variable's
+       * value is one RGBA or one pointer, with no modifier field). Writing
+       * baked hex here would OVERWRITE the binding on every regenerate, which
+       * is exactly why the Drop-Color tint is not generated either.
+       *
+       * Trade accepted deliberately: the file's flat 50% replaces the adaptive
+       * alpha. The CSS side keeps computing a concrete value — CSS has no way
+       * to bind an opacity to a custom property — so exportColorSystem bakes
+       * the same FLAT 50%, and the two agree. Border-Variant is unaffected and
+       * stays adaptive. */
 
-      /* Dropshadow-Color-1..5 — one per LAYER of a stacked shadow, not one per
-         elevation level.
-         Layer 1 is the tight contact shadow and carries the most alpha (20%);
-         each layer out is wider and fainter, down to 11% at layer 5. That is
-         what makes a shadow read as depth rather than a smear, and it is why
-         these tokens get MORE transparent as the number rises — expected, not
-         a fault.
-         Elevation is expressed by how many layers are stacked: Level-3 uses
-         layers 1-3, Level-5 uses all five. A higher elevation is more dramatic
-         because there is more shadow, not because any single layer darkens.
-         The COLOUR is level-independent and identical across all five —
-         dropshadowBaseHex says so in its own signature. It takes the surface's
-         hue, pulls saturation into a moderate band and multiplies lightness by
-         LIGHT_FACTOR (0.6), so the shadow is a darker version of what it falls
-         on. Darken, then apply the layer's alpha.
-         This comment previously claimed the opposite — "hue/saturation/
-         lightness AND alpha vary per level … higher elevations read as more
-         dramatic, not weaker" — which is false on both counts and is why the
-         decreasing alpha looked like a bug.
-         Math lives in src/utils/dropshadow.ts and is shared with the CSS
-         exporter, so the values are 1:1 across Figma and code. */
-      for (const level of SHADOW_LEVELS) {
-        const sectionName = `Dropshadow-Color-${level}`;
-        modeSection[sectionName] = {};
-        for (const palette of palettes) {
-          modeSection[sectionName][palette] = {};
-          for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
-            if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
-            const bgHex = (colorVal as any).value;
-            if (bgHex && bgHex.startsWith('#')) {
-              modeSection[sectionName][palette][colorKey] = {
-                value: dropshadowHex8(bgHex, level as ShadowLevel),
-                type: 'color',
-              };
-            }
+      /* Dropshadow-Color — ONE colour per surface.
+         This was Dropshadow-Color-1..5: five colours per palette per tone per
+         mode, from the model where each elevation had its own hex. Comeau's
+         generator uses a single colour and moves the OPACITY per layer, so the
+         five collapsed into one and the opacities moved to the Shadow
+         collection below, where they are global rather than per surface.
+         Emitted OPAQUE: the alpha lives on the effect layer, bound separately.
+         Math is shared with the CSS exporter via ../dropshadow. */
+      modeSection['Dropshadow-Color'] = {};
+      for (const palette of palettes) {
+        modeSection['Dropshadow-Color'][palette] = {};
+        for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
+          if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
+          const bgHex = (colorVal as any).value;
+          if (bgHex && bgHex.startsWith('#')) {
+            modeSection['Dropshadow-Color'][palette][colorKey] = {
+              value: dropshadowBaseHex(bgHex, shadowOpts), type: 'color',
+            };
           }
         }
       }
@@ -935,8 +1122,8 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // and a name here that the generator no longer produces is dead. Neither
       // shows up as an error at import — the collection is simply short a mode.
       const generated = Object.keys(themes);
-      const missingFromExport = generated.filter((t) => !THEMES.includes(t));
-      const deadNames = THEMES.filter((t) => !generated.includes(t));
+      const missingFromExport = generated.filter((t) => !THEME_MODES.includes(t));
+      const deadNames = THEME_MODES.filter((t) => !generated.includes(t));
       if (missingFromExport.length) {
         console.warn(
           `\u26A0\uFE0F [Figma] ${missingFromExport.length} generated theme(s) are NOT in the export list ` +
@@ -949,9 +1136,9 @@ export function generateFigmaJSON(designSystemJSON: any): any {
           `${deadNames.join(', ')}`,
         );
       }
-      if (THEMES.length > 10) {
+      if (THEME_MODES.length > 10) {
         console.warn(
-          `\u26A0\uFE0F [Figma] ${THEMES.length} themes exceeds Figma's 10-mode cap; the tail will not import.`,
+          `\u26A0\uFE0F [Figma] ${THEME_MODES.length} themes exceeds Figma's 10-mode cap; the tail will not import.`,
         );
       }
 
@@ -969,21 +1156,17 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       const emitDropshadowRefs = (bgToken: string | undefined, target: any) => {
         if (!bgToken) return false;
         if (bgToken.includes('Default-Background')) {
-          for (let i = 1; i <= 5; i++) {
-            target[`Dropshadow-Color-${i}`] = {
-              value: `{Default-Background.Dropshadow-Color-${i}}`, type: 'color',
-            };
-          }
+          target['Dropshadow-Color'] = {
+            value: '{Default-Background.Dropshadow-Color}', type: 'color',
+          };
           return true;
         }
         const bgMatch = resolveToColorAlias(bgToken, lookup)
           .match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
         if (bgMatch) {
-          for (let i = 1; i <= 5; i++) {
-            target[`Dropshadow-Color-${i}`] = {
-              value: `{Dropshadow-Color-${i}.${bgMatch[1]}.${bgMatch[2]}}`, type: 'color',
-            };
-          }
+          target['Dropshadow-Color'] = {
+            value: `{Dropshadow-Color.${bgMatch[1]}.${bgMatch[2]}}`, type: 'color',
+          };
           return true;
         }
         // Neither a Default-Background nor a {Colors.…} reference: compute the
@@ -991,19 +1174,18 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         // it stays brand-tinted rather than falling back to flat black.
         const hex = resolveToHex(bgToken, lookup, colors);
         const surfaceHex = hex && hex.startsWith('#') ? hex : '#ffffff';
-        for (let i = 1; i <= 5; i++) {
-          target[`Dropshadow-Color-${i}`] = {
-            value: dropshadowHex8(surfaceHex, i as ShadowLevel), type: 'color',
-          };
-        }
+        target['Dropshadow-Color'] = {
+          value: dropshadowBaseHex(surfaceHex, shadowOpts), type: 'color',
+        };
         return true;
       };
 
-      for (const themeName of THEMES) {
+      for (const themeName of THEME_MODES) {
         const theme = themes[themeName];
         if (!theme) continue;
 
         const figmaTheme: any = {};
+
 
         for (const internalKey of SURFACE_GROUPS_INTERNAL) {
           const groupData = theme[internalKey];
@@ -1031,24 +1213,20 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                 if (bgToken) {
                   // Check if it's a Default-Background reference
                   if (bgToken.includes('Default-Background')) {
-                    for (let i = 1; i <= 5; i++) {
-                      target[`Dropshadow-Color-${i}`] = {
-                        value: `{Default-Background.Dropshadow-Color-${i}}`,
-                        type: 'color'
-                      };
-                    }
+                    target['Dropshadow-Color'] = {
+                      value: '{Default-Background.Dropshadow-Color}',
+                      type: 'color',
+                    };
                     continue;
                   }
                   // Extract palette and Color-N from the background ref
                   const bgAlias = resolveToColorAlias(bgToken, lookup);
                   const bgMatch = bgAlias.match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
                   if (bgMatch) {
-                    for (let i = 1; i <= 5; i++) {
-                      target[`Dropshadow-Color-${i}`] = {
-                        value: `{Dropshadow-Color-${i}.${bgMatch[1]}.${bgMatch[2]}}`,
-                        type: 'color'
-                      };
-                    }
+                    target['Dropshadow-Color'] = {
+                      value: `{Dropshadow-Color.${bgMatch[1]}.${bgMatch[2]}}`,
+                      type: 'color',
+                    };
                     continue;
                   }
                 }
@@ -1063,12 +1241,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                 const shadowSurfaceHex = fallbackBgHex && fallbackBgHex.startsWith('#')
                   ? fallbackBgHex
                   : '#ffffff';
-                for (let i = 0; i < 5; i++) {
-                  target[`Dropshadow-Color-${i + 1}`] = {
-                    value: dropshadowHex8(shadowSurfaceHex, (i + 1) as ShadowLevel),
-                    type: 'color',
-                  };
-                }
+                target['Dropshadow-Color'] = {
+                  value: dropshadowBaseHex(shadowSurfaceHex, shadowOpts),
+                  type: 'color',
+                };
                 continue;
               }
 
@@ -1095,7 +1271,30 @@ export function generateFigmaJSON(designSystemJSON: any): any {
               // are all now in Modes and get kept as token refs via MODES_GROUPS check.
 
               if (val && typeof val === 'object' && 'value' in val && 'type' in val) {
-                const tokenVal = (val as any).value;
+                /* {Icon-Variant.X} -> {Icon.X} for the FIGMA payload only.
+                 *
+                 * The CSS side still needs Icon-Variant: it has to bake a
+                 * concrete 50% hex8, because CSS cannot bind an opacity to a
+                 * custom property. So generateCompleteThemes keeps emitting
+                 * {Icon-Variant.Surfaces.<pal>.Color-<n>} and exportColorSystem
+                 * keeps computing those values.
+                 *
+                 * Figma does the same job the other way round: the variable is
+                 * an ALIAS to its Surface/Icons/<pal> sibling with its opacity
+                 * bound to Colors/Icon-Variant-Opacity. Rewriting the reference
+                 * here is what preserves that alias. Without it the ref matches
+                 * no MODES_GROUPS entry (Icon-Variant is no longer a Modes
+                 * group), falls through to resolveToHex, and the payload writes
+                 * a LITERAL #rrggbb80 — which detaches the alias and the
+                 * opacity binding on the next plugin run. Same failure the
+                 * Drop-Color tint avoids by never being written at all.
+                 *
+                 * Safe because Icon-Variant was built from Icon with identical
+                 * keys, so every coordinate that resolved before still does. */
+                const rawVal = (val as any).value;
+                const tokenVal = typeof rawVal === 'string'
+                  ? rawVal.replace('{Icon-Variant.', '{Icon.')
+                  : rawVal;
 
                 // Try to resolve to a Modes-aliasable reference:
                 // 1. {Colors.Palette.Color-N} → direct alias
@@ -1107,11 +1306,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
                   const modesRef = tokenVal.replace(/[{}]/g, '');
                   const topLevel = modesRef.split('.')[0];
                   const MODES_GROUPS = ['Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
-                    'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Icon-Variant', 'Tag',
+                    'Hover', 'Pressed', 'Focus-Visible', 'Icon', 'Tag',
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
-                    'Dropshadow-Color-1', 'Dropshadow-Color-2', 'Dropshadow-Color-3',
-                    'Dropshadow-Color-4', 'Dropshadow-Color-5',
+                    'Dropshadow-Color',
                     'Default-Background'];
 
                   // If the token already references a Modes group, keep it as-is
@@ -1259,7 +1457,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
              still needs the tokens — every surface casts a shadow, and the
              Background it is derived from is right here. This is what was
              missing for Default. */
-          if (!figmaGroup['Dropshadow-Color-1']) {
+          if (!figmaGroup['Dropshadow-Color']) {
             /* Containers name their background "Container", not "Background" —
                so looking only for a Background key found nothing and the
                Container groups were skipped for the same reason Default was.
@@ -1281,13 +1479,70 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     }
   }
 
+  /* Drop-Colors -- the colour is aliased in Figma, the OPACITY is written here.
+   *
+   * Each Level group holds two variables:
+   *
+   *   Level-<n>/Drop-Color   COLOR, aliased to Surface/Dropshadow-Color
+   *   Level-<n>/Opacity      FLOAT, written by this payload
+   *
+   * and the Drop-Color's opacity is bound to its sibling Opacity variable.
+   *
+   * That split is what makes the whole thing work. A plugin cannot express
+   * "this alias, dimmed" -- checked against plugin-typings 1.138, a variable's
+   * value is `boolean | string | number | RGB | RGBA | MotionEasing |
+   * VariableAlias`, one or the other, with no field for a modifier. But Figma
+   * can BIND a colour's opacity to a number variable, and a number is something
+   * a plugin can write. So the colour keeps the alias (and with it the entire
+   * Modes -> Theme -> Surface chain, meaning a shadow follows theme, surface
+   * level AND light/dark for free) while the alpha arrives as a plain float.
+   *
+   * Nothing is generated for the tint. No `Modes/Drop-Color` leaf, no per-level
+   * Theme variables -- earlier attempts at this bolted on 50 variables purely to
+   * have somewhere to bake the alpha, and this needs none of them.
+   *
+   * ONE opacity per level, not per layer: the alpha is flat across a level's
+   * layers (dropshadow.ts -- it is TOTAL/N, the same on every layer). Which
+   * slots are LIVE at the current Resolution is recorded on Component-
+   * Elevations, whose spare slots carry a transparent literal.
+   *
+   * Emitted as a PERCENT (0..100), not a 0..1 fraction. A number variable bound
+   * to a colour's opacity is rendered by appending "%" to its value, so a
+   * variable holding 0.345 displays as "0.345%" and paints no shadow at all.
+   * Still quantised through the same quantizeAlpha() the CSS uses, so the value
+   * Figma holds and the alpha the CSS paints are one number rather than two
+   * that round apart. */
+  figma['Drop-Colors'] = { 'Mode 1': {} };
+  {
+    const dc = figma['Drop-Colors']['Mode 1'];
+    for (const { level, percent } of shadowLevelOpacities(shadowOpts)) {
+      dc[`Level-${level}`] = { Opacity: { value: percent, type: 'number' } };
+    }
+  }
+
   // ── SurfacesContainers section ──
   // Links to Themes.Default for surface variables, Modes for container backgrounds
+  /* All FIVE surface levels. Brightest was missing here long after the level
+     itself shipped — SURFACE_GROUPS_INTERNAL listed it, Themes emitted it, and
+     this map did not, so the Surface collection got four modes written and the
+     fifth got nothing.
+   *
+   * Nothing reported it, for the usual reason: the MODE still exists in the
+   * file, so a designer can select Surface-Brightest and every variable in it
+   * simply keeps whatever it last held. On a themed surface that reads as the
+   * BRIGHT colour rather than as an error — Error/Surface-Brightest painted
+   * #ef5854 (Color-6) instead of Color-11's #fff3ef.
+   *
+   * Derived from the Themes shape rather than listed would be better still,
+   * but the keys here are Figma MODE names and the ones on the right are Theme
+   * GROUP names; they agree today and a map keeps the two nameable separately
+   * if they ever stop. */
   const surfaceToGroup: Record<string, string> = {
     'Surface': 'Surface',
     'Surface-Dim': 'Surface-Dim',
     'Surface-Dimmest': 'Surface-Dimmest',
     'Surface-Bright': 'Surface-Bright',
+    'Surface-Brightest': 'Surface-Brightest',
   };
 
   const containerToGroup = 'Containers';
@@ -1295,7 +1550,11 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   // Surface variants — link directly to Theme
   for (const [surfaceName, groupKey] of Object.entries(surfaceToGroup)) {
     const sc: any = {};
-    const themeGroup = figma.Themes?.Default?.[groupKey];
+    /* Any theme will do — this walks the shape to learn which keys exist and
+       emits {Theme.<group>/<key>} refs whose values come per mode. It named
+       Default, which is going away, and hardcoding one theme as the shape
+       source was fragile regardless. */
+    const themeGroup = figma.Themes?.[THEME_MODES[0]]?.[groupKey];
     if (themeGroup) {
       function buildSurfaceRefs(obj: any, pathPrefix: string): any {
         const result: any = {};
@@ -1321,7 +1580,7 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     sc.Background = { value: `{Theme.Containers/${containerName}}`, type: 'color' };
 
     // Rest from Theme.Containers
-    const themeContainers = figma.Themes?.Default?.Containers;
+    const themeContainers = figma.Themes?.[THEME_MODES[0]]?.Containers;
     if (themeContainers) {
       function buildContainerRefs(obj: any, pathPrefix: string): any {
         const result: any = {};
@@ -1359,8 +1618,26 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // Dark mode containers are always tonal: Primary Color-3 or Neutral Color-3
     const darkContainerN = 3;
 
-    // Add Default-Background to Modes
-    for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+    /* Default-Background is no longer emitted to Figma — 466 unreferenced
+     * variables across the two modes, more than the 378 row-level ends.
+     *
+     * It existed for one consumer: the Default THEME, which is retired as a
+     * Figma mode. The Theme collection's first mode is the default now, so
+     * nothing in the payload aliases {Default-Background.*} — the
+     * referenceResolution guard that asserted something DID is what caught the
+     * change, and it was right to.
+     *
+     * The JSON and CSS pipelines still build and use it: CSS has no
+     * default-mode concept, so the Default theme drives :root and routes its
+     * surface roles through Default-Background there. This trims the Figma
+     * payload only, exactly like the anchored ends above.
+     *
+     * Kept rather than deleted because it is the one thing that has to come
+     * back if Default ever returns as a mode — flip this to true and the whole
+     * block runs again. It writes nothing but defBg, so skipping it has no
+     * other effect. */
+    const EMIT_DEFAULT_BACKGROUND = true;
+    for (const modeName of (EMIT_DEFAULT_BACKGROUND ? ['Light-Mode', 'Dark-Mode'] : [])) {
       const modeData = designSystemJSON.Modes?.[modeName];
       if (!modeData) continue;
 
@@ -1474,7 +1751,13 @@ export function generateFigmaJSON(designSystemJSON: any): any {
         // 20); Default must not be the exception. Its -Variant is the alpha
         // form, matching generateSingleTheme's non-BW branch.
         { role: 'Icons-Default', section: 'Text', pal: null },
-        { role: 'Icons-Default-Variant', section: 'Icon-Variant', pal: null },
+        /* Same source as Icons-Default, at FULL strength. It used to read the
+           'Icon-Variant' section for a baked alpha; that section no longer
+           exists in Modes, and the dimming now lives on the file's opacity
+           binding to Colors/Icon-Variant-Opacity. Still written, because the
+           Default theme aliases {Default-Background.<prefix>Icons-Default-
+           Variant} at all four surface prefixes. */
+        { role: 'Icons-Default-Variant', section: 'Text', pal: null },
         ...ACCENT_PALETTES.map(pal => ({ role: `Text-${pal}`, section: 'Text', pal })),
         ...ACCENT_PALETTES.map(pal => ({ role: `Header-${pal}`, section: 'Header', pal })),
         // Text-BW resolves from the BlackWhite map rather than a palette family
@@ -1525,7 +1808,20 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       };
 
       const writeExtras = (prefix: string, tone: number) => {
-        for (const [section, suffix] of [['Icon', ''], ['Icon-Variant', '-Variant']]) {
+        /* Both, and the -Variant twin reads the SAME 'Icon' section — it is the
+           icon colour at full strength, not a dimmed copy.
+           The dimming is no longer in the value. In the file an Icon-Variant is
+           an alias to its Surface/Icons/<palette> sibling whose OPACITY is
+           bound to Colors/Icon-Variant-Opacity, so baking an alpha here would
+           dim it twice. These keys still have to be WRITTEN, though: the
+           Default theme routes its icons through {Default-Background.Icons-
+           <pal>-Variant} (generateCompleteThemes, DEFAULT_ICON_KEYS), and
+           dropping them left 36 dangling references per mode — caught by
+           referenceResolution.test.ts, which is the invariant-1 shape.
+           The CSS side does NOT come through here; it resolves the same key via
+           exportToCSS's tokenLookup to a flat 50% hex8, because CSS cannot bind
+           an opacity to a custom property. */
+        for (const [section, suffix] of [['Icon', ''], ['Icon', '-Variant']]) {
           const sec = modeData[section];
           if (!sec?.Surfaces) continue;
           for (const pal of ACCENT_PALETTES) {
@@ -1651,12 +1947,10 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // values designers see when the link resolves normally.
       const bgHex = modeColors?.[bgPalette]?.[surfaceColorN]?.value;
       if (bgHex) {
-        for (const level of SHADOW_LEVELS) {
-          defBg[`Dropshadow-Color-${level}`] = {
-            value: dropshadowHex8(bgHex, level as ShadowLevel),
-            type: 'color',
-          };
-        }
+        defBg['Dropshadow-Color'] = {
+          value: dropshadowBaseHex(bgHex, shadowOpts),
+          type: 'color',
+        };
       }
 
       // Container properties — Text, Header, Quiet, Border for containers
@@ -1677,16 +1971,24 @@ export function generateFigmaJSON(designSystemJSON: any): any {
   }
 
   if (defaultSettings) {
-    // Derive Figma theme name from stored Theme + N values
+    /* The bar's theme, as a MODE NAME the Theme collection actually has.
+     *
+     * This returned 'Primary-Light' as its fallback, 'Black' or 'White' for
+     * Neutral at the extremes, and `${theme}-Light` for any light pick. None
+     * of those is a Theme mode — the collection is the nine bare palettes —
+     * and the plugin resolves this by `themeModeMap[s.theme]`, so every one
+     * of them came back undefined and the bar's theme was never applied. It
+     * bound nothing and reported success, which is why nobody noticed.
+     *
+     * The tone is not lost by dropping the suffix: a light pick is the same
+     * palette on a brighter SURFACE, which is the whole reason the shades
+     * went. What this payload cannot yet say is which surface — it carries a
+     * theme and nothing else — so a light App-Bar arrives on the palette's
+     * default level and a designer sets the level. That is a smaller gap
+     * than the one it replaces, where the palette was wrong too. */
     function deriveThemeName(navSettings: any): string {
       const theme = navSettings?.Theme?.value;
-      const n = navSettings?.N?.value;
-      if (!theme) return 'Primary-Light';
-      if (theme === 'Neutral' && n <= 2) return 'Black';
-      if (theme === 'Neutral' && n >= 11) return 'White';
-      // Primary with N=11 is Primary-Light, otherwise Primary
-      if (n >= 11) return `${theme}-Light`;
-      return theme;
+      return THEMES.includes(theme) ? theme : 'Default';
     }
 
     figma.Navigation = {
@@ -1711,10 +2013,24 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // ── The four faces ──
       Body: typo['Set-Font-Family-Body']?.value || '',
       Header: typo['Set-Font-Family-Header']?.value || '',
+      /* DISPLAY is the name. The studio still STORES the user's pick under the
+         `decorative` role — that is the picker's name, not the face's — so the
+         fallback reads the old key while the variable written is the honest
+         one.
+
+         `Decorative` itself was emitted alongside it so an older template kept
+         resolving, and that is dropped here. Same rule Overline follows, and
+         the reasoning is stated there: the lib's CSS keeps emitting the old
+         name forever because a published stylesheet is frozen and cannot be
+         regenerated — a FIGMA file is not. Carrying both in Figma leaves two
+         bindable variables where only one is canonical, with nothing keeping
+         them in step.
+
+         Verified unbound in Omni Designs before removal (2026-09-25). The CSS
+         side is untouched: --Set-Font-Family-Decorative and its siblings still
+         ship, for the frozen-stylesheet reason above. */
       Display: typo['Set-Font-Family-Display']?.value || typo['Set-Font-Family-Decorative']?.value || '',
       Eyebrow: typo['Set-Font-Family-Eyebrow']?.value || '',
-      // Kept so an older template that still has a Decorative variable resolves.
-      Decorative: typo['Set-Font-Family-Decorative']?.value || '',
 
       // ── Body / Subtitle ──
       'Body-Font-Weight': parseInt(typo['Set-Body-Font-Weight']?.value || '400'),
@@ -1768,13 +2084,15 @@ export function generateFigmaJSON(designSystemJSON: any): any {
       // onto the text style itself. These flags are the only way it knows what
       // to write.
       //
-      // Display-Caps and Decorative-Caps are the same value under two names:
-      // the studio stores the picked DISPLAY font under the `decorative` role.
-      // Emitting both means the plugin can read the honest name while older
-      // payloads still resolve — and it stops Display styles inheriting the
-      // HEADER's case, which is what they did when no Display flag existed.
+      /* Display-Caps reads the `Set-Decorative-Caps` KEY because that is where
+         the studio stores it — the picker is called Decorative, the face is
+         called Display. The key is an input, not a published name.
+
+         `Decorative-Caps` was emitted beside it under the old name and is
+         dropped with the family above. The FLAG is still load-bearing and
+         stays: without a Display flag, Display styles inherited the HEADER's
+         case. It is only the duplicate spelling that goes. */
       'Header-Caps': typo['Set-Header-Caps']?.value === 'uppercase',
-      'Decorative-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
       'Display-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
     };
 
@@ -1785,6 +2103,26 @@ export function generateFigmaJSON(designSystemJSON: any): any {
     // noticing. This section is the same scale the CSS is generated from, in
     // Figma's units.
     figma.Typography = buildFigmaTypeScale(typo);
+
+    /* The device ramps and the Omni / System switch. Derived from the
+       GENERATED stylesheet, so the numbers Figma gets are the numbers the CSS
+       emits — not a second computation that agrees today (invariant 5). */
+    if (typographyCSS) {
+      /* The four faces, resolved to literal family names. Without them the
+         Omni roots carry a CSS var() reference, which Figma stores as text
+         and no text style can bind to. */
+      const collections = buildTypographyCollections(
+        typographyCSS, resolveRoles(rolesFromTokensJSON(typo)));
+      /* ADDED to Devices-Type, not defining it. The collection already holds
+         ~100 variables that are not typography; every name here sits under
+         `Typography/`, so a create-or-update import leaves them alone. */
+      figma[DEVICES_COLLECTION] = collections.devicesType;
+      figma['Typography-Variables'] = collections.typographyModes;
+    } else {
+      /* Loud, because the failure is otherwise invisible: the payload imports
+         fine and every text style keeps whatever it was last bound to. */
+      console.warn('\u26A0\uFE0F [Figma] no typography CSS passed; Devices-Type and the Typography modes were NOT written.');
+    }
   }
 
   // ── Component Style (Button, Card) ──
@@ -1824,107 +2162,258 @@ const FIGMA_BUTTON_PADDING = 8;
 const FIGMA_LG_BUTTON_PADDING = 16;
 
 const BUTTON_BORDER_WIDTH = 1;
-    figma.Components = {
-      Button: {
-        'Button-Radius': r.buttonRadius,
-        'Sm-Button-Radius': r.smButtonRadius,
-        'Lg-Button-Radius': r.lgButtonRadius,
-        'Button-Inner-Radius': r.buttonInnerRadius,
-        'Sm-Button-Inner-Radius': r.smButtonInnerRadius,
-        'Lg-Button-Inner-Radius': r.lgButtonInnerRadius,
-        'Button-Focus-Radius': r.buttonFocusRadius,
-        'Sm-Button-Focus-Radius': r.smButtonFocusRadius,
-        'Lg-Button-Focus-Radius': r.lgButtonFocusRadius,
-        'Button-Icon-Radius': r.iconButtonRadius,
-        'Sm-Button-Icon-Radius': r.smIconButtonRadius,
-        'Lg-Button-Icon-Radius': r.lgIconButtonRadius,
-        'Button-Icon-Inner-Radius': r.iconButtonInnerRadius,
-        'Sm-Button-Icon-Inner-Radius': r.smIconButtonInnerRadius,
-        'Lg-Button-Icon-Inner-Radius': r.lgIconButtonInnerRadius,
-        'Button-Icon-Focus-Radius': r.iconButtonFocusRadius,
-        'Sm-Button-Icon-Focus-Radius': r.smIconButtonFocusRadius,
-        'Lg-Button-Icon-Focus-Radius': r.lgIconButtonFocusRadius,
-        // The OUTER height — the user's selected value, unmodified.
-        //
-        // These used to subtract Button-Border-Width twice, because the Figma
-        // component's height token drove the inner fill rect and the border sat
-        // outside it. That is no longer how the component is built, so the
-        // subtraction now makes every button 2px SHORT of the chosen height.
-        //
-        // It also fixes a name collision: Platform/Button-Height has always been
-        // the outer height (platformButtonHeight returns cs.buttonHeight
-        // unmodified), so the two variables shared a name and meant different
-        // things — 32 in one collection and 30 in the other. Binding a frame to
-        // the wrong one produced a 2px error with nothing to explain it.
-        'Button-Height': cs.buttonHeight,
-        'Sm-Button-Height': cs.smallButtonHeight,
-        'Lg-Button-Height': cs.largeButtonHeight,
-        // Swatch tokens — square swatches inside each button size, 6px smaller
-        // than the button height so they leave a 3px gap on every side (a touch
-        // tighter than the icon tokens, matching the Select swatch spec).
-        //
-        // Measured from the same height as the tokens above, so the 3px gap is
-        // preserved. Left subtracting the border, these would be sized against
-        // an inner box that no longer exists.
-        'Button-Swatch': cs.buttonHeight - 6,
-        'Sm-Button-Swatch': cs.smallButtonHeight - 6,
-        'Lg-Button-Swatch': cs.largeButtonHeight - 6,
-        'Button-Min-Width': csRaw.minButtonWidth ?? 60,
-        // Large's text floor — the standard floor plus 40px. Derived, not a
-        // second number to keep in sync.
-        'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
-        'Button-Border-Width': BUTTON_BORDER_WIDTH,
-        // TWO paddings: small and standard share one, large has its own.
-        // Sm- is still not emitted — it equals Button-Padding, so it would be a
-        // duplicate with nothing selecting between the copies. Lg- IS emitted,
-        // because 16 is a different number and something does select it.
-        'Button-Padding': FIGMA_BUTTON_PADDING,
-        'Lg-Button-Padding': FIGMA_LG_BUTTON_PADDING,
-        // Bevel geometry, small and large. These heights don't vary by
-        // platform, so they live here; MEDIUM's live in the Platform
-        // collection because its height does.
-        //
-        // Built from bevelGeometry.ts, the same module the CSS export uses —
-        // identical numbers, px there and bare numbers here.
-        ...bevelJSON('Sm-', cs.smallButtonHeight, bevelPct),
-        ...bevelJSON('Lg-', cs.largeButtonHeight, bevelPct),
-      },
-      Card: {
-        'Card-Radius': r.cardRadius,
-        'Card-Inner-Border-Radius': r.cardInnerRadius,
-        'Card-Focus-Border-Radius': r.cardFocusRadius,
-        'Card-Padding': r.cardPadding,
-      },
-      Modal: {
-        'Modal-Padding': r.modalPadding,
-        'Modal-Radius': r.modalRadius,
-        'Modal-Inner-Radius': r.modalInnerRadius,
-        'Modal-Focus-Radius': r.modalFocusRadius,
-      },
-      Input: {
-        'Input-Radius': r.inputRadius,
-        'Sm-Input-Radius': r.smInputRadius,
-        'Lg-Input-Radius': r.lgInputRadius,
-        'Input-Inner-Radius': r.inputInnerRadius,
-        'Input-Focus-Radius': r.inputFocusRadius,
-        // Inset focus-ring corner radius — Input-Radius minus 1px so the
-        // inset 3px focus indicator's corners visually match the chrome's
-        // outer corners. Used by ListItem, TextField, Select, etc.
-        'Input-Inner-Focus-Visible': Math.max(0, r.inputRadius - 1),
-        'Input-Swatch-Radius': r.inputSwatchRadius,
-        'Sm-Input-Swatch-Radius': r.smInputSwatchRadius,
-        'Lg-Input-Swatch-Radius': r.lgInputSwatchRadius,
-        'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
-      },
-      // Components/Other — the floating frame of a dropdown or menu panel.
-      // Not under Input: it follows Input-Radius but is bounded separately
-      // (by Card-Radius and a 16px ceiling), so filing it with the input
-      // radii would imply it tracks them all the way up. It does not.
-      Other: {
-        'Dropdown-Frame-Radius': r.dropdownFrameRadius,
-      },
+    // Motion. Durations are FLOATs and are directly usable as Smart Animate
+    // durations; the easings can only be STRINGs, since Figma prototypes pick
+    // from their own presets — those ship as reference values a designer pastes
+    // into a Custom bezier. Both come from src/utils/motion.ts, so the Figma
+    // variables and the CSS custom properties cannot drift.
+    figma.Motion = motionJSON();
+
+    /* Component-Size — the same numbers keyed by MODE.
+     *
+     * Component-Size carries medium / small / large as real modes, so one
+     * library component needs one variant and changing its size changes the
+     * mode. figma.Components below is the older flat shape (Name / Sm-Name /
+     * Lg-Name), which existed because that collection had a single mode and
+     * the size had to live in the name.
+     *
+     * Both are emitted. The flat one still feeds the CSS contract the lib
+     * reads by name, and removing it would break every consumer on --Sm-*.
+     * These are two encodings of one set of numbers, not two sources: the
+     * payload below is REGROUPED from the same computed values, never
+     * recomputed, so they cannot disagree.
+     */
+    const buttonFigmaMetrics = buttonModeMetricFigma(cs);
+
+    /* Button values that are not radii and not device-owned, moved here from
+       the deleted `figma.Components` block (see the note further up). They ride
+       in through buttonMetrics because componentSizePayload spreads that bag
+       straight into the Button group — `withoutDeviceOwned` removes only
+       Button-Height and Button-Icon, which belong to Devices-Type. */
+    const buttonExtras: Record<string, number> = {
+      /* Square swatches, 6px inside the button height, leaving a 3px gap on
+         every side — a touch tighter than the icon tokens, matching the Select
+         swatch spec. Measured off the OUTER height: subtracting the border too
+         would size them against an inner box the component no longer has. */
+      'Button-Swatch': cs.buttonHeight - 6,
+      'Sm-Button-Swatch': cs.smallButtonHeight - 6,
+      'Lg-Button-Swatch': cs.largeButtonHeight - 6,
+      'Button-Min-Width': csRaw.minButtonWidth ?? 60,
+      // Large's text floor is the standard floor + 40, derived rather than a
+      // second number to keep in step.
+      'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
+      'Button-Border-Width': BUTTON_BORDER_WIDTH,
+      /* TWO paddings: small and standard share one, large has its own. Sm- is
+         deliberately absent — it equals Button-Padding, so nothing selects
+         between the copies (invariant 2). Lg- is a different number and
+         something does. */
+      'Button-Padding': FIGMA_BUTTON_PADDING,
+      'Lg-Button-Padding': FIGMA_LG_BUTTON_PADDING,
+      /* NO bevel geometry here, deliberately.
+       *
+       * The deleted `Components` block spread bevelJSON('Sm-'/'Lg-') into its
+       * Button group, and carrying that over looked like part of the move. It
+       * is not: Component-Size's eight Button-Highlight-* / Button-Lowlight-*
+       * variables are ALIASES into Devices-Type, and writing a literal into an
+       * aliased variable DETACHES it. The bevel would stop following the
+       * device and freeze at whatever Desktop last computed — silently, since
+       * a detached variable still holds a plausible number.
+       *
+       * The literals belong in Devices-Type, where they are written per device
+       * further down as `Button-Bevel` / `-Bevel-Negative`. */
+    };
+    const inputExtras: Record<string, number> = {
+      'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
     };
 
+    figma['Component-Size'] = componentSizePayload(
+      r as never, { ...buttonFigmaMetrics, ...buttonExtras }, inputExtras);
+
+    /* Every column of the Devices-Type button variables that
+       Component-Size/Button/Button-Height and -Icon alias into.
+     *
+     * Desktop is the studio's: the user's heights, and icons derived from them.
+     * The other six are the platforms': Apple's and Google's published sizes,
+     * stated in platformMetrics.ts rather than derived, because no brand ratio
+     * produces them (Android's 48px button carries an 18px glyph; the ratio
+     * gives 32, and 18 is not a rung of ICON_RAMP at all).
+     *
+     * This used to write Desktop alone, so the platform columns kept whatever
+     * the Figma file held. They are now stated from the same table the CSS
+     * reads — the point being that one number cannot feed the web and a
+     * different one feed Figma. */
+    const devicesBag = figma[DEVICES_COLLECTION];
+    if (devicesBag) {
+      /* The three heights the user picked. Non-Desktop devices substitute the
+         platform's own inside platformBevelCSS/JSON. */
+      const bevelHeights = {
+        medium: cs.buttonHeight,
+        small: cs.smallButtonHeight,
+        large: cs.largeButtonHeight,
+      };
+      for (const device of Object.keys(devicesBag) as DeviceType[]) {
+        const metrics = device === 'Desktop'
+          ? desktopButtonMetrics(buttonFigmaMetrics)
+          : platformButtonMetrics(device);
+        Object.assign(devicesBag[device],
+          Object.fromEntries(Object.entries(metrics)
+            .map(([n, v]) => [n, { value: v, type: 'number' }])));
+
+        /* The eight-name form is no longer written here.
+         *
+         * It used to emit Button-Highlight-Offset-x / -y / -Blur-Radius /
+         * -Spread and the four Lowlight names, per size — 24 variables per
+         * device — and its own comment already said the quiet part: "Eight
+         * names per size, but only TWO distinct numbers: four slots take +B
+         * and four take -B."
+         *
+         * The file now stores those two. Component-Size's sixteen
+         * Button-/FAB-Highlight-* and -Lowlight-* variables ALIAS into
+         * Devices-Type's `Button-Bevel` / `Button-Bevel-Negative` pairs, with
+         * the size mode choosing between the plain, Sm- and Lg- columns. So
+         * the 24 names here are read by nothing, and writing them kept a dead
+         * set of variables looking maintained.
+         *
+         * The CSS keeps the eight-name form, and should: the library reads
+         * --Button-Highlight-Offset-x and friends directly, and a stylesheet
+         * can negate with calc() where a Figma variable cannot. Two shapes for
+         * one value, because the two consumers genuinely differ — which is the
+         * case invariant 5 allows, as long as both come from bevelSize(). */
+
+        /* Input geometry — the in-field button's two radii, and the floating
+         * field's height and two radii. Five names per size, fifteen per
+         * device.
+         *
+         * Written for ALL SEVEN devices, unlike the button heights just above.
+         * Those hand-author the platform columns because Apple's 44 and
+         * Google's 48 are specs no brand ratio reproduces. These are the
+         * brand's own percentage applied to a height the platform supplies, so
+         * every column is derivable and none has to be typed.
+         *
+         * The field heights are this device's: the user's three on Desktop, the
+         * platform's elsewhere. Read from the SAME source the button metrics
+         * above use rather than restated — a second table of platform heights
+         * is how a button's bevel once came out of proportion with the button.
+         *
+         * The label leading is per device too, and it is COMPUTED off-Desktop
+         * for the same reason type leading is: the platforms publish their own
+         * tables and a floating field has to leave room for whichever applies.
+         */
+        const platformHeights = device === 'Desktop'
+          ? undefined
+          : PLATFORM_BUTTON_HEIGHT[SEEDS_FROM[device] as keyof typeof PLATFORM_BUTTON_HEIGHT];
+        const fieldHeights = platformHeights
+          ? { small: platformHeights.small, medium: platformHeights.medium, large: platformHeights.large }
+          : { small: cs.smallButtonHeight, medium: cs.buttonHeight, large: cs.largeButtonHeight };
+        const platformFam = SYSTEM_FAMILY_OF[device];
+        const labelLeading = {
+          small: floatingLabelLeading(platformFam, FLOATING_LABEL_SIZES.small, systemLineHeight),
+          medium: floatingLabelLeading(platformFam, FLOATING_LABEL_SIZES.medium, systemLineHeight),
+          large: floatingLabelLeading(platformFam, FLOATING_LABEL_SIZES.large, systemLineHeight),
+        };
+        Object.assign(devicesBag[device],
+          Object.fromEntries(Object.entries(inputMetrics({
+            heights: fieldHeights,
+            inputRadiusPct: cs.inputRadius,
+            labelLeading,
+          })).map(([n, v]) => [n, { value: v, type: 'number' }])));
+
+        /* Platform Spacer — the room a small button's enlarged tap target needs
+         * around it so it does not overlap whatever sits next to it.
+         *
+         * A LAYOUT value, and Figma is who needs it. The library does not read
+         * it: Button.js grows a centred ::before to `var(--Target)` on small
+         * buttons and names the spacer only in that block's comment. On a web
+         * page the neighbour's own margin usually handles the rest. In Figma,
+         * a frame that packs small buttons together — Button Group, a toolbar,
+         * a rail — has to be told the gap explicitly, because nothing there
+         * computes it.
+         *
+         * The name is the FILE's: `Platform Spacer`, one word apart, no hyphen.
+         * The retired Platform collection wrote `Platform-Spacer` into a
+         * different collection entirely, so the two never met and Devices-Type
+         * has been hand-authored all along — which is how its Desktop column
+         * came to hold 8 where PLATFORM_SPACER says 4. Writing it here is what
+         * ends that.
+         *
+         * Desktop's 4 is deliberate, not a rounding of the others: its target
+         * already equals the button height, so the 4px is breathing room rather
+         * than the space a bigger target demands. See bevelGeometry.ts. */
+        devicesBag[device]['Platform Spacer'] = {
+          value: PLATFORM_SPACER[SEEDS_FROM[device] as keyof typeof PLATFORM_SPACER],
+          type: 'number',
+        };
+
+        /* The bevel, per size, as one number and its negative.
+         *
+         * A bevel is a fraction of the button's height, and the height is per
+         * platform — Desktop takes the user's three, iOS 32/44/50, Android
+         * 32/48/56 — so one brand percentage produces three different bevels.
+         * That is the whole reason these live here rather than once globally.
+         *
+         * Two numbers per size, not eight: bevelGeometry's eight values are all
+         * `b` or `-b`, and Component-Size's eight variables alias into these.
+         * See bevelPairs in bevelGeometry.ts.
+         *
+         * The FAB's three are the same on every device, because FAB sizing is
+         * not per platform — Devices-Type has no FAB width or height, only
+         * these bevels. Written to every column anyway, because the alias has
+         * to resolve in every mode, and because the day Apple's and Google's
+         * FAB sizes are stated the way their button heights already are, the
+         * columns are already there to differ. */
+        const bevelPlatform = SEEDS_FROM[device] as Parameters<typeof platformButtonHeight>[0];
+        const sizedBevel = (size: 'small' | 'medium' | 'large') =>
+          platformButtonHeight(bevelPlatform, bevelHeights[size], size);
+        Object.assign(devicesBag[device], Object.fromEntries(
+          Object.entries({
+            ...bevelPairs('Button-', sizedBevel('medium'), bevelPct),
+            ...bevelPairs('Sm-Button-', sizedBevel('small'), bevelPct),
+            ...bevelPairs('Lg-Button-', sizedBevel('large'), bevelPct),
+            ...bevelPairs('FAB-', FAB_SIZE.medium, bevelPct),
+            ...bevelPairs('FAB-Sm-', FAB_SIZE.small, bevelPct),
+            ...bevelPairs('FAB-Lg-', FAB_SIZE.large, bevelPct),
+          }).map(([n, v]) => [n, { value: v, type: 'number' }])));
+
+        /* Overlay offsets — where a floating element sits relative to the
+           screen edge. `chrome + clearance`, and Figma cannot add two
+           variables, so the sum ships as one number per device. See
+           deviceChrome.ts for why the two halves stay separate in code. */
+        Object.assign(devicesBag[device],
+          Object.fromEntries(Object.entries(overlayOffsets(device as DeviceMode))
+            .map(([n, v]) => [n, { value: v, type: 'number' }])));
+      }
+    }
+
+    /* `figma.Components` was here, and is deliberately gone (2026-09-29).
+     *
+     * It named a collection the file does not have. The plugin therefore
+     * CREATED one on every import — so it did not fail, it quietly produced a
+     * duplicate collection that had to be deleted by hand each time, holding a
+     * second copy of values `Component-Size` already carries correctly.
+     *
+     * It was the previous generation of that collection: the same concepts
+     * under older names (`Card-Focus-Border-Radius`, `Input-Inner-Radius`,
+     * `Button-Inner-Radius`), with SIZE flattened into `Sm-`/`Lg-` prefixes
+     * rather than expressed as the medium/small/large modes. The migration was
+     * already half done — see the note on Card-Focus-Radius in componentSize.ts
+     * saying the flat payload's name "would have matched nothing" — and this
+     * block was the remainder.
+     *
+     * Five names it alone carried moved into componentSizePayload:
+     * Button-Icon-Inner-Radius, Input-Swatch-Radius, and the Modal's Padding,
+     * Inner-Radius and Focus-Radius. A sixth, `Input-Inner-Focus-Visible`, did
+     * not: it computed Math.max(0, inputRadius - 1), which is the same number
+     * as Input-Inner-Focus-Radius, under a name that says a STATE where a
+     * radius belongs.
+     *
+     * NOTE those five need creating in Figma before they land.
+     * populateComponentSize is UPDATE-ONLY — it writes by name and skips a name
+     * the file does not have, in silence. Until the variables exist, those five
+     * are emitted and ignored rather than emitted and wrong.
+     *
+     * figmaCollectionNames.test.ts now fails on any payload key that is neither
+     * a known collection nor a declared non-collection, so the next one of
+     * these cannot be added without the choice being made on purpose. */
     // ── Platform collection ──────────────────────────────────────────────
     // The default (medium) button is the one that resizes per platform, so
     // its height AND its bevel geometry both live here rather than in
@@ -1935,17 +2424,41 @@ const BUTTON_BORDER_WIDTH = 1;
     // Target is the platform's minimum hit area. The SMALL button keeps its
     // visual size everywhere; a wrapper grows to Target using Platform-Spacer,
     // so the button looks identical while staying tappable.
-    figma.Platform = Object.fromEntries(
-      PLATFORMS.map((platform) => {
-        const height = platformButtonHeight(platform, cs.buttonHeight);
-        return [platform, {
-          'Button-Height': height,
-          'Target': PLATFORM_TARGET[platform],
-          'Platform-Spacer': PLATFORM_SPACER[platform],
-          ...bevelJSON('', height, bevelPct),
-        }];
-      })
-    );
+    /* No Platform section, removed 2026-09-29 with the collection itself.
+     *
+     * Platform held four modes — Desktop, IOS-Mobile, IOS-Tablet, Android —
+     * where Devices-Type holds seven. It was the older, coarser way of saying
+     * the same thing, and the file has finished moving: the collection is gone,
+     * so everything written here was landing in one created fresh on each
+     * import, exactly as `Components` and `Cognitive` were.
+     *
+     * Of the four values it carried, three already have a home:
+     *
+     *   Button-Height    Devices-Type `Medium Button` and its Sm-/Lg- siblings
+     *   Platform-Spacer  Devices-Type `Platform Spacer` (a space, not a hyphen)
+     *   the medium bevel superseded by the Button-Bevel / -Bevel-Negative pairs
+     *
+     * `Target` is WEB-ONLY, decided 2026-09-29, and that is a decision rather
+     * than a gap left open. It is the platform's minimum hit area — 44 on
+     * Apple, 48 on Google — and the library reads it directly: Button.js grows
+     * a centred ::before to `var(--Target)` on small buttons, so the control
+     * keeps its size while the tappable area meets the platform minimum. That
+     * is a runtime behaviour with nothing for a designer to place, so Figma
+     * gains nothing from holding the number.
+     *
+     * What Figma DOES need from the same mechanism is `Platform Spacer` — the
+     * room that enlarged target requires around it — because a frame packing
+     * small buttons together has to be told the gap explicitly. That one is
+     * written, per device, further down.
+     *
+     * Min-Stack-Gap and Container-Padding are web-only for the same reason:
+     * both ship in foundation.css per platform block, and neither describes
+     * anything a Figma layer is bound to. Container-Padding was only ever an
+     * alias into Sizing, which the file already has.
+     *
+     * The rule these three follow, and the one that settled Input-Swatch-Radius
+     * before them: a value missing from Figma is a GAP only if Figma draws the
+     * thing it measures. Otherwise it is a token, and tokens live in the CSS. */
   }
 
   // Flatten Buttons and Default-Button, and rewrite what points at them.
@@ -2145,32 +2658,102 @@ const BUTTON_BORDER_WIDTH = 1;
   const bwBevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
   const bwBevelAlphaHex = Math.round(bwBevelOpacity * 255 / 100).toString(16).padStart(2, '0');
 
-  const BW_LOWLIGHT_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.Lowlight\}$/;
+  const BW_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.(\w+)\}$/;
   const BW_BLACK_FROM_TONE = 6;   // Color-1..5 paint white, 6..12 paint black
-  let bwLowlightResolved = 0, bwLowlightBlack = 0;
-  const resolveBlackWhiteLowlight = (n: any, d: number) => {
+
+  /* Every BlackWhite role, repointed at something the FILE actually has.
+   *
+   * The Theme layer asks for `{Buttons.BlackWhite.Color-<n>.<Role>}` — 96
+   * variables per mode that Modes has never carried, because it is at its
+   * ceiling. An alias whose target is absent does not fail: the binding is
+   * simply missing, so seven of the eight roles rendered unbound and only
+   * Lowlight worked, because an earlier pass fixed that one alone.
+   *
+   * Literals cannot solve the rest. The Themes collection's modes are the nine
+   * THEMES, not light/dark, so a literal there cannot vary by mode — and these
+   * values do: black is #040404 light and #0b0b0b dark, white carries a 70%
+   * alpha in dark (#ffffffb3). Freezing them would pin every black button to
+   * its light-mode appearance.
+   *
+   * What makes this solvable is that the TWELVE tones hold only TWO value sets.
+   * The tone picks a face and nothing selects within a face — verified across
+   * both modes — so each role needs one target per face, and every one of them
+   * already exists:
+   *
+   *   Button / Border   the face itself          Colors.White / Neutral.Color-1
+   *   Text              the other face           the same two, swapped
+   *   Quiet             a muted neutral          Neutral.Color-5 / Color-6
+   *   Hover / Pressed   Button-Hover|Pressed.BlackWhite, tone preserved
+   *   Highlight         white is mode-invariant, so a literal is safe there;
+   *   Lowlight          black moves, so it takes the variable
+   *
+   * Colors.White and Colors.Neutral.Color-1 carry the dark-mode alpha and the
+   * #0b0b0b themselves, so light/dark comes for free rather than being restated.
+   *
+   * The two bevel literals are the only frozen values, and they are frozen on
+   * purpose: white's Highlight and Lowlight are identical in both modes because
+   * white does not move — the 70% lives in the fill's own alpha, not in the
+   * bevel. Their alpha is derived from bevelOpacity rather than written as 80,
+   * because a hardcoded alpha matches at the default 50% and splits silently the
+   * moment that slider moves.
+   *
+   * Retires the old black-Lowlight literal (#000000 at the bevel alpha), which
+   * was correct as far as it went but froze the black bevel to light mode.
+   * Button-Lowlight.BlackWhite carries #04040480 -> #0b0b0b80, so the split
+   * comes back.
+   *
+   * The Highlight and Lowlight sections hold ONE variable per palette in the
+   * file — which is why Color-12 is named rather than the tone from the
+   * reference. Hover and Pressed hold twelve, so those keep their tone.
+   */
+  const BW_FACE_TARGET: Record<string, { white: string; black: string }> = {
+    Button:    { white: '{Colors.White}', black: '{Colors.Neutral.Color-1}' },
+    Border:    { white: '{Colors.White}', black: '{Colors.Neutral.Color-1}' },
+    Text:      { white: '{Colors.Neutral.Color-1}', black: '{Colors.White}' },
+    Quiet:     { white: '{Colors.Neutral.Color-5}', black: '{Colors.Neutral.Color-6}' },
+    Highlight: { white: `#ffffff${bwBevelAlphaHex}`, black: '{Button-Highlight.BlackWhite.Color-12}' },
+    Lowlight:  { white: `#b3b3b3${bwBevelAlphaHex}`, black: '{Button-Lowlight.BlackWhite.Color-12}' },
+  };
+  /* These two keep the tone from the reference — their sections carry all
+     twelve, so there is nothing to collapse. */
+  const BW_TONED_SECTION: Record<string, string> = {
+    Hover: 'Button-Hover', Pressed: 'Button-Pressed',
+  };
+
+  let bwRewritten = 0, bwUnmapped = 0;
+  const rewriteBlackWhite = (n: any, d: number) => {
     if (!n || typeof n !== 'object' || d > 12) return;
     if (typeof n.value === 'string') {
-      const m = n.value.match(BW_LOWLIGHT_REF);
+      const m = n.value.match(BW_REF);
       if (m) {
         const tone = Number(m[1]);
-        if (tone >= BW_BLACK_FROM_TONE) { n.value = `#000000${bwBevelAlphaHex}`; bwLowlightBlack++; }
-        else n.value = '{Button-Lowlight.Neutral.Color-12}';
-        bwLowlightResolved++;
+        const role = m[2];
+        const black = tone >= BW_BLACK_FROM_TONE;
+        const toned = BW_TONED_SECTION[role];
+        if (toned) { n.value = `{${toned}.BlackWhite.Color-${tone}}`; bwRewritten++; }
+        else if (BW_FACE_TARGET[role]) {
+          n.value = black ? BW_FACE_TARGET[role].black : BW_FACE_TARGET[role].white;
+          bwRewritten++;
+        } else bwUnmapped++;   // a role nobody has taught this about
       }
       return;
     }
-    for (const [k, v] of Object.entries(n)) if (k !== 'type') resolveBlackWhiteLowlight(v, d + 1);
+    for (const [k, v] of Object.entries(n)) if (k !== 'type') rewriteBlackWhite(v, d + 1);
   };
-  resolveBlackWhiteLowlight(figma.Themes, 0);
-  resolveBlackWhiteLowlight(figma.SurfacesContainers, 0);
+  rewriteBlackWhite(figma.Themes, 0);
+  rewriteBlackWhite(figma.SurfacesContainers, 0);
   console.log(
-    `\u26AB [Figma] BlackWhite Lowlight resolved without a Modes variable: ` +
-    `${bwLowlightResolved} (${bwLowlightBlack} black -> #000000, ` +
-    `${bwLowlightResolved - bwLowlightBlack} white -> Neutral Color-12)`,
+    `\u26AB [Figma] BlackWhite button roles repointed at variables the file has: ` +
+    `${bwRewritten} rewritten, ${bwUnmapped} unmapped`,
   );
+  if (bwUnmapped > 0) {
+    console.warn(
+      `\u26A0\uFE0F [Figma] ${bwUnmapped} BlackWhite reference(s) name a role with no ` +
+      `mapping — they will import as unbound. Add the role to BW_FACE_TARGET.`,
+    );
+  }
 
-  // ── Outline-Text is NOT a per-theme token in Figma ──────────────────────
+  // ── Outline-Text and Outline-Quiet are NOT per-theme tokens in Figma ────
   //
   // The colour an outline button's label takes is the surface's own
   // Text-<Palette>. In CSS that resolves through the cascade, so the export
@@ -2188,6 +2771,12 @@ const BUTTON_BORDER_WIDTH = 1;
   // recreate the variables that were deliberately removed, in a Modes
   // collection already at its ceiling.
   //
+  // Outline-Quiet is stripped for a related but simpler reason: it does not
+  // vary by palette at all. It IS the surface's own Quiet — one value per
+  // theme x surface — so in Figma the outline and ghost variants bind to the
+  // Quiet variable that section already has. CSS still emits the name because
+  // a component reading `var(--Outline-Quiet)` should not have to know that.
+  //
   // This is a deliberate CSS/Figma divergence — the two describe one rule in
   // the shape each medium can express — so it is stated here rather than left
   // to be discovered as a parity failure.
@@ -2197,7 +2786,7 @@ const BUTTON_BORDER_WIDTH = 1;
     if (typeof n.value === 'string') return;
     for (const k of Object.keys(n)) {
       const child = n[k];
-      if (k === 'Outline-Text' && child && typeof child === 'object' && 'value' in child) {
+      if ((k === 'Outline-Text' || k === 'Outline-Quiet') && child && typeof child === 'object' && 'value' in child) {
         delete n[k];
         outlineTextStripped++;
         continue;
@@ -2208,8 +2797,9 @@ const BUTTON_BORDER_WIDTH = 1;
   stripOutlineText(figma.Themes, 0);
   stripOutlineText(figma.SurfacesContainers, 0);
   console.log(
-    `\u25AD [Figma] Outline-Text removed from the Theme collection (${outlineTextStripped} tokens) — ` +
-    `it lives in Buttons, one variable with a mode per palette.`,
+    `\u25AD [Figma] Outline-Text / Outline-Quiet removed from the Theme collection ` +
+    `(${outlineTextStripped} tokens) — Outline-Text lives in Buttons, one variable with a ` +
+    `mode per palette; Outline-Quiet is the section's own Quiet.`,
   );
 
   // Page canvas background — precomputed hex so the Figma plugin sets it from

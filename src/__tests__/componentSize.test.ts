@@ -1,0 +1,530 @@
+import { describe, it, expect } from 'vitest';
+import { PLATFORM_BUTTON_HEIGHT } from '../utils/bevelGeometry';
+import { computeRadii } from '../utils/componentRadii';
+import { componentSizeGroup, componentSizeFigma, componentSizeNames, componentSizePayload, lineMetricsVars, selectionMetricsVars, SIZE_MODES,
+  FAB_SIZE, FAB_ICON } from '../utils/componentSize';
+
+/* Component-Size carries medium/small/large as MODES, so one library component
+   needs one variant and the size switches the mode. The payload has always
+   held the same numbers as flat Sm-/Lg- triples, because the old Components
+   collection had a single mode and the size had to live in the name.
+
+   This regroups; it must never recompute. A second implementation of the
+   sizing rules would drift from the CSS, which is the failure this codebase
+   keeps hitting. */
+
+const BUTTON = {
+  'Button-Height': 32, 'Sm-Button-Height': 24, 'Lg-Button-Height': 56,
+  'Button-Radius': 32, 'Sm-Button-Radius': 12, 'Lg-Button-Radius': 28,
+  'Button-Border-Width': 1,                       // no size siblings
+};
+
+describe('the numbers survive regrouping', () => {
+  it('puts each triple on its own mode', () => {
+    const g = componentSizeGroup('Button', BUTTON);
+    expect(g.medium['Button/Button-Height']).toBe(32);
+    expect(g.small['Button/Button-Height']).toBe(24);
+    expect(g.large['Button/Button-Height']).toBe(56);
+  });
+
+  it('changes no value, only where it sits', () => {
+    // Every number in must appear somewhere out. Regrouping that alters a
+    // value is a sizing change disguised as a refactor.
+    const g = componentSizeGroup('Button', BUTTON);
+    const out = SIZE_MODES.flatMap((m) => Object.values(g[m]));
+    for (const v of Object.values(BUTTON)) expect(out).toContain(v);
+  });
+
+  it('names are grouped, and carry no collection prefix', () => {
+    /* Figma renders "/" as a group and the plugin indexes by the full name.
+       The collection is not part of it — the mistake that made the first
+       add-on import bind nothing. */
+    const names = componentSizeNames(componentSizeGroup('Button', BUTTON));
+    expect(names).toContain('Button/Button-Height');
+    expect(names.filter((n) => n.startsWith('Component-Size/'))).toEqual([]);
+  });
+});
+
+describe('a metric with no size siblings', () => {
+  it('is repeated across all three modes rather than dropped', () => {
+    /* A variable with no value in a mode resolves to nothing at that size,
+       which is worse than one that is simply equal everywhere. */
+    const g = componentSizeGroup('Button', BUTTON);
+    for (const mode of SIZE_MODES) {
+      expect(g[mode]['Button/Button-Border-Width'], mode).toBe(1);
+    }
+  });
+
+  it('leaves every mode holding the same key set', () => {
+    const g = componentSizeGroup('Button', BUTTON);
+    const keys = SIZE_MODES.map((m) => Object.keys(g[m]).sort().join('|'));
+    expect(new Set(keys).size).toBe(1);
+  });
+});
+
+describe('prefixes are not mistaken for metrics', () => {
+  it('emits one variable per base name, not three', () => {
+    // Sm-/Lg- are the SAME metric at another size. Treating them as separate
+    // names is what the mode structure exists to stop.
+    const names = componentSizeNames(componentSizeGroup('Button', BUTTON));
+    expect(names.filter((n) => n.includes('/Sm-') || n.includes('/Lg-'))).toEqual([]);
+    expect(names).toEqual([
+      'Button/Button-Border-Width',
+      'Button/Button-Height',
+      'Button/Button-Radius',
+    ]);
+  });
+});
+
+describe('several groups merge into one payload', () => {
+  it('keeps each group in its own namespace', () => {
+    const p = componentSizeFigma({
+      Button: { 'Button-Height': 32, 'Sm-Button-Height': 24 },
+      Card: { 'Card-Radius': 8 },
+    });
+    expect(p.medium['Button/Button-Height']).toBe(32);
+    expect(p.small['Button/Button-Height']).toBe(24);
+    expect(p.medium['Card/Card-Radius']).toBe(8);
+    expect(p.small['Card/Card-Radius']).toBe(8);
+  });
+});
+
+describe('the payload uses the names that are IN THE FILE', () => {
+  /* A "correct" name that matches nothing silently leaves the variable at
+     whatever was last typed by hand — which is how a Button-Focus-Radius of
+     3125 stood where the rule gives 31. Matching the file is the entire job. */
+  const R = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
+  };
+
+  it('writes the accordion radii under the CORRECTED spelling', () => {
+    /* The file carried "Accordian-Radius" (sic) and this writer deliberately
+       matched it, because populateComponentSize is UPDATE-ONLY: it writes by
+       name, and a name the file does not have is skipped in silence. The Figma
+       rename landed on 2026-09-18, so the misspelling here had to go with it —
+       otherwise the writer would have kept looking for a variable that no
+       longer exists and quietly stopped updating the value. */
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Accordion/Accordion-Radius']).toBe(8);
+    expect(p.medium['Accordion/Accordian-Radius']).toBeUndefined();
+  });
+
+  it('emits the focus radii Figma cannot derive for itself', () => {
+    /* CSS needs neither: an outline is drawn concentric with the border
+       radius, so the browser works them out. Figma cannot do arithmetic on a
+       variable, so both were hand-typed — and would have drifted the moment
+       the brand radius moved. 8 + 3 and 8 - 3, matching the lib's
+       outlineOffset: -3px. */
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Accordion/Accordion-Focus-Radius']).toBe(11);
+    expect(p.medium['Accordion/Accordion-Inner-Focus-Radius']).toBe(5);
+  });
+
+  it('Card focus is Card-Focus-Radius, not Card-Focus-Border-Radius', () => {
+    // The flat payload used the longer name; the file does not have it.
+    const p = componentSizePayload(R, {});
+    expect(p.medium['Card/Card-Focus-Radius']).toBe(19);
+    expect(p.medium['Card/Card-Focus-Border-Radius']).toBeUndefined();
+  });
+
+
+  it('computes the focus radius rather than trusting the file', () => {
+    // r + 3. The file had 3125 at large where this gives 31 — a hand-typed
+    // value that no import would have corrected while nothing wrote to it.
+    const p = componentSizePayload(R, {});
+    expect(p.large['Button/Button-Focus-Radius']).toBe(31);
+    expect(p.large['Button/Button-Radius']).toBe(28);
+  });
+
+  it('every mode carries the same names', () => {
+    const p = componentSizePayload(R, {});
+    const keys = (['medium', 'small', 'large'] as const).map((m) => Object.keys(p[m]).sort().join('|'));
+    expect(new Set(keys).size).toBe(1);
+  });
+});
+
+/* Divider / Step bar / No Count Step live in Component-Size → Other, and the
+ * LIB carries the same three numbers as literals (Divider.js SIZE_MAP,
+ * Stepper.js connectorThickness and dot). That is one value in two places,
+ * three times over — and they were caught disagreeing: the lib's Divider was
+ * wearing the STEP BAR's 1/2/4 while the connector sat pinned at 2 for every
+ * size. Nothing could detect it because nothing wrote them.
+ *
+ * These names are the ones IN THE FILE, spaces included. populateComponentSize
+ * is UPDATE-ONLY and writes by name, so a "tidier" Step-Bar or NoCountStep
+ * would match nothing and silently leave the value at whatever was last typed
+ * by hand — which is the failure this whole file exists to avoid.
+ */
+describe('the Other group writes the line and dot weights', () => {
+  const R = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
+  };
+
+  const payload = () => componentSizePayload(R, {});
+
+  it('carries all three at every size', () => {
+    const p = payload() as unknown as Record<string, Record<string, number>>;
+    for (const name of ['Other/Divider', 'Other/Step bar', 'Other/No Count Step']) {
+      for (const mode of ['small', 'medium', 'large'] as const) {
+        expect(`${mode} ${name}: ${typeof p[mode][name]}`)
+          .toBe(`${mode} ${name}: number`);
+      }
+    }
+  });
+
+  it('matches the ramps the lib renders', () => {
+    const p = payload() as unknown as Record<string, Record<string, number>>;
+    expect([p.small['Other/Divider'], p.medium['Other/Divider'], p.large['Other/Divider']])
+      .toEqual([0.5, 1, 2]);
+    expect([p.small['Other/Step bar'], p.medium['Other/Step bar'], p.large['Other/Step bar']])
+      .toEqual([1, 2, 4]);
+    expect([p.small['Other/No Count Step'], p.medium['Other/No Count Step'], p.large['Other/No Count Step']])
+      .toEqual([8, 12, 16]);
+  });
+
+  it('and the two ramps are not swapped', () => {
+    /* The specific mistake that was shipped: Divider wearing the step bar's
+       weights. They must differ at small and large. */
+    const p = payload() as unknown as Record<string, Record<string, number>>;
+    expect(p.small['Other/Divider']).not.toBe(p.small['Other/Step bar']);
+    expect(p.large['Other/Divider']).not.toBe(p.large['Other/Step bar']);
+  });
+});
+
+const R2 = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
+  };
+
+/* The line weights have to reach BOTH sides.
+ *
+ * The lib reads --Divider / --Step-Bar / --No-Count-Step by name (Divider.js
+ * SIZE_MAP, Stepper.js connectorThickness and dot) with the design's numbers
+ * as fallbacks. If nothing emits them the fallback paints forever and the
+ * brand cannot move the weight — which looks identical to working.
+ *
+ * Preview and export are separate implementations and have diverged before
+ * while both looked self-consistent (invariant 5), so they read one table.
+ * This asserts the table, the CSS spelling, and that a Figma name carrying
+ * SPACES does not leak into a custom property.
+ */
+describe('the line weights emit as CSS custom properties', () => {
+  it('names them the way the lib reads them', () => {
+    expect(Object.keys(lineMetricsVars()).sort()).toEqual([
+      '--Divider', '--Lg-Divider', '--Lg-No-Count-Step', '--Lg-Step-Bar',
+      '--No-Count-Step', '--Sm-Divider', '--Sm-No-Count-Step', '--Sm-Step-Bar',
+      '--Step-Bar',
+    ]);
+  });
+
+  it('carries the design ramps, with units', () => {
+    const v = lineMetricsVars();
+    expect([v['--Sm-Divider'], v['--Divider'], v['--Lg-Divider']])
+      .toEqual(['0.5px', '1px', '2px']);
+    expect([v['--Sm-Step-Bar'], v['--Step-Bar'], v['--Lg-Step-Bar']])
+      .toEqual(['1px', '2px', '4px']);
+    expect([v['--Sm-No-Count-Step'], v['--No-Count-Step'], v['--Lg-No-Count-Step']])
+      .toEqual(['8px', '12px', '16px']);
+  });
+
+  it('never emits a property name containing a space', () => {
+    /* The Figma variables are "Step bar" and "No Count Step". A custom
+       property with a space in it is invalid and silently dropped, so a
+       derivation that just prefixed the Figma name would produce tokens that
+       never resolve and a fallback that never stops painting. */
+    for (const name of Object.keys(lineMetricsVars())) {
+      expect(`${name} has a space: ${name.includes(' ')}`).toBe(`${name} has a space: false`);
+    }
+  });
+
+  it('matches the values written to Figma', () => {
+    /* Same numbers on both routes — the Figma payload and the stylesheet. If
+       these ever disagree, one of the two is lying about the design. */
+    const p = componentSizePayload(R2, {}) as unknown as Record<string, Record<string, number>>;
+    const v = lineMetricsVars();
+    const pairs: Array<[string, string]> = [
+      ['Other/Divider', 'Divider'],
+      ['Other/Step bar', 'Step-Bar'],
+      ['Other/No Count Step', 'No-Count-Step'],
+    ];
+    for (const [figma, css] of pairs) {
+      expect(`${css} small`).toBe(`${css} small`);
+      expect(v[`--Sm-${css}`]).toBe(`${p.small[figma]}px`);
+      expect(v[`--${css}`]).toBe(`${p.medium[figma]}px`);
+      expect(v[`--Lg-${css}`]).toBe(`${p.large[figma]}px`);
+    }
+  });
+});
+
+/* Radio and Checkbox. The writer is UPDATE-ONLY and matches by name, so these
+ * names have to be the ones in the file — a group Figma does not have is not
+ * an error, it is a silent no-op, and the value stays at whatever was last
+ * typed by hand while the run reports success.
+ */
+describe('the Radio and Checkbox groups', () => {
+  const R = {
+    buttonRadius: 32, smButtonRadius: 12, lgButtonRadius: 28,
+    buttonInnerRadius: 31, smButtonInnerRadius: 11, lgButtonInnerRadius: 27,
+    buttonFocusRadius: 35, smButtonFocusRadius: 15, lgButtonFocusRadius: 31,
+    iconButtonRadius: 32, smIconButtonRadius: 32, lgIconButtonRadius: 32,
+    iconButtonFocusRadius: 35, smIconButtonFocusRadius: 35, lgIconButtonFocusRadius: 35,
+    iconButtonInnerRadius: 31, smIconButtonInnerRadius: 31, lgIconButtonInnerRadius: 31,
+    cardRadius: 16, smCardRadius: 8, lgCardRadius: 24,
+    cardInnerRadius: 15, smCardInnerRadius: 7, lgCardInnerRadius: 23,
+    cardFocusRadius: 19, smCardFocusRadius: 11, lgCardFocusRadius: 27,
+    cardPadding: 16,
+    listItemRadius: 8, smListItemRadius: 8, lgListItemRadius: 8,
+    listItemFocusRadius: 6, smListItemFocusRadius: 6, lgListItemFocusRadius: 6,
+    listItemPadding: 12, smListItemPadding: 8, lgListItemPadding: 16,
+    listItemGap: 12, smListItemGap: 8, lgListItemGap: 16, listItemImageRadius: 4,
+    listItemImageWidth: 64, smListItemImageWidth: 48, lgListItemImageWidth: 80,
+    inputRadius: 4, smInputRadius: 4, lgInputRadius: 4,
+    inputFocusRadius: 7, inputInnerRadius: 2,
+    inputSwatchRadius: 1, smInputSwatchRadius: 1, lgInputSwatchRadius: 1,
+    accordionRadius: 8, accordionFocusRadius: 11, accordionInnerFocusRadius: 5,
+    modalRadius: 32, modalPadding: 24, modalInnerRadius: 31, modalFocusRadius: 35,
+    smModalPadding: 18, lgModalPadding: 30,
+    dropdownFrameRadius: 0,
+    menuItemRadius: 0, menuFocusRadius: 0,
+    smCardPadding: 12, lgCardPadding: 20,
+  };
+
+  /* Read off Omni Designs-Aug12 on 2026-09-20. The writer is UPDATE-ONLY and
+     matches by name, so a name the file does not have writes NOTHING and the
+     run still reports success — which is why these are pinned as strings
+     rather than trusted. An earlier pass here invented Radio-Size, Radio-Dot
+     and Checkbox-Size; all three would have gone silently nowhere. */
+  const IN_THE_FILE = [
+    'Checkbox/Checkbox-Gap', 'Checkbox/Checkbox-Icon', 'Checkbox/Checkbox-Radius',
+    'Checkbox/Checkbox-Width',
+    'Radio/Dot', 'Radio/Radio', 'Radio/Radio-Gap',
+  ];
+
+  it('writes only names the file actually has', () => {
+    const p = componentSizePayload(R, {});
+    const mine = Object.keys(p.medium)
+      .filter((k) => k.startsWith('Radio/') || k.startsWith('Checkbox/'))
+      .sort();
+    expect(mine).toEqual(IN_THE_FILE);
+  });
+
+  it('does not write the invented names', () => {
+    const p = componentSizePayload(R, {});
+    for (const gone of ['Radio/Radio-Size', 'Radio/Radio-Dot', 'Checkbox/Checkbox-Size']) {
+      expect(`${gone}: ${p.medium[gone]}`).toBe(`${gone}: undefined`);
+    }
+  });
+
+  it('carries the ring and dot ramps', () => {
+    const p = componentSizePayload(R, {});
+    expect([p.small['Radio/Radio'], p.medium['Radio/Radio'], p.large['Radio/Radio']])
+      .toEqual([16, 20, 24]);
+    expect([p.small['Radio/Dot'], p.medium['Radio/Dot'], p.large['Radio/Dot']])
+      .toEqual([8, 10, 12]);
+  });
+
+  it('keeps the dot at half the ring', () => {
+    /* Figma had 8/9.5/12 against a 16/20/20 ring and the lib 8/9.5/9.5 against
+       16/20/24 — 50%, then 60% or 40%. 9.5 is not on the Sizing scale and the
+       proportion changed with the size. */
+    const p = componentSizePayload(R, {});
+    for (const mode of SIZE_MODES) {
+      expect(p[mode]['Radio/Dot'] / p[mode]['Radio/Radio']).toBe(0.5);
+    }
+  });
+
+  it('gives the two controls the same box and gap at every size', () => {
+    /* One literal, two names. The file had drifted both ways: Checkbox-Gap
+       4/4/12 against Radio-Gap 4/8/12 (different at MEDIUM, the default), and
+       Checkbox-Width 16/20/24 against Radio 16/20/20. */
+    const p = componentSizePayload(R, {});
+    for (const mode of SIZE_MODES) {
+      expect(p[mode]['Radio/Radio']).toBe(p[mode]['Checkbox/Checkbox-Width']);
+      expect(p[mode]['Radio/Radio-Gap']).toBe(p[mode]['Checkbox/Checkbox-Gap']);
+    }
+  });
+
+  it('writes Checkbox-Radius, which the lib has been reading all along', () => {
+    /* Checkbox.js: var(--Checkbox-Radius, 4px) and the Sm-/Lg- siblings. Figma
+       has had the variable; the studio never emitted it, so every brand ever
+       generated painted the FALLBACK. Invisible because the fallback is right. */
+    const p = componentSizePayload(R, {});
+    expect([p.small['Checkbox/Checkbox-Radius'], p.medium['Checkbox/Checkbox-Radius'],
+            p.large['Checkbox/Checkbox-Radius']]).toEqual([3.2, 4, 4.8]);
+  });
+
+  it('keeps the checkmark independent of the button icon size', () => {
+    /* Icons & Avatars aliases Icon-Size per mode — in-check to this variable,
+       in-button to Button/Button-Icon — so the two are siblings, not one
+       value. They must not be collapsed: Button-Icon is snap(0.625 x button
+       height) and the button height is USER input, so a shared value would
+       resize the checkmark whenever someone changed their buttons, inside a
+       box that did not move. ICON_RAMP starts at 16 besides, and the small
+       box IS 16. */
+    const p = componentSizePayload(R, {});
+    expect([p.small['Checkbox/Checkbox-Icon'], p.medium['Checkbox/Checkbox-Icon'],
+            p.large['Checkbox/Checkbox-Icon']]).toEqual([12, 14, 18]);
+    for (const mode of SIZE_MODES) {
+      expect(p[mode]['Checkbox/Checkbox-Icon'])
+        .toBeLessThan(p[mode]['Checkbox/Checkbox-Width']);
+    }
+  });
+
+  it('Figma and CSS carry the same numbers', () => {
+    /* Invariant 5 at its narrowest: two emitters, one table, and this is the
+       assertion that they did not each read it their own way. The CSS name
+       differs from the Figma name for the two Radio metrics on purpose —
+       custom properties are flat, so `--Dot` would say nothing. */
+    const p = componentSizePayload(R, {});
+    const css = selectionMetricsVars();
+    const pairs: [string, string][] = [
+      ['Radio/Radio', 'Radio-Size'], ['Radio/Dot', 'Radio-Dot'],
+      ['Radio/Radio-Gap', 'Radio-Gap'], ['Checkbox/Checkbox-Width', 'Checkbox-Width'],
+      ['Checkbox/Checkbox-Radius', 'Checkbox-Radius'],
+      ['Checkbox/Checkbox-Icon', 'Checkbox-Icon'],
+      ['Checkbox/Checkbox-Gap', 'Checkbox-Gap'],
+    ];
+    for (const [figma, base] of pairs) {
+      expect(`${base} sm ${css[`--Sm-${base}`]}`).toBe(`${base} sm ${p.small[figma]}px`);
+      expect(`${base} md ${css[`--${base}`]}`).toBe(`${base} md ${p.medium[figma]}px`);
+      expect(`${base} lg ${css[`--Lg-${base}`]}`).toBe(`${base} lg ${p.large[figma]}px`);
+    }
+  });
+
+  it('every mode still carries the same names', () => {
+    const p = componentSizePayload(R, {});
+    const keys = SIZE_MODES.map((m) => Object.keys(p[m]).sort().join('|'));
+    expect(new Set(keys).size).toBe(1);
+  });
+});
+
+/**
+ * The FAB: fixed, the same on every device, and different from the button.
+ *
+ * Three claims worth pinning, because each was got wrong once while this was
+ * being wired.
+ *
+ * It is NOT the button's size ladder. A button is 32/44/50 on iOS and 32/48/56
+ * on Android; a FAB is 32/48/56 everywhere. Reusing the button's heights to
+ * derive a FAB bevel would be wrong on five of the seven device columns.
+ *
+ * It is NOT per device. Devices-Type carries no FAB width or height — only the
+ * bevels, which therefore hold one number across all seven columns.
+ *
+ * The ICON is stated, not derived. width / 2 gives 16 / 24 / 28 and the answer
+ * is 16 / 24 / 32: the large one is off by 4, and silently, because 28 is a
+ * perfectly plausible icon size.
+ */
+describe('FAB sizing', () => {
+  /* Radii are irrelevant to the FAB group — it reads none of them — so this
+     is computeRadii's own output rather than a hand-written fixture. */
+  const P = componentSizePayload(computeRadii({
+    buttonRadius: 20, iconButtonRadius: 50, inputRadius: 20, cardPadding: 16,
+    buttonHeight: 32, smallButtonHeight: 24, largeButtonHeight: 56,
+  } as never) as never, {});
+
+  it('writes width, icon and focus radius, one variable per mode', () => {
+    /* Read back as modes rather than as Sm-/Lg- names: the prefix IS the mode,
+       and a prefix surviving into a name would give the collection two
+       spellings of one variable. */
+    expect([P.small['FAB/FAB-Width'], P.medium['FAB/FAB-Width'], P.large['FAB/FAB-Width']])
+      .toEqual([32, 48, 56]);
+    expect([P.small['FAB/FAB-Icon'], P.medium['FAB/FAB-Icon'], P.large['FAB/FAB-Icon']])
+      .toEqual([16, 24, 32]);
+  });
+
+  it('derives the focus radius as width + 6, exact at all three sizes', () => {
+    /* The ring sits 3px outside the button, so its box is 6px wider; a radius
+       of the full box width keeps it circular at any size. Asserted against
+       FAB_SIZE rather than against 38/54/62, so the two move together. */
+    for (const size of ['small', 'medium', 'large'] as const) {
+      const mode = size === 'medium' ? P.medium : size === 'small' ? P.small : P.large;
+      expect(`${size}: ${mode['FAB/FAB-Focus-Radius']}`).toBe(`${size}: ${FAB_SIZE[size] + 6}`);
+    }
+  });
+
+  it('does not reuse the BUTTON\'s ladder', () => {
+    /* The specific mistake this guards: deriving a FAB bevel from the button's
+       height. They agree at small (32) and nowhere else. */
+    expect(FAB_SIZE.small).toBe(PLATFORM_BUTTON_HEIGHT.Android.small);
+    expect(FAB_SIZE.medium).not.toBe(PLATFORM_BUTTON_HEIGHT['IOS-Mobile'].medium);
+    expect(FAB_SIZE.large).not.toBe(PLATFORM_BUTTON_HEIGHT['IOS-Mobile'].large);
+  });
+
+  it('states the icon rather than halving the width', () => {
+    /* width / 2 is right at small and medium and wrong at large — the shape of
+       a derivation that looks verified because two of three cases agree. */
+    expect(FAB_ICON.small).toBe(FAB_SIZE.small / 2);
+    expect(FAB_ICON.medium).toBe(FAB_SIZE.medium / 2);
+    expect(FAB_ICON.large).not.toBe(FAB_SIZE.large / 2);
+    expect(FAB_ICON.large).toBe(32);
+  });
+});

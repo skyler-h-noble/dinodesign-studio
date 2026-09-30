@@ -4,8 +4,10 @@
  */
 
 import { generateBaseButtons, generateDefaultButton } from './generateButtonsSimplified';
+import type { NavSelection } from './generateCompleteThemes';
 import { generateAllThemesWithSurfacesAndContainers } from './generateCompleteThemes';
 import { generateLightModeTags, generateDarkModeTags } from './generateTagsSimplified';
+import type { AltStop2 } from '../altDisplay';
 
 /**
  * Helper to detect surface style based on extracted colors
@@ -98,9 +100,9 @@ export function getSimplifiedDefaultSettings(
     // made every caller passing the full union a type error at the call site.
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
       | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
      *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
      *  Declaring only the family form described an input this code was never
@@ -720,9 +722,9 @@ export function generateCompleteSimplifiedSystem(
     // made every caller passing the full union a type error at the call site.
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
       | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
      *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
      *  Declaring only the family form described an input this code was never
@@ -734,7 +736,10 @@ export function generateCompleteSimplifiedSystem(
       | 'laddered-adaptive' | 'laddered-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
-  }
+  },
+  /* Passed straight through to the theme builder. Decided by altStop2Palette
+     where the palettes are, because nothing from here down holds a hex. */
+  altStop2: AltStop2 = 'mono',
 ): {
   Themes: any;
   'Default-Button': any;
@@ -767,7 +772,7 @@ export function generateCompleteSimplifiedSystem(
   const OB = 6;
   
   // Generate all sections with COMPLETE THEMES (includes Surfaces and Containers)
-  const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections);
+  const themes = generateAllThemesWithSurfacesAndContainers(mode, extractedTones, surfaceStyle, schemeType, userSelections, altStop2);
   const buttons = generateBaseButtons(mode, extractedTones);
   const defaultButton = generateDefaultButton(config.buttonMode, config.textColoring, mode);
   const tag = mode === 'Light-Mode' 

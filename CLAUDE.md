@@ -83,7 +83,7 @@ for token/theme details.)
 | Headings | `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `DisplayLarge`, `DisplaySmall` |
 | Body text | `Body`, `BodyLarge`, `BodySmall`, `Subtitle`, `SubtitleLarge` — Body has no bold; see [Body weights](#body-weights) |
 | Labels | `Label`, `Overline`, `Caption` |
-| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`-light`/`ghost`/`text`), `ButtonGroup`, `Fab` |
+| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
 | Selection | `Checkbox`, `Radio`, `RadioGroup`, `SwitchInput`, `Slider`/`SliderInput`, `RangeSlider`, `Rating` |
 | Layout | `VStack`, `HStack`, `Stack`, `Box`, `Grid`, `Container`, `Divider`, `Spacing` |
@@ -163,21 +163,37 @@ Its 18 failing ARIA tests are **test** bugs, not component bugs: they assert on
 `aria-haspopup` / `aria-expanded` / `aria-controls` are correctly set on the
 ancestor `<button>`. Do not "fix" the component to satisfy them.
 
-### `AvatarMenu` — fixed in lib
+### `AvatarMenu` — does NOT exist in the lib
 
-If `@omni-design/components`'s `AvatarMenu` ever silent-fails again, the cause is
-a `Menu` rendered without its `<Dropdown>` root: the default context has
-`open: false`, so it returns `null` silently. That is a usage error rather than
-a component bug — see the `Menu` entry above. The fix is the inline-portal
-pattern; the rewrite lives at
-`/Users/lisenoble/Documents/dinodesign/src/components/AvatarMenu/AvatarMenu.js`.
+**This entry said "fixed in lib" and pointed at `~/Documents/dinodesign`,
+which is not this project's library.** There is no `AvatarMenu` in
+`~/DinoDesign/src/components/` and none exported from the package. The entry
+described a fix in a repo nothing here builds against.
 
-### `ButtonGroup` — fixed via wrapper
+The studio's own `src/components/AvatarDropdown.tsx` has this right — it is
+tagged `MISSING-LIB-COMPONENT: AvatarMenu` and implements the inline-portal
+pattern locally. Use that, not an import.
 
-The legacy `ButtonGroup` paints an outer border on its `Box` and clones each
-child with `*-outline` variant — producing a double-pill outline. The wrapper
-at `/Users/lisenoble/Documents/dinodesign/src/components/ButtonGroup/ButtonGroup.js`
-strips the outer border via `sx`. Use as normal:
+Do not add `AvatarMenu` to `src/types/dynodesign.d.ts`. It was declared there
+as `FC<any>`, so `import { AvatarMenu } from '@omni-design/components'` passed
+the typecheck and would have crashed at runtime — a shim that promises an
+export the package does not have is worse than no shim, because the compiler
+stops being able to tell you.
+
+### `ButtonGroup` — works; the wrapper this described does not exist
+
+**This entry said "fixed via wrapper" and pointed at a file in
+`~/Documents/dinodesign`, which is not this project's library** — the lib is
+`~/DinoDesign`, and nothing here imports a wrapper. `ButtonGroup` comes
+straight from `@omni-design/components` like any other component.
+
+The double-pill outline it described was real and is fixed IN THE LIB: the
+container sets `border: none` and only the segments carry one. Leaving the
+entry up meant every tool reading this file believed a workaround was load-
+bearing and that the component could not be trusted — the same way the `Menu`
+entry made a working menu go unused for months.
+
+Use it as normal:
 
 ```tsx
 <ButtonGroup value={selected} onChange={setSelected} size="small">
@@ -187,8 +203,38 @@ strips the outer border via `sx`. Use as normal:
 ```
 
 Always pass `value` + `onChange` to the group and `value=` on each child
-(controlled mode). Setting `variant="default"` / `variant="outline"` on
-children manually is wrong — that's what re-introduces the double-border.
+(controlled mode). Do NOT set `variant` on the children: the group assigns it
+per segment — the palette when selected, `-outline` when not — and an explicit
+one wins over that, which is how a group ends up with every segment looking
+selected.
+
+`variant="light"` on the GROUP lightens the unselected segments by changing
+their **surface**, not their theme — `data-theme="{Color}"` plus
+`data-surface="Surface-Brightest"`. It used to name a `{Color}-Light` theme,
+which no longer exists.
+
+### Button, Chip and Badge have no `-light` shape
+
+Removed in `@omni-design/components` 0.9.0. It painted `--<C>-Color-11`, a
+tinted fill that was never a shape in the design — shape there is solid /
+outline / ghost / text, and COLOUR arrives as a Buttons mode.
+
+`variant="{color}-light"` still renders: each component strips the suffix to
+the solid variant of that colour and warns once in development. Nothing breaks
+silently, but do not write new ones, and the converter must never emit one.
+
+The 16 convenience exports are **deleted** — `PrimaryLightChip`…`ErrorLightChip`
+and `PrimaryLightBadge`…`ErrorLightBadge`. A stale import now fails at build,
+which is better than a named export rendering something other than its name.
+
+A light chip or badge is a SURFACE: `{color}-outline` with `data-theme` +
+`data-surface="Surface-Brightest"`.
+
+Two `light`s are still real and are different things:
+
+- **`SwitchInput` `variant="{color}-light"`** — a tinted track.
+- **`ButtonGroup` `variant="light"`** — changes the unselected segments'
+  SURFACE, not their theme (see the ButtonGroup entry above).
 
 ### `Select`
 
@@ -297,6 +343,31 @@ disagreed on six values (`--Button-Radius` 4px vs 34px, and the whole bevel
 system), and the plural was missing `--Input-Radius`, which the
 `Dropdown-Frame-Radius` chain depends on.
 
+**Shadow alpha is FLAT per level, not a ramp: `alpha = TOTAL[level] / N`.**
+Measured off ten captures of Comeau's generator (totals 1.03 / 1.44 / 2.68 for
+his low / medium / high, reproducing all fourteen samples exactly). Resolution
+therefore redistributes a level's opacity without changing it — the slider
+cannot make a shadow heavier. Elevation lives in the total and the geometry.
+This file previously emitted a descending ramp, along with a cubic offset curve,
+a 74px Level-5 and two spread caps, all from one earlier reverse-engineering
+pass; every one of them is wrong against the captures. Full table of what
+changed: [docs/shadow-elevation.md](docs/shadow-elevation.md).
+
+**A shadow's colour and its opacity are separate variables in Figma.** The
+Drop-Color is aliased to `Surface/Dropshadow-Color`; its opacity is bound to a
+sibling `Opacity` FLOAT that the payload writes. A plugin cannot set
+"alias + opacity" in one value — `VariableValue` is one RGBA or one
+`{type, id}` pointer, no modifier field — but it can write a number, and Figma
+can bind a colour's opacity to one.
+
+So nothing is generated for the shadow tint: the alias carries the whole
+`Modes → Theme → Surface` chain, and a shadow follows theme, surface level and
+light/dark for free. Five floats, one per level, quantised through
+`quantizeAlpha()` so the float Figma holds and the alpha the CSS paints are the
+same number. Never write the Drop-Color itself — that detaches the alias.
+
+Full write-up: [docs/shadow-elevation.md](docs/shadow-elevation.md).
+
 ### A var() fallback only fires when the variable is UNDEFINED
 
 This caused three separate bugs in one session, so it is worth stating plainly.
@@ -398,6 +469,34 @@ The lib's `<Icon>` is already `aria-hidden` unless you pass it an `aria-label`,
 so the ordinary case is correct by default. `Button` now dev-warns on both
 failure modes — they are invisible without a screen reader, which is how they
 survive.
+
+### A bad accessible name is worse than none
+
+`aria-label="button"`, `aria-label="JD"`, `aria-label="3"` — a name that exists
+but says nothing passes every automated checker AND silences the lib's own dev
+warning. A MISSING name at least trips something. So `meaningless-name` is an
+error in the conversion's Accessibility tab, at the same severity as no name.
+
+Which Button Types need one is decided by Type, not by judgement:
+
+| Type | needs `aria-label` |
+| --- | --- |
+| `text` | **no** — the visible label is already the name; adding one announces twice |
+| `iconOnly`, `Avatar`, `letterNumber` | yes |
+
+There is deliberately **no Accessible Name property in Figma** — a required
+field gets filled badly, and its default would be the failure above. The
+converter derives the name (layer name → icon meaning → convention) and marks
+every guess in the emitted code:
+
+```
+// DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, from the layer name
+```
+
+Same convention as `MISSING-LIB-COMPONENT`, so it survives a copy/paste into a
+PR. Never name the glyph where it differs from the action, and never the
+rendered content. Full write-up:
+[docs/accessibility-coverage.md](docs/accessibility-coverage.md).
 
 ## Don't override component colors
 

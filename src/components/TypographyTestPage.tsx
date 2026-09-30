@@ -748,6 +748,19 @@ export interface TypographyMeta {
    *  false the Body SuggestedCard reads "Style: Suggested"; when true it
    *  reads "Style: Customized". */
   bodyFamilyTouched: boolean;
+  /** Whether the user actually PICKED the Display family / its case, as
+   *  opposed to the value simply being what got saved.
+   *
+   *  Without these, reloading a saved system replays every persisted value as
+   *  an explicit override: `decorativeOverride` is seeded from the saved
+   *  family, which familyForTrioRole treats as "an explicit pick ALWAYS wins",
+   *  and the case override is seeded to 'normal' whenever allCaps was false —
+   *  never null. Detection then cannot surface at all.
+   *
+   *  Absent on systems saved before these existed, which read as false — so
+   *  those pick up detection once, which is the intended repair. */
+  decorativeFamilyTouched?: boolean;
+  decorativeCaseTouched?: boolean;
   /** The category the user picked from the customize modal for the Header
    *  role (e.g. "Sans / Geometric"). Kept for designs saved before the Header
    *  became a Flex face; it no longer drives anything. */
@@ -854,7 +867,30 @@ export default function TypographyTestPage({
   // when present, otherwise null so the matcher's auto pick is used.
   const [trioIdx, setTrioIdx] = useState(initialMeta?.trioIndex ?? 0);
   const [headerOverride, setHeaderOverride] = useState<string | null>(initialByType.header?.family ?? null);
-  const [decorativeOverride, setDecorativeOverride] = useState<string | null>(initialByType.decorative?.family ?? null);
+  /* Always seed from the saved family — it is the last known good value, and
+     navigating back has to show what was on screen when you left.
+     This briefly required `decorativeFamilyTouched`, so an untouched family
+     restored as null and had to be re-derived by re-running the matcher. That
+     takes 15-40s and can fail outright, and until it lands the Display falls
+     back to the mood trio: going forward and back lost the face.
+     Whether a FRESH analysis may replace this is the touched flag's job, below
+     — not this initialiser's. */
+  const [decorativeOverride, setDecorativeOverride] = useState<string | null>(
+    initialByType.decorative?.family ?? null,
+  );
+  /* Set by the three paths where the USER picks a Display face — the font
+     modal, a font upload, and the style preset picker. Deliberately NOT set by
+     the CLIP suggestion effect, the ignore-lettering reset, or the saved-system
+     restore, which are all automatic.
+     Getting this list wrong is what makes the suggestion below overwrite a real
+     choice: mark too few paths and the effect fires again the moment the
+     ranking resolves and stomps whatever the user just chose. */
+  const [decorativeFamilyTouched, setDecorativeFamilyTouched] = useState(
+    initialMeta?.decorativeFamilyTouched ?? false,
+  );
+  const [decorativeCaseTouched, setDecorativeCaseTouched] = useState(
+    initialMeta?.decorativeCaseTouched ?? false,
+  );
   const [bodyOverride, setBodyOverride] = useState<string | null>(initialByType.body?.family ?? null);
   // When a category preset is picked (e.g. "Sans / Geometric"), the trio
   // cards cycle through that category's font pool so each trio shows a
@@ -870,6 +906,9 @@ export default function TypographyTestPage({
   // (per-role weight slider, letter-spacing slider, All-caps toggle) sticks.
   const headerCaseFromSaved: TextCase | null = initialByType.header
     ? (initialByType.header.allCaps ? 'uppercase' : 'normal') : null;
+  // Seeded from saved for the same reason as the family: back-navigation must
+  // restore what was shown. Detection outranks it only when the case was never
+  // touched AND a fresh analysis is in hand — see displayAllCaps.
   const decoCaseFromSaved: TextCase | null = initialByType.decorative
     ? (initialByType.decorative.allCaps ? 'uppercase' : 'normal') : null;
   // The Header face is Google Sans Flex, never a picked family, so its
@@ -1176,9 +1215,15 @@ export default function TypographyTestPage({
   // The lettering's own case is the starting point for the Display — if the
   // words in the image are set in caps, the Display is too until the user says
   // otherwise. `null` override means "follow the image".
-  const displayAllCaps = decorativeCaseOverride !== null
-    ? decorativeCaseOverride === 'uppercase'
-    : sampledAllCaps;
+  /* Detection wins over a saved case the user never chose, but only while a
+     fresh analysis is in hand. A saved `false` used to be indistinguishable
+     from "never decided" and pinned the checkbox off forever — the image could
+     read as ALL CAPS and the Display would still open in sentence case. With no
+     analysis (navigating back, or the analyzer failing) the saved value stands,
+     so returning to this step never silently re-cases the Display. */
+  const displayAllCaps = (!decorativeCaseTouched && sampledRegion)
+    ? sampledAllCaps
+    : (decorativeCaseOverride !== null ? decorativeCaseOverride === 'uppercase' : sampledAllCaps);
 
   // The Header never runs in caps while the Display does — see the note where
   // it is applied. The user's own Header choice still stands when the Display
@@ -1357,6 +1402,22 @@ export default function TypographyTestPage({
     [match.status, match.status === 'done' ? match.ranked : null],
   );
 
+  /* Select the closest match to the image.
+   *
+   * The ranking was computed, scored and rendered under "Closest to your
+   * image" — and never consulted as a SOURCE for the family. familyForTrioRole
+   * runs explicit pick -> category pool -> mood trio, so a detection putting
+   * Bebas Neue at 88% against heavy, tight-tracked ALL CAPS lost to whatever
+   * the mood trio held.
+   *
+   * A suggestion, so it does NOT mark the family touched — a re-analysis may
+   * replace it, while a real pick stands and is never overwritten. */
+  const topMatchFamily = match.status === 'done' ? (match.ranked[0]?.family ?? null) : null;
+  useEffect(() => {
+    if (decorativeFamilyTouched || ignoreTextDetection || !topMatchFamily) return;
+    setDecorativeOverride((prev) => (prev === topMatchFamily ? prev : topMatchFamily));
+  }, [topMatchFamily, decorativeFamilyTouched, ignoreTextDetection]);
+
   const headerAxisPresets = useMemo(
     () => headerPresets(result?.mood?.key ?? 'Modern', headerAxisOptions),
     [result?.mood?.key, headerAxisOptions]
@@ -1373,7 +1434,10 @@ export default function TypographyTestPage({
   const applyDisplayPatch = useCallback((patch: Partial<DisplayRole>) => {
     if (patch.weight !== undefined) setDecorativeWeightOverride(patch.weight);
     if (patch.letterSpacing !== undefined) setDecorativeSpacingOverride(patch.letterSpacing);
-    if (patch.allCaps !== undefined) setDecorativeCaseOverride(patch.allCaps ? 'uppercase' : 'normal');
+    if (patch.allCaps !== undefined) {
+      setDecorativeCaseOverride(patch.allCaps ? 'uppercase' : 'normal');
+      setDecorativeCaseTouched(true);
+    }
     if (patch.size !== undefined) setDisplaySize(patch.size);
     if (patch.leading !== undefined) setDisplayLeading(patch.leading);
     if (patch.noise !== undefined) setDisplayNoise(patch.noise);
@@ -1382,6 +1446,7 @@ export default function TypographyTestPage({
 
   const applyDisplayFont = useCallback((family: string, category: string) => {
     setDecorativeOverride(family);
+    setDecorativeFamilyTouched(true);
     setDecorativePresetCategory(category);
     setDecorativeUpload(null);
   }, []);
@@ -1573,6 +1638,7 @@ export default function TypographyTestPage({
       } else if (role === 'decorative') {
         setDecorativeUpload(upload);
         setDecorativeOverride(family);
+        setDecorativeFamilyTouched(true);
         setDecorativeWeightOverride(null);
         setDecorativeSpacingOverride(null);
         setDecorativePresetCategory(null);
@@ -1631,9 +1697,11 @@ export default function TypographyTestPage({
       setHeaderPresetCategory(preset.category);
     } else {
       setDecorativeOverride(preset.family);
+      setDecorativeFamilyTouched(true);
       setDecorativeWeightOverride(preset.weight);
       setDecorativeSpacingOverride(preset.letterSpacing);
       setDecorativeCaseOverride(preset.textTransform ?? 'normal');
+      setDecorativeCaseTouched(true);
       setDecorativePresetCategory(preset.category);
     }
   }, []);
@@ -1741,6 +1809,8 @@ export default function TypographyTestPage({
     setDecorativePresetCategory(initialMeta?.decorativePresetCategory ?? null);
     setBodyFamily(initialMeta?.bodyFamily ?? 'sans');
     setBodyFamilyTouched(initialMeta?.bodyFamilyTouched ?? false);
+    setDecorativeFamilyTouched(initialMeta?.decorativeFamilyTouched ?? false);
+    setDecorativeCaseTouched(initialMeta?.decorativeCaseTouched ?? false);
     setDisplayPoolOverride(AUTO);
     setIgnoreTextDetection(initialMeta?.ignoreTextDetection ?? false);
 
@@ -1830,6 +1900,8 @@ export default function TypographyTestPage({
       trioIndex: trioIdx,
       bodyFamily,
       bodyFamilyTouched,
+      decorativeFamilyTouched,
+      decorativeCaseTouched,
       headerPresetCategory,
       decorativePresetCategory,
       ignoreTextDetection,
@@ -1855,7 +1927,7 @@ export default function TypographyTestPage({
     });
   }, [
     onMetaChange,
-    trioIdx, bodyFamily, bodyFamilyTouched,
+    trioIdx, bodyFamily, bodyFamilyTouched, decorativeFamilyTouched, decorativeCaseTouched,
     headerPresetCategory, decorativePresetCategory, ignoreTextDetection,
     sampledRegion, displayRegionIdx, sampledBranchStyle.branch, sampledBranchStyle.style,
     sampledWeight, sampledClip.category, initialMeta?.detection, imgSize,

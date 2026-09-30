@@ -114,7 +114,15 @@ function AdaptiveDemo() {
           <VStack spacing={2}>
             <HStack spacing={2} style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
               <H3 style={{ margin: 0 }}>Stays readable</H3>
-              <Chip variant={passAA ? 'success-light' : 'warning-light'}>
+              {/* A light chip is -outline in the palette's brightest zone: the
+                  bg is var(--Background) and the label var(--Text), so both
+                  follow the cascade. The lib's `-light` shape was removed —
+                  it painted the SOLID button fill, never a light surface. */}
+              <Chip
+                variant={passAA ? 'success-outline' : 'warning-outline'}
+                data-theme={passAA ? 'Success' : 'Warning'}
+                data-surface="Surface-Brightest"
+              >
                 {ratio ? `${ratio.toFixed(1)}:1` : '—'} {passAAA ? 'AAA ✓' : passAA ? 'AA ✓' : ''}
               </Chip>
             </HStack>
@@ -123,7 +131,7 @@ function AdaptiveDemo() {
             <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
               <Button variant="default" size="small">Primary action</Button>
               <Button variant="default-outline" size="small">Secondary</Button>
-              <Chip variant="success-light">Active</Chip>
+              <Chip variant="success-outline" data-theme="Success" data-surface="Surface-Brightest">Active</Chip>
             </HStack>
           </VStack>
         </div>

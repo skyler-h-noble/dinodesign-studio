@@ -13,6 +13,10 @@ interface PhonePreviewProps {
   typographyStyles?: TypographyStyle[];
   moodBoardUrl?: string | null;
   designSystemName?: string;
+  /** The component-style sliders, Shadow included. Without them the phone
+   *  mock-up shows default shadows while the rest of the stage shows the
+   *  user's — the two sat side by side and disagreed. */
+  styleCustomizations?: Record<string, unknown>;
 }
 
 export default function PhonePreview({
@@ -23,13 +27,17 @@ export default function PhonePreview({
   typographyStyles,
   moodBoardUrl,
   designSystemName = 'Your Design System',
+  styleCustomizations,
 }: PhonePreviewProps) {
   const css = useMemo(() => {
     if (!colorScheme) return '';
     try {
-      return buildPreviewCSS({ colorScheme, userSelections, componentStyle, mode, typographyStyles });
+      return buildPreviewCSS({
+        colorScheme, userSelections, componentStyle, mode, typographyStyles,
+        styleCustomizations: styleCustomizations as never,
+      });
     } catch { return ''; }
-  }, [colorScheme, userSelections, componentStyle, mode, typographyStyles]);
+  }, [colorScheme, userSelections, componentStyle, mode, typographyStyles, styleCustomizations]);
 
   if (!colorScheme) return null;
 

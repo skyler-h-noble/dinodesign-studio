@@ -1,0 +1,751 @@
+/**
+ * Omni / System typography — the structure and the values.
+ *
+ * The values are parsed out of the GENERATED stylesheet rather than computed
+ * again, so these tests assert the parse and the shape. A second computation
+ * of the ramp here would be exactly the divergence invariant 5 describes.
+ */
+import { describe, it, expect } from 'vitest';
+import {
+  DEVICE_TYPES, FACE_MODES, SWITCHED_PROPS, DEVICE_PROPS, SEEDS_FROM, SYSTEM_FACE,
+  sourceName, parsePlatformBlock, typographyVariablePayload, payloadNames,
+  blockSelector, faceSelector, LEGACY_DEVICE_ALIAS, payloadIsAdditive,
+  familyName, familyAlias, FAMILY_ROOT_OF, ROOT_ROLE, NON_STYLE_SECTIONS, groupedProp,
+  weightRootName, weightRootAlias,
+  resolveVar,
+  mirrorsOmni, figmaFamily,
+  variableForSection,
+} from '../utils/typographyPlatform';
+/* The same `?raw` import the app uses, so this exercises the real path.
+   It returned an EMPTY STRING until `test: { css: true }` was set in
+   vite.config.ts — vitest stubs CSS imports by default, and a stub is
+   indistinguishable from a file with no platform blocks in it. Every
+   assertion below would have passed on nothing. */
+import { typographyTokensCSS, buildTypographyTokensCSS } from '../utils/typographyTokens';
+import { resolveRoles, HEADER_CLAMPED_WEIGHT_FLOOR, BODY_LINE_HEIGHT } from '../utils/typeScale';
+
+/* The four faces, resolved. `resolveRoles(null)` is the real defaulting path,
+   not a stub: it returns the fallback family for each role and pins Header to
+   Google Sans Flex, which is what a design with no picked faces actually
+   gets. */
+/**
+ * Follow one alias hop inside a device bag.
+ *
+ * Nine steps take their weight from their face and store a pointer at it —
+ * Display-Large -> Displays/Display-Font-Weight — so a weight assertion has to
+ * resolve before it compares. What it resolves TO is the whole point of the
+ * indirection, and is what these tests are about.
+ */
+function resolved(bag: Record<string, { value: unknown }>, name: string): unknown {
+  const v = bag[name]?.value;
+  const m = typeof v === 'string' && v.match(/^\{(.+)\}$/);
+  return m ? bag[m[1].split('.').join('/')]?.value : v;
+}
+
+const FACES = resolveRoles(null);
+const P = typographyVariablePayload(typographyTokensCSS, FACES);
+
+describe('the parse', () => {
+  it('reads every style out of a platform block', () => {
+    const { styles } = parsePlatformBlock(typographyTokensCSS, 'IOS-Mobile');
+    /* 36, not 40: the three --Body-<step>-Bold-Font-Weight tokens are excluded
+       because Body has no bold, and Button-ExtraSmall because the design does
+       not use one. See EXCLUDED_STYLES.
+
+       36 rather than 33 since Alt-Display gained its three steps here. They
+       have to be IN the device blocks, not only in the generated Desktop one:
+       a style the block does not declare is filled from Desktop by the
+       device-floor merge, which had the Alt reporting Desktop's 72px on every
+       phone. */
+    /* 38 since Caption became a three-step ramp. Caption-Small and
+       Caption-Large have to be IN the device blocks rather than left to the
+       device-floor merge, because that merge replaces a style whole: a step
+       declared on Desktop only would carry Desktop's 1.5 leading on every
+       phone, which is the same trap Alt-Display fell into above. */
+    /* 39 since Mobile-Nav-Label was added. It is the one style in this file
+       whose values genuinely differ per platform rather than being restated:
+       Apple's tab-bar label is 10/10 untracked, Material's navigation label is
+       12/16 at 0.5, and Desktop keeps 11/16.5/0.5. So it MUST be declared in
+       every block — leaving it to the device-floor merge would put Desktop's
+       11px on both phones and erase the reason the style exists. */
+    expect(Object.keys(styles).length).toBe(39);
+    expect(styles['Mobile-Nav-Label']).toEqual({
+      'Font-Size': '10px', 'Font-Weight': '600',
+      'Line-Height': '10px', 'Letter-Spacing': '0px',
+    });
+    expect(styles['H1']).toEqual({
+      'Font-Size': '28px', 'Font-Weight': '600',
+      'Line-Height': '28px', 'Letter-Spacing': '0px',
+    });
+
+    /* Display is a three-step ramp on mobile too. It used to be two steps at
+       one size — Small and Large both 28px, which is H1's size, so the display
+       styles rendered identically to a heading and to each other, and Medium
+       was absent from every device block. Absent did not read as absent: the
+       device-floor merge filled it from Desktop, so Medium reported 60px on a
+       phone and never moved. Sizes are the platforms' own display tiers
+       (Material 3 for Android; Apple has no display tier, so iOS anchors at
+       Large Title 34/41 and steps up). */
+    const display = (step: string) => styles[`Display-${step}`]?.['Font-Size'];
+    expect([display('Small'), display('Medium'), display('Large')])
+      .toEqual(['34px', '40px', '48px']);
+  });
+
+  it('takes the LAST family declaration in a section, as the cascade does', () => {
+    /* The mobile blocks declare --Font-Family-Body twice: once under Headers
+       pointing at the DECORATIVE family, then again under Body pointing at
+       Body. The browser uses the second. Reading the first would record a
+       value nothing renders. */
+    const { families } = parsePlatformBlock(typographyTokensCSS, 'IOS-Mobile');
+    expect(families['Body']).toContain('Platform-Font-Families-Body');
+  });
+});
+
+describe('the Devices-Type source', () => {
+  it('gives every device the same variable names', () => {
+    /* Read against the GENERATED stylesheet, which is what ships. The static
+       asset has one block per platform and they agree; the real file splices a
+       Desktop block built from the scale, and that one carried five styles the
+       others did not — Badge, Button-Large, Display-Medium,
+       Label-Medium-All-Caps, Subtitle-Medium.
+     *
+     * The consequence is the quiet kind. The alias collection is built from
+     * Desktop's key set, so those variables get created and only the Desktop
+     * MODE is ever written; the other six keep Figma's default and a Badge on
+     * iOS renders at font-size 0. Nothing fails — the import succeeds and the
+     * variable exists.
+     *
+     * The previous version of this test read the static file, where Desktop is
+     * static too, so it agreed with itself and saw none of it. Same mistake as
+     * the Desktop weights: testing the input that is not shipped. */
+    const styles: any = [
+      { type: 'decorative', family: 'Playfair Display', weight: '800' },
+      { type: 'header', family: 'X', weight: '600' },
+      { type: 'body', family: 'Source Sans 3', weight: '400' },
+    ];
+    const G = typographyVariablePayload(buildTypographyTokensCSS(styles), resolveRoles(styles));
+    const sets = DEVICE_TYPES.map((d) => payloadNames(G.devices[d]).join('|'));
+    expect(new Set(sets).size).toBe(1);
+    /* And the five are actually present off-Desktop, not merely consistent by
+       being absent everywhere. */
+    for (const d of DEVICE_TYPES)
+      for (const k of ['Typography/Badges/Badge-Font-Size',
+                       'Typography/Displays/Display-Medium-Font-Size',
+                       'Typography/Buttons/Button-Large-Font-Size'])
+        expect(Number(G.devices[d][k]?.value), `${d} ${k}`).toBeGreaterThan(0);
+  });
+
+  it('carries both faces for every switched property', () => {
+    for (const prop of SWITCHED_PROPS) {
+      for (const face of FACE_MODES) {
+        expect(P.devices.Desktop[sourceName(face, groupedProp('H1', prop))]).toBeDefined();
+      }
+    }
+  });
+
+  it('keeps the vertical rhythm OUT of the face split', () => {
+    /* Size AND line-height are the device's, identical across both faces.
+       Together they are the vertical rhythm: holding them fixed means
+       toggling Omni / System reshapes glyphs and moves nothing down the page.
+       Letter-spacing is the one switched property that touches layout, and it
+       only widens or narrows a line — horizontal give is absorbed by
+       wrapping, vertical give breaks a grid. */
+    for (const prop of DEVICE_PROPS) {
+      expect(P.devices.Desktop[`Typography/${groupedProp('H1', prop)}`]).toBeDefined();
+      for (const face of FACE_MODES) {
+        expect(`${prop} switched: ${P.devices.Desktop[sourceName(face, groupedProp('H1', prop))] !== undefined}`)
+          .toBe(`${prop} switched: false`);
+      }
+    }
+  });
+
+  it('switches only family, weight and tracking', () => {
+    expect([...SWITCHED_PROPS]).toEqual(['Font-Weight', 'Letter-Spacing']);
+    expect([...DEVICE_PROPS]).toEqual(['Font-Size', 'Line-Height']);
+  });
+
+  /* A family is a LITERAL on the face root and an ALIAS on every style.
+   *
+   * The previous version of this test asserted
+   *   expect(String(omni.value)).toContain('Font-Families-Body')
+   * which pinned `var(--Platform-Font-Families-Body)` in place as the correct
+   * answer. It is a CSS reference written into a Figma STRING: stored as text,
+   * bindable by nothing, and pointing at a collection that is being removed.
+   * The test passed for as long as the bug survived, which is the whole of its
+   * usefulness as a warning. */
+  it('puts a literal family on each of the three roots, never a var()', () => {
+    for (const d of DEVICE_TYPES) {
+      for (const face of FACE_MODES) {
+        for (const root of Object.keys(ROOT_ROLE)) {
+          const v = P.devices[d][familyName(face, root)];
+          expect(v, `${d} ${face} ${root}`).toBeDefined();
+          expect(String(v.value)).not.toContain('var(');
+          expect(String(v.value)).not.toContain('{');   // a literal, not a link
+        }
+      }
+    }
+  });
+
+  it('points every other style at the root it wears', () => {
+    /* The structure built by hand in the file: Display, Headers and Body hold
+       a name; Subtitle, Caption, Label, Legal, Number, Button and Overline all
+       link to Body. */
+    for (const d of DEVICE_TYPES) {
+      const bag = P.devices[d];
+      for (const style of ['Subtitle', 'Caption', 'Label', 'Legal', 'Number', 'Button', 'Eyebrow']) {
+        const v = bag[familyName('Omni', style)];
+        if (!v) continue;   // a device whose block does not declare that section
+        expect(v.value, `${d} ${style}`).toBe(familyAlias('Omni', 'Body'));
+      }
+    }
+  });
+
+  it('gives System the platform face on all three roots, unquoted', () => {
+    expect(P.devices['Android-Mobile'][familyName('System', 'Body')].value).toBe('Roboto');
+    expect(P.devices['Android-Mobile'][familyName('System', 'Headers')].value).toBe('Roboto');
+    expect(P.devices['IOS-Mobile'][familyName('System', 'Body')].value).toBe('SF Pro');
+    /* Desktop's System face is Omni's — see mirrorsOmni. It used to be the CSS
+       stack, which no Figma family variable can hold. */
+    expect(P.devices.Desktop[familyName('System', 'Body')].value)
+      .toBe(P.devices.Desktop[familyName('Omni', 'Body')].value);
+  });
+
+  it('skips the Omni roots when no faces are given, rather than inventing one', () => {
+    /* A wrong family name in Figma renders as a real font and looks deliberate;
+       a missing variable is visible in the panel. Absence is the safer failure,
+       so the payload declines to guess. */
+    const bare = typographyVariablePayload(typographyTokensCSS);
+    expect(bare.devices.Desktop[familyName('Omni', 'Body')]).toBeUndefined();
+    /* Desktop's System root is the brand face too, so it goes with it. A device
+       whose System face is the PLATFORM's still gets one — that value never
+       depended on the design. */
+    expect(bare.devices.Desktop[familyName('System', 'Body')]).toBeUndefined();
+    expect(bare.devices['Android-Mobile'][familyName('System', 'Body')].value).toBe('Roboto');
+  });
+
+  it('never reads a face-definition section as a style', () => {
+    /* `Faces-Font-Family` — the face DEFINITIONS block read as a type style,
+       carrying a var() into the panel. The first thing anyone noticed. */
+    for (const d of DEVICE_TYPES) {
+      for (const name of Object.keys(P.devices[d])) {
+        expect(name).not.toContain('Faces-Font-Family');
+        expect(name).not.toContain('Face weights');
+      }
+    }
+  });
+
+  /* The GENERATED Desktop block, which is what actually ships — the static one
+     in the asset file is replaced per design system. Every test above reads the
+     static file and so never saw this. */
+  const GEN = buildTypographyTokensCSS(null);
+
+  it('resolves a weight that the block states once and references per step', () => {
+    /* The generated Desktop block writes
+         --H1-Font-Weight: var(--Font-Weight-Header);
+       and declares the number once under Face weights. parseFloat on that is
+       NaN, the property gets dropped, and the Figma variable keeps whatever it
+       held — every Desktop weight read 0, while the mobile blocks, which spell
+       their numbers out, were fine. */
+    const { styles } = parsePlatformBlock(GEN, 'Desktop');
+    expect(styles['H1']['Font-Weight']).toBe('600');
+    const G = typographyVariablePayload(GEN, resolveRoles(null));
+    const weights = Object.keys(G.devices.Desktop).filter((k) => k.includes('Font-Weight'));
+    expect(weights.length).toBeGreaterThan(0);
+    for (const k of weights) expect(Number(resolved(G.devices.Desktop, k)), k).toBeGreaterThan(0);
+  });
+
+  it('resolves only what the block itself declares', () => {
+    const declared = { A: '600', B: 'var(--A)' };
+    expect(resolveVar('var(--B)', declared)).toBe('600');
+    expect(resolveVar('var(--Missing, 400)', declared)).toBe('400');
+    /* A name the block does not define is the consumer's to set — left alone so
+       the caller drops it, rather than guessed at. */
+    expect(resolveVar('var(--Set-Font-Family-Header)', declared))
+      .toBe('var(--Set-Font-Family-Header)');
+    /* A cycle must not hang the export. */
+    expect(() => resolveVar('var(--X)', { X: 'var(--Y)', Y: 'var(--X)' })).not.toThrow();
+  });
+
+  it("relays the user's Display and Header weights all the way to Figma", () => {
+    /* The whole point of the collection. These read 0 until var() resolution
+       landed, because the generated block states each weight once and
+       references it per step. */
+    const picked: any = [
+      { type: 'decorative', family: 'Playfair Display', weight: '800' },
+      { type: 'header', family: 'Whatever', weight: '250' },
+      { type: 'body', family: 'Source Sans 3', weight: '300' },
+    ];
+    const css = buildTypographyTokensCSS(picked);
+    const roles = resolveRoles(picked);
+    const D = typographyVariablePayload(css, roles).devices.Desktop;
+    const weight = (k: string) => resolved(D, sourceName('Omni', groupedProp(k, 'Font-Weight')));
+
+    expect(weight('Display-Large')).toBe(800);   // the Decorative pick
+    expect(weight('H1')).toBe(250);              // the Header pick
+    expect(weight('H3')).toBe(250);
+    expect(weight('Body-Medium')).toBe(300);
+
+    /* H4-H6 are the user's header weight too, with a FLOOR of 500. Only ever
+       raised, never lowered — a 250 that reads elegant at 48px reads washed out
+       at 18px — and snapped to a weight the face actually ships, since asking a
+       static 400/700 face for 500 gives 400 on some platforms and 700 on
+       others. Below the floor: */
+    expect(weight('H4')).toBe(HEADER_CLAMPED_WEIGHT_FLOOR);
+    expect(weight('H6')).toBe(HEADER_CLAMPED_WEIGHT_FLOOR);
+
+    /* And the families the user picked, as literals. */
+    expect(D[familyName('Omni', 'Display')].value).toBe('Playfair Display');
+    expect(D[familyName('Omni', 'Body')].value).toBe('Source Sans 3');
+  });
+
+  it('passes a header weight AT or ABOVE the floor through to H4-H6 untouched', () => {
+    /* The other arm, and the one that says the clamp is a floor rather than a
+       value: a design that asked for 700 keeps 700 on every header step. This
+       rule exists to strengthen small headers, not to flatten bold ones — and
+       without this case a clamp that simply wrote 500 everywhere would pass. */
+    const bold: any = [
+      { type: 'decorative', family: 'Playfair Display', weight: '800' },
+      { type: 'header', family: 'Whatever', weight: '700' },
+      { type: 'body', family: 'Source Sans 3', weight: '300' },
+    ];
+    const D = typographyVariablePayload(
+      buildTypographyTokensCSS(bold), resolveRoles(bold)).devices.Desktop;
+    for (const step of ['H1', 'H3', 'H4', 'H6'])
+      expect(resolved(D, sourceName('Omni', groupedProp(step, 'Font-Weight'))), step).toBe(700);
+  });
+
+  it('offers Body as Semibold, never as Bold', () => {
+    /* Body ships standard and semibold; bold at body sizes is what Subtitle is
+       for, and the lib resolves variant="body-bold" to the SEMIBOLD style. The
+       static mobile blocks still declare --Body-<step>-Bold-Font-Weight: 700,
+       and the CSS must keep emitting it because a published stylesheet cannot
+       be regenerated. Figma must not: a variable there is an offer, and a
+       designer picking Body-Large-Bold would get 700 in the mock against
+       semibold in the build, with nothing reporting the difference. */
+    for (const d of DEVICE_TYPES) {
+      for (const face of FACE_MODES) {
+        for (const step of ['Small', 'Medium', 'Large']) {
+          expect(P.devices[d][sourceName(face, groupedProp(`Body-${step}-Semibold`, 'Font-Weight'))], `${d} ${step}`)
+            .toBeDefined();
+          expect(P.devices[d][sourceName(face, groupedProp(`Body-${step}-Bold`, 'Font-Weight'))], `${d} ${step}`)
+            .toBeUndefined();
+        }
+        /* Caption and Legal really do ship those weights, so their names mean
+           what they say and must survive the exclusion. */
+        expect(P.devices[d][sourceName(face, groupedProp('Caption-Bold', 'Font-Weight'))]).toBeDefined();
+      }
+    }
+  });
+
+  it('carries no paragraph spacing', () => {
+    /* Deliberate: the text styles do not take it from this collection. It falls
+       out of the parse rather than being filtered, so this is the thing holding
+       it — adding Paragraph-Spacing to the prop pattern would start emitting it
+       with nothing to say that was intended. */
+    for (const d of DEVICE_TYPES)
+      for (const name of Object.keys(P.devices[d]))
+        expect(name).not.toContain('Paragraph');
+  });
+
+  it('sets body at 1.5 on every device, ahead of the platform table', () => {
+    /* Apple's body is 17/22 (1.29) and Material's 14/20 (1.43); Material's
+       16/24 is 1.5 only because the numbers meet there. Letting either table
+       govern Body would make the same design's running text tighter on iOS
+       than on Desktop, and how a paragraph reads is the one thing that must
+       not change between devices.
+
+       It is also WCAG 1.4.8 (AAA), which asks for space-and-a-half WITHIN
+       PARAGRAPHS. That scope is why the headings stay on the platform curve —
+       an H1 at 1.21 is the criterion applied, not an exception to it. */
+    for (const d of DEVICE_TYPES) {
+      const bag = P.devices[d];
+      for (const step of ['Small', 'Medium', 'Large']) {
+        const size = Number(bag[`Typography/Body/Body-${step}-Font-Size`].value);
+        const lh = Number(bag[`Typography/Body/Body-${step}-Line-Height`].value);
+        expect(lh / size, `${d} Body-${step}`).toBeCloseTo(BODY_LINE_HEIGHT, 5);
+      }
+      /* And a non-body style is still the platform's, or the split did nothing. */
+      const h1 = Number(bag['Typography/Headers/H1-Line-Height'].value)
+               / Number(bag['Typography/Headers/H1-Font-Size'].value);
+      if (d !== 'Desktop') expect(h1, `${d} H1`).toBeLessThan(BODY_LINE_HEIGHT);
+    }
+  });
+
+  it('carries exactly the same names in both faces', () => {
+    /* Not cosmetic. Every token in the Typography collection aliases into BOTH
+       faces — {Typography.Omni.X} for one mode and {Typography.System.X} for
+       the other — so a name present in only one resolves to NOTHING when the
+       mode flips. An unresolved binding does not error: the text style keeps
+       whatever it last rendered, on a switch that looked like it worked.
+
+       Counted by eye in the file before anything checked it here: Omni 83,
+       System 84. */
+    for (const d of DEVICE_TYPES) {
+      const strip = (face: 'Omni' | 'System') => Object.keys(P.devices[d])
+        .filter((k) => k.startsWith(`Typography/${face}/`))
+        .map((k) => k.replace(`Typography/${face}/`, ''))
+        .sort();
+      expect(strip('System'), d).toEqual(strip('Omni'));
+    }
+  });
+
+  it('points a face-following step at its face weight, and nothing else', () => {
+    /* A step that takes its weight from a face points at the face, so the
+       number lives once: move Headers' weight and H1-H3 follow, which is what
+       the stylesheet already does and what Figma was flattening into copies.
+
+       The DISPLAY family is the exception, and states its own number. Devices-
+       Type is the value layer — the Typography collection aliases into it — so
+       an alias here leads back to the same collection. For Display it is worse
+       than a wasted hop: Alt Display exists to be a DIFFERENT weight, and
+       pointing it at the Display root makes the two identical, the distinction
+       deleted by the link meant to keep them in step. Worse, the alias was
+       decided by buildTypeScale(null) — the default design — while whether the
+       Alt follows its face depends on the user's own family.
+
+       The others must NOT point at it either. H4-H6 read
+       --Header-Clamped-Weight, which only ever raises a light pick, and
+       Subtitle / Label / Number / Button / Badge state their own. Aliasing
+       those would make the root look like it governs the whole group and then
+       surprise whoever moved it. */
+    const picked: any = [
+      { type: 'decorative', family: 'P', weight: '800' },
+      { type: 'header', family: 'X', weight: '250' },
+      { type: 'body', family: 'S', weight: '300' },
+    ];
+    const D = typographyVariablePayload(
+      buildTypographyTokensCSS(picked), resolveRoles(picked)).devices.Desktop;
+    const raw = (k: string) => D[sourceName('Omni', groupedProp(k, 'Font-Weight'))].value;
+
+    expect(D[weightRootName('Omni', 'Display')].value).toBe(800);
+    expect(D[weightRootName('Omni', 'Headers')].value).toBe(250);
+    expect(D[weightRootName('Omni', 'Body')].value).toBe(300);
+
+    /* The Display root is still published — a designer may want to move the
+       face in Figma — but the steps hold numbers rather than following it. */
+    for (const step of ['Display-Large', 'Display-Medium', 'Display-Small'])
+      expect(raw(step), step).toBe(800);
+    /* The Alt states a number too, and here it is the SAME number: this
+       fixture's family is "P", which ships no weights this system knows, so
+       there is no lighter step to drop to and the Alt keeps the face's. The
+       point is that it is a VALUE either way — a real family with a lighter
+       weight resolves to that instead, where the old alias would have
+       overwritten it with Display's. */
+    for (const step of ['Alt-Display-Large', 'Alt-Display-Medium', 'Alt-Display-Small'])
+      expect(raw(step), step).toBe(800);
+    for (const step of ['H1', 'H2', 'H3'])
+      expect(raw(step), step).toBe(weightRootAlias('Omni', 'Headers'));
+    for (const step of ['Body-Small', 'Body-Medium', 'Body-Large'])
+      expect(raw(step), step).toBe(weightRootAlias('Omni', 'Body'));
+
+    for (const step of ['H4', 'H6', 'Subtitle-Medium', 'Label-Large', 'Number-Small'])
+      expect(typeof raw(step), step).toBe('number');
+  });
+
+  it('never points a step at a face weight that was not written', () => {
+    /* The Omni roots come from the resolved faces and are skipped when those
+       are absent. Without a guard the steps still pointed at them — nine
+       dangling aliases per device, which Figma does not report: the variable
+       exists and resolves to nothing. */
+    const bare = typographyVariablePayload(typographyTokensCSS);
+    for (const d of DEVICE_TYPES) {
+      const bag = bare.devices[d];
+      for (const [name, v] of Object.entries(bag)) {
+        if (typeof v.value !== 'string' || !v.value.startsWith('{')) continue;
+        const target = v.value.slice(1, -1).split('.').join('/');
+        expect(bag[target], `${d}: ${name} -> ${target}`).toBeDefined();
+      }
+    }
+  });
+
+  it('gives Desktop the same System values as Omni', () => {
+    /* "The system font" is not one font on Desktop — Segoe, SF, whatever the
+       distro picked — so the CSS answers with a stack, and a Figma family
+       variable holds one NAME. Desktop is also the brand's own surface, so
+       there is nothing for System to mean there that Omni does not say. */
+    expect(mirrorsOmni('Desktop')).toBe(true);
+    const d = P.devices.Desktop;
+    const resolve = (v: unknown): unknown => {
+      const m = String(v).match(/^\{Typography\.(Omni|System)\.(.+)\}$/);
+      /* The path is dotted in the alias and slashed in the name. */
+      return m ? d[sourceName(m[1] as 'Omni' | 'System', m[2].split('.').join('/'))].value : v;
+    };
+    for (const key of Object.keys(d)) {
+      if (!key.startsWith('Typography/Omni/')) continue;
+      const sys = d[key.replace('/Omni/', '/System/')];
+      if (!sys) continue;
+      /* Resolved, not literal: a family is an alias on either side and the two
+         point at their OWN root, which is correct — flattening System's styles
+         onto Omni's root would break the switch on every other device. What has
+         to match is what they resolve TO. */
+      expect(resolve(sys.value), key).toEqual(resolve(d[key].value));
+    }
+  });
+
+  it('writes a font NAME, never a CSS stack or a quoted family', () => {
+    /* Figma stores a font name. `"SF Pro"` keeps its quotes and matches
+       nothing; a comma-separated stack matches nothing either. Both render in a
+       fallback and look like a deliberate choice. */
+    expect(figmaFamily('"SF Pro"')).toBe('SF Pro');
+    for (const dev of DEVICE_TYPES) {
+      for (const face of FACE_MODES) {
+        for (const root of Object.keys(ROOT_ROLE)) {
+          const v = String(P.devices[dev][familyName(face, root)].value);
+          expect(v, `${dev} ${face} ${root}`).not.toContain(',');
+          expect(v, `${dev} ${face} ${root}`).not.toContain('"');
+        }
+      }
+    }
+  });
+
+  it('spells the eyebrow Eyebrow everywhere, and never Overline', () => {
+    /* The two blocks disagreed: the generated Desktop one is post-rename and
+       writes Eyebrow-*, the static mobile ones still write Overline-*. Read as
+       separate styles that produced two variables per property, each filled on
+       the devices whose block used its spelling and left at a stale 0 on the
+       rest — Overline-Small-Font-Weight read 0 on Desktop and 500 on the
+       tablets. */
+    for (const d of DEVICE_TYPES) {
+      const bag = P.devices[d];
+      for (const name of Object.keys(bag)) expect(name, d).not.toContain('Overline');
+      for (const step of ['Small', 'Medium', 'Large']) {
+        for (const face of FACE_MODES) {
+          const w = bag[sourceName(face, groupedProp(`Eyebrow-${step}`, 'Font-Weight'))];
+          expect(w, `${d} ${face} ${step}`).toBeDefined();
+          expect(Number(w.value)).toBeGreaterThan(0);
+        }
+        expect(Number(bag[`Typography/${groupedProp(`Eyebrow-${step}`, 'Font-Size')}`].value)).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('never lets a back-compat var() alias overwrite the value it points at', () => {
+    /* --Overline-<prop>: var(--Eyebrow-<prop>) is emitted right after the
+       canonical token. Folding the names without this rule would land the alias
+       last; a var() string parses to NaN, the property would be dropped, and
+       the Figma variable would silently keep whatever it held before. */
+    const { styles } = parsePlatformBlock(typographyTokensCSS, 'Desktop');
+    for (const [style, props] of Object.entries(styles))
+      for (const [prop, value] of Object.entries(props))
+        expect(String(value), `${style} ${prop}`).not.toContain('var(');
+  });
+
+  it('emits Eyebrow as the seam, and no Overline family at all', () => {
+    /* Eyebrow is where a design repoints the eyebrow face; the text styles bind
+       to it. Overline-Font-Family is gone from the file, so emitting one would
+       create a variable nothing references. */
+    for (const d of DEVICE_TYPES) {
+      expect(P.devices[d][familyName('Omni', 'Eyebrow')].value).toBe(familyAlias('Omni', 'Body'));
+      expect(P.devices[d][familyName('Omni', 'Overline')]).toBeUndefined();
+      expect(P.devices[d][familyName('System', 'Overline')]).toBeUndefined();
+    }
+  });
+
+  it('has a root for every section the stylesheet declares', () => {
+    /* The role table is stated, not derived — this is what stops the two
+       drifting apart when a section is added on one side only. */
+    for (const d of DEVICE_TYPES) {
+      const { families } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
+      for (const section of Object.keys(families)) {
+        if (NON_STYLE_SECTIONS.has(section)) continue;
+        const v = variableForSection(section);
+        expect(FAMILY_ROOT_OF[v], `no root for section "${section}" (variable "${v}")`).toBeDefined();
+      }
+    }
+  });
+
+  it('seeds the values from the block each device inherits', () => {
+    /* Nothing rendered changes on the day this lands. */
+    for (const d of DEVICE_TYPES) {
+      const { styles } = parsePlatformBlock(typographyTokensCSS, SEEDS_FROM[d]);
+      expect(P.devices[d][`Typography/${groupedProp('H1', 'Font-Size')}`].value)
+        .toBe(parseFloat(styles['H1']['Font-Size']));
+    }
+  });
+
+  it('names nothing outside the Typography group', () => {
+    /* Devices-Type already holds ~100 variables that are not typography. This
+       payload must ADD to the collection, never define it — an importer that
+       creates-or-updates by name then leaves the rest alone.
+       
+       The consequence of getting it wrong is not a failed import. It is a
+       quietly emptied collection, and a deleted Figma variable cannot be
+       recovered by re-importing: the recreated one gets a new id and every
+       layer bound to the old one stays unbound (invariant 8). */
+    for (const d of DEVICE_TYPES) {
+      const stray = payloadNames(P.devices[d]).filter((n) => !n.startsWith('Typography/'));
+      expect(`${d} stray names: ${stray.join(',') || 'none'}`).toBe(`${d} stray names: none`);
+      expect(payloadIsAdditive(P.devices[d])).toBe(true);
+    }
+  });
+
+  it('numbers are bare, not px strings', () => {
+    /* Figma FLOAT variables hold numbers; "28px" would import as a string or
+       not at all. */
+    for (const [name, v] of Object.entries(P.devices.Desktop)) {
+      if (name.endsWith('-Font-Family')) continue;
+      /* An alias is a reference string by design — it is the pointer, not the
+         value. What it points AT still has to be a bare number. */
+      if (typeof v.value === 'string' && v.value.startsWith('{')) {
+        expect(`${name}: ${typeof resolved(P.devices.Desktop, name)}`).toBe(`${name}: number`);
+        continue;
+      }
+      expect(`${name}: ${typeof v.value}`).toBe(`${name}: number`);
+    }
+  });
+});
+
+describe('the Typography alias collection', () => {
+  it('has exactly the two face modes', () => {
+    expect(Object.keys(P.typography).sort()).toEqual(['Omni', 'System']);
+  });
+
+  it('points each mode at its own face', () => {
+    const w = groupedProp('H1', 'Font-Weight');
+    const dotted = (face: string, n: string) => `{Typography.${face}.${n.split('/').join('.')}}`;
+    expect(P.typography.Omni[w].value).toBe(dotted('Omni', w));
+    expect(P.typography.System[w].value).toBe(dotted('System', w));
+    const ls = groupedProp('H1', 'Letter-Spacing');
+    expect(P.typography.Omni[ls].value).toBe(dotted('Omni', ls));
+  });
+
+  it('exposes the size too, identically in both modes', () => {
+    /* A text style binds to this collection and nothing else, so the size has
+       to be reachable here — but it does not switch, so both modes point at
+       the one value. */
+    for (const prop of DEVICE_PROPS) {
+      const key = groupedProp('H1', prop);
+      expect(P.typography.Omni[key].value)
+        .toBe(`{Typography.${key.split('/').join('.')}}`);
+      expect(P.typography.System[key].value).toBe(P.typography.Omni[key].value);
+    }
+  });
+
+  it('every alias resolves to a name that exists in Devices-Type', () => {
+    /* The whole point of the structure. A dangling alias is not an error in
+       Figma — it is an unbound variable that renders as nothing. */
+    const have = new Set(payloadNames(P.devices.Desktop));
+    for (const face of FACE_MODES) {
+      for (const [token, v] of Object.entries(P.typography[face])) {
+        const path = String(v.value).slice(1, -1).replace(/\./g, '/');
+        expect(`${face}/${token} -> ${have.has(path)}`).toBe(`${face}/${token} -> true`);
+      }
+    }
+  });
+
+  it('both modes carry the same names', () => {
+    expect(payloadNames(P.typography.Omni)).toEqual(payloadNames(P.typography.System));
+  });
+});
+
+describe('the CSS selectors', () => {
+  it('Omni needs no attribute, so it is the default', () => {
+    expect(faceSelector('Omni')).toBe('');
+  });
+
+  it('System outranks Omni on specificity, not on source order', () => {
+    /* What ships today is [data-fonts] against [data-fonts="Default"] — a bare
+       attribute selector matches ANY value, "Default" included, so the two
+       have identical specificity and only file order decides. Here System
+       carries one more attribute. */
+    const sys = blockSelector('IOS-Mobile', 'System');
+    const omni = blockSelector('IOS-Mobile', 'Omni');
+    expect(sys).toContain('[data-typography="System"]');
+    expect(omni).not.toContain('[data-typography');
+    for (const sel of sys.split(',\n')) {
+      expect(`${sel} attrs: ${(sel.match(/\[/g) || []).length >= 2}`)
+        .toBe(`${sel} attrs: true`);
+    }
+  });
+
+  it('keeps data-platform emitted beside data-device', () => {
+    /* Generated CSS is frozen per system in Storage. A page written against an
+       older system sets data-platform and always will; emitting only the new
+       name gives it no block at all, silently. Same call as --Overline-*. */
+    const sel = blockSelector('IOS-Mobile', 'Omni');
+    expect(sel).toContain('[data-device="IOS-Mobile"]');
+    expect(sel).toContain('[data-platform="IOS-Mobile"]');
+  });
+
+  it('keeps the old value spellings resolving', () => {
+    /* `Android` used to mean the phone. */
+    expect(LEGACY_DEVICE_ALIAS['Android']).toBe('Android-Mobile');
+    const sel = blockSelector('Android-Mobile', 'Omni');
+    expect(sel).toContain('[data-device="Android"]');
+    expect(sel).toContain('[data-platform="Android"]');
+  });
+
+  it('accepts the old face attribute too', () => {
+    const sel = blockSelector('IOS-Mobile', 'System');
+    expect(sel).toContain('[data-fonts="Default"]');
+  });
+});
+
+/* An extra weight must stay HEAVIER than the step it hangs off.
+ *
+ * `Body-Small-Semibold` is not a style the platforms have an opinion about by
+ * that name — it is one more weight on Body/Small. `roleOf` matched the BASE's
+ * prefix and answered for the base, so every semibold and bold was handed its
+ * own base's weight and the emphasis vanished: Body-*-Semibold 600 -> 400,
+ * Caption-*-Bold 700 -> 500, Legal-Semibold 600 -> 500, on six of the seven
+ * devices. Desktop was fine only because its System mirrors Omni.
+ *
+ * It was invisible in every obvious place. The CSS was correct throughout, the
+ * variable existed, the name was right, and the value was a plausible weight —
+ * so the only symptom was semibold body looking like body on a phone in System
+ * mode.
+ *
+ * Asserted as the RELATIONSHIP rather than against a table of numbers: what has
+ * to hold is that the emphasis survives, whatever each platform's number for it
+ * turns out to be.
+ */
+describe('extra weights stay heavier than their base step', () => {
+  const PAIRS: [string, string][] = [
+    ['Body/Body-Small', 'Body/Body-Small-Semibold'],
+    ['Body/Body-Medium', 'Body/Body-Medium-Semibold'],
+    ['Body/Body-Large', 'Body/Body-Large-Semibold'],
+    ['Captions/Caption-Small', 'Captions/Caption-Small-Bold'],
+    ['Captions/Caption', 'Captions/Caption-Bold'],
+    ['Captions/Caption-Large', 'Captions/Caption-Large-Bold'],
+    ['Legal/Legal', 'Legal/Legal-Semibold'],
+  ];
+
+  it.each(DEVICE_TYPES)('on %s, in both faces', (device) => {
+    const bag = P.devices[device] as Record<string, { value: unknown }>;
+    for (const face of FACE_MODES) {
+      for (const [base, extra] of PAIRS) {
+        const w = (n: string) => Number(resolved(bag, sourceName(face, `${n}-Font-Weight`)));
+        expect(`${face} ${extra}: ${w(extra)} > ${w(base)}`)
+          .toBe(`${face} ${extra}: ${w(extra)} > ${w(base)}`.replace(/: (\d+) > (\d+)$/,
+            (_m, a, b) => Number(a) > Number(b) ? `: ${a} > ${b}` : `: HEAVIER-THAN-${b} > ${b}`));
+      }
+    }
+  });
+
+  it('never invents a weight the face does not ship', () => {
+    /* Roboto has no 600 — Thin 100, Light 300, Regular 400, Medium 500, Bold
+       700, Black 900 — so Material's emphasis weight IS 500 and writing 600
+       there asks for a weight that has to be snapped or synthesised. Apple
+       ships Semibold at 600, so iOS keeps it. Android landing lower is the
+       face's constraint, not a leftover of the bug this describe block is
+       about. */
+    const android = P.devices['Android-Mobile'] as Record<string, { value: unknown }>;
+    const ios = P.devices['IOS-Mobile'] as Record<string, { value: unknown }>;
+    const w = (bag: Record<string, { value: unknown }>, n: string) =>
+      resolved(bag, sourceName('System', `${n}-Font-Weight`));
+    /* Legal is the case where the preference and the requirement conflict.
+       Its base resolves to the `label` role, which both platforms set at 500 —
+       so Material's 500 emphasis would have landed ON the base and rendered
+       Legal-Semibold identically to Legal. Roboto has nothing between 500 and
+       700, so 700 is the next weight that exists. Bolder than intended, and
+       the alternative was an emphasis that is not one. */
+    expect(w(android, 'Legal/Legal-Semibold')).toBe(700);
+    expect(w(ios, 'Legal/Legal-Semibold')).toBe(600);
+    /* Body's base is 400, so Material's 500 clears it and no escalation fires —
+       which is the check that the rule above is a fallback, not the norm. */
+    expect(w(android, 'Body/Body-Medium-Semibold')).toBe(500);
+    /* Bold is 700 on both — that one they agree on. */
+    expect(w(android, 'Captions/Caption-Bold')).toBe(700);
+    expect(w(ios, 'Captions/Caption-Bold')).toBe(700);
+  });
+});

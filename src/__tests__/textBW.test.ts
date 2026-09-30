@@ -215,19 +215,69 @@ describe('Text-BW', () => {
     expect(String(d['Surfaces-Dim']['Text-BW'].value)).toBe('{Default-Background.Surface-Dim-Text-BW}');
   });
 
-  it('resolves in the Figma payload for every Default surface', () => {
-    // Default's surfaces reach Text-BW through {Default-Background.*Text-BW},
-    // and that section is built from ROLE_SOURCES in generateFigmaJSON — a
-    // SEPARATE list from the CSS one. Missing there, the aliases pointed at a
-    // key that did not exist and resolved to nothing, while Containers linked
-    // fine because it needs no indirection.
-    const f: any = figmaOf(json);
-    const db = f.Modes?.['Light-Mode']?.['Default-Background'] || {};
-    for (const key of ['Text-BW', 'Surface-Dim-Text-BW', 'Surface-Bright-Text-BW']) {
-      expect(db[key]?.value, `Default-Background.${key} missing`).toMatch(/^#[0-9a-f]{6}$/i);
+  it('resolves for every Default surface, and flips between them', () => {
+    /* Asserted on the JSON layer, which is where Default still lives.
+       
+       It used to read the Figma payload's Default-Background section. That
+       section existed for one consumer — the Default Figma THEME — and the
+       theme is retired as a mode: the Theme collection's first mode is the
+       default now, so the payload no longer emits Default-Background at all.
+       CSS has no default-mode concept, so Default survives there and drives
+       :root, and this property survives with it.
+
+       The property itself is unchanged and still worth guarding: Text-BW has
+       to be present on each of Default's surfaces AND actually flip between
+       the dark and light ends, rather than being one colour everywhere. */
+    const themes = (json as any).Modes['Light-Mode'].Themes;
+    const roles = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Bright'] as const;
+    for (const role of roles) {
+      expect(themes.Default?.[role]?.['Text-BW']?.value, `Default.${role} Text-BW missing`)
+        .toBeTruthy();
     }
-    // And it must actually flip, not be one colour everywhere.
-    expect(db['Surface-Dim-Text-BW'].value).not.toBe(db['Surface-Bright-Text-BW'].value);
+    expect(themes.Default['Surfaces-Dim']['Text-BW'].value)
+      .not.toBe(themes.Default['Surfaces-Bright']['Text-BW'].value);
+  });
+
+  it('covers the brightest surface, where it must be black', () => {
+    /* Default's lightest surface had no Text-BW at all: its Text-Primary
+       routes through Default-Background rather than naming a tone, and
+       Surfaces-Brightest was missing from the fallback map, so the loop gave
+       up on the one level whose answer is most obvious.
+
+       The CSS lookup had built Default-Background.Surface-Brightest-Text-BW
+       the whole time — nothing pointed at it. That is why removing the Figma
+       Default-Background section exposed this: the indirection was covering a
+       hole on the JSON side. */
+    const brightest = (json as any).Modes['Light-Mode'].Themes.Default?.['Surfaces-Brightest'];
+    expect(brightest?.['Text-BW']?.value).toBe('{Default-Background.Surface-Brightest-Text-BW}');
+  });
+
+  it('resolves to BLACK there, through the map rather than a literal', () => {
+    /* Black is the right answer on a Color-11/12 background, but it is reached
+       through the same BlackWhite map as every other level — white at
+       Color-1..5, black from Color-6 up — instead of being written down.
+
+       That matters in dark mode, where the brightest surface is the dark
+       ramp's top rather than pure white: a hardcoded #000000 would have looked
+       correct in light mode and been unreadable there. */
+    const lm = generateCSSFiles(json)['Light-Mode.css'] || '';
+    // Split on block ends rather than slicing a fixed window: the declaration
+    // sits further into the block than a guessed offset reaches.
+    const blocks = lm.split('}').filter((b) => b.includes('Surface-Brightest'));
+    expect(blocks.length, 'no Surface-Brightest blocks in the CSS').toBeGreaterThan(0);
+
+    const missing = blocks.filter((b) => !/--Text-BW:/.test(b));
+    expect(missing.length, `${missing.length} Surface-Brightest block(s) still have no --Text-BW`).toBe(0);
+
+    const def = blocks.find((b) => b.includes('data-theme="Default"'));
+    expect(def, 'no Default Surface-Brightest block').toBeTruthy();
+    /* The DARK extreme, expressed as the system's own token rather than a raw
+       hex — var(--Neutral-Color-1), not #000000. Asserted as "the dark end,
+       and definitely not the light one" so it holds however the extreme is
+       spelled, and fails loudly if the map ever flips. */
+    const value = def!.match(/--Text-BW:\s*([^;]+);/)![1].trim().toLowerCase();
+    expect(value).toMatch(/color-1\b|#000000|\bblack\b/);
+    expect(value).not.toMatch(/color-12\b|#ffffff|\bwhite\b/);
   });
 
   it('reaches the CSS as --Text-BW', () => {

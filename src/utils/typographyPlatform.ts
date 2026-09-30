@@ -1,0 +1,1175 @@
+/**
+ * Typography by device type, switchable between the brand's faces and the
+ * platform's own.
+ *
+ * ── The shape ─────────────────────────────────────────────────────────────
+ *
+ *   Devices-Type
+ *     <Device>/Typography/Omni/<Style>-<Prop>     the brand's faces
+ *     <Device>/Typography/System/<Style>-<Prop>   the platform's faces
+ *
+ *   Typography            modes: Omni | System
+ *     <Style>-<Prop>  ->  an ALIAS to one of the two above
+ *
+ * Every Figma text style binds to the Typography collection and nothing else,
+ * so flipping that collection's mode switches the whole system in one gesture.
+ * A style never knows which face it is wearing.
+ *
+ * This is the pattern Icons & Avatars already uses: `Icon-Size` has modes
+ * `in-check` and `in-button`, each aliasing to a different Component-Size
+ * variable, and the SIZE ramp is inherited through the pointer rather than
+ * restated. Same trick, one axis up.
+ *
+ * ── What switches, and what does not ──────────────────────────────────────
+ *
+ * Font-SIZE is deliberately absent. The size ramp is a DEVICE decision — 28px
+ * at H1 on a phone — and it does not change because the face changed. Keeping
+ * it out means flipping Omni/System never reflows a layout: line boxes keep
+ * their heights, columns keep their measure, and the only thing that moves is
+ * the shape of the glyphs.
+ *
+ * It also halves the table. Size lives once, per device, where it already is.
+ *
+ * What DOES switch is everything the face owns:
+ *
+ *   Font-Family      the face itself
+ *   Font-Weight      SF Pro's 600 is not Roboto's 600 is not a brand face's
+ *   Line-Height      different faces have different metrics at one size
+ *   Letter-Spacing   a face tuned for UI needs different tracking
+ */
+
+/** Device types, in the order they appear in the file. */
+export const DEVICE_TYPES = [
+  'Desktop',
+  'IOS-Mobile',
+  'Android-Mobile',
+  'IOS-Tablet-Vertical',
+  'IOS-Tablet-Horizontal',
+  'Android-Tablet-Vertical',
+  'Android-Tablet-Horizontal',
+] as const;
+export type DeviceType = (typeof DEVICE_TYPES)[number];
+
+/** The two faces a device can be wearing. */
+export const FACE_MODES = ['Omni', 'System'] as const;
+export type FaceMode = (typeof FACE_MODES)[number];
+
+/**
+ * Which existing platform block each device seeds from.
+ *
+ * typography-tokens.css ships four blocks; this is seven device types. The map
+ * says where each one's starting numbers come from rather than inventing them,
+ * so nothing in the ramp changes on the day this lands — the structure moves,
+ * the values do not.
+ *
+ * The two tablet orientations seed from the SAME block, which makes the
+ * duplication explicit. If a rotation never changes a type value, those pairs
+ * stay equal for good and the orientation split is carrying nothing for
+ * typography (it still earns its keep in Device-Sizes, where layout lives).
+ */
+export const SEEDS_FROM: Record<DeviceType, string> = {
+  'Desktop': 'Desktop',
+  'IOS-Mobile': 'IOS-Mobile',
+  'Android-Mobile': 'Android',
+  'IOS-Tablet-Vertical': 'IOS-Tablet',
+  'IOS-Tablet-Horizontal': 'IOS-Tablet',
+  'Android-Tablet-Vertical': 'Android',
+  'Android-Tablet-Horizontal': 'Android',
+};
+
+/**
+ * The platform's own face, per device.
+ *
+ * Desktop has no single answer — "the system font" is Segoe on Windows, SF on
+ * macOS, whatever the distro picked on Linux — so it gets the stack and the OS
+ * resolves it. The mobile platforms have exactly one answer each.
+ */
+export const SYSTEM_FACE: Record<DeviceType, string> = {
+  'Desktop': 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  'IOS-Mobile': '"SF Pro"',
+  'Android-Mobile': 'Roboto',
+  'IOS-Tablet-Vertical': '"SF Pro"',
+  'IOS-Tablet-Horizontal': '"SF Pro"',
+  'Android-Tablet-Vertical': 'Roboto',
+  'Android-Tablet-Horizontal': 'Roboto',
+};
+
+/**
+ * The properties that switch with the face.
+ *
+ * Family, weight and tracking. A face has its own colour and its own natural
+ * weight at a given size, and tracking is tuned per face.
+ */
+export const SWITCHED_PROPS = [
+  'Font-Weight',
+  'Letter-Spacing',
+] as const;
+
+/**
+ * The properties that stay with the DEVICE, identical across both faces.
+ *
+ * Size and line-height together are the vertical rhythm, and holding them
+ * fixed is what makes the switch safe: toggling Omni / System reshapes the
+ * glyphs and moves nothing. Every line box keeps its height, every baseline
+ * stays on the grid, and no screen reflows vertically.
+ *
+ * The sizes on the mobile devices are the PLATFORM's — Apple's and Material's
+ * own ramps — not the brand's, and both faces sit on them. Desktop's come from
+ * the user's chosen scale, because Desktop is the brand's own surface.
+ *
+ * Letter-spacing is the one switched property that does affect layout, and it
+ * only affects it horizontally: a line gets wider or narrower, it does not
+ * move down the page. That is a deliberate line — horizontal give is absorbed
+ * by wrapping, vertical give breaks a grid.
+ */
+export const DEVICE_PROPS = ['Font-Size', 'Line-Height'] as const;
+
+/**
+ * Styles that offer only their WEIGHT as a Figma variable.
+ *
+ * Alt Display is the same face at the same sizes as Display — size, leading
+ * and tracking are identical on every device and in both faces, by design,
+ * because the pairing sets one word on one baseline ("Omni" + "Design") and a
+ * separate ramp would stop the halves lining up.
+ *
+ * Invariant 2 decides this, and the test is not "do the copies match" but
+ * "does anything SELECT between them". Nothing does, and nothing can: the
+ * requirement is that they stay equal. Publishing them twice would manufacture
+ * a choice that must never be exercised — someone nudges
+ * Alt-Display-Large-Font-Size and the pairing breaks with no error anywhere.
+ *
+ * The Alt text style binds those three fields to DISPLAY's variables instead.
+ * That is not a loss of expressiveness: it is the pairing stated in the file
+ * rather than merely hoped for.
+ *
+ * Note this is a FIGMA-only trim. The CSS keeps every token, because the two
+ * are different kinds of thing: a CSS token is a DEPENDENCY — the lib reads
+ * --Alt-Display-Large-Font-Size by name and a missing one breaks a consumer's
+ * build — while a Figma variable is an OFFER, and withdrawing an offer nobody
+ * should accept costs nothing.
+ */
+export const WEIGHT_ONLY_STYLES = /^Alt-Display-/;
+
+/**
+ * Styles whose weight is a NUMBER in Devices-Type, never an alias.
+ *
+ * Devices-Type is the value layer: the Typography collection aliases INTO it,
+ * so a variable here pointing at another variable here adds a hop that leads
+ * back to the same collection.
+ *
+ * For the Display family it is worse than redundant. Alt Display exists to be
+ * a different weight from Display, and an alias to the Display root makes the
+ * two identical — the distinction deleted by the very link meant to keep
+ * things in step.
+ *
+ * It was also decided by the wrong design. WEIGHT_FACES is built once from
+ * buildTypeScale(null), the DEFAULT scale, while whether the Alt follows its
+ * face depends on the user's own family: Raleway ships a lighter weight to
+ * drop to, Anton does not. A table computed from Open Sans cannot answer that
+ * for either of them, so the alias could be applied to a step that had already
+ * worked out its own number.
+ *
+ * Headers and Body keep their roots. H1-H3 following Headers-Font-Weight is
+ * the behaviour asked for, and there is no Alt in those families to collide
+ * with.
+ */
+export const LITERAL_WEIGHT_STYLES = /^(?:Alt-)?Display-/;
+
+/* ── Why Devices-Type has THREE branches and not two ───────────────────────
+ *
+ *   Typography/<Section>/...          Font-Size, Line-Height          62
+ *   Typography/Omni/<Section>/...     Family, Weight, Letter-Spacing  77
+ *   Typography/System/<Section>/...   Family, Weight, Letter-Spacing  77
+ *
+ * It reads oddly in the panel: `Displays` appears at two different depths, so
+ * the tree implies a relationship between the two that does not exist. The
+ * obvious tidy-up is to move the sizes into both faces and leave a clean pair.
+ *
+ * DO NOT. That is 62 more variables, and the count is the smaller half of the
+ * cost: it would be two variables holding one number with nothing selecting
+ * between them. Nothing in Figma keeps them equal, and the first nudge to
+ * either makes Omni and System render at different SIZES — at which point
+ * switching face reflows the page, which is the one thing the split exists to
+ * prevent.
+ *
+ * Invariant 2, inverted. It was written for Light/Medium button shades, which
+ * held identical values while the Theme layer SELECTED between them, so
+ * collapsing them destroyed a real choice. Here nothing selects, so splitting
+ * them would manufacture a choice that should not exist.
+ *
+ * Naming the third branch — Typography/Shared/... — would make the tree
+ * symmetric for free, and was considered and skipped: it buys tidiness at the
+ * price of one more level to navigate on every size lookup.
+ */
+
+/* ── The device axis has to be MODES, not groups ───────────────────────────
+ *
+ * This is the constraint the whole structure turns on, and it is easy to get
+ * backwards: "a Typography group under each Device Type" is the natural way to
+ * say it in English, and it does not work.
+ *
+ * A Figma collection has ONE mode axis. Typography spends its axis on
+ * Omni | System. So `Typography/H1-Font-Weight` is a single variable with two
+ * values, and each value is one alias — it can point at exactly one target.
+ * If the seven devices were GROUPS, there would be seven candidate targets and
+ * no way to choose between them, because the collection has no axis left to
+ * choose with.
+ *
+ * With the devices as MODES of Devices-Type, the alias points at one name and
+ * the DEVICE resolves underneath it, exactly the way Icons & Avatars works:
+ * `Icon-Size` spends its axis on in-check | in-button and aliases into
+ * Component-Size, whose own axis supplies small | medium | large. Two
+ * collections, two axes, composed through the pointer.
+ *
+ * The device therefore does NOT appear in these names. It is a column, not a
+ * path segment. That also collapses the size of this: one variable per
+ * style-property per face (~220) rather than one per device as well (~1,540).
+ */
+const GROUPED = (...parts: string[]) => parts.join('/');
+
+/** Where the face values live in Devices-Type. The device is a MODE. */
+export function sourceName(face: FaceMode, token: string): string {
+  return GROUPED('Typography', face, token);
+}
+
+/** The alias string the Typography collection stores, pointing at that source. */
+export function aliasTo(face: FaceMode, token: string): string {
+  return `{Devices-Type.${sourceName(face, token).replace(/\//g, '.')}}`;
+}
+
+/* ── The CSS side ─────────────────────────────────────────────────────────
+ *
+ * Two attributes, mirroring the two Figma collections:
+ *
+ *   data-device="IOS-Mobile"    which device type   (Devices-Type)
+ *   data-fonts="Omni"|"System"  which face          (Typography, its 2 modes)
+ *
+ * ── Why data-platform does not simply go away ─────────────────────────────
+ *
+ * A design system's CSS is FROZEN per system in Storage and cannot be
+ * regenerated. A page written against an older system sets data-platform and
+ * always will. Emitting only data-device would mean that page silently gets no
+ * platform block at all — no error, no fallback, just Desktop's values (or
+ * none) on a phone.
+ *
+ * This is the same call the Eyebrow rename made, and it was made the same way:
+ * --Overline-* is still emitted, forever, as an alias. The old name keeps
+ * resolving; the new name is the one to write.
+ *
+ * So every block is emitted under BOTH attributes. A selector list costs one
+ * comma and nothing at runtime. data-device is the name to use; data-platform
+ * keeps working and is not documented for new work.
+ *
+ * ── The value names moved too ─────────────────────────────────────────────
+ *
+ * `Android` became `Android-Mobile`, and the tablets split by orientation. An
+ * old page says data-platform="Android" and means the phone, so that spelling
+ * has to keep resolving to Android-Mobile rather than matching nothing.
+ */
+export const LEGACY_DEVICE_ALIAS: Record<string, DeviceType> = {
+  'Android': 'Android-Mobile',
+  'IOS-Tablet': 'IOS-Tablet-Vertical',
+};
+
+/**
+ * The selector for one device's block: the new attribute, the old one, and any
+ * legacy spelling that used to mean this device.
+ */
+export function deviceSelector(device: DeviceType, extra = ''): string {
+  const names = [device, ...Object.entries(LEGACY_DEVICE_ALIAS)
+    .filter(([, to]) => to === device).map(([from]) => from)];
+  return names
+    .flatMap((n) => [`[data-device="${n}"]`, `[data-platform="${n}"]`])
+    .map((sel) => sel + extra)
+    .join(',\n');
+}
+
+/**
+ * The face selector, appended to a device selector.
+ *
+ * Omni is the DEFAULT and carries no attribute at all: a page that never sets
+ * data-typography gets the brand's faces, which is the right thing to happen
+ * when someone forgets. System is opt-in.
+ *
+ * That also fixes the cascade rather than relying on it. What ships today is
+ *
+ *     [data-platform="X"][data-fonts]           -> the brand faces
+ *     [data-platform="X"][data-fonts="Default"] -> the system faces
+ *
+ * and a BARE attribute selector matches any value, "Default" included. Both
+ * rules have identical specificity, so which one wins is decided purely by
+ * SOURCE ORDER — it works now only because the Default blocks happen to sit
+ * later in the file. One reordering and every brand silently renders in the
+ * system face, with nothing to see in a diff.
+ *
+ * Here System carries one more attribute than Omni, so it wins on specificity
+ * and the order of the file stops mattering.
+ *
+ * "Default" stays as a second spelling of System, and data-fonts as a second
+ * spelling of the attribute, for the frozen-CSS reason above: pages already
+ * set them and cannot be regenerated.
+ */
+export function faceSelector(face: FaceMode): string {
+  if (face === 'Omni') return '';
+  return '[data-typography="System"]';
+}
+
+/** The spellings of "system faces" that a frozen page might already carry. */
+export const LEGACY_SYSTEM_SELECTORS = [
+  '[data-typography="System"]',
+  '[data-fonts="System"]',
+  '[data-fonts="Default"]',
+];
+
+/**
+ * Every selector for one device + face pair.
+ *
+ * Omni is one selector per device spelling. System multiplies by the legacy
+ * face attributes, which is a handful of extra selectors in a file that
+ * already runs to hundreds — cheap insurance against a page that cannot be
+ * regenerated.
+ */
+export function blockSelector(device: DeviceType, face: FaceMode): string {
+  if (face === 'Omni') return deviceSelector(device);
+  return LEGACY_SYSTEM_SELECTORS
+    .map((f) => deviceSelector(device, f))
+    .join(',\n');
+}
+
+/* ── Values ───────────────────────────────────────────────────────────────
+ *
+ * Parsed out of the GENERATED stylesheet rather than computed again here.
+ *
+ * That direction is deliberate. Invariant 5 is that the preview and the export
+ * are separate implementations and drift silently, and this file would have
+ * been a third. Deriving the Figma payload FROM the CSS means the two cannot
+ * disagree about a number — not "are kept in sync", but cannot disagree, since
+ * there is only one computation and Figma reads its output.
+ *
+ * It also picks up the live Desktop ramp for free: buildTypographyTokensCSS
+ * splices the user's chosen scale into the Desktop block, so parsing the
+ * result gives the brand's real Desktop values and the static mobile ones in
+ * a single pass.
+ */
+
+import { SYSTEM_FAMILY_OF, systemTracking, systemWeight, systemExtraWeight, systemLineHeight } from './systemTypography';
+import type { FamilyRole, ResolvedRoles } from './typeScale';
+import { buildTypeScale, BODY_LINE_HEIGHT } from './typeScale';
+
+export interface TypeValue { value: string | number; type: string }
+export type VarBag = Record<string, TypeValue>;
+
+/** One style's properties, keyed by the property suffix. */
+type StyleProps = Record<string, string>;
+
+/**
+ * What a `var(--X)` resolves to inside its own block.
+ *
+ * Does what the browser does and nothing more: follow the name, and on a miss
+ * take the fallback. A reference that leads nowhere is returned unchanged — the
+ * caller's parseFloat then drops it, which is the honest outcome for a value
+ * this file genuinely cannot know (`--Set-Font-Family-Header` is the
+ * consumer's to define, not ours).
+ *
+ * Depth-bounded because a cycle in the stylesheet would otherwise hang the
+ * export rather than produce a wrong number.
+ */
+export function resolveVar(value: string, declared: Record<string, string>, depth = 0): string {
+  const v = String(value).trim();
+  if (depth > 8 || !v.startsWith('var(')) return v;
+  const m = v.match(/^var\(\s*--([\w-]+)\s*(?:,\s*([\s\S]+))?\)$/);
+  if (!m) return v;
+  const [, name, fallback] = m;
+  if (declared[name] !== undefined) return resolveVar(declared[name], declared, depth + 1);
+  if (fallback !== undefined) return resolveVar(fallback, declared, depth + 1);
+  return v;
+}
+
+/** Parse one `[data-platform="X"] { … }` block into style -> prop -> value. */
+export function parsePlatformBlock(css: string, platform: string):
+  { styles: Record<string, StyleProps>; families: Record<string, string> } {
+  const re = new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`);
+  const m = css.match(re);
+  const styles: Record<string, StyleProps> = {};
+  const families: Record<string, string> = {};
+  if (!m) return { styles, families };
+
+  /* Every custom property the block declares, so a reference can be resolved
+     against it.
+   *
+   * The generated Desktop block does not restate a weight per step — it writes
+   *   --H1-Font-Weight: var(--Font-Weight-Header);
+   * and declares the number once under `/* Face weights *\/`, which is the
+   * right thing for CSS: one number, and a step that reads a DIFFERENT weight
+   * (H4-H6 read --Header-Clamped-Weight) says so by naming it.
+   *
+   * Reading that with parseFloat gives NaN, the property is dropped, and the
+   * Figma variable silently keeps whatever it held — which is how every Desktop
+   * font weight came to read 0 while the mobile blocks, which are static and
+   * spell their numbers out, were fine.
+   *
+   * Collected in a separate pass so declaration ORDER cannot matter: the face
+   * weights are emitted after the styles that reference them. */
+  const declared: Record<string, string> = {};
+  for (const raw of m[1].split('\n')) {
+    const d = raw.trim().match(/^--([\w-]+):\s*(.+?);$/);
+    if (d) declared[d[1]] = d[2];   // last wins, matching the cascade
+  }
+
+  let section = '';
+  for (const raw of m[1].split('\n')) {
+    const line = raw.trim();
+    const sec = line.match(/^\/\*\s*(.+?)\s*\*\/$/);
+    if (sec) { section = sec[1]; continue; }
+    const decl = line.match(/^--([\w-]+):\s*(.+?);$/);
+    if (!decl) continue;
+    const [, name, value] = decl;
+    const fam = name.match(/^Font-Family-(\w+)$/);
+    /* Last one wins, matching the cascade. The mobile blocks declare
+       --Font-Family-Body twice — once in Headers pointing at the DECORATIVE
+       family, then again in Body pointing at Body — so reading the first would
+       record a value the browser never uses. */
+    if (fam) { families[section] = value; continue; }
+    const prop = name.match(/^(.+?)-(Font-Size|Font-Weight|Line-Height|Letter-Spacing)$/);
+    if (prop) {
+      const style = styleVariable(prop[1]);
+      if (EXCLUDED_STYLES.test(style)) continue;
+      const into = (styles[style] ??= {});
+      /* A pure `var(...)` is a BACK-COMPAT ALIAS, never a value.
+       *
+       * The generated Desktop block emits the canonical token and then
+       * --Overline-<prop>: var(--Eyebrow-<prop>) right behind it. Folding the
+       * two names together without this would let the alias land last and
+       * overwrite the number it points at — and since a var() string parses to
+       * NaN, the property would then be dropped entirely and the variable would
+       * keep whatever it held before. That is how Overline-Small-Font-Weight
+       * came to read 0 on Desktop and 500 on the tablets. */
+      if (into[prop[2]] !== undefined && /^var\(/.test(value)) continue;
+      into[prop[2]] = resolveVar(value, declared);
+    }
+  }
+  return { styles, families };
+}
+
+/** px / unitless string to a bare number, for Figma's FLOAT variables. */
+function num(v: string | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Any length to PX, against the style's own size.
+ *
+ * The stylesheet mixes units for letter-spacing and it is not sloppiness —
+ * the mobile blocks are static and written in px, while the Desktop ramp is
+ * generated and the header tracking curve emits em. Reading both with
+ * parseFloat gives -0.018 and 0 and treats them as the same kind of number,
+ * which is how an em value ends up in Figma meaning 0.018 PIXELS.
+ *
+ * Everything is normalised to px here because that is the unit the existing
+ * mobile values are already in, and because Figma stores a bare float whose
+ * unit lives on the text style — so the two sides have to agree before they
+ * get there, not after.
+ */
+function toPx(v: string | undefined, size: number): number | undefined {
+  if (v === undefined) return undefined;
+  const m = String(v).trim().match(/^(-?[\d.]+)\s*(em|px|%)?$/);
+  if (!m) return undefined;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return undefined;
+  if (m[2] === 'em') return +(n * size).toFixed(4);
+  if (m[2] === '%') return +((n / 100) * size).toFixed(4);
+  return n;
+}
+
+/** Properties measured as a length, which therefore need unit normalising. */
+const LENGTH_PROPS = new Set(['Letter-Spacing', 'Line-Height', 'Font-Size']);
+
+const FLOAT_PROPS = new Set(['Font-Weight', 'Line-Height', 'Letter-Spacing', 'Font-Size']);
+
+/**
+ * Which family each type-style section wears, by the name of the variable that
+ * holds it.
+ *
+ * Three roots carry a literal family name — Display, Headers, Body — and every
+ * other style points at one of them. The roots are ordinary style names rather
+ * than a separate `Faces/` group, because the Display style wears the Display
+ * face and there is no third thing for the extra name to mean. It is also the
+ * structure already built by hand in the file, and the file is the authority:
+ * a name invented here that the file does not have is a silent no-op that
+ * reports success, which has happened twice already (`Radio-Size` against the
+ * file's `Radio`, `Checkbox-Size` against `Checkbox-Width`).
+ *
+ * Stated here rather than parsed out of the stylesheet, which departs from the
+ * rest of this file — worth being explicit about.
+ *
+ * Invariant 5 says derive from the CSS so the two cannot disagree about a
+ * VALUE. This is not a value; it is an assignment, and the stylesheet's copy of
+ * it is wrong in two places:
+ *
+ *   mobile   Headers  -> --Font-Family-Body: var(--Platform-Font-Families-Decorative)
+ *                        wrong token AND wrong face; Desktop has it right
+ *   Overline          -> Decorative on Desktop, Body on mobile
+ *
+ * Deriving from that carried both bugs into Figma, which is what the previous
+ * pass did. The stylesheet's Platform vars are also being removed, so there
+ * will shortly be nothing there to derive from.
+ *
+ * `hasARootForEverySection` holds this table against the sections the CSS
+ * actually declares, so a new section cannot be added on one side alone — the
+ * drift invariant 5 guards against is caught by a test instead of by shared
+ * derivation.
+ */
+export const FAMILY_ROOT_OF: Record<string, string> = {
+  Display: 'Display',
+  Headers: 'Headers',
+  Body: 'Body',
+  /* Everything below resolves to the Body face. The eyebrow has no picker of
+     its own — resolveRoles maps the eyebrow role at the Body family — so there
+     is no third literal to hold. */
+  Subtitle: 'Body',
+  Caption: 'Body',
+  Label: 'Body',
+  'Mobile-Nav-Label': 'Body',
+  Legal: 'Body',
+  Number: 'Body',
+  Button: 'Body',
+
+  /* Eyebrow is a SEAM, not a face: somewhere to change the eyebrow's family
+     without touching Body. It resolves to Body today and the text styles bind
+     to it, so a design that wants a distinct eyebrow face has one variable to
+     repoint and every eyebrow follows.
+
+     There is deliberately no `Overline-Font-Family`. Eyebrow is the name (the
+     lib's CSS keeps emitting --Overline-* forever because a published
+     stylesheet is frozen and cannot be regenerated — a Figma file is not, and
+     this one has already dropped it). */
+  Eyebrow: 'Body',
+};
+
+/**
+ * Stylesheet section -> the variable that holds its family.
+ *
+ * Only ever needed where the two names differ. The CSS block is still headed
+ * `/* Overline *\/` — the frozen-stylesheet reason that keeps --Overline-*
+ * alive on the web does not reach a live Figma file, so the variable is
+ * Eyebrow and only the section comment lags.
+ */
+export const SECTION_VARIABLE: Record<string, string> = { Overline: 'Eyebrow' };
+
+/**
+ * The FOLDER a style's variables live in, as the Figma file spells it.
+ *
+ * ~90 names per face is one scroll; grouped it is a tree. The names are the
+ * file's, read off the variables panel on 2026-09-20 — Displays, Headers,
+ * Subtitles, Body, Captions, Labels, Legal, Eyebrows, Numbers, Buttons,
+ * Badges. Mostly plural, and Body and Legal are not, which is exactly why this
+ * is a table and not a pluralise() call.
+ *
+ * The file is the authority and the reason is mechanical: the importer matches
+ * by NAME. A folder invented here that the file does not have would not fail —
+ * it would CREATE a second set of variables beside the real ones, leaving the
+ * grouped originals still bound to every layer and never updated again. That is
+ * the same shape as `Radio-Size` against the file's `Radio`, except doubled.
+ *
+ * Keyed by the scale's own group, so the styles a group contains are derived
+ * rather than restated.
+ */
+export const GROUP_FOLDER: Record<string, string> = {
+  Display: 'Displays',
+  Header: 'Headers',
+  Subtitle: 'Subtitles',
+  Body: 'Body',
+  Caption: 'Captions',
+  Label: 'Labels',
+  Legal: 'Legal',
+  Eyebrow: 'Eyebrows',
+  Number: 'Numbers',
+  Button: 'Buttons',
+  Badge: 'Badges',
+};
+
+/** token -> the scale's group, plus the extra-weight suffixes that hang off one. */
+function buildStyleGroups(): { group: Record<string, string>; suffixes: string[] } {
+  const group: Record<string, string> = {};
+  const suffixes = new Set<string>();
+  for (const st of buildTypeScale(null)) {
+    group[st.token] = st.group;
+    for (const w of st.extraWeights || []) suffixes.add(w.suffix);
+  }
+  return { group, suffixes: [...suffixes] };
+}
+const STYLE_GROUPS = buildStyleGroups();
+
+/**
+ * Where one style's property lands.
+ *
+ * The LEAF keeps its whole name — `Body/Body-Small-Font-Weight`, not
+ * `Body/Small/Font-Weight`. That is the file's shape, and it also means the
+ * only thing that changes is a folder segment in front, so a variable stays
+ * recognisable to anyone reading a diff or hunting it in the panel.
+ *
+ * An extra weight belongs to its base step's group: Body-Small-Semibold is one
+ * more weight on Body/Small, not a group of its own.
+ *
+ * A token the scale does not know falls back to the flat name. That keeps it
+ * VISIBLE rather than dropping it, and a test holds the coverage so a real gap
+ * fails there instead of quietly scattering one style outside the tree.
+ */
+export function styleFolder(token: string): string | undefined {
+  const direct = STYLE_GROUPS.group[token];
+  if (direct) return GROUP_FOLDER[direct];
+  for (const suffix of STYLE_GROUPS.suffixes) {
+    if (!token.endsWith(`-${suffix}`)) continue;
+    const stem = STYLE_GROUPS.group[token.slice(0, -(suffix.length + 1))];
+    if (stem) return GROUP_FOLDER[stem];
+  }
+  return undefined;
+}
+
+/**
+ * The extra-weight suffix a token carries, or undefined for a base step.
+ *
+ * Matched against the suffixes the SCALE declares rather than a literal list,
+ * so a weight added upstream is recognised here without this file being
+ * touched. The stem has to be a real style too — otherwise a style that merely
+ * ended in the word would be mistaken for one.
+ */
+export function extraWeightSuffix(token: string): string | undefined {
+  for (const suffix of STYLE_GROUPS.suffixes) {
+    if (!token.endsWith(`-${suffix}`)) continue;
+    if (STYLE_GROUPS.group[token.slice(0, -(suffix.length + 1))]) return suffix;
+  }
+  return undefined;
+}
+
+/** The step an extra weight hangs off — `Body-Small-Semibold` -> `Body-Small`. */
+export function baseOf(token: string, suffix: string): string {
+  return token.slice(0, -(suffix.length + 1));
+}
+
+/** A style property's name, grouped. */
+export function groupedProp(token: string, prop: string): string {
+  const folder = styleFolder(token);
+  return folder ? `${folder}/${token}-${prop}` : `${token}-${prop}`;
+}
+
+/**
+ * The folder a section's FAMILY sits in — with its styles, not beside them.
+ *
+ * `Displays` holds five variables in the file: two steps x two switched
+ * properties, and the family. So the family belongs inside the group.
+ */
+export const FAMILY_FOLDER: Record<string, string> = {
+  Display: 'Displays', Headers: 'Headers', Subtitle: 'Subtitles', Body: 'Body',
+  Caption: 'Captions', Label: 'Labels', 'Mobile-Nav-Label': 'Mobile-Nav-Label',
+  Legal: 'Legal', Eyebrow: 'Eyebrows',
+  Number: 'Numbers', Button: 'Buttons',
+};
+
+/**
+ * Which steps take their weight FROM THE FACE, and from which one.
+ *
+ * The weight half of what the families already do: three roots carrying a
+ * number, and every step that follows a face pointing at its root instead of
+ * restating it. Change the Display face's weight and all three Display steps
+ * move, the way the stylesheet already behaves —
+ * `--Display-Large-Font-Weight: var(--Font-Weight-Display)`.
+ *
+ * Derived from buildTypeScale rather than listed, because the scale is what
+ * decides it: a step sets weightFromFace, or names a different variable, or
+ * states a number. Reading that means a step which changes its mind is
+ * followed automatically instead of quietly keeping a stale alias.
+ *
+ * Deliberately NOT everything. H4-H6 read --Header-Clamped-Weight, which only
+ * ever raises a light pick and is a different value by design; Subtitle, Label,
+ * Number, Button and Badge state their own. Pointing those at a face root would
+ * make the root look like it governs the group and then surprise whoever moved
+ * it.
+ */
+const WEIGHT_ROOT_OF_ROLE: Record<string, string> = {
+  display: 'Display', header: 'Headers', body: 'Body',
+};
+
+function buildWeightFaces(): { root: Record<string, string>; sample: Record<string, string> } {
+  const root: Record<string, string> = {};
+  const sample: Record<string, string> = {};
+  for (const st of buildTypeScale(null) as any[]) {
+    if (!st.weightFromFace || st.weightVar) continue;
+    const r = WEIGHT_ROOT_OF_ROLE[st.familyRole];
+    if (!r) continue;
+    root[st.token] = r;
+    if (!sample[r]) sample[r] = st.token;   // any step of that face; they agree
+  }
+  return { root, sample };
+}
+const WEIGHT_FACES = buildWeightFaces();
+
+/** The root a step's weight follows, or undefined when it states its own. */
+export function weightRootOf(token: string): string | undefined {
+  return WEIGHT_FACES.root[token];
+}
+
+/** The variable holding one face's weight. */
+export function weightRootName(face: FaceMode, root: string): string {
+  return sourceName(face, `${FAMILY_FOLDER[root]}/${root}-Font-Weight`);
+}
+
+/** The alias a step stores, pointing at its face's weight. */
+export function weightRootAlias(face: FaceMode, root: string): string {
+  return `{${weightRootName(face, root).replace(/\//g, '.')}}`;
+}
+
+/** The variable a stylesheet section's family lands in. */
+export function variableForSection(section: string): string {
+  return SECTION_VARIABLE[section] ?? section;
+}
+
+/**
+ * Styles the stylesheet declares that must NOT reach Figma.
+ *
+ * `--Body-<step>-Bold-Font-Weight: 700` is a legacy token. Body ships standard
+ * and SEMIBOLD only — bold at body sizes is what Subtitle is for — and the lib
+ * resolves `variant="body-bold"` to the semibold style, not to a 700. The
+ * generated Desktop block already knows this and emits only Semibold
+ * (BODY_EXTRA_WEIGHTS); the static mobile blocks are older and declare both.
+ *
+ * The CSS has to keep emitting it, for the frozen-stylesheet reason: a
+ * published system cannot be regenerated and a consumer may already read the
+ * name. Figma does not, because a variable there is an OFFER — a designer who
+ * picks Body-Large-Bold gets 700 in the mock and semibold in the build, and
+ * nothing anywhere reports the difference.
+ *
+ * Button-ExtraSmall is here for the design's own reason rather than a
+ * correctness one: the file has no extra-small button. It stays in the CSS,
+ * because the lib reads it — Typography.js:515-518 resolves its tokens — and
+ * pulling those would render the component unstyled wherever it is already
+ * used. Withdrawing a Figma variable costs nothing; withdrawing a CSS token
+ * breaks a build. It leaves the stylesheet when the lib stops exporting it.
+ *
+ * Display-Medium is NOT here. It was, briefly, on a reading of "we only have
+ * Display Large and Small" that turned out to be about a different collection
+ * — the file has all three. Worth the note: the lib exports DisplayMedium and
+ * resolves its tokens, so excluding it would have left a shipped component
+ * with no variables behind it, which is the same defect as Body-Bold with the
+ * sign reversed.
+ *
+ * Caption-Bold and Legal-Semibold are NOT here: those styles really do ship
+ * that weight (see SYSTEM_STYLES), so the name means what it says.
+ */
+export const EXCLUDED_STYLES =
+  /^(Body-(Small|Medium|Large)-Bold|Button-ExtraSmall|Button-Standard)$/;
+
+/* Button-Standard is here for a DIFFERENT reason than the other two.
+ *
+ * Body-*-Bold and Button-ExtraSmall are excluded because the design does not
+ * have them. Button-Standard is excluded because it is the same style as
+ * Button-Medium under its old name — the stylesheet emits
+ * `--Button-Standard-Font-Size: var(--Button-Medium-Font-Size)` so that frozen
+ * systems and un-upgraded consumers keep resolving, and the parser resolves
+ * var() against what the block already declared. Without this line that alias
+ * parses back into a second style holding the same numbers, and the Figma
+ * payload grows a Button-Standard group beside Button-Medium: two variables per
+ * property, a designer able to pick either, and no way to tell which a layer
+ * used.
+ *
+ * So: the CSS keeps the old name forever, and Figma never sees it. That split
+ * is the Overline -> Eyebrow precedent — a published stylesheet cannot be
+ * regenerated, a Figma file can. */
+
+/**
+ * The variable a stylesheet STYLE lands in. Overline is spelled Eyebrow.
+ *
+ * The two blocks disagree about the name and each carries half the ramp: the
+ * generated Desktop block is post-rename and writes Eyebrow-*, while the static
+ * mobile blocks still write Overline-*. Reading them as separate styles
+ * produced two variables per property, each populated on the devices whose
+ * block happened to use its spelling and untouched — so showing a stale 0 — on
+ * the rest.
+ *
+ * Folding them here means one name, filled on all seven. The CSS keeps emitting
+ * both spellings forever, for the frozen-stylesheet reason in
+ * generateTypographyTokensCSS; Figma takes only the canonical one.
+ */
+export function styleVariable(style: string): string {
+  return style.replace(/^Overline-/, 'Eyebrow-');
+}
+
+/**
+ * A family name as FIGMA wants it.
+ *
+ * CSS quotes a family whose name has a space — `"SF Pro"` — and Figma does not:
+ * it stores a font NAME, and the quotes would be part of it, so the font simply
+ * would not match. Nothing reports that; the text renders in a fallback and
+ * looks like a font choice.
+ */
+export function figmaFamily(cssFamily: string): string {
+  return cssFamily.trim().replace(/^["']|["']$/g, '');
+}
+
+/**
+ * Devices whose System face is the same as their Omni one.
+ *
+ * Desktop. "The system font" is not one font there — it is Segoe on Windows, SF
+ * on macOS, whatever the distro picked on Linux — so the CSS answers with a
+ * stack, and a stack is not something a Figma variable can hold: the field
+ * takes one font name. Writing the stack in produced a variable no text style
+ * could use.
+ *
+ * Desktop is also the brand's own surface, which is the substantive reason
+ * rather than the mechanical one: there is nothing for System to mean there
+ * that Omni does not already say.
+ */
+export function mirrorsOmni(device: DeviceType): boolean {
+  return device === 'Desktop';
+}
+
+/**
+ * Will this face's ROOTS be written for this device?
+ *
+ * Everything that points at a root has to ask, because a pointer to a name
+ * that was never written is the worst of the three outcomes: Figma does not
+ * report it, the variable exists, and it resolves to nothing.
+ *
+ * Omni's roots are the brand's and need the resolved faces. System's are the
+ * platform's and are always available — except on Desktop, where System
+ * mirrors Omni and so needs them too.
+ *
+ * Both the family aliases and the weight aliases got this wrong independently,
+ * the second one caught by a test written for the first. One predicate now, so
+ * the next thing to gain a root cannot get it wrong a third time.
+ */
+export function rootsWritten(face: FaceMode, device: DeviceType, hasFaces: boolean): boolean {
+  return face === 'System' && !mirrorsOmni(device) ? true : hasFaces;
+}
+
+/** The three roots, and the face whose literal family each one holds. */
+export const ROOT_ROLE: Record<string, FamilyRole> = {
+  Display: 'display',
+  Headers: 'header',
+  Body: 'body',
+};
+
+/**
+ * Sections the stylesheet declares that are NOT type styles.
+ *
+ * The generated Desktop block opens with a Faces group defining the four face
+ * tokens themselves, and the parse — which keys families by whatever section
+ * comment preceded them — read it as a style and produced `Faces-Font-Family`,
+ * holding a var() reference to a collection that is being removed. It was the
+ * first thing anyone noticed in the variables panel.
+ */
+export const NON_STYLE_SECTIONS = new Set(['Faces', 'Face weights']);
+
+/** The variable that holds one section's family. */
+export function familyName(face: FaceMode, section: string): string {
+  const folder = FAMILY_FOLDER[section];
+  return sourceName(face, folder ? `${folder}/${section}-Font-Family` : `${section}-Font-Family`);
+}
+
+/** The alias a non-root style stores, pointing at its root. */
+export function familyAlias(face: FaceMode, root: string): string {
+  return `{${familyName(face, root).replace(/\//g, '.')}}`;
+}
+
+/**
+ * The collection's name in the file, EXACTLY as Figma spells it.
+ *
+ * One constant because a wrong collection name is the quietest failure in this
+ * system: the write lands nowhere and the run reports success. That has
+ * already happened twice — `Radio-Size` against the file's `Radio`, and
+ * `Checkbox-Size` against `Checkbox-Width`.
+ *
+ * Read off the variables panel on 2026-09-20 as "Devices-Type", plural on the
+ * first word. It is NOT used inside the alias strings — those carry a path and
+ * no collection — so this affects only the payload key.
+ */
+export const DEVICES_COLLECTION = 'Devices-Type';
+
+/** Everything this writes into that collection sits under this prefix. */
+export const DEVICES_TYPE_PREFIX = 'Typography/';
+
+/**
+ * The two collections, ready for the payload.
+ *
+ * `devices` is keyed by device type — each key is a MODE of Devices-Type, not
+ * a group, so the variable names inside are identical across all seven and
+ * only the values differ. That is what lets one alias serve every device.
+ *
+ * ── Devices-Type is ADDED TO, never replaced ──────────────────────────────
+ *
+ * The collection already holds ~100 variables that have nothing to do with
+ * typography. This function names ONLY variables under `Typography/`, so an
+ * importer that creates-or-updates by name leaves every other variable
+ * untouched. `payloadIsAdditive()` asserts that and a test holds it, because
+ * the failure mode is not a broken import — it is a silently emptied
+ * collection, and a deleted Figma variable cannot be recovered by
+ * re-importing (invariant 8): the recreated one gets a new id and every layer
+ * bound to the old one stays unbound.
+ *
+ * The import itself has to be create-or-update rather than replace-collection.
+ * Nothing here can enforce that; it is a property of the plugin.
+ */
+export function typographyVariablePayload(
+  generatedCSS: string,
+  /* The brand's four faces, already resolved to literal family names. Omitted
+     only by older callers and the parse-shape tests; when it is missing the
+     Omni face roots are skipped rather than filled with a placeholder, because
+     a wrong family name in Figma is invisible and a missing one is not. */
+  faces?: ResolvedRoles,
+): {
+  devices: Record<DeviceType, VarBag>;
+  typography: Record<FaceMode, VarBag>;
+} {
+  const devices = {} as Record<DeviceType, VarBag>;
+  const typography = { Omni: {} as VarBag, System: {} as VarBag };
+
+  /* Desktop's styles, as the FLOOR every other device's set is filled up to.
+   *
+   * The Desktop block is generated from the scale and carries everything the
+   * system has; the other three blocks are static, older, and short by five
+   * styles — Badge, Button-Large, Display-Medium, Label-Medium-All-Caps and
+   * Subtitle-Medium. Left alone, each of those becomes a variable whose DESKTOP
+   * mode holds a value and whose other six hold Figma's default, so a Badge on
+   * iOS renders at font-size 0. Nothing reports it: the import succeeds, the
+   * variable exists, and only that one mode is empty.
+   *
+   * A device's OWN block always wins where it declares a style — mobile H1 stays
+   * 28px, not Desktop's 48 — so this fills gaps and overrides nothing. The
+   * inherited sizes then go through the same platform rules as everything else,
+   * because they are read as a size like any other.
+   */
+  const desktopStyles = parsePlatformBlock(generatedCSS, SEEDS_FROM['Desktop']).styles;
+
+  for (const device of DEVICE_TYPES) {
+    const bag: VarBag = {};
+    const own = parsePlatformBlock(generatedCSS, SEEDS_FROM[device]);
+    const styles = { ...desktopStyles, ...own.styles };
+    const families = own.families;
+
+    for (const [style, props] of Object.entries(styles)) {
+      /* Font-Size is a DEVICE decision, not a face one — it sits outside the
+         Omni/System split, together with Line-Height: the two are the vertical
+         rhythm, and holding them fixed is what makes the switch safe. */
+      const size = num(props['Font-Size']) ?? 16;
+      /* Size and leading still READ from the stylesheet — the line-height
+         computation below and the Alt's own weight both need the size — they
+         are simply not published. */
+      const weightOnly = WEIGHT_ONLY_STYLES.test(style);
+      for (const prop of DEVICE_PROPS) {
+        if (weightOnly) continue;
+        /* LINE HEIGHT is COMPUTED, not read.
+         *
+         * The stylesheet's mobile blocks set every heading solid — Display and
+         * H1-H6 all at 1.0 — which in Figma clips, because a text box IS its
+         * line height and a descender has nowhere to go. They also carry two
+         * values that cannot be right at all: Android's Button-ExtraSmall at
+         * 11px in a 28px box, and Number-Medium at 28px in a 16px one.
+         *
+         * So on those devices it comes from the platform's own published table
+         * instead — Apple's Dynamic Type on the iOS ones, Material 3 on the
+         * Android ones. Deriving it from the size means the two impossible
+         * values cannot recur: there is no longer a number to mistype.
+         *
+         * DESKTOP IS LEFT ALONE. Its block is generated, not static, and it is
+         * already right: body at 1.5 and headings on a ramp that turns out to
+         * be exactly max(size x 1.15, size + 8) — H1 48->56, H2 40->48,
+         * H3 32->40, H4 24->32, H5 20->28, all exact, without anybody having
+         * written the rule down. Running the curve over it anyway would have
+         * loosened Legal to 1.80 and Label-ExtraSmall to 1.73, because the +8
+         * was fitted to the middle of the range and the platforms add 2-5px at
+         * the bottom, not 8. The existing ramp is the better answer there. */
+        const platform = SYSTEM_FAMILY_OF[device];
+        const declared = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
+        /* Replace a declared value; never invent one where the style has none.
+         *
+         * The extra weights are the case that proves it. `Body-Small-Semibold`
+         * is not a style — it is one more weight on Body/Small — so the block
+         * declares a Font-Weight for it and nothing else. Computing a leading
+         * from its size gave it a Line-Height on iOS and Android and not on
+         * Desktop, where the undeclared value was simply skipped, and the seven
+         * devices stopped carrying the same names. A style missing a variable
+         * on one device resolves to nothing there, silently. */
+        /* BODY IS 1.5 EVERYWHERE, ahead of the platform table.
+         *
+         * Apple sets its body at 17/22 — 1.29 — and Material at 16/24, which is
+         * 1.5 only because the numbers happen to meet there; its 14/20 is 1.43.
+         * Running either table over Body would have made the brand's running
+         * text tighter on iOS than on Desktop, on the same design, and the one
+         * thing that must not change between devices is how a paragraph reads.
+         *
+         * BODY_LINE_HEIGHT is the same constant the Desktop ramp is built from,
+         * read rather than restated, so the two cannot answer differently.
+         *
+         * It is also the accessible answer, and the two WCAG criteria that
+         * mention 1.5 say different things:
+         *
+         *   1.4.8 Visual Presentation (AAA)  line spacing IS at least
+         *     space-and-a-half WITHIN PARAGRAPHS. A rule about the default.
+         *   1.4.12 Text Spacing (AA)  nothing breaks WHEN A USER sets line
+         *     height to 1.5. A rule about adaptability, not about the default.
+         *
+         * Body at 1.5 meets the first and makes the second trivially true. And
+         * "within paragraphs" is why the headings are left on the platform
+         * curve rather than dragged up with them: 1.4.8 scopes its leading
+         * clause to blocks of text, so an H1 at 1.21 is the criterion applied,
+         * not an exception to it. */
+        const isBody = styleFolder(style) === 'Body';
+        const v = prop !== 'Line-Height' || declared === undefined
+          ? declared
+          : isBody ? Math.round(size * BODY_LINE_HEIGHT * 100) / 100
+          : platform !== 'desktop' ? systemLineHeight(platform, size)
+          : declared;
+        if (v !== undefined) bag[`Typography/${groupedProp(style, prop)}`] = { value: v, type: 'number' };
+      }
+
+      /* Omni is the USER's — straight out of the stylesheet their choices
+         generated. System is the PLATFORM's, from Apple's and Google's own
+         conventions. The two have to actually differ or the switch shows
+         nothing: an earlier pass wrote the same numbers to both and changed
+         only the family, which made System a relabelled Omni. */
+      const fam = SYSTEM_FAMILY_OF[device];
+      for (const prop of SWITCHED_PROPS) {
+        if (weightOnly && prop !== 'Font-Weight') continue;
+        const omni = LENGTH_PROPS.has(prop) ? toPx(props[prop], size) : num(props[prop]);
+        if (omni === undefined) continue;
+        /* A step that follows its face points at the face's root rather than
+           restating the number, so moving the face moves every step wearing
+           it. Exactly what the stylesheet does; Figma was flattening it. */
+        /* Alias ONLY when the root will actually be written.
+         *
+         * The Omni roots come from the resolved faces and are skipped when
+         * those are absent (an older caller, or the parse-shape tests). Without
+         * this guard the steps still pointed at them, leaving nine dangling
+         * aliases per device — which Figma does not report: the variable exists
+         * and resolves to nothing. System's roots are the platform's and are
+         * always available, except on Desktop where System mirrors Omni. */
+        const root = prop === 'Font-Weight' && !LITERAL_WEIGHT_STYLES.test(style)
+          ? weightRootOf(style)
+          : undefined;
+        const omniRoot = rootsWritten('Omni', device, !!faces) ? root : undefined;
+        const systemRoot = rootsWritten('System', device, !!faces) ? root : undefined;
+
+        bag[sourceName('Omni', groupedProp(style, prop))] = omniRoot
+          ? { value: weightRootAlias('Omni', omniRoot), type: 'string' }
+          : { value: omni, type: 'number' };
+
+        /* The platform's tables are in em — size-relative, because the seven
+           devices do not share one scale — and land in px like everything
+           else here. */
+        /* An extra weight resolves by its SUFFIX, not by the base step's role.
+           `roleOf('Legal-Semibold')` matches the Legal prefix and answers for
+           Legal, so every semibold and bold was being handed its own base's
+           weight and the emphasis disappeared. See SYSTEM_EXTRA_WEIGHT. */
+        const suffix = prop === 'Font-Weight' ? extraWeightSuffix(style) : undefined;
+        const sys = mirrorsOmni(device)
+          ? omni
+          : prop === 'Font-Weight'
+            ? (suffix
+                ? systemExtraWeight(fam, suffix, omni, systemWeight(fam, baseOf(style, suffix)))
+                : systemWeight(fam, style))
+            : +(systemTracking(fam, size) * size).toFixed(4);
+        bag[sourceName('System', groupedProp(style, prop))] = systemRoot
+          ? { value: weightRootAlias('System', systemRoot), type: 'string' }
+          : { value: sys, type: 'number' };
+      }
+    }
+
+    /* ── Families: four literal roots, every style an alias to one ────────
+     *
+     * What shipped before was the stylesheet's raw declaration —
+     * `var(--Platform-Font-Families-Body)` — written into a Figma STRING. That
+     * is a CSS reference, not a font name: Figma stores the text verbatim, no
+     * text style can bind to it, and the collection it points at is being
+     * removed, so it will not resolve on the web either.
+     *
+     * The literal now lives once per face, and Caption / Subtitle / Label /
+     * H1-H6 alias the face they wear. Changing a face is one edit; the styles
+     * follow. It is the shape the CSS already had, moved into the collection
+     * because the collection it used to lean on is going away.
+     */
+    for (const face of FACE_MODES) {
+      /* The three roots, each holding a literal family name. Omni is the
+         brand's, already resolved; System is the platform's, one per device. */
+      for (const [root, role] of Object.entries(ROOT_ROLE)) {
+        const brand = faces && faces[role].family;
+        const value = face === 'System' && !mirrorsOmni(device) ? SYSTEM_FACE[device] : brand;
+        if (value) bag[familyName(face, root)] = { value: figmaFamily(value), type: 'string' };
+
+        /* The face's WEIGHT, beside its family. Omni is the user's pick for
+           that face; System is the platform's for the same role, taken through
+           systemWeight against a step that follows this face rather than
+           restated — so the root cannot disagree with the steps pointing at
+           it. Desktop's System mirrors Omni, as everywhere else. */
+        const sample = WEIGHT_FACES.sample[root];
+        if (!sample) continue;
+        const omniWeight = faces && faces[role].weight;
+        const weight = face === 'System' && !mirrorsOmni(device)
+          ? systemWeight(SYSTEM_FAMILY_OF[device], sample)
+          : omniWeight;
+        if (typeof weight === 'number') {
+          bag[weightRootName(face, root)] = { value: weight, type: 'number' };
+        }
+      }
+
+      /* Every other name points at what it wears.
+       *
+       * Driven by the TABLE rather than by the stylesheet's sections, because
+       * Eyebrow is not a section — no `/* Eyebrow *\/` block declares it — and
+       * iterating the CSS would drop the one name the text styles bind to. The
+       * opposite direction is still guarded: a test holds the table against
+       * the sections the CSS does declare. */
+      for (const [name, target] of Object.entries(FAMILY_ROOT_OF)) {
+        if (target === name) continue;             // a root holds its own literal
+        if (!rootsWritten(face, device, !!faces)) continue;
+        bag[familyName(face, name)] = { value: familyAlias(face, target), type: 'string' };
+      }
+    }
+    devices[device] = bag;
+  }
+
+  /* The alias collection. Built off Desktop's key set — every device carries
+     the same names by construction, so any of them would do; asserting that
+     is cheaper than trusting it, and the test does. */
+  for (const name of Object.keys(devices.Desktop)) {
+    const token = name.replace(/^Typography\/(Omni|System)\//, '').replace(/^Typography\//, '');
+    if (/^Typography\/(Omni|System)\//.test(name)) {
+      const isFamily = name.endsWith('-Font-Family');
+      for (const face of FACE_MODES) {
+        typography[face][token] =
+          { value: `{${sourceName(face, token).replace(/\//g, '.')}}`,
+            type: isFamily ? 'string' : 'number' };
+      }
+    } else {
+      /* Font-Size does not switch, so BOTH modes alias the one value. Nothing
+         selects between them — but a text style binds to the Typography
+         collection only, so the size has to be reachable from there too. */
+      for (const face of FACE_MODES) {
+        /* Dotted throughout, like every other alias here. The token now carries
+           its group, so it holds a slash — left in, the string reads
+           `{Typography.Headers/H1-Font-Size}` and only resolves because the
+           plugin turns dots into slashes and the two happen to meet at the
+           right name. Working by coincidence is not the same as working. */
+        typography[face][token] =
+          { value: `{Typography.${token.split('/').join('.')}}`, type: 'number' };
+      }
+    }
+  }
+  return { devices, typography };
+}
+
+/** Every mode carries the same names, or a style resolves to nothing at a size. */
+export function payloadNames(bag: VarBag): string[] { return Object.keys(bag).sort(); }
+
+/**
+ * True when a bag touches nothing outside the Typography group.
+ *
+ * The guarantee this gives is narrow and worth stating exactly: it proves the
+ * payload never NAMES another variable. It cannot prove the import is
+ * non-destructive — an importer that replaces a whole collection would still
+ * take the other hundred with it.
+ */
+export function payloadIsAdditive(bag: VarBag): boolean {
+  return Object.keys(bag).every((n) => n.startsWith(DEVICES_TYPE_PREFIX));
+}

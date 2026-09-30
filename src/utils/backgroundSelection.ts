@@ -12,8 +12,39 @@
  * tone on reload is a brand change nobody asked for.
  */
 
-export const BACKGROUND_THEMES = ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const;
-export type BackgroundTheme = typeof BACKGROUND_THEMES[number];
+/**
+ * Every theme a surface can be painted in. This is the PARSING vocabulary and
+ * must stay wide: stored systems chose Secondary and Tertiary backgrounds while
+ * the picker offered them, and narrowing what parses would silently repaint
+ * those brands white.
+ */
+export const ALL_THEMES = ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const;
+export type BackgroundTheme = typeof ALL_THEMES[number];
+
+/**
+ * What the BACKGROUND picker offers — Primary or Neutral only.
+ *
+ * A page background is the one surface every other colour is judged against, so
+ * it is either the brand's own colour or a neutral. Secondary and Tertiary are
+ * accents: they exist to be seen AGAINST the background, and a page painted in
+ * one leaves the palette with nothing to push off. Users who want a different
+ * hue there reorder their core colours instead, which moves Primary rather than
+ * adding a fourth page colour.
+ *
+ * Narrower than ALL_THEMES on purpose — see the note there.
+ */
+export const BACKGROUND_THEMES = ['Primary', 'Neutral'] as const;
+
+/**
+ * What the BAR pickers offer — any theme, at any surface level.
+ *
+ * The opposite argument to the background's. A status, app or nav bar is a band
+ * ON the page rather than the page itself, so an accent reads as intended
+ * there: it has the background to sit against. This is the change that makes a
+ * Secondary app bar over a Primary page expressible at all — the old picker had
+ * four opaque strings and could not say it.
+ */
+export const BAR_THEMES = ALL_THEMES;
 
 export const SURFACE_LEVELS = [
   'Surface-Dimmest',
@@ -117,9 +148,12 @@ export function parseBackground(
   if (typeof value === 'string') {
     if (LEGACY[value]) return LEGACY[value];
     // 'Primary/Surface-Bright' — the serialised form of the new picker.
+    // Validated against ALL_THEMES, not BACKGROUND_THEMES: the picker no longer
+    // offers Secondary or Tertiary, but systems that stored one must keep
+    // resolving to the background they were published with.
     const [theme, surface] = value.split('/');
     if (
-      (BACKGROUND_THEMES as readonly string[]).includes(theme) &&
+      (ALL_THEMES as readonly string[]).includes(theme) &&
       (SURFACE_LEVELS as readonly string[]).includes(surface)
     ) {
       return { theme: theme as BackgroundTheme, surface: surface as SurfaceLevel };
@@ -154,4 +188,67 @@ export function backgroundLabel(sel: BackgroundSelection): string {
   if (legacy === 'white') return 'White';
   if (legacy === 'black') return 'Black';
   return `${sel.theme} ${sel.surface.replace('Surface-', '').replace('Surface', 'Base')}`.trim();
+}
+
+/* ─── Bars ────────────────────────────────────────────────────────────────── */
+
+/**
+ * The four opaque strings the bar pickers used to offer, and the theme +
+ * surface each resolves to.
+ *
+ * Identical in effect to the background's LEGACY table, and deliberately a
+ * separate constant: they are separate pickers with separate stored values, and
+ * a shared table is a shared decision the next change to either would have to
+ * unpick.
+ */
+const LEGACY_BAR: Record<string, BackgroundSelection> = {
+  'white':         { theme: 'Neutral', surface: 'Surface-Brightest' },
+  'black':         { theme: 'Neutral', surface: 'Surface-Dimmest' },
+  'primary-light': { theme: 'Primary', surface: 'Surface-Brightest' },
+  'primary':       { theme: 'Primary', surface: 'Surface' },
+  'primary-base':  { theme: 'Primary', surface: 'Surface' },
+};
+
+/** Read a stored bar value in either form. */
+export function parseBar(
+  value: string | BackgroundSelection | null | undefined,
+): BackgroundSelection {
+  if (value && typeof value === 'object' && 'theme' in value) return value;
+  if (typeof value === 'string') {
+    if (LEGACY_BAR[value]) return LEGACY_BAR[value];
+    const [theme, surface] = value.split('/');
+    if (
+      (ALL_THEMES as readonly string[]).includes(theme) &&
+      (SURFACE_LEVELS as readonly string[]).includes(surface)
+    ) {
+      return { theme: theme as BackgroundTheme, surface: surface as SurfaceLevel };
+    }
+  }
+  // The old default for every bar was 'primary-light'.
+  return { theme: 'Primary', surface: 'Surface-Brightest' };
+}
+
+/** The serialised form stored on the design system. */
+export function formatBar(sel: BackgroundSelection): string {
+  return `${sel.theme}/${sel.surface}`;
+}
+
+/**
+ * The palette and tone a bar paints with — the shape every generator wants.
+ *
+ * Nine files decoded the four legacy strings with their own switch. That is the
+ * duplication invariant 5 is about: each copy is individually correct until one
+ * of them learns about a fifth value and the others do not.
+ */
+export function barPaletteAndTone(
+  value: string | BackgroundSelection | null | undefined,
+  coreToneN?: number,
+): { palette: BackgroundTheme; n: number; theme: BackgroundTheme; surface: SurfaceLevel } {
+  const sel = parseBar(value);
+  return {
+    palette: sel.theme,
+    n: toneFor(sel.theme, sel.surface, coreToneN),
+    theme: sel.theme,
+    surface: sel.surface,
+  };
 }

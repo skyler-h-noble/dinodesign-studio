@@ -20,6 +20,8 @@
 // Reuse the shared union rather than restating it — a second copy here is the
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
+import { buttonModeMetricVars } from './buttonSizing';
+import { lineMetricsVars, navMetricsVars, selectionMetricsVars } from './componentSize';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -98,6 +100,7 @@ export function componentStyleVars(
     '--Style-Border-Radius': `${buttonRadiusPx}px`,
     '--Button-Padding': `${BUTTON_PADDING}px`,
     '--Sm-Button-Padding': 'var(--Button-Padding)',
+    ...buttonModeMetricVars({ buttonHeight, smallButtonHeight, largeButtonHeight }),
     '--Lg-Button-Padding': `${LG_BUTTON_PADDING}px`,
     '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
     '--Button-Radius': `${buttonRadiusPx}px`,
@@ -107,13 +110,31 @@ export function componentStyleVars(
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
     '--Button-Bevel-Px': `${bevelPx}px`,
-    '--Button-Height': `${buttonHeight}px`,
-    '--Small-Button-Height': `${smallButtonHeight}px`,
-    '--Large-Button-Height': `${largeButtonHeight}px`,
+    /* Button-Height / Sm- / Lg- now come from buttonModeMetricVars above, so
+       they are not restated here — one source, matching Figma's names.
+       These two remain as ALIASES: ToggleButtonGroup, Autocomplete and Input
+       read the --Small-/--Large- spelling, and Tabs reads --Sm-. Two names for
+       one value in the library itself; the aliases keep the older reads
+       working rather than silently dropping them. */
+    '--Small-Button-Height': 'var(--Sm-Button-Height)',
+    '--Large-Button-Height': 'var(--Lg-Button-Height)',
     '--Button-Min-Width': `${minButtonWidth}px`,
     '--Lg-Button-Min-Width': `${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px`,
     '--Card-Radius': `${cardRadius}px`,
     '--Card-Padding': `${cardRadius >= 16 ? 20 : 16}px`,
+    /* Divider / Step bar / No Count Step, from the one source componentSize
+       owns. The lib reads these by name (Divider.js, Stepper.js) with the
+       design's numbers as fallbacks, so emitting them is what lets a brand
+       actually move the weights instead of the fallback painting forever. */
+    ...lineMetricsVars(),
+    /* Radio / Checkbox box, dot, check, gap and the shared touch target. */
+    ...selectionMetricsVars(),
+    /* Rail-Width / App-Bar-Height / Nav-Bar-Height. The record form of the
+       same table navMetricsCSS() writes into the exported stylesheet and into
+       buildPreviewCSS — one walk, two shapes, so these cannot drift. Needed
+       here because this object is spread into inline style unconditionally,
+       while brandCSS only exists once a scheme is applied. */
+    ...navMetricsVars(),
   };
 }
 

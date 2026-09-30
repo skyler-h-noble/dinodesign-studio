@@ -589,3 +589,64 @@ describe('Text.Surfaces stays a reference table', () => {
     expect(raw.slice(0, 10).join('\n'), `${raw.length} raw values in Text.Surfaces`).toBe('');
   });
 });
+
+/* ── Container levels are FIVE, on both sides ────────────────────────────────
+ *
+ * The preview painted all five the same colour. Its container rule lists every
+ * level in one selector and set `--Background` once, so a Container-Low card
+ * and a Container-Highest card looked identical in the studio and different
+ * once published.
+ *
+ * Both sides were self-consistent, which is why nothing failed: they reach the
+ * background by different routes. The published theme rule defines the five
+ * `--Container-*` VALUES and base.css maps each level to its own background
+ * (`[data-surface="Container-Low"] { --Background: var(--Container-Low) }`).
+ * The preview set `--Background` directly and never consulted the levels.
+ *
+ * This is the exact shape invariant 5 describes — "the tonal container was
+ * keyed on light/dark MODE in the preview and on the background's LIGHTNESS in
+ * the export; both were self-consistent, so every test passed". Same
+ * component, found again, so the assertion is on the VALUES resolving apart
+ * rather than on both sides emitting something.
+ */
+describe('container levels: the preview and the export agree', () => {
+  const levels = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest'] as const;
+
+  const previewValues = (css: string) => levels.map((l) => {
+    const m = css.match(new RegExp(`--${l}:\\s*([^;]+);`));
+    return m ? m[1].trim() : null;
+  });
+
+  for (const { label, sel } of SELECTION_MATRIX) {
+    it(`${label}: emits all five container values`, () => {
+      /* NOT "all five differ". A white-cards-on-white-background system
+         legitimately collapses the ladder, and asserting difference would fail
+         on a correct design. What must hold is that five are STATED, so the
+         level is what decides rather than one value standing in for all. */
+      const { previewCss } = buildAll(SCHEME, sel, 'light');
+      expect(previewValues(previewCss).filter(Boolean)).toHaveLength(levels.length);
+    });
+  }
+
+  it('never paints one background across every level', () => {
+    /* The defect. The rule listing all five levels must not set --Background
+       at all: it scores (0,2,0) against base.css's (0,1,0), so anything set
+       there wins and the level stops deciding. Both sides then reach the
+       background the same way — base.css maps it per level, and base.css ships
+       from the library AND the export. */
+    const { previewCss } = buildAll(SCHEME, SELECTION_MATRIX[0].sel, 'light');
+    const start = previewCss.indexOf('[data-surface] [data-surface="Container-Lowest"] {');
+    expect(start).toBeGreaterThan(-1);
+    const block = previewCss.slice(start, previewCss.indexOf('\n}', start));
+    expect(block.split('\n').filter((l) => /^\s+--Background:/.test(l))).toEqual([]);
+  });
+
+  it('carries no rationale into the emitted stylesheet', () => {
+    /* Twice now a comment explaining a fix has been written inside the
+       template literal and shipped to every consumer. Cheap to assert, and it
+       also stops a comment's example selectors from satisfying the checks
+       above — which is how the first version of this suite passed itself. */
+    const { previewCss } = buildAll(SCHEME, SELECTION_MATRIX[0].sel, 'light');
+    expect(previewCss).not.toMatch(/absence is the fix/);
+  });
+});

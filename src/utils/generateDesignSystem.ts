@@ -1,6 +1,7 @@
 import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from './firebase/storage';
 import {
   bevelCSS, bevelJSON, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
+  platformBevelCSS,
 } from './bevelGeometry';
 import { extractHeroImage } from './heroImage';
 import { STORAGE_BUCKET } from './firebase/client';
@@ -13,6 +14,7 @@ import { generateFigmaJSON } from './generateFigmaJSON';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { typographyDeclarations } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles, SYSTEM_UI_STACK } from './typeScale';
+import { overlayOffsetCSS } from './deviceChrome';
 
 /**
  * Returns a public download URL for a file in a design system.
@@ -196,20 +198,32 @@ Apply \`data-theme\` to any element to change the color context for it and all c
   <Body>Text, borders, buttons all adapt automatically</Body>
 </section>
 
-{/* Dark hero banner */}
-<div data-theme="Primary-Dark">
+{/* Dark hero banner — the palette, on its dimmest level */}
+<div data-theme="Primary" data-surface="Surface-Dimmest">
   <H1>Dark themed hero</H1>
 </div>
 
-{/* Error alert area */}
-<div data-theme="Error-Light">
+{/* Error alert area — the same palette, on its brightest level */}
+<div data-theme="Error" data-surface="Surface-Brightest">
   <Alert variant="error">Something went wrong</Alert>
 </div>
 \`\`\`
 
-**Light themes** (-Light suffix) use the palette's lightest tone as background.
-**Medium themes** (no suffix) use the palette's mid-range tone.
-**Dark themes** (-Dark suffix) use the palette's darkest tone.
+**A theme is a palette. A surface is how light it sits.** They are two
+attributes because they are two decisions, and pairing them is what gives you
+the whole matched token set — Background, Text, Quiet, Border, Hover and the
+rest — tuned for that combination.
+
+There is no \`-Light\` or \`-Dark\` theme. There used to be, and the suffix was
+doing the surface's job: \`Primary-Light\` is \`data-theme="Primary"\` with
+\`data-surface="Surface-Brightest"\`. One axis per attribute means five levels
+per palette instead of three named ones, and it is the same five everywhere.
+
+| you want | theme | surface |
+| --- | --- | --- |
+| the palette at full strength | \`Primary\` | omit, or \`Surface\` |
+| a pale tint of it | \`Primary\` | \`Surface-Brightest\` |
+| a deep version of it | \`Primary\` | \`Surface-Dimmest\` |
 **Default** adapts based on user selection — it can be white, black, tonal, or gray.
 
 ---
@@ -364,11 +378,11 @@ var(--Container-Dropshadow-Color) /* shadow on containers */
 
 5-level elevation system. Use on the parent surface, not the element itself:
 \`\`\`css
-.level-1 { box-shadow: 0 1px 2px var(--Dropshadow-Color); }
-.level-2 { box-shadow: 0 2px 4px var(--Dropshadow-Color), 0 1px 2px var(--Dropshadow-Color); }
-.level-3 { box-shadow: 0 4px 8px var(--Dropshadow-Color), 0 2px 4px var(--Dropshadow-Color); }
-.level-4 { box-shadow: 0 8px 16px var(--Dropshadow-Color), 0 4px 8px var(--Dropshadow-Color); }
-.level-5 { box-shadow: 0 16px 32px var(--Dropshadow-Color), 0 8px 16px var(--Dropshadow-Color); }
+.level-1 { box-shadow: var(--Effect-Level-1); }
+.level-2 { box-shadow: var(--Effect-Level-2); }
+.level-3 { box-shadow: var(--Effect-Level-3); }
+.level-4 { box-shadow: var(--Effect-Level-4); }
+.level-5 { box-shadow: var(--Effect-Level-5); }
 \`\`\`
 
 ### Focus Tokens
@@ -383,7 +397,9 @@ var(--Focus-Visible)        /* focus ring color (used with :focus-visible) */
 var(--Font-Family-Header)   /* heading font */
 var(--Font-Family-Body)     /* body font */
 var(--Style-Border-Radius)  /* component border radius */
-var(--Card-Radius)          /* card border radius */
+var(--Card-Radius)          /* card border radius (medium) */
+var(--Sm-Card-Radius)       /* small card */
+var(--Lg-Card-Radius)       /* large card */
 \`\`\`
 
 ---
@@ -431,12 +447,11 @@ import {
 ### Button
 
 \`\`\`jsx
-{/* Variant pattern: {color}, {color}-outline, {color}-light */}
+{/* Variant pattern: {color}, {color}-outline */}
 {/* Colors: primary, secondary, tertiary, neutral, info, success, warning, error */}
 
 <Button variant="primary">Solid primary</Button>
 <Button variant="primary-outline">Outlined primary</Button>
-<Button variant="primary-light">Light primary</Button>
 <Button variant="neutral-outline">Outlined neutral</Button>
 <Button variant="error">Solid error</Button>
 <Button variant="ghost">Ghost (no background)</Button>
@@ -657,14 +672,21 @@ switch the whole region's \`data-theme\` and let the surface carry it.
 
 ## Dark Mode
 
-Dark mode is applied via theme suffixes: \`Primary-Dark\`, \`Secondary-Dark\`, \`Tertiary-Dark\`, \`Neutral-Dark\`.
+Dark mode is a **stylesheet**, not a theme name. You ship both mode sheets and
+swap which one is active; every theme and every surface then resolves to its
+dark-mode values, and nothing in your markup changes.
+
+This is worth being exact about, because the two used to look alike. A
+\`-Dark\` THEME suffix is gone — it never meant dark mode, it meant "this
+palette at its darkest tone", which is now a surface level:
 
 \`\`\`jsx
-{/* Dark section */}
-<div data-theme="Primary-Dark">
-  <H1>Dark Mode Section</H1>
+{/* A dim section. Same in light mode and dark mode — the mode sheet
+    decides what "dimmest" resolves to. */}
+<div data-theme="Primary" data-surface="Surface-Dimmest">
+  <H1>Dim section</H1>
   <Card>
-    <Body>Card adapts automatically in dark mode</Body>
+    <Body>Card adapts automatically</Body>
   </Card>
 </div>
 \`\`\`
@@ -702,8 +724,8 @@ The design system uses CSS custom property cascading. Here is the precedence:
   </div>
 
   <!-- Themed section nested inside -->
-  <section data-theme="Primary-Light">
-    <p style="color: var(--Text)">Now using Primary-Light text color</p>
+  <section data-theme="Primary" data-surface="Surface-Brightest">
+    <p style="color: var(--Text)">Now using Primary's text color, on its brightest level</p>
   </section>
 </div>
 \`\`\`
@@ -829,52 +851,42 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     // which is AFTER this point in the same scope — reading it here would hit
     // the temporal dead zone. Read the same input the migration defaults from.
     const platformDesktopButtonHeight = input.styleCustomizations?.buttonHeight ?? 32;
-    designSystemJSON.Platform = {
-      Desktop: {
-        'Container-Padding': { value: 'var(--Sizing-4)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('Desktop', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Button-Width': { value: '80px', type: 'sizing' },
-        'Min-Stack-Gap': { value: '0px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET.Desktop}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER.Desktop}px`, type: 'spacing' },
-        'Platform-Label': { value: 'Desktop', type: 'string' },
-      },
-      'IOS-Mobile': {
-        'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('IOS-Mobile', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Stack-Gap': { value: '10px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET['IOS-Mobile']}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER['IOS-Mobile']}px`, type: 'spacing' },
-        'Platform-Label': { value: 'IOS-Mobile', type: 'string' },
-      },
-      'IOS-Tablet': {
-        'Container-Padding': { value: 'var(--Sizing-3)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('IOS-Tablet', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Stack-Gap': { value: '10px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET['IOS-Tablet']}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER['IOS-Tablet']}px`, type: 'spacing' },
-        'Platform-Label': { value: 'IOS-Tablet', type: 'string' },
-      },
-      Android: {
-        'Container-Padding': { value: 'var(--Sizing-2)', type: 'spacing' },
-        'Button-Height': { value: `${platformButtonHeight('Android', platformDesktopButtonHeight)}px`, type: 'sizing' },
-        'Min-Stack-Gap': { value: '12px', type: 'spacing' },
-        'Target': { value: `${PLATFORM_TARGET.Android}px`, type: 'sizing' },
-        'Platform-Spacer': { value: `${PLATFORM_SPACER.Android}px`, type: 'spacing' },
-        'Platform-Label': { value: 'Android', type: 'string' },
-      },
-    };
+    /* No Platform section, removed 2026-09-29 with the Figma collection.
+     *
+     * Four modes where Devices-Type has seven, and the collection no longer
+     * exists — so this reached the plugin (which reads tokens.json as well as
+     * figma.json) and had it recreated on every import, the same way Cognitive
+     * did.
+     *
+     * Button-Height, Min-Button-Width, Platform-Spacer and the overlay offsets
+     * are all written elsewhere already — Devices-Type or Component-Size. What
+     * had no other home: `Target`, `Min-Stack-Gap` and `Container-Padding`.
+     *
+     * All three are WEB-ONLY by decision, not by omission. They ship in
+     * foundation.css per platform block, which is what the library reads —
+     * Button.js grows a small button's tap target to `var(--Target)` at
+     * runtime — and none of them describes something a Figma layer binds to.
+     * See the fuller note in generateFigmaJSON beside the Platform removal. */
 
-    // Add Cognitive Accessibility section to JSON
-    designSystemJSON.Cognitive = {
-      Dyslexia: {
-        'Cognitive-Multiplier': { value: '1.5', type: 'number' },
-        'Body-Font-Family': { value: 'OpenDyslexic', type: 'fontFamily' },
-      },
-      ADHD: {
-        'Cognitive-Multiplier': { value: '1.5', type: 'number' },
-      },
-    };
+    /* No Cognitive section on tokens.json, removed 2026-09-29.
+     *
+     * It held a Dyslexia and an ADHD preset — a 1.5 line-height multiplier and
+     * OpenDyslexic — and nothing read it back. What it DID do was reach the
+     * Figma plugin, which reads tokens.json as well as figma.json and turned
+     * the section into a `Cognitive` variable collection. That collection was
+     * deleted by hand after every regenerate and recreated by the next one.
+     *
+     * The feature is not being removed, and this is the distinction worth
+     * keeping straight. `--Cognitive-Multiplier` is LIVE: foundation.css
+     * declares it at 1 and raises it to 1.5 under the accessibility overrides
+     * further down this file, and the library multiplies line heights by it —
+     * Link.js alone reads it five times. That is the whole mechanism. The JSON
+     * section was a second statement of the same two numbers, for a consumer
+     * that did not exist.
+     *
+     * If a Cognitive collection is ever wanted in Figma, it should come from
+     * generateFigmaJSON like every other collection, where
+     * figmaCollectionNames.test.ts would make someone confirm the file has one. */
   } catch (err) {
     console.error('❌❌❌ JSON generation FAILED:', err);
     console.error('❌ Stack:', (err as Error).stack);
@@ -945,7 +957,13 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     defaultTheme: 'Default',
     defaultStyle: input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1),
     defaultSurface: 'Surface',
-    darkTheme: 'Neutral-Dark',
+    /* A theme that exists. 'Neutral-Dark' was written here and there is no
+       such theme any more — the root would have bound nothing in dark mode
+       and fallen through to Default, silently.
+       
+       Dark mode is the mode STYLESHEET; every theme resolves to its dark
+       values under it. This only says which palette the root carries. */
+    darkTheme: 'Neutral',
   }, null, 2);
 
   // 5. Build foundation.css and styles.css (simple static files)
@@ -980,6 +998,10 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   // than a second number to keep in sync.
   const lgMinButtonWidth = minButtonWidth + 40;
   const bevelPercent = input.styleCustomizations?.bevel ?? 0;
+
+  /* The user's own three heights, in one object so every bevel emission
+     takes the same three rather than three separate arguments. */
+  const bevelHeights = { medium: buttonHeight, small: smallButtonHeight, large: largeButtonHeight };
   const bevelOpacity = input.styleCustomizations?.bevelOpacity ?? 50;
   const bevelPx = Math.round(buttonHeight * bevelPercent / 100);
   const r = computeRadii(sc);
@@ -990,9 +1012,9 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Radius: ${r.buttonRadius}px;
   --Sm-Button-Radius: ${r.smButtonRadius}px;
   --Lg-Button-Radius: ${r.lgButtonRadius}px;
-  --Button-Inner-Radius: ${r.buttonInnerRadius}px;
-  --Sm-Button-Inner-Radius: ${r.smButtonInnerRadius}px;
-  --Lg-Button-Inner-Radius: ${r.lgButtonInnerRadius}px;
+  --Button-Inner-Focus-Radius: ${r.buttonInnerRadius}px;
+  --Sm-Button-Inner-Focus-Radius: ${r.smButtonInnerRadius}px;
+  --Lg-Button-Inner-Focus-Radius: ${r.lgButtonInnerRadius}px;
   --Button-Focus-Radius: ${r.buttonFocusRadius}px;
   --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;
   --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;
@@ -1022,15 +1044,42 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Style-Border-Radius: var(--Button-Radius);
 
   /* Card */
+  --Accordion-Radius: ${r.accordionRadius}px;
   --Card-Radius: ${r.cardRadius}px;
+  --Sm-Card-Radius: ${r.smCardRadius}px;
+  --Lg-Card-Radius: ${r.lgCardRadius}px;
   --Card-Inner-Radius: ${r.cardInnerRadius}px;
+  --Sm-Card-Inner-Radius: ${r.smCardInnerRadius}px;
+  --Lg-Card-Inner-Radius: ${r.lgCardInnerRadius}px;
   --Card-Focus-Radius: ${r.cardFocusRadius}px;
+  --List-Item-Radius: ${r.listItemRadius}px;
+  --List-Item-Focus-Radius: ${r.listItemFocusRadius}px;
+  --List-Item-Padding: ${r.listItemPadding}px;
+  --List-Item-Gap: ${r.listItemGap}px;
+  --Sm-List-Item-Padding: ${r.smListItemPadding}px;
+  --Lg-List-Item-Padding: ${r.lgListItemPadding}px;
+  --Sm-List-Item-Gap: ${r.smListItemGap}px;
+  --Lg-List-Item-Gap: ${r.lgListItemGap}px;
+  --Sm-List-Item-Radius: ${r.smListItemRadius}px;
+  --Lg-List-Item-Radius: ${r.lgListItemRadius}px;
+  --Sm-List-Item-Focus-Radius: ${r.smListItemFocusRadius}px;
+  --Lg-List-Item-Focus-Radius: ${r.lgListItemFocusRadius}px;
+  --List-Item-Image-Radius: ${r.listItemImageRadius}px;
+  --List-Item-Default-Image-Width: ${r.listItemImageWidth}px;
+  --Sm-List-Item-Default-Image-Width: ${r.smListItemImageWidth}px;
+  --Lg-List-Item-Default-Image-Width: ${r.lgListItemImageWidth}px;
+  --Sm-Card-Focus-Radius: ${r.smCardFocusRadius}px;
+  --Lg-Card-Focus-Radius: ${r.lgCardFocusRadius}px;
   --Card-Padding: ${r.cardPadding}px;
+  --Sm-Card-Padding: ${r.smCardPadding}px;
+  --Lg-Card-Padding: ${r.lgCardPadding}px;
 
   /* Modal */
   --Modal-Padding: ${r.modalPadding}px;
   --Modal-Radius: ${r.modalRadius}px;
   --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
+  --Menu-Item-Radius: ${r.menuItemRadius}px;
+  --Menu-Focus-Radius: ${r.menuFocusRadius}px;
   --Modal-Inner-Radius: ${r.modalInnerRadius}px;
   --Modal-Focus-Radius: ${r.modalFocusRadius}px;
 
@@ -1038,7 +1087,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Input-Radius: ${r.inputRadius}px;
   --Sm-Input-Radius: ${r.smInputRadius}px;
   --Lg-Input-Radius: ${r.lgInputRadius}px;
-  --Input-Inner-Radius: ${r.inputInnerRadius}px;
+  --Input-Inner-Focus-Radius: ${r.inputInnerRadius}px;
   --Input-Focus-Radius: ${r.inputFocusRadius}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;
@@ -1203,16 +1252,22 @@ ${typographyDeclarations(input.typographyStyles)}
   --Label-Paragraph-Spacing: 4px;
   --Button-Font-Size: 16px;
   --Button-Line-Height: 20px;
-  /* Medium bevel geometry — derived from THIS platform's button height, which
-     is why it lives beside the height rather than in foundation.css. Each
-     [data-platform] block below re-emits it for its own height. */
-${bevelCSS('', buttonHeight, bevelPercent)}
+  /* Bevel geometry for ALL THREE sizes — derived from THIS platform's button
+     heights, which is why it lives beside them rather than in foundation.css.
+     Each [data-platform] block below re-emits all three for its own heights.
+     It used to re-emit the MEDIUM set only, so a small or large button wore
+     Desktop's bevel on every platform. */
+${platformBevelCSS('Desktop', bevelHeights, bevelPercent)}
   /* Hit target. The SMALL button keeps its visual size on every platform; the
      lib wraps it in a box that grows to --Target using --Platform-Spacer, so
      the button looks identical while the tappable area meets the platform
      minimum. */
   --Target: ${PLATFORM_TARGET.Desktop}px;
   --Platform-Spacer: ${PLATFORM_SPACER.Desktop}px;
+  /* Floating overlays. Desktop reserves no system chrome, so these are the
+     clearance alone — stated rather than left to fall back, because an unset
+     custom property paints nothing and reports nothing. */
+${overlayOffsetCSS('Desktop').slice(1).join('\n')}
 }
 
 /* iOS Mobile */
@@ -1221,9 +1276,10 @@ ${bevelCSS('', buttonHeight, bevelPercent)}
   --Platform-Label: "IOS-Mobile";
   --Button-Height: ${platformButtonHeight('IOS-Mobile', buttonHeight)}px;
   --Min-Stack-Gap: 10px;
-${bevelCSS('', platformButtonHeight('IOS-Mobile', buttonHeight), bevelPercent)}
+${platformBevelCSS('IOS-Mobile', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['IOS-Mobile']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['IOS-Mobile']}px;
+${overlayOffsetCSS('IOS-Mobile').join('\n')}
   --Body-Font-Size: 16px;
   --Body-Letter-Spacing: -.5px;
   --Body-Line-Height: 24px;
@@ -1266,9 +1322,10 @@ ${bevelCSS('', platformButtonHeight('IOS-Mobile', buttonHeight), bevelPercent)}
   --Platform-Label: "IOS-Tablet";
   --Button-Height: ${platformButtonHeight('IOS-Tablet', buttonHeight)}px;
   --Min-Stack-Gap: 10px;
-${bevelCSS('', platformButtonHeight('IOS-Tablet', buttonHeight), bevelPercent)}
+${platformBevelCSS('IOS-Tablet', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['IOS-Tablet']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['IOS-Tablet']}px;
+${overlayOffsetCSS('IOS-Tablet').join('\n')}
   --Body-Font-Size: 17px;
   --Body-Letter-Spacing: -.5px;
   --Body-Line-Height: 25.5px;
@@ -1311,9 +1368,10 @@ ${bevelCSS('', platformButtonHeight('IOS-Tablet', buttonHeight), bevelPercent)}
   --Platform-Label: "Android";
   --Button-Height: ${platformButtonHeight('Android', buttonHeight)}px;
   --Min-Stack-Gap: 12px;
-${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
+${platformBevelCSS('Android', bevelHeights, bevelPercent)}
   --Target: ${PLATFORM_TARGET['Android']}px;
   --Platform-Spacer: ${PLATFORM_SPACER['Android']}px;
+${overlayOffsetCSS('Android').join('\n')}
   --Body-Font-Size: 16px;
   --Body-Line-Height: 24px;
   --Body-Letter-Spacing: .5px;
@@ -1410,7 +1468,21 @@ ${bevelCSS('', platformButtonHeight('Android', buttonHeight), bevelPercent)}
       try {
         if (input.styleCustomizations) designSystemJSON._componentStyle = input.styleCustomizations;
         designSystemJSON._userSelections = input.userSelections;
-        const figmaPayload = generateFigmaJSON(designSystemJSON);
+        const figmaPayload = generateFigmaJSON(designSystemJSON, typographyTokensCSS);
+        /* What the plugin is about to be handed, by collection. Without this
+           the only way to tell "the export omitted it" from "the plugin
+           ignored it" is to open the uploaded file by hand — and those two
+           have completely different fixes. */
+        /* warn, not log: Vite's dev server forwards console.warn and
+           console.error to the terminal but NOT console.log, so a diagnostic
+           written with log() is invisible to anyone reading the server output
+           — which is most of the value of having it. */
+        console.warn('📦 [figma.json] collections:',
+          Object.keys(figmaPayload).map((k) => {
+            const v = (figmaPayload as Record<string, unknown>)[k];
+            const n = v && typeof v === 'object' ? Object.keys(v as object).length : 0;
+            return `${k}(${n})`;
+          }).join(' '));
         // Metadata that the Figma plugin reads to detect updates since its
         // last import. version is monotonic; lastModified is ISO 8601.
         figmaPayload.Metadata = {

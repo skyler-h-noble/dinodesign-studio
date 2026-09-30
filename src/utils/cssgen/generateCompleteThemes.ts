@@ -1,6 +1,6 @@
 import { getSimplifiedDefaultSettings } from './completeSimplifiedSystem';
 import { toneToColorNumber, generateSemanticLightModeScale, findClosestColorN } from '../colorScale';
-import { neutralSurfaceWindow } from '../surfaceWindow';
+import { neutralSurfaceWindow, surfaceWindow, MIN_SURFACE_TONE, MAX_SURFACE_TONE } from '../surfaceWindow';
 import type { SurfaceLevel } from '../surfaceWindow';
 // Text and Header roles reference the Text.*/Header.* families directly rather
 // than the getFixed* helpers. Those helpers return a raw {Colors.Palette.Color-N}
@@ -13,6 +13,8 @@ import type { SurfaceLevel } from '../surfaceWindow';
 /**
  * Theme configuration for generating Surfaces and Containers
  */
+import { monoStopTone, type AltStop2 } from '../altDisplay';
+
 interface ThemeConfig {
   themeName: string;
   theme: string; // Primary, Secondary, Tertiary, Neutral
@@ -52,6 +54,9 @@ interface ThemeConfig {
   surfaceScopedButton?: boolean;
   /** True for the black/white button style, whose border is its own fill. */
   blackWhiteButton?: boolean;
+  /** Which palette the Alt gradient's second stop draws from — see
+   *  altStop2Palette. 'mono' means another tone of Primary. */
+  altStop2: AltStop2;
 }
 
 /**
@@ -163,6 +168,41 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       value: `{Header.Surfaces.Tertiary.Color-${n}}`,
       type: 'color'
     },
+    /* Alt Display: Primary solid, Primary -> Secondary gradient.
+     *
+     * Three DISTINCT palettes rather than a computed shade of one. A shade has
+     * to come from somewhere, and at background tones 5 and 6 the ramp can run
+     * out — the derived colour lands on the base it was derived from and the
+     * gradient renders as a flat fill, with nothing to say it failed. Separate
+     * palettes cannot collapse that way.
+     *
+     * It also drops the analogous branch entirely. That existed to stop a
+     * two-hue blend crossing the desaturated middle, but it decided which
+     * palette the SECOND stop came from — and a stop that moves per brand is a
+     * stop a designer cannot reason about.
+     *
+     * All three are ALIASES into the Header tables, never computed colours, so
+     * the Alt follows data-surface exactly as the Header tokens it is built
+     * from do, and every stop is already contrast-checked for the surface it
+     * lands on. A baked pair could not be, and a gradient has to clear its
+     * threshold at BOTH ends.
+     *
+     * Figma has no gradient variable type, so a gradient is two bound stops —
+     * VariableBindableColorStopField is 'color', so each stop takes one. */
+    'Alt-Display-Color': {
+      value: `{Header.Surfaces.Primary.Color-${n}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-1': {
+      value: `{Header.Surfaces.Primary.Color-${n}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-2': {
+      value: config.altStop2 === 'mono'
+        ? `{Colors.Primary.Color-${monoStopTone(n)}}`
+        : `{Header.Surfaces.${config.altStop2}.Color-${n}}`,
+      type: 'color'
+    },
     'Header-Neutral': {
       value: `{Header.Surfaces.Neutral.Color-${n}}`,
       type: 'color'
@@ -241,6 +281,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
           return {
             'Button': { value: `{Buttons.${config.theme}.${shade}.Button}`, type: 'color' },
             'Text': { value: `{Buttons.${config.theme}.${shade}.Text}`, type: 'color' },
+            'Quiet': { value: `{Buttons.${config.theme}.${shade}.Quiet}`, type: 'color' },
             'Border': { value: `{Border.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${shade}.Hover}`, type: 'color' },
             'Pressed': { value: `{Buttons.${config.theme}.${shade}.Pressed}`, type: 'color' },
@@ -271,6 +312,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         return {
           'Button': { value: `{${src}.Button}`, type: 'color' },
           'Text': { value: `{${src}.Text}`, type: 'color' },
+          'Quiet': { value: `{${src}.Quiet}`, type: 'color' },
           // A black or white button has no tonal ramp to step to for an edge,
           // so its border is its own fill — the face alone delineates it. The
           // BlackWhite table already stores Border that way.
@@ -286,6 +328,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Primary': {
         'Button': { value: `{Buttons.Primary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Primary.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Primary.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Primary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Primary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Primary.${shade}.Pressed}`, type: 'color' }
@@ -293,6 +336,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Secondary': {
         'Button': { value: `{Buttons.Secondary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Secondary.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Secondary.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Secondary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Secondary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Secondary.${shade}.Pressed}`, type: 'color' }
@@ -300,6 +344,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Tertiary': {
         'Button': { value: `{Buttons.Tertiary.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Tertiary.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Tertiary.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Tertiary.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Tertiary.${shade}.Pressed}`, type: 'color' }
@@ -312,6 +357,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'BlackWhite': {
         'Button': { value: `{Buttons.BlackWhite.Color-${n}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.BlackWhite.Color-${n}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.BlackWhite.Color-${n}.Quiet}`, type: 'color' },
         'Border': { value: `{Buttons.BlackWhite.Color-${n}.Border}`, type: 'color' },
         'Hover': { value: `{Buttons.BlackWhite.Color-${n}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.BlackWhite.Color-${n}.Pressed}`, type: 'color' },
@@ -321,6 +367,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Neutral.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Neutral.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Neutral.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Neutral.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Neutral.${shade}.Pressed}`, type: 'color' }
@@ -328,6 +375,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Info': {
         'Button': { value: `{Buttons.Info.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Info.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Info.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Info.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Info.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Info.${shade}.Pressed}`, type: 'color' }
@@ -335,6 +383,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Success': {
         'Button': { value: `{Buttons.Success.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Success.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Success.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Success.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Success.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Success.${shade}.Pressed}`, type: 'color' }
@@ -342,6 +391,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Warning': {
         'Button': { value: `{Buttons.Warning.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Warning.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Warning.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Warning.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Warning.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Warning.${shade}.Pressed}`, type: 'color' }
@@ -349,6 +399,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
       'Error': {
         'Button': { value: `{Buttons.Error.${shade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Error.${shade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Error.${shade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Surfaces.Error.Color-${n}}`, type: 'color' },
         'Hover': { value: `{Buttons.Error.${shade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Error.${shade}.Pressed}`, type: 'color' }
@@ -447,6 +498,21 @@ function generateSingleTheme(config: ThemeConfig): any {
   const locked = config.themeName === 'Neutral' ? neutralSurfaceWindow() : null;
   const lockStep = (level: SurfaceLevel) => locked?.find((s) => s.level === level) ?? null;
 
+  /* The ends come from surfaceWindow for CHROMATIC themes too, not just the
+     locked Neutral one.
+     
+     dimmestN used to be `config.n - 2` here and the identical expression lived
+     in generateSimplifiedBackgrounds — two copies of one rule, which is how
+     they drifted. Both now read the module, so Theme's tone index and the
+     Modes value it aliases cannot disagree; when they did, the foreground
+     tables (Text, Quiet, Border, Eyebrow) were solved against one tone while
+     the surface painted another. */
+  const endWindow = locked
+    ?? surfaceWindow(Math.min(Math.max(config.n, MIN_SURFACE_TONE), MAX_SURFACE_TONE));
+  const endStep = (level: SurfaceLevel) => endWindow.find((s) => s.level === level)!;
+  const dimmestStep = endStep('Surface-Dimmest');
+  const brightestStep = endStep('Surface-Brightest');
+
   // A locked end paints the anchor outright; every foreground table is still
   // keyed by toneIndex (1 for black, 12 for white), which is what keeps Text,
   // Quiet, Border and Eyebrow resolving on a surface that has no tone of its own.
@@ -486,14 +552,31 @@ function generateSingleTheme(config: ThemeConfig): any {
   };
 
   // Surface-Dimmest
+  //
+  // LINKED to the row's own end, not to another row's Surface. It used to read
+  // {Background-<n-2>.Surfaces.Surface} — a DIFFERENT background's base surface
+  // standing in for this one's darkest level. Modes has carried a real
+  // Surface-Dimmest entry on every row for a while; nothing pointed at it, so
+  // the link went to a neighbour instead and the level tracked the row it
+  // borrowed from rather than the theme it belongs to.
+  //
+  // Black stays a literal: no tone is true black (Color-1 is L1 in light mode,
+  // L3 in dark), so the anchor can only come from one. That is also what keeps
+  // Neutral's locked window black in BOTH modes.
   theme['Surfaces-Dimmest'] = {
     'Background': {
-      value: dimmestLock?.paint.kind === 'black' || config.n <= 2
+      /* Aliases the COLOUR, not a Backgrounds row. The row's own
+         Surface-Dimmest was never anything but {Colors.<palette>.Color-N}
+         itself, so this resolves identically with one hop fewer — and the two
+         ends are anchored per theme, so a per-row copy of them on all twelve
+         rows was 378 variables saying one thing. Colors is inside Modes, so
+         the alias stays mode-aware. */
+      value: dimmestStep.paint.kind === 'black'
         ? '#000000'
-        : `{Backgrounds.${config.theme}.Background-${dimmestLock ? dimmestLock.toneIndex : dimmestN}.Surfaces.Surface}`,
+        : `{Colors.${config.theme}.Color-${dimmestStep.toneIndex}}`,
       type: 'color'
     },
-    ...buildSurfaceTokens(config, dimmestLock ? dimmestLock.toneIndex : dimmestN)
+    ...buildSurfaceTokens(config, dimmestStep.toneIndex)
   };
 
   // Surface-Bright
@@ -514,15 +597,20 @@ function generateSingleTheme(config: ThemeConfig): any {
   // 11 unless Bright has already taken it (Surface at 10), in which case 12.
   // Above that the ramp is exhausted and it paints white outright — the same
   // shape as Dimmest falling through to black when the tone runs out below.
-  const brightestN = brightN >= 11 ? 12 : 11;
+  // Linked to the row's own end for the same reason as Dimmest above.
   theme['Surfaces-Brightest'] = {
     'Background': {
-      value: brightN >= 12
+      /* Same one-hop alias as Dimmest. The literal is reserved for a
+         chromatic ramp that has run out; Neutral keeps ALIASING even though
+         its window says white, because Neutral's Color-12 IS pure white and a
+         hard #ffffff would light dark mode's brightest surface to pure white
+         instead of the dark ramp's top. `locked` is Neutral. */
+      value: !locked && brightestStep.paint.kind === 'white'
         ? '#ffffff'
-        : `{Backgrounds.${config.theme}.Background-${brightestN}.Surfaces.Surface}`,
+        : `{Colors.${config.theme}.Color-${brightestStep.toneIndex}}`,
       type: 'color'
     },
-    ...buildSurfaceTokens(config, brightestN)
+    ...buildSurfaceTokens(config, brightestStep.toneIndex)
   };
 
   // Containers Section — reference Modes/Containers for Light/Dark mode adaptation
@@ -609,6 +697,23 @@ function generateSingleTheme(config: ThemeConfig): any {
       value: `{Header.Containers.Tertiary.Color-${config.contN}}`,
       type: 'color'
     },
+    /* Same three on the container side — a surface and a container resolve
+       different tones, so the Alt must be stated for both or it keeps the
+       surface's colour on a card. */
+    'Alt-Display-Color': {
+      value: `{Header.Containers.Primary.Color-${config.contN}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-1': {
+      value: `{Header.Containers.Primary.Color-${config.contN}}`,
+      type: 'color'
+    },
+    'Alt-Color-Gradient-Stop-2': {
+      value: config.altStop2 === 'mono'
+        ? `{Colors.Primary.Color-${monoStopTone(config.contN)}}`
+        : `{Header.Containers.${config.altStop2}.Color-${config.contN}}`,
+      type: 'color'
+    },
     'Header-Neutral': {
       value: `{Header.Containers.Neutral.Color-${config.contN}}`,
       type: 'color'
@@ -677,6 +782,7 @@ function generateSingleTheme(config: ThemeConfig): any {
           return {
             'Button': { value: `{Buttons.${config.theme}.${config.cShade}.Button}`, type: 'color' },
             'Text': { value: `{Buttons.${config.theme}.${config.cShade}.Text}`, type: 'color' },
+            'Quiet': { value: `{Buttons.${config.theme}.${config.cShade}.Quiet}`, type: 'color' },
             'Border': { value: `{Border.Containers.${config.theme}.Color-${config.contN}}`, type: 'color' },
             'Hover': { value: `{Buttons.${config.theme}.${config.cShade}.Hover}`, type: 'color' },
             'Pressed': { value: `{Buttons.${config.theme}.${config.cShade}.Pressed}`, type: 'color' },
@@ -693,6 +799,7 @@ function generateSingleTheme(config: ThemeConfig): any {
         return {
           'Button': { value: `{${cSrc}.Button}`, type: 'color' },
           'Text': { value: `{${cSrc}.Text}`, type: 'color' },
+          'Quiet': { value: `{${cSrc}.Quiet}`, type: 'color' },
           'Border': config.blackWhiteButton
             ? { value: `{${cSrc}.Border}`, type: 'color' }
             : { value: `{Border.Containers.${config.defaultButtonPalette}.Color-${config.contN}}`, type: 'color' },
@@ -705,6 +812,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Primary': {
         'Button': { value: `{Buttons.Primary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Primary.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Primary.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Primary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Primary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Primary.${config.cShade}.Pressed}`, type: 'color' }
@@ -712,6 +820,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Secondary': {
         'Button': { value: `{Buttons.Secondary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Secondary.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Secondary.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Secondary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Secondary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Secondary.${config.cShade}.Pressed}`, type: 'color' }
@@ -719,6 +828,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Tertiary': {
         'Button': { value: `{Buttons.Tertiary.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Tertiary.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Tertiary.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Tertiary.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Tertiary.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Tertiary.${config.cShade}.Pressed}`, type: 'color' }
@@ -729,6 +839,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'BlackWhite': {
         'Button': { value: `{Buttons.BlackWhite.Color-${config.contN}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.BlackWhite.Color-${config.contN}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.BlackWhite.Color-${config.contN}.Quiet}`, type: 'color' },
         'Border': { value: `{Buttons.BlackWhite.Color-${config.contN}.Border}`, type: 'color' },
         'Hover': { value: `{Buttons.BlackWhite.Color-${config.contN}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.BlackWhite.Color-${config.contN}.Pressed}`, type: 'color' },
@@ -738,6 +849,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Neutral.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Neutral.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Neutral.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Neutral.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Neutral.${config.cShade}.Pressed}`, type: 'color' }
@@ -745,6 +857,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Info': {
         'Button': { value: `{Buttons.Info.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Info.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Info.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Info.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Info.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Info.${config.cShade}.Pressed}`, type: 'color' }
@@ -752,6 +865,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Success': {
         'Button': { value: `{Buttons.Success.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Success.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Success.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Success.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Success.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Success.${config.cShade}.Pressed}`, type: 'color' }
@@ -759,6 +873,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Warning': {
         'Button': { value: `{Buttons.Warning.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Warning.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Warning.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Warning.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Warning.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Warning.${config.cShade}.Pressed}`, type: 'color' }
@@ -766,6 +881,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       'Error': {
         'Button': { value: `{Buttons.Error.${config.cShade}.Button}`, type: 'color' },
         'Text': { value: `{Buttons.Error.${config.cShade}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.Error.${config.cShade}.Quiet}`, type: 'color' },
         'Border': { value: `{Border.Containers.Error.Color-${config.contN}}`, type: 'color' },
         'Hover': { value: `{Buttons.Error.${config.cShade}.Hover}`, type: 'color' },
         'Pressed': { value: `{Buttons.Error.${config.cShade}.Pressed}`, type: 'color' }
@@ -838,6 +954,16 @@ function generateSingleTheme(config: ThemeConfig): any {
  * Generate all themes with Surfaces and Containers
  * Creates 28 themes total based on the specification
  */
+/** The flat names, kept because saved systems still carry them. */
+type FlatNavSelection =
+  | 'primary-light' | 'primary-light-bright' | 'primary-light-dim'
+  | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+
+/** What the studio writes today: a theme and one of its surface levels. */
+type ThemeLevelSelection = `${string}/${string}`;
+
+export type NavSelection = FlatNavSelection | ThemeLevelSelection;
+
 export function generateAllThemesWithSurfacesAndContainers(
   mode: 'Light-Mode' | 'Dark-Mode',
   extractedTones: { primary: number; secondary: number; tertiary: number },
@@ -850,9 +976,21 @@ export function generateAllThemesWithSurfacesAndContainers(
     // stopped matching, missing 'primary-medium'.
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-base'
       | 'primary-medium' | 'primary-dark' | 'neutral-light' | 'neutral-dark';
-    appBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    navBar?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
-    status?: 'primary-light' | 'primary-light-bright' | 'primary-light-dim' | 'primary' | 'primary-bright' | 'primary-dim' | 'white' | 'black';
+    /* Two vocabularies, and the second is the one actually sent.
+     *
+     * These used to list only the flat names. The studio writes
+     * "<Theme>/<Surface-Level>" — "Tertiary/Surface-Bright" — which matched
+     * none of them, so every nav selection fell through navSelectionToSource's
+     * catch-all default and the App-Bar, Nav-Bar and Status themes were never
+     * generated at all.
+     *
+     * The type could not catch it because the call site reads
+     * `userSelections?.appBar as string`. A union that describes an input the
+     * code is never sent is worse than no union: it reads as a specification
+     * and is actually a record of what the vocabulary used to be. */
+    appBar?: NavSelection;
+    navBar?: NavSelection;
+    status?: NavSelection;
     /** Accepts the STYLE form with its -adaptive / -fixed suffix, because the
      *  body strips it: userSelections.button.replace(/-fixed|-adaptive/g, '').
      *  Declaring only the family form described an input this code was never
@@ -864,7 +1002,12 @@ export function generateAllThemesWithSurfacesAndContainers(
       | 'laddered-adaptive' | 'laddered-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black'; // CRITICAL FIX: Added to pass card coloring selection to generateModesThemes
-  }
+  },
+  /* Which palette the Alt gradient's second stop uses. Decided once, from the
+     palettes' own hues, by altStop2Palette — the theme layer never sees a hex,
+     so the question has to be answered where the colours are and carried in.
+     Defaults to 'mono', the answer that needs no second hue to be known. */
+  altStop2: AltStop2 = 'mono',
 ): any {
   
   const themes: any = {};
@@ -946,6 +1089,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   
   // 1. Default Theme (from user/calculated settings)
   themes.Default = generateSingleTheme({
+    altStop2,
     themeName: 'Default',
     surfaceScopedButton: isSurfaceScopedButton,
     blackWhiteButton: isBlackWhiteButton,
@@ -1131,8 +1275,36 @@ export function generateAllThemesWithSurfacesAndContainers(
       case 'primary-dim':          return { theme: 'Primary', level: 'Surfaces-Dim' };
       case 'white':                return { theme: 'Neutral', level: 'Surfaces-Brightest' };
       case 'black':                return { theme: 'Neutral', level: 'Surfaces-Dimmest' };
-      default:                     return { theme: selection || 'Primary', level: 'Surfaces' };
     }
+
+    /* The vocabulary the studio actually writes now: "<Theme>/<Surface-Level>",
+       e.g. "Tertiary/Surface-Bright". None of the cases above match it, so
+       every nav selection was falling through to the default below and passing
+       the WHOLE string as a theme name — themes['Tertiary/Surface-Bright'] is
+       undefined, navThemeFrom returned null, and the App-Bar, Nav-Bar and
+       Status themes were simply never generated.
+       
+       Third time this exact shape has appeared here. moodAxes.ts:
+       "NONE of them matched before this: every one fell through to 'Modern'…
+       A catch-all default hides a vocabulary mismatch, because the fallback is
+       a real value that renders." Same again.
+       
+       The level also has to be translated: a theme object keys its levels
+       Surfaces / Surfaces-Bright / Surfaces-Dimmest (plural), while the
+       user-facing name is Surface-Bright (singular) — the pairing
+       overrideSurface() already spells out at line ~1107. */
+    const slash = String(selection ?? '').split('/');
+    if (slash.length === 2) {
+      const [theme, level] = slash.map((x) => x.trim());
+      return { theme, level: level === 'Surface' ? 'Surfaces' : level.replace(/^Surface-/, 'Surfaces-') };
+    }
+
+    /* Anything else really is unknown. Say so rather than resolving to a
+       plausible theme that renders and hides the mismatch. */
+    if (selection) {
+      console.warn(`  ⚠️ nav selection "${selection}" is not a known shape; falling back to Primary/Surfaces`);
+    }
+    return { theme: selection || 'Primary', level: 'Surfaces' };
   }
 
   /** Copy a theme, promoting one of its surface levels to be its Surface. */
@@ -1170,6 +1342,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
   // For other themes, use the default container settings
   const makeConfig = (themeName: string, theme: string, n: number): ThemeConfig => ({
+    altStop2,
     themeName,
     theme,
     n,

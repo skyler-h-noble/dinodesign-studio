@@ -114,6 +114,183 @@ The accessibility report also validates:
 
 ---
 
+## The other half: accessible names
+
+Everything above is about the design SYSTEM — token contrast, checked once per
+system. Accessible naming is checked per *converted frame*, in
+`src/utils/conversionA11y.ts`, and surfaces in the Accessibility tab beside
+Drift in the AAID workbench.
+
+The two are separate on purpose. A contrast failure is visible the moment you
+look at it. A naming failure renders perfectly.
+
+### Which controls need a name
+
+A Button's **Type** decides it:
+
+| Type | needs `aria-label` | why |
+| --- | --- | --- |
+| `text` | **no** | the visible label already IS the accessible name; adding one makes a screen reader announce the control twice |
+| `iconOnly` | yes | nothing readable to announce |
+| `Avatar` | yes | an image; there is no string anywhere in the component |
+| `letterNumber` | yes | "JD" and "3" are the CONTENT, not a name |
+
+The lib enforces this in dev: `Button.js` warns when a labelless type carries no
+`aria-label` / `aria-labelledby` / `title`, and warns again when the button *and*
+an icon inside it are both labelled.
+
+`letterNumber` was missing from that check until 2026-09-07, and it is the worst
+one to miss. An unnamed avatar announces as nothing, which gets noticed. An
+unnamed letterNumber announces as **"123, button"** — which sounds deliberate,
+so nobody investigates.
+
+### A bad name is worse than no name
+
+This is the part that is not obvious, and it is why `meaningless-name` is an
+**error** and not a warning:
+
+| | what happens |
+| --- | --- |
+| no `aria-label` | lib dev-warning fires · automated checkers flag it · shows up in an audit |
+| `aria-label="button"` | **nothing fires.** A name exists, so every check passes and the lib goes quiet |
+
+A missing name is a bug that announces itself. A meaningless one is a bug that
+hides behind a passing check. The same goes for `aria-label="JD"` and
+`aria-label="3"` — the rendered content mistaken for the name.
+
+### Names are derived, not authored
+
+There is **no Accessible Name property in the Figma file**, and that is a
+decision rather than an omission. A required field gets filled badly, and Figma
+text properties want a default — where the obvious default, `button`, is exactly
+the failure above.
+
+So the converter derives the name, in this order (`figmaToCode.ts`, rule 0d):
+
+1. **The instance's layer name**, when it reads like an action — "Profile",
+   "Search", "Add member". Skipped when generic: "Button", "Frame 12", the
+   component name, a bare number.
+2. **For `iconOnly`, the icon's meaning as an action.** Where the glyph and the
+   action differ, the action wins — a house icon opening a dashboard is
+   "Dashboard", not "Home".
+3. **For `Avatar` in a nav, convention** — "Your account".
+4. **For `letterNumber`, nothing derivable exists.**
+
+Step 1 does most of the work, because designers already name their instances —
+"Profile" is exactly the string that would have gone in the field.
+
+### Every guess is flagged in the code
+
+Deriving means guessing, and a guess has to reach the person who can correct it.
+The converter emits a marker for anything that came from step 2, 3 or 4:
+
+```
+// DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, from the layer name
+```
+
+Same convention as `MISSING-LIB-COMPONENT`, and for the same reason: a marker
+**in the emitted code** survives being copied, saved, or pasted into a PR. A note
+carried beside the code is dropped by all three. `computeA11y` reads it straight
+out of the JSX, which is why nothing had to be plumbed through the conversion
+result.
+
+The Accessibility tab shows these as *info*, not warnings — a derived name is
+usually right. It needs a human only to confirm the ACTION matches the glyph,
+which is the one thing the file cannot know.
+
+---
+
+## The third half: lists
+
+A bulleted or numbered list is the other structure that renders perfectly and
+carries no semantics. Its failure mode is the same shape as the accessible
+name: nothing about the output looks wrong.
+
+**Figma draws the marker, so it is not in the string.** A list authored with
+Figma's list control arrives as plain `"First\nSecond\nThird"` — no bullet
+character anywhere. It is therefore indistinguishable from three lines of prose
+by looking at the text, which is the whole problem: the converter, seeing only
+characters, emits three `<Body>` elements. No `role="list"`, no item count
+announced, no way to navigate by list. That is WCAG 1.3.1 Info and
+Relationships, and it is invisible without a screen reader.
+
+So the plugin stamps what Figma knows, in `aaidNodeRecord`:
+
+```
+_aaid.list = { type: "UNORDERED" }              // whole node, one level
+_aaid.list = { type: "ORDERED", indent: 1 }     // whole node, nested
+_aaid.list = { lines: [{t,i},…] }               // per line, when mixed
+```
+
+Read per LINE rather than per node. `node.listOptions` returns `figma.mixed` the
+moment one paragraph is a list and another is not — and that case is the
+ordinary one, not an edge: an intro sentence above three bullets produces it.
+Each line is sampled over its **first character**, which can never be mixed,
+rather than over the line's whole span, which can.
+
+**Three tiers, and only the first is knowledge.**
+
+| Tier | Signal | Confidence |
+| --- | --- | --- |
+| Native Figma list | `_aaid.list` | read, not inferred — no flag |
+| Markers typed into the text | `"• "`, `"1. "` at line start | a guess about intent — flagged |
+| One text node per bullet | sibling analysis | the most guess-prone |
+
+Tier 2 is a judgement: a line starting with `-` may be a dash. So it emits a
+marker in the code, the same convention and for the same reason as
+`DERIVED-ARIA-LABEL`:
+
+```
+// DERIVED-LIST: 3 items on <List> — markers typed as "• " in one text node
+```
+
+and lands as *info*. A tier-1 list is never flagged — there is nothing for a
+human to confirm about a fact.
+
+**Two findings catch what the converter got wrong.** `prose-list` is an
+**error**: a marker surviving inside a `<Body>` proves the text was copied
+verbatim and the list was never recognised, and no amount of restyling recovers
+it — the markup has to change. `double-marker` is a **warning**: the structure
+is right but the item kept its typed bullet, so `<List>` draws one marker and
+the string supplies another, shown twice and announced twice.
+
+No lib gap blocks any of this: `<List>` already renders `<ul role="list">` with
+`<li>` children and takes `component="ol"` (`List.js:343`).
+
+### `handmade-state` — an empty or error state composed by hand
+
+The same failure shape as `raw-interactive`: it looks correct and announces
+nothing. A centred `Icon` + heading + body built from `Box` has no role, no
+accessible name and no live region, so a screen-reader user tabbing past a
+table hears "group" and must enter it to learn the query found nothing — and a
+failed load is not announced at all.
+
+The check fires on a **short headline** (≤ 60 characters) in a heading
+component whose text opens with a state phrase — `no`, `nothing`, `not found`,
+`couldn't`, `failed`, `something went wrong` — in JSX that contains no
+`<StateMessage>`. Both conditions matter: "No" is unremarkable mid-paragraph,
+and a long heading that merely starts with the word is a section title, not a
+state.
+
+It is a **warning**, deliberately, and the reason is the difference from
+`prose-list`. A typed bullet can only be a typed bullet. "No archived items"
+could be a real section heading — so this is a judgement about intent, and a
+false positive at error severity trains people to ignore the whole report.
+
+The message points at the **component**, not at the attributes, because
+`<StateMessage>` carries all of them: `aria-labelledby` from its own headline,
+`role="alert"` on the error type only (empty and no-results are the ordinary
+outcome of an ordinary query, and announcing those assertively talks over
+whatever the user was reading), and an `aria-hidden` icon.
+
+**The converter cannot add this itself.** There is no Figma property that says
+"this frame is an error state", so inferring it would mean guessing on
+something whose failure is silent — which is the reason `DERIVED-ARIA-LABEL`
+exists. Putting the ARIA in the component turns the converter's job into
+"recognise this and emit `<StateMessage>`", and correctness follows.
+
+---
+
 ## Why the pairing matters more than the count
 
 A high number of passing checks means nothing if a check compares the wrong two

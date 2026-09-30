@@ -1,0 +1,570 @@
+/**
+ * The shadow model reaches Figma and the CSS as ONE colour per surface plus a
+ * global per-layer opacity set — not five colours per surface.
+ *
+ * Invariant 5 says the preview and the export diverge silently, so both are
+ * asserted here. Invariant 7 says parity alone is not correctness: the SHAPE is
+ * asserted independently on each side, so the two agreeing on something wrong
+ * still fails.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import chroma from 'chroma-js';
+import { buildPreviewCSS } from '../utils/buildPreviewCSS';
+import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
+import { generateFigmaJSON } from '../utils/generateFigmaJSON';
+import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
+import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
+import {
+  dropshadowAlphas, quantizeAlpha, shadowLevelOpacities, shadowLayers, shadowLayerCount, dropshadowBaseHex,
+  shadowOptionsFromStyle, SHADOW_LEVELS, SHADOW_DEFAULTS,
+} from '../utils/dropshadow';
+import type { ColorScheme } from '../types';
+
+const TYPOGRAPHY = [
+  { type: 'header' as const, family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false },
+  { type: 'decorative' as const, family: 'Caveat', weight: '400', letterSpacing: '0em', allCaps: false },
+  { type: 'body' as const, family: 'Inter', weight: '400', letterSpacing: '0em', allCaps: false },
+];
+
+function makeScheme(colors: [string, string, string]): ColorScheme {
+  const light = (h: string) => generateSemanticLightModeScale(h, undefined, h);
+  const dark = (h: string) => generateSemanticDarkModeScale(h);
+  return {
+    name: 'Test', colors,
+    extractedTones: {
+      primary: chroma(colors[0]).lch()[0],
+      secondary: chroma(colors[1]).lch()[0],
+      tertiary: chroma(colors[2]).lch()[0],
+    },
+    tonePalettes: { primary: light(colors[0]), secondary: light(colors[1]), tertiary: light(colors[2]) },
+    darkModeTonePalettes: { primary: dark(colors[0]), secondary: dark(colors[1]), tertiary: dark(colors[2]) },
+  } as unknown as ColorScheme;
+}
+
+const SCHEME = makeScheme(['#7b3f9d', '#2563eb', '#b8329b']);
+
+/** A non-default shadow setting, so a hard-coded default cannot pass. */
+const CUSTOM = {
+  shadowIntensity: 0.62, shadowCrispy: 0.8, shadowResolution: 0.9,
+  shadowLightX: 0, shadowLightY: -1, shadowTint: true,
+};
+
+function buildFigma(componentStyle?: Record<string, unknown>) {
+  const json = exportColorSystemToJSON(
+    generateFullLightPalettes(
+      SCHEME.tonePalettes!.primary as never,
+      SCHEME.tonePalettes!.secondary as never,
+      SCHEME.tonePalettes!.tertiary as never,
+    ),
+    generateFullDarkPalettes(
+      SCHEME.darkModeTonePalettes!.primary as never,
+      SCHEME.darkModeTonePalettes!.secondary as never,
+      SCHEME.darkModeTonePalettes!.tertiary as never,
+    ),
+    'neutral', 'primary-fixed' as never, SCHEME.extractedTones, 'modern',
+    {
+      header: { family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false },
+      decorative: { family: 'Caveat', weight: '400', letterSpacing: '0em', allCaps: false },
+      body: { family: 'Inter', weight: '400', letterSpacing: '0em', allCaps: false },
+    },
+    'ShadowExport', undefined, undefined, undefined, 'light-tonal', undefined,
+    { background: 'neutral' as never, button: 'primary-fixed' as never,
+      cardColoring: 'tonal' as never, textColoring: 'standard' as never },
+  ) as unknown as Record<string, unknown>;
+  if (componentStyle) json._componentStyle = componentStyle;
+  return generateFigmaJSON(json as never);
+}
+
+describe('Figma carries one shadow colour, not five', () => {
+  const figma = buildFigma();
+
+  it('emits a Dropshadow-Color section and no numbered ones', () => {
+    const mode = (figma as never as Record<string, any>).Modes['Light-Mode'];
+    const numbered = Object.keys(mode).filter((k) => /^Dropshadow-Color-\d$/.test(k));
+    expect(`single: ${!!mode['Dropshadow-Color']}, numbered: ${numbered.length}`)
+      .toBe('single: true, numbered: 0');
+  });
+
+  /* The colour must be OPAQUE. The opacity lives on the effect layer and is
+     bound separately; baking an alpha into the colour would apply it twice. */
+  it('emits the colour opaque, as 6-digit hex', () => {
+    const sec = (figma as never as Record<string, any>).Modes['Light-Mode']['Dropshadow-Color'];
+    const vals = Object.values(sec).flatMap((p) => Object.values(p as object)).map((v: any) => v.value);
+    expect(vals.length).toBeGreaterThan(0);
+    expect(vals.every((v: string) => /^#[0-9a-f]{6}$/i.test(v))).toBe(true);
+  });
+});
+
+describe('Figma carries the per-layer geometry and opacity globally', () => {
+  const figma = buildFigma() as never as Record<string, any>;
+
+  it('gives every level ten slots', () => {
+    for (const l of SHADOW_LEVELS) {
+      const slots = Object.keys(figma.Elevation[`Level-${l}`]);
+      expect(`L${l}: ${slots.length}`).toBe(`L${l}: 10`);
+    }
+  });
+
+  /* Slots past a level's layer count must be ZERO, not absent — the effect
+     styles are premade at full width, so lowering Resolution has to silence
+     the tail rather than restructure the style. */
+  it('zeroes the slots past the active layer count', () => {
+    for (const l of SHADOW_LEVELS) {
+      const n = shadowLayerCount(l);
+      for (let i = n; i < 10; i++) {
+        const s = figma.Elevation[`Level-${l}`][`Shadow-${i + 1}`];
+        expect(`L${l} slot ${i + 1}: ${s['x'].value}/${s['y'].value}/${s['Blur'].value}/${s['Spread'].value}`)
+          .toBe(`L${l} slot ${i + 1}: 0/0/0/0`);
+      }
+    }
+  });
+
+  it('matches the generator for the active slots', () => {
+    for (const l of SHADOW_LEVELS) {
+      shadowLayers(l).forEach(([x, y, blur, spread], i) => {
+        const s = figma.Elevation[`Level-${l}`][`Shadow-${i + 1}`];
+        expect(`L${l}.${i + 1}: ${s['x'].value}/${s['y'].value}/${s['Blur'].value}/${s['Spread'].value}`)
+          .toBe(`L${l}.${i + 1}: ${x}/${y}/${blur}/${spread}`);
+      });
+    }
+  });
+});
+
+describe('the user\'s Shadow controls actually reach the exports', () => {
+  /* A hard-coded default would pass every assertion above. These force the
+     non-default settings through the real pipeline. */
+  it('changes the Figma geometry, and the Drop-Colors opacity with it', () => {
+    const custom = buildFigma(CUSTOM) as never as Record<string, any>;
+    const o = shadowOptionsFromStyle(CUSTOM);
+    const layers = shadowLayers(5, o);
+    expect(`slots: ${layers.length}`).not.toBe(`slots: ${shadowLayers(5).length}`);
+    layers.forEach(([x, y, blur, spread], i) => {
+      const s = custom.Elevation['Level-5'][`Shadow-${i + 1}`];
+      expect(`${s['x'].value}/${s['y'].value}/${s['Blur'].value}/${s['Spread'].value}`)
+        .toBe(`${x}/${y}/${blur}/${spread}`);
+    });
+    /* The alpha left Elevation for Drop-Colors, so a settings change has to
+       show up THERE now — this is the half that would otherwise stop being
+       covered when the opacity moved collections. */
+    const dc = custom['Drop-Colors'][Object.keys(custom['Drop-Colors'])[0]];
+    expect(dc['Level-5'].Opacity.value).toBe(shadowLevelOpacities(o)[4].percent);
+    expect(dc['Level-5'].Opacity.value)
+      .not.toBe(shadowLevelOpacities(SHADOW_DEFAULTS)[4].percent);
+  });
+
+  /* Intensity moves the COLOUR, not only the alpha. A call site that drops the
+     options emits a plausible-but-wrong hex, which is exactly the failure this
+     pins — light position 0 also proves the geometry is straight-down. */
+  it('changes the Figma shadow colour', () => {
+    const custom = buildFigma(CUSTOM) as never as Record<string, any>;
+    const dflt = buildFigma() as never as Record<string, any>;
+    /* Compare the WHOLE section, not one tone. LIGHT_MAX caps shadow lightness
+       at 52, so on a very light surface two different intensities can land on
+       the same clamped hex — a single-tone probe would report "no change" from
+       the clamp rather than from a broken pipeline. */
+    const all = (f: Record<string, any>) => JSON.stringify(f.Modes['Light-Mode']['Dropshadow-Color']);
+    expect(all(custom)).not.toBe(all(dflt));
+  });
+
+  it('changes the preview CSS recipes', () => {
+    const css = (cs?: Record<string, unknown>) => buildPreviewCSS({
+      colorScheme: SCHEME,
+      userSelections: { background: 'neutral', button: 'primary', cardColoring: 'tonal', textColoring: 'standard' },
+      componentStyle: 'modern', mode: 'light', typographyStyles: TYPOGRAPHY,
+      ...(cs ? { styleCustomizations: cs } : {}),
+    } as never);
+    const line = (s: string) => (s.match(/--Effect-Level-5:[^;]*/) || ['none'])[0];
+    expect(line(css(CUSTOM))).not.toBe(line(css()));
+  });
+});
+
+describe('the preview and the CSS export agree on the recipe shape', () => {
+  const css = buildPreviewCSS({
+    colorScheme: SCHEME,
+    userSelections: { background: 'neutral', button: 'primary', cardColoring: 'tonal', textColoring: 'standard' },
+    componentStyle: 'modern', mode: 'light', typographyStyles: TYPOGRAPHY,
+  } as never);
+
+  /* The dead per-level tokens. Nothing reads them since the recipes moved to
+     the single var, and they cost five variables on every surface. */
+  it('emits no --Dropshadow-Color-N anywhere', () => {
+    expect(/--Dropshadow-Color-\d/.test(css)).toBe(false);
+  });
+
+  /* rgba() with a COMMA triple, because @omni-design/components consumes
+     rgba(var(--Dropshadow-Color), a). The space-separated form is invalid
+     inside rgba() and paints nothing, silently. */
+  it('emits a comma triple and rgba(), the form the lib consumes', () => {
+    const triple = css.match(/--Dropshadow-Color:\s*([^;]+);/);
+    expect(triple && /^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(triple[1].trim())).toBe(true);
+    expect(/--Effect-Level-5:[^;]*rgba\(var\(--Dropshadow-Color\),/.test(css)).toBe(true);
+  });
+
+  it('gives level 5 one recipe entry per layer', () => {
+    const recipe = (css.match(/--Effect-Level-5:([^;]*)/) || ['', ''])[1];
+    const entries = (recipe.match(/rgba\(var\(--Dropshadow-Color\),/g) || []).length;
+    expect(`entries: ${entries}`).toBe(`entries: ${shadowLayerCount(5)}`);
+  });
+});
+
+/* The lib compiles its own shadow geometry in, so without this override the
+   Shadow controls reach a Card's COLOUR and nothing else — every card in the
+   app looks identical however the sliders move. */
+describe('the lib\'s own components are repointed at the recipes', () => {
+  const css = buildPreviewCSS({
+    colorScheme: SCHEME,
+    userSelections: { background: 'neutral', button: 'primary', cardColoring: 'tonal', textColoring: 'standard' },
+    componentStyle: 'modern', mode: 'light', typographyStyles: TYPOGRAPHY,
+  } as never);
+
+  /* The shadow override that used to be asserted here is gone: the lib reads
+     var(--Effect-Level-N) itself now, and a :root-declared custom property has
+     its inner var() resolved at :root — so the override gave every card the
+     root's shadow colour instead of its own surface's. */
+  it('emits no box-shadow override for lib components', () => {
+    expect(/\.card\.card\s*\{\s*box-shadow/.test(css)).toBe(false);
+    expect(/\.appbar\.appbar\s*\{\s*box-shadow/.test(css)).toBe(false);
+  });
+
+  /* Doubled class, not a bare one: the lib's styles come from emotion as a
+     single generated class, so `.card` alone ties on specificity and the
+     winner depends on stylesheet insertion order. Doubling wins outright, so
+     the override must not need !important either. */
+  /* TextArea wraps MUI's TextField, so it inherits MUI's corner rather than
+     reading --Input-Radius — a TextArea and a TextInput side by side had
+     different corners. The notched outline needs it too: that fieldset draws
+     the visible border, so leaving it square shows a square outline inside a
+     rounded box. */
+  it('repoints MUI-backed fields at --Input-Radius, outline included', () => {
+    expect(/\.MuiOutlinedInput-root\.MuiOutlinedInput-root[^{]*\{[^}]*var\(--Input-Radius/.test(css)).toBe(true);
+    expect(css.includes('.MuiOutlinedInput-notchedOutline')).toBe(true);
+  });
+
+  it('outranks emotion by specificity rather than !important', () => {
+    const rules = [...css.matchAll(/^\.MuiOutlinedInput-root[^{]*\{[^}]*border-radius[^}]*\}/gm)].map((m) => m[0]);
+    expect(rules.length).toBeGreaterThan(0);
+    for (const r of rules) {
+      expect(`doubled: ${/^\.(\S+?)\.\1/.test(r)}`).toBe('doubled: true');
+      expect(`important: ${r.includes('!important')}`).toBe('important: false');
+    }
+  });
+});
+
+describe('the shadow controls have defaults for a system that never set them', () => {
+  it('falls back to SHADOW_DEFAULTS on an empty record', () => {
+    expect(shadowOptionsFromStyle(undefined)).toEqual(SHADOW_DEFAULTS);
+    expect(shadowOptionsFromStyle({})).toEqual(SHADOW_DEFAULTS);
+  });
+
+  it('keeps the shadow darker than the surface at every intensity', () => {
+    const lum = (hex: string) => {
+      const h = hex.replace('#', '');
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    for (const surface of ['#f0ebe0', '#3b6ea5', '#ffffff']) {
+      for (const intensity of [0.05, 0.4, 1]) {
+        const ok = lum(dropshadowBaseHex(surface, { intensity })) < lum(surface);
+        expect(`${surface} @${intensity}: ${ok}`).toBe(`${surface} @${intensity}: true`);
+      }
+    }
+  });
+});
+
+
+/* ── Every consumer must hand over the sliders ──────────────────────────────
+ *
+ * buildPreviewCSS covers colour and typography from its own arguments, but the
+ * component-style sliders arrive only through styleCustomizations. A call site
+ * that omits them renders a PLAUSIBLE design system that silently ignores the
+ * user's choices — there is no error, the shadows are simply the defaults.
+ *
+ * This has now happened twice: first with button radii (the detail page showed
+ * 4px corners for a system saved at 86%), then with the Shadow step, where the
+ * studio's own chrome, the detail page and the phone mock-up all rendered
+ * default shadows. Both times the bug was a missing property at a call site, so
+ * that is what this asserts.
+ */
+describe('every buildPreviewCSS call site passes the sliders', () => {
+  const srcRoot = new URL('..', import.meta.url).pathname;
+
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) return name === '__tests__' ? [] : walk(full);
+      return /\.tsx?$/.test(name) ? [full] : [];
+    });
+
+  it('names styleCustomizations in every call', () => {
+    const offenders: string[] = [];
+    for (const file of walk(srcRoot)) {
+      if (file.includes('/utils/buildPreviewCSS.ts')) continue;
+      const src = readFileSync(file, 'utf8');
+      let i = src.indexOf('buildPreviewCSS({');
+      while (i !== -1) {
+        // the call's argument object, up to its closing brace
+        let depth = 0;
+        let end = src.indexOf('{', i);
+        for (let k = end; k < src.length; k++) {
+          if (src[k] === '{') depth++;
+          else if (src[k] === '}') { depth--; if (depth === 0) { end = k; break; } }
+        }
+        const call = src.slice(i, end + 1);
+        if (!call.includes('styleCustomizations')) {
+          offenders.push(`${file.replace(srcRoot, '')}:${src.slice(0, i).split('\n').length}`);
+        }
+        i = src.indexOf('buildPreviewCSS({', end);
+      }
+    }
+    expect(offenders.join(', ')).toBe('');
+  });
+});
+
+/* ── Display caps reach Figma ───────────────────────────────────────────────
+ *
+ * The Display's All-caps checkbox has to arrive as a text style property, not
+ * just as CSS: Figma applies case through textCase on the style, so a payload
+ * that omits it leaves the Display in sentence case in the file while the web
+ * export renders it uppercase.
+ *
+ * Both directions are asserted. Only checking the caps case would pass on an
+ * emitter that hardcoded UPPER, which is the failure that actually matters —
+ * unchecking the box has to REMOVE the case, not merely stop adding it.
+ */
+describe('the Display\'s all-caps setting reaches the Figma text styles', () => {
+  const build = (allCaps: boolean) => {
+    const json = exportColorSystemToJSON(
+      generateFullLightPalettes(
+        SCHEME.tonePalettes!.primary as never,
+        SCHEME.tonePalettes!.secondary as never,
+        SCHEME.tonePalettes!.tertiary as never,
+      ),
+      generateFullDarkPalettes(
+        SCHEME.darkModeTonePalettes!.primary as never,
+        SCHEME.darkModeTonePalettes!.secondary as never,
+        SCHEME.darkModeTonePalettes!.tertiary as never,
+      ),
+      'neutral', 'primary-fixed' as never, SCHEME.extractedTones, 'modern',
+      {
+        header: { family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false },
+        decorative: { family: 'Bebas Neue', weight: '400', letterSpacing: '0em', allCaps },
+        body: { family: 'Inter', weight: '400', letterSpacing: '0em', allCaps: false },
+      },
+      'CapsTest', undefined, undefined, undefined, 'light-tonal', undefined,
+      { background: 'neutral' as never, button: 'primary-fixed' as never,
+        cardColoring: 'tonal' as never, textColoring: 'standard' as never },
+    ) as unknown as Record<string, any>;
+    const figma = generateFigmaJSON(json as never) as never as Record<string, any>;
+    // The type styles live under Typography.styles, not at the top level.
+    const styles: any[] = (figma.TypeStyles ?? figma.Typography?.styles ?? figma.textStyles ?? []) as any[];
+    return {
+      token: json?.Typography?.['Set-Decorative-Caps']?.value,
+      display: styles.filter((s) => /display/i.test(String(s.group ?? ''))),
+    };
+  };
+
+  it('sets UPPER on every Display step when all-caps is on', () => {
+    const { token, display } = build(true);
+    expect(token).toBe('uppercase');
+    expect(display.length).toBeGreaterThan(0);
+    expect(display.map((s) => `${s.step}:${s.textCase}`).join(' '))
+      .toBe(display.map((s) => `${s.step}:UPPER`).join(' '));
+  });
+
+  it('removes it again when all-caps is off', () => {
+    const { token, display } = build(false);
+    expect(token).toBe('none');
+    expect(display.length).toBeGreaterThan(0);
+    expect(display.map((s) => `${s.step}:${s.textCase}`).join(' '))
+      .toBe(display.map((s) => `${s.step}:ORIGINAL`).join(' '));
+  });
+});
+
+
+/**
+ * The payload's SHAPE must match the Elevation collection that exists in the
+ * Figma file, name for name.
+ *
+ * This is the failure that made the collection hand-authored in the first
+ * place: the generator emitted `Shadow / Level-N / Layer-M / {X,Y,Blur,Spread}`
+ * while the file has `Elevation / Level-0..5 / Shadow-M / {offset-x, offset-y,
+ * blur-radius, spread-radius}`. Nothing errored — the import simply had no
+ * collection to land in, so the numbers stayed frozen and drifted from the CSS.
+ *
+ * A mismatch here is invisible at every layer except the designer's file, which
+ * is why it is asserted rather than left to the next import to reveal.
+ */
+/** Every slot's value for one property, in Shadow-1..10 order. */
+const slotValues = (level: Record<string, Record<string, { value: number }>>, prop: string) =>
+  Array.from({ length: 10 }, (_, i) => level[`Shadow-${i + 1}`][prop].value);
+
+describe('the Elevation payload matches the Figma collection', () => {
+  const figma = buildFigma();
+
+  it('is keyed by the collection name Figma actually has', () => {
+    expect(figma.Elevation).toBeTruthy();
+    // The old key would create a second, parallel collection.
+    expect((figma as Record<string, unknown>).Shadow).toBeUndefined();
+  });
+
+  it('emits Level-0 through Level-5 as the modes', () => {
+    expect(Object.keys(figma.Elevation)).toEqual([
+      'Level-0', 'Level-1', 'Level-2', 'Level-3', 'Level-4', 'Level-5',
+    ]);
+  });
+
+  it('emits ten Shadow-N slots in every level', () => {
+    for (const level of Object.keys(figma.Elevation)) {
+      const slots = Object.keys(figma.Elevation[level]);
+      expect(slots, level).toHaveLength(10);
+      expect(slots[0]).toBe('Shadow-1');
+      expect(slots[9]).toBe('Shadow-10');
+    }
+  });
+
+  it('uses the collection\'s own property names', () => {
+    const slot = figma.Elevation['Level-3']['Shadow-1'];
+    expect(Object.keys(slot).sort()).toEqual(
+      ['Blur', 'Spread', 'x', 'y'],
+    );
+  });
+
+  it('Level-0 is fully off, so nothing inherits Level-1', () => {
+    /* A mode with no values inherits the previous one, so an unstyled element
+       would silently pick up Level-1's shadow. Level-0 is emitted zeroed rather
+       than omitted. */
+    for (let i = 1; i <= 10; i++) {
+      const s = figma.Elevation['Level-0'][`Shadow-${i}`];
+      expect(s['x'].value).toBe(0);
+      expect(s['y'].value).toBe(0);
+      expect(s['Blur'].value).toBe(0);
+      expect(s['Spread'].value).toBe(0);
+    }
+  });
+
+  it('carries no opacity — that moved to Drop-Colors', () => {
+    /* The collection is 40 variables: 10 slots x 4 fields. An `opacity` here
+       would be a fifth field with no variable to land in, and a second place
+       for the same number to drift from — the alpha now lives on Drop-Colors as
+       a per-level Opacity that a Drop-Color's opacity binds to. */
+    for (const level of [0, ...SHADOW_LEVELS]) {
+      for (let i = 1; i <= 10; i++) {
+        const s = figma.Elevation[`Level-${level}`][`Shadow-${i}`];
+        expect(Object.keys(s).sort(), `Level-${level} Shadow-${i}`)
+          .toEqual(['Blur', 'Spread', 'x', 'y']);
+      }
+    }
+  });
+
+  it('reaches the depth the CSS does — not the old hand-authored 32px', () => {
+    /* The hand-authored collection topped out at y=32. Level-5 now ends at 50,
+       which is his high tier measured off the captures (it was 74, from an
+       earlier reading). Still comfortably past the old ceiling, which is what
+       this guards: if the two ever agree again it means someone pinned the
+       generator to the old numbers rather than the other way round. */
+    const deepest = Math.max(...slotValues(figma.Elevation['Level-5'], 'y'));
+    expect(deepest).toBe(50);
+    expect(deepest).toBeGreaterThan(32);
+  });
+});
+
+/* ── Drop-Colors is hand-authored ───────────────────────────────────────────
+   Five variables in the file, `Level-<n>/Drop-Color`, each aliasing
+   Surface/Dropshadow-Color with that level's opacity applied in the UI. The
+   payload must NOT write them, and must not carry the generated chain that
+   briefly existed to have somewhere to bake the alpha. What it must still do is
+   reference them from Component-Elevations, and keep Modes/Dropshadow-Color —
+   the opaque base the whole Surface chain tints from. */
+describe('Drop-Colors: opacity written, colour left aliased', () => {
+  const figma = buildFigma() as never as Record<string, any>;
+  const LEVELS = [1, 2, 3, 4, 5] as const;
+
+  it('emits the per-level OPACITY and nothing else for Drop-Colors', () => {
+    /* The colour is aliased in Figma and must never be written from here: a
+       plugin cannot express "this alias, dimmed" (a variable value is one RGBA
+       or one pointer, no modifier field), but Figma can bind a colour's opacity
+       to a NUMBER variable — so the alias survives and the alpha rides in as a
+       plain float. If a Drop-Color key ever appears here, something is trying to
+       write the tint and will detach the alias. */
+    const dc = figma['Drop-Colors'];
+    expect(dc).toBeDefined();
+    expect(Object.keys(dc)).toHaveLength(1);   // the file's single unnamed mode
+    const section = dc[Object.keys(dc)[0]];
+    expect(Object.keys(section).sort()).toEqual(LEVELS.map((l) => `Level-${l}`).sort());
+    for (const level of LEVELS) {
+      expect(Object.keys(section[`Level-${level}`])).toEqual(['Opacity']);
+      const entry = section[`Level-${level}`].Opacity;
+      expect(entry.type).toBe('number');
+      /* A PERCENT, 0..100. A number variable bound to a colour's opacity is
+         rendered by appending "%", so a variable holding 0.345 displays as
+         "0.345%" and paints nothing. This assertion is the guard against that
+         off-by-100 coming back — it is invisible in a diff and near-invisible
+         on screen. */
+      expect(entry.value).toBeGreaterThan(1);
+      expect(entry.value).toBeLessThanOrEqual(100);
+      // Still the level's flat alpha, quantised the way the CSS quantises it.
+      expect(entry.value).toBe(
+        Math.round(quantizeAlpha(dropshadowAlphas(level, SHADOW_DEFAULTS)[0]) * 1000) / 10);
+    }
+  });
+
+  it('emits no generated chain in Modes or Theme', () => {
+    /* A 45-variable Modes leaf and 5 Theme aliases existed to hold the alpha,
+       because an alias carries one but cannot apply one. Aliasing
+       Surface/Dropshadow-Color in the UI does the same job with five
+       hand-authored variables and no generated ones, so the chain is gone. If
+       either reappears, two things are tinting the same shadow. */
+    for (const mode of ['Light-Mode', 'Dark-Mode'])
+      expect(figma.Modes[mode]['Drop-Color'], `${mode} leaf`).toBeUndefined();
+    for (const theme of Object.keys(figma.Themes || {}))
+      expect(figma.Themes[theme]['Drop-Color'], `Themes.${theme}`).toBeUndefined();
+  });
+
+  it('keeps Modes/Dropshadow-Color, opaque and per mode', () => {
+    /* The base the Surface chain resolves to. Opaque: the opacity is applied on
+       the Drop-Colors alias in Figma, so baking one here would apply it twice. */
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      const v = figma.Modes[mode]['Dropshadow-Color']?.Primary?.['Color-12']?.value;
+      expect(v, `${mode} Dropshadow-Color`).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+    // The tint is derived from each mode's own surface, so the two differ.
+    const light = figma.Modes['Light-Mode']['Dropshadow-Color'].Primary['Color-3'].value;
+    const dark = figma.Modes['Dark-Mode']['Dropshadow-Color'].Primary['Color-3'].value;
+    expect(light).not.toBe(dark);
+  });
+
+  it('points Component-Elevations at the five hand-authored variables', () => {
+    const ce = figma['Component-Elevations'];
+    const seen = new Set<string>();
+    for (const mode of ['Standard', 'Elevated'] as const) {
+      for (const [name, entry] of Object.entries<any>(ce[mode])) {
+        if (!name.endsWith('/Drop-Color')) continue;
+        const v = String(entry.value);
+        if (v.startsWith('{')) {
+          expect(v).toMatch(/^\{Drop-Colors\.Level-[1-5]\.Drop-Color\}$/);
+          seen.add(v);
+        } else {
+          // A spare slot at this Resolution.
+          expect(v).toBe('#00000000');
+        }
+      }
+    }
+    // Only the five exist to be referenced — never a per-slot name.
+    expect([...seen].sort()).toEqual(
+      LEVELS.map((l) => `{Drop-Colors.Level-${l}.Drop-Color}`).sort());
+  });
+
+  it('keeps the percent and the fraction in step', () => {
+    /* Two representations of one number: `alpha` is what the CSS paints, and
+       `percent` is what the Figma Opacity variable holds. One decimal, because
+       the levels differ by tenths — whole percent would collapse two of them. */
+    const rows = shadowLevelOpacities(SHADOW_DEFAULTS);
+    expect(rows).toHaveLength(5);
+    for (const { level, alpha, percent } of rows) {
+      expect(percent).toBe(Math.round(alpha * 1000) / 10);
+      expect(alpha).toBe(quantizeAlpha(dropshadowAlphas(level, SHADOW_DEFAULTS)[0]));
+    }
+  });
+});

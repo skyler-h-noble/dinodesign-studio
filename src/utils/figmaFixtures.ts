@@ -30,6 +30,18 @@ export const FIXTURES: FigmaFixture[] = [
     label: 'Omni-Designs · Test card (Display + 3 list rows + Avatar)',
     file: '/figma-fixtures/omni-designs-test.json',
     sourceUrl: 'https://www.figma.com/design/ycUFfME6PNi0TFoQJYwl4l/Omni-Designs?node-id=6883-29407',
+    /* NOTE the file key: ycUFfME6… is "Omni-Designs", an OLDER file, and NOT
+       the component library the studio is built against — that is
+       Qv2dqF7mYoAGY77EkdrwTv, "Omni-Designs-Aug12". The two are easy to
+       confuse: both have a Fab page and their node ids share a numbering
+       space, so a query against the wrong one returns plausible answers
+       rather than an error. Omni-Designs has no Menu-Levels, Buttons or
+       Icons & Avatars collection at all.
+
+       This URL is correct HERE — it is where this fixture was extracted
+       from, and that provenance is the point. It is only a hazard because it
+       was for a while the only Figma URL in the repo, so anything looking for
+       "the file key" found this one. */
     note: 'Initial smoke-test fixture. Card frame with vertical auto-layout, 3 list rows with thumbnail + 3-line text + checkbox, ending with a small avatar.',
   },
 ];

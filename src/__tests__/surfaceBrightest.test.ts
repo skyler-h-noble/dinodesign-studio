@@ -18,7 +18,8 @@ import chroma from 'chroma-js';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
-import { generateFigmaJSON } from '../utils/generateFigmaJSON';
+import { generateFigmaJSON, themeOrder } from '../utils/generateFigmaJSON';
+import { parseBackground, toneFor, SURFACE_LEVELS } from '../utils/backgroundSelection';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 import { buildAccessibilityReport } from '../utils/accessibilityReport';
@@ -159,6 +160,156 @@ describe('Surface-Brightest', () => {
     }
   });
 
+  it('every surface-end reference RESOLVES — invariant 1', () => {
+    /* Theme's two ends were rewired to point at the row's own
+       Background-<n>.Surfaces.Surface-Dimmest / -Brightest instead of standing
+       in a different row's plain Surface. That is a change of reference
+       TARGET, and a Figma alias to a key that is not there does not error —
+       the binding is simply absent and the layer paints nothing.
+
+       So the keys are checked to exist rather than assumed. One flatten
+       orphaned 6,084 of 13,701 references precisely because nothing counted. */
+    const dangling: string[] = [];
+    const walk = (node: any, depth: number) => {
+      if (!node || typeof node !== 'object' || depth > 16) return;
+      if (typeof node.value === 'string') {
+        const m = node.value.match(
+          /^\{Backgrounds\.([\w-]+)\.(Background-\d+)\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/,
+        );
+        if (m) {
+          const [, palette, row, level] = m;
+          for (const mode of ['Light-Mode', 'Dark-Mode'] as const) {
+            const target = json.Modes[mode]?.Backgrounds?.[palette]?.[row]?.Surfaces?.[level];
+            if (!target?.value) dangling.push(`${mode} ${palette}.${row}.${level}`);
+          }
+        }
+        return;
+      }
+      for (const k of Object.keys(node)) if (k !== 'type') walk(node[k], depth + 1);
+    };
+    walk(json.Modes['Light-Mode'].Themes, 0);
+    walk(json.Modes['Dark-Mode'].Themes, 0);
+    expect(dangling).toEqual([]);
+
+    /* And there should be NONE left: the ends are anchored per theme, so Theme
+       aliases {Colors.<palette>.Color-N} directly and the per-row copies are
+       dead weight. This keeps them from creeping back. The previous version
+       guarded that such references EXISTED, which was right while the row was
+       their only home. */
+    let rowEndRefs = 0;
+    const count = (node: any, depth: number) => {
+      if (!node || typeof node !== 'object' || depth > 16) return;
+      if (typeof node.value === 'string') {
+        if (/\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/.test(node.value)) rowEndRefs++;
+        return;
+      }
+      for (const k of Object.keys(node)) if (k !== 'type') count(node[k], depth + 1);
+    };
+    count(json.Modes['Light-Mode'].Themes, 0);
+    count(json.Modes['Dark-Mode'].Themes, 0);
+    expect(rowEndRefs).toBe(0);
+  });
+
+  it('emits no per-row copies of the anchored ends', () => {
+    /* The 378 variables (208 light, 170 dark) this removes were one value each
+       repeated across twelve rows and eight palettes. Nothing selects between
+       the copies — the ends are one level per THEME — which is the test
+       invariant 2 actually sets: identical values are redundant only when
+       nothing chooses among them.
+
+       Separate from the reference check above, and it has to be: that one
+       passes whether or not the variables exist, because Theme stopped
+       pointing at them either way. This is what fails if the strip is removed. */
+    const f: any = withStyle();
+    const found: string[] = [];
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      const bg = f.Modes?.[mode]?.Backgrounds || {};
+      for (const palette of Object.keys(bg)) {
+        for (const row of Object.keys(bg[palette] || {})) {
+          for (const k of ['Surface-Dimmest', 'Surface-Brightest']) {
+            if (bg[palette][row]?.Surfaces?.[k]) found.push(`${mode}/${palette}/${row}/${k}`);
+          }
+        }
+      }
+    }
+    expect(found.slice(0, 5)).toEqual([]);
+  });
+
+  it('emits Default-Background, because Default reads it', () => {
+    /* Briefly removed as 466 orphaned variables when Default was retired as a
+       mode. Default is back — the Surface collection carries no Background, so
+       the theme axis alone resolves to the theme's core tone and a user who
+       picked Primary / Surface-Brightest saw Primary at PC. Default holds the
+       resolved pair, and this is where its background comes from. */
+    const f: any = withStyle();
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      expect(f.Modes?.[mode]?.['Default-Background'], `${mode} is missing it`).toBeTruthy();
+    }
+  });
+
+  it('carries the SAME roles as Surface, in every theme', () => {
+    /* Surface-Brightest was added as a level after several lists that
+       enumerate the levels had already been written, and each list that missed
+       it left the level short a role. Three did: the Dropshadow/Border-Variant
+       pass, the Highlight/Lowlight pass, and the Tag-Default pass — costing
+       Icons/On-* and Tag/Default/* here.
+
+       A missing role is an ABSENT variable, not a wrong one, so nothing looked
+       broken; the level just quietly offered less than its siblings.
+
+       Asserted as a set comparison rather than a count so a future list that
+       forgets it names the roles it dropped. */
+    const f: any = withStyle();
+    const flat = (o: any, pre = ''): string[] => {
+      const out: string[] = [];
+      for (const [k, v] of Object.entries<any>(o || {})) {
+        if (v && typeof v === 'object' && 'value' in v) out.push(pre + k);
+        else if (v && typeof v === 'object') out.push(...flat(v, pre + k + '/'));
+      }
+      return out;
+    };
+    for (const [name, groups] of Object.entries<any>(f.Themes || {})) {
+      const surface = flat(groups['Surface']);
+      const brightest = flat(groups['Surface-Brightest']);
+      expect(surface.length, `${name} has no Surface roles`).toBeGreaterThan(0);
+      expect(
+        surface.filter((k) => !brightest.includes(k)),
+        `${name}: Surface-Brightest is missing roles Surface has`,
+      ).toEqual([]);
+    }
+  });
+
+  it('links Dropshadow-Color wherever the background is itself a link', () => {
+    /* emitDropshadowRefs aliases into {Dropshadow-Color.<palette>.<Color-N>}
+       only when the group's Background reduces to a {Colors.…} reference.
+       Anything else falls to a computed tinted hex — correct for a literal,
+       wrong for a surface that has a tone.
+
+       Surface-Brightest used to land in that second branch: its Background was
+       either a literal #ffffff, once the chromatic ramp ran out, or a
+       Backgrounds row reference that did not reduce. So its shadow was a baked
+       hex while every sibling level carried a link, which is visible in Figma
+       as a raw value where the others show a chip.
+
+       The rule, stated so it holds for any level: a group whose Background is
+       an alias must have a Dropshadow-Color that is also an alias. A literal
+       background — Neutral's black end — keeps a computed shadow, which is the
+       point of that branch. */
+    const f: any = withStyle();
+    const offenders: string[] = [];
+    for (const [themeName, groups] of Object.entries<any>(f.Themes || {})) {
+      for (const [groupName, data] of Object.entries<any>(groups || {})) {
+        if (!groupName.startsWith('Surface')) continue;   // Containers name theirs differently
+        const bg = data?.Background?.value;
+        const shadow = data?.['Dropshadow-Color']?.value;
+        if (typeof bg !== 'string' || !bg.startsWith('{')) continue;
+        if (typeof shadow === 'string' && shadow.startsWith('{')) continue;
+        offenders.push(`${themeName}/${groupName}: bg=${bg} shadow=${shadow}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('carries the full foreground set, not just a background', () => {
     const s = json.Modes['Light-Mode'].Themes.Primary['Surfaces-Brightest'];
     for (const role of ['Background', 'Text', 'Header', 'Quiet', 'Border', 'Text-BW']) {
@@ -167,9 +318,18 @@ describe('Surface-Brightest', () => {
   });
 
   it('lands on tone 11, stepping to 12 when Bright has taken it', () => {
+    /* Read from the FOREGROUND table's tone, not from the reference's row.
+       
+       The reference used to name the tone directly — Background-11.Surfaces.
+       Surface — because Brightest borrowed another row's plain Surface. It now
+       names its own row and its own level (Background-<n>.Surfaces.
+       Surface-Brightest), so the row number is the theme's surface, not the
+       level's tone. The tone still has to be checked, and the foregrounds are
+       where it is observable: they are keyed by exactly the tone the level
+       paints, which is the pairing that must hold. */
     const toneOf = (theme: string, sec: string) =>
-      (String(json.Modes['Light-Mode'].Themes[theme]?.[sec]?.Background?.value || '')
-        .match(/Background-(\d+)/) || [])[1];
+      (String(json.Modes['Light-Mode'].Themes[theme]?.[sec]?.Text?.value || '')
+        .match(/Color-(\d+)\}$/) || [])[1];
     expect(toneOf('Neutral', 'Surfaces-Brightest')).toBe('12');
     for (const t of ['Primary', 'Secondary', 'Info']) {
       expect(toneOf(t, 'Surfaces-Brightest'), `${t} should land on 11`).toBe('11');
@@ -196,7 +356,10 @@ describe('Surface-Brightest', () => {
     // Default sets theme: 'Neutral' on any grey system, so keying the lock off
     // the PALETTE instead of the theme name blacked out Default's dark end too.
     const bg = json.Modes['Light-Mode'].Themes.Default?.['Surfaces-Dimmest']?.Background?.value;
-    expect(bg).toMatch(/^\{Backgrounds\./);
+    // Not the literal black the Neutral lock produces — Default only borrows
+    // the palette, and keying the lock off the PALETTE blacked it out too.
+    expect(bg).not.toBe('#000000');
+    expect(bg).toMatch(/^\{Colors\./);
   });
 
   it('keeps Neutral Surface-Brightest mode-aware rather than a literal white', () => {
@@ -204,7 +367,12 @@ describe('Surface-Brightest', () => {
     // same colour AND still aliases into Modes. A hard #ffffff would light up
     // dark mode's brightest surface as pure white.
     const light = json.Modes['Light-Mode'].Themes.Neutral?.['Surfaces-Brightest']?.Background?.value;
-    expect(light).toMatch(/Background-12/);
+    /* An ALIAS, not a literal — Neutral keeps aliasing even though its locked
+       window says white, because Neutral's Color-12 IS pure white in light
+       mode while a hard #ffffff would light dark mode's brightest surface to
+       white instead of the dark ramp's top. */
+    expect(light).toMatch(/^\{Colors\.Neutral\.Color-12\}$/);
+    expect(light).not.toBe('#ffffff');
   });
 
   // The BlackWhite button's Lowlight is answered WITHOUT a Modes variable.
@@ -228,7 +396,22 @@ describe('Surface-Brightest', () => {
     expect(aliased, 'no Themes entry may still alias the absent BlackWhite variable').toBe(0);
   });
 
-  it('gives the black face pure black, and the white face Neutral Color-12', () => {
+  it('keeps the black bevel MODE-AWARE, and freezes only what cannot move', () => {
+    /* This used to assert a hard `#00000080` for the black face — a literal in
+       the Themes collection, whose modes are the nine THEMES rather than
+       light/dark. It was defensible at the time (a shadow can never come out
+       lighter than the button it sits under, so pure black is safe in both),
+       but it FROZE a value that genuinely moves: Button-Lowlight.BlackWhite
+       carries #04040480 in light and #0b0b0b80 in dark.
+     *
+     * Now that every BlackWhite role is repointed at a variable the file has,
+     * the black face can take the real one and the split comes back.
+     *
+     * WHITE stays a literal, and that is not the same compromise. White's
+     * Highlight and Lowlight are IDENTICAL in both modes — #ffffff80 and
+     * #b3b3b380 — because white does not move; the 70% dark-mode alpha lives in
+     * the fill's own colour, not in its bevel. Freezing a constant costs
+     * nothing. Freezing a variable costs dark mode. */
     const f: any = withStyle();
     const seen = new Set<string>();
     const walk = (n: any, path: string, d: number) => {
@@ -240,14 +423,52 @@ describe('Surface-Brightest', () => {
       for (const k of Object.keys(n)) if (k !== 'type') walk(n[k], path + '/' + k, d + 1);
     };
     walk({ Themes: f.Themes }, '', 0);
-    // Pure black specifically: it is at or below the fill in BOTH modes
-    // (#040404 light, #0b0b0b dark), so a literal frozen across the Themes
-    // collection's theme-modes can never render lighter than the button.
-    //
-    // The trailing 80 is the bevel alpha at the default 50% opacity, matching
-    // what the white face receives through Neutral Color-12. Opaque black would
-    // make the black button's shadow read twice as strong as the white one's.
-    expect([...seen].sort()).toEqual(['#00000080', '{Button-Lowlight.Neutral.Color-12}']);
+    expect([...seen].sort())
+      .toEqual(['#b3b3b380', '{Button-Lowlight.BlackWhite.Color-12}']);
+
+    /* The literal must never be the black one again. A frozen black bevel is
+       the specific regression this replaced. */
+    expect([...seen]).not.toContain('#00000080');
+  });
+
+  it('leaves no BlackWhite role pointing at a target Modes does not carry', () => {
+    /* The check that would have caught the original bug. Seven of the eight
+       roles aliased {Buttons.BlackWhite.Color-N.<Role>}, which Modes has never
+       held — and an alias to an absent target does not fail, it just does not
+       bind. Asserted against what the payload actually DEFINES rather than
+       against a list of role names, so a new role added upstream is covered
+       without this test knowing about it. */
+    const f: any = withStyle();
+    const defined = new Set<string>();
+    const walkDef = (n: any, p: string[]) => {
+      if (!n || typeof n !== 'object') return;
+      if ('value' in n && typeof n.value !== 'object') { defined.add(p.join('.')); return; }
+      for (const k of Object.keys(n)) if (k !== 'type') walkDef(n[k], [...p, k]);
+    };
+    walkDef(f.Modes?.['Light-Mode'], []);
+
+    /* Only references that target MODES are checked here. SurfacesContainers
+       legitimately aliases into the Theme collection — `Theme.Surface/Buttons/
+       BlackWhite/Button` — and those resolve in a different collection with a
+       different path syntax. Matching on the first dotted segment against the
+       Modes sections keeps this honest without modelling Theme's paths, which
+       would be a second implementation of the plugin's naming. */
+    const modeSections = new Set([...defined].map((x) => x.split('.')[0]));
+    const dangling: string[] = [];
+    const walk = (n: any, path: string, d: number) => {
+      if (!n || typeof n !== 'object' || d > 14) return;
+      if (typeof n.value === 'string') {
+        const m = String(n.value).match(/^\{(.+)\}$/);
+        if (m && /BlackWhite/.test(path)
+            && modeSections.has(m[1].split('.')[0]) && !defined.has(m[1])) {
+          dangling.push(`${path} -> ${m[1]}`);
+        }
+        return;
+      }
+      for (const k of Object.keys(n)) if (k !== 'type') walk(n[k], path + '/' + k, d + 1);
+    };
+    walk({ Themes: f.Themes, SurfacesContainers: f.SurfacesContainers }, '', 0);
+    expect(dangling).toEqual([]);
   });
 
   // Every theme the CSS emits must also reach Figma.
@@ -271,7 +492,15 @@ describe('Surface-Brightest', () => {
     for (const m of lm.matchAll(/\[data-theme="([^"]+)"\]\[data-surface=/g)) cssThemes.add(m[1]);
 
     const figThemes = Object.keys(f.Themes || {});
-    const missing = [...cssThemes].filter((t) => !NAV_ONLY.includes(t) && !figThemes.includes(t));
+
+    /* 'Default' is a CSS theme with no Figma mode, on purpose. It held a COPY
+       of whichever palette and tone the user chose, spending one of ten mode
+       slots on a duplicate; the Theme collection's FIRST mode is Figma's
+       default, so the user's pick leading the list says the same thing. CSS
+       keeps the name because a stylesheet has no equivalent of a default mode. */
+    const FIGMA_EXEMPT = ['Default'];
+    const missing = [...cssThemes].filter(
+      (t) => !NAV_ONLY.includes(t) && !FIGMA_EXEMPT.includes(t) && !figThemes.includes(t));
     expect(missing, `themes in CSS but absent from Figma: ${missing.join(', ')}`).toEqual([]);
 
     // and nothing in Figma that the CSS does not emit
@@ -279,6 +508,97 @@ describe('Surface-Brightest', () => {
     expect(stale, `themes in Figma that CSS never emits: ${stale.join(', ')}`).toEqual([]);
 
     for (const t of NAV_ONLY) expect(Object.keys(f.Navigation || {})).toContain(t);
+  });
+
+  it('leads the Theme collection with the user picked theme', () => {
+    /* Order is the mechanism, not decoration: the plugin reads
+       Object.keys(data.Themes) and makes the first one the collection's
+       DEFAULT mode, which every layer inherits without setting one. So the
+       first key IS the default theme, and that is what replaced the Default
+       mode.
+
+       Figma cannot fix this later — defaultModeId is readonly, there is no
+       reorderMode, and the plugin only creates modes when the collection is
+       absent. A fresh file gets it; an existing one keeps the default it was
+       built with until re-imported. */
+    const f: any = withStyle();
+    const picked = (json as any).Metadata?.['Default-Settings']?.['Default-Theme']?.Theme?.value;
+    const figThemes = Object.keys(f.Themes || {});
+    // Default leads: it is the only mode holding a BACKGROUND for the chosen
+    // (theme, level) pair, and the first mode is what a layer inherits.
+    expect(figThemes[0]).toBe('Default');
+    if (picked && figThemes.includes(picked)) expect(figThemes[1]).toBe(picked);
+    expect(figThemes.length).toBeLessThanOrEqual(10);
+  });
+
+  it('themeOrder puts the pick first without dropping or duplicating any', () => {
+    /* Tested directly, because the payload assertion above cannot fail on its
+       own: the fixture picks Primary, which is already first, so ordering can
+       be switched off and the payload still looks right. A rule checked only
+       where it happens to be a no-op is not checked. */
+    const base = themeOrder(undefined);
+    expect(base[0]).toBe('Default');
+
+    for (const pick of base.filter((t) => t !== 'Default')) {
+      const got = themeOrder(pick);
+      expect(got[0], 'Default must stay the default mode').toBe('Default');
+      expect(got[1], `${pick} should follow Default`).toBe(pick);
+      expect([...got].sort(), `${pick} set changed`).toEqual([...base].sort());
+      expect(new Set(got).size, `${pick} duplicated a theme`).toBe(got.length);
+    }
+  });
+
+  it('themeOrder ignores a pick it cannot honour', () => {
+    // A palette that is not a theme must not be prepended — that would invent
+    // a mode with no variables behind it.
+    expect(themeOrder('BlackWhite')).toEqual(themeOrder(undefined));
+    expect(themeOrder('')).toEqual(themeOrder(undefined));
+  });
+
+  it('carries the chosen SURFACE LEVEL, not just its tone', () => {
+    /* Figma splits a background selection across two mode axes — theme and
+       surface — and treats each collection's first mode as its default. So
+       the default needs a NAME on each axis, and N cannot supply the second:
+       a tone does not name its own level.
+
+       This is the pair that replaced the Default theme, and it is what has to
+       line up with the single set of values CSS resolves into :root. */
+    for (const bg of ['primary', 'white', 'black', 'primary-light']) {
+      const built: any = buildAll(SCHEME, { ...(sel as any), background: bg } as never, 'light');
+      const dt = built.json.Metadata?.['Default-Settings']?.['Default-Theme'];
+      const expected = parseBackground(bg);
+      expect([bg, dt?.Surface?.value]).toEqual([bg, expected.surface]);
+      expect([bg, dt?.Theme?.value]).toEqual([bg, expected.theme]);
+      expect(SURFACE_LEVELS as readonly string[]).toContain(dt?.Surface?.value);
+    }
+  });
+
+  it('the default pair is the one CSS resolves into :root', () => {
+    /* The sync that matters. CSS has no default-mode concept, so it bakes the
+       whole (theme, level) pair into :root; Figma names each half as the first
+       mode of its collection. If the two halves disagree with the pair, a
+       layer with no modes set and an element with no data-theme show different
+       colours — and both sides look self-consistent, which is exactly how the
+       last divergence survived a passing parity suite. */
+    for (const bg of ['primary', 'white', 'primary-light']) {
+      const built: any = buildAll(SCHEME, { ...(sel as any), background: bg } as never, 'light');
+      const dt = built.json.Metadata?.['Default-Settings']?.['Default-Theme'];
+      const pair = parseBackground(bg);
+
+      /* Figma: Default leads and RESOLVES the pair — the Surface collection has
+         no Background, so the chosen level cannot come from that axis. The
+         chosen theme follows it. */
+      const figThemes = themeOrder(dt?.Theme?.value);
+      expect([bg, figThemes[0]]).toEqual([bg, 'Default']);
+      expect([bg, figThemes[1]]).toEqual([bg, pair.theme]);
+
+      // Figma half 2: the Surface collection leads on the chosen level.
+      expect([bg, dt?.Surface?.value]).toEqual([bg, pair.surface]);
+
+      // CSS: the same pair resolved to one tone, which :root carries.
+      expect([bg, dt?.N?.value])
+        .toEqual([bg, toneFor(pair.theme as never, pair.surface as never, dt?.N?.value)]);
+    }
   });
 
   it('gives every Figma theme all five surfaces', () => {
@@ -315,9 +635,13 @@ describe('Surface-Brightest', () => {
     expect(cssStd).toBe(MIN_W);
     expect(cssLg, 'large floor is the standard floor + 40').toBe(MIN_W + 40);
 
-    const comp: any = figmaGen(j).Components?.Button || {};
-    expect(comp['Button-Min-Width'], 'Figma and CSS must agree').toBe(cssStd);
-    expect(comp['Lg-Button-Min-Width'], 'Figma and CSS must agree').toBe(cssLg);
+    /* Component-Size, not the deleted `Components` — which named a collection
+       the library file does not have, so the plugin created a duplicate on
+       every import. Size is the MODE here, so the large floor is the `large`
+       column of one variable rather than a second `Lg-` name. */
+    const cs: any = figmaGen(j)['Component-Size'] || {};
+    expect(cs.medium?.['Button/Button-Min-Width'], 'Figma and CSS must agree').toBe(cssStd);
+    expect(cs.large?.['Button/Button-Min-Width'], 'Figma and CSS must agree').toBe(cssLg);
   });
 
   // The five surface levels must ASCEND in lightness, in BOTH modes.
@@ -386,12 +710,16 @@ describe('Surface-Brightest', () => {
     expect(base).toContain('--Sm-Button-Padding: var(--Button-Padding);');
     expect(base).toContain('--Large-Button-Padding: var(--Lg-Button-Padding);');
 
-    const comp: any = figmaGen(j).Components?.Button || {};
-    expect(comp['Button-Padding'], 'Figma and CSS must agree').toBe(8);
-    expect(comp['Lg-Button-Padding'], 'Figma and CSS must agree').toBe(16);
-    // Sm- stays out of Figma: it equals Button-Padding, so nothing selects
-    // between the copies. Lg- is a genuinely different number.
-    expect(comp['Sm-Button-Padding']).toBeUndefined();
+    const cs: any = figmaGen(j)['Component-Size'] || {};
+    expect(cs.medium?.['Button/Button-Padding'], 'Figma and CSS must agree').toBe(8);
+    expect(cs.large?.['Button/Button-Padding'], 'Figma and CSS must agree').toBe(16);
+    /* Small takes the standard padding rather than one of its own — same claim
+       the CSS makes by aliasing --Sm-Button-Padding to --Button-Padding.
+       Asserted as small EQUALLING medium now that size is a mode: there is no
+       `Sm-` name left to be absent, and a missing value would read as
+       inherited rather than as a gap. */
+    expect(cs.small?.['Button/Button-Padding']).toBe(cs.medium?.['Button/Button-Padding']);
+    expect(cs.medium?.['Button/Sm-Button-Padding']).toBeUndefined();
   });
 
   // Outline-Text is a Buttons-collection variable in Figma, not a per-theme one.
@@ -491,15 +819,57 @@ describe('Surface-Brightest', () => {
     ]);
   });
 
-  it('is covered by Default indirection in the Figma payload', () => {
-    // Default routes foregrounds through Default-Background. A level missing
-    // there resolves to nothing — which is how Surface/Dim/Bright shipped with
-    // unlinked Text-BW while Containers, needing no indirection, worked.
-    const f: any = withStyle();
-    const db = f.Modes?.['Light-Mode']?.['Default-Background'] || {};
-    const keys = Object.keys(db).filter((k) => k.startsWith('Surface-Brightest-'));
-    expect(keys.length).toBeGreaterThan(20);
-    expect(db['Surface-Brightest-Text']?.value).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(db['Surface-Brightest-Text-BW']?.value).toMatch(/^#[0-9a-f]{6}$/i);
+  it('carries a full foreground set on Default, where Default still lives', () => {
+    /* This read the Figma payload's Default-Background section, which is gone:
+       it served the Default Figma THEME, and that theme is retired as a mode
+       now the collection's first mode is the default. Default remains in the
+       JSON because CSS has no default-mode concept and drives :root from it,
+       so the property moves there rather than disappearing.
+
+       Text-BW is deliberately NOT asserted: Default's Surfaces-Brightest does
+       not carry one in the JSON, and neither the CSS Surface-Brightest block
+       nor :root emits --Text-BW. The Figma indirection was SYNTHESISING it, so
+       removing that section exposed a gap rather than creating one. Asserting
+       it here would fail on a real pre-existing hole; it is recorded instead. */
+    const brightest = (json as any).Modes['Light-Mode'].Themes.Default?.['Surfaces-Brightest'];
+    expect(brightest, 'Default has no Surfaces-Brightest').toBeTruthy();
+    for (const role of ['Background', 'Text', 'Header', 'Quiet', 'Border']) {
+      expect(brightest?.[role]?.value, `Default Surfaces-Brightest missing ${role}`).toBeTruthy();
+    }
   });
+
+  /* All five surface levels must reach the Surface collection.
+   *
+   * `surfaceToGroup` in generateFigmaJSON drives which Figma MODES get written,
+   * and Brightest was absent from it long after the level shipped —
+   * SURFACE_GROUPS_INTERNAL listed it, Themes emitted it, that map did not. So
+   * four modes were written and the fifth got nothing.
+   *
+   * The failure is silent in the worst way: the MODE still exists in the file, so
+   * a designer selects Surface-Brightest and every variable in it keeps whatever
+   * it last held. On Error that painted #ef5854 — Color-6, the BRIGHT value —
+   * where Color-11's #fff3ef was expected. A plausible colour, not a broken one.
+   *
+   * Asserted against the Theme groups rather than a hardcoded list, so a sixth
+   * level added to Themes fails here instead of quietly not being written.
+   */
+  describe('the Surface collection carries every level Themes defines', () => {
+    it('writes one mode per surface group, Brightest included', () => {
+      const f: any = withStyle();
+      const themeSurfaces = Object.keys(f.Themes?.[Object.keys(f.Themes)[0]] || {})
+        .filter((k) => k.startsWith('Surface'));
+      const written = Object.keys(f.SurfacesContainers || {}).filter((k) => k.startsWith('Surface'));
+      expect(written.sort()).toEqual(themeSurfaces.sort());
+    });
+    it('points each mode at its OWN level, not a neighbour', () => {
+      /* The off-by-one this would have caught: Brightest resolving to Bright.
+         Each mode's Background must reference the matching Theme group. */
+      const f: any = withStyle();
+      for (const level of Object.keys(f.SurfacesContainers || {}).filter((k) => k.startsWith('Surface'))) {
+        expect(`${level} -> ${f.SurfacesContainers[level]?.Background?.value}`)
+          .toBe(`${level} -> {Theme.${level}/Background}`);
+      }
+    });
+  });
+
 });

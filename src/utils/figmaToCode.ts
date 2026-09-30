@@ -34,7 +34,7 @@ TYPOGRAPHY (each has an optional color prop: quiet|primary|secondary|...):
   - <Label>, <Overline>, <OverlineSmall>, <Caption>
 
 CONTROLS:
-  - <Button variant="primary|secondary|tertiary|...|-outline|-light|ghost|text">
+  - <Button variant="primary|secondary|tertiary|...|-outline|ghost|text">
   - <ButtonGroup>, <Fab>
   - <Checkbox>, <Radio>, <RadioGroup>, <SwitchInput>, <Slider>, <Rating>
   - <TextField>, <TextInput>, <EmailTextField>, <PasswordTextField>,
@@ -211,7 +211,7 @@ CONVERSION RULES:
        a Checkbox. Those shapes were removed from the lib; they still resolve to
        their colour but warn. The shape rule below applies to Button ONLY.
        On a BUTTON, a Style/Appearance VARIANT property still selects the SHAPE
-       — solid vs -outline vs -light vs ghost vs text — and composes with the
+       — solid vs -outline vs ghost vs text — and composes with the
        mode:
            modes.Buttons "Error" + variant Style "Outline" → variant="error-outline"
        If a colour appears BOTH as a mode and as a variant property, the MODE
@@ -243,6 +243,32 @@ CONVERSION RULES:
     OMIT the corresponding element or prop entirely — never render a placeholder
     for it and never duplicate visible text to fill the gap.
 
+    3. _aaid.visibleWhen names a VARIABLE that drives this layer's visibility,
+       which is a different thing from being hidden and must not be treated as
+       one. "visible" is a bindable field, so a boolean variable scoped to a
+       mode can show a drawer on mobile and a bar on desktop from ONE
+       component, with no variants.
+
+       node.visible then reports whichever mode was resolved when the file was
+       stamped. _aaid.visibleNow carries that snapshot, and it is NOT a
+       decision: stamp from Desktop and the mobile drawer reads false; stamp
+       from Mobile and the bar does.
+
+       So a layer with visibleWhen is ALWAYS emitted, whatever visibleNow says,
+       and rendered behind its condition — a breakpoint, a prop, or state named
+       after the variable. Dropping it by rule 1 above produces one
+       breakpoint's layout with nothing to show the others ever existed, which
+       looks completely correct and is missing most of the design.
+
+       The variable name is the condition. Names keyed to device width
+       (Show-Drawer, Is-Mobile, Show-Rail) become breakpoints; anything else
+       becomes a prop. Where several layers share one variable they share one
+       condition — emit them in the same branch rather than testing repeatedly.
+
+       Note the plugin does NOT set _aaid.visible on these, precisely so rule 1
+       cannot fire on them. Seeing visibleWhen without visible is the normal
+       case, not a contradiction.
+
     CONCRETE (the List case): a ListItem whose 2nd row (title) and 3rd row
     (secondary) booleans are false shows ONLY the overline. Emit just
     overline="…" — do NOT pass children (title) or secondary, and do NOT repeat
@@ -262,10 +288,57 @@ CONVERSION RULES:
       - State        → checked/selected/disabled/etc. ONLY if the instance is in
                        that state.
       - Booleans     → show/hide per rule 0b.
+      - aria-label   → DERIVED, not read from a property. See rule 0d.
     If you emit a component and leave a prop at its default while the instance's
     variant says otherwise, that is a bug. Enumerate _aaid.variant and translate
     each key. (The lib's own per-row typography, padding, etc. are handled by the
     component — your job is to pass the instance's variant props faithfully.)
+
+0d. NAME EVERY CONTROL THAT RENDERS NO READABLE TEXT.
+    Button Type of iconOnly, Avatar or letterNumber, and any icon-only control,
+    needs aria-label. Type "text" does NOT — its visible label is already the
+    accessible name, and adding aria-label there makes a screen reader announce
+    the control twice.
+
+    There is no Accessible Name property in the file. Derive it, in this order,
+    and take the first that yields something meaningful:
+
+      1. The INSTANCE'S LAYER NAME, when it reads like an action — "Profile",
+         "Search", "Add member". Skip it when it is generic or automatic:
+         "Button", "Button-Small", "Frame 12", "Ellipse 3", the component name,
+         or a bare number.
+      2. For iconOnly, the icon's MEANING as an action. SearchIcon → "Search",
+         NotificationsIcon → "Notifications". Where the glyph and the action
+         differ, the action wins: a home icon that opens a dashboard is
+         "Dashboard", not "Home".
+      3. For Avatar in a nav or app bar, the convention: "Your account".
+      4. For letterNumber, nothing derivable exists — the characters are the
+         CONTENT, not the name. "JD" is not a name; "3" is not a name. Use the
+         layer name if it is meaningful, otherwise describe the action you can
+         infer from context ("Notifications") and flag it.
+
+    NEVER use the glyph where it differs from the action, and NEVER use the
+    rendered content — aria-label="JD" and aria-label="3" pass every automated
+    check while telling the user nothing, which is worse than no label at all
+    because it silences the lib's own dev warning.
+
+    Do NOT also label the icon inside. The button owns the name; labelling both
+    makes a screen reader read it twice.
+
+    FLAG EVERY GUESS, in the comment block at the top, one line each, in
+    exactly this form so it can be picked up automatically:
+
+      // DERIVED-ARIA-LABEL: "Dashboard" on Button — house icon, inferred from
+      // the layer name "Dashboard link"
+
+    Emit one for every control whose name came from step 2, 3 or 4 — anything
+    you inferred rather than read. Not for step 1: a layer name the designer
+    wrote is authored, not guessed.
+
+    A wrong name is invisible in the render, passes every visual check, and is
+    only ever found with a screen reader. The designer is the one who knows
+    whether that house icon means Home or Dashboard, and this line is the only
+    thing that will ever ask them.
 
 1. Outermost frame for Mobile / Tab / Web → <Container>.
    Outermost frame for a component → <Card> or <Section> as appropriate.
@@ -642,6 +715,55 @@ CONVERSION RULES:
     If a design genuinely uses a size the scale does not publish, set BOTH —
     fontSize and lineHeight — and never one alone.
 
+4d-2. PROSE LISTS (bulleted / numbered TEXT) — read _aaid.list, do not guess.
+
+    This is about a paragraph of BULLETS, not the row list in 4d. The two are
+    unrelated: 4d is a component with slots, this is body copy.
+
+    FIGMA DRAWS THE MARKER, SO IT IS NOT IN THE STRING. A native Figma list
+    arrives as plain "First\nSecond\nThird" with no bullet character. It is
+    therefore indistinguishable from three lines of prose by looking at the
+    text — which is exactly why the plugin stamps it:
+
+      _aaid.list = { type: "UNORDERED" }              // whole node, one level
+      _aaid.list = { type: "ORDERED", indent: 1 }     // whole node, nested
+      _aaid.list = { lines: [{t,i},…] }               // per line, when mixed
+
+      t: "U" unordered · "O" ordered · "N" not a list      i: nesting level
+
+    WHEN _aaid.list IS PRESENT, IT IS AUTHORITATIVE. Split the node's characters
+    on newline and emit one <ListItem> per line. Never re-add a bullet glyph or
+    a number — <List> renders the marker:
+
+      <List component="ul">
+        <ListItem>First</ListItem>
+        <ListItem>Second</ListItem>
+      </List>
+
+    ORDERED → component="ol". The lib's <List> defaults to "ul" and sets
+    role="list" with <li> children, so the semantics come for free; a <VStack>
+    of <Body> lines does NOT have them.
+
+    MIXED (the "lines" shape) is the ordinary case, not an edge one — an intro
+    sentence above three bullets produces it. Lines with t:"N" are prose and
+    stay OUTSIDE the <List>; consecutive list lines group into one <List>. A
+    change of "t" starts a new list; an increase in "i" starts a nested <List>
+    inside the current <ListItem>.
+
+    WHEN _aaid.list IS ABSENT BUT THE TEXT LOOKS LIKE A LIST — the designer
+    typed the markers by hand ("• ", "- ", "1. ") instead of using Figma's list
+    control, or built one text node per bullet in a vertical auto-layout.
+
+    Emit the <List> anyway, strip the typed marker from the text, and FLAG IT:
+
+      // DERIVED-LIST: 3 items on <List> — markers typed as "• " in one text node
+
+    Same convention and the same reason as DERIVED-ARIA-LABEL (rule 0d): the
+    marker travels in the code, and a guess about the designer's intent gets
+    surfaced instead of silently becoming markup. A line starting with "-" may
+    be a dash, not a bullet — so this is a judgement, and it is flagged as one.
+    Do NOT flag when _aaid.list is present: that is read, not inferred.
+
 4e. TYPOGRAPHY COLOR PROP — DEFAULT TO STANDARD TEXT.
 
     The typography components (<H1>...<H6>, <Body>, <Subtitle>,
@@ -799,7 +921,10 @@ CONVERSION RULES:
     FILL STYLE (combines with the palette above):
       - Solid / filled background  → variant="<palette>"            (e.g. "default")
       - Outlined (border, no fill) → variant="<palette>-outline"
-      - Tonal / light fill         → variant="<palette>-light"
+      - Tonal / light fill         → variant="<palette>". There is no -light
+                                     shape on Button; a tonal fill is the SOLID
+                                     button of that palette. Never emit
+                                     "<palette>-light" — see the STYLE rule below.
       - NO fill AND no border (bare label only) → variant="text" or "ghost"
 
     variant="text" renders as a HOTLINK, not a button. NEVER use it for a

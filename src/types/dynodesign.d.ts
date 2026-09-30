@@ -93,12 +93,21 @@ declare module '@omni-design/components' {
   export const CheckboxWithDescription: FC<any>;
   export const IndeterminateCheckbox: FC<any>;
   export const Radio: FC<any>;
+  /** Aspect-ratio slot. fit="width" fills the parent and derives the height. */
+  export const Ratio: FC<any>;
   export const RadioInput: FC<any>;
   export const RadioGroup: FC<any>;
   export const SwitchInput: FC<any>;
   export const SliderInput: FC<any>;
   export const RatingInput: FC<any>;
   export const SearchField: FC<any>;
+  /* Body at 700 — the bold weight Body itself does not have. Exported by
+     the package and simply missing here, so using it failed to compile. */
+  export const Subtitle: FC<any>;
+  export const LabelExtraSmall: FC<any>;
+  export const LabelSmall: FC<any>;
+  export const SubtitleLarge: FC<any>;
+  export const SubtitleSmall: FC<any>;
 
   // Chips
   export const Chip: FC<any>;
@@ -151,6 +160,12 @@ declare module '@omni-design/components' {
   export const Dropdown: FC<any>;
   export const Menu: FC<any>;
   export const MenuItem: FC<any>;
+  /* The rule between two groups of menu rows. Present in the package and in
+     its own types since the lib's Menu was written — missing HERE, which is
+     the only place that matters for a TS build, so the first use of it failed
+     to compile rather than failing to render. */
+  export const MenuDivider: FC<any>;
+  export const MenuButton: FC<any>;
   export const BottomNavigation: FC<any>;
   export const Stepper: FC<any>;
   export const SpeedDial: FC<any>;
@@ -173,7 +188,12 @@ declare module '@omni-design/components' {
   // Data Display
   export const Avatar: FC<any>;
   export const AvatarGroup: FC<any>;
-  export const AvatarMenu: FC<any>;
+  /* AvatarMenu is NOT exported by the package — no component of that name
+     exists in the lib. Declaring it here made the import typecheck and crash
+     at runtime, which is worse than no declaration: the compiler stops being
+     able to tell you. The studio's AvatarDropdown.tsx implements it locally
+     and is tagged MISSING-LIB-COMPONENT.
+  export const AvatarMenu: FC<any>; */
   export const Badge: FC<any>;
   export const Divider: FC<any>;
   export const List: FC<any>;

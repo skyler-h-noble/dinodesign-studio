@@ -13,13 +13,27 @@ const STATS = [
   { label: 'Churn',           value: '1.8%',   delta: '-0.3% this month' },
 ];
 
+// A light status chip is a SURFACE, not a shape: an outline chip in the
+// palette's brightest zone, so its fill (--Background) and label (--Text)
+// stay paired. The lib's `-light` shape was removed — it painted the SOLID
+// button fill, which is why these read as saturated blocks in a table.
+const StatusChip = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
+  <Chip
+    variant={`${tone.toLowerCase()}-outline`}
+    data-theme={tone}
+    data-surface="Surface-Brightest"
+  >
+    {children}
+  </Chip>
+);
+
 // Table: columns can be plain strings; rows are arrays of cells (a cell may be JSX).
 const COLUMNS = ['Customer', 'Plan', 'Status', 'MRR'];
 const ROWS = [
-  ['Acme Inc.', 'Enterprise', <Chip variant="success-light">Active</Chip>,   '$1,900'],
-  ['Globex',    'Pro',        <Chip variant="success-light">Active</Chip>,   '$190'],
-  ['Initech',   'Pro',        <Chip variant="warning-light">Past due</Chip>, '$190'],
-  ['Umbrella',  'Starter',    <Chip variant="neutral-light">Trial</Chip>,    '$0'],
+  ['Acme Inc.', 'Enterprise', <StatusChip tone="Success">Active</StatusChip>,   '$1,900'],
+  ['Globex',    'Pro',        <StatusChip tone="Success">Active</StatusChip>,   '$190'],
+  ['Initech',   'Pro',        <StatusChip tone="Warning">Past due</StatusChip>, '$190'],
+  ['Umbrella',  'Starter',    <StatusChip tone="Neutral">Trial</StatusChip>,    '$0'],
 ];
 
 export default function Dashboard() {

@@ -1,4 +1,6 @@
 import { blendColors, generateSemanticLightModeScale } from '../colorScale';
+import { surfaceWindow, MIN_SURFACE_TONE, MAX_SURFACE_TONE } from '../surfaceWindow';
+import type { SurfaceLevel, SurfaceStep } from '../surfaceWindow';
 
 /**
  * The Neutral ramp, from the same seed the export builds it from
@@ -664,16 +666,37 @@ function addSurfaceEnds(
   // The ends still get their own entries below, which is a prerequisite for any
   // future remap: without them Dimmest and Brightest read OTHER rows' Surface.
 
-  // Light: unchanged from what the theme layer used to assemble by hand.
-  const dimmestN = Math.max(n - 2, 1);
-  const brightN = Math.min(n + 1, 12);
-  const brightestN = brightN >= 11 ? 12 : 11;
-  out.Surfaces['Surface-Dimmest'] = n > 2
-    ? { value: ref(dimmestN), type: 'color' }
-    : { value: '#000000', type: 'color' };
-  out.Surfaces['Surface-Brightest'] = brightN >= 12
-    ? { value: '#ffffff', type: 'color' }
-    : { value: ref(brightestN), type: 'color' };
+  /* The two ends are ANCHORED, not relative — read from surfaceWindow rather
+     than recomputed here.
+     
+     This used to be `dimmestN = n - 2` and a matching brightest, which made
+     both ends move with the row: Background-6 got Dimmest Color-4,
+     Background-9 got Color-7. That is what a "dimmest" surface must not do,
+     because it is the same level on every background — the darkest surface the
+     theme offers — and a level that changes colour per background cannot be
+     hoisted to the theme, which is where it belongs.
+
+     surfaceWindow has held this rule, with tests, the whole time; nothing
+     imported it for chromatic themes, so the shipped generator and the
+     documented rule disagreed silently. Reading it here is what closes that,
+     and keeps ONE definition — a second copy is how the two drifted apart.
+
+     The squeeze is why locking is safe: at low surfaces Dim would collide with
+     a fixed Color-3, so Dimmest steps under it (Dim-1) and then to black.
+     surfaceWindow's guard rejects a surface tone that cannot carry five
+     distinct levels rather than clamping into an out-of-range Color-N. */
+  const win = surfaceWindow(Math.min(Math.max(n, MIN_SURFACE_TONE), MAX_SURFACE_TONE));
+  const paintValue = (step: SurfaceStep): string =>
+    step.paint.kind === 'tone' ? ref(step.paint.tone)
+      : step.paint.kind === 'black' ? '#000000'
+      : '#ffffff';
+  const endStep = (level: SurfaceLevel) =>
+    win.find((s) => s.level === level)!;
+
+  out.Surfaces['Surface-Dimmest'] =
+    { value: paintValue(endStep('Surface-Dimmest')), type: 'color' };
+  out.Surfaces['Surface-Brightest'] =
+    { value: paintValue(endStep('Surface-Brightest')), type: 'color' };
   return out as SimplifiedSurfacesAndContainers;
 }
 

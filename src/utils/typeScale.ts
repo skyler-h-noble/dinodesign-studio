@@ -29,6 +29,8 @@
 
 import type { TypographyStyle } from '../types';
 import { HEADER_FAMILY, moodToAxes } from './moodAxes';
+import { altDisplayWeight } from './altDisplay';
+import { weightsFor } from './googleFontWeights';
 
 /** The eyebrow renders in the OS UI font, which has no Figma equivalent. Inter
  *  is the closest neutral stand-in and is always present. */
@@ -104,7 +106,7 @@ export interface ExtraWeight {
 
 export interface TypeStyle {
   /** Token base — the string the lib interpolates, e.g. 'H1', 'Display-Large',
-   *  'Eyebrow-Small', 'Button-Standard'. */
+   *  'Eyebrow-Small', 'Button-Medium'. */
   token: string;
   /** Slash name used by Figma text styles, e.g. 'Header/H1'. */
   name: string;
@@ -163,6 +165,15 @@ export const DEFAULT_DISPLAY_SIZE = 72;
  *  48 rather than 72 / 56 / 40, so the three are closer together.) */
 export const H1_SIZE = 48;
 
+/* Three steps, everywhere: the stylesheet, the Figma payload and the lib.
+ *
+ * Medium was briefly cut from the Figma payload and then put back — the design
+ * file has all three. The detour is worth a line, because the first attempt cut
+ * it from THIS ramp rather than from the payload, and the lib reads
+ * --Display-Medium-* for its DisplayMedium export (Typography.js:124-128), so
+ * that would have rendered the component unstyled on every page already using
+ * it. A CSS token is a dependency; a Figma variable is only an offer.
+ */
 const DISPLAY_STEP_TOKENS = {
   large: { token: 'Display-Large', step: 'Large' },
   medium: { token: 'Display-Medium', step: 'Medium' },
@@ -361,14 +372,92 @@ interface SystemStyleSpec {
 }
 
 export const SYSTEM_STYLES: SystemStyleSpec[] = [
-  { token: 'Caption', group: 'Caption', step: 'Standard', size: 14, weight: 500, lh: 21, cs: 0.1, ps: 28,
+  /* Caption is Body's ramp shifted down one step: 12 / 14 / 16 against Body's
+   * 14 / 16 / 18, leading at 1.5 throughout.
+   *
+   * The gap is the point. A caption and a body at the SAME size are separated
+   * only by weight (500 vs 400) and a 0.1px nudge of tracking — which held
+   * while Caption was a single 14 sitting beside Body-Medium's 16, but
+   * collapses the moment a card scales down: Body-Small is also 14, so the two
+   * would have rendered identically in a small card and the hierarchy between
+   * them would have vanished. One step below Body at EVERY mode keeps it.
+   *
+   * THE MIDDLE STEP KEEPS THE BARE NAME. The lib reads `--Caption-Font-Size`
+   * with no step (Typography.js:339), and generated CSS is frozen per design
+   * system, so renaming it to `-Medium` would leave both an old stylesheet and
+   * the shipped component resolving to nothing. Same trap as Button-Standard.
+   * So the ramp is Caption-Small / Caption / Caption-Large, and the asymmetry
+   * is deliberate rather than an oversight.
+   *
+   * Paragraph spacing scales with the size (2x, as the existing 14/28 already
+   * was). Tracking does not: 0.1px is an optical nudge, not a ramp, and the
+   * Eyebrow rule about small type needing more air does not reach a value this
+   * small. Bold stays on the middle step alone — `fw('Caption-Bold')` is one
+   * size-independent weight the lib pairs with any caption size. */
+  /* STEP is `Medium`, TOKEN is bare `Caption`, and the two disagreeing is the
+   * point. The step names the style in Figma — Caption/Medium, the middle of
+   * three, which is what a designer picking it needs to read. The token names
+   * the CSS custom property, and the lib reads `--Caption-Font-Size` with no
+   * step (Typography.js:339), so that half cannot move without breaking every
+   * shipped caption and every frozen stylesheet.
+   *
+   * `Standard` stays on Legal and Badge deliberately. There it means "this
+   * group has ONE size", and renaming those to Medium would advertise a Small
+   * and a Large that do not exist. Two meanings, so two words. */
+  { token: 'Caption-Small', group: 'Caption', step: 'Small', size: 12, weight: 500, lh: 18, cs: 0.1, ps: 24,
+    extraWeights: [{ suffix: 'Bold', weight: 700 }] },
+  { token: 'Caption', group: 'Caption', step: 'Medium', size: 14, weight: 500, lh: 21, cs: 0.1, ps: 28,
+    extraWeights: [{ suffix: 'Bold', weight: 700 }] },
+  { token: 'Caption-Large', group: 'Caption', step: 'Large', size: 16, weight: 500, lh: 24, cs: 0.1, ps: 32,
     extraWeights: [{ suffix: 'Bold', weight: 700 }] },
 
   { token: 'Label-ExtraSmall', group: 'Label', step: 'Extra Small', size: 11, weight: 600, lh: 16.5, cs: 0.5 },
+  /* All-Caps is a CASE VARIANT, not a step: each one mirrors its base step's
+   * size, leading and tracking exactly and adds nothing but the transform.
+   * Medium All Caps shipped alone for a long time, which made the group read
+   * as four sizes and one oddity; three sizes x two cases is the shape the
+   * design actually uses.
+   *
+   * Tracking is INHERITED from the base step rather than bumped for the caps.
+   * The instinct to add air to uppercase is right in general and is exactly
+   * what the Eyebrow ramp does — but Label already tracks its smaller steps
+   * (0.5 / 0.25 / 0) for the same optical reason, and Medium All Caps has
+   * always matched Medium at 0. Inventing a caps bump here would be a value
+   * derived from a rule of thumb rather than from the design, and it would
+   * make the two cases of one step disagree about a property that is not what
+   * distinguishes them.
+   *
+   * Reading this later and wanting caps tracking: change all three together,
+   * and change them because the design says so, not because caps usually want
+   * it. */
   { token: 'Label-Small', group: 'Label', step: 'Small', size: 12.5, weight: 600, lh: 18.75, cs: 0.25 },
+  { token: 'Label-Small-All-Caps', group: 'Label', step: 'Small All Caps', size: 12.5, weight: 600, lh: 18.75, cs: 0.25, uppercase: true },
   { token: 'Label-Medium', group: 'Label', step: 'Medium', size: 16, weight: 600, lh: 24 },
   { token: 'Label-Medium-All-Caps', group: 'Label', step: 'Medium All Caps', size: 16, weight: 600, lh: 24, uppercase: true },
   { token: 'Label-Large', group: 'Label', step: 'Large', size: 18, weight: 600, lh: 27 },
+  { token: 'Label-Large-All-Caps', group: 'Label', step: 'Large All Caps', size: 18, weight: 600, lh: 27, uppercase: true },
+
+  /* Mobile Nav Label — the label under a bottom-nav or rail icon.
+   *
+   * Its values are the ones Label-ExtraSmall holds (11 / 600 / 16.5 / 0.5),
+   * and that is deliberate rather than a copy waiting to be collapsed. The
+   * test invariant 2 sets is not "do the values match" but "does anything
+   * select between them", and something does: the lib reads
+   * --Label-ExtraSmall-* as the Label group's off-ramp step
+   * (Typography.js:361), while a nav label reads this. Two consumers, so two
+   * tokens.
+   *
+   * The point of the split is that they can now DIVERGE. Label is a three-step
+   * ramp that a brand can move; the label under a nav icon is sized by the
+   * target it sits in, not by where it falls in a type ramp, so it must not
+   * follow when Label-Small moves. Before this existed, Nav-Bar, Rail and
+   * Slider were all reaching for the extra-small label and getting whatever
+   * the Label ramp happened to be.
+   *
+   * `Standard` for the step, which in this file means "this group has ONE
+   * size" - the same contract Legal and Badge use. Naming it Medium would
+   * advertise a Small and a Large that do not exist. */
+  { token: 'Mobile-Nav-Label', group: 'Mobile-Nav-Label', step: 'Standard', size: 11, weight: 600, lh: 16.5, cs: 0.5 },
 
   { token: 'Legal', group: 'Legal', step: 'Standard', size: 10, weight: 400, lh: 15, ps: 20,
     extraWeights: [{ suffix: 'Semibold', weight: 600 }] },
@@ -382,14 +471,41 @@ export const SYSTEM_STYLES: SystemStyleSpec[] = [
   // The lib's `button` / `button-standard` styles read the aggregate
   // --Button-Font-Size / --Button-Line-Height, which core.css owns per
   // platform. This is the per-step token the Figma variables are named after.
-  { token: 'Button-Standard', group: 'Button', step: 'Standard', size: 16, weight: 600, lh: 16 },
+  /* Medium, not Standard. `Standard` in this file means "this group has ONE
+   * size" — the contract Legal and Badge use — and Button has four, so the
+   * word was always doing the wrong job here.
+   *
+   * --Button-Standard-* KEEPS BEING EMITTED as an alias onto this one. It is
+   * not tidiness to drop it: a design system's CSS is frozen in Storage and can
+   * never be regenerated, the lib reads
+   * `var(--Button-Standard-Font-Size, var(--Button-Font-Size))`
+   * (Typography.js:539), and consumers upgrade on their own schedule. Removing
+   * the old name leaves an unresolved var() that paints nothing and reports
+   * nothing — the trap this file names twice, at line 388 and in
+   * typeScaleRamps.test.ts.
+   *
+   * Direction is load-bearing and is Standard -> Medium: Medium holds the
+   * literal, Standard reads it. Pointed the other way it also cannot drift and
+   * looks identical in a diff, while quietly making Standard canonical again —
+   * exactly what eyebrowAlias.test.ts asserts in both directions for Overline,
+   * and what buttonMediumAlias.test.ts now asserts here. */
+  { token: 'Button-Medium', group: 'Button', step: 'Medium', size: 16, weight: 600, lh: 16 },
   { token: 'Button-Large', group: 'Button', step: 'Large', size: 24, weight: 600, lh: 24 },
+
+  /* Badge — the counter's digits. Its own style, not a Button step.
+     11/12 sits between Button Extra Small (11/11) and the Button-Numbers
+     ladder's rungs (10 / 12 / 16), so no existing token carries it: the lib
+     was reading --Sm-Button-Numbers (10) and --Button-Small-Line-Height (14)
+     and rendering a badge a pixel small on a leading four too loose.
+     Face, weight and tracking still come from the Buttons/Small role, which is
+     what the Figma style binds — only the size and leading are its own. */
+  { token: 'Badge', group: 'Badge', step: 'Standard', size: 11, weight: 600, lh: 12 },
 ];
 
 /** Order the exports and the Figma payload use. */
 export const GROUP_ORDER = [
   'Display', 'Header', 'Subtitle', 'Body', 'Caption',
-  'Label', 'Legal', 'Eyebrow', 'Number', 'Button',
+  'Label', 'Mobile-Nav-Label', 'Legal', 'Eyebrow', 'Number', 'Button', 'Badge',
 ];
 
 /** Usage guidance per group. Travels into the Figma text-style description so
@@ -485,6 +601,184 @@ export function resolveRoles(styles: TypographyStyle[] | undefined | null): Reso
 const pxToEm = (px: number | undefined, size: number): string =>
   px ? `${+(px / size).toFixed(4)}em` : '0em';
 
+/* ── Header tracking follows optical size ─────────────────────────────────
+ *
+ * The header ramp spans H1 to H6 — 48px down to 18px by default, a 2.7x range
+ * — and every step used to take ONE letter-spacing value, the user's pick,
+ * applied flat. There is no number that is right at both ends of that range.
+ * Type tightens as it grows: a value tuned at 18px reads visibly loose at
+ * 48px, and one tuned at 48px looks cramped at 18px.
+ *
+ * So the user's value becomes an ANCHOR rather than the answer, and each step
+ * takes a delta off it. Their choice still decides the character of the
+ * tracking; the size decides how much of it each step gets.
+ *
+ * ── Why the anchor is the SMALLEST header ─────────────────────────────────
+ *
+ * Anchoring at H6 means "this is my tracking at small header sizes" and
+ * everything larger tightens from there. Anchoring at H1 would make their
+ * value describe the display end and loosen the small ones — worse, because a
+ * wrong value costs more readability at 18px than at 48px.
+ *
+ * H6 is where the SIZE delta is zero, not where the output equals the input.
+ * The face adjustment below applies at every step including this one, because
+ * it is about the face and not about the size: a Bold H6 wants different
+ * tracking from a Thin H6, and exempting one step would make that step the
+ * only one ignoring the weight. So the anchor is the baseline the two deltas
+ * are measured from, not a value that survives to the stylesheet verbatim.
+ *
+ * ── Derived from the SIZE, not from the token ─────────────────────────────
+ *
+ * A table keyed by H1..H6 would be simpler and would quietly stop being right
+ * the moment the scale moves — H1_SIZE is configurable, and the Display ramp
+ * hands off to it. Keying on the actual size means the curve follows the
+ * scale wherever the user puts it.
+ */
+
+/** The step the user's own value lands on, unmodified: H6's size. */
+export const HEADER_TRACKING_ANCHOR_PX = 18;
+
+/* em of tightening per px of size above the anchor.
+   1/1500 puts H1 at -0.02em when H1 is 48 — about -1px. Enough to take the
+   looseness off a large heading, not so much that a face which never needed
+   it looks mannered. */
+const MIXED_CASE_RATE = 1 / 1500;
+
+/* All-caps barely moves, and this is the conditional that matters most.
+   Capitals are uniform in width and have no descenders, so they read CRAMPED
+   at the tracking that suits mixed case — they want air, at every size. The
+   optical-size effect is real for caps too but much weaker, so the curve
+   flattens to a tenth rather than inverting. A caps ramp that tightened like
+   mixed case would undo the one thing caps actually need. */
+const CAPS_RATE = 1 / 15000;
+
+/* ── The face's own axes shift the curve ──────────────────────────────────
+ *
+ * The Header is always Google Sans Flex and its character comes from the
+ * axes, so "which face did the user pick" is really "where are wght, wdth and
+ * GRAD set". All three change how much air a line needs, and the direction is
+ * worth stating because it is the opposite of the usual shorthand about
+ * tightening bold headlines — that advice is about SIZE, which the curve above
+ * already handles.
+ *
+ * WEIGHT. Picture "AV" at 48px in Thin and in Black. In Black the stems are
+ * thick and the letters nearly touch: pull them further together and they
+ * collide. In Thin the stems are hairlines and the gap yawns: it wants
+ * closing. So HEAVIER asks for MORE tracking and LIGHTER for less — the
+ * sidebearings are drawn for the middle of the range and the stroke eats into
+ * them as weight climbs. Across the moods that is Elegant at 250 against Bold
+ * at 800, which is most of the axis.
+ *
+ * WIDTH. A condensed face has narrower letterforms AND proportionally tighter
+ * sidebearings, so it crowds sooner. Tech sits at 72 — well below the 100
+ * default and the most condensed setting any mood uses — and wants the air
+ * back. Expanded needs slightly less.
+ *
+ * GRADE. Grade thickens the stems WITHOUT changing the advance width, which is
+ * the whole point of the axis. So unlike weight, nothing compensates: the ink
+ * grows and the gap shrinks by exactly that much. Per unit it therefore counts
+ * for more than weight does, and Bold's GRAD of 80 is the largest in the
+ * table.
+ *
+ * The three together stay deliberately smaller than the size curve — roughly
+ * half its magnitude at the extremes — so size still leads and the face
+ * adjusts. These are heuristics with a defensible direction, not measured
+ * values, and they are meant to be looked at.
+ */
+const WEIGHT_REF = 400;
+const WEIGHT_RATE = 1 / 60000;   // Bold's 800 -> +0.0067em; Elegant's 250 -> -0.0025em
+const WIDTH_REF = 100;
+const WIDTH_RATE = 1 / 12000;    // Tech's 72 -> +0.0023em
+const GRADE_RATE = 1 / 25000;    // Bold's 80 -> +0.0032em
+
+/** How far the face's own settings move the tracking, in em. */
+export function faceTrackingDelta(axes?: Record<string, number>): number {
+  if (!axes) return 0;
+  const wght = axes.wght ?? WEIGHT_REF;
+  const wdth = axes.wdth ?? WIDTH_REF;
+  const grad = axes.GRAD ?? 0;
+  return (wght - WEIGHT_REF) * WEIGHT_RATE
+       + (WIDTH_REF - wdth) * WIDTH_RATE
+       + grad * GRADE_RATE;
+}
+
+/* Guard rails, in em. Not opinions about good tracking — just a floor and a
+   ceiling so a pathological anchor cannot produce unreadable type at the far
+   end of the ramp. */
+const TRACKING_MIN_EM = -0.05;
+const TRACKING_MAX_EM = 0.2;
+
+export interface TrackingContext {
+  /** roles.<role>.textTransform === 'uppercase' */
+  caps: boolean;
+  /**
+   * The face's `opsz` axis VARIES WITH THE RENDERED SIZE.
+   *
+   * Not "the face has an opsz axis" — that was the first version of this flag
+   * and it was wrong in a way that made the whole function a no-op. An
+   * optical-size axis only compensates when its value follows the size it is
+   * set at. The header role pins ONE opsz for the whole ramp (moodToAxes
+   * supplies 72 and every step inherits it), so across 48px down to 18px the
+   * font is held at a single optical size and compensates for nothing.
+   *
+   * Every header therefore passes `false` today. The flag stays because the
+   * real fix is to emit `opsz` per step — that is what the axis is for — and
+   * on the day that happens this tracking curve must back off or the two
+   * corrections stack.
+   */
+  opszTracksSize: boolean;
+  /**
+   * The face's variable axes. For the Header this is always Google Sans Flex's
+   * set, where the user's pick lives — the family is fixed, so wght / wdth /
+   * GRAD are what "which face" actually means here.
+   */
+  axes?: Record<string, number>;
+}
+
+/** Split "0.02em" / "1.25px" / "0" into a number and its unit. */
+function parseTracking(value: string): { n: number; unit: 'em' | 'px' } {
+  const m = String(value ?? '').trim().match(/^(-?[\d.]+)\s*(em|px)?$/);
+  if (!m) return { n: 0, unit: 'em' };
+  return { n: parseFloat(m[1]) || 0, unit: (m[2] as 'em' | 'px') || 'em' };
+}
+
+/**
+ * The user's tracking, adjusted for one header size.
+ *
+ * Returns the value in the SAME UNIT it arrived in. That is deliberate: em is
+ * the better unit for tracking and px is what the current export emits, and
+ * quietly switching the unit would change every brand's stylesheet shape on
+ * top of changing the number. One change at a time.
+ *
+ * Note what a flat PX value means in the first place — 1.25px is 0.069em at
+ * 18px and 0.026em at 48px. So a px anchor applied flat is ALREADY
+ * size-dependent, in the right direction but by an accident of the unit and
+ * by far too much. Converting through em is what makes the curve deliberate.
+ */
+export function suggestedHeaderTracking(
+  anchor: string,
+  size: number,
+  ctx: TrackingContext,
+): string {
+  const { n, unit } = parseTracking(anchor);
+
+  /* A face whose opsz FOLLOWS the size is already tightening itself as it
+     scales. Adding this on top double-corrects and the large end comes out
+     too tight — the one case where doing nothing is the correct answer. */
+  if (ctx.opszTracksSize) return anchor;
+
+  const anchorEm = unit === 'px' ? n / HEADER_TRACKING_ANCHOR_PX : n;
+  const rate = ctx.caps ? CAPS_RATE : MIXED_CASE_RATE;
+  const em = Math.min(TRACKING_MAX_EM, Math.max(TRACKING_MIN_EM,
+    anchorEm
+      - (size - HEADER_TRACKING_ANCHOR_PX) * rate
+      + faceTrackingDelta(ctx.axes)));
+
+  return unit === 'px'
+    ? `${+(em * size).toFixed(3)}px`
+    : `${+em.toFixed(4)}em`;
+}
+
 /**
  * Build the full scale from the chosen faces.
  *
@@ -518,6 +812,41 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
     });
   }
 
+  /* Alt Display — the same face at the same sizes, set apart by COLOUR and,
+   * where the family allows it, by weight.
+   *
+   * Sizes, leading and tracking mirror Display exactly, and that is the
+   * point rather than laziness: the pairing "Omni" + "Design" is one word on
+   * one baseline with the second half in the Alt. Give the Alt its own ramp
+   * and the two halves stop lining up.
+   *
+   * The weight is an ENHANCEMENT, not the distinction. 56% of the curated
+   * display pool ships exactly one weight — Anton, Bangers, Lobster, Great
+   * Vibes, Alfa Slab One are all [400] — so altDisplayWeight returns undefined
+   * more often than not, and the style then simply reads the face's weight
+   * like Display does. Colour is what always separates them; see
+   * altDisplay.ts, which holds both decisions. */
+  const altWeight = altDisplayWeight(roles.display.weight, weightsFor(roles.display.family));
+  for (const step of displaySteps(roles.display.size ?? DEFAULT_DISPLAY_SIZE)) {
+    push({
+      token: `Alt-${step.token}`, name: `Display/Alt-${step.step}`,
+      group: 'Display', step: `Alt-${step.step}`,
+      familyRole: 'display',
+      /* Only when the family has no lighter weight to offer: then the Alt
+         tracks the face exactly as Display does, rather than pinning a number
+         that would stop following the user's slider. */
+      weightFromFace: altWeight === undefined,
+      size: step.size, weight: altWeight ?? roles.display.weight,
+      lineHeight: step.lineHeight,
+      letterSpacing: roles.display.letterSpacing,
+      textTransform: roles.display.textTransform,
+      paragraphSpacing: 0,
+      axes: roles.display.axes,
+      noise: roles.display.noise || 0,
+      bounce: roles.display.bounce || 0,
+    });
+  }
+
   for (const step of HEADER_STEPS) {
     push({
       token: step.token, name: `Header/${step.step}`, group: 'Header', step: step.step,
@@ -526,7 +855,25 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
         ? { weightVar: 'Header-Clamped-Weight' }
         : {}),
       size: step.size, weight: roles.header.weight, lineHeight: step.lineHeight,
-      letterSpacing: roles.header.letterSpacing,
+      /* The user's value is the ANCHOR at H6, not a flat answer for all six —
+         see suggestedHeaderTracking. Type tightens as it grows, and one value
+         across a 48-to-18 ramp is wrong at whichever end it was not tuned
+         for. Caps flatten the curve rather than inverting it, and a face with
+         an opsz axis is left alone because it is already compensating. */
+      letterSpacing: suggestedHeaderTracking(roles.header.letterSpacing, step.size, {
+        caps: roles.header.textTransform === 'uppercase',
+        /* FALSE on purpose, even though the header face always has an opsz
+           axis. The axis is pinned to one value for the whole role, so it is
+           not tracking the size and is compensating for nothing — see
+           TrackingContext. Reading `axes.opsz !== undefined` here made this
+           function a no-op for every brand, which is how it was written
+           first. */
+        opszTracksSize: false,
+        /* Google Sans Flex's settings — where the user's header choice
+           actually lives, since the family is fixed and the mood moves the
+           axes. */
+        axes: roles.header.axes,
+      }),
       textTransform: roles.header.textTransform,
       paragraphSpacing: 0,
       axes: roles.header.axes,

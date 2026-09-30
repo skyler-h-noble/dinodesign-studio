@@ -36,12 +36,14 @@ import ColorStage from './components/stages/ColorStage';
 import ColorAssignmentStage from './components/stages/ColorAssignmentStage';
 import TypographyStageV2 from './components/stages/TypographyStageV2';
 import ComponentStyleStage from './components/stages/ComponentStyleStage';
+import ShadowStage from './components/stages/ShadowStage';
 import ReviewStage from './components/stages/ReviewStage';
 import ExportStage from './components/stages/ExportStage';
 import Playground from './components/Playground';
 import GeneratedPreview from './components/GeneratedPreview';
 import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
 import ToneTuner from './components/ToneTuner';
+import ShadowTuner from './components/ShadowTuner';
 import AccountPage from './components/AccountPage';
 import LandingPage from './components/LandingPage';
 import AddOnCatalogPage from './components/AddOnCatalogPage';
@@ -51,6 +53,7 @@ import MyDesignsPage from './components/MyDesignsPage';
 import AdminProposals from './components/AdminProposals';
 import TypographyTestPage from './components/TypographyTestPage';
 import AaidWorkbenchPage from './components/AaidWorkbenchPage';
+import NavDesignerPage from './components/NavDesignerPage';
 
 /**
  * Re-map a scheme's tone palettes onto a new role order.
@@ -589,6 +592,20 @@ function MainApp() {
             typographyStyles={typographyStyles}
           />
         );
+      case 'shadow':
+        return (
+          <ShadowStage
+            onNext={goNext}
+            onBack={goBack}
+            componentStyle={componentStyle}
+            customizations={savedStyleCustomizations?.[componentStyle] as never}
+            onChange={(customs) => {
+              setSavedStyleCustomizations((prev: Record<string, unknown> | null) => ({
+                ...(prev || {}), [componentStyle]: customs,
+              }));
+            }}
+          />
+        );
       case 'review':
         return (
           <ReviewStage
@@ -599,6 +616,7 @@ function MainApp() {
             userSelections={userSelections}
             typographyStyles={typographyStyles}
             componentStyle={componentStyle}
+            styleCustomizations={savedStyleCustomizations?.[componentStyle]}
             moodBoardUrl={moodBoardUrl}
             pendingReExport={pendingReExport}
             originalSnapshot={originalSnapshot}
@@ -671,7 +689,31 @@ function MainApp() {
   // from Firestore at mount, so the brand chrome can show from the very
   // first stage instead of switching on mid-flow.
   const applyBrand = pendingReExport
-    || ['color-assignment', 'typography', 'component-style', 'review', 'export'].includes(stage);
+    /* Every stage from colour-assignment on, i.e. once there is enough of a
+       system to paint with. Derived from STAGE_ORDER rather than listed by
+       name: the hand-written list silently omitted 'shadow' when that stage
+       was added, so the Shadow step rendered in the lib's default theme while
+       the step before it was fully branded. A new stage now inherits the
+       brand automatically. */
+    || STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf('color-assignment');
+
+  /* Put the brand theme on <body>, not just on <main>.
+   *
+   * brandCSS scopes every token to [data-theme="Brand"] and its DESCENDANTS,
+   * and that attribute lives on <main>. MUI's Modal — and our own portalled
+   * dropdown panels — render into document.body, which is a SIBLING of <main>,
+   * so none of the brand selectors matched them. Portalled content fell back to
+   * the lib defaults: a serif heading where the brand sets a sans, the wrong
+   * container background, the wrong card shadow.
+   *
+   * Only data-theme goes here. data-surface would paint the body itself and
+   * force a surface on every portal; the theme alone is enough for the tokens
+   * to cascade in, and each portal still declares its own surface. */
+  useEffect(() => {
+    const t = applyBrand ? 'Brand' : 'Default';
+    document.body.setAttribute('data-theme', t);
+    return () => { document.body.removeAttribute('data-theme'); };
+  }, [applyBrand]);
 
   // Build full brand CSS from the same logic as the phone preview
   // Post-process to add !important so it overrides OmniDesignProvider's theme
@@ -703,13 +745,18 @@ function MainApp() {
         componentStyle,
         mode: 'light',
         typographyStyles,
+        /* The sliders, including the Shadow step. Without these the studio
+           renders every system at the DEFAULT shadow — the same class of bug
+           the detail page had with button radii: plausible output, silently
+           ignoring the user's choice. */
+        styleCustomizations: savedStyleCustomizations?.[componentStyle],
       });
       // No !important needed — Brand theme selectors don't conflict with provider
       return css;
     } catch {
       return '';
     }
-  }, [applyBrand, selectedColorScheme, userSelections, componentStyle, typographyStyles]);
+  }, [applyBrand, selectedColorScheme, userSelections, componentStyle, typographyStyles, savedStyleCustomizations]);
   // Typography font families for inline style injection
   const headerFont = typographyStyles.find(t => t.type === 'header');
   const decorativeFont = typographyStyles.find(t => t.type === 'decorative');
@@ -873,9 +920,12 @@ function MainApp() {
       `}} />
       {/* Per-variant bevel shadow. Each variant exposes its palette's
           Highlight/Lowlight RGB triples via --Current-Bevel-*; one rule
-          applies the shadow, skipping ghost/text (flat by design). */}
+          applies the shadow, skipping ghost/text (flat by design).
+          No .btn-*-light selectors: the -light shape was removed from the
+          lib and Button now builds its class from the NORMALISED variant,
+          so `primary-light` renders .btn-primary and is already covered. */}
       <style id="dino-button-bevel" dangerouslySetInnerHTML={{ __html: `
-        .btn-primary, .btn-primary-outline, .btn-primary-light, .btn-outline {
+        .btn-primary, .btn-primary-outline, .btn-outline {
           --Current-Bevel-Highlight: var(--Buttons-Primary-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Primary-Lowlight, black);
         }
@@ -883,31 +933,31 @@ function MainApp() {
           --Current-Bevel-Highlight: var(--Buttons-Default-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Default-Lowlight, black);
         }
-        .btn-secondary, .btn-secondary-outline, .btn-secondary-light {
+        .btn-secondary, .btn-secondary-outline {
           --Current-Bevel-Highlight: var(--Buttons-Secondary-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Secondary-Lowlight, black);
         }
-        .btn-tertiary, .btn-tertiary-outline, .btn-tertiary-light {
+        .btn-tertiary, .btn-tertiary-outline {
           --Current-Bevel-Highlight: var(--Buttons-Tertiary-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Tertiary-Lowlight, black);
         }
-        .btn-neutral, .btn-neutral-outline, .btn-neutral-light {
+        .btn-neutral, .btn-neutral-outline {
           --Current-Bevel-Highlight: var(--Buttons-Neutral-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Neutral-Lowlight, black);
         }
-        .btn-info, .btn-info-outline, .btn-info-light {
+        .btn-info, .btn-info-outline {
           --Current-Bevel-Highlight: var(--Buttons-Info-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Info-Lowlight, black);
         }
-        .btn-success, .btn-success-outline, .btn-success-light {
+        .btn-success, .btn-success-outline {
           --Current-Bevel-Highlight: var(--Buttons-Success-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Success-Lowlight, black);
         }
-        .btn-warning, .btn-warning-outline, .btn-warning-light {
+        .btn-warning, .btn-warning-outline {
           --Current-Bevel-Highlight: var(--Buttons-Warning-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Warning-Lowlight, black);
         }
-        .btn-error, .btn-error-outline, .btn-error-light, .btn-danger {
+        .btn-error, .btn-error-outline, .btn-danger {
           --Current-Bevel-Highlight: var(--Buttons-Error-Highlight, white);
           --Current-Bevel-Lowlight: var(--Buttons-Error-Lowlight, black);
         }
@@ -1054,6 +1104,7 @@ function App() {
         <Route path="/api/tokens/:uuid" element={<ApiTokensJson />} />
         <Route path="/api/tokens/:uuid/md" element={<ApiTokensMd />} />
         <Route path="/tune" element={<ToneTuner />} />
+        <Route path="/tune-shadows" element={<ShadowTuner />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccess />} />
         <Route path="/accessibility-report" element={<AccessibilityReport />} />
@@ -1062,6 +1113,7 @@ function App() {
         <Route path="/admin/proposals" element={<AdminProposals />} />
         <Route path="/test/typography" element={<TypographyTestPage />} />
         <Route path="/admin/aaid-workbench" element={<AaidWorkbenchPage />} />
+        <Route path="/add-ons/nav" element={<NavDesignerPage />} />
       </Routes>
     </BrowserRouter>
     </OmniDesignProvider>
