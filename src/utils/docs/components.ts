@@ -27,7 +27,8 @@ export const BUTTON_DOC: ComponentDoc = {
       note: 'Raises it one elevation level; a button is flat at rest and earns its shadow by being hovered.' },
     { name: 'selected', type: 'boolean', default: 'false',
       note: 'For a toggled-on button in a group. Suppresses the hover lift so a selected button does not animate when hovered again.' },
-    { name: 'fullWidth', type: 'boolean', default: 'false' },
+    { name: 'fullWidth', type: 'boolean', default: 'false',
+      note: 'Text buttons only. It is IGNORED on `iconOnly` and `letterNumber` (Button.js:476), and Figma matches by offering `Fit` only on `Type=text` — there is no such thing as a full-width icon button.' },
     { name: 'disabled', type: 'boolean', default: 'false' },
     { name: 'startIcon / endIcon', type: 'ReactNode', default: 'undefined' },
   ],
@@ -192,7 +193,8 @@ export const CARD_DOC: ComponentDoc = {
 
 import { FORM_DOCS } from './componentsForms';
 import { SURFACE_DOCS } from './componentsSurfaces';
+import { OVERLAY_DOCS } from './componentsOverlays';
 
 export const COMPONENT_DOCS: ComponentDoc[] = [
-  BUTTON_DOC, TABS_DOC, CARD_DOC, ...FORM_DOCS, ...SURFACE_DOCS,
+  BUTTON_DOC, TABS_DOC, CARD_DOC, ...FORM_DOCS, ...SURFACE_DOCS, ...OVERLAY_DOCS,
 ];
