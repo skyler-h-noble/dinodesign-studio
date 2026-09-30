@@ -17,7 +17,7 @@ describe('one table, three targets', () => {
        is the whole point of Component-Size: a component has one variant and
        switching the mode switches the size. */
     expect(componentSizeNames(payload)).toEqual([
-      'Other/App-Bar Height', 'Other/Nav-Bar Height', 'Other/Rail-Width',
+      'Other/App-Bar-Height', 'Other/Nav-Bar Height', 'Other/Rail-Width',
     ]);
     expect(payload.medium['Other/Rail-Width']).toBe(80);
     expect(payload.small['Other/Rail-Width']).toBe(72);
@@ -25,12 +25,15 @@ describe('one table, three targets', () => {
   });
 
   it('keeps the file’s own name, space and all', () => {
-    /* Component-Size holds `App-Bar Height`. A tidier `App-Bar-Height` would
+    /* The name is the FILE's, whatever it currently is. `App-Bar Height` was
+       renamed to `App-Bar-Height` in Figma on 2026-09-30 and this followed in
+       the same pass; `Nav-Bar Height` still carries its space. A tidier name would
        match no variable in the file, leave the value at whatever was last
        typed by hand, and report success the whole time. */
-    expect(Object.keys(NAV_METRICS)).toContain('App-Bar Height');
+    expect(Object.keys(NAV_METRICS)).toContain('App-Bar-Height');
+    expect(Object.keys(NAV_METRICS)).toContain('Nav-Bar Height');
     const payload = componentSizeGroup('Other', navMetricsFlat());
-    expect(payload.medium['Other/App-Bar Height']).toBe(64);
+    expect(payload.medium['Other/App-Bar-Height']).toBe(64);
   });
 
   it('emits the CSS triple a SIZE_MAP picks between', () => {

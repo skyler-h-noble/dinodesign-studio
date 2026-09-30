@@ -671,7 +671,7 @@ describe('the brand is a slot like the others', () => {
 });
 
 describe('the brand occupies the same rectangle either way', () => {
-  /* Rail-Width across, App-Bar Height down, at the top-left corner — the
+  /* Rail-Width across, App-Bar-Height down, at the top-left corner — the
      intersection of the rail's column and the bar's row. Which component
      contains it changes with barPosition; where it lands on screen must not.
 
@@ -691,12 +691,12 @@ describe('the brand occupies the same rectangle either way', () => {
     expect(find(navDefinition({ layout: 'rail' }).root, 'Rail').width).toBe('hug');
   });
 
-  it('is App-Bar Height down in both', () => {
-    expect(block('beside-rail').height).toEqual({ fixed: { token: 'Other/App-Bar Height' } });
+  it('is App-Bar-Height down in both', () => {
+    expect(block('beside-rail').height).toEqual({ fixed: { token: 'Other/App-Bar-Height' } });
     // In the bar it fills, and the bar is App-Bar Height.
     expect(block('above-rail').height).toBe('fill');
     expect(find(navDefinition({ layout: 'rail', barPosition: 'above-rail' }).root, 'Bar').height)
-      .toEqual({ fixed: { token: 'Other/App-Bar Height' } });
+      .toEqual({ fixed: { token: 'Other/App-Bar-Height' } });
   });
 
   it('above the rail, the bar is not a band — nothing caps its contents', () => {

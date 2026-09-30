@@ -26,9 +26,9 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { ComponentDefinition, NodeDef, Sizing, TokenRef } from '../utils/addOns/defineComponent';
 
 /* A custom property cannot contain a space, so a Figma variable that has one
-   — Component-Size holds `App-Bar Height` — hyphenates on the way to CSS.
+   — Component-Size holds `Nav-Bar Height` — hyphenates on the way to CSS.
    navMetricsCSS emits the hyphenated name for exactly this reason; without
-   the same conversion here the reference came out `var(--App-Bar Height)`,
+   the same conversion here the reference came out `var(--Nav-Bar Height)`,
    which is invalid and silently resolves to nothing. */
 const tok = (t: TokenRef | undefined): string | undefined =>
   t ? `var(--${t.token.split('/').pop()!.replace(/ /g, '-')})` : undefined;

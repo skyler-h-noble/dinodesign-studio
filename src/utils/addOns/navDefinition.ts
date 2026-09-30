@@ -255,7 +255,7 @@ export const TABS_MIN_WIDTH = 900;
 /**
  * The brand's rectangle, and it is the SAME rectangle in both arrangements.
  *
- * Rail-Width across, App-Bar Height down, at the top-left corner — the
+ * Rail-Width across, App-Bar-Height down, at the top-left corner — the
  * intersection of the rail's column and the bar's row. Which component happens
  * to contain it changes with barPosition; where it lands on screen does not.
  *
@@ -267,7 +267,7 @@ export const TABS_MIN_WIDTH = 900;
  *
  * `inRail` decides which axis is fixed and which fills, because the container
  * already constrains the other one: the rail is Rail-Width wide, so the block
- * fills it and fixes its height; the bar is App-Bar Height tall, so the block
+ * fills it and fixes its height; the bar is App-Bar-Height tall, so the block
  * fills it and fixes its width.
  */
 function brandBlock(inRail: boolean): NodeDef {
@@ -278,7 +278,7 @@ function brandBlock(inRail: boolean): NodeDef {
     justify: 'center',
     align: 'center',
     width: inRail ? 'fill' : { fixed: t('Other/Rail-Width') },
-    height: inRail ? { fixed: t('Other/App-Bar Height') } : 'fill',
+    height: inRail ? { fixed: t('Other/App-Bar-Height') } : 'fill',
     /* Only in the rail. In the bar the rule IS the bar's own bottom edge, and
        a second one inside it would draw the same line twice. */
     ...(inRail ? { borderBottom: t('Border-Variant') } : {}),
@@ -501,7 +501,7 @@ function bar(o: NavOptions): NodeDef {
        it. Padding would inset it and the two would miss each other by exactly
        Sizing-3, which reads as the rail being misaligned rather than the bar
        being padded. */
-    /* NO vertical padding. The bar is a fixed App-Bar Height and centres its
+    /* NO vertical padding. The bar is a fixed App-Bar-Height and centres its
        contents, so padding on top of that only fights the height — it made the
        hero's tab strip 96px where the token says 64, and the strip is the one
        place that extra height is most visible because the tabs have their own
@@ -511,14 +511,14 @@ function bar(o: NavOptions): NodeDef {
       ...(o.layout === 'rail' && o.barPosition === 'above-rail' ? {} : { left: PAD_X }),
     },
     width: 'fill',
-    /* FIXED at the design system's own App-Bar Height, not hug.
+    /* FIXED at the design system's own App-Bar-Height, not hug.
      
        Hugging meant the bar was as tall as its tallest child plus padding —
        92px where the token says 64 — so the inset that clears it was 28px
        short and the rail slid under the bar. The token and the thing it
        measures have to be the same number, and the design system is the one
        that decides it. */
-    height: { fixed: t('Other/App-Bar Height') },
+    height: { fixed: t('Other/App-Bar-Height') },
     /* The bar carries the pair itself rather than inheriting it.
        
        Inheriting works — custom properties cascade — but it leaves the bar
@@ -647,7 +647,7 @@ function railNode(fullHeight: boolean): NodeDef {
        What is left is room for the brand above the items, which is this
        wrapper's own job. */
     /* No TOP padding when the rail carries the brand. The brand block is
-       App-Bar Height tall so its bottom edge lands on the bar's — but only if
+       App-Bar-Height tall so its bottom edge lands on the bar's — but only if
        it starts at zero. Padding above it pushed the whole rail down by
        Sizing-2 and the two edges missed each other, which is the misalignment
        the block exists to prevent.
