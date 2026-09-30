@@ -36,7 +36,7 @@ export const CHECKBOX_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`data-theme` on an ancestor — Checkbox has no theme prop.',
+    { collection: 'Theme', inCode: '`data-theme` on an ancestor — Checkbox has no theme prop.',
       inFigma: 'Pins no Theme mode; it inherits. Set the mode on the frame around it.' },
   ],
   tokens: [
@@ -86,7 +86,7 @@ export const RADIO_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`theme` / `surface` props, or `data-theme` on an ancestor.',
+    { collection: 'Theme', inCode: '`theme` / `surface` props, or `data-theme` on an ancestor.',
       inFigma: 'The variant root pins `Theme=Primary`. Change the mode there to retheme it.' },
   ],
   themingNotes: [
@@ -135,7 +135,7 @@ export const SWITCH_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`data-theme` on an ancestor.',
+    { collection: 'Theme', inCode: '`data-theme` on an ancestor.',
       inFigma: 'The variant root pins `Theme=Primary`. Change the mode there.' },
   ],
   tokens: [
@@ -180,7 +180,7 @@ export const CHIP_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`data-theme` on an ancestor; the chip sets `data-surface` itself from `selected`.',
+    { collection: 'Theme', inCode: '`data-theme` on an ancestor; the chip sets `data-surface` itself from `selected`.',
       inFigma: 'The variant root pins `Theme=Primary`, and `Chip-body` pins `Surface=Surface-Brightest`. The theme is the root; the surface is the body.' },
   ],
   themingNotes: [
@@ -220,7 +220,7 @@ export const ALERT_DOC: ComponentDoc = {
   ],
   states: [{ state: 'None', setBy: 'prop', note: 'An alert is not interactive; its colour is the message.' }],
   theming: [
-    { inCode: '`color` picks the semantic palette. `data-theme` on an ancestor is rarely wanted — an error alert should stay an error colour.',
+    { collection: 'Theme', inCode: '`color` picks the semantic palette. `data-theme` on an ancestor is rarely wanted — an error alert should stay an error colour.',
       inFigma: '`Alert Container` pins both Theme (Error / Warning) and `Surface=Surface-Brightest`. That container is the node to change.' },
   ],
   tokens: [
@@ -257,8 +257,8 @@ export const BADGE_DOC: ComponentDoc = {
   ],
   states: [{ state: 'None', setBy: 'prop', note: 'A badge is decoration on its child; it has no states of its own.' }],
   theming: [
-    { inCode: '`data-theme` on an ancestor.',
-      inFigma: 'Badge Counter pins nothing and inherits. Set the mode on the frame around it.' },
+    { collection: 'Icons', inCode: '`data-theme` on an ancestor; the fill follows the Icons colour.',
+      inFigma: 'Badge Counter binds `Icon` and `On-Icon` from the Icons collection and pins nothing. Set the Icons mode on it or an ancestor — that is what recolours a badge.' },
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'the badge fill', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
@@ -297,8 +297,8 @@ export const AVATAR_DOC: ComponentDoc = {
     { state: 'Focus-visible', setBy: 'interaction', note: 'Only when `clickable`.' },
   ],
   theming: [
-    { inCode: '`data-theme` on an ancestor.',
-      inFigma: 'Pins nothing and inherits. The Style variant chooses Photo / Initials / Default, which is content, not colour.' },
+    { collection: 'Buttons', inCode: '`data-theme` on an ancestor.',
+      inFigma: 'The `Button-Theme-Avatar` and `Button-Theme-Initials` layers mark where the Buttons mode goes. Both are unpinned, so an avatar inherits. The Style variant chooses Photo / Initials / Default, which is content, not colour.' },
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'the initials background', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
@@ -345,7 +345,7 @@ export const INPUT_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`data-theme` on an ancestor.',
+    { collection: 'Theme', inCode: '`data-theme` on an ancestor.',
       inFigma: 'Pins nothing and inherits. Set the mode on the frame around it.' },
   ],
   tokens: [

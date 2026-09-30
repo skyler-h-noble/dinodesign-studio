@@ -39,10 +39,10 @@ export const BUTTON_DOC: ComponentDoc = {
     { state: 'Selected', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`data-theme` on the button, or on any ancestor — it inherits.',
+    { collection: 'Theme', inCode: '`data-theme` on the button, or on any ancestor — it inherits.',
       inFigma: 'The Button component pins no Theme mode, so it inherits too. Set the mode on the frame it sits in.' },
-    { inCode: '`variant` picks the palette — `variant="success"`.',
-      inFigma: 'The Style / Type variant props. Colour is not a variant axis: it arrives as a mode.' },
+    { collection: 'Buttons', inCode: '`variant` picks the palette — `variant="success"`.',
+      inFigma: 'Set the Buttons mode. Colour is not a variant axis in Figma either — it arrives as a mode.' },
   ],
   themingNotes: [
     'Colour and theme are different things. `variant="success"` picks a palette; a theme moves the whole surface, including the text and border tones that have to stay readable on it.',
@@ -101,9 +101,9 @@ export const TABS_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop', note: 'On the individual `Tab`.' },
   ],
   theming: [
-    { inCode: '`TabList` carries the zone: a `variant` other than `standard` sets `data-theme` + `data-surface` for every tab inside.',
+    { collection: 'Theme', inCode: '`TabList` carries the zone: a `variant` other than `standard` sets `data-theme` + `data-surface` for every tab inside.',
       inFigma: 'Neither the Tabs nor the Tab set pins a Theme mode — both inherit. Set the mode on the frame holding the Tabs instance.' },
-    { inCode: '`standard` sets neither, so it inherits the surface it is dropped on.',
+    { collection: 'Theme', inCode: '`standard` sets neither, so it inherits the surface it is dropped on.',
       inFigma: 'Same behaviour, and the reason nothing is pinned: a tab bar usually belongs to the region around it.' },
   ],
   tokens: [
@@ -159,9 +159,9 @@ export const CARD_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { inCode: '`data-theme` on the card, or wrap it in `<Section>`.',
+    { collection: 'Theme', inCode: '`data-theme` on the card, or wrap it in `<Section>`.',
       inFigma: 'The Card set pins no Theme mode — it inherits. Set the mode on the frame around it.' },
-    { inCode: '`surface="Surface"` when the card is a Surface-level region rather than a Container.',
+    { collection: 'Theme', inCode: '`surface="Surface"` when the card is a Surface-level region rather than a Container.',
       inFigma: '`Card Content` pins `Surface=Container`, which is what makes the inner content read Container tones. That is the node to change if a card should be a Surface.' },
   ],
   themingNotes: [

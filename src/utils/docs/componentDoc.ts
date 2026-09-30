@@ -67,6 +67,61 @@ export interface TokenDoc {
   figma: string;
 }
 
+/**
+ * The three mode collections that carry colour, and what each one moves.
+ *
+ * This is the fact a component doc cannot carry on its own, because getting it
+ * wrong sends an agent to the right node in the wrong collection — and the
+ * change appears to do nothing rather than erroring.
+ *
+ * `Icons` is new: its colours lived as ~27 flat variables inside Surface, so a
+ * component had to bind to ONE of them. Badge bound to `Icons/Error` and could
+ * therefore only ever be an error badge in Figma, while the library offered
+ * nine colours. Collapsing them into 3 variables × 10 modes fixed that the same
+ * way Buttons already had.
+ */
+export const COLOUR_COLLECTIONS = [
+  {
+    name: 'Theme',
+    moves: 'the whole surface — background, text, border, quiet, hover, pressed',
+    inCode: '`data-theme` on the element or any ancestor',
+    inFigma: 'set the Theme mode on a `Theme-*` layer',
+  },
+  {
+    name: 'Buttons',
+    moves: 'an accent fill and its border, hover and pressed',
+    inCode: 'the `variant` / `color` prop — `variant="success"`',
+    inFigma: 'set the Buttons mode on a `Button-Theme-*` layer',
+  },
+  {
+    name: 'Icons',
+    moves: 'an icon or badge colour, plus its variant and on-colour',
+    inCode: 'the `color` prop on `Icon` — `<Icon color="primary">`',
+    inFigma: 'set the Icons mode on an `Icon-Theme-*` layer',
+  },
+] as const;
+
+export type ColourCollection = typeof COLOUR_COLLECTIONS[number]['name'] | '—';
+
+export function renderColourSystem(): string {
+  const out = ['## How colour works', '',
+    'Three mode collections carry colour, and they are not interchangeable.',
+    'Changing the right node in the wrong collection appears to do nothing —',
+    'it does not error.', ''];
+  out.push('| Collection | What it moves | In code | In Figma |');
+  out.push('| --- | --- | --- | --- |');
+  for (const c of COLOUR_COLLECTIONS) {
+    out.push(`| **${c.name}** | ${c.moves} | ${c.inCode} | ${c.inFigma} |`);
+  }
+  out.push('',
+    'A `Theme-*`, `Button-Theme-*` or `Icon-Theme-*` layer marks **where** a',
+    'mode goes. Most are unpinned, which means the component inherits — set the',
+    'mode on the frame around it. A pinned one is a deliberate choice: Alert',
+    'pins Error and Warning because there the colour *is* the message.', '',
+    'A component with no such layer has nothing of its own to recolour.', '');
+  return out.join('\n');
+}
+
 export interface StateDoc {
   state: string;
   /** 'prop' when the caller sets it, 'interaction' when the browser does. */
@@ -94,7 +149,12 @@ export interface ComponentDoc {
    * element against a variable mode on one specific node — and an agent asked
    * to theme a component in Figma cannot derive the node from the CSS.
    */
-  theming: Array<{ inCode: string; inFigma: string }>;
+  theming: Array<{
+    /** Which mode collection this row is about — the thing that cannot be guessed. */
+    collection: ColourCollection;
+    inCode: string;
+    inFigma: string;
+  }>;
   /** Extra theming rules that are not a code/Figma pair. */
   themingNotes?: string[];
   tokens: TokenDoc[];
@@ -241,8 +301,9 @@ export function renderComponentDoc(
 
   if (doc.theming.length) {
     out.push('### Theming', '');
-    out.push(...table(['In code', 'In Figma'],
-      doc.theming.map(t => [t.inCode, t.inFigma])));
+    out.push(...table(['Collection', 'In code', 'In Figma'],
+      doc.theming.map(t => [t.collection === '—' ? '—' : `**${t.collection}**`,
+        t.inCode, t.inFigma])));
     if (doc.themingNotes?.length) {
       out.push('');
       out.push(...doc.themingNotes.map(n => `- ${n}`));
