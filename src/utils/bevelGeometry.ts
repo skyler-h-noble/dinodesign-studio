@@ -190,3 +190,28 @@ export function platformBevelJSON(
   }
   return out;
 }
+
+/**
+ * The bevel as the file now stores it: one number and its negative.
+ *
+ * `bevelGeometry` returns eight values, and all eight are `b` or `-b` —
+ * Highlight offsets and blur are `b`, its spread is `-b`, Lowlight offsets and
+ * spread are `-b`, its blur is `b`. So the eight are a presentation of two.
+ *
+ * Figma now holds the two, per size, per device, in Devices-Type, and
+ * Component-Size's eight `Button-Highlight-*` / `Button-Lowlight-*` variables
+ * ALIAS into them. That is 12 numbers per device instead of 48, and — the part
+ * that matters — the alias is what makes a bevel follow the device at all. A
+ * literal written into Component-Size would DETACH it, which is the one thing
+ * that must not happen here.
+ *
+ * Names are the file's, including the trailing `-Negative` rather than a
+ * leading one: `Button-Bevel-Negative`, `FAB-Sm-Bevel-Negative`. The writer is
+ * update-only and matches on the full name, so a tidier spelling would be
+ * skipped in silence.
+ */
+export function bevelPairs(prefix: string, height: number, percent: number): Record<string, number> {
+  const b = bevelSize(height, percent);
+  return { [`${prefix}Bevel`]: b, [`${prefix}Bevel-Negative`]: -b };
+}
+

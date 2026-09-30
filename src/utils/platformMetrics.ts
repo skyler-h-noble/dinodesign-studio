@@ -84,6 +84,20 @@ export function isTouchPlatform(p: CSSPlatform): p is TouchPlatform {
 /**
  * The CSS names for one platform's button metrics.
  *
+ * NOT CURRENTLY CALLED, and that is not an oversight to fix by wiring it in.
+ * The `:root[data-platform="…"]` button blocks live at the bottom of the
+ * static `typography-tokens.css`, hand-written, and `buildTypographyTokensCSS`
+ * carries them through untouched — it only splices the Desktop TYPE block.
+ * `platformMetrics.test.ts` ("ships the same numbers to the CSS and to Figma")
+ * parses those blocks back out and compares them to PLATFORM_BUTTON, so the
+ * two copies cannot drift even though only one of them is generated.
+ *
+ * Kept because it is what a move to generating those blocks would use, and
+ * because the selector rule below is worth stating somewhere in code. If you
+ * do wire it in, the asset's hand-written blocks have to come OUT in the same
+ * pass — two sources for one declaration is decided by load order, which is
+ * exactly what --Platform-Spacer did.
+ *
  * Only the six base names are written. `--Small-Button-Height` and
  * `--Large-Button-Height` are declared in :root as `var(--Sm-Button-Height)`
  * and `var(--Lg-Button-Height)`, and a var() in a custom property resolves

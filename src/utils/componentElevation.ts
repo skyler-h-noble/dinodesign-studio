@@ -63,6 +63,36 @@ export const COMPONENT_ELEVATIONS: ComponentElevation[] = [
   // No Hover: a bar is a fixed chrome band, not a target that lifts.
   { group: 'AppBar, Toolbars, Menus', base: 2, hasHover: false },
   { group: 'FAB', base: 3, hasHover: true },
+  /* Alert, Snackbar and Speed Dial are deliberately absent, for two reasons.
+   *
+   * Speed Dial DELEGATES. It is built from Fab — SpeedDial.js imports and
+   * renders it, and in Figma its variants contain Fab instances already
+   * carrying the FAB styles — so its elevation is the FAB's. A row here would
+   * be a second source for one shadow.
+   *
+   * Alert and Snackbar SHARE. An Alert is inline (no `position: fixed` in
+   * Alert.js) and sits at level 1 with the accordion; a Snackbar floats
+   * without blocking and sits at the FAB's RESTING level 3. Below the modal is
+   * not a judgement call there — the lib stacks Snackbar at zIndex 1400 and
+   * Modal/Dialog at 10000000, so a dialog covers a snackbar outright.
+   *
+   * Both then read an existing row rather than getting one of their own, which
+   * is the convention already in the file: a ROW is named for its primary
+   * component and a STYLE lists every consumer. Hence `Handle, Accordion` the
+   * row against `Accordion, Handle, Alert, Bottom-Sheet` the style, and `FAB`
+   * against `FAB, Snackbar`.
+   *
+   * They briefly HAD rows here. Adding them was the right call against the
+   * file as it stood — Alert and Snackbar were both reading the Dialog/Modal
+   * style, four levels too high for an inline banner. But the fix chosen in
+   * Figma was to bind them to the level-appropriate shared styles, so a row
+   * each would now emit 60 variables nothing reads. The levels they were given
+   * are the levels they now resolve to; only the plumbing differs.
+   *
+   * The cost of sharing is real and worth stating: Alert cannot move without
+   * moving Accordion, and Snackbar cannot move without moving the FAB. If
+   * either ever needs to, it needs a row here first — the style cannot diverge
+   * on its own, because a style binds exactly one row. */
   // Already at the top of the stack, so Elevated cannot lift it and there is
   // no hover state to raise it to.
   { group: 'Dialog, Modal', base: 5, hasHover: false },
@@ -100,6 +130,45 @@ export function componentElevationFigma(): Record<string, Record<string, unknown
     }
   }
   return out;
+}
+
+/**
+ * How many Shadow-n slots a ROW carries, across every mode.
+ *
+ * The max, not the per-mode count, and that distinction is the whole of a bug.
+ *
+ * A row's two modes sit at different levels — `elevationFor` adds ELEVATED_LIFT
+ * — and DROP_COLOR_SLOTS grows with the level (3 · 4 · 5 · 8 · 10). Taking the
+ * count per mode therefore made Standard write FEWER slots than Elevated, and
+ * the slots in between were never written at all. An unwritten Figma variable
+ * keeps its previous value, so those slots went on holding whatever had been
+ * hand-authored there — in the real file, a live `Level-N/Drop-Color` alias
+ * rather than the transparent literal an unused slot is supposed to carry.
+ *
+ * It was invisible from inside Figma. The stale slots have zero geometry, and a
+ * shadow with no blur, offset or spread paints nothing, so the only trace was a
+ * style reporting more visible-alpha layers than its level has — which matters
+ * because the alpha model is `TOTAL[level] / N` and N is a layer count.
+ *
+ * The hazard was already documented one axis over: the comment on Drop-Color
+ * below explains that unused slots must be EMITTED rather than skipped, because
+ * "a slot dropped by a lower Resolution would go on painting what it held
+ * before". That is this bug exactly, and Resolution was the axis it was noticed
+ * on. Mode is another. Any axis that varies the slot count has it.
+ *
+ * Returns 0 only when every mode is Level-0, which is the one case where the
+ * row genuinely has no slots to write.
+ */
+export function componentElevationRowSlots(
+  c: ComponentElevation,
+  state: 'Default' | 'Hover',
+): number {
+  let n = 0;
+  for (const mode of ['Standard', 'Elevated'] as const) {
+    const level = elevationFor(c, state, mode);
+    if (level > 0) n = Math.max(n, DROP_COLOR_SLOTS[level as ShadowLevel]);
+  }
+  return n;
 }
 
 /**
@@ -144,10 +213,16 @@ export function componentElevationGeometryFigma(
            already implied by the values written into them. Emitting it would be
            an unmatched key on every row. `elevationFor` remains the source of
            the number for anything that needs it. */
-        if (level === 0) continue;
+        /* The row's slot count, not this mode's — see componentElevationRowSlots.
+           A mode sitting at a lower level still writes every slot the row has,
+           zeroed and transparent, so nothing is left holding a stale value. */
+        const slots = componentElevationRowSlots(c, state);
+        if (slots === 0) continue;
 
-        const layers = shadowLayers(level as ShadowLevel, o);
-        const slots = DROP_COLOR_SLOTS[level as ShadowLevel];
+        /* Level-0 keeps its meaning: no layers, so every slot below comes out
+           zeroed and transparent. It just no longer SKIPS the row, which is
+           what left the other mode's slots unwritten. */
+        const layers = level === 0 ? [] : shadowLayers(level as ShadowLevel, o);
         for (let i = 0; i < slots; i++) {
           const live = i < layers.length;
           const [x, y, blur, spread] = layers[i] ?? [0, 0, 0, 0];
@@ -187,8 +262,7 @@ export function componentElevationSlotCount(): number {
   for (const mode of ['Standard', 'Elevated'] as const)
     for (const c of COMPONENT_ELEVATIONS)
       for (const state of (c.hasHover ? ['Default', 'Hover'] : ['Default']) as Array<'Default' | 'Hover'>) {
-        const level = elevationFor(c, state, mode);
-        if (level > 0) n += DROP_COLOR_SLOTS[level as ShadowLevel];
+        n += componentElevationRowSlots(c, state);
       }
   return n;
 }

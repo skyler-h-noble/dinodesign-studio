@@ -77,9 +77,12 @@ describe('the Figma payload', () => {
   });
 
   it('emits exactly one variable per component/state — nine, not 150', () => {
-    /* Nine rows, not ten: Accordion lost its Hover child. An accordion lifts
-       when it OPENS, which is the Elevated mode, not a pointer state — the
-       Hover row invented an interaction the component does not have. */
+    /* Nine, not ten: Accordion lost its Hover child, because an accordion lifts
+       when it OPENS — the Elevated mode, not a pointer state — and the Hover
+       row invented an interaction the component does not have.
+
+       Briefly eleven, while Alert and Snackbar had rows of their own. They
+       share existing ones instead; see the note in componentElevation.ts. */
     expect(Object.keys(payload.Standard)).toHaveLength(SPEC.length);
     expect(Object.keys(payload.Elevated)).toHaveLength(SPEC.length);
     expect(SPEC.length).toBe(9);
