@@ -6,7 +6,7 @@ import {
 } from '../utils/dropshadow';
 import {
   componentElevationGeometryFigma, componentElevationSlotCount,
-  COMPONENT_ELEVATIONS, elevationFor,
+  COMPONENT_ELEVATIONS, elevationFor, componentElevationRowSlots,
 } from '../utils/componentElevation';
 
 /* The Figma collection this pins, written out longhand rather than derived, so
@@ -149,12 +149,65 @@ describe('Component-Elevations — geometry written, colour aliased', () => {
     }
   });
 
-  it('emits no shadow at all for a level-0 row', () => {
-    // Button/Outlined Cards rests flat in Standard mode.
-    expect(ce.Standard['Button, Outlined Cards/Default/Shadow-1/y']).toBeUndefined();
-    expect(ce.Standard['Button, Outlined Cards/Default/Shadow-1/Drop-Color']).toBeUndefined();
-    // ...and the Elevated lift gives it one.
-    expect(ce.Elevated['Button, Outlined Cards/Default/Shadow-1/Drop-Color']).toBeDefined();
+  it('states the absence of a shadow rather than omitting it', () => {
+    /* This assertion used to be that a level-0 row emitted NOTHING in the mode
+       where it rests flat, and that was pinning a bug rather than a rule.
+       Button/Outlined Cards is level-0 in Standard and lifted in Elevated, so
+       Elevated's write CREATES the Shadow-n variables for the row — and a
+       Standard that emits nothing leaves them holding whatever was last in
+       them. An unwritten Figma variable keeps its previous value.
+
+       So a flat mode writes the row's slots explicitly, zeroed and
+       transparent. "No shadow here" is a value; leaving the field blank is
+       not the same statement. */
+    const row = 'Button, Outlined Cards/Default';
+    expect(ce.Standard[`${row}/Shadow-1/y`]).toEqual({ value: 0, type: 'number' });
+    expect(ce.Standard[`${row}/Shadow-1/Drop-Color`]).toEqual({ value: '#00000000', type: 'color' });
+    // ...and the Elevated lift gives it a real one.
+    expect(ce.Elevated[`${row}/Shadow-1/Drop-Color`])
+      .toEqual({ value: '{Drop-Colors.Level-1.Drop-Color}', type: 'color' });
+  });
+
+  it('writes the SAME slot names in every mode', () => {
+    /* The bug, stated as a property rather than as one example row.
+
+       Slot counts come from DROP_COLOR_SLOTS, which grows with the level
+       (3 · 4 · 5 · 8 · 10), and ELEVATED_LIFT puts a row's two modes at
+       different levels — 8 of them today. Taking the count per mode made
+       Standard write fewer slots than Elevated, and the difference was never
+       written in either direction, so it kept its hand-authored value.
+
+       In the real file that showed up as FAB/Default Shadow-6..8 holding a
+       live Level-3/Drop-Color alias in Standard where the generator intends
+       #00000000 — invisible in Figma, because zero geometry paints nothing,
+       but it inflates any count of layers-with-visible-alpha, and the alpha
+       model is TOTAL[level] / N with N a layer count. */
+    const std = new Set(Object.keys(ce.Standard));
+    const elv = new Set(Object.keys(ce.Elevated));
+    expect([...elv].filter((k) => !std.has(k))).toEqual([]);
+    expect([...std].filter((k) => !elv.has(k))).toEqual([]);
+  });
+
+  it('would still notice if a mode stopped writing its tail', () => {
+    /* The set comparison above passes trivially if both modes emit nothing, so
+       pin that the rows in question actually have a tail to write. */
+    const differing = COMPONENT_ELEVATIONS.flatMap((c) =>
+      (c.hasHover ? ['Default', 'Hover'] : ['Default'] as const).map((st) => ({
+        row: `${c.group}/${st}`,
+        std: elevationFor(c, st as 'Default' | 'Hover', 'Standard'),
+        elv: elevationFor(c, st as 'Default' | 'Hover', 'Elevated'),
+      })),
+    ).filter((r) => r.std !== r.elv);
+    expect(differing.length).toBeGreaterThan(0);
+    for (const r of differing) {
+      const slots = componentElevationRowSlots(
+        COMPONENT_ELEVATIONS.find((c) => r.row.startsWith(c.group + '/'))!,
+        r.row.endsWith('/Hover') ? 'Hover' : 'Default',
+      );
+      expect(`${r.row}: ${slots > 0}`).toBe(`${r.row}: true`);
+      expect(ce.Standard[`${r.row}/Shadow-${slots}/Drop-Color`]).toBeDefined();
+      expect(ce.Elevated[`${r.row}/Shadow-${slots}/Drop-Color`]).toBeDefined();
+    }
   });
 
   it('emits no Level variable — the collection carries geometry only', () => {
@@ -167,10 +220,59 @@ describe('Component-Elevations — geometry written, colour aliased', () => {
 
   it('has as many slots as the levels it references', () => {
     /* Sum across both modes. Moves whenever the level ladder or the slot counts
-       move, so it is here to catch a silent change, not as a magic number. */
-    expect(componentElevationSlotCount()).toBe(93);
+       move, so it is here to catch a silent change, not as a magic number.
+
+       93 -> 106 when the row slot count stopped being per-mode: the 13 extra
+       are the slots a lower-level mode was skipping and therefore leaving at
+       whatever they already held. The number going UP is the fix — those slots
+       were always in the file, they just were not being written.
+
+       It went to 130 while Alert and Snackbar had rows of their own, and back
+       to 106 when they were given the level-appropriate shared styles in Figma
+       instead. */
+    expect(componentElevationSlotCount()).toBe(106);
   });
 });
+
+describe('Alert, Snackbar and Speed Dial have no row of their own', () => {
+  /* All three resolve to a level; none of them owns one.
+   *
+   * Speed Dial delegates — it is built from Fab. Alert and Snackbar share:
+   * their Figma styles bind `Handle, Accordion/Default` and `FAB/Default`.
+   * The convention is that a ROW is named for its primary component and a
+   * STYLE lists every consumer, which is why the file has `Handle, Accordion`
+   * the row against `Accordion, Handle, Alert, Bottom-Sheet` the style.
+   *
+   * Asserted because the alternative was tried: all three briefly had rows,
+   * which would have emitted 60 variables nothing reads. */
+  const has = (re: RegExp) => COMPONENT_ELEVATIONS.some((c) => re.test(c.group));
+
+  it('gives none of them a row', () => {
+    expect({
+      alert: has(/alert/i), snackbar: has(/snack/i), speedDial: has(/speed ?dial/i),
+    }).toEqual({ alert: false, snackbar: false, speedDial: false });
+  });
+
+  it('keeps the rows they borrow at the levels they were given', () => {
+    /* Alert inherits level 1 through Handle, Accordion; Snackbar inherits the
+       FAB's RESTING level 3, not its hover. Moving either row moves the
+       borrower with it, which is the price of sharing and the reason these
+       two assertions are here rather than only in the styles. */
+    const at = (g: string) => elevationFor(
+      COMPONENT_ELEVATIONS.find((c) => c.group === g)!, 'Default', 'Standard');
+    expect(at('Handle, Accordion')).toBe(1);
+    expect(at('FAB')).toBe(3);
+    expect(at('Dialog, Modal')).toBe(5);
+  });
+
+  it('leaves Dialog and Modal alone at the top', () => {
+    const atTop = COMPONENT_ELEVATIONS
+      .filter((c) => elevationFor(c, 'Default', 'Standard') === 5)
+      .map((c) => c.group);
+    expect(atTop).toEqual(['Dialog, Modal']);
+  });
+});
+
 
 describe('Component-Elevations — geometry matches the ladder and the CSS', () => {
   /* Invariant 5: the Figma payload and the CSS export are separate

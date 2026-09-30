@@ -13,6 +13,7 @@ import chroma from 'chroma-js';
 import { BUTTON_MODE_METRICS, buttonModeMetrics, derivedTextMetrics, ICON_RAMP } from '../utils/buttonSizing';
 import { componentStyleVars } from '../utils/componentStyleVars';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
+import { DEVICE_OWNED_METRICS, NOT_IN_FIGMA } from '../utils/componentSize';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
 import { generateFigmaJSON } from '../utils/generateFigmaJSON';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
@@ -64,10 +65,16 @@ function pxOf(css: string, name: string): number | null {
 describe('mode-scoped button metrics', () => {
   const json = buildSystem();
   const css = (generateCSSFiles(json as never) as Record<string, string>)['base.css'] ?? '';
+  /* Reads Component-Size, not the deleted `Components`. The two carried the
+     same numbers; the difference is that this one names a collection the
+     library file actually has, and expresses SIZE as the medium/small/large
+     MODE rather than as an `Sm-`/`Lg-` name prefix. */
   const figma = generateFigmaJSON(json) as unknown as
-    { Components?: { Button?: Record<string, number> } };
+    { 'Component-Size'?: Record<string, Record<string, number>> };
   const preview = componentStyleVars('modern', HEIGHTS as never);
-  const btn = figma.Components?.Button ?? {};
+  const cs = figma['Component-Size'] ?? {};
+  const at = (mode: 'medium' | 'small' | 'large', name: string) =>
+    (cs[mode] ?? {})[`Button/${name}`];
 
   it('every metric ships all three modes to the CSS export', () => {
     for (const name of NAMES) {
@@ -87,13 +94,44 @@ describe('mode-scoped button metrics', () => {
     }
   });
 
-  it('the Figma payload carries the same numbers', () => {
-    for (const name of NAMES) {
+  it('the Figma payload carries the same numbers, one per mode', () => {
+    /* Minus the device-owned pair. Button-Height and Button-Icon differ per
+       PLATFORM — Apple's 44 and Google's 48 are specs no brand ratio produces —
+       so they are written into Devices-Type, one column per device, and
+       withoutDeviceOwned keeps them out of Component-Size. Two collections
+       holding the same name is how a button ends up 2px short with nothing to
+       explain it; the next assertion checks they landed in the other one. */
+    /* Minus two sets. DEVICE_OWNED_METRICS go to Devices-Type instead (see the
+       next test); NOT_IN_FIGMA go nowhere, because the file has no variable for
+       them — Button-Text's size is covered by Dynamic-Button-Font-Size. */
+    const skip = new Set<string>([...DEVICE_OWNED_METRICS, ...NOT_IN_FIGMA]);
+    for (const name of NAMES.filter((n) => !skip.has(n))) {
       const m = METRICS[name];
-      expect(btn[name], name).toBe(m.medium);
-      expect(btn[`Sm-${name}`], `Sm-${name}`).toBe(m.small);
-      expect(btn[`Lg-${name}`], `Lg-${name}`).toBe(m.large);
+      expect(at('medium', name), `medium ${name}`).toBe(m.medium);
+      expect(at('small', name), `small ${name}`).toBe(m.small);
+      expect(at('large', name), `large ${name}`).toBe(m.large);
     }
+  });
+
+  it('keeps the device-owned pair OUT of Component-Size', () => {
+    /* Asserted as an absence, because the failure it guards is a duplicate
+       rather than a gap: the same name in two collections, resolving to
+       different numbers depending on which one a layer happened to bind. */
+    for (const name of DEVICE_OWNED_METRICS)
+      for (const mode of ['medium', 'small', 'large'] as const)
+        expect(at(mode, name), `${mode} ${name}`).toBeUndefined();
+  });
+
+  it('carries no Sm-/Lg- prefixed name — the prefix IS the mode', () => {
+    /* The prefix leaking through would give the collection two spellings of one
+       variable: `Button/Lg-Button-Text` in the medium mode beside
+       `Button/Button-Text` in the large one. Figma would take both, and the
+       second would be a variable nothing binds. */
+    const leaked: string[] = [];
+    for (const mode of ['medium', 'small', 'large'] as const)
+      for (const key of Object.keys(cs[mode] ?? {}))
+        if (/\/(Sm|Lg)-/.test(key)) leaked.push(`${mode} ${key}`);
+    expect(leaked).toEqual([]);
   });
 
   // The derivation is the point: it must reproduce the design's own table at

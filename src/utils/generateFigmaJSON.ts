@@ -10,11 +10,16 @@
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
 import { componentSizePayload, desktopButtonMetrics } from './componentSize';
+import { inputMetrics, floatingLabelLeading, FLOATING_LABEL_SIZES } from './inputMetrics';
+import { overlayOffsets, type DeviceMode } from './deviceChrome';
+import { SYSTEM_FAMILY_OF, systemLineHeight } from './systemTypography';
 import { platformButtonMetrics } from './platformMetrics';
+import { FAB_SIZE } from './componentSize';
 import { THEME_MODES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
-  platformBevelJSON,
+  PLATFORM_BUTTON_HEIGHT,
+  bevelPairs,
 } from './bevelGeometry';
 import {
   dropshadowBaseHex, dropshadowAlphas, shadowLayers, shadowOptionsFromStyle,
@@ -1517,11 +1522,27 @@ export function generateFigmaJSON(
 
   // ── SurfacesContainers section ──
   // Links to Themes.Default for surface variables, Modes for container backgrounds
+  /* All FIVE surface levels. Brightest was missing here long after the level
+     itself shipped — SURFACE_GROUPS_INTERNAL listed it, Themes emitted it, and
+     this map did not, so the Surface collection got four modes written and the
+     fifth got nothing.
+   *
+   * Nothing reported it, for the usual reason: the MODE still exists in the
+   * file, so a designer can select Surface-Brightest and every variable in it
+   * simply keeps whatever it last held. On a themed surface that reads as the
+   * BRIGHT colour rather than as an error — Error/Surface-Brightest painted
+   * #ef5854 (Color-6) instead of Color-11's #fff3ef.
+   *
+   * Derived from the Themes shape rather than listed would be better still,
+   * but the keys here are Figma MODE names and the ones on the right are Theme
+   * GROUP names; they agree today and a map keeps the two nameable separately
+   * if they ever stop. */
   const surfaceToGroup: Record<string, string> = {
     'Surface': 'Surface',
     'Surface-Dim': 'Surface-Dim',
     'Surface-Dimmest': 'Surface-Dimmest',
     'Surface-Bright': 'Surface-Bright',
+    'Surface-Brightest': 'Surface-Brightest',
   };
 
   const containerToGroup = 'Containers';
@@ -1992,10 +2013,24 @@ export function generateFigmaJSON(
       // ── The four faces ──
       Body: typo['Set-Font-Family-Body']?.value || '',
       Header: typo['Set-Font-Family-Header']?.value || '',
+      /* DISPLAY is the name. The studio still STORES the user's pick under the
+         `decorative` role — that is the picker's name, not the face's — so the
+         fallback reads the old key while the variable written is the honest
+         one.
+
+         `Decorative` itself was emitted alongside it so an older template kept
+         resolving, and that is dropped here. Same rule Overline follows, and
+         the reasoning is stated there: the lib's CSS keeps emitting the old
+         name forever because a published stylesheet is frozen and cannot be
+         regenerated — a FIGMA file is not. Carrying both in Figma leaves two
+         bindable variables where only one is canonical, with nothing keeping
+         them in step.
+
+         Verified unbound in Omni Designs before removal (2026-09-25). The CSS
+         side is untouched: --Set-Font-Family-Decorative and its siblings still
+         ship, for the frozen-stylesheet reason above. */
       Display: typo['Set-Font-Family-Display']?.value || typo['Set-Font-Family-Decorative']?.value || '',
       Eyebrow: typo['Set-Font-Family-Eyebrow']?.value || '',
-      // Kept so an older template that still has a Decorative variable resolves.
-      Decorative: typo['Set-Font-Family-Decorative']?.value || '',
 
       // ── Body / Subtitle ──
       'Body-Font-Weight': parseInt(typo['Set-Body-Font-Weight']?.value || '400'),
@@ -2049,13 +2084,15 @@ export function generateFigmaJSON(
       // onto the text style itself. These flags are the only way it knows what
       // to write.
       //
-      // Display-Caps and Decorative-Caps are the same value under two names:
-      // the studio stores the picked DISPLAY font under the `decorative` role.
-      // Emitting both means the plugin can read the honest name while older
-      // payloads still resolve — and it stops Display styles inheriting the
-      // HEADER's case, which is what they did when no Display flag existed.
+      /* Display-Caps reads the `Set-Decorative-Caps` KEY because that is where
+         the studio stores it — the picker is called Decorative, the face is
+         called Display. The key is an input, not a published name.
+
+         `Decorative-Caps` was emitted beside it under the old name and is
+         dropped with the family above. The FLAG is still load-bearing and
+         stays: without a Display flag, Display styles inherited the HEADER's
+         case. It is only the duplicate spelling that goes. */
       'Header-Caps': typo['Set-Header-Caps']?.value === 'uppercase',
-      'Decorative-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
       'Display-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
     };
 
@@ -2147,7 +2184,50 @@ const BUTTON_BORDER_WIDTH = 1;
      * recomputed, so they cannot disagree.
      */
     const buttonFigmaMetrics = buttonModeMetricFigma(cs);
-    figma['Component-Size'] = componentSizePayload(r as never, buttonFigmaMetrics);
+
+    /* Button values that are not radii and not device-owned, moved here from
+       the deleted `figma.Components` block (see the note further up). They ride
+       in through buttonMetrics because componentSizePayload spreads that bag
+       straight into the Button group — `withoutDeviceOwned` removes only
+       Button-Height and Button-Icon, which belong to Devices-Type. */
+    const buttonExtras: Record<string, number> = {
+      /* Square swatches, 6px inside the button height, leaving a 3px gap on
+         every side — a touch tighter than the icon tokens, matching the Select
+         swatch spec. Measured off the OUTER height: subtracting the border too
+         would size them against an inner box the component no longer has. */
+      'Button-Swatch': cs.buttonHeight - 6,
+      'Sm-Button-Swatch': cs.smallButtonHeight - 6,
+      'Lg-Button-Swatch': cs.largeButtonHeight - 6,
+      'Button-Min-Width': csRaw.minButtonWidth ?? 60,
+      // Large's text floor is the standard floor + 40, derived rather than a
+      // second number to keep in step.
+      'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
+      'Button-Border-Width': BUTTON_BORDER_WIDTH,
+      /* TWO paddings: small and standard share one, large has its own. Sm- is
+         deliberately absent — it equals Button-Padding, so nothing selects
+         between the copies (invariant 2). Lg- is a different number and
+         something does. */
+      'Button-Padding': FIGMA_BUTTON_PADDING,
+      'Lg-Button-Padding': FIGMA_LG_BUTTON_PADDING,
+      /* NO bevel geometry here, deliberately.
+       *
+       * The deleted `Components` block spread bevelJSON('Sm-'/'Lg-') into its
+       * Button group, and carrying that over looked like part of the move. It
+       * is not: Component-Size's eight Button-Highlight-* / Button-Lowlight-*
+       * variables are ALIASES into Devices-Type, and writing a literal into an
+       * aliased variable DETACHES it. The bevel would stop following the
+       * device and freeze at whatever Desktop last computed — silently, since
+       * a detached variable still holds a plausible number.
+       *
+       * The literals belong in Devices-Type, where they are written per device
+       * further down as `Button-Bevel` / `-Bevel-Negative`. */
+    };
+    const inputExtras: Record<string, number> = {
+      'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
+    };
+
+    figma['Component-Size'] = componentSizePayload(
+      r as never, { ...buttonFigmaMetrics, ...buttonExtras }, inputExtras);
 
     /* Every column of the Devices-Type button variables that
        Component-Size/Button/Button-Height and -Icon alias into.
@@ -2179,145 +2259,161 @@ const BUTTON_BORDER_WIDTH = 1;
           Object.fromEntries(Object.entries(metrics)
             .map(([n, v]) => [n, { value: v, type: 'number' }])));
 
-        /* Bevel geometry, all three sizes, for THIS device's platform.
+        /* The eight-name form is no longer written here.
          *
-         * Devices-Type rather than the Platform collection: Platform is being
-         * retired, and the seven device modes are where the file now keeps
-         * anything that varies by hardware. SEEDS_FROM is the same map the
-         * typography payload uses to decide which platform block a device
-         * reads, so the bevel cannot disagree with the type about which
-         * platform a device is.
+         * It used to emit Button-Highlight-Offset-x / -y / -Blur-Radius /
+         * -Spread and the four Lowlight names, per size — 24 variables per
+         * device — and its own comment already said the quiet part: "Eight
+         * names per size, but only TWO distinct numbers: four slots take +B
+         * and four take -B."
          *
-         * Eight names per size, but only TWO distinct numbers: four slots take
-         * +B and four take -B. Figma cannot negate a variable, which is why the
-         * negative is written rather than derived. */
-        const bevel = platformBevelJSON(
-          SEEDS_FROM[device] as never, bevelHeights, bevelPct,
-        );
+         * The file now stores those two. Component-Size's sixteen
+         * Button-/FAB-Highlight-* and -Lowlight-* variables ALIAS into
+         * Devices-Type's `Button-Bevel` / `Button-Bevel-Negative` pairs, with
+         * the size mode choosing between the plain, Sm- and Lg- columns. So
+         * the 24 names here are read by nothing, and writing them kept a dead
+         * set of variables looking maintained.
+         *
+         * The CSS keeps the eight-name form, and should: the library reads
+         * --Button-Highlight-Offset-x and friends directly, and a stylesheet
+         * can negate with calc() where a Figma variable cannot. Two shapes for
+         * one value, because the two consumers genuinely differ — which is the
+         * case invariant 5 allows, as long as both come from bevelSize(). */
+
+        /* Input geometry — the in-field button's two radii, and the floating
+         * field's height and two radii. Five names per size, fifteen per
+         * device.
+         *
+         * Written for ALL SEVEN devices, unlike the button heights just above.
+         * Those hand-author the platform columns because Apple's 44 and
+         * Google's 48 are specs no brand ratio reproduces. These are the
+         * brand's own percentage applied to a height the platform supplies, so
+         * every column is derivable and none has to be typed.
+         *
+         * The field heights are this device's: the user's three on Desktop, the
+         * platform's elsewhere. Read from the SAME source the button metrics
+         * above use rather than restated — a second table of platform heights
+         * is how a button's bevel once came out of proportion with the button.
+         *
+         * The label leading is per device too, and it is COMPUTED off-Desktop
+         * for the same reason type leading is: the platforms publish their own
+         * tables and a floating field has to leave room for whichever applies.
+         */
+        const platformHeights = device === 'Desktop'
+          ? undefined
+          : PLATFORM_BUTTON_HEIGHT[SEEDS_FROM[device] as keyof typeof PLATFORM_BUTTON_HEIGHT];
+        const fieldHeights = platformHeights
+          ? { small: platformHeights.small, medium: platformHeights.medium, large: platformHeights.large }
+          : { small: cs.smallButtonHeight, medium: cs.buttonHeight, large: cs.largeButtonHeight };
+        const platformFam = SYSTEM_FAMILY_OF[device];
+        const labelLeading = {
+          small: floatingLabelLeading(platformFam, FLOATING_LABEL_SIZES.small, systemLineHeight),
+          medium: floatingLabelLeading(platformFam, FLOATING_LABEL_SIZES.medium, systemLineHeight),
+          large: floatingLabelLeading(platformFam, FLOATING_LABEL_SIZES.large, systemLineHeight),
+        };
         Object.assign(devicesBag[device],
-          Object.fromEntries(Object.entries(bevel)
+          Object.fromEntries(Object.entries(inputMetrics({
+            heights: fieldHeights,
+            inputRadiusPct: cs.inputRadius,
+            labelLeading,
+          })).map(([n, v]) => [n, { value: v, type: 'number' }])));
+
+        /* Platform Spacer — the room a small button's enlarged tap target needs
+         * around it so it does not overlap whatever sits next to it.
+         *
+         * A LAYOUT value, and Figma is who needs it. The library does not read
+         * it: Button.js grows a centred ::before to `var(--Target)` on small
+         * buttons and names the spacer only in that block's comment. On a web
+         * page the neighbour's own margin usually handles the rest. In Figma,
+         * a frame that packs small buttons together — Button Group, a toolbar,
+         * a rail — has to be told the gap explicitly, because nothing there
+         * computes it.
+         *
+         * The name is the FILE's: `Platform Spacer`, one word apart, no hyphen.
+         * The retired Platform collection wrote `Platform-Spacer` into a
+         * different collection entirely, so the two never met and Devices-Type
+         * has been hand-authored all along — which is how its Desktop column
+         * came to hold 8 where PLATFORM_SPACER says 4. Writing it here is what
+         * ends that.
+         *
+         * Desktop's 4 is deliberate, not a rounding of the others: its target
+         * already equals the button height, so the 4px is breathing room rather
+         * than the space a bigger target demands. See bevelGeometry.ts. */
+        devicesBag[device]['Platform Spacer'] = {
+          value: PLATFORM_SPACER[SEEDS_FROM[device] as keyof typeof PLATFORM_SPACER],
+          type: 'number',
+        };
+
+        /* The bevel, per size, as one number and its negative.
+         *
+         * A bevel is a fraction of the button's height, and the height is per
+         * platform — Desktop takes the user's three, iOS 32/44/50, Android
+         * 32/48/56 — so one brand percentage produces three different bevels.
+         * That is the whole reason these live here rather than once globally.
+         *
+         * Two numbers per size, not eight: bevelGeometry's eight values are all
+         * `b` or `-b`, and Component-Size's eight variables alias into these.
+         * See bevelPairs in bevelGeometry.ts.
+         *
+         * The FAB's three are the same on every device, because FAB sizing is
+         * not per platform — Devices-Type has no FAB width or height, only
+         * these bevels. Written to every column anyway, because the alias has
+         * to resolve in every mode, and because the day Apple's and Google's
+         * FAB sizes are stated the way their button heights already are, the
+         * columns are already there to differ. */
+        const bevelPlatform = SEEDS_FROM[device] as Parameters<typeof platformButtonHeight>[0];
+        const sizedBevel = (size: 'small' | 'medium' | 'large') =>
+          platformButtonHeight(bevelPlatform, bevelHeights[size], size);
+        Object.assign(devicesBag[device], Object.fromEntries(
+          Object.entries({
+            ...bevelPairs('Button-', sizedBevel('medium'), bevelPct),
+            ...bevelPairs('Sm-Button-', sizedBevel('small'), bevelPct),
+            ...bevelPairs('Lg-Button-', sizedBevel('large'), bevelPct),
+            ...bevelPairs('FAB-', FAB_SIZE.medium, bevelPct),
+            ...bevelPairs('FAB-Sm-', FAB_SIZE.small, bevelPct),
+            ...bevelPairs('FAB-Lg-', FAB_SIZE.large, bevelPct),
+          }).map(([n, v]) => [n, { value: v, type: 'number' }])));
+
+        /* Overlay offsets — where a floating element sits relative to the
+           screen edge. `chrome + clearance`, and Figma cannot add two
+           variables, so the sum ships as one number per device. See
+           deviceChrome.ts for why the two halves stay separate in code. */
+        Object.assign(devicesBag[device],
+          Object.fromEntries(Object.entries(overlayOffsets(device as DeviceMode))
             .map(([n, v]) => [n, { value: v, type: 'number' }])));
       }
     }
 
-    figma.Components = {
-      Button: {
-        // Mode-scoped metrics (medium / Sm- / Lg-). See buttonSizing.ts.
-        ...buttonModeMetricFigma(cs),
-        'Button-Radius': r.buttonRadius,
-        'Sm-Button-Radius': r.smButtonRadius,
-        'Lg-Button-Radius': r.lgButtonRadius,
-        'Button-Inner-Radius': r.buttonInnerRadius,
-        'Sm-Button-Inner-Radius': r.smButtonInnerRadius,
-        'Lg-Button-Inner-Radius': r.lgButtonInnerRadius,
-        'Button-Focus-Radius': r.buttonFocusRadius,
-        'Sm-Button-Focus-Radius': r.smButtonFocusRadius,
-        'Lg-Button-Focus-Radius': r.lgButtonFocusRadius,
-        'Button-Icon-Radius': r.iconButtonRadius,
-        'Sm-Button-Icon-Radius': r.smIconButtonRadius,
-        'Lg-Button-Icon-Radius': r.lgIconButtonRadius,
-        'Button-Icon-Inner-Radius': r.iconButtonInnerRadius,
-        'Sm-Button-Icon-Inner-Radius': r.smIconButtonInnerRadius,
-        'Lg-Button-Icon-Inner-Radius': r.lgIconButtonInnerRadius,
-        'Button-Icon-Focus-Radius': r.iconButtonFocusRadius,
-        'Sm-Button-Icon-Focus-Radius': r.smIconButtonFocusRadius,
-        'Lg-Button-Icon-Focus-Radius': r.lgIconButtonFocusRadius,
-        // The OUTER height — the user's selected value, unmodified.
-        //
-        // These used to subtract Button-Border-Width twice, because the Figma
-        // component's height token drove the inner fill rect and the border sat
-        // outside it. That is no longer how the component is built, so the
-        // subtraction now makes every button 2px SHORT of the chosen height.
-        //
-        // It also fixes a name collision: Platform/Button-Height has always been
-        // the outer height (platformButtonHeight returns cs.buttonHeight
-        // unmodified), so the two variables shared a name and meant different
-        // things — 32 in one collection and 30 in the other. Binding a frame to
-        // the wrong one produced a 2px error with nothing to explain it.
-        // The three height lines that stood here are gone: buttonModeMetricFigma
-        // above now carries Button-Height / Sm- / Lg-, so they arrive with the
-        // spread and with heightsOf()'s defaults behind them. Restating them
-        // here overrode that spread with cs.* directly, which wrote `undefined`
-        // whenever a height was unset.
-        // Swatch tokens — square swatches inside each button size, 6px smaller
-        // than the button height so they leave a 3px gap on every side (a touch
-        // tighter than the icon tokens, matching the Select swatch spec).
-        //
-        // Measured from the same height as the tokens above, so the 3px gap is
-        // preserved. Left subtracting the border, these would be sized against
-        // an inner box that no longer exists.
-        'Button-Swatch': cs.buttonHeight - 6,
-        'Sm-Button-Swatch': cs.smallButtonHeight - 6,
-        'Lg-Button-Swatch': cs.largeButtonHeight - 6,
-        'Button-Min-Width': csRaw.minButtonWidth ?? 60,
-        // Large's text floor — the standard floor plus 40px. Derived, not a
-        // second number to keep in sync.
-        'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
-        'Button-Border-Width': BUTTON_BORDER_WIDTH,
-        // TWO paddings: small and standard share one, large has its own.
-        // Sm- is still not emitted — it equals Button-Padding, so it would be a
-        // duplicate with nothing selecting between the copies. Lg- IS emitted,
-        // because 16 is a different number and something does select it.
-        'Button-Padding': FIGMA_BUTTON_PADDING,
-        'Lg-Button-Padding': FIGMA_LG_BUTTON_PADDING,
-        // Bevel geometry, small and large. These heights don't vary by
-        // platform, so they live here; MEDIUM's live in the Platform
-        // collection because its height does.
-        //
-        // Built from bevelGeometry.ts, the same module the CSS export uses —
-        // identical numbers, px there and bare numbers here.
-        ...bevelJSON('Sm-', cs.smallButtonHeight, bevelPct),
-        ...bevelJSON('Lg-', cs.largeButtonHeight, bevelPct),
-      },
-      Accordion: {
-        /* Follows Button-Radius, capped at half the summary height. Figma has
-           carried a hand-made "Other/Accordian-Radius" (sic) — this is the
-           generated one, correctly spelled. */
-        'Accordion-Radius': r.accordionRadius,
-      },
-      Card: {
-        'Card-Radius': r.cardRadius,
-        /* Sized cards. Scaled off the resolved medium rather than re-running
-           the corner+padding formula, which the 24px cap collapses to one
-           value at every preset above Pro. */
-        'Sm-Card-Radius': r.smCardRadius,
-        'Lg-Card-Radius': r.lgCardRadius,
-        'Sm-Card-Inner-Border-Radius': r.smCardInnerRadius,
-        'Lg-Card-Inner-Border-Radius': r.lgCardInnerRadius,
-        'Card-Inner-Border-Radius': r.cardInnerRadius,
-        'Card-Focus-Border-Radius': r.cardFocusRadius,
-        'Card-Padding': r.cardPadding,
-      },
-      Modal: {
-        'Modal-Padding': r.modalPadding,
-        'Modal-Radius': r.modalRadius,
-        'Modal-Inner-Radius': r.modalInnerRadius,
-        'Modal-Focus-Radius': r.modalFocusRadius,
-      },
-      Input: {
-        'Input-Radius': r.inputRadius,
-        'Sm-Input-Radius': r.smInputRadius,
-        'Lg-Input-Radius': r.lgInputRadius,
-        'Input-Inner-Radius': r.inputInnerRadius,
-        'Input-Focus-Radius': r.inputFocusRadius,
-        // Inset focus-ring corner radius — Input-Radius minus 1px so the
-        // inset 3px focus indicator's corners visually match the chrome's
-        // outer corners. Used by ListItem, TextField, Select, etc.
-        'Input-Inner-Focus-Visible': Math.max(0, r.inputRadius - 1),
-        'Input-Swatch-Radius': r.inputSwatchRadius,
-        'Sm-Input-Swatch-Radius': r.smInputSwatchRadius,
-        'Lg-Input-Swatch-Radius': r.lgInputSwatchRadius,
-        'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
-      },
-      // Components/Other — the floating frame of a dropdown or menu panel.
-      // Not under Input: it follows Input-Radius but is bounded separately
-      // (by Card-Radius and a 16px ceiling), so filing it with the input
-      // radii would imply it tracks them all the way up. It does not.
-      Other: {
-        'Dropdown-Frame-Radius': r.dropdownFrameRadius,
-      },
-    };
-
+    /* `figma.Components` was here, and is deliberately gone (2026-09-29).
+     *
+     * It named a collection the file does not have. The plugin therefore
+     * CREATED one on every import — so it did not fail, it quietly produced a
+     * duplicate collection that had to be deleted by hand each time, holding a
+     * second copy of values `Component-Size` already carries correctly.
+     *
+     * It was the previous generation of that collection: the same concepts
+     * under older names (`Card-Focus-Border-Radius`, `Input-Inner-Radius`,
+     * `Button-Inner-Radius`), with SIZE flattened into `Sm-`/`Lg-` prefixes
+     * rather than expressed as the medium/small/large modes. The migration was
+     * already half done — see the note on Card-Focus-Radius in componentSize.ts
+     * saying the flat payload's name "would have matched nothing" — and this
+     * block was the remainder.
+     *
+     * Five names it alone carried moved into componentSizePayload:
+     * Button-Icon-Inner-Radius, Input-Swatch-Radius, and the Modal's Padding,
+     * Inner-Radius and Focus-Radius. A sixth, `Input-Inner-Focus-Visible`, did
+     * not: it computed Math.max(0, inputRadius - 1), which is the same number
+     * as Input-Inner-Focus-Radius, under a name that says a STATE where a
+     * radius belongs.
+     *
+     * NOTE those five need creating in Figma before they land.
+     * populateComponentSize is UPDATE-ONLY — it writes by name and skips a name
+     * the file does not have, in silence. Until the variables exist, those five
+     * are emitted and ignored rather than emitted and wrong.
+     *
+     * figmaCollectionNames.test.ts now fails on any payload key that is neither
+     * a known collection nor a declared non-collection, so the next one of
+     * these cannot be added without the choice being made on purpose. */
     // ── Platform collection ──────────────────────────────────────────────
     // The default (medium) button is the one that resizes per platform, so
     // its height AND its bevel geometry both live here rather than in
@@ -2328,17 +2424,41 @@ const BUTTON_BORDER_WIDTH = 1;
     // Target is the platform's minimum hit area. The SMALL button keeps its
     // visual size everywhere; a wrapper grows to Target using Platform-Spacer,
     // so the button looks identical while staying tappable.
-    figma.Platform = Object.fromEntries(
-      PLATFORMS.map((platform) => {
-        const height = platformButtonHeight(platform, cs.buttonHeight);
-        return [platform, {
-          'Button-Height': height,
-          'Target': PLATFORM_TARGET[platform],
-          'Platform-Spacer': PLATFORM_SPACER[platform],
-          ...bevelJSON('', height, bevelPct),
-        }];
-      })
-    );
+    /* No Platform section, removed 2026-09-29 with the collection itself.
+     *
+     * Platform held four modes — Desktop, IOS-Mobile, IOS-Tablet, Android —
+     * where Devices-Type holds seven. It was the older, coarser way of saying
+     * the same thing, and the file has finished moving: the collection is gone,
+     * so everything written here was landing in one created fresh on each
+     * import, exactly as `Components` and `Cognitive` were.
+     *
+     * Of the four values it carried, three already have a home:
+     *
+     *   Button-Height    Devices-Type `Medium Button` and its Sm-/Lg- siblings
+     *   Platform-Spacer  Devices-Type `Platform Spacer` (a space, not a hyphen)
+     *   the medium bevel superseded by the Button-Bevel / -Bevel-Negative pairs
+     *
+     * `Target` is WEB-ONLY, decided 2026-09-29, and that is a decision rather
+     * than a gap left open. It is the platform's minimum hit area — 44 on
+     * Apple, 48 on Google — and the library reads it directly: Button.js grows
+     * a centred ::before to `var(--Target)` on small buttons, so the control
+     * keeps its size while the tappable area meets the platform minimum. That
+     * is a runtime behaviour with nothing for a designer to place, so Figma
+     * gains nothing from holding the number.
+     *
+     * What Figma DOES need from the same mechanism is `Platform Spacer` — the
+     * room that enlarged target requires around it — because a frame packing
+     * small buttons together has to be told the gap explicitly. That one is
+     * written, per device, further down.
+     *
+     * Min-Stack-Gap and Container-Padding are web-only for the same reason:
+     * both ship in foundation.css per platform block, and neither describes
+     * anything a Figma layer is bound to. Container-Padding was only ever an
+     * alias into Sizing, which the file already has.
+     *
+     * The rule these three follow, and the one that settled Input-Swatch-Radius
+     * before them: a value missing from Figma is a GAP only if Figma draws the
+     * thing it measures. Otherwise it is a token, and tokens live in the CSS. */
   }
 
   // Flatten Buttons and Default-Button, and rewrite what points at them.
@@ -2538,30 +2658,100 @@ const BUTTON_BORDER_WIDTH = 1;
   const bwBevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
   const bwBevelAlphaHex = Math.round(bwBevelOpacity * 255 / 100).toString(16).padStart(2, '0');
 
-  const BW_LOWLIGHT_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.Lowlight\}$/;
+  const BW_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.(\w+)\}$/;
   const BW_BLACK_FROM_TONE = 6;   // Color-1..5 paint white, 6..12 paint black
-  let bwLowlightResolved = 0, bwLowlightBlack = 0;
-  const resolveBlackWhiteLowlight = (n: any, d: number) => {
+
+  /* Every BlackWhite role, repointed at something the FILE actually has.
+   *
+   * The Theme layer asks for `{Buttons.BlackWhite.Color-<n>.<Role>}` — 96
+   * variables per mode that Modes has never carried, because it is at its
+   * ceiling. An alias whose target is absent does not fail: the binding is
+   * simply missing, so seven of the eight roles rendered unbound and only
+   * Lowlight worked, because an earlier pass fixed that one alone.
+   *
+   * Literals cannot solve the rest. The Themes collection's modes are the nine
+   * THEMES, not light/dark, so a literal there cannot vary by mode — and these
+   * values do: black is #040404 light and #0b0b0b dark, white carries a 70%
+   * alpha in dark (#ffffffb3). Freezing them would pin every black button to
+   * its light-mode appearance.
+   *
+   * What makes this solvable is that the TWELVE tones hold only TWO value sets.
+   * The tone picks a face and nothing selects within a face — verified across
+   * both modes — so each role needs one target per face, and every one of them
+   * already exists:
+   *
+   *   Button / Border   the face itself          Colors.White / Neutral.Color-1
+   *   Text              the other face           the same two, swapped
+   *   Quiet             a muted neutral          Neutral.Color-5 / Color-6
+   *   Hover / Pressed   Button-Hover|Pressed.BlackWhite, tone preserved
+   *   Highlight         white is mode-invariant, so a literal is safe there;
+   *   Lowlight          black moves, so it takes the variable
+   *
+   * Colors.White and Colors.Neutral.Color-1 carry the dark-mode alpha and the
+   * #0b0b0b themselves, so light/dark comes for free rather than being restated.
+   *
+   * The two bevel literals are the only frozen values, and they are frozen on
+   * purpose: white's Highlight and Lowlight are identical in both modes because
+   * white does not move — the 70% lives in the fill's own alpha, not in the
+   * bevel. Their alpha is derived from bevelOpacity rather than written as 80,
+   * because a hardcoded alpha matches at the default 50% and splits silently the
+   * moment that slider moves.
+   *
+   * Retires the old black-Lowlight literal (#000000 at the bevel alpha), which
+   * was correct as far as it went but froze the black bevel to light mode.
+   * Button-Lowlight.BlackWhite carries #04040480 -> #0b0b0b80, so the split
+   * comes back.
+   *
+   * The Highlight and Lowlight sections hold ONE variable per palette in the
+   * file — which is why Color-12 is named rather than the tone from the
+   * reference. Hover and Pressed hold twelve, so those keep their tone.
+   */
+  const BW_FACE_TARGET: Record<string, { white: string; black: string }> = {
+    Button:    { white: '{Colors.White}', black: '{Colors.Neutral.Color-1}' },
+    Border:    { white: '{Colors.White}', black: '{Colors.Neutral.Color-1}' },
+    Text:      { white: '{Colors.Neutral.Color-1}', black: '{Colors.White}' },
+    Quiet:     { white: '{Colors.Neutral.Color-5}', black: '{Colors.Neutral.Color-6}' },
+    Highlight: { white: `#ffffff${bwBevelAlphaHex}`, black: '{Button-Highlight.BlackWhite.Color-12}' },
+    Lowlight:  { white: `#b3b3b3${bwBevelAlphaHex}`, black: '{Button-Lowlight.BlackWhite.Color-12}' },
+  };
+  /* These two keep the tone from the reference — their sections carry all
+     twelve, so there is nothing to collapse. */
+  const BW_TONED_SECTION: Record<string, string> = {
+    Hover: 'Button-Hover', Pressed: 'Button-Pressed',
+  };
+
+  let bwRewritten = 0, bwUnmapped = 0;
+  const rewriteBlackWhite = (n: any, d: number) => {
     if (!n || typeof n !== 'object' || d > 12) return;
     if (typeof n.value === 'string') {
-      const m = n.value.match(BW_LOWLIGHT_REF);
+      const m = n.value.match(BW_REF);
       if (m) {
         const tone = Number(m[1]);
-        if (tone >= BW_BLACK_FROM_TONE) { n.value = `#000000${bwBevelAlphaHex}`; bwLowlightBlack++; }
-        else n.value = '{Button-Lowlight.Neutral.Color-12}';
-        bwLowlightResolved++;
+        const role = m[2];
+        const black = tone >= BW_BLACK_FROM_TONE;
+        const toned = BW_TONED_SECTION[role];
+        if (toned) { n.value = `{${toned}.BlackWhite.Color-${tone}}`; bwRewritten++; }
+        else if (BW_FACE_TARGET[role]) {
+          n.value = black ? BW_FACE_TARGET[role].black : BW_FACE_TARGET[role].white;
+          bwRewritten++;
+        } else bwUnmapped++;   // a role nobody has taught this about
       }
       return;
     }
-    for (const [k, v] of Object.entries(n)) if (k !== 'type') resolveBlackWhiteLowlight(v, d + 1);
+    for (const [k, v] of Object.entries(n)) if (k !== 'type') rewriteBlackWhite(v, d + 1);
   };
-  resolveBlackWhiteLowlight(figma.Themes, 0);
-  resolveBlackWhiteLowlight(figma.SurfacesContainers, 0);
+  rewriteBlackWhite(figma.Themes, 0);
+  rewriteBlackWhite(figma.SurfacesContainers, 0);
   console.log(
-    `\u26AB [Figma] BlackWhite Lowlight resolved without a Modes variable: ` +
-    `${bwLowlightResolved} (${bwLowlightBlack} black -> #000000, ` +
-    `${bwLowlightResolved - bwLowlightBlack} white -> Neutral Color-12)`,
+    `\u26AB [Figma] BlackWhite button roles repointed at variables the file has: ` +
+    `${bwRewritten} rewritten, ${bwUnmapped} unmapped`,
   );
+  if (bwUnmapped > 0) {
+    console.warn(
+      `\u26A0\uFE0F [Figma] ${bwUnmapped} BlackWhite reference(s) name a role with no ` +
+      `mapping — they will import as unbound. Add the role to BW_FACE_TARGET.`,
+    );
+  }
 
   // ── Outline-Text and Outline-Quiet are NOT per-theme tokens in Figma ────
   //

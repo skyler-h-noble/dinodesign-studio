@@ -417,3 +417,158 @@ describe('Radio and Checkbox sizing reaches the stylesheet', () => {
   });
 
 });
+
+/* The dropdown panel, its rows and their ring — CSS and Figma, one derivation.
+ *
+ * Three values that each exist in four places: componentRadii computes them,
+ * exportToCSS and buildPreviewCSS emit them, and the Component-Size payload
+ * ships them to Figma. That is exactly the shape invariant 5 is about, and the
+ * menu radii arrived with a head start on drifting: Menu-Item-Radius and
+ * Menu-Focus-Radius were hand-typed in the file for months while nothing
+ * generated either, so 4 and 3 were true only for the brand they were typed
+ * against.
+ *
+ * The assertions are on the RELATIONSHIP, not on a table of numbers. The
+ * numbers belong to the frame, which belongs to the brand; the only things
+ * this derivation owns are the 8px padding and the 1px ring inset, so those
+ * are what a test can hold.
+ */
+describe('the menu radii agree across CSS and Figma', () => {
+  const built = () => {
+    const sel = { background: 'primary', button: 'primary',
+      cardColoring: 'tonal', textColoring: 'tonal' } as never;
+    const { json } = buildAll(SCHEME, sel, 'light') as never as { json: never };
+    const j = JSON.parse(JSON.stringify(json));
+    j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100,
+      cardPadding: 24, bevelOpacity: 50, shadowResolution: 3 };
+    return {
+      css: Object.values(generateCSSFiles(j) as never as Record<string, string>).join('\n'),
+      figma: figmaGen(j) as unknown as Record<string, Record<string, Record<string, number>>>,
+    };
+  };
+
+  const px = (out: string, name: string) => {
+    const line = out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
+    return line === undefined ? undefined : Number(line.match(/([\d.]+)px/)?.[1]);
+  };
+
+  it('emits all three to the stylesheet', () => {
+    const { css } = built();
+    for (const n of ['--Dropdown-Frame-Radius', '--Menu-Item-Radius', '--Menu-Focus-Radius']) {
+      expect(`${n} present: ${px(css, n) !== undefined}`).toBe(`${n} present: true`);
+    }
+  });
+
+  it('keeps the row SQUARE regardless of the frame', () => {
+    /* Full-bleed rows: the panel's own clip rounds the first and last, so a
+       radius on the row draws a second curve inside the first. This used to
+       derive `frame - 8`, which returned 0 for a square brand and would have
+       started returning a corner for a rounder one — the fixture below is a
+       100% input radius precisely so the frame is at its 16px ceiling and the
+       row still has to be 0. */
+    const { css } = built();
+    expect(px(css, '--Dropdown-Frame-Radius')).toBeGreaterThan(0);
+    expect(px(css, '--Menu-Item-Radius')).toBe(0);
+    expect(px(css, '--Menu-Focus-Radius')).toBe(0);
+  });
+
+  it('ships the same three numbers to Figma, under the Menu group', () => {
+    /* The group is half the assertion. populateComponentSize is UPDATE-ONLY
+       and matches on the full `Group/Name`, so moving the variable in Figma
+       without moving it here leaves the writer matching nothing — no error,
+       and the value silently stops tracking the brand. */
+    const { css, figma } = built();
+    const medium = figma['Component-Size'].medium;
+    expect(medium['Menu/Dropdown-Frame-Radius']).toBe(px(css, '--Dropdown-Frame-Radius'));
+    expect(medium['Menu/Menu-Item-Radius']).toBe(px(css, '--Menu-Item-Radius'));
+    expect(medium['Menu/Menu-Focus-Radius']).toBe(px(css, '--Menu-Focus-Radius'));
+  });
+
+  it('and no longer writes the frame to Other', () => {
+    const { figma } = built();
+    expect(figma['Component-Size'].medium['Other/Dropdown-Frame-Radius']).toBeUndefined();
+  });
+
+  it('carries all three at every size mode', () => {
+    /* A name present in one mode and absent in another resolves to nothing at
+       that size — which is why componentSizeGroup repeats medium deliberately
+       rather than leaving the other two empty. */
+    const { figma } = built();
+    for (const mode of ['small', 'medium', 'large'] as const) {
+      for (const n of ['Menu/Dropdown-Frame-Radius', 'Menu/Menu-Item-Radius', 'Menu/Menu-Focus-Radius']) {
+        expect(`${mode} ${n}: ${typeof figma['Component-Size'][mode][n]}`)
+          .toBe(`${mode} ${n}: number`);
+      }
+    }
+  });
+});
+
+/* Card padding is three values now, not medium echoed three times.
+ *
+ * It had no Sm-/Lg- siblings, so componentSizeGroup repeated the medium into
+ * all three modes — the documented behaviour for a metric with no siblings,
+ * and harmless while only the CORNER changed with the size. It stops being
+ * harmless once the type inside a card follows the size mode: a small card
+ * would have held 14px type inside a medium card's 24px of padding, which
+ * reads as a layout bug rather than as a density choice.
+ *
+ * No new variable in Figma — the prefix is stripped and the size becomes the
+ * MODE, so this fills two columns of Card/Card-Padding that were echoing the
+ * middle one.
+ */
+describe('card padding scales with the size mode', () => {
+  const built = () => {
+    const sel = { background: 'primary', button: 'primary',
+      cardColoring: 'tonal', textColoring: 'tonal' } as never;
+    const { json } = buildAll(SCHEME, sel, 'light') as never as { json: never };
+    const j = JSON.parse(JSON.stringify(json));
+    j._componentStyle = { buttonRadius: 100, iconButtonRadius: 100, inputRadius: 100,
+      cardPadding: 24, bevelOpacity: 50, shadowResolution: 3 };
+    return {
+      css: Object.values(generateCSSFiles(j) as never as Record<string, string>).join('\n'),
+      figma: figmaGen(j) as unknown as Record<string, Record<string, Record<string, number>>>,
+    };
+  };
+
+  const px = (out: string, name: string) => {
+    const line = out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
+    return line === undefined ? undefined : Number(line.match(/([\d.]+)px/)?.[1]);
+  };
+
+  it('emits all three to the stylesheet', () => {
+    const { css } = built();
+    for (const n of ['--Sm-Card-Padding', '--Card-Padding', '--Lg-Card-Padding']) {
+      expect(`${n} present: ${px(css, n) !== undefined}`).toBe(`${n} present: true`);
+    }
+  });
+
+  it('scales on the same 0.75 / 1.25 pair the card radii use', () => {
+    const { css } = built();
+    const md = px(css, '--Card-Padding')!;
+    expect(px(css, '--Sm-Card-Padding')).toBe(Math.round(md * 0.75));
+    expect(px(css, '--Lg-Card-Padding')).toBe(Math.round(md * 1.25));
+  });
+
+  it('is monotonic and actually distinct', () => {
+    /* The point of the change. Three equal numbers would pass every other
+       assertion here and leave the small card exactly where it was. */
+    const { css } = built();
+    const [sm, md, lg] = ['--Sm-Card-Padding', '--Card-Padding', '--Lg-Card-Padding']
+      .map((n) => px(css, n)!);
+    expect(sm).toBeLessThan(md);
+    expect(md).toBeLessThan(lg);
+  });
+
+  it('reaches Figma as three different values on one variable', () => {
+    /* One NAME across three MODES — that is the whole Component-Size shape.
+       Three names would mean three variables and a component with three
+       variants, which is what the mode structure exists to remove. */
+    const { css, figma } = built();
+    const cs = figma['Component-Size'];
+    expect(cs.small['Card/Card-Padding']).toBe(px(css, '--Sm-Card-Padding'));
+    expect(cs.medium['Card/Card-Padding']).toBe(px(css, '--Card-Padding'));
+    expect(cs.large['Card/Card-Padding']).toBe(px(css, '--Lg-Card-Padding'));
+    expect(cs.medium['Card/Sm-Card-Padding']).toBeUndefined();
+    expect(cs.medium['Card/Lg-Card-Padding']).toBeUndefined();
+  });
+});
