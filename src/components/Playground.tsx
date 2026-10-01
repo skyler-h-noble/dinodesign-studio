@@ -22,12 +22,19 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import EmailIcon from '@mui/icons-material/Email';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { getPublicFileUrl } from '../utils/firebase/storage';
+import { systemCssUrls } from '../utils/docs/systemCss';
+import { suppressStudioSkin } from '../utils/studioSkin';
 
 export default function Playground() {
   const [searchParams] = useSearchParams();
   const uuid = searchParams.get('user');
   const [exists, setExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /* The studio's own skin is :root-scoped and lands in <head> last, so on a
+     page rendering somebody ELSE's system it is a coin flip decided by network
+     timing. Suppressed for as long as this page is mounted. */
+  useEffect(() => suppressStudioSkin(), []);
 
   useEffect(() => {
     if (!uuid) {
@@ -75,12 +82,7 @@ export default function Playground() {
   // instead of re-fetching.
   return (
     <OmniDesignProvider
-      foundationCSS={getPublicFileUrl(uuid, 'foundation.css')}
-      coreCSS={getPublicFileUrl(uuid, 'core.css')}
-      lightModeCSS={getPublicFileUrl(uuid, 'Light-Mode.css')}
-      darkModeCSS={getPublicFileUrl(uuid, 'Dark-Mode.css')}
-      baseCSS={getPublicFileUrl(uuid, 'base.css')}
-      stylesCSS={getPublicFileUrl(uuid, 'styles.css')}
+      {...systemCssUrls(uuid)}
       defaultTheme="Default"
       defaultStyle="Modern"
       defaultSurface="Surface"

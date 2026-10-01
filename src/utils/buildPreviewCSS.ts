@@ -2049,11 +2049,10 @@ ${(() => {
   --Dropdown-Frame-Radius: ${r.dropdownFrameRadius}px;
   --Menu-Item-Radius: ${r.menuItemRadius}px;
   --Menu-Focus-Radius: ${r.menuFocusRadius}px;
-  /* Menu swatch — see the note in exportToCSS. Large aliases medium until
-     Figma's Menu/Menu-Swatch Large is set (it is currently 0). */
+  /* Menu swatch — Figma's Menu/Menu-Swatch, 16 / 24 / 32. */
   --Sm-Menu-Swatch: 16px;
-  --Menu-Swatch: 20px;
-  --Lg-Menu-Swatch: var(--Menu-Swatch);
+  --Menu-Swatch: 24px;
+  --Lg-Menu-Swatch: 32px;
 ${navMetricsCSS('  ').join('\n')}
   --Accordion-Radius: ${cappedAccordionRadius}px;
   --Input-Radius: ${r.inputRadius}px;

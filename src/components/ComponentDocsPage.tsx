@@ -22,6 +22,7 @@ import { COMPONENT_DOCS } from '../utils/docs/components';
 import type { ComponentDoc } from '../utils/docs/componentDoc';
 import { docsSlug } from '../utils/docs/docsLink';
 import { systemCssUrls, systemExists } from '../utils/docs/systemCss';
+import { suppressStudioSkin } from '../utils/studioSkin';
 import { EXAMPLES, hasExample } from '../utils/docs/examples';
 import { renderFoundations } from '../utils/docs/foundations';
 import { renderColourSystem } from '../utils/docs/componentDoc';
@@ -116,6 +117,11 @@ export function ComponentDocsPage() {
   const { uuid, component } = useParams<{ uuid: string; component: string }>();
   const [tab, setTab] = useState<TabName>('Example');
   const [exists, setExists] = useState<boolean | null>(null);
+
+  /* The studio's own skin is :root-scoped and lands in <head> last, so on a
+     page rendering somebody ELSE's system it is a coin flip decided by network
+     timing. Suppressed for as long as this page is mounted. */
+  useEffect(() => suppressStudioSkin(), []);
 
   useEffect(() => {
     let live = true;
