@@ -11,12 +11,24 @@
 // Storage layout (kept in sync with src/utils/firebase/storage.ts):
 //   design-systems/<uuid>/foundation.css
 //   design-systems/<uuid>/core.css
+//   design-systems/<uuid>/typography-tokens.css
 //   design-systems/<uuid>/Light-Mode.css
 //   design-systems/<uuid>/base.css
 //   design-systems/<uuid>/styles.css
 //
 // Each <link> carries the same `id` the DynoDesignProvider uses internally
-// (`dyno-foundation`, `dyno-core`, `dyno-mode`, `dyno-base`, `dyno-styles`).
+// (`omni-foundation`, `omni-core`, `omni-typography`, `omni-mode`,
+// `omni-base`, `omni-styles`).
+//
+// The ids were `dyno-*` here until the package was renamed to @omni-design in
+// 0.7.0, which moved the Provider's own map to `omni-*`. Adoption is a plain
+// getElementById, so a stale id does not warn — it just misses, the Provider
+// adds its own tag, and the whole point of this function (no flash of lib
+// defaults) was quietly lost while the links kept working.
+//
+// typography-tokens.css was missing outright, which is the worse half: the lib
+// BUNDLES a copy, so the type ramp stayed defined and simply belonged to
+// whichever brand the lib shipped.
 // When the Provider later calls `loadCSSSource`, it finds the existing tag
 // by id and resolves immediately — no duplicate fetch, no FOUC.
 
@@ -29,13 +41,14 @@ const STORAGE_BUCKET = Netlify.env.get('FIREBASE_STORAGE_BUCKET') ?? '';
 
 // File names + Provider tag-ids. Keep in sync with:
 //   - src/utils/generateDesignSystem.ts (upload manifest)
-//   - DinoDesign/src/DynoDesignProvider.js (TAG constants)
+//   - DinoDesign/src/OmniDesignProvider.js (the TAG map)
 const SHEETS: Array<{ id: string; file: string }> = [
-  { id: 'dyno-foundation', file: 'foundation.css' },
-  { id: 'dyno-core',       file: 'core.css' },
-  { id: 'dyno-mode',       file: 'Light-Mode.css' },
-  { id: 'dyno-base',       file: 'base.css' },
-  { id: 'dyno-styles',     file: 'styles.css' },
+  { id: 'omni-foundation', file: 'foundation.css' },
+  { id: 'omni-core',       file: 'core.css' },
+  { id: 'omni-typography', file: 'typography-tokens.css' },
+  { id: 'omni-mode',       file: 'Light-Mode.css' },
+  { id: 'omni-base',       file: 'base.css' },
+  { id: 'omni-styles',     file: 'styles.css' },
 ];
 
 // Conservative validator — UUIDs / Firestore ids only. Rejects anything
@@ -66,7 +79,7 @@ export default async (request: Request, context: Context): Promise<Response | un
   const preconnect =
     `<link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>`;
   const links = SHEETS.map(s =>
-    `<link rel="stylesheet" id="${s.id}" data-dyno="true" data-dyno-edge="true" href="${buildHref(uuid, s.file)}">`
+    `<link rel="stylesheet" id="${s.id}" data-omni="true" data-omni-edge="true" href="${buildHref(uuid, s.file)}">`
   ).join('');
   const injected = html.replace('</head>', `${preconnect}${links}</head>`);
 

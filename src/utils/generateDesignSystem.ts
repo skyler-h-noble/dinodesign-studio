@@ -143,6 +143,7 @@ function App() {
     <OmniDesignProvider
       foundationCSS={tokenUrl('foundation.css')}
       coreCSS={tokenUrl('core.css')}
+      typographyCSS={tokenUrl('typography-tokens.css')}
       lightModeCSS={tokenUrl('Light-Mode.css')}
       darkModeCSS={tokenUrl('Dark-Mode.css')}
       baseCSS={tokenUrl('base.css')}
@@ -161,18 +162,21 @@ function App() {
 
 For the fastest possible time-to-styled-paint, also put the brand \`<link>\`
 tags directly in your HTML's \`<head>\` so the browser fetches CSS in parallel
-with the JS bundle. Use the same \`id="dyno-*"\` attributes — the Provider
-will adopt the existing tags instead of re-fetching them:
+with the JS bundle. Use the same \`id="omni-*"\` attributes — the Provider
+looks each tag up by id and adopts it instead of re-fetching. The id has to
+match exactly: an unrecognised one is not an error, the Provider simply adds
+its own tag and the preload buys nothing.
 
 \`\`\`html
 <!-- public/index.html -->
 <head>
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
-  <link rel="stylesheet" id="dyno-foundation" data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Ffoundation.css?alt=media">
-  <link rel="stylesheet" id="dyno-core"       data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fcore.css?alt=media">
-  <link rel="stylesheet" id="dyno-mode"       data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2FLight-Mode.css?alt=media">
-  <link rel="stylesheet" id="dyno-base"       data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fbase.css?alt=media">
-  <link rel="stylesheet" id="dyno-styles"     data-dyno="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fstyles.css?alt=media">
+  <link rel="stylesheet" id="omni-foundation" data-omni="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Ffoundation.css?alt=media">
+  <link rel="stylesheet" id="omni-core"       data-omni="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fcore.css?alt=media">
+  <link rel="stylesheet" id="omni-typography" data-omni="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Ftypography-tokens.css?alt=media">
+  <link rel="stylesheet" id="omni-mode"       data-omni="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2FLight-Mode.css?alt=media">
+  <link rel="stylesheet" id="omni-base"       data-omni="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fbase.css?alt=media">
+  <link rel="stylesheet" id="omni-styles"     data-omni="true" href="https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/design-systems%2F${uuid}%2Fstyles.css?alt=media">
 </head>
 \`\`\`
 
@@ -186,10 +190,26 @@ Apply \`data-theme\` to any element to change the color context for it and all c
 
 | Category | Values |
 |----------|--------|
-| **Light** | Default, Primary-Light, Primary, Secondary-Light, Secondary, Tertiary-Light, Tertiary, Neutral-Light, Neutral |
-| **Dark** | Primary-Dark, Secondary-Dark, Tertiary-Dark, Neutral-Dark |
-| **State** | Info-Light, Info, Success-Light, Success, Warning-Light, Warning, Error-Light, Error, Info-Dark, Success-Dark, Warning-Dark, Error-Dark |
+| **Palette** | Default, Primary, Secondary, Tertiary, Neutral |
+| **State** | Info, Success, Warning, Error |
 | **Navigation** | App-Bar, Nav-Bar, Status |
+
+There is no \`-Light\`, \`-Medium\` or \`-Dark\` theme. A shade and a surface
+level were two ways of saying one thing, so the shades were dropped and the
+surface carries it instead:
+
+\`\`\`jsx
+{/* was data-theme="Primary-Light" */}
+<section data-theme="Primary" data-surface="Surface-Brightest">
+
+{/* was data-theme="Neutral-Dark" */}
+<section data-theme="Neutral" data-surface="Surface-Dimmest">
+\`\`\`
+
+Worth being exact about, because the old names fail QUIETLY: an unmatched
+\`[data-theme="Primary-Light"]\` selector is not an error, so the element just
+inherits whatever is above it and the section reads as unthemed rather than
+broken.
 
 \`\`\`jsx
 {/* Page section with primary theme */}
