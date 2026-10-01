@@ -60,7 +60,15 @@ export const COMPONENT_ELEVATIONS: ComponentElevation[] = [
      interaction the component does not have. */
   { group: 'Handle, Accordion', base: 1, hasHover: false },
   { group: 'Card, Bottom Sheet', base: 1, hasHover: true },
-  // No Hover: a bar is a fixed chrome band, not a target that lifts.
+  /* No Hover: a bar is a fixed chrome band, not a target that lifts.
+     TOOLTIP shares this row. A tooltip is a transient, anchored, non-blocking
+     floating panel, which is the Menu's behaviour, and it has no Hover level
+     for the same reason the Accordion does not: a tooltip IS the hover result,
+     not something that responds to hover. It gets no row of its own, by the
+     convention below — the Figma STYLE lists it as a consumer instead.
+     Before this it had no elevation anywhere: no group here, none in Figma's
+     Component-Elevations, and a hardcoded `0 2px 8px rgba(0,0,0,0.15)` in the
+     lib that ignored --Dropshadow-Color and never changed between modes. */
   { group: 'AppBar, Toolbars, Menus', base: 2, hasHover: false },
   { group: 'FAB', base: 3, hasHover: true },
   /* Alert, Snackbar and Speed Dial are deliberately absent, for two reasons.
@@ -80,7 +88,8 @@ export const COMPONENT_ELEVATIONS: ComponentElevation[] = [
    * is the convention already in the file: a ROW is named for its primary
    * component and a STYLE lists every consumer. Hence `Handle, Accordion` the
    * row against `Accordion, Handle, Alert, Bottom-Sheet` the style, and `FAB`
-   * against `FAB, Snackbar`.
+   * against `FAB, Snackbar`. Tooltip joins the same way, on the
+   * `AppBar, Toolbars, Menus` row.
    *
    * They briefly HAD rows here. Adding them was the right call against the
    * file as it stood — Alert and Snackbar were both reading the Dialog/Modal

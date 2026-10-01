@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import {
+  IconBadge,
   AppBar, Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, Section, Footer, Icon,
 } from '@omni-design/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -140,7 +141,7 @@ export default function LandingPage() {
       </Section>
 
       {/* ─── Hero ─── */}
-      <Section theme="Neutral-Dark" surface="Surface" padding="80px 24px 60px">
+      <Section theme="Neutral" surface="Surface-Dimmest" padding="80px 24px 60px">
         <VStack spacing={4} alignItems="center" style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={2} alignItems="center">
             <BodySmall color="primary" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.75rem', textAlign: 'center' }}>
@@ -261,7 +262,7 @@ export default function LandingPage() {
       </Section>
 
       {/* ─── What you get (Resources) ─── */}
-      <Section theme="Primary-Light" surface="Container" id="resources" padding="80px 24px">
+      <Section theme="Primary" surface="Surface-Brightest" id="resources" padding="80px 24px">
         <VStack spacing={5} style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
             <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
@@ -274,14 +275,7 @@ export default function LandingPage() {
             {FEATURES.map(f => (
               <Card key={f.title} padding="medium">
                 <VStack spacing={2}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 10,
-                    background: 'var(--Buttons-Primary-Button)',
-                    color: 'var(--Buttons-Primary-Text)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {f.icon}
-                  </div>
+                  <IconBadge color="primary">{f.icon}</IconBadge>
                   <BodySmall style={{ fontWeight: 700 }}>{f.title}</BodySmall>
                   <BodySmall color="quiet">{f.description}</BodySmall>
                 </VStack>

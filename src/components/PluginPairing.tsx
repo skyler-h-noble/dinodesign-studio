@@ -55,10 +55,8 @@ export default function PluginPairing() {
   return (
     <Card padding="medium">
       <VStack spacing={2} alignItems="flex-start">
-        <BodySmall style={{
-          fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)',
-        }}>
+        <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '0.05em', fontSize: '0.65rem' }}>
           Figma plugin
         </BodySmall>
         <Body>Pair the OmniDesign plugin so it can sign in as you.</Body>

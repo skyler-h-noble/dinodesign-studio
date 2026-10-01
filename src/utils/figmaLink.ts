@@ -88,6 +88,75 @@ export interface LinkedFigmaFileEntry {
   fileName: string;
   fileUrl: string;
   lastSeenAt: Date;
+  /** Every page in the user's copy: name, and the node id in THEIR file. */
+  pages?: FigmaNodeRef[];
+  /** Every component in the user's copy — see hasComponentMap below. */
+  components?: FigmaComponentRef[];
+}
+
+/** A node in the user's own copy of the template. */
+export interface FigmaNodeRef {
+  id: string;
+  name: string;
+}
+
+export interface FigmaComponentRef extends FigmaNodeRef {
+  /** The page it lives on, by NAME — ids are per copy, names are not. */
+  page: string;
+  /** 1 for a lone component; the variant count for a set. */
+  variants: number;
+}
+
+/**
+ * Does this link carry a component map?
+ *
+ * NOT a fifth FigmaLinkState. Those four describe the PUSH pipeline — whether
+ * a design system's tokens have reached Figma and are current — and this is a
+ * different axis: whether the PLUGIN that last wrote this entry knew to report
+ * components. A link can be fully `synced` and still have no map.
+ *
+ * False for every user until they next run the plugin, because the build that
+ * reports components shipped after the build that reports pages. It is the
+ * default state, not an edge case, and it self-clears on the next import.
+ *
+ * It matters because the remedy differs. With no link at all the instruction
+ * is "link your Figma file"; here the file IS linked and the instruction is
+ * "re-run the plugin" — and telling someone to link a file they have already
+ * linked is how ten minutes disappear.
+ */
+export function hasComponentMap(entry: LinkedFigmaFileEntry | null | undefined): boolean {
+  return !!entry && Array.isArray(entry.components) && entry.components.length > 0;
+}
+
+/**
+ * A deep link to one component in the user's own file.
+ *
+ * node-id uses a HYPHEN where the API uses a colon: `8216:9719` addresses the
+ * node, `8216-9719` addresses it in a URL. Figma accepts only the latter in
+ * the query string, and the difference is invisible until a link silently
+ * opens the file at no particular node.
+ */
+export function figmaComponentUrl(
+  entry: LinkedFigmaFileEntry,
+  component: FigmaComponentRef,
+): string {
+  const slug = (entry.fileName || 'design-system').trim().replace(/[^A-Za-z0-9]+/g, '-');
+  return `https://www.figma.com/design/${entry.fileKey}/${slug}?node-id=${component.id.replace(/:/g, '-')}`;
+}
+
+/**
+ * The components on one page, by page NAME.
+ *
+ * Keyed on name rather than id for the reason the plugin's own note gives:
+ * ids are per copy of the template, names survive it. A page renamed by the
+ * user simply stops matching, which is visible; an id looked up across copies
+ * resolves to something else, which is not.
+ */
+export function componentsOnPage(
+  entry: LinkedFigmaFileEntry,
+  pageName: string,
+): FigmaComponentRef[] {
+  return (entry.components || []).filter(c => c.page === pageName);
 }
 
 /**

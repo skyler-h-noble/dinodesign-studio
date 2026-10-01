@@ -176,7 +176,7 @@ export default function ReviewStage({
                   />
                 </div>
 
-                <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+                <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
                   {designSystemName} &bull; {STYLE_LABELS[componentStyle]} &bull; {previewMode === 'light' ? 'Light' : 'Dark'} Mode
                 </BodySmall>
               </VStack>
@@ -270,7 +270,7 @@ export default function ReviewStage({
                 />
               </div>
 
-              <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+              <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
                 {designSystemName} &bull; {STYLE_LABELS[componentStyle]} &bull; {previewMode === 'light' ? 'Light' : 'Dark'} Mode
               </BodySmall>
             </VStack>
@@ -288,9 +288,9 @@ export default function ReviewStage({
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   border: '1px solid var(--Border)',
                 }}>
-                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>QR Code</BodySmall>
+                  <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>QR Code</BodySmall>
                 </div>
-                <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+                <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
                   Scan to preview on mobile
                 </BodySmall>
               </VStack>
@@ -350,7 +350,7 @@ export default function ReviewStage({
                 <VStack spacing={1}>
                   <BodySmall style={{ fontWeight: 600 }}>Typography</BodySmall>
                   {typographyStyles.map((t, i) => (
-                    <BodySmall key={i} style={{ color: 'var(--Quiet)', textTransform: 'capitalize' }}>
+                    <BodySmall key={i} color="quiet" style={{ textTransform: 'capitalize' }}>
                       {t.type}: {t.family} ({t.weight}){t.allCaps ? ' ALL CAPS' : ''}
                     </BodySmall>
                   ))}

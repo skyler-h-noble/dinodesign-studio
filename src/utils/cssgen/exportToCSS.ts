@@ -29,7 +29,7 @@ import {
   generateChartsVariables
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
-import { lineMetricsVars, selectionMetricsVars } from '../componentSize';
+import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars } from '../componentSize';
 
 /**
  * Determine the correct CSS font fallback category for a given font name
@@ -4942,6 +4942,9 @@ export function generateBaseCSS(jsonData: any): string {
     /* Radio and Checkbox — the box, the dot, the check, the label gap, and
        the shared 24px hit area. Literals in Radio.js and Checkbox.js until
        now, which is how the two ended up with different label gaps. */
+    for (const [name, value] of Object.entries(tooltipMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
     for (const [name, value] of Object.entries(selectionMetricsVars())) {
       lines.push(`  ${name}: ${value};`);
     }
@@ -4994,6 +4997,16 @@ export function generateBaseCSS(jsonData: any): string {
     // The row inside it, and its inset ring — concentric off the frame.
     lines.push(`  --Menu-Item-Radius: ${r.menuItemRadius}px;`);
     lines.push(`  --Menu-Focus-Radius: ${r.menuFocusRadius}px;`);
+    /* The colour chip inside a menu row — a Select in colour mode, or a menu
+       item with its Swatch boolean on. A density constant, like the rail width
+       above, read from Figma's Menu/Menu-Swatch: 16 / 24 / 32.
+
+       Large was 0 in Figma when this was first emitted, so it aliased medium
+       rather than ship an invisible swatch; it is set now, and medium moved
+       from 20 to 24 at the same time. */
+    lines.push(`  --Sm-Menu-Swatch: 16px;`);
+    lines.push(`  --Menu-Swatch: 24px;`);
+    lines.push(`  --Lg-Menu-Swatch: 32px;`);
     /* Nav chrome — the rail's width and the app bar's height, one per size.
        Constants rather than derived: a rail is 80 wide in every brand, and
        the three sizes are a density decision. Emitted from the SAME table

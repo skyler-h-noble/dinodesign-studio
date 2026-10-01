@@ -100,6 +100,13 @@ declare module '@omni-design/components' {
   export const SwitchInput: FC<any>;
   export const SliderInput: FC<any>;
   export const RatingInput: FC<any>;
+  /* The package exports this as an alias of RatingInput. Declared here because
+     a `declare module` REPLACES the package's own types rather than extending
+     them — so an export missing from this shim is missing full stop, however
+     real it is upstream. The shim cannot be deleted: the library's generated
+     .d.ts marks every prop REQUIRED (tsc infers that from destructured params
+     in JS), which makes <Button>Save</Button> fail for want of startIcon. */
+  export const Rating: FC<any>;
   export const SearchField: FC<any>;
   /* Body at 700 — the bold weight Body itself does not have. Exported by
      the package and simply missing here, so using it failed to compile. */
@@ -195,6 +202,13 @@ declare module '@omni-design/components' {
      and is tagged MISSING-LIB-COMPONENT.
   export const AvatarMenu: FC<any>; */
   export const Badge: FC<any>;
+  /* Ships in the package and works at runtime — it was simply never added
+     here. This shim REPLACES the package's own .d.ts files rather than
+     supplementing them, so a component missing from this list reads as "has no
+     exported member" even though it is exported. That is the mirror of the
+     AvatarMenu trap above: declaring what does not exist crashes at runtime,
+     omitting what does exist hides a usable component. */
+  export const IconBadge: FC<any>;
   export const Divider: FC<any>;
   export const List: FC<any>;
   export const Slider: FC<any>;

@@ -21,7 +21,7 @@
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
 import { buttonModeMetricVars } from './buttonSizing';
-import { lineMetricsVars, navMetricsVars, selectionMetricsVars } from './componentSize';
+import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars } from './componentSize';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -129,6 +129,7 @@ export function componentStyleVars(
     ...lineMetricsVars(),
     /* Radio / Checkbox box, dot, check, gap and the shared touch target. */
     ...selectionMetricsVars(),
+    ...tooltipMetricsVars(),
     /* Rail-Width / App-Bar-Height / Nav-Bar-Height. The record form of the
        same table navMetricsCSS() writes into the exported stylesheet and into
        buildPreviewCSS — one walk, two shapes, so these cannot drift. Needed

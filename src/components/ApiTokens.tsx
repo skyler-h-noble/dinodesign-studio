@@ -1,3 +1,16 @@
+/*
+ * The raw <pre> in this file is deliberate, and the one place in the studio
+ * where a code panel should NOT be `CodeBlock`.
+ *
+ * These two routes are payload endpoints, not pages. The `/md` URL is handed to
+ * the user to give to their own AI tool (see `claudeMdUrl` in
+ * DesignSystemDetail) — what matters is that the body is the file and nothing
+ * else. CodeBlock would wrap it in a themed dark panel with a header label and
+ * a copy button, which is chrome around a response.
+ *
+ * So: no header, no copy button, no theming. `white-space: pre-wrap` and a
+ * monospace stack, which is what a browser shows for `text/plain`.
+ */
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { getPublicFileUrl } from '../utils/firebase/storage';

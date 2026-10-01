@@ -42,6 +42,7 @@ import ExportStage from './components/stages/ExportStage';
 import Playground from './components/Playground';
 import GeneratedPreview from './components/GeneratedPreview';
 import { ApiTokensJson, ApiTokensMd } from './components/ApiTokens';
+import { ComponentDocsPage, ComponentDocsIndex } from './components/ComponentDocsPage';
 import ToneTuner from './components/ToneTuner';
 import ShadowTuner from './components/ShadowTuner';
 import AccountPage from './components/AccountPage';
@@ -1103,6 +1104,11 @@ function App() {
         <Route path="/preview" element={<GeneratedPreview />} />
         <Route path="/api/tokens/:uuid" element={<ApiTokensJson />} />
         <Route path="/api/tokens/:uuid/md" element={<ApiTokensMd />} />
+        {/* What a Figma component's "Link to documentation" opens. The id is
+            the design system's, because each user's file has its own node ids
+            and a link without it could never resolve to theirs. */}
+        <Route path="/docs/:uuid" element={<ComponentDocsIndex />} />
+        <Route path="/docs/:uuid/:component" element={<ComponentDocsPage />} />
         <Route path="/tune" element={<ToneTuner />} />
         <Route path="/tune-shadows" element={<ShadowTuner />} />
         <Route path="/account" element={<AccountPage />} />

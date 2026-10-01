@@ -1361,7 +1361,7 @@ export default function ColorStage({
                     >
                       {hexLocked ? 'Locked' : 'Lock Color'}
                     </Button>
-                    <BodySmall style={{ color: 'var(--Quiet)', flex: 1 }}>
+                    <BodySmall color="quiet" style={{ flex: 1 }}>
                       Lock ensures this exact hex is used in the generated tones, in light mode
                     </BodySmall>
                   </HStack>
@@ -1428,7 +1428,7 @@ export default function ColorStage({
     <div className="color-theme-stage">
       <VStack spacing={1} alignItems="center">
         <H2 style={{ textAlign: 'center' }}>Theme</H2>
-        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+        <Body color="quiet" style={{ textAlign: 'center' }}>
           Select a primary color and a color scheme below.
         </Body>
       </VStack>
@@ -1586,7 +1586,7 @@ export default function ColorStage({
                       {toneMode === 'dark' ? (
                         <BodySmall
                           title="Switch to Light Mode to edit this colour — the dark scale is derived from it."
-                          style={{ color: 'var(--Quiet)', fontSize: '0.7rem', whiteSpace: 'nowrap', display: 'inline' }}
+                          color="quiet" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap', display: 'inline' }}
                         >
                           Edit
                         </BodySmall>
@@ -1756,7 +1756,7 @@ export default function ColorStage({
                   <VStack spacing={2}>
                     {customEditing && (
                       <VStack spacing={2}>
-                        <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+                        <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
                           Pick from your core colors for each role.
                         </BodySmall>
                         {(['Primary', 'Secondary', 'Tertiary']).map((roleLabel, roleIdx) => (

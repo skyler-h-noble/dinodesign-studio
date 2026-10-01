@@ -77,23 +77,17 @@ function written(collection: string, skip: RegExp): string[] {
  * missing name is a gap only if Figma DRAWS the thing it measures.
  */
 const MISSING_FROM_FILE: Record<string, string[]> = {
-  'Component-Size': [
-    'Other/Modal-Padding',
-    'Other/Nav-Bar Height',
-    /* Renamed in Figma 2026-09-30 (App-Bar Height -> App-Bar-Height); the
-       fixture predates it. Refresh the fixture and drop this line. */
-    'Other/App-Bar-Height',
-    /* All five EXIST in the file now, under the `List-item` group (lowercase
-       i — the payload said `List` first, which would have matched nothing).
-       They are listed here only because the fixture predates them; refresh
-       `__fixtures__/figmaVariableNames.json` and delete this block. */
-    'List-item/List-Item-Radius',
-    'List-item/List-Item-Focus-Radius',
-    'List-item/List-Item-Padding',
-    'List-item/List-Item-Gap',
-    'List-item/List-Item-Image-Radius',
-    'List-item/List-Item-Default-Image-Width',
-  ].sort(),
+  /* Empty, and worth keeping as a list rather than deleting the mechanism.
+     Every name the payload writes now exists in the file. The previous entries
+     were all of one kind — the fixture lagging a rename or an addition someone
+     had already made in Figma (`App-Bar Height` -> `App-Bar-Height`, the six
+     `List-item/*` names, `Modal-Padding`, `Nav-Bar Height`) — and each carried a
+     note saying to refresh the snapshot and drop the line. Refreshed 2026-10-01,
+     so they are dropped.
+     A name belongs here only when the payload deliberately writes something the
+     file does not have yet. Anything else means the import is silently skipping
+     it, which is the failure this whole suite exists to catch. */
+  'Component-Size': [],
   'Devices-Type': [],
 };
 

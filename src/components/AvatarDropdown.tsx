@@ -67,13 +67,15 @@ export default function AvatarDropdown({ user, onSignOut }: AvatarDropdownProps)
           alignItems: 'center',
         }}
       >
+        {/* `initials` is a PROP, not children. Passed as children it never
+            reached the component, and with no initials and no icon Avatar falls
+            back to its built-in stock photo — which is what rendered. */}
         <Avatar
           src={user.photoURL || undefined}
           alt={user.displayName || user.email || 'Account'}
+          initials={!user.photoURL ? initial : undefined}
           size="small"
-        >
-          {!user.photoURL ? initial : undefined}
-        </Avatar>
+        />
       </button>
       {open && anchorRect && createPortal(
         <div

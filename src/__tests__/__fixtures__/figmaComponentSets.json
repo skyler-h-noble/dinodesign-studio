@@ -1,0 +1,678 @@
+{
+  "_comment": "Captured from the library Figma file Qv2dqF7mYoAGY77EkdrwTv on 2026-09-30. Node ids are per COPY of the template and are NOT used for matching - the plugin reports the user's own at link time. They are captured so drift in this capture is visible. Page and set NAMES are what figmaComponentMap keys on. `pages` is every page; `sets` covers component SETS plus the handful of lone COMPONENTs on pages that have no set. Pages with a set are not scanned for lone components: the Icon page holds ~600 individual glyphs, which are artwork.",
+  "capturedAt": "2026-10-01 (third capture: CodeBlock designed — page and lone COMPONENT added; it moved out of NO_FIGMA_PAGE.undesigned)",
+  "fileKey": "Qv2dqF7mYoAGY77EkdrwTv",
+  "sets": [
+    {
+      "page": "Accordion",
+      "name": "Accordion Segment",
+      "id": "3156:2295",
+      "variants": 20
+    },
+    {
+      "page": "Accordion",
+      "name": "Accordion Group",
+      "id": "6888:29570",
+      "variants": 2
+    },
+    {
+      "page": "Alert",
+      "name": "Alert",
+      "id": "8835:28010",
+      "variants": 4
+    },
+    {
+      "page": "AppBar",
+      "name": "AppBar",
+      "id": "7442:31333",
+      "variants": 3
+    },
+    {
+      "page": "Avatar",
+      "name": "Avatar",
+      "id": "3156:3696",
+      "variants": 3
+    },
+    {
+      "page": "Badge",
+      "name": "Badge Counter",
+      "id": "3156:5150",
+      "variants": 2
+    },
+    {
+      "page": "Brand",
+      "name": "Brand",
+      "id": "8818:12187",
+      "variants": 1
+    },
+    {
+      "page": "Box",
+      "name": "Box",
+      "id": "7191:61860",
+      "variants": 2
+    },
+    {
+      "page": "Breadcrumbs",
+      "name": "Breadcrumb-Segments",
+      "id": "3156:5336",
+      "variants": 2
+    },
+    {
+      "page": "Breadcrumbs",
+      "name": "Breadcrumbs-separator",
+      "id": "3156:5342",
+      "variants": 3
+    },
+    {
+      "page": "Button",
+      "name": "Button",
+      "id": "5769:46293",
+      "variants": 75
+    },
+    {
+      "page": "ButtonGroup",
+      "name": "ButtonGroup",
+      "id": "6599:138",
+      "variants": 4
+    },
+    {
+      "page": "ButtonGroup",
+      "name": "Button-Group-Segments",
+      "id": "7981:9443",
+      "variants": 108
+    },
+    {
+      "page": "ButtonGroup",
+      "name": "Separated-Button-Segments",
+      "id": "8422:34618",
+      "variants": 12
+    },
+    {
+      "page": "Card",
+      "name": "Quote Cards",
+      "id": "7523:23833",
+      "variants": 2
+    },
+    {
+      "page": "Card",
+      "name": "Card",
+      "id": "8103:17421",
+      "variants": 12
+    },
+    {
+      "page": "Card",
+      "name": "Card Content / Ecommerce",
+      "id": "8636:43",
+      "variants": 6
+    },
+    {
+      "page": "Carousel",
+      "name": "Carousel Dot",
+      "id": "8379:11675",
+      "variants": 5
+    },
+    {
+      "page": "Checkbox",
+      "name": "Checkbox",
+      "id": "6731:46",
+      "variants": 15
+    },
+    {
+      "page": "Chip",
+      "name": "Chip",
+      "id": "8927:15447",
+      "variants": 10
+    },
+    {
+      "page": "CodeBlock",
+      "name": "CodeBlock",
+      "id": "9150:18462",
+      "variants": 1
+    },
+    {
+      "page": "Data Visualization",
+      "name": "Bar-Basic",
+      "id": "8103:16899",
+      "variants": 2
+    },
+    {
+      "page": "Date Picker",
+      "name": "Day Cell",
+      "id": "8619:3484",
+      "variants": 30
+    },
+    {
+      "page": "Divider",
+      "name": "Divider",
+      "id": "6847:27685",
+      "variants": 2
+    },
+    {
+      "page": "FAB",
+      "name": "FAB",
+      "id": "6778:17180",
+      "variants": 5
+    },
+    {
+      "page": "Forms",
+      "name": "Form-Label",
+      "id": "8702:11037",
+      "variants": 1
+    },
+    {
+      "page": "Forms",
+      "name": "Message Icons",
+      "id": "8580:22896",
+      "variants": 4
+    },
+    {
+      "page": "Forms",
+      "name": "Input Message",
+      "id": "8580:22909",
+      "variants": 4
+    },
+    {
+      "page": "Forms",
+      "name": "Form-Helper",
+      "id": "8580:22922",
+      "variants": 1
+    },
+    {
+      "page": "Forms",
+      "name": "Form Elements",
+      "id": "8583:23375",
+      "variants": 13
+    },
+    {
+      "page": "Icon",
+      "name": "Icon",
+      "id": "5669:49502",
+      "variants": 2
+    },
+    {
+      "page": "Input",
+      "name": "Input",
+      "id": "8574:19742",
+      "variants": 15
+    },
+    {
+      "page": "Input",
+      "name": "Input Buttons",
+      "id": "8590:24802",
+      "variants": 10
+    },
+    {
+      "page": "Input",
+      "name": "Input Text Style",
+      "id": "8574:19724",
+      "variants": 4
+    },
+    {
+      "page": "ImagePlaceholder",
+      "name": "Image Placeholder",
+      "id": "7251:1985",
+      "variants": 1
+    },
+    {
+      "page": "Link",
+      "name": "Link",
+      "id": "3156:5476",
+      "variants": 5
+    },
+    {
+      "page": "Link",
+      "name": "Hotlink Group",
+      "id": "3156:5504",
+      "variants": 1
+    },
+    {
+      "page": "List",
+      "name": "List Item",
+      "id": "7022:49393",
+      "variants": 6
+    },
+    {
+      "page": "List",
+      "name": "List",
+      "id": "7022:51249",
+      "variants": 4
+    },
+    {
+      "page": "Loader",
+      "name": "Loader",
+      "id": "5859:1629",
+      "variants": 4
+    },
+    {
+      "page": "MenuItem",
+      "name": "Menu Item",
+      "id": "8007:25355",
+      "variants": 10
+    },
+    {
+      "page": "NavBar",
+      "name": "Nav-Bar",
+      "id": "7442:31297",
+      "variants": 7
+    },
+    {
+      "page": "NavBar",
+      "name": "Nav Item",
+      "id": "5670:49999",
+      "variants": 2
+    },
+    {
+      "page": "NumberField",
+      "name": "Field Button",
+      "id": "6850:28584",
+      "variants": 10
+    },
+    {
+      "page": "Pagination",
+      "name": "Pagination Number",
+      "id": "8400:33345",
+      "variants": 6
+    },
+    {
+      "page": "Progress Indicators",
+      "name": "Progress Bar",
+      "id": "8379:11531",
+      "variants": 1
+    },
+    {
+      "page": "Progress Indicators",
+      "name": "Progress Dial",
+      "id": "8379:11570",
+      "variants": 1
+    },
+    {
+      "page": "Radio",
+      "name": "Radio",
+      "id": "6778:13571",
+      "variants": 10
+    },
+    {
+      "page": "Radio",
+      "name": "Radio Group",
+      "id": "6778:13979",
+      "variants": 2
+    },
+    {
+      "page": "Rail",
+      "name": "Nav Rail Item",
+      "id": "8224:5192",
+      "variants": 11
+    },
+    {
+      "page": "Rail",
+      "name": "Expandable Nav Rail Item",
+      "id": "8239:5977",
+      "variants": 6
+    },
+    {
+      "page": "Rail",
+      "name": "Nav Rail",
+      "id": "8224:5229",
+      "variants": 3
+    },
+    {
+      "page": "Rail",
+      "name": "Drawer Title",
+      "id": "8239:5911",
+      "variants": 2
+    },
+    {
+      "page": "Ratio",
+      "name": "Ratio - Fill Horizontal",
+      "id": "6241:11978",
+      "variants": 21
+    },
+    {
+      "page": "Ratio",
+      "name": "Ratio - Fill Vertical",
+      "id": "7257:3697",
+      "variants": 21
+    },
+    {
+      "page": "Rating",
+      "name": "Star",
+      "id": "6780:12460",
+      "variants": 15
+    },
+    {
+      "page": "Rating",
+      "name": "Rating",
+      "id": "6780:12693",
+      "variants": 1
+    },
+    {
+      "page": "Select",
+      "name": "SelectMenu",
+      "id": "8493:19531",
+      "variants": 1
+    },
+    {
+      "page": "Select",
+      "name": "Select",
+      "id": "8493:19536",
+      "variants": 15
+    },
+    {
+      "page": "Sheet",
+      "name": "Sheet",
+      "id": "8326:2842",
+      "variants": 1
+    },
+    {
+      "page": "Slider",
+      "name": "Slider",
+      "id": "6791:14897",
+      "variants": 8
+    },
+    {
+      "page": "Slider",
+      "name": "Slider-thumb Vertical",
+      "id": "7514:21988",
+      "variants": 10
+    },
+    {
+      "page": "Slider",
+      "name": "Slider-thumb Horizontal",
+      "id": "6791:15142",
+      "variants": 10
+    },
+    {
+      "page": "Snackbar",
+      "name": "Snack",
+      "id": "8836:28155",
+      "variants": 9
+    },
+    {
+      "page": "Snackbar",
+      "name": "Snackbar",
+      "id": "8839:28556",
+      "variants": 2
+    },
+    {
+      "page": "Switch",
+      "name": "Switch",
+      "id": "6779:2252",
+      "variants": 10
+    },
+    {
+      "page": "SpeedDial",
+      "name": "SpeedDial",
+      "id": "6843:25091",
+      "variants": 20
+    },
+    {
+      "page": "Status Bar",
+      "name": "Status-Bar-Lower",
+      "id": "8430:37085",
+      "variants": 2
+    },
+    {
+      "page": "Status Bar",
+      "name": "Cellular Signal",
+      "id": "8351:3914",
+      "variants": 10
+    },
+    {
+      "page": "Status Bar",
+      "name": "Wifi",
+      "id": "8351:3959",
+      "variants": 6
+    },
+    {
+      "page": "Status Bar",
+      "name": "Battery",
+      "id": "8351:3984",
+      "variants": 8
+    },
+    {
+      "page": "Status Bar",
+      "name": "Time",
+      "id": "8351:4019",
+      "variants": 2
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Time",
+      "id": "8351:3702",
+      "variants": 1
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Battery",
+      "id": "8351:3719",
+      "variants": 8
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Cellular Signal",
+      "id": "8351:3746",
+      "variants": 12
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/WiFi",
+      "id": "8351:3821",
+      "variants": 10
+    },
+    {
+      "page": "Status Bar",
+      "name": "Android/Bluetooth",
+      "id": "8351:3874",
+      "variants": 3
+    },
+    {
+      "page": "Status Bar",
+      "name": "Status Bar/iPadOS",
+      "id": "8351:4058",
+      "variants": 1
+    },
+    {
+      "page": "Stepper",
+      "name": "Stepper",
+      "id": "8379:13867",
+      "variants": 4
+    },
+    {
+      "page": "Stepper",
+      "name": "Count Step",
+      "id": "8379:13829",
+      "variants": 15
+    },
+    {
+      "page": "Stepper",
+      "name": "No-Count Step",
+      "id": "8425:36435",
+      "variants": 3
+    },
+    {
+      "page": "Stepper",
+      "name": "Step - Line",
+      "id": "8379:13862",
+      "variants": 4
+    },
+    {
+      "page": "Table",
+      "name": "Table Header Row",
+      "id": "8379:12003",
+      "variants": 1
+    },
+    {
+      "page": "Table",
+      "name": "Table Body Row",
+      "id": "8379:12096",
+      "variants": 1
+    },
+    {
+      "page": "Tabs",
+      "name": "Tab",
+      "id": "8212:9219",
+      "variants": 15
+    },
+    {
+      "page": "Tabs",
+      "name": "Tabs",
+      "id": "8216:9719",
+      "variants": 3
+    },
+    {
+      "page": "Tag",
+      "name": "Tag",
+      "id": "7442:31271",
+      "variants": 9
+    },
+    {
+      "page": "Tooltip",
+      "name": "Tooltip",
+      "id": "8829:27295",
+      "variants": 4
+    },
+    {
+      "page": "TreeView",
+      "name": "TreeView",
+      "id": "6911:36658",
+      "variants": 1
+    },
+    {
+      "page": "Dialog",
+      "name": "Dialog",
+      "id": "8122:6780",
+      "variants": 1
+    },
+    {
+      "page": "Drawer",
+      "name": "Drawer",
+      "id": "6911:36775",
+      "variants": 1
+    },
+    {
+      "page": "Modal",
+      "name": "Modal",
+      "id": "8122:6781",
+      "variants": 1
+    },
+    {
+      "page": "Modal",
+      "name": "Modal with overlay",
+      "id": "8122:6940",
+      "variants": 1
+    },
+    {
+      "page": "Text Editor",
+      "name": "Text Editor",
+      "id": "8379:19337",
+      "variants": 1
+    },
+    {
+      "page": "TransferList",
+      "name": "TransferList",
+      "id": "6848:27865",
+      "variants": 1
+    }
+  ],
+  "pages": [
+    "Almost Theme! - Import your Dino Design",
+    "Page 13",
+    "Accordion",
+    "Adaptive Templates",
+    "Alert",
+    "AppBar",
+    "Avatar",
+    "Badge",
+    "Brand",
+    "Box",
+    "Breadcrumbs",
+    "Button",
+    "ButtonGroup",
+    "Card",
+    "Carousel",
+    "Checkbox",
+    "Chip",
+    "CodeBlock",
+    "Data Visualization",
+    "Date Picker",
+    "Dialog",
+    "Divider",
+    "Drawer",
+    "FAB",
+    "Forms",
+    "Hero",
+    "Icon",
+    "Input",
+    "ImagePlaceholder",
+    "Link",
+    "List",
+    "Loader",
+    "Modal",
+    "MenuItem",
+    "NavBar",
+    "NumberField",
+    "Pagination",
+    "Player",
+    "Progress Indicators",
+    "Radio",
+    "Rail",
+    "Ratio",
+    "Rating",
+    "Select",
+    "Shapes",
+    "Sheet",
+    "Slider",
+    "Snackbar",
+    "Switch",
+    "SpeedDial",
+    "Status Bar",
+    "Stepper",
+    "Table",
+    "Tabs",
+    "Tag",
+    "Text Editor",
+    "TransferList",
+    "Tooltip",
+    "ToggleButton",
+    "TreeView",
+    "Typography",
+    "Design to Code Test"
+  ],
+  "componentSizeGroups": [
+    "Accordion",
+    "Button",
+    "Card",
+    "Checkbox",
+    "Data-Visualizations",
+    "Dynamic-Typography",
+    "FAB",
+    "Input",
+    "List-item",
+    "Menu",
+    "Other",
+    "Radio",
+    "Slider",
+    "Switch"
+  ],
+  "collections": [
+    "Add-Ons",
+    "Alt-Display",
+    "Buttons",
+    "Charts",
+    "Component-Size",
+    "Component-Elevations",
+    "Device-Sizes",
+    "Devices-Type",
+    "Drop-Colors",
+    "Elevation",
+    "Icons & Avatars",
+    "Menu-Levels",
+    "Modes",
+    "Sizing",
+    "Spacing",
+    "Surface",
+    "Theme",
+    "Typography",
+    "Cognitive"
+  ]
+}

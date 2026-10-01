@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  H3,
   H2, Body, BodySmall, VStack, HStack, Card, Button, Select,
 } from '@omni-design/components';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -423,10 +424,13 @@ function DesignSystemCard({
         {/* Name + ellipsis menu */}
         <HStack spacing={1} style={{ alignItems: 'flex-start', minWidth: 0 }}>
           <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ ...headerStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {/* H3, not a raw <h3> — see the note in DesignSystemDetail: the lib
+                heading keeps --Header and the ramp, headerStyle only overlays
+                the brand's own face. */}
+            <H3 style={{ ...headerStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {ds.name}
-            </h3>
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+            </H3>
+            <BodySmall color="quiet" style={{ fontSize: 11 }}>
               {ds.createdAt}
               {ds.addOns.length > 0 && ` · ${ds.addOns.join(' · ')}`}
             </BodySmall>

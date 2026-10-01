@@ -130,7 +130,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
             <Slider variant="default" size="small" min={0.05} max={1} step={0.01}
               value={c.shadowIntensity} aria-label="Intensity"
               onChange={(_: unknown, v: number | number[]) => set('shadowIntensity', v as number)} />
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
               The weight every level composites to. Also deepens the shadow colour.
             </BodySmall>
           </VStack>
@@ -140,7 +140,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
             <Slider variant="default" size="small" min={0} max={1} step={0.01}
               value={c.shadowCrispy} aria-label="Crispy"
               onChange={(_: unknown, v: number | number[]) => set('shadowCrispy', v as number)} />
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
               Blur {(1.8 - 0.9 * c.shadowCrispy).toFixed(2)}× the offset, tuck-in
               −{(5 * c.shadowCrispy).toFixed(1)}px. Crisper = tighter.
             </BodySmall>
@@ -151,7 +151,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
             <Slider variant="default" size="small" min={0} max={1} step={0.01}
               value={c.shadowResolution} aria-label="Resolution"
               onChange={(_: unknown, v: number | number[]) => set('shadowResolution', v as number)} />
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
               Layers {SHADOW_LEVELS.map((l) => shadowLayerCount(l, o)).join(' / ')}. More layers,
               same size shadow.
             </BodySmall>
@@ -164,7 +164,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
               y={c.shadowLightY}
               onChange={(lx, ly) => commit({ ...c, shadowLightX: lx, shadowLightY: ly })}
             />
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
               The shadow falls away from the light. Centre it horizontally for a
               straight-down offset.
             </BodySmall>
@@ -183,7 +183,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
               aria-label="Tint shadow"
               onChange={(e: { target: { checked: boolean } }) => set('shadowTint', e.target.checked)}
             />
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>
+            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
               Off gives a neutral grey. A neutral surface stays grey either way.
             </BodySmall>
           </VStack>
