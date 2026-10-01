@@ -4997,6 +4997,17 @@ export function generateBaseCSS(jsonData: any): string {
     // The row inside it, and its inset ring — concentric off the frame.
     lines.push(`  --Menu-Item-Radius: ${r.menuItemRadius}px;`);
     lines.push(`  --Menu-Focus-Radius: ${r.menuFocusRadius}px;`);
+    /* The colour chip inside a menu row — a Select in colour mode, or a menu
+       item with its Swatch boolean on. A density constant, like the rail width
+       above: 16 at small, 20 at medium, read from Figma's Menu/Menu-Swatch.
+
+       Large aliases medium deliberately. Figma currently has Large = 0, which
+       would render an invisible swatch, and that reads as unset rather than
+       intended — so this falls back rather than inventing a third number or
+       shipping a zero. Set it in Figma and change this to match. */
+    lines.push(`  --Sm-Menu-Swatch: 16px;`);
+    lines.push(`  --Menu-Swatch: 20px;`);
+    lines.push(`  --Lg-Menu-Swatch: var(--Menu-Swatch);`);
     /* Nav chrome — the rail's width and the app bar's height, one per size.
        Constants rather than derived: a rail is 80 wide in every brand, and
        the three sizes are a density decision. Emitted from the SAME table
