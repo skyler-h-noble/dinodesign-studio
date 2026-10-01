@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CodeBlock, H1, Body, NumberField } from '@omni-design/components';
 import chroma from 'chroma-js';
 import { generateSemanticLightModeScale } from '../utils/colorScale';
 
@@ -15,7 +16,10 @@ const INITIAL_TEXT: number[] =    [9, 9, 9, 10, 10, 1, 3, 3, 4, 4, 5, 5];
 const INITIAL_HEADER: number[] =  [7, 7, 8, 8, 9, 3, 4, 5, 5, 6, 6, 6];
 const INITIAL_QUIET: number[] =   [7, 7, 8, 8, 9, 2, 3, 4, 4, 5, 5, 5];
 
-// Test with a few different palette hues
+/* Raw hex below is the DATA, not styling: these are the sample hues being
+   tuned, and the black/white picks further down are contrast decisions computed
+   against an arbitrary test colour rather than a design-system surface. The
+   tool's own chrome uses tokens. */
 const TEST_COLORS = [
   { name: 'Pink/Rose', hex: '#c9a08a' },
   { name: 'Teal', hex: '#2e8b8b' },
@@ -51,19 +55,29 @@ export default function ToneTuner() {
     }
   };
 
-  const copyArrays = () => {
-    const output = `const TEXT_LOOKUP_LIGHT_BG: number[] = [\n  ${textLookup.slice(0, 6).join(', ')},\n  ${textLookup.slice(6).join(', ')},\n];\n\nconst HEADER_LOOKUP_LIGHT_BG: number[] = [\n  ${headerLookup.slice(0, 6).join(', ')},\n  ${headerLookup.slice(6).join(', ')},\n];\n\nconst QUIET_LOOKUP_LIGHT_BG: number[] = [\n  ${quietLookup.slice(0, 6).join(', ')},\n  ${quietLookup.slice(6).join(', ')},\n];`;
-    navigator.clipboard.writeText(output);
-    alert('Copied to clipboard!');
-  };
+  /* The paste-ready form, and the ONLY rendering of these arrays on the page.
+     There used to be two — a terse TEXT:/HEADER:/QUIET: summary in a <pre> and
+     this TypeScript in a copy handler — which is two things to keep in step for
+     one set of numbers. CodeBlock shows and copies the same string, so the
+     summary, the raw copy button and its alert() all went. */
+  const lookupSource = [
+    ['TEXT', textLookup],
+    ['HEADER', headerLookup],
+    ['QUIET', quietLookup],
+  ]
+    .map(([name, arr]) => {
+      const a = arr as number[];
+      return `const ${name}_LOOKUP_LIGHT_BG: number[] = [\n  ${a.slice(0, 6).join(', ')},\n  ${a.slice(6).join(', ')},\n];`;
+    })
+    .join('\n\n');
 
   return (
     <div style={{ padding: 32, fontFamily: 'system-ui', maxWidth: 1400, margin: '0 auto' }}>
-      <h1 style={{ marginBottom: 8 }}>Tone Tuner</h1>
-      <p style={{ color: '#888', marginBottom: 24 }}>
+      <H1 style={{ marginBottom: 8 }}>Tone Tuner</H1>
+      <Body color="quiet" style={{ marginBottom: 24 }}>
         Adjust Text, Header, and Quiet Color-N values for each of the 12 surface tones.
         Contrast ratios are shown — Text/Quiet need 4.5:1, Header needs 3.1:1.
-      </p>
+      </Body>
 
       {/* Color picker */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -85,7 +99,7 @@ export default function ToneTuner() {
         {palette.map((t, i) => (
           <div key={i} style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ height: 32, background: t.hex, borderRadius: 4, marginBottom: 4 }} />
-            <span style={{ fontSize: 10, color: '#888' }}>{i + 1}</span>
+            <span style={{ fontSize: 10, color: 'var(--Quiet)' }}>{i + 1}</span>
           </div>
         ))}
       </div>
@@ -116,39 +130,54 @@ export default function ToneTuner() {
               {/* Header preview */}
               <div style={{ color: headerHex, fontWeight: 700, fontSize: 14 }}>Header</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={1} max={12} value={headerLookup[i]}
-                  onChange={e => update('header', i, parseInt(e.target.value) || 1)}
-                  style={{ width: 36, padding: 2, fontSize: 11, textAlign: 'center', borderRadius: 4, border: '1px solid rgba(128,128,128,0.5)' }}
+                <NumberField
+                  min={1}
+                  max={12}
+                  value={headerLookup[i]}
+                  onChange={(v: number) => update('header', i, v || 1)}
+                  size="small"
+                  aria-label={`header tone for surface ${i + 1}`}
+                  style={{ width: 56 }}
                 />
                 <span style={{
                   fontSize: 9, fontWeight: 700,
-                  color: headerCR >= 3.1 ? '#22c55e' : '#ef4444',
+                  color: headerCR >= 3.1 ? 'var(--Text-Success)' : 'var(--Text-Error)',
                 }}>{headerCR.toFixed(1)}</span>
               </div>
 
               {/* Text preview */}
               <div style={{ color: textHex, fontSize: 13 }}>Body text sample</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={1} max={12} value={textLookup[i]}
-                  onChange={e => update('text', i, parseInt(e.target.value) || 1)}
-                  style={{ width: 36, padding: 2, fontSize: 11, textAlign: 'center', borderRadius: 4, border: '1px solid rgba(128,128,128,0.5)' }}
+                <NumberField
+                  min={1}
+                  max={12}
+                  value={textLookup[i]}
+                  onChange={(v: number) => update('text', i, v || 1)}
+                  size="small"
+                  aria-label={`text tone for surface ${i + 1}`}
+                  style={{ width: 56 }}
                 />
                 <span style={{
                   fontSize: 9, fontWeight: 700,
-                  color: textCR >= 4.5 ? '#22c55e' : '#ef4444',
+                  color: textCR >= 4.5 ? 'var(--Text-Success)' : 'var(--Text-Error)',
                 }}>{textCR.toFixed(1)}</span>
               </div>
 
               {/* Quiet preview */}
               <div style={{ color: quietHex, fontSize: 11 }}>Quiet text</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={1} max={12} value={quietLookup[i]}
-                  onChange={e => update('quiet', i, parseInt(e.target.value) || 1)}
-                  style={{ width: 36, padding: 2, fontSize: 11, textAlign: 'center', borderRadius: 4, border: '1px solid rgba(128,128,128,0.5)' }}
+                <NumberField
+                  min={1}
+                  max={12}
+                  value={quietLookup[i]}
+                  onChange={(v: number) => update('quiet', i, v || 1)}
+                  size="small"
+                  aria-label={`quiet tone for surface ${i + 1}`}
+                  style={{ width: 56 }}
                 />
                 <span style={{
                   fontSize: 9, fontWeight: 700,
-                  color: quietCR >= 4.5 ? '#22c55e' : '#ef4444',
+                  color: quietCR >= 4.5 ? 'var(--Text-Success)' : 'var(--Text-Error)',
                 }}>{quietCR.toFixed(1)}</span>
               </div>
             </div>
@@ -156,23 +185,8 @@ export default function ToneTuner() {
         })}
       </div>
 
-      {/* Copy button */}
-      <button
-        onClick={copyArrays}
-        style={{
-          padding: '12px 32px', fontSize: 16, fontWeight: 700, borderRadius: 8,
-          background: '#333', color: '#fff', border: 'none', cursor: 'pointer',
-        }}
-      >
-        Copy Lookup Arrays to Clipboard
-      </button>
-
-      {/* Current values display */}
-      <pre style={{ marginTop: 24, padding: 16, background: '#f5f5f5', borderRadius: 8, fontSize: 12, overflow: 'auto' }}>
-{`TEXT:   [${textLookup.join(', ')}]
-HEADER: [${headerLookup.join(', ')}]
-QUIET:  [${quietLookup.join(', ')}]`}
-      </pre>
+      {/* The tuned arrays, paste-ready. CodeBlock owns the copy button. */}
+      <CodeBlock code={lookupSource} language="TypeScript" />
     </div>
   );
 }

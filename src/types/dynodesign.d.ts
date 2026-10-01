@@ -202,6 +202,13 @@ declare module '@omni-design/components' {
      and is tagged MISSING-LIB-COMPONENT.
   export const AvatarMenu: FC<any>; */
   export const Badge: FC<any>;
+  /* Ships in the package and works at runtime — it was simply never added
+     here. This shim REPLACES the package's own .d.ts files rather than
+     supplementing them, so a component missing from this list reads as "has no
+     exported member" even though it is exported. That is the mirror of the
+     AvatarMenu trap above: declaring what does not exist crashes at runtime,
+     omitting what does exist hides a usable component. */
+  export const IconBadge: FC<any>;
   export const Divider: FC<any>;
   export const List: FC<any>;
   export const Slider: FC<any>;

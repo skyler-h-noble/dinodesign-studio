@@ -15,7 +15,7 @@ import { overlayOffsets, type DeviceMode } from './deviceChrome';
 import { SYSTEM_FAMILY_OF, systemLineHeight } from './systemTypography';
 import { platformButtonMetrics } from './platformMetrics';
 import { FAB_SIZE } from './componentSize';
-import { THEME_MODES } from './themes';
+import { THEME_MODES, CSS_ONLY_THEMES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
   PLATFORM_BUTTON_HEIGHT,
@@ -1122,7 +1122,16 @@ export function generateFigmaJSON(
       // and a name here that the generator no longer produces is dead. Neither
       // shows up as an error at import — the collection is simply short a mode.
       const generated = Object.keys(themes);
-      const missingFromExport = generated.filter((t) => !THEME_MODES.includes(t));
+      /* The bar themes are CSS-only BY DESIGN — see CSS_ONLY_THEMES in
+         ./themes. A bar is a composition of a user pick, and Figma expresses
+         that by pinning a mode on the bar's frame, so it needs no mode of its
+         own. Comparing the raw lists is the "both lists must match" check that
+         themes.ts says would be wrong: it reported App-Bar, Nav-Bar and Status
+         as dropped on every single export, which is how a warning that should
+         mean something became three lines of noise nobody read. */
+      const missingFromExport = generated.filter(
+        (t) => !THEME_MODES.includes(t) && !(CSS_ONLY_THEMES as readonly string[]).includes(t),
+      );
       const deadNames = THEME_MODES.filter((t) => !generated.includes(t));
       if (missingFromExport.length) {
         console.warn(

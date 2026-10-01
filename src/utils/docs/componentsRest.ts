@@ -120,9 +120,51 @@ const undesigned = (
   theming: inherits(), tokens, composition, accessibility, gotchas,
 });
 
+export const CODE_BLOCK_DOC: ComponentDoc = {
+  name: 'CodeBlock',
+  summary: 'A block of code, a shell command or a copyable URL, with its own copy button.',
+  insteadUse: [
+    { when: 'It is one word of code inside a sentence', use: 'inline `code` in the Markdown' },
+    { when: 'You only need the copy affordance', use: 'CopyButton' },
+  ],
+  props: [
+    { name: 'code', type: 'string', default: "''", note: 'The text shown AND the text copied — they are the same string, so what the user pastes is what they read.' },
+    { name: 'language', type: 'string', default: "'JSX'", note: 'The header label: `"bash"`, `"JSX"`, `"CSS"`, `"URL"`. A label, not a syntax highlighter.' },
+    { name: 'showCopy', type: 'boolean', default: 'true' },
+    { name: 'showHeader', type: 'boolean', default: 'true' },
+    { name: 'maxHeight', type: 'string | number', default: 'undefined', note: 'Caps the code area and scrolls past it.' },
+    { name: 'wrap', type: 'boolean', default: 'false', note: 'Wrap long lines instead of scrolling horizontally.' },
+  ],
+  states: [
+    { state: 'Copied', setBy: 'interaction', note: 'The component owns the flag, the confirmation and the timer.' },
+  ],
+  theming: [
+    { collection: 'Theme',
+      inCode: 'None to set. The root declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"` itself, so the dark region follows the brand\'s own neutrals.',
+      inFigma: 'The component pins the same pair. Change the Neutral ramp, not this component, to move it.' },
+  ],
+  tokens: [
+    surfaceToken('--Background', 'the dark code region — via Surface-Dimmest'),
+    surfaceToken('--Text', 'the code'),
+    surfaceToken('--Border', 'the edge and the header rule'),
+  ],
+  composition: [
+    'It brings its own copy button, confirmation and timer, so the surrounding component should NOT keep a `copied` flag of its own.',
+  ],
+  accessibility: [
+    'The copy control is a button with a name, not an icon alone — "Copy code", not "copy".',
+    'Copying is announced; a purely visual tick tells a screen-reader user nothing.',
+  ],
+  gotchas: [
+    'Its dark region is NOT a hardcoded colour. The wrapper declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"`, so it follows the brand\'s neutrals and stays legible in both modes. Do not override its background — that is the one change that breaks dark mode for it.',
+    'Any block of code, shell command or copyable URL uses this. Hand-rolling a `<pre>`/`<code>` panel with its own copy button is what it replaces, and the studio still has ten of those.',
+  ],
+};
+
 export const REST_DOCS: ComponentDoc[] = [
   SELECT_DOC,
   MENU_DOC,
+  CODE_BLOCK_DOC,
 
   undesigned('Autocomplete',
     'A text field whose list narrows as the user types.',

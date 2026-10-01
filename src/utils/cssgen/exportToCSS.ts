@@ -29,7 +29,7 @@ import {
   generateChartsVariables
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
-import { lineMetricsVars, selectionMetricsVars } from '../componentSize';
+import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars } from '../componentSize';
 
 /**
  * Determine the correct CSS font fallback category for a given font name
@@ -4942,6 +4942,9 @@ export function generateBaseCSS(jsonData: any): string {
     /* Radio and Checkbox — the box, the dot, the check, the label gap, and
        the shared 24px hit area. Literals in Radio.js and Checkbox.js until
        now, which is how the two ended up with different label gaps. */
+    for (const [name, value] of Object.entries(tooltipMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
     for (const [name, value] of Object.entries(selectionMetricsVars())) {
       lines.push(`  ${name}: ${value};`);
     }

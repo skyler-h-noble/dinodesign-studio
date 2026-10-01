@@ -2,6 +2,7 @@ import chroma from 'chroma-js';
 import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
+import { SEMANTIC_SEEDS } from './generateFullPalettes';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor } from './backgroundSelection';
@@ -11,7 +12,7 @@ import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromS
 // surface tone, which fails WCAG on light surfaces. These helpers return
 // design-token references (e.g. "{Colors.Primary.Color-8}") that we then
 // convert to CSS var() form below.
-import { getFixedTextToken, getFixedHeaderToken } from './cssgen/exportColorSystem';
+import { getFixedTextToken, getFixedHeaderToken, getFixedIconToken, iconToneAt } from './cssgen/exportColorSystem';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
 
@@ -42,6 +43,92 @@ function buildTextPaletteLines(backgroundN: number, isContainer: boolean): strin
   return palettes
     .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedTextToken(backgroundN, isContainer, palette))};`)
     .join('\n');
+}
+
+/** The tone number out of a `{Colors.Palette.Color-N}` reference, or null when
+ *  the table returned a raw hex instead. */
+function toneOfRef(ref: string): number | null {
+  const m = ref.match(/^\{Colors\.[^.]+\.Color-(\d+)\}$/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The Icons collection, per surface or container — 27 tokens.
+ *
+ * The export gets these free: processTokens walks the theme JSON, so every key
+ * generateCompleteThemes writes becomes a custom property without anyone naming
+ * it. The preview builds its tokens by hand and so emitted NONE of them — not
+ * --Icons-Primary either. That is invariant 5 in its quietest form: no
+ * unresolved var to report, the export simply painted icons from the brand and
+ * the preview inherited whatever --Text happened to be.
+ *
+ * Tones come from getFixedIconToken / iconToneAt in exportColorSystem, the same
+ * functions the export's Icon section is built from, rather than a second copy
+ * of the table here.
+ */
+function buildIconPaletteLines(
+  backgroundN: number, isContainer: boolean, isDark: boolean, defaultPalette: string,
+  hexOf: (palette: string, n: number) => string | null,
+  textValue: string, textTone: number,
+): string {
+  const palettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
+                    'Info', 'Success', 'Warning', 'Error'] as const;
+  const lines: string[] = [];
+  const n = Math.max(1, Math.min(12, backgroundN));
+
+  /* The 4.5:1 mark that sits ON an icon colour.
+   *
+   * The first choice is the Text table indexed at the ICON's own tone — the
+   * icon is picked to contrast with the SURFACE, so it lands on an arbitrary
+   * tone and a fixed token path cannot express this.
+   *
+   * That choice lands just short surprisingly often: measured 3.99–4.10:1 on
+   * Primary, Secondary, Tertiary and Neutral across two brands. So it carries
+   * the same fallback exportColorSystem's producer does — the end of the
+   * Neutral ramp furthest from the icon — and for the same reason. Without it
+   * the preview ships a mark that reads as legible and is not. */
+  const onTokenFor = (pal: string, iconTone: number): string => {
+    const iconHex = hexOf(pal, iconTone);
+    const first = getFixedTextToken(iconTone, isContainer, pal);
+    if (!iconHex) return first;                       // no hex to check against
+    const firstTone = toneOfRef(first);
+    const firstHex = firstTone ? hexOf(pal, firstTone) : (first.startsWith('#') ? first : null);
+    if (firstHex && contrastRatio(firstHex, iconHex) >= 4.5) return first;
+
+    // Furthest end of the Neutral ramp. Color-1 is the darkest tone, so a LIGHT
+    // icon takes Color-1 and a dark one takes Color-12.
+    const farN = chroma(iconHex).luminance() > 0.5 ? 1 : 12;
+    const farHex = hexOf('Neutral', farN);
+    if (farHex && contrastRatio(farHex, iconHex) >= 4.5) return `{Colors.Neutral.Color-${farN}}`;
+    return getFixedTextToken(farN, isContainer, 'Neutral');
+  };
+
+  for (const pal of palettes) {
+    const iconTone = iconToneAt(n, isContainer, isDark);
+    const iconVar = tokenRefToVar(getFixedIconToken(n, isContainer, pal, isDark));
+    lines.push(`  --Icons-${pal}: ${iconVar};`);
+    /* Icon-Variant holds the SAME value as Icon — generateIconVariantPaletteStructure
+       returns generateIconPaletteStructure verbatim. The variant's transparency is a
+       separate float in the Icons collection (Icon-Variant-Opacity), not a second
+       colour, so emitting a different hex here would invent one. */
+    lines.push(`  --Icons-${pal}-Variant: ${iconVar};`);
+    lines.push(`  --Icons-On-${pal}: ${tokenRefToVar(onTokenFor(pal, iconTone))};`);
+  }
+
+  /* Default is not an accent: it tracks --Text, verified across all 20 themes,
+     which is why the export routes it through Default-Background.
+     It takes the scope's OWN --Text value, passed in. Two wrong turns got here
+     first: `var(--Text)` as an alias (a custom property does not re-resolve
+     when a nested scope redefines --Text, so it picked up whichever won and
+     measured 1.00:1 against its own background), then getFixedTextToken (the
+     EXPORT's fixed table — but the preview derives --Text with
+     findAccessibleTone, which verifies against the real hex and lands on a
+     different tone, so Icons-Default read 2.37:1 where --Text read 4.5:1). */
+  lines.push(`  --Icons-Default: ${textValue};`);
+  lines.push(`  --Icons-Default-Variant: ${textValue};`);
+  lines.push(`  --Icons-On-Default: ${tokenRefToVar(onTokenFor(defaultPalette, textTone))};`);
+
+  return lines.join('\n');
 }
 
 function buildHeaderPaletteLines(backgroundN: number, isContainer: boolean): string {
@@ -396,6 +483,49 @@ export function buildPreviewCSS(input: BuildInput): string {
   const vTertiary = isDark ? tertiaryDark : tertiaryLight;
 
   const p = (arr: typeof primary, n: number) => arr[n - 1]?.hex || '#888';
+  /* A real hex for any of the eight palettes, at the mode in play.
+     The Icons tokens need this: their On- pair is only correct if it can be
+     CHECKED, and the semantic four are generated from the same fixed seeds the
+     export uses rather than restated here. */
+  const SEMANTIC_RAMPS: Record<string, Array<{ hex: string }>> = {
+    Neutral: NEUTRAL.map((hex) => ({ hex })),
+    Info:    (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.info)
+                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.info)),
+    Success: (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.success)
+                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.success)),
+    Warning: (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.warning)
+                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.warning)),
+    Error:   (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.error)
+                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.error)),
+    /* The tenth palette. Purple (#8B5CF6), a real ramp in Figma's Modes
+       collection and in the export — and the LAST of the scales the preview
+       referenced without defining. --Hotlink-Visited and --Link-Visited both
+       resolve through it, so visited links painted nothing in the playground
+       while the export and Figma had the colour all along. */
+    'Hotlink-Visited': (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS['hotlink-visited'])
+                               : generateSemanticLightModeScale(SEMANTIC_SEEDS['hotlink-visited'])),
+  };
+  /* The brand three resolve to the LIGHT ramp in BOTH modes — that is what the
+     :root and [data-theme="Brand"] blocks emit, and it is deliberate (the same
+     reason dark-mode buttons bake to a Light-Mode tone). Neutral and the
+     semantic four are mode-dependent. Reading the dark ramp here instead made
+     every contrast check in dark mode compare against a colour the stylesheet
+     never paints, so the On- fallback silently declined to fire. */
+  const hexOfPalette = (palette: string, n: number): string | null => {
+    const arr = palette === 'Primary' ? primaryLight
+      : palette === 'Secondary' ? secondaryLight
+      : palette === 'Tertiary' ? tertiaryLight
+      : SEMANTIC_RAMPS[palette];
+    return arr?.[n - 1]?.hex ?? null;
+  };
+  /* Info / Success / Warning / Error scales. The preview REFERENCED these —
+     --Text-Info, --Header-Error, --Hotlink and --Link all resolve through them —
+     and never defined them, so those tokens have been painting nothing. They are
+     generated from fixed seeds, so there is no user input to wait for. */
+  const semanticScaleLines = (): string =>
+    ['Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited']
+      .flatMap((pal) => SEMANTIC_RAMPS[pal].map((t, i) => `  --${pal}-Color-${i + 1}: ${t.hex};`))
+      .join('\n');
 
   /**
    * Color-Vibrant — the palette's accent, and the token the dark-mode eyebrow
@@ -1135,7 +1265,6 @@ export function buildPreviewCSS(input: BuildInput): string {
   --Hotlink: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
   --Link: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
-  --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, hotlinkColorN + (scopeN <= 5 ? -1 : 1)))});
   --Link-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
   --Buttons-Primary-Border: ${scopeBtnBorderPrimary};
   --Buttons-Secondary-Border: ${scopeBtnBorderSecondary};
@@ -1197,6 +1326,7 @@ ${primaryLight.map((t, i) => `  --Primary-Color-${i + 1}: ${t.hex};`).join('\n')
 ${secondaryLight.map((t, i) => `  --Secondary-Color-${i + 1}: ${t.hex};`).join('\n')}
 ${tertiaryLight.map((t, i) => `  --Tertiary-Color-${i + 1}: ${t.hex};`).join('\n')}
 ${NEUTRAL.map((h, i) => `  --Neutral-Color-${i + 1}: ${h};`).join('\n')}
+${semanticScaleLines()}
 ${vibrantLines()}
 }
 
@@ -1285,6 +1415,7 @@ ${primaryLight.map((c, i) => `  --Primary-Color-${i + 1}: ${c.hex};`).join('\n')
 ${secondaryLight.map((c, i) => `  --Secondary-Color-${i + 1}: ${c.hex};`).join('\n')}
 ${tertiaryLight.map((c, i) => `  --Tertiary-Color-${i + 1}: ${c.hex};`).join('\n')}
 ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
+${semanticScaleLines()}
 ${vibrantLines()}
 
   --Background: var(--${surfacePaletteName}-Color-${surfaceN});
@@ -1311,9 +1442,9 @@ ${vibrantLines()}
   --Hotlink: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
   --Link: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
-  --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, surfaceTones.text + (surfaceN <= 5 ? -1 : 1)))});
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
 ${buildTextPaletteLines(surfaceN, false)}
+${buildIconPaletteLines(surfaceN, false, isDark, surfacePaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
 ${buildHeaderPaletteLines(surfaceN, false)}
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
@@ -1504,9 +1635,9 @@ ${(() => {
   --Hotlink: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
   --Link: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
-  --Link-Hover: var(--Info-Color-${Math.max(1, Math.min(12, containerTones.text + (containerN <= 5 ? -1 : 1)))});
   --Link-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
 ${buildTextPaletteLines(containerN, true)}
+${buildIconPaletteLines(containerN, true, isDark, containerPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText, containerTones.text)}
 ${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${contDefBg};
   --Buttons-Primary-Text: ${contDefText};

@@ -72,7 +72,7 @@ export default function DesignSystemNameStage({ onNext, onBack, onSubmit }: Prop
     <VStack spacing={4} alignItems="center" style={{ padding: '80px 24px' }}>
       <VStack spacing={1} alignItems="center">
         <H2 style={{ textAlign: 'center' }}>Name Your Design System</H2>
-        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+        <Body color="quiet" style={{ textAlign: 'center' }}>
           Give your design system a name to get started
         </Body>
       </VStack>

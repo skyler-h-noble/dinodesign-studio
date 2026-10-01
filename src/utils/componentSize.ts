@@ -397,6 +397,83 @@ export const CHECKBOX_METRICS = {
 } as const;
 
 /** Both, for the CSS side — which has no groups and emits one flat list. */
+/** The arrow's HEIGHT — how far it points away from the bubble. The design's
+ *  own table; everything else about the arrow derives from it.
+ *  Named `Tooltip-Arrow-Height` in Figma. It was `Tooltip-Arrow` until the width
+ *  got its own token, at which point a bare `Arrow` no longer said which
+ *  dimension it meant. The payload has to use the new spelling: the import is
+ *  update-only and matches by name, so the old one would be skipped in silence
+ *  and the variable would keep whatever was last typed. */
+const TOOLTIP_ARROW_HEIGHT = { medium: 8, small: 6, large: 10 } as const;
+
+/** 2 x the height, because medium is drawn 16x8 and that 2:1 is the ratio the
+ *  design states. It used to be bound to `Sizing-2` — a single generic 16 — so
+ *  the height scaled and the width did not, and the arrow's proportion drifted
+ *  with size: 2.67:1 small, 2.00:1 medium, 1.60:1 large. A generic cannot carry
+ *  three numbers, which is why this is its own token. */
+const arrowWidth = (h: number) => h * 2;
+
+/** How much of the arrow shows. The rest tucks behind the bubble.
+ *
+ *  70% of the height, rounded — which reproduces the design's 4 / 6 / 7 exactly
+ *  (4.2, 5.6, 7.0). `height - 2` also gives 4 and 6 and was the tempting read,
+ *  but it puts large at 8 and the design says 7, so the subtraction matched two
+ *  of three by coincidence. */
+const visibleArrowHeight = (h: number) => Math.round(h * 0.7);
+
+const byHeight = (f: (h: number) => number) => ({
+  medium: f(TOOLTIP_ARROW_HEIGHT.medium),
+  small: f(TOOLTIP_ARROW_HEIGHT.small),
+  large: f(TOOLTIP_ARROW_HEIGHT.large),
+});
+
+/** Tooltip, per size mode.
+ *
+ *  Every one of these existed in Figma with NO producer here — bound to layers,
+ *  holding typed values, and skipped by every regenerate. That is the mirror of
+ *  the update-only writer problem: a name the file has and the generator does
+ *  not, so nothing ever reports it stale.
+ *
+ *  Tooltip-Radius is deliberately absent — it is flat across sizes and the lib
+ *  derives it from the brand (`--Style-Border-Radius`), so pinning a number
+ *  here would make Tooltip the one radius in the system that ignores the brand. */
+const TOOLTIP_PADDING = { medium: 8, small: 4, large: 12 } as const;
+
+/* Half the padding, at every size — 2/4, 4/8, 6/12.
+ *
+ * Not the rule List-Item uses. There the comment is explicit that "the gap
+ * BETWEEN rows equals the padding INSIDE one", which is about separating
+ * repeated rows. This gap sits between an icon, a label and an optional button
+ * INSIDE one bubble, so it wants to be tighter than the padding around them or
+ * the content reads as further from itself than from its own edge.
+ *
+ * Large held 8 for a while, where half of 12 is 6 — small and medium were
+ * already half. Deriving it means the three cannot disagree again. */
+const tooltipGap = (padding: number) => padding / 2;
+
+export const TOOLTIP_METRICS = {
+  /* Flat — 8 at every size AND every brand. A deliberate choice, not an
+     oversight, so it is worth saying what it costs: every other radius in the
+     system is brand-derived (Button-Radius is a percentage of height,
+     Card-Radius is a corner plus padding, Dropdown-Frame-Radius is
+     min(Input-Radius, Card-Radius, 16)). This one is not, so a brand with square
+     buttons still gets an 8px tooltip.
+     The alternative considered was min(buttonRadius, 12) — 0/4/10/12/12 across
+     sharp to pill — which would have tracked the brand. Flat was chosen.
+     The lib has to read THIS token rather than --Style-Border-Radius, or the
+     two disagree for every brand whose radius is not 8. */
+  'Tooltip-Radius': { medium: 8, small: 8, large: 8 },
+  'Tooltip-Arrow-Height': TOOLTIP_ARROW_HEIGHT,
+  'Tooltip-Arrow-Width': byHeight(arrowWidth),
+  'Tooltip-Visible-Arrow-Height': byHeight(visibleArrowHeight),
+  'Tooltip-Padding': TOOLTIP_PADDING,
+  'Tooltip-Gap': {
+    medium: tooltipGap(TOOLTIP_PADDING.medium),
+    small: tooltipGap(TOOLTIP_PADDING.small),
+    large: tooltipGap(TOOLTIP_PADDING.large),
+  },
+} as const;
+
 export const SELECTION_METRICS = {
   ...RADIO_METRICS,
   ...CHECKBOX_METRICS,
@@ -432,6 +509,10 @@ export function radioMetricsFlat(): Record<string, number> {
 
 export function checkboxMetricsFlat(): Record<string, number> {
   return flattenByMode(CHECKBOX_METRICS as never);
+}
+
+export function tooltipMetricsFlat(): Record<string, number> {
+  return flattenByMode(TOOLTIP_METRICS as never);
 }
 
 /* Figma name -> CSS custom-property base.
@@ -526,6 +607,28 @@ export function navMetricsVars(): Record<string, string> {
  *  for it, so a new name would be a third spelling of a number that has two. */
 export function selectionMetricsVars(): Record<string, string> {
   return metricsVars(SELECTION_METRICS as never, SELECTION_METRIC_CSS);
+}
+
+/* Figma name -> CSS name. Identical here, unlike Radio's, because the Figma
+   group already spells "Tooltip" into every variable. The map still exists so
+   metricsVars has one shape for every table. */
+const TOOLTIP_METRIC_CSS: Record<string, string> = {
+  'Tooltip-Radius': 'Tooltip-Radius',
+  'Tooltip-Arrow-Height': 'Tooltip-Arrow-Height',
+  'Tooltip-Arrow-Width': 'Tooltip-Arrow-Width',
+  'Tooltip-Visible-Arrow-Height': 'Tooltip-Visible-Arrow-Height',
+  'Tooltip-Padding': 'Tooltip-Padding',
+  'Tooltip-Gap': 'Tooltip-Gap',
+};
+
+/** Tooltip metrics as CSS custom properties.
+ *
+ *  The arrow needs TWO dimensions in code, not one. The lib drove MUI's arrow
+ *  through `fontSize`, and MUI computes `width: 1em; height: 0.71em` from it —
+ *  a rotated square — so it could express neither the 2:1 the design draws nor
+ *  a width and height that move independently. */
+export function tooltipMetricsVars(): Record<string, string> {
+  return metricsVars(TOOLTIP_METRICS as never, TOOLTIP_METRIC_CSS);
 }
 
 /** The same values as stylesheet lines, plus --Disabled.
@@ -800,6 +903,7 @@ export function componentSizePayload(
        versions did. */
     Radio: radioMetricsFlat(),
     Checkbox: checkboxMetricsFlat(),
+    Tooltip: tooltipMetricsFlat(),
     FAB: fabMetricsFlat(),
     /* The dropdown panel, its rows and their focus ring — one group, because
        the three are one derivation: the frame follows the brand and the other

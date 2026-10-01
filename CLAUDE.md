@@ -230,11 +230,18 @@ which is better than a named export rendering something other than its name.
 A light chip or badge is a SURFACE: `{color}-outline` with `data-theme` +
 `data-surface="Surface-Brightest"`.
 
-Two `light`s are still real and are different things:
+One `light` is still real:
 
-- **`SwitchInput` `variant="{color}-light"`** — a tinted track.
 - **`ButtonGroup` `variant="light"`** — changes the unselected segments'
   SURFACE, not their theme (see the ButtonGroup entry above).
+
+`SwitchInput`'s tinted track was the other one, and it is gone. The Figma
+Switch set has only State and Status axes, so a light shape had nothing to be
+checked against, and the ON state now takes its colour from the Icons
+collection (`--Icons-{Color}` for the track, `--Icons-On-{Color}` for the
+knob). `{color}-light` still renders — it normalizes to `{color}` and warns
+once in development — but the eight `PrimaryLightSwitch`…`ErrorLightSwitch`
+exports are deleted, so a stale import fails at build.
 
 ### `Select`
 

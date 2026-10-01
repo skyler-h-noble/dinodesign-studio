@@ -210,7 +210,7 @@ export default function LandingPageAlt() {
       </Section>
 
       {/* ─── Hero: efficiency lead ─── */}
-      <Section theme="Neutral-Dark" surface="Surface" padding="80px 24px 60px">
+      <Section theme="Neutral" surface="Surface-Dimmest" padding="80px 24px 60px">
         <VStack spacing={4} alignItems="center" style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={2} alignItems="center">
             <BodySmall color="primary" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.75rem', textAlign: 'center' }}>
@@ -373,7 +373,7 @@ export default function LandingPageAlt() {
       </Section>
 
       {/* ─── HI not AI (value line, no how) ─── */}
-      <Section theme="Neutral-Dark" surface="Surface" padding="64px 24px">
+      <Section theme="Neutral" surface="Surface-Dimmest" padding="64px 24px">
         <VStack spacing={2} alignItems="center" style={{ maxWidth: 700, margin: '0 auto' }}>
           <H2 style={{ textAlign: 'center' }}>Built on human intelligence — not AI guesswork</H2>
           <Body color="quiet" style={{ textAlign: 'center' }}>

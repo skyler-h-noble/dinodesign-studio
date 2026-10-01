@@ -82,11 +82,11 @@ export default function PricingPage({ onCheckout }: Props) {
 
       {/* Header */}
       <VStack spacing={1} alignItems="center">
-        <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+        <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem' }}>
           Pricing
         </BodySmall>
         <H2 style={{ textAlign: 'center' }}>Build your design system</H2>
-        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+        <Body color="quiet" style={{ textAlign: 'center' }}>
           One image. A complete, accessible, branded design system — live in minutes.
         </Body>
       </VStack>
@@ -98,7 +98,7 @@ export default function PricingPage({ onCheckout }: Props) {
             <BodySmall style={{ fontWeight: 700 }}>{TIER.name}</BodySmall>
             <H3 style={{ margin: 0 }}>
               ${TIER.price}
-              <BodySmall component="span" style={{ color: 'var(--Quiet)', fontSize: '0.85rem', marginLeft: 4, fontWeight: 400 }}>
+              <BodySmall component="span" color="quiet" style={{ fontSize: '0.85rem', marginLeft: 4, fontWeight: 400 }}>
                 one-time
               </BodySmall>
             </H3>
@@ -159,21 +159,21 @@ export default function PricingPage({ onCheckout }: Props) {
         <HStack spacing={2} style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <VStack spacing={0}>
             <BodySmall style={{ fontWeight: 700 }}>Hosted playground</BodySmall>
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+            <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
               Live components, code snippets, guidelines + accessibility details
             </BodySmall>
           </VStack>
           <VStack spacing={0} alignItems="flex-end" style={{ flexShrink: 0 }}>
             <HStack spacing={1} alignItems="baseline">
               {isAnnual && (
-                <BodySmall style={{ textDecoration: 'line-through', color: 'var(--Quiet)', fontSize: '0.75rem' }}>
+                <BodySmall color="quiet" style={{ textDecoration: 'line-through', fontSize: '0.75rem' }}>
                   ${HOSTING_MONTHLY}
                 </BodySmall>
               )}
               <BodySmall style={{ fontWeight: 700 }}>${hostingPrice}/mo</BodySmall>
             </HStack>
             <HStack spacing={1} alignItems="center">
-              <Chip color="primary" size="small" label="Required" />
+              <Chip variant="primary" label="Required" />
               {isAnnual && <BodySmall style={{ color: 'var(--Text-Success)', fontSize: '0.6rem', fontWeight: 600 }}>Save ${(HOSTING_MONTHLY - HOSTING_ANNUAL_MONTHLY) * 12}/yr</BodySmall>}
             </HStack>
           </VStack>
@@ -182,7 +182,7 @@ export default function PricingPage({ onCheckout }: Props) {
 
       {/* Optional add-ons */}
       <VStack spacing={2}>
-        <BodySmall style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet" style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
           Optional add-ons
         </BodySmall>
         <HStack spacing={2} style={{ alignItems: 'stretch' }}>
@@ -202,10 +202,10 @@ export default function PricingPage({ onCheckout }: Props) {
                 />
                 <VStack spacing={1} style={{ flex: 1 }}>
                   <BodySmall style={{ fontWeight: 700 }}>{addon.label}</BodySmall>
-                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>{addon.description}</BodySmall>
+                  <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>{addon.description}</BodySmall>
                   <HStack spacing={1} alignItems="baseline">
                     {isAnnual && (
-                      <BodySmall style={{ textDecoration: 'line-through', color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+                      <BodySmall color="quiet" style={{ textDecoration: 'line-through', fontSize: '0.7rem' }}>
                         ${addon.price}
                       </BodySmall>
                     )}
@@ -267,7 +267,7 @@ export default function PricingPage({ onCheckout }: Props) {
         Get started with OmniDesign
       </Button>
 
-      <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center', fontSize: '0.7rem' }}>
+      <BodySmall color="quiet" style={{ textAlign: 'center', fontSize: '0.7rem' }}>
         Tokens and CSS are hosted — no raw file downloads. Playground subscription required for all plans.
       </BodySmall>
     </VStack>

@@ -119,7 +119,7 @@ export const SWITCH_DOC: ComponentDoc = {
     { when: 'It is one of several options', use: 'RadioGroup' },
   ],
   props: [
-    { name: 'variant', type: 'string', default: 'default', note: 'Also takes `{color}-light`, which tints the track. This is one of only two surviving `-light` values in the system.' },
+    { name: 'variant', type: 'string', default: 'default', note: 'Picks which Icons colour the on state paints with: `primary` resolves the track to `--Icons-Primary`. Also takes `{color}-outline`.' },
     { name: 'size', type: 'string', values: ['small', 'medium', 'large'], default: 'medium' },
     { name: 'checked / defaultChecked', type: 'boolean', default: 'undefined' },
     { name: 'label', type: 'ReactNode', default: 'undefined' },
@@ -136,10 +136,14 @@ export const SWITCH_DOC: ComponentDoc = {
   ],
   theming: [
     { collection: 'Theme', inCode: '`data-theme` on an ancestor.',
-      inFigma: 'The variant root pins `Theme=Primary`. Change the mode there.' },
+      inFigma: 'The variant root pins `Theme=Primary`. Change the mode there. This drives the OFF state, which is drawn in `--Quiet` / `--Border`.' },
+    { collection: 'Icons', inCode: '`variant` — `<SwitchInput variant="primary">` resolves the on track to `--Icons-Primary`.',
+      inFigma: 'The ON variants bind Switch-Body\'s fill AND stroke to `Icon`, and the Dot to `On-Icon`, and pin nothing — so they inherit. Set the Icons mode on the switch or an ancestor; that is what recolours an on switch.' },
   ],
   tokens: [
-    { name: '--Buttons-{Color}-Button', sets: 'the on track', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
+    { name: '--Icons-{Color}', sets: 'the on track — fill and edge are the same token', variesWith: 'theme + surface', figma: 'Icons → Icon' },
+    { name: '--Icons-On-{Color}', sets: 'the knob on the on track', variesWith: 'theme + surface', figma: 'Icons → On-Icon' },
+    surfaceToken('--Quiet', 'the off knob'),
     surfaceToken('--Border', 'the off track'),
     { name: '--Switch-Width', sets: 'track width', variesWith: 'size mode', figma: 'Switch/Switch-Width' },
     { name: '--Switch-Height', sets: 'track height', variesWith: 'size mode', figma: 'Switch/Switch-Height' },
@@ -151,7 +155,7 @@ export const SWITCH_DOC: ComponentDoc = {
     'Label it with what it controls, not its state: "Email notifications", never "On".',
   ],
   gotchas: [
-    '`variant="{color}-light"` is real here and tints the track. Everywhere else `-light` was removed in 0.9.0 — Button, Chip and Badge strip the suffix and warn.',
+    'The `-light` shape is gone here too. It tinted the track, which is not a shape in the Figma set — that has only State and Status axes. `{color}-light` still renders (it normalizes to `{color}` and warns once in development), but the eight `*LightSwitch` convenience exports are deleted, so a stale import fails at build. `ButtonGroup` `variant="light"` is unrelated and still real.',
   ],
 };
 
@@ -180,8 +184,8 @@ export const CHIP_DOC: ComponentDoc = {
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
-    { collection: 'Theme', inCode: '`data-theme` on an ancestor; the chip sets `data-surface` itself from `selected`.',
-      inFigma: 'The variant root pins `Theme=Primary`, and `Chip-body` pins `Surface=Surface-Brightest`. The theme is the root; the surface is the body.' },
+    { collection: 'Theme', inCode: '`variant` sets `data-theme` on the chip; the chip sets `data-surface` itself from `selected`. `variant="default"` sets no theme and inherits.',
+      inFigma: 'One layer carries both: `Theme-Chip-Body` pins `Theme` AND the `Surface` level. Nothing is pinned on the variant root — the shadow lives on `Chip Holder` ABOVE it, so a drop shadow reads the page\'s theme rather than the chip\'s.' },
   ],
   themingNotes: [
     'Do not reach for an outline variant — there is no outline/solid axis, only selected and unselected. `-outline` is stripped to the solid variant for back-compat and should not be written.',

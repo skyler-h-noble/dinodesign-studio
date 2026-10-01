@@ -680,6 +680,36 @@ CONVERSION RULES:
     only place icons come from; the component library ships none.
         import AddIcon from '@mui/icons-material/Add';
 
+    THE GLYPH MAY BE A TEXT LAYER. The icon set is a FONT, so the glyph is a
+    text node whose CHARACTERS are the ligature — "home", "info_outline" — in
+    one of the Material Icons families. Read the characters; fall back to the
+    layer name only if they are empty. Figma names a text layer after its
+    content, so the two normally agree, but the name stops tracking once the
+    content is edited and the characters are what is actually drawn.
+
+    THE Icon COMPONENT CARRIES A Style VARIANT, and it is the font family.
+    Material ships the same glyph in three corner treatments, and MUI ships a
+    matching component for each, so the variant decides the SUFFIX:
+
+        Style=Default  (Material Icons)        add -> AddIcon
+        Style=Round    (Material Icons Round)  add -> AddRoundedIcon
+        Style=Sharp    (Material Icons Sharp)  add -> AddSharpIcon
+
+        import AddRoundedIcon from '@mui/icons-material/AddRounded';
+
+    Note Figma says "Round" and MUI says "Rounded" — map it, do not copy it.
+    Dropping the variant is a silent miss: a rounded icon emitted as AddIcon
+    still compiles and still renders an icon, just with the wrong corners.
+
+    SOLID vs OUTLINE IS IN THE NAME, NOT THE VARIANT. None of the three
+    families is outlined — they are all filled, differing only in corner
+    treatment. An outlined icon is a different ligature with its own name, and
+    it already PascalCases correctly:
+        info_outline   -> InfoOutlinedIcon
+        star_border    -> StarBorderIcon
+    So never infer outline from the Style variant, and never strip an _outline
+    or _border suffix thinking it is decoration — it is the icon's identity.
+
     ALWAYS WRAP IT IN THE LIB'S <Icon>. A bare <AddIcon /> takes MUI's colour
     and sizing rather than the brand's. <Icon> is aria-hidden by default, which
     is what a decorative glyph inside a labelled control should be.

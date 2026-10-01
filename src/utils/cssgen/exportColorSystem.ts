@@ -1574,6 +1574,66 @@ function generateIconVariantsForBackground(
  * Generate complete Icon palette structure organized by palette > Color-N
  * Now supports different values for Light-Mode and Dark-Mode
  */
+/**
+ * Which palette tone an ICON renders at, on a background of tone N.
+ *
+ * Icons carry meaning, so under WCAG 1.4.11 they need the same 3:1 against the
+ * background a Border does — and therefore the same tones. These arrays mirror
+ * Border.Surfaces exactly (verified identical across all eight palettes in both
+ * modes). The previous icon-specific tones sat too close to the background:
+ * 86.8% passing in light mode and only 16.7% in dark. Adopting Border's tones
+ * takes both to ~100%.
+ *
+ * Keep these in step with the Border structures — if a Border tone changes, the
+ * matching icon tone must change with it or icons silently drop below 3:1.
+ *
+ * This is the ONE source for the mapping. generateIconPaletteStructure builds
+ * the export's Icon section from it and buildPreviewCSS builds the preview's
+ * --Icons-* from it, because the two holding separate copies is invariant 5
+ * exactly: both self-consistent, silently disagreeing, no unresolved var to
+ * report it.
+ */
+const ICON_TONES = {
+  // For Color-1 through Color-6 (dark backgrounds)
+  lightDarkBg:  [6, 6, 7, 9, 10, 2],
+  // For Color-7 through Color-12 (light backgrounds)
+  lightLightBg: [5, 5, 5, 5, 5, 5],
+  darkDarkBg:   [6, 6, 7, 8, 9, 2],
+  darkLightBg:  [3, 4, 5, 5, 5, 5],
+} as const;
+
+/**
+ * Containers do NOT render at tone N: in dark mode every container level is
+ * drawn from the Color-2..Color-4 ramp regardless of background, and in light
+ * mode a container is flat Color-11 on a light background or Color-2 on a dark
+ * one. Keying icons by N therefore picked a tone for a background the container
+ * never has — putting dark icons on dark containers (#2d3d32 on #111111 =
+ * 1.64:1). Resolve the container's actual tone first.
+ */
+function iconContainerTone(n: number, isDark: boolean): number {
+  if (isDark) return 4;          // dark containers span Color-2..4; anchor on Color-4
+  return n <= 5 ? 2 : 11;        // light: Color-2 on a dark background, else Color-11
+}
+
+/** The tone an icon renders at, for a background of tone `n`. */
+export function iconToneAt(n: number, isContainer: boolean, isDark: boolean): number {
+  const effectiveN = isContainer ? iconContainerTone(n, isDark) : n;
+  const darkBg = isDark ? ICON_TONES.darkDarkBg : ICON_TONES.lightDarkBg;
+  const lightBg = isDark ? ICON_TONES.darkLightBg : ICON_TONES.lightLightBg;
+  return effectiveN <= 6 ? darkBg[effectiveN - 1] : lightBg[effectiveN - 7];
+}
+
+/**
+ * Get fixed Icon token reference, in the same shape as getFixedTextToken /
+ * getFixedHeaderToken so the preview can consume all three the same way.
+ */
+export function getFixedIconToken(
+  backgroundNumber: number, isContainer: boolean, paletteName: string, isDark: boolean,
+): string {
+  const n = Math.max(1, Math.min(12, backgroundNumber));
+  return `{Colors.${paletteName}.Color-${iconToneAt(n, isContainer, isDark)}}`;
+}
+
 function generateIconPaletteStructure(isDark: boolean = false) {
   const iconStructure: any = {
     Surfaces: {
@@ -1601,56 +1661,24 @@ function generateIconPaletteStructure(isDark: boolean = false) {
   const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
   const surfaces = ['Surfaces', 'Containers'];
   
-  // Icons carry meaning, so under WCAG 1.4.11 they need the same 3:1 against the
-  // background that a Border does — and therefore the same tones. These arrays
-  // mirror Border.Surfaces exactly (verified identical across all eight
-  // palettes in both modes).
-  //
-  // The previous icon-specific tones sat too close to the background: they
-  // measured 86.8% passing in light mode and only 16.7% in dark. Adopting
-  // Border's tones takes both to ~100%.
-  //
-  // Keep these in step with the Border structures — if a Border tone changes,
-  // the matching icon tone must change with it or icons silently drop below 3:1.
-  const lightMode_DarkBackgroundColors = [6, 6, 7, 9, 10, 2];      // For Color-1 through Color-6
-  const lightMode_LightBackgroundColors = [5, 5, 5, 5, 5, 5];      // For Color-7 through Color-12
-
-  const darkMode_DarkBackgroundColors = [6, 6, 7, 8, 9, 2];        // For Color-1 through Color-6
-  const darkMode_LightBackgroundColors = [3, 4, 5, 5, 5, 5];       // For Color-7 through Color-12
-
-  const darkBgColors = isDark ? darkMode_DarkBackgroundColors : lightMode_DarkBackgroundColors;
-  const lightBgColors = isDark ? darkMode_LightBackgroundColors : lightMode_LightBackgroundColors;
-
-  // Index N is the BACKGROUND tone. For Surfaces that is also the tone the
-  // surface renders at, so N indexes the arrays directly.
-  //
-  // Containers do NOT render at tone N: in dark mode every container level is
-  // drawn from the Color-2..Color-4 ramp regardless of background, and in light
-  // mode a container is flat Color-11 on a light background or Color-2 on a dark
-  // one. Keying icons by N therefore picked a tone for a background the
-  // container never has — putting dark icons on dark containers (e.g.
-  // #2d3d32 on #111111 = 1.64:1). Resolve the container's actual tone first.
-  const containerToneFor = (n: number): number => {
-    if (isDark) return 4;            // dark containers span Color-2..4; anchor on Color-4
-    return n <= 5 ? 2 : 11;          // light: Color-2 on a dark background, else Color-11
-  };
-  const toneAt = (n: number): number =>
-    n <= 6 ? darkBgColors[n - 1] : lightBgColors[n - 7];
-
+  // The tone mapping lives in iconToneAt (module scope), so the preview can
+  // build --Icons-* from the same function instead of a second copy.
   surfaces.forEach(surface => {
     const isContainer = surface === 'Containers';
     palettes.forEach(palette => {
       for (let n = 1; n <= 12; n++) {
-        const effectiveN = isContainer ? containerToneFor(n) : n;
         iconStructure[surface][palette][`Color-${n}`] = {
-          value: `{Colors.${palette}.Color-${toneAt(effectiveN)}}`,
+          value: getFixedIconToken(n, isContainer, palette, isDark),
           type: 'color'
         };
       }
 
-      // Color-Vibrant
+      // Color-Vibrant. Surfaces pin tone 9 directly rather than going through
+      // the table; containers resolve 9 the same way every other tone does.
       iconStructure[surface][palette]['Color-Vibrant'] = {
-        value: `{Colors.${palette}.Color-${isContainer ? toneAt(containerToneFor(9)) : 9}}`,
+        value: isContainer
+          ? getFixedIconToken(9, true, palette, isDark)
+          : `{Colors.${palette}.Color-9}`,
         type: 'color'
       };
     });

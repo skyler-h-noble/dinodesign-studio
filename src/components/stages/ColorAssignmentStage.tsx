@@ -262,7 +262,7 @@ export default function ColorAssignmentStage({
             </div>
           </div>
 
-          <BodySmall className="assign-preview-label" style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>Preview</BodySmall>
+          <BodySmall className="assign-preview-label" color="quiet" style={{ fontSize: '0.7rem' }}>Preview</BodySmall>
         </div>
 
         {/* ─── Right: Controls ─── */}
@@ -300,7 +300,7 @@ export default function ColorAssignmentStage({
                 }}
               >
                 <HStack spacing={1} alignItems="center">
-                  <BodySmall style={{ color: 'var(--Quiet)', cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
+                  <BodySmall color="quiet" style={{ cursor: 'grab', width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⠿</BodySmall>
                   <div
                     aria-hidden
                     style={{

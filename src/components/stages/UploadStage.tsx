@@ -103,11 +103,11 @@ export default function UploadStage({
     <VStack spacing={4} alignItems="center" style={{ padding: '60px 24px' }}>
       <VStack spacing={1} alignItems="center">
         <H2 style={{ textAlign: 'center' }}>Upload Mood Board</H2>
-        <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+        <Body color="quiet" style={{ textAlign: 'center' }}>
           Upload an image to extract colors and styles
         </Body>
         {!preview && (
-          <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center', fontStyle: 'italic' }}>
+          <BodySmall color="quiet" style={{ textAlign: 'center', fontStyle: 'italic' }}>
             An image is required to continue.
           </BodySmall>
         )}
@@ -158,7 +158,7 @@ export default function UploadStage({
         ) : (
           <VStack spacing={1} alignItems="center">
             <CloudUploadIcon style={{ fontSize: 48, color: 'var(--Quiet)', opacity: 0.5 }} />
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Drag and drop image or mood board</Body>
+            <Body color="quiet" style={{ textAlign: 'center' }}>Drag and drop image or mood board</Body>
             <BodySmall style={{ color: 'var(--Text-Quiet)', textAlign: 'center' }}>or click to browse</BodySmall>
           </VStack>
         )}

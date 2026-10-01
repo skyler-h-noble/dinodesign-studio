@@ -1,3 +1,21 @@
+/*
+ * Raw elements here are a deliberate exception, and this says why so the audit
+ * does not keep finding them.
+ *
+ * This widget renders THREE OTHER design systems side by side, loading each
+ * one's published CSS and letting the cards paint themselves from it. Its own
+ * styles are token-driven — var(--Background), var(--Border), var(--Hover),
+ * var(--Buttons-Primary-Button) — so it follows whichever system is active;
+ * what it does not do is use lib components, because the card's whole job is to
+ * be a surface those foreign stylesheets paint.
+ *
+ * Closest in spirit to PhonePreview: chrome that displays someone else's
+ * system. `.card-title` sets its own weight, size and colour, so swapping in
+ * the lib's H3 would change nothing visible while adding a cascade to reason
+ * about.
+ *
+ * If this should be converted anyway, the card is a <Card> + <H3> + <Body>.
+ */
 import { useEffect, useRef, useState } from 'react';
 
 const DS_IDS = [

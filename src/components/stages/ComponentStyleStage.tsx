@@ -149,7 +149,7 @@ export default function ComponentStyleStage({
           <VStack spacing={2}>
             <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style Settings</H3>
 
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)', marginTop: 8 }}>Components</BodySmall>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', marginTop: 8 }}>Components</BodySmall>
             {[
               { key: 'button', label: 'Button', defaultOpen: true, content: (
                 <VStack spacing={2} style={{ width: '100%' }}>
@@ -166,7 +166,7 @@ export default function ComponentStyleStage({
                     size="small"
                     valueLabelDisplay="auto"
                   />
-                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
+                  <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
                   <Slider variant="default" label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider variant="default" label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                   <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
@@ -215,8 +215,8 @@ export default function ComponentStyleStage({
           {/* Presets — base style picker. Lives in the main column so the
               full row of options stays visible (the left nav crops them). */}
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>Presets</BodySmall>
-            <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>Choose a base style then fine-tune the details.</BodySmall>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>Presets</BodySmall>
+            <BodySmall color="quiet" style={{ textAlign: 'center' }}>Choose a base style then fine-tune the details.</BodySmall>
             <ButtonGroup
               size="small"
               fit="equal"
@@ -300,7 +300,7 @@ export default function ComponentStyleStage({
                 <VStack spacing={4}>
                   {/* Style: Solid, Outline, Ghost */}
                   <VStack spacing={2}>
-                    <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Style</Label>
+                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Style</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
                       <Button variant="default" size="medium"
                         sx={{ minHeight: `${custom.buttonHeight}px` }}
@@ -322,7 +322,7 @@ export default function ComponentStyleStage({
 
                   {/* Size: Small, Medium, Large */}
                   <VStack spacing={2}>
-                    <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Size</Label>
+                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Size</Label>
                     <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
                       <Button variant="default" size="small"
                         sx={{ minHeight: `${custom.smallButtonHeight}px` }}
@@ -344,7 +344,7 @@ export default function ComponentStyleStage({
 
                   {/* Icon Buttons: Solid, Outline, Ghost */}
                   <VStack spacing={2}>
-                    <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Icon Buttons</Label>
+                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Icon Buttons</Label>
                     <HStack spacing={2}>
                       <Button variant="default" size="medium" iconOnly
                         sx={{
@@ -381,7 +381,7 @@ export default function ComponentStyleStage({
 
                   {/* Inputs: text, search, dropdown */}
                   <VStack spacing={2}>
-                    <Label style={{ fontSize: '0.7rem', color: 'var(--Quiet)' }}>Inputs</Label>
+                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Inputs</Label>
                     <VStack spacing={2}>
                       <TextInput label="Text" placeholder="Type here..." size="small" fullWidth />
                       <SearchField placeholder="Search..." size="small" fullWidth />

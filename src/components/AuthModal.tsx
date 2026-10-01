@@ -129,7 +129,7 @@ export default function AuthModal({ open, onClose, onSuccess }: Props) {
           {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
         </Button>
 
-        <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+        <BodySmall color="quiet" style={{ textAlign: 'center' }}>
           {mode === 'signin' ? (
             <>Don't have an account?{' '}
               <Link

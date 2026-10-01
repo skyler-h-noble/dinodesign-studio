@@ -69,7 +69,7 @@ export default function CheckoutSuccess() {
       {status === 'checking' && (
         <>
           <H2 style={{ textAlign: 'center' }}>Payment received!</H2>
-          <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+          <Body color="quiet" style={{ textAlign: 'center' }}>
             Setting up your account... This may take a moment.
           </Body>
           <div className="typo-spinner" />
@@ -79,7 +79,7 @@ export default function CheckoutSuccess() {
       {status === 'ready' && (
         <>
           <H2 style={{ textAlign: 'center' }}>You're all set!</H2>
-          <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+          <Body color="quiet" style={{ textAlign: 'center' }}>
             Your credits have been added. Redirecting you back...
           </Body>
         </>
@@ -88,7 +88,7 @@ export default function CheckoutSuccess() {
       {status === 'timeout' && (
         <>
           <H2 style={{ textAlign: 'center' }}>Almost there</H2>
-          <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+          <Body color="quiet" style={{ textAlign: 'center' }}>
             Your payment was received but credits are still being processed.
             This can take up to a minute.
           </Body>

@@ -57,9 +57,26 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Chip:              { page: 'Chip', sets: ['Chip'] },
   Dialog:            { page: 'Dialog', sets: ['Dialog'] },
   Divider:           { page: 'Divider', sets: ['Divider'] },
+  /* Designed 2026-10-01, so it moves out of NO_FIGMA_PAGE.undesigned. The page
+     holds a lone COMPONENT rather than a set — CodeBlock has no variant axis,
+     it is one shape whose content changes. */
+  CodeBlock:         { page: 'CodeBlock', sets: ['CodeBlock'] },
   Drawer:            { page: 'Drawer', sets: ['Drawer'] },
   Fab:               { page: 'FAB', sets: ['FAB'],
                        note: 'Figma says FAB, the export says Fab. Every one of the ~110 FAB variables spells it FAB, and renaming the export would break consumers — so the two differ on purpose.' },
+  /* The Icon page is a FONT now, not a glyph library.
+     It carried ~1,500 icon components and the template's own components used
+     FIFTEEN of them — home, chevron_left, chevron_right, photo, error, info,
+     check_circle, warning, flight, hotel, local_dining, directions_car,
+     star_purple500, star_border_purple500, arrow_drop_down. A 99% carrying
+     cost, paid by every clone and every scan over the file.
+     So the glyph is a TEXT layer in Material Icons, and the Icon component set
+     carries a Style variant for the three families Figma has — Default, Round,
+     Sharp. All three are FILLED; the legacy Outlined and Two Tone families are
+     not available in Figma, so outline comes from the ligature instead
+     (info vs info_outline, star vs star_border), which is also what makes it
+     survive conversion: the style is in the NAME, and the name is what
+     figmaToCode reads. */
   Icon:              { page: 'Icon', sets: ['Icon'] },
   Input:             { page: 'Input', sets: ['Input', 'Input Buttons', 'Input Text Style'] },
   Link:              { page: 'Link', sets: ['Link', 'Hotlink Group'] },
@@ -116,7 +133,7 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
  *
  * Two kinds, and only the first is a gap:
  *   DRAWN but undesigned — Autocomplete, Select, TextField, SearchField,
- *     Popover, Paper, Sidebar, Toolbar, CodeBlock, IconBadge, DropZone,
+ *     Popover, Paper, Sidebar, Toolbar, IconBadge, DropZone,
  *     StateMessage. Real UI a designer would expect to find.
  *   NOT DRAWABLE — Container, Grid, Stack, Spacing, Section, MainLayout,
  *     Showcase, Colors, BevelText, CurvedText, Copyright, Footer, Gradient.
@@ -125,7 +142,7 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
 export const NO_FIGMA_PAGE = {
   undesigned: [
     'Autocomplete', 'TextField', 'SearchField', 'Popover', 'Paper',
-    'Sidebar', 'Toolbar', 'CodeBlock', 'IconBadge', 'DropZone', 'StateMessage',
+    'Sidebar', 'Toolbar', 'IconBadge', 'DropZone', 'StateMessage',
   ],
   notDrawable: [
     'Container', 'Grid', 'Stack', 'Spacing', 'Section', 'MainLayout',

@@ -1,6 +1,6 @@
 {
   "_comment": "Captured from the library Figma file Qv2dqF7mYoAGY77EkdrwTv on 2026-09-30. Node ids are per COPY of the template and are NOT used for matching - the plugin reports the user's own at link time. They are captured so drift in this capture is visible. Page and set NAMES are what figmaComponentMap keys on. `pages` is every page; `sets` covers component SETS plus the handful of lone COMPONENTs on pages that have no set. Pages with a set are not scanned for lone components: the Icon page holds ~600 individual glyphs, which are artwork.",
-  "capturedAt": "2026-09-30 (second capture: Dropdown page renamed Select, MenuItem split out)",
+  "capturedAt": "2026-10-01 (third capture: CodeBlock designed — page and lone COMPONENT added; it moved out of NO_FIGMA_PAGE.undesigned)",
   "fileKey": "Qv2dqF7mYoAGY77EkdrwTv",
   "sets": [
     {
@@ -122,6 +122,12 @@
       "name": "Chip",
       "id": "8927:15447",
       "variants": 10
+    },
+    {
+      "page": "CodeBlock",
+      "name": "CodeBlock",
+      "id": "9150:18462",
+      "variants": 1
     },
     {
       "page": "Data Visualization",
@@ -586,6 +592,7 @@
     "Carousel",
     "Checkbox",
     "Chip",
+    "CodeBlock",
     "Data Visualization",
     "Date Picker",
     "Dialog",

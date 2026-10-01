@@ -8,7 +8,7 @@ import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '.
  */
 
 // Fixed seed colors for semantic palettes
-const SEMANTIC_SEEDS: Record<string, string> = {
+export const SEMANTIC_SEEDS: Record<string, string> = {
   neutral: '#808080',           // Pure gray
   info: '#4A7BF7',             // Blue
   success: '#2E9E5A',          // Green

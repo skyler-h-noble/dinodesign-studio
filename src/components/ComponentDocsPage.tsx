@@ -17,6 +17,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
+import { H1, H2, Body, BodySmall, Link, Tabs, TabList, Tab } from '@omni-design/components';
 import { COMPONENT_DOCS } from '../utils/docs/components';
 import type { ComponentDoc } from '../utils/docs/componentDoc';
 import { docsSlug } from '../utils/docs/docsLink';
@@ -32,6 +33,20 @@ const mono: React.CSSProperties = {
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, lineHeight: 1.6,
 };
 const wrap: React.CSSProperties = { padding: '32px 24px', maxWidth: 960, margin: '0 auto' };
+
+/* The page CHROME is pinned to Neutral at its brightest surface, and that is
+   what lets it use lib components at all.
+ 
+   Without it the chrome would be painted by whichever design system the route
+   loads, so a brand with an extreme palette could make its own documentation
+   unreadable. The old answer was to write the chrome as bare <h1>/<p>, which
+   works only because the generated CSS gives bare elements NO appearance — real
+   isolation, but invisible, and it cost the page every lib component.
+ 
+   Pinning the zone states the same intent out loud: stable, light chrome
+   regardless of brand, while the Example panel below keeps its own surface so
+   the component still renders in the user's system. */
+const CHROME = { 'data-theme': 'Neutral', 'data-surface': 'Surface-Brightest' } as const;
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -64,7 +79,7 @@ function TabBody({ doc, tab }: { doc: ComponentDoc; tab: TabName }) {
            agent has not found look identical otherwise, and the first is a real
            answer. Modal and Drawer need open state and a portal, and a
            half-working example teaches a shape that does not run. */
-        return <p style={mono}>No live example — this component needs state or a portal to be shown honestly. The props below are the reference.</p>;
+        return <Body color="quiet">No live example — this component needs state or a portal to be shown honestly. The props below are the reference.</Body>;
       }
       return <div style={{ padding: 24 }} data-surface="Surface">{EXAMPLES[doc.name]()}</div>;
 
@@ -114,18 +129,18 @@ export function ComponentDocsPage() {
 
   if (!doc) {
     return (
-      <div style={wrap}>
-        <h1 style={mono}>{component || 'Component'}</h1>
-        <p style={mono}>No reference for this component.</p>
+      <div style={wrap} {...CHROME}>
+        <H1>{component || 'Component'}</H1>
+        <Body>No reference for this component.</Body>
         <List items={COMPONENT_DOCS.map(d => d.name)} />
       </div>
     );
   }
 
   const body = (
-    <div style={wrap}>
-      <h1 style={{ ...mono, fontSize: 28, marginBottom: 4 }}>{doc.name}</h1>
-      <p style={{ ...mono, opacity: 0.8 }}>{doc.summary}</p>
+    <div style={wrap} {...CHROME}>
+      <H1 style={{ fontSize: 28, marginBottom: 4 }}>{doc.name}</H1>
+      <Body color="quiet">{doc.summary}</Body>
 
       {doc.insteadUse.length > 0 && (
         <div style={{ ...mono, margin: '16px 0', paddingLeft: 12, borderLeft: '3px solid var(--Border-Variant, #eee)' }}>
@@ -133,17 +148,15 @@ export function ComponentDocsPage() {
         </div>
       )}
 
-      <div role="tablist" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, margin: '20px 0 16px' }}>
-        {TABS.map(t => (
-          <button key={t} role="tab" aria-selected={t === tab} onClick={() => setTab(t)}
-            style={{ ...mono, padding: '6px 12px', cursor: 'pointer',
-              border: '1px solid var(--Border-Variant, #ddd)',
-              borderBottomWidth: t === tab ? 2 : 1,
-              borderBottomColor: t === tab ? 'var(--Buttons-Primary-Border, #333)' : 'var(--Border-Variant, #ddd)',
-              background: 'transparent', fontWeight: t === tab ? 600 : 400 }}>
-            {t}
-          </button>
-        ))}
+      {/* The lib's Tabs, not a hand-rolled role="tablist": it brings the roles,
+          the arrow-key roving focus and the selected mark, all of which the
+          hand-rolled version had to restate and only partly did. */}
+      <div style={{ margin: '20px 0 16px' }}>
+        <Tabs value={TABS.indexOf(tab)} onChange={(_: unknown, i: number) => setTab(TABS[i])}>
+          <TabList>
+            {TABS.map(t => <Tab key={t}>{t}</Tab>)}
+          </TabList>
+        </Tabs>
       </div>
 
       <TabBody doc={doc} tab={tab} />
@@ -168,12 +181,12 @@ export function ComponentDocsPage() {
 
 function ReportLink({ component, designSystemId }: { component: string; designSystemId: string }) {
   return (
-    <p style={{ ...mono, marginTop: 40, opacity: 0.8 }}>
+    <BodySmall color="quiet" style={{ marginTop: 40 }}>
       Something wrong or missing?{' '}
-      <a href={`/report?component=${encodeURIComponent(component)}&system=${encodeURIComponent(designSystemId)}`}>
+      <Link href={`/report?component=${encodeURIComponent(component)}&system=${encodeURIComponent(designSystemId)}`}>
         Report an issue or request a component
-      </a>
-    </p>
+      </Link>
+    </BodySmall>
   );
 }
 
@@ -181,11 +194,11 @@ function ReportLink({ component, designSystemId }: { component: string; designSy
 export function ComponentDocsIndex() {
   const { uuid } = useParams<{ uuid: string }>();
   return (
-    <div style={wrap}>
-      <h1 style={{ ...mono, fontSize: 28 }}>Component reference</h1>
+    <div style={wrap} {...CHROME}>
+      <H1 style={{ fontSize: 28 }}>Component reference</H1>
       <pre style={{ ...mono, whiteSpace: 'pre-wrap' }}>{renderColourSystem()}</pre>
       <pre style={{ ...mono, whiteSpace: 'pre-wrap' }}>{renderFoundations()}</pre>
-      <h2 style={mono}>Components</h2>
+      <H2>Components</H2>
       <ul style={{ ...mono, paddingLeft: 20 }}>
         {COMPONENT_DOCS.map(d => (
           <li key={d.name} style={{ marginBottom: 6 }}>

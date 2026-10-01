@@ -10,15 +10,26 @@
  * portal, and a half-working example is worse than none — it teaches a shape
  * that does not run. Those fall through to the props table, which is honest.
  *
- * Tag and Loader have no example because the package does not export them,
- * even at 0.11.0 — they exist as directories in the library but are not in its
- * public index. That is a library gap rather than a docs one, and an example
- * cannot import what is not exported.
+ * The Input example imports TEXTINPUT, not Input. The package publishes the
+ * component under that name — `export { Input as TextInput }`, which the
+ * library's index calls the preferred one — while the doc entry, the Figma page
+ * and figmaComponentMap all still say "Input". Importing `Input` here threw at
+ * RUNTIME ("does not provide an export named 'Input'") and took the whole docs
+ * page down, not just this example.
+ *
+ * TypeScript could not have caught it: src/types/dynodesign.d.ts `declare
+ * module`s the package, and a declared module REPLACES the real types, so the
+ * compiler stopped being able to tell the truth about what the package exports.
+ * That is the AvatarMenu warning in this repo's CLAUDE.md, played out.
+ *
+ * Tag and Loader still have no example. They were missing from the library's
+ * index entirely and have been added, but the studio installs the PUBLISHED
+ * package — so they arrive here on the next release, not before.
  */
 import React from 'react';
 import {
   Button, Chip, Badge, Alert, Card, Avatar, Icon, Link, Divider,
-  Checkbox, Radio, RadioGroup, SwitchInput, Slider, Rating, Input, Breadcrumbs,
+  Checkbox, Radio, RadioGroup, SwitchInput, Slider, Rating, TextInput, Breadcrumbs,
   Pagination, Tabs, TabList, Tab, TabPanel, ButtonGroup, Accordion,
   Body, H3, VStack, HStack,
 } from '@omni-design/components';
@@ -96,6 +107,7 @@ export const EXAMPLES: Record<string, () => React.ReactElement> = {
       <Radio value="b" label="Second" />
     </RadioGroup>
   ),
+  Input: () => <TextInput label="Email" placeholder="you@example.com" />,
   SwitchInput: () => (
     <VStack gap="var(--Sizing-Half)">
       <SwitchInput label="Off" />
@@ -104,7 +116,6 @@ export const EXAMPLES: Record<string, () => React.ReactElement> = {
   ),
   Slider: () => <Slider defaultValue={40} />,
   Rating: () => <Rating defaultValue={3} />,
-  Input: () => <Input label="Email" placeholder="you@example.com" />,
   Breadcrumbs: () => (
     <Breadcrumbs>
       <Link href="#a">Home</Link>

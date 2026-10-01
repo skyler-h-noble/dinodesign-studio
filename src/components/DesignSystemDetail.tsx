@@ -20,6 +20,8 @@ import {
   Modal,
   Chip,
   CodeBlock,
+  Alert,
+  IconBadge,
 } from '@omni-design/components';
 import ComputerIcon from '@mui/icons-material/Computer';
 import CloseIcon from '@mui/icons-material/Close';
@@ -546,7 +548,7 @@ function FigmaUpdateModal({ open, onClose, hasLinkedFile }: { open: boolean; onC
         </Body>
         <Card padding="medium">
           <VStack spacing={2}>
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
               In Figma
             </BodySmall>
             <Step n={1} body="Open your linked Figma file." />
@@ -633,7 +635,10 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
             ))}
           </HStack>
           <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ ...headerStyle, margin: 0, fontSize: '1.6rem', fontWeight: 700 }}>{record.name}</h2>
+            {/* H2, not a raw <h2>: the lib's heading keeps --Header and the type
+                ramp, and `headerStyle` only overlays the brand's own header face
+                so the system's name renders in its own typeface. */}
+            <H2 style={{ ...headerStyle, margin: 0, fontSize: '1.6rem', fontWeight: 700 }}>{record.name}</H2>
             <BodySmall color="quiet">
               {record.componentStyle} · v{record.version} · created {record.createdAt?.toLocaleDateString() || 'unknown'}
             </BodySmall>
@@ -720,28 +725,25 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
           </HStack>
         </HStack>
         {pending > 0 && (
-          <HStack spacing={2} data-theme="Warning" data-surface="Container" style={{
-            padding: '8px 12px', borderRadius: 6,
-            background: 'var(--Background)',
-            border: '1px solid var(--Border)',
-            fontSize: 12,
-            alignItems: 'center',
-          }}>
-            <BodySmall style={{ flex: 1 }}>
-              <strong>{pending} {pending === 1 ? 'change' : 'changes'}</strong> not yet pushed to Figma. Re-import in the plugin to sync.
-            </BodySmall>
-            <Button
-              variant="primary-outline"
-              size="small"
-              disabled={marking}
-              onClick={async () => {
-                setMarking(true);
-                try { await onMarkPushed(); } finally { setMarking(false); }
-              }}
-            >
-              {marking ? 'Marking…' : 'Mark as pushed'}
-            </Button>
-          </HStack>
+          <Alert
+            color="warning"
+            size="small"
+            endDecorator={
+              <Button
+                variant="primary-outline"
+                size="small"
+                disabled={marking}
+                onClick={async () => {
+                  setMarking(true);
+                  try { await onMarkPushed(); } finally { setMarking(false); }
+                }}
+              >
+                {marking ? 'Marking…' : 'Mark as pushed'}
+              </Button>
+            }
+          >
+            <strong>{pending} {pending === 1 ? 'change' : 'changes'}</strong> not yet pushed to Figma. Re-import in the plugin to sync.
+          </Alert>
         )}
         <HStack spacing={1} style={{ alignItems: 'center' }}>
           <BodySmall color="quiet" style={{ flexShrink: 0, width: 24 }}>ID:</BodySmall>
@@ -752,6 +754,11 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
               fullWidth
               inputProps={{ readOnly: true }}
               onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
+              /* The lib's INPUT BUTTON — ghost, small, tight padding — which is
+                 the pattern InputShowcase publishes for a copy affordance in a
+                 field. Not CodeBlock's CopyButton: that is an icon-only
+                 IconButton with a tooltip, built for the dark code panel, and it
+                 does not read as the in-field button Figma's Input set draws. */
               endAdornment={
                 <Button
                   variant="ghost"
@@ -830,9 +837,9 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
     <div className="export-cards-grid">
       <Card padding="medium">
         <VStack spacing={3}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Primary-Button)', color: 'var(--Buttons-Primary-Text)' }}>
+          <IconBadge color="primary">
             <ComputerIcon />
-          </div>
+          </IconBadge>
           <H3 style={{ fontSize: '1.1rem' }}>Hosted Design System</H3>
           <BodySmall color="quiet">
             View your complete design system with all components rendered with your brand tokens.
@@ -845,7 +852,9 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
 
       <Card padding="medium">
         <VStack spacing={3}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a', color: '#fff' }}>
+          {/* IconBadge has no black: black is not a Theme mode, so it bound nothing.
+              Neutral at its dimmest surface is the system's near-black. */}
+          <IconBadge color="neutral" variant="dark">
             <svg width="20" height="20" viewBox="0 0 38 57" fill="none">
               <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" fill="#1ABCFE"/>
               <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" fill="#0ACF83"/>
@@ -853,7 +862,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
               <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" fill="#F24E1E"/>
               <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" fill="#A259FF"/>
             </svg>
-          </div>
+          </IconBadge>
           <H3 style={{ fontSize: '1.1rem' }}>Figma Design System</H3>
           {record.linkedFigmaFiles.length > 0 ? (
             <>
@@ -887,9 +896,9 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
 
       <Card padding="medium">
         <VStack spacing={3}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Tertiary-Button)', color: 'var(--Buttons-Tertiary-Text)' }}>
+          <IconBadge color="tertiary">
             <CodeIcon />
-          </div>
+          </IconBadge>
           <H3 style={{ fontSize: '1.1rem' }}>Add to Your Code Project</H3>
           <BodySmall color="quiet">
             Install the OmniDesign component library and connect your design system to your React project.
@@ -903,9 +912,9 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
 
       <Card padding="medium">
         <VStack spacing={3}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Secondary-Button)', color: 'var(--Buttons-Secondary-Text)' }}>
+          <IconBadge color="secondary">
             <GridViewIcon />
-          </div>
+          </IconBadge>
           <H3 style={{ fontSize: '1.1rem' }}>Start Using in AI</H3>
           <BodySmall color="quiet">
             Connect your design system to Cursor, Claude Code, or any AI coding assistant.
@@ -919,9 +928,9 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
 
       <Card padding="medium">
         <VStack spacing={3}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--Buttons-Success-Button)', color: 'var(--Buttons-Success-Text)' }}>
+          <IconBadge color="success">
             <CheckCircleOutlineIcon />
-          </div>
+          </IconBadge>
           <H3 style={{ fontSize: '1.1rem' }}>Accessibility Report</H3>
           <BodySmall color="quiet">
             Detailed contrast report for every background, surface, and container.
@@ -940,8 +949,10 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
         <VStack spacing={2}>
           <HStack spacing={1} style={{ alignItems: 'center' }}>
             <H3 style={{ fontSize: '1.1rem', margin: 0 }}>Text over image default</H3>
+            {/* `variant`, not `color` — Chip has no `color` prop, so the
+                success/default distinction was silently never applied. */}
             {overlayHasDefault !== null && (
-              <Chip color={overlayHasDefault ? 'success' : 'default'} size="small">
+              <Chip variant={overlayHasDefault ? 'success' : 'default'}>
                 {overlayHasDefault ? 'Set' : 'Not set'}
               </Chip>
             )}
@@ -1109,7 +1120,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           >
             Push to local OmniDesign
           </Button>
-          <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+          <BodySmall color="quiet" style={{ fontSize: '0.7rem', textAlign: 'center' }}>
             Writes the 3 dynamic CSS files (base / Light-Mode / Dark-Mode) into your OmniDesign repo folder. Chrome/Edge only. First click prompts you to pick the folder; after that it remembers.
           </BodySmall>
         </VStack>
@@ -1187,7 +1198,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
     <VStack spacing={3}>
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Subscription
           </BodySmall>
           <KV k="Plan" v={record.plan || 'design-system (one-time)'} />
@@ -1197,12 +1208,12 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
 
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Hosting
           </BodySmall>
           <KV k="Tokens" v="Firebase Storage · public read" />
           <HStack spacing={2} style={{ padding: '6px 0', alignItems: 'baseline' }}>
-            <BodySmall style={{ color: 'var(--Quiet)', width: 130, flexShrink: 0 }}>Playground URL</BodySmall>
+            <BodySmall color="quiet" style={{ width: 130, flexShrink: 0 }}>Playground URL</BodySmall>
             <a
               href={`${SHOWCASE_BASE}/?user=${id}`}
               target="_blank"
@@ -1223,7 +1234,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
 
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Linked Figma files
           </BodySmall>
           {record.linkedFigmaFiles.length === 0 ? (
@@ -1245,7 +1256,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
                     <BodySmall style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {f.fileName || 'Untitled file'}
                     </BodySmall>
-                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+                    <BodySmall color="quiet" style={{ fontSize: 11 }}>
                       Last imported{' '}
                       {f.lastSeenAt
                         ? f.lastSeenAt.toLocaleDateString() + ' ' + f.lastSeenAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1275,7 +1286,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
             </VStack>
           )}
           <VStack spacing={1} style={{ width: '100%', paddingTop: 4 }}>
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+            <BodySmall color="quiet" style={{ fontSize: 11 }}>
               {record.linkedFigmaFiles.length ? 'Link another file' : 'Link a file'}
             </BodySmall>
             <HStack spacing={1} style={{ width: '100%', alignItems: 'flex-start' }}>
@@ -1304,7 +1315,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
             {linkError && (
               <BodySmall style={{ color: 'var(--Text-Error)', fontSize: 11 }}>{linkError}</BodySmall>
             )}
-            <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+            <BodySmall color="quiet" style={{ fontSize: 11 }}>
               The plugin re-links on every import and will correct the file name then.
             </BodySmall>
           </VStack>
@@ -1313,7 +1324,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
 
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Add-Ons
           </BodySmall>
           {addOns.length === 0 ? (
@@ -1326,7 +1337,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
 
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Payment Details
           </BodySmall>
           {payments.length === 0 ? (
@@ -1335,7 +1346,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
             <VStack spacing={0}>
               {payments.slice(0, 6).map(p => (
                 <HStack key={p.id} spacing={2} style={{ padding: '6px 0', borderBottom: '1px solid var(--Border)' }}>
-                  <BodySmall style={{ width: 90, color: 'var(--Quiet)', flexShrink: 0 }}>{p.date}</BodySmall>
+                  <BodySmall color="quiet" style={{ width: 90, flexShrink: 0 }}>{p.date}</BodySmall>
                   <BodySmall style={{ flex: 1 }}>{p.description}</BodySmall>
                   <BodySmall style={{ fontWeight: 600, flexShrink: 0 }}>${(p.amount / 100).toFixed(2)}</BodySmall>
                 </HStack>
@@ -1360,7 +1371,7 @@ function VersionsTab({
     return (
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Versions
           </BodySmall>
           <BodySmall color="quiet">
@@ -1376,7 +1387,7 @@ function VersionsTab({
   return (
     <Card padding="medium">
       <VStack spacing={2}>
-        <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+        <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
           Versions
         </BodySmall>
         <VStack spacing={0}>
@@ -1426,7 +1437,7 @@ function VersionsTab({
                       />
                     )}
                   </HStack>
-                  <BodySmall style={{ color: 'var(--Quiet)', fontSize: 11 }}>
+                  <BodySmall color="quiet" style={{ fontSize: 11 }}>
                     {v.componentStyle}
                     {' · '}
                     {v.createdAt
@@ -1488,7 +1499,7 @@ function RestoreVersionModal({
 function KV({ k, v }: { k: string; v: string }) {
   return (
     <HStack spacing={2}>
-      <BodySmall style={{ color: 'var(--Quiet)', width: 140, flexShrink: 0 }}>{k}</BodySmall>
+      <BodySmall color="quiet" style={{ width: 140, flexShrink: 0 }}>{k}</BodySmall>
       <BodySmall>{v}</BodySmall>
     </HStack>
   );

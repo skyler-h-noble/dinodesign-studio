@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import chroma from 'chroma-js';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
+import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 
@@ -133,6 +134,184 @@ describe('--Icons-On-<palette>', () => {
         // test that resolves nothing and passes.
         expect(checked, 'resolved too few pairs to be meaningful').toBeGreaterThan(20);
         expect(failures).toEqual([]);
+      });
+    }
+  }
+});
+
+/**
+ * The PREVIEW must emit the Icons collection too.
+ *
+ * It emitted none of it — not --Icons-Primary, not the -Variant, not On-*. The
+ * export gets all 27 free because processTokens walks the theme JSON; the
+ * preview builds its tokens by hand, so a key nobody names is simply absent.
+ * Nothing reported it: there is no unresolved var() to see, the export just
+ * painted icons from the brand while the preview inherited --Text. Invariant 5,
+ * in the form where both sides are self-consistent.
+ *
+ * Asserting EXISTENCE is not enough (invariant 7 — parity is not correctness),
+ * so these also resolve the preview's own var() chains and hold them to the same
+ * 4.5:1 the export is held to above.
+ */
+function previewCSSFor(colors: [string, string, string], mode: 'light' | 'dark'): string {
+  const light = (h: string) => generateSemanticLightModeScale(h, undefined, h);
+  const dark = (h: string) => generateSemanticDarkModeScale(h);
+  return buildPreviewCSS({
+    colorScheme: {
+      colors,
+      extractedTones: {
+        primary: chroma(colors[0]).lch()[0],
+        secondary: chroma(colors[1]).lch()[0],
+        tertiary: chroma(colors[2]).lch()[0],
+      },
+      tonePalettes: { primary: light(colors[0]), secondary: light(colors[1]), tertiary: light(colors[2]) },
+      darkModeTonePalettes: { primary: dark(colors[0]), secondary: dark(colors[1]), tertiary: dark(colors[2]) },
+    },
+    userSelections: { background: 'primary', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' },
+    componentStyle: 'modern',
+    mode,
+    typographyStyles: [
+      { type: 'header', family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false },
+      { type: 'decorative', family: 'Caveat', weight: '400', letterSpacing: '0em', allCaps: false },
+      { type: 'body', family: 'Inter', weight: '400', letterSpacing: '0em', allCaps: false },
+    ],
+  } as never);
+}
+
+describe('the preview emits the Icons collection', () => {
+  for (const [name, colors] of SCHEMES) {
+    for (const mode of ['light', 'dark'] as const) {
+      const css = previewCSSFor(colors, mode);
+
+      it(`${name} / ${mode}: every palette has Icon, Icon-Variant and On-Icon`, () => {
+        for (const pal of PALETTES) {
+          expect(css, `--Icons-${pal} missing`).toContain(`--Icons-${pal}:`);
+          expect(css, `--Icons-${pal}-Variant missing`).toContain(`--Icons-${pal}-Variant:`);
+          expect(css, `--Icons-On-${pal} missing`).toContain(`--Icons-On-${pal}:`);
+        }
+      });
+
+      it(`${name} / ${mode}: On-Icon clears 4.5:1 on its Icon`, () => {
+        const globals = flatDecls(css);
+        const failures: string[] = [];
+        let checked = 0;
+        for (const { selector, decls } of scopes(css)) {
+          for (const pal of PALETTES) {
+            const onRaw = decls.get(`--Icons-On-${pal}`);
+            const iconRaw = decls.get(`--Icons-${pal}`);
+            if (!onRaw || !iconRaw) continue;
+            const on = resolve(onRaw, decls, globals);
+            const icon = resolve(iconRaw, decls, globals);
+            if (!on || !icon) continue;
+            checked++;
+            const r = contrast(on, icon);
+            if (r < 4.5) failures.push(`${selector} --Icons-On-${pal} ${on} on ${icon} = ${r.toFixed(2)}:1`);
+          }
+        }
+        expect(checked, 'resolved too few pairs to be meaningful').toBeGreaterThan(8);
+        expect(failures).toEqual([]);
+      });
+
+      it(`${name} / ${mode}: every accent Icon clears 3:1 on its surface`, () => {
+        /* Icons carry meaning, so WCAG 1.4.11 applies — the same 3:1 a Border
+           gets, which is why the icon tones mirror Border's exactly.
+           The eight ACCENTS only. Icons-Default is excluded on purpose: it is
+           defined as tracking --Text rather than as an independent colour, so
+           its ratio is --Text's ratio and testing it here would just restate
+           whatever --Text does. The contract it actually owes is the next
+           test. */
+        const globals = flatDecls(css);
+        const failures: string[] = [];
+        let checked = 0;
+        for (const { selector, decls } of scopes(css)) {
+          const bgRaw = decls.get('--Background');
+          if (!bgRaw) continue;
+          const bg = resolve(bgRaw, decls, globals);
+          if (!bg) continue;
+          for (const pal of PALETTES) {
+            if (pal === 'Default') continue;
+            const iconRaw = decls.get(`--Icons-${pal}`);
+            if (!iconRaw) continue;
+            const icon = resolve(iconRaw, decls, globals);
+            if (!icon) continue;
+            checked++;
+            const r = contrast(icon, bg);
+            if (r < 3) failures.push(`${selector} --Icons-${pal} ${icon} on ${bg} = ${r.toFixed(2)}:1`);
+          }
+        }
+        // Eight: the accents, in the one scope that defines both --Background
+        // and the Icons tokens. A floor, so a change in var-chain shape cannot
+        // turn this into a test that resolves nothing and passes.
+        expect(checked, 'resolved too few icons to be meaningful').toBeGreaterThanOrEqual(8);
+        expect(failures).toEqual([]);
+      });
+
+      it(`${name} / ${mode}: Icons-Default IS --Text, in every scope that sets both`, () => {
+        /* Not an accent. Icons-Default tracks --Text — verified across all 20
+           themes, and the reason the export routes it through
+           Default-Background rather than the Icon table.
+           This is asserted as EQUALITY rather than as a contrast ratio because
+           equality is the contract; a ratio test here would pass or fail on
+           --Text's own correctness. (It currently fails: with real extracted
+           tones and background=primary the preview emits --Background, --Text
+           and --Quiet all at Primary-Color-5. That is a --Text bug, upstream of
+           the Icons collection, and this test deliberately does not hide it.) */
+        const globals = flatDecls(css);
+        const mismatches: string[] = [];
+        let checked = 0;
+        for (const { selector, decls } of scopes(css)) {
+          const textRaw = decls.get('--Text');
+          const defRaw = decls.get('--Icons-Default');
+          if (!textRaw || !defRaw) continue;
+          const text = resolve(textRaw, decls, globals) ?? textRaw;
+          const def = resolve(defRaw, decls, globals) ?? defRaw;
+          checked++;
+          if (text !== def) mismatches.push(`${selector} --Icons-Default ${def} != --Text ${text}`);
+        }
+        expect(checked, 'no scope defined both').toBeGreaterThan(0);
+        expect(mismatches).toEqual([]);
+      });
+
+    }
+  }
+});
+
+/**
+ * No palette scale may be REFERENCED without being DEFINED.
+ *
+ * This is the guard that should have existed first. The preview referenced five
+ * ramps it never defined — Info, Success, Warning, Error and Hotlink-Visited —
+ * so --Text-Info, --Header-Error, --Hotlink, --Link and --Hotlink-Visited all
+ * resolved to nothing while the export and Figma had the colours. Nothing
+ * reported it: an undefined custom property is not an error, the text just
+ * inherits.
+ *
+ * The palette-name pattern is deliberately `[A-Za-z][A-Za-z-]*`, NOT
+ * `[A-Za-z]+`. The strict version silently skipped every hyphenated palette,
+ * which is exactly how Hotlink-Visited survived a pass that caught the other
+ * four — the check excluded it from both sides of the comparison and reported
+ * a clean result.
+ */
+describe('every palette scale the preview references is defined', () => {
+  for (const [name, colors] of SCHEMES) {
+    for (const mode of ['light', 'dark'] as const) {
+      it(`${name} / ${mode}: no referenced-but-undefined ramp`, () => {
+        const css = previewCSSFor(colors, mode);
+        const defined = new Set([...css.matchAll(/--([A-Za-z][A-Za-z-]*)-Color-\d+\s*:/g)].map((m) => m[1]));
+        const referenced = new Set([...css.matchAll(/var\(\s*--([A-Za-z][A-Za-z-]*)-Color-\d+\s*\)/g)].map((m) => m[1]));
+        expect(referenced.size, 'resolved no references at all').toBeGreaterThan(4);
+        expect([...referenced].filter((r) => !defined.has(r)).sort()).toEqual([]);
+      });
+
+      it(`${name} / ${mode}: emits no --Link-Hover`, () => {
+        /* Links do not change colour on hover — the underline thickens instead.
+           The preview used to emit a ±1 tone step off Info, which is an INVENTED
+           value on text carrying a 4.5:1 requirement. The lib agrees it should
+           not exist: Link documents --Link-Hover as intentionally absent, and
+           Breadcrumbs was fixed specifically to stop reading "a variable nothing
+           defines". Defining it in the preview only made the playground
+           disagree with both. */
+        expect(previewCSSFor(colors, mode)).not.toContain('--Link-Hover');
       });
     }
   }

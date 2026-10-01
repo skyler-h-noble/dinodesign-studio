@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   H2, H3, H4, Body, BodySmall, VStack, HStack, Card, Button, Chip, Alert, Divider,
+  CodeBlock,
 } from '@omni-design/components';
 import {
   collection, query, where, getDocs, orderBy, doc, getDoc, updateDoc,
@@ -245,10 +246,10 @@ function ProposalCard({
         <Body>{proposal.useCase}</Body>
 
         <BodySmall style={{ fontWeight: 600 }}>Proposed API</BodySmall>
-        <CodeBlock>{proposal.proposedApi}</CodeBlock>
+        <CodeBlock code={proposal.proposedApi} language="JSX" />
 
         <BodySmall style={{ fontWeight: 600 }}>Inline implementation</BodySmall>
-        <CodeBlock>{proposal.implementation}</CodeBlock>
+        <CodeBlock code={proposal.implementation} language="JSX" />
 
         {proposal.notes && (
           <>
@@ -360,23 +361,3 @@ function FigmaTemplateUploader() {
   );
 }
 
-function CodeBlock({ children }: { children: string }) {
-  return (
-    <pre
-      data-surface="Container-Lowest"
-      style={{
-        margin: 0,
-        padding: 12,
-        background: 'var(--Background)',
-        border: '1px solid var(--Border)',
-        borderRadius: 'var(--Style-Border-Radius, 6px)',
-        fontSize: 12,
-        lineHeight: 1.5,
-        overflowX: 'auto',
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-      }}
-    >
-      {children}
-    </pre>
-  );
-}

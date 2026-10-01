@@ -161,13 +161,15 @@ export default function AccountPage() {
         <Card padding="medium">
           <VStack spacing={3}>
             <HStack spacing={3} alignItems="center">
+              {/* `initials` is a PROP, not children. Passed as children it never
+                  reached the component, and with no initials and no icon Avatar falls
+                  back to its built-in stock photo — which is what rendered. */}
               <Avatar
                 src={user.photoURL || undefined}
                 alt={user.displayName || user.email || 'Account'}
+                initials={!user.photoURL ? initial : undefined}
                 size="large"
-              >
-                {!user.photoURL ? initial : undefined}
-              </Avatar>
+              />
               <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
                 <H3 style={{ margin: 0, fontSize: '1.1rem' }}>
                   {user.displayName || user.email?.split('@')[0] || 'You'}
@@ -199,7 +201,7 @@ export default function AccountPage() {
               {/* At a glance */}
               <Card padding="medium">
                 <VStack spacing={2}>
-                  <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+                  <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                     At a glance
                   </BodySmall>
                   <HStack spacing={4} style={{ flexWrap: 'wrap' }}>
@@ -213,7 +215,7 @@ export default function AccountPage() {
               {/* Payment History */}
               <Card padding="medium">
                 <VStack spacing={2}>
-                  <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+                  <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                     Payment history
                   </BodySmall>
                   {payments.length === 0 ? (
@@ -228,7 +230,7 @@ export default function AccountPage() {
                       </HStack>
                       {payments.slice(0, 20).map(p => (
                         <HStack key={p.id} spacing={2} style={{ padding: '10px 0', borderBottom: '1px solid var(--Border)' }}>
-                          <BodySmall style={{ width: 90, color: 'var(--Quiet)', flexShrink: 0 }}>{p.date}</BodySmall>
+                          <BodySmall color="quiet" style={{ width: 90, flexShrink: 0 }}>{p.date}</BodySmall>
                           <BodySmall style={{ flex: 1 }}>{p.description}</BodySmall>
                           <BodySmall style={{ width: 80, textAlign: 'right', fontWeight: 600, flexShrink: 0 }}>
                             ${(p.amount / 100).toFixed(2)}
@@ -250,7 +252,7 @@ export default function AccountPage() {
 
               <Card padding="medium">
                 <VStack spacing={2} alignItems="flex-start">
-                  <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+                  <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                     Account actions
                   </BodySmall>
                   <HStack spacing={2}>
@@ -310,7 +312,7 @@ function DesignSystemPanel({
           <Accordion>
             <AccordionSummary>
               <HStack spacing={2} style={{ width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+                <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                   Add-ons
                 </BodySmall>
                 <BodySmall color="quiet">
@@ -351,7 +353,7 @@ function DesignSystemPanel({
       {/* Hosting preferences */}
       <Card padding="medium">
         <VStack spacing={2}>
-          <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Hosting preferences
           </BodySmall>
           <BodySmall color="quiet">
@@ -394,7 +396,7 @@ function AddOnRow({
         <BodySmall style={{ fontWeight: 700 }}>{addon.title}</BodySmall>
         <AddOnStatusBadge addon={addon} unlocked={unlocked} inCart={inCart} />
       </HStack>
-      <BodySmall style={{ color: 'var(--Quiet)', marginTop: 4 }}>
+      <BodySmall color="quiet" style={{ marginTop: 4 }}>
         {addon.description}
       </BodySmall>
       <HStack spacing={2} style={{ alignItems: 'center', marginTop: 6 }}>
@@ -453,13 +455,13 @@ function AddOnStatusBadge({
   }
   if (!addon.available) {
     return (
-      <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600, flexShrink: 0 }}>
+      <BodySmall color="quiet" style={{ fontWeight: 600, flexShrink: 0 }}>
         Coming soon
       </BodySmall>
     );
   }
   return (
-    <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 600, flexShrink: 0 }}>
+    <BodySmall color="quiet" style={{ fontWeight: 600, flexShrink: 0 }}>
       {formatPrice(addon.priceUsdCents)}
     </BodySmall>
   );
@@ -491,7 +493,7 @@ function HostingToggle({
 function Stat({ k, v }: { k: string; v: string }) {
   return (
     <VStack spacing={0}>
-      <BodySmall style={{ color: 'var(--Quiet)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.6rem' }}>{k}</BodySmall>
+      <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.6rem' }}>{k}</BodySmall>
       <H3 style={{ margin: 0, fontSize: '1.4rem' }}>{v}</H3>
     </VStack>
   );

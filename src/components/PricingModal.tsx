@@ -100,11 +100,11 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
       <Modal open={open} onClose={handleClose} title="">
         <VStack spacing={4} style={{ maxWidth: 780, width: '100%' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem' }}>
               Pricing
             </BodySmall>
             <H2 style={{ textAlign: 'center' }}>Build your design system</H2>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+            <Body color="quiet" style={{ textAlign: 'center' }}>
               One image. A complete, accessible, branded design system.
             </Body>
           </VStack>
@@ -121,7 +121,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
           )}
 
           <VStack spacing={2} style={{ width: '100%' }}>
-            <BodySmall style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
               1. Choose a project tier
             </BodySmall>
 
@@ -164,7 +164,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
                         </span>
                         <span style={{ color: 'var(--Quiet)', fontSize: '0.85rem', marginLeft: 4 }}>one-time</span>
                       </div>
-                      <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+                      <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
                         {t.count > 1 ? `$${t.perProject}/project · ` : ''}+ ${HOSTING_PRICE}/mo each
                       </BodySmall>
                       <VStack spacing={0} style={{ marginTop: 8 }}>
@@ -205,7 +205,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
           <H2 style={{ textAlign: 'center' }}>
             {useExistingCredit ? 'Use a credit' : 'Choose your add-ons'}
           </H2>
-          <Body style={{ color: 'var(--Quiet)', textAlign: 'center' }}>
+          <Body color="quiet" style={{ textAlign: 'center' }}>
             {useExistingCredit
               ? `You have ${credits} credit${credits !== 1 ? 's' : ''}. Using 1 for this design system.`
               : `${tier.name} — $${tier.price.toLocaleString()} one-time`}
@@ -217,7 +217,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
           <HStack spacing={2} style={{ justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
             <VStack spacing={0}>
               <BodySmall style={{ fontWeight: 700 }}>Hosted playground</BodySmall>
-              <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>
+              <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>
                 Live components, code snippets, guidelines + accessibility details
               </BodySmall>
             </VStack>
@@ -230,7 +230,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
 
         {/* Optional add-ons */}
         <VStack spacing={2} style={{ width: '100%' }}>
-          <BodySmall style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', color: 'var(--Quiet)' }}>
+          <BodySmall color="quiet" style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
             Optional add-ons
           </BodySmall>
           <HStack spacing={2} style={{ width: '100%', alignItems: 'stretch' }}>
@@ -250,7 +250,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
                   />
                   <VStack spacing={1} style={{ flex: 1 }}>
                     <BodySmall style={{ fontWeight: 700 }}>{addon.label}</BodySmall>
-                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.7rem' }}>{addon.description}</BodySmall>
+                    <BodySmall color="quiet" style={{ fontSize: '0.7rem' }}>{addon.description}</BodySmall>
                     <BodySmall style={{ fontWeight: 600 }}>+${addon.price}/month</BodySmall>
                   </VStack>
                 </HStack>
@@ -330,7 +330,7 @@ export default function PricingModal({ open, onClose, credits, onUseCredit, onBu
           </BodySmall>
         )}
 
-        <BodySmall style={{ color: 'var(--Quiet)', textAlign: 'center', fontSize: '0.7rem' }}>
+        <BodySmall color="quiet" style={{ textAlign: 'center', fontSize: '0.7rem' }}>
           Tokens and CSS are hosted — no raw file downloads. Playground subscription required for all plans.
         </BodySmall>
       </VStack>

@@ -52,11 +52,11 @@ export default function AddOnCatalogPage() {
       <section style={{ padding: '64px 24px' }}>
         <VStack spacing={5} style={{ maxWidth: 1100, margin: '0 auto' }}>
           <VStack spacing={1} alignItems="center">
-            <BodySmall style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--Quiet)', fontSize: '0.7rem', textAlign: 'center' }}>
+            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.7rem', textAlign: 'center' }}>
               Add-On Catalog
             </BodySmall>
             <H1 style={{ textAlign: 'center' }}>Expand your design system</H1>
-            <Body style={{ color: 'var(--Quiet)', textAlign: 'center', maxWidth: 620 }}>
+            <Body color="quiet" style={{ textAlign: 'center', maxWidth: 620 }}>
               Premium components styled with your brand tokens. Add what you need to any of your design systems.
             </Body>
           </VStack>
@@ -67,7 +67,7 @@ export default function AddOnCatalogPage() {
                 <VStack spacing={2}>
                   <HStack spacing={1} style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 700 }}>{addon.title}</BodySmall>
-                    <BodySmall style={{ color: 'var(--Quiet)', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    <BodySmall color="quiet" style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                       {addon.available ? formatPrice(addon.priceUsdCents) + ' / design system' : 'Coming soon'}
                     </BodySmall>
                   </HStack>
