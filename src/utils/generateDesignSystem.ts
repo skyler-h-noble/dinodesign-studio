@@ -966,7 +966,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     //
     // Omitting this slot did not fail loudly: the Provider simply never
     // fetched the brand's ramp, so the lib's BUNDLED typography-tokens.css
-    // won on [data-platform="Desktop"] and replaced it. A header weight of
+    // won on [data-device="Desktop"] and replaced it. A header weight of
     // 857 rendered as 600 and H1 came out 32px instead of 48px — a design
     // system quietly wearing the lib's default type.
     typography: getPublicFileUrl(uuid, 'typography-tokens.css'),
@@ -1172,7 +1172,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
 }
 
 /* Platform Font Overrides */
-[data-platform="IOS-Mobile"][data-fonts] {
+[data-device="IOS-Mobile"][data-fonts] {
   --Body-Font-Family: var(--Set-Font-Family-Body);
   --Header-Font-Family: var(--Set-Font-Family-Header);
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
@@ -1182,7 +1182,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
-[data-platform="IOS-Tablet"][data-fonts] {
+[data-device="IOS-Tablet"][data-fonts] {
   --Body-Font-Family: var(--Set-Font-Family-Body);
   --Header-Font-Family: var(--Set-Font-Family-Header);
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
@@ -1192,7 +1192,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
-[data-platform="Android"][data-fonts] {
+[data-device="Android"][data-fonts] {
   --Body-Font-Family: var(--Set-Font-Family-Body);
   --Header-Font-Family: var(--Set-Font-Family-Header);
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
@@ -1203,7 +1203,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
 
-[data-platform="IOS-Mobile"][data-fonts="Default"] {
+[data-device="IOS-Mobile"][data-fonts="Default"] {
   --Body-Font-Family: "SF Pro";
   --Header-Font-Family: "SF Pro";
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
@@ -1213,7 +1213,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
-[data-platform="IOS-Tablet"][data-fonts="Default"] {
+[data-device="IOS-Tablet"][data-fonts="Default"] {
   --Body-Font-Family: "SF Pro";
   --Header-Font-Family: "SF Pro";
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
@@ -1223,7 +1223,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
 }
-[data-platform="Android"][data-fonts="Default"] {
+[data-device="Android"][data-fonts="Default"] {
   --Body-Font-Family: "Roboto";
   --Header-Font-Family: "Roboto";
   --Header-Font-Weight: var(--Set-Font-Family-Header-Weight);
@@ -1262,7 +1262,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Line-Height: 24px;
   --Body-Paragraph-Spacing: 16px;
   /* Per-style ramp — generated from the same type scale that produces
-     typography-tokens.css, so a consumer that never sets data-platform gets
+     typography-tokens.css, so a consumer that never sets data-device gets
      the identical Desktop values. Editing sizes here is wrong; edit
      src/utils/typeScale.ts. */
 ${typographyDeclarations(input.typographyStyles)}
@@ -1274,7 +1274,7 @@ ${typographyDeclarations(input.typographyStyles)}
   --Button-Line-Height: 20px;
   /* Bevel geometry for ALL THREE sizes — derived from THIS platform's button
      heights, which is why it lives beside them rather than in foundation.css.
-     Each [data-platform] block below re-emits all three for its own heights.
+     Each [data-device] block below re-emits all three for its own heights.
      It used to re-emit the MEDIUM set only, so a small or large button wore
      Desktop's bevel on every platform. */
 ${platformBevelCSS('Desktop', bevelHeights, bevelPercent)}
@@ -1291,7 +1291,7 @@ ${overlayOffsetCSS('Desktop').slice(1).join('\n')}
 }
 
 /* iOS Mobile */
-[data-platform="IOS-Mobile"] {
+[data-device="IOS-Mobile"] {
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "IOS-Mobile";
   --Button-Height: ${platformButtonHeight('IOS-Mobile', buttonHeight)}px;
@@ -1337,7 +1337,7 @@ ${overlayOffsetCSS('IOS-Mobile').join('\n')}
 }
 
 /* iOS Tablet */
-[data-platform="IOS-Tablet"] {
+[data-device="IOS-Tablet"] {
   --Container-Padding: var(--Sizing-3);
   --Platform-Label: "IOS-Tablet";
   --Button-Height: ${platformButtonHeight('IOS-Tablet', buttonHeight)}px;
@@ -1382,16 +1382,69 @@ ${overlayOffsetCSS('IOS-Tablet').join('\n')}
   --Button-Line-Height: 21px;
 }
 
-/* Android */
-[data-platform="Android"] {
+/* Android, a block each.
+   Android-Tablet and Android-Mobile carry identical METRICS — Figma gives
+   both a 48px button and a 12px spacer — so these two blocks hold the same
+   values. They are written separately rather than sharing a selector list
+   because every other platform has a block of its own, and a reader checking
+   "is this platform covered" should find one answer in one shape. The two
+   exist as separate devices because TYPOGRAPHY differs between them. */
+/* Android tablet */
+[data-device="Android-Tablet"] {
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "Android";
-  --Button-Height: ${platformButtonHeight('Android', buttonHeight)}px;
+  --Button-Height: ${platformButtonHeight('Android-Tablet', buttonHeight)}px;
   --Min-Stack-Gap: 12px;
-${platformBevelCSS('Android', bevelHeights, bevelPercent)}
-  --Target: ${PLATFORM_TARGET['Android']}px;
-  --Platform-Spacer: ${PLATFORM_SPACER['Android']}px;
-${overlayOffsetCSS('Android').join('\n')}
+${platformBevelCSS('Android-Tablet', bevelHeights, bevelPercent)}
+  --Target: ${PLATFORM_TARGET['Android-Tablet']}px;
+  --Platform-Spacer: ${PLATFORM_SPACER['Android-Tablet']}px;
+${overlayOffsetCSS('Android-Tablet').join('\n')}
+  --Body-Font-Size: 16px;
+  --Body-Line-Height: 24px;
+  --Body-Letter-Spacing: .5px;
+  --Body-Paragraph-Spacing: 16px;
+  --H1-Font-Size: 36px;
+  --H1-Line-Height: 40px;
+  --H1-Letter-Spacing: -.5px;
+  --H1-Paragraph-Spacing: 20px;
+  --H2-Font-Size: 28px;
+  --H2-Line-Height: 36px;
+  --H2-Letter-Spacing: -.5px;
+  --H2-Paragraph-Spacing: 20px;
+  --H3-Font-Size: 24px;
+  --H3-Line-Height: 32px;
+  --H3-Letter-Spacing: 0px;
+  --H3-Paragraph-Spacing: 16px;
+  --H4-Font-Size: 20px;
+  --H4-Line-Height: 28px;
+  --H4-Letter-Spacing: 0px;
+  --H4-Paragraph-Spacing: 12px;
+  --H5-Font-Size: 18px;
+  --H5-Line-Height: 26px;
+  --H5-Letter-Spacing: 0px;
+  --H5-Paragraph-Spacing: 12px;
+  --H6-Font-Size: 16px;
+  --H6-Line-Height: 24px;
+  --H6-Letter-Spacing: .5px;
+  --H6-Paragraph-Spacing: 8px;
+  --Label-Font-Size: 13px;
+  --Label-Line-Height: 18px;
+  --Label-Letter-Spacing: 0px;
+  --Label-Paragraph-Spacing: 4px;
+  --Button-Font-Size: 16px;
+  --Button-Line-Height: 20px;
+}
+
+/* Android phone */
+[data-device="Android-Mobile"] {
+  --Container-Padding: var(--Sizing-2);
+  --Platform-Label: "Android";
+  --Button-Height: ${platformButtonHeight('Android-Mobile', buttonHeight)}px;
+  --Min-Stack-Gap: 12px;
+${platformBevelCSS('Android-Mobile', bevelHeights, bevelPercent)}
+  --Target: ${PLATFORM_TARGET['Android-Mobile']}px;
+  --Platform-Spacer: ${PLATFORM_SPACER['Android-Mobile']}px;
+${overlayOffsetCSS('Android-Mobile').join('\n')}
   --Body-Font-Size: 16px;
   --Body-Line-Height: 24px;
   --Body-Letter-Spacing: .5px;

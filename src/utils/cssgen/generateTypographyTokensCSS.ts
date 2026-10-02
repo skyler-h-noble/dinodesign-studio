@@ -131,9 +131,9 @@ function styleBlock(s: TypeStyle): string {
   return lines.join('\n');
 }
 
-/** The `[data-platform="Desktop"] { … }` block, generated from the scale. */
+/** The `[data-device="Desktop"] { … }` block, generated from the scale. */
 export function generateDesktopTypographyBlock(typography: TypographyStyle[] | null | undefined): string {
-  return `[data-platform="Desktop"] {\n${typographyDeclarations(typography)}\n}`;
+  return `[data-device="Desktop"] {\n${typographyDeclarations(typography)}\n}`;
 }
 
 /** Just the custom-property declarations, so the export and the studio's live
@@ -476,9 +476,9 @@ export function buildTypographyTokensCSS(
   typography: TypographyStyle[] | null | undefined
 ): string {
   // Anchored to the start of a line — the file's header comment mentions
-  // [data-platform="Desktop"] in prose, and an unanchored search finds that
+  // [data-device="Desktop"] in prose, and an unanchored search finds that
   // first and splices the generated block into the middle of the comment.
-  const marker = '\n[data-platform="Desktop"]';
+  const marker = '\n[data-device="Desktop"]';
   const markerAt = staticCSS.indexOf(marker);
   const start = markerAt === -1 ? -1 : markerAt + 1;
   // A closing brace in the first column ends the block — every nested value in

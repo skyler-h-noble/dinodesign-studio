@@ -19,7 +19,7 @@ const CSS = buildTypographyTokensCSS([
 ] as never);
 
 const spacerIn = (platform: string): string | undefined => {
-  const block = CSS.match(new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`));
+  const block = CSS.match(new RegExp(`\\[data-device="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`));
   return block?.[1].match(/--Platform-Spacer:\s*([^;]+);/)?.[1];
 };
 
@@ -42,27 +42,27 @@ describe('platform button metrics', () => {
 
   it('overrides base.css on SPECIFICITY, not on load order', () => {
     /* The provider injects this file at slot 3 and base.css at slot 5, and
-       base.css declares --Button-Height at :root. A bare [data-platform="…"]
+       base.css declares --Button-Height at :root. A bare [data-device="…"]
        ties with :root at (0,1,0), so the later file would win and these
        overrides would do nothing — silently, because an override that loses
        looks exactly like one that was never written.
 
-       :root[data-platform="…"] scores (0,2,0) and wins wherever it loads. If
+       :root[data-device="…"] scores (0,2,0) and wins wherever it loads. If
        this ever regresses to the bare selector, buttons quietly return to the
        brand's desktop heights on every phone. */
     for (const platform of CSS_PLATFORMS) {
       if (platform === 'Desktop') continue;
-      const hiSpec = new RegExp(`:root\\[data-platform="${platform}"\\]\\s*\\{[^}]*--Button-Height`);
+      const hiSpec = new RegExp(`:root\\[data-device="${platform}"\\]\\s*\\{[^}]*--Button-Height`);
       expect(`${platform}: ${hiSpec.test(CSS)}`).toBe(`${platform}: true`);
     }
     /* And never in a bare block, where it would lose. */
     const bareWithButtons = CSS.split('\n\n').some((chunk) =>
-      /^\[data-platform="[^"]+"\]/.test(chunk) && /--Button-Height/.test(chunk));
+      /^\[data-device="[^"]+"\]/.test(chunk) && /--Button-Height/.test(chunk));
     expect(bareWithButtons).toBe(false);
   });
 
   it('gives Desktop no override — the brand owns that column', () => {
-    expect(/:root\[data-platform="Desktop"\]\s*\{[^}]*--Button-Height/.test(CSS)).toBe(false);
+    expect(/:root\[data-device="Desktop"\]\s*\{[^}]*--Button-Height/.test(CSS)).toBe(false);
     expect(platformButtonMetrics('Desktop' as never)).toEqual({});
   });
 
@@ -74,10 +74,16 @@ describe('platform button metrics', () => {
                           'Android-Tablet-Horizontal'] as const) {
       const figma = platformButtonMetrics(device);
       expect(Object.keys(figma).sort()).toEqual(Object.keys(CSS_NAME).sort());
+      /* Five blocks now, not four. 'Android' used to cover the phone and both
+         tablet orientations; it was split because the two disagree on
+         Floating-Label-Large-Line-Height, so a shared block dropped one of the
+         two values. Orientation still collapses — across all 379 Typography
+         variables the vertical and horizontal modes are identical. */
       const platform = device.startsWith('IOS-Mobile') ? 'IOS-Mobile'
-        : device.startsWith('IOS') ? 'IOS-Tablet' : 'Android';
+        : device.startsWith('IOS') ? 'IOS-Tablet'
+        : device === 'Android-Mobile' ? 'Android-Mobile' : 'Android-Tablet';
       const block = CSS.match(
-        new RegExp(`:root\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+        new RegExp(`:root\\[data-device="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
       for (const [figmaName, cssName] of Object.entries(CSS_NAME)) {
         const inCSS = block.match(new RegExp(`${cssName}:\\s*(\\d+)px;`))?.[1];
         expect(`${device} ${figmaName}: ${inCSS}`).toBe(`${device} ${figmaName}: ${figma[figmaName]}`);
@@ -91,8 +97,8 @@ describe('platform button metrics', () => {
        ratio gives 32, and 18 is not a rung at all. Two published vendor
        tables, not one curve; anything that "simplifies" these back into the
        ratio changes every touch platform's icons. */
-    expect(PLATFORM_BUTTON.Android.icon.medium).toBe(18);
-    expect(PLATFORM_BUTTON.Android.height.medium).toBe(48);
-    expect(Math.round(48 * 0.625)).not.toBe(PLATFORM_BUTTON.Android.icon.medium);
+    expect(PLATFORM_BUTTON['Android-Mobile'].icon.medium).toBe(18);
+    expect(PLATFORM_BUTTON['Android-Mobile'].height.medium).toBe(48);
+    expect(Math.round(48 * 0.625)).not.toBe(PLATFORM_BUTTON['Android-Mobile'].icon.medium);
   });
 });

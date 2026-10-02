@@ -182,9 +182,9 @@ describe('the Alt Display type styles', () => {
       { type: 'body', family: 'Inter', weight: '400' },
     ] as never);
 
-    for (const platform of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android']) {
+    for (const platform of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android-Tablet', 'Android-Mobile']) {
       const block = css.match(
-        new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+        new RegExp(`\\[data-device="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
       expect(`${platform} block found: ${block.length > 0}`).toBe(`${platform} block found: true`);
       for (const step of ['Small', 'Medium', 'Large']) {
         for (const prop of ['Font-Size', 'Line-Height']) {
@@ -544,9 +544,9 @@ describe('the Alt Display weight across devices', () => {
        web rendering 600 and Figma showing 500 — invariant 5 introduced on
        purpose, with convenience as the excuse. */
     const { css } = await FIG('Playfair Display', '800');
-    for (const platform of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android']) {
+    for (const platform of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android-Tablet', 'Android-Mobile']) {
       const block = css.match(
-        new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+        new RegExp(`\\[data-device="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
       const w = block.match(/--Alt-Display-Large-Font-Weight:\s*([^;]+);/)?.[1]?.trim();
       expect(`${platform}: ${w}`).toBe(`${platform}: 500`);
     }
@@ -557,7 +557,7 @@ describe('the Alt Display weight across devices', () => {
        must follow the face — pinning 400 would stop it moving with the user's
        slider — and colour carries the distinction instead. */
     const { css } = await FIG('Anton', '400');
-    const desktop = css.match(/\[data-platform="Desktop"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    const desktop = css.match(/\[data-device="Desktop"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
     expect(desktop).toMatch(/--Alt-Display-Large-Font-Weight:\s*var\(--Font-Weight-Display\)/);
   });
 });

@@ -658,13 +658,13 @@ describe('the CSS selectors', () => {
     }
   });
 
-  it('keeps data-platform emitted beside data-device', () => {
+  it('keeps data-device emitted beside data-device', () => {
     /* Generated CSS is frozen per system in Storage. A page written against an
-       older system sets data-platform and always will; emitting only the new
+       older system sets data-device and always will; emitting only the new
        name gives it no block at all, silently. Same call as --Overline-*. */
     const sel = blockSelector('IOS-Mobile', 'Omni');
     expect(sel).toContain('[data-device="IOS-Mobile"]');
-    expect(sel).toContain('[data-platform="IOS-Mobile"]');
+    expect(sel).toContain('[data-device="IOS-Mobile"]');
   });
 
   it('keeps the old value spellings resolving', () => {
@@ -672,7 +672,7 @@ describe('the CSS selectors', () => {
     expect(LEGACY_DEVICE_ALIAS['Android']).toBe('Android-Mobile');
     const sel = blockSelector('Android-Mobile', 'Omni');
     expect(sel).toContain('[data-device="Android"]');
-    expect(sel).toContain('[data-platform="Android"]');
+    expect(sel).toContain('[data-device="Android"]');
   });
 
   it('accepts the old face attribute too', () => {

@@ -514,7 +514,7 @@ describe('FAB sizing', () => {
   it('does not reuse the BUTTON\'s ladder', () => {
     /* The specific mistake this guards: deriving a FAB bevel from the button's
        height. They agree at small (32) and nowhere else. */
-    expect(FAB_SIZE.small).toBe(PLATFORM_BUTTON_HEIGHT.Android.small);
+    expect(FAB_SIZE.small).toBe(PLATFORM_BUTTON_HEIGHT['Android-Mobile'].small);
     expect(FAB_SIZE.medium).not.toBe(PLATFORM_BUTTON_HEIGHT['IOS-Mobile'].medium);
     expect(FAB_SIZE.large).not.toBe(PLATFORM_BUTTON_HEIGHT['IOS-Mobile'].large);
   });

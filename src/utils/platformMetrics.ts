@@ -17,11 +17,27 @@ import { DEVICE_BUTTON_NAMES, SIZE_MODES } from './componentSize';
  * nothing here changes when a tablet is turned on its side.
  */
 
-/** The platform blocks `typography-tokens.css` declares. */
-export type CSSPlatform = 'Desktop' | 'IOS-Mobile' | 'IOS-Tablet' | 'Android';
+/** The device blocks `typography-tokens.css` declares.
+ *
+ * FIVE, not the seven modes Figma has and not the four this used to carry.
+ *
+ * The orientation collapse is correct and was checked rather than assumed:
+ * across all 379 Typography variables in Figma's Devices-Type collection,
+ * IOS-Tablet-Vertical and -Horizontal are identical in every one, as are the
+ * two Android tablet orientations. Nothing about type changes when a tablet
+ * turns, so those pairs share a block.
+ *
+ * Android-Tablet and Android-Mobile do NOT share one, which is what the old
+ * four-block list got wrong. They differ on
+ * `Floating-Label-Large-Line-Height` — 24 on the tablet, 16 on the phone, in
+ * both the Omni and System faces. Collapsing them meant one of those two
+ * values never reached CSS at all, silently, since a collapsed block simply
+ * emits whichever device seeded it. */
+export type CSSPlatform =
+  'Desktop' | 'IOS-Mobile' | 'IOS-Tablet' | 'Android-Tablet' | 'Android-Mobile';
 
 export const CSS_PLATFORMS: readonly CSSPlatform[] =
-  ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android'] as const;
+  ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android-Tablet', 'Android-Mobile'] as const;
 
 /* --Platform-Spacer is NOT here.
  *
@@ -71,8 +87,16 @@ export const PLATFORM_BUTTON: Record<TouchPlatform, { height: SizeTriple; icon: 
     height: PLATFORM_BUTTON_HEIGHT['IOS-Tablet'],
     icon:   { medium: 20, small: 16, large: 24 },
   },
-  'Android': {
-    height: PLATFORM_BUTTON_HEIGHT.Android,
+  /* Both Android form factors, same metrics — Figma gives each a 48px button
+     and an 18px medium glyph. They are separate keys because the typography
+     blocks are separate, and a metrics table missing one of them would make
+     the two lists disagree about what devices exist. */
+  'Android-Tablet': {
+    height: PLATFORM_BUTTON_HEIGHT['Android-Tablet'],
+    icon:   { medium: 18, small: 18, large: 24 },
+  },
+  'Android-Mobile': {
+    height: PLATFORM_BUTTON_HEIGHT['Android-Mobile'],
     icon:   { medium: 18, small: 18, large: 24 },
   },
 };
@@ -85,7 +109,7 @@ export function isTouchPlatform(p: CSSPlatform): p is TouchPlatform {
  * The CSS names for one platform's button metrics.
  *
  * NOT CURRENTLY CALLED, and that is not an oversight to fix by wiring it in.
- * The `:root[data-platform="…"]` button blocks live at the bottom of the
+ * The `:root[data-device="…"]` button blocks live at the bottom of the
  * static `typography-tokens.css`, hand-written, and `buildTypographyTokensCSS`
  * carries them through untouched — it only splices the Desktop TYPE block.
  * `platformMetrics.test.ts` ("ships the same numbers to the CSS and to Figma")

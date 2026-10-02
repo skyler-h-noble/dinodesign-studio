@@ -299,7 +299,7 @@ export function iconAvatarSize(mode: string): { prop: string | null; px: number 
 //   Typography     2 modes   Omni · System
 //
 // All three are ENVIRONMENT. The consumer sets them once at the root — the
-// platform via `data-platform`, the face via which stylesheet is loaded — and
+// platform via `data-device`, the face via which stylesheet is loaded — and
 // every token underneath resolves against them. There is no per-component prop
 // because there is no per-component choice: two buttons on one screen cannot
 // be on different platforms.

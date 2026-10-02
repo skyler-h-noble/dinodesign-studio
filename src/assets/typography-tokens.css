@@ -1,9 +1,9 @@
 /* typography-tokens.css
  * Auto-generated — do not edit by hand.
- * Apply [data-platform="Desktop"] etc to your root element.
+ * Apply [data-device="Desktop"] etc to your root element.
  */
 
-[data-platform="Desktop"] {
+[data-device="Desktop"] {
 
   /* Display */
   --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
@@ -197,7 +197,7 @@
 
 }
 
-[data-platform="IOS-Mobile"] {
+[data-device="IOS-Mobile"] {
 
 
 
@@ -436,7 +436,7 @@
 
 }
 
-[data-platform="IOS-Tablet"] {
+[data-device="IOS-Tablet"] {
 
 
 
@@ -675,7 +675,247 @@
 
 }
 
-[data-platform="Android"] {
+[data-device="Android-Tablet"] {
+
+
+
+  /* Display */
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
+  --Display-Small-Font-Size:     36px;
+  --Display-Small-Font-Weight:   600;
+  --Display-Small-Line-Height:   44px;
+  --Display-Small-Letter-Spacing: 0px;
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
+  --Display-Medium-Font-Size:     45px;
+  --Display-Medium-Font-Weight:   600;
+  --Display-Medium-Line-Height:   52px;
+  --Display-Medium-Letter-Spacing: 0px;
+  --Font-Family-Display: var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)));
+  --Display-Large-Font-Size:     57px;
+  --Display-Large-Font-Weight:   600;
+  --Display-Large-Line-Height:   64px;
+  --Display-Large-Letter-Spacing: 0px;
+
+  /* Headers */
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H1-Font-Size:     28px;
+  --H1-Font-Weight:   600;
+  --H1-Line-Height:   28px;
+  --H1-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H2-Font-Size:     26px;
+  --H2-Font-Weight:   600;
+  --H2-Line-Height:   26px;
+  --H2-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H3-Font-Size:     24px;
+  --H3-Font-Weight:   600;
+  --H3-Line-Height:   24px;
+  --H3-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H4-Font-Size:     20px;
+  --H4-Font-Weight:   600;
+  --H4-Line-Height:   20px;
+  --H4-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H5-Font-Size:     18px;
+  --H5-Font-Weight:   600;
+  --H5-Line-Height:   18px;
+  --H5-Letter-Spacing: 0px;
+  --Font-Family-Body: var(--Platform-Font-Families-Decorative);
+  --H6-Font-Size:     16px;
+  --H6-Font-Weight:   600;
+  --H6-Line-Height:   16px;
+  --H6-Letter-Spacing: 0px;
+
+  /* Subtitle */
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Small-Font-Size:     16px;
+  --Subtitle-Small-Font-Weight:   700;
+  --Subtitle-Small-Line-Height:   24px;
+  --Subtitle-Small-Letter-Spacing: 0px;
+  --Font-Family-Subtitle: var(--Platform-Font-Families-Body);
+  --Subtitle-Large-Font-Size:     18px;
+  --Subtitle-Large-Font-Weight:   700;
+  --Subtitle-Large-Line-Height:   32px;
+  --Subtitle-Large-Letter-Spacing: 0px;
+
+  /* Body */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Small-Font-Size:     14px;
+  --Body-Small-Font-Weight:   500;
+  --Body-Small-Line-Height:   21px;
+  --Body-Small-Letter-Spacing: 0px;
+  --Body-Small-Semibold-Font-Weight: 600;
+  --Body-Small-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Medium-Font-Size:     16px;
+  --Body-Medium-Font-Weight:   500;
+  --Body-Medium-Line-Height:   24px;
+  --Body-Medium-Letter-Spacing: 0px;
+  --Body-Medium-Semibold-Font-Weight: 600;
+  --Body-Medium-Bold-Font-Weight: 700;
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Body-Large-Font-Size:     18px;
+  --Body-Large-Font-Weight:   600;
+  --Body-Large-Line-Height:   27px;
+  --Body-Large-Letter-Spacing: 0px;
+  --Body-Large-Semibold-Font-Weight: 600;
+  --Body-Large-Bold-Font-Weight: 700;
+
+  /* Caption */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  /* Leading here is the PLATFORM's, not the brand's 1.5 — Material 3's own
+     table at 12 / 14 / 16. The Figma payload computes these same numbers for
+     every non-Desktop device (typographyPlatform.ts, "LINE HEIGHT is COMPUTED,
+     not read"), while this block declared a flat 21 at every size, so one
+     caption read 20 in the file and 21 in the stylesheet and nothing could
+     see it. Declared rather than left to compute so the two sides state the
+     same value instead of arriving at it separately.
+
+     EVERY property is restated, tracking included, because the payload's
+     device-floor merge replaces a style WHOLE — `{...desktopStyles, ...own}`
+     keys on the STYLE, not on the property — so a step this block declares
+     partially loses whatever it leaves out instead of inheriting it from
+     Desktop. That variable then exists on Desktop and nowhere else, and one
+     missing on six of seven devices resolves to nothing there, silently. The
+     CSS cascade would have carried it; the payload does not, and the payload
+     is the half that fails without a sound.
+
+     The 0px is this block's existing answer for Caption, extended to the two
+     new steps rather than importing Desktop's 0.1px nudge — which would leave
+     the ramp reading 0.0996 / 0 / 0.1008, three steps of one style disagreeing
+     about whether the brand tracks captions at all. Whether mobile SHOULD zero
+     it is a brand decision and still open; this only stops the ramp from
+     contradicting itself. */
+  --Caption-Small-Font-Size:     12px;
+  --Caption-Small-Font-Weight:   500;
+  --Caption-Small-Letter-Spacing: 0px;
+  --Caption-Small-Line-Height:   16px;
+  --Caption-Font-Size:     14px;
+  --Caption-Font-Weight:   500;
+  --Caption-Line-Height:   20px;
+  --Caption-Letter-Spacing: 0px;
+  --Caption-Bold-Font-Weight: 700;
+  --Caption-Large-Font-Size:     16px;
+  --Caption-Large-Font-Weight:   500;
+  --Caption-Large-Letter-Spacing: 0px;
+  --Caption-Large-Line-Height:   24px;
+
+  /* Label */
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-ExtraSmall-Font-Size:     11px;
+  --Label-ExtraSmall-Font-Weight:   600;
+  --Label-ExtraSmall-Line-Height:   16.5px;
+  --Label-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Small-Font-Size:     12.5px;
+  --Label-Small-Font-Weight:   600;
+  --Label-Small-Line-Height:   18.75px;
+  --Label-Small-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Medium-Font-Size:     16px;
+  --Label-Medium-Font-Weight:   600;
+  --Label-Medium-Line-Height:   24px;
+  --Label-Medium-Letter-Spacing: 0px;
+  --Font-Family-Label: var(--Platform-Font-Families-Body);
+  --Label-Large-Font-Size:     18px;
+  --Label-Large-Font-Weight:   600;
+  --Label-Large-Line-Height:   27px;
+  --Label-Large-Letter-Spacing: 0px;
+
+
+  /* Mobile Nav Label — Material's navigation label: 12sp on 16, 0.5 tracking. */
+  --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body);
+  --Mobile-Nav-Label-Font-Size:     12px;
+  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Line-Height:   16px;
+  --Mobile-Nav-Label-Letter-Spacing: 0.5px;
+
+  /* Legal */
+  --Font-Family-Body: var(--Platform-Font-Families-Body);
+  --Legal-Font-Size:     10px;
+  --Legal-Font-Weight:   400;
+  --Legal-Line-Height:   15px;
+  --Legal-Letter-Spacing: 0px;
+  --Legal-Semibold-Font-Weight: 600;
+
+  /* Overline */
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Small-Font-Size:     14px;
+  --Overline-Small-Font-Weight:   500;
+  --Overline-Small-Line-Height:   21px;
+  --Overline-Small-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Medium-Font-Size:     16px;
+  --Overline-Medium-Font-Weight:   600;
+  --Overline-Medium-Line-Height:   24px;
+  --Overline-Medium-Letter-Spacing: 0px;
+  --Font-Family-Overline: var(--Platform-Font-Families-Body);
+  --Overline-Large-Font-Size:     18px;
+  --Overline-Large-Font-Weight:   600;
+  --Overline-Large-Line-Height:   27px;
+  --Overline-Large-Letter-Spacing: 0px;
+
+  /* Number */
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Small-Font-Size:     16px;
+  --Number-Small-Font-Weight:   700;
+  --Number-Small-Line-Height:   16px;
+  --Number-Small-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Medium-Font-Size:     28px;
+  --Number-Medium-Font-Weight:   700;
+  --Number-Medium-Line-Height:   16px;
+  --Number-Medium-Letter-Spacing: 0px;
+  --Font-Family-Number: var(--Platform-Font-Families-Body);
+  --Number-Large-Font-Size:     36px;
+  --Number-Large-Font-Weight:   700;
+  --Number-Large-Line-Height:   36px;
+  --Number-Large-Letter-Spacing: 0px;
+
+  /* Button */
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-ExtraSmall-Font-Size:     11px;
+  --Button-ExtraSmall-Font-Weight:   600;
+  --Button-ExtraSmall-Line-Height:   28px;
+  --Button-ExtraSmall-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Small-Font-Size:     14px;
+  --Button-Small-Font-Weight:   600;
+  --Button-Small-Line-Height:   16px;
+  --Button-Small-Letter-Spacing: 0px;
+  --Font-Family-Button: var(--Platform-Font-Families-Body);
+  --Button-Medium-Font-Size:     16px;
+  --Button-Medium-Font-Weight:   600;
+  --Button-Medium-Line-Height:   16px;
+  --Button-Medium-Letter-Spacing: 0px;
+  /* was Button-Standard — kept so frozen stylesheets keep resolving. */
+  --Button-Standard-Font-Size:     var(--Button-Medium-Font-Size);
+  --Button-Standard-Font-Weight:   var(--Button-Medium-Font-Weight);
+  --Button-Standard-Line-Height:   var(--Button-Medium-Line-Height);
+  --Button-Standard-Letter-Spacing: var(--Button-Medium-Letter-Spacing);
+
+  /* Alt Display — mirrors Display step for step. The pairing sets one word
+     on one baseline ("Omni" + "Design"), so the two must not diverge in
+     size or leading; colour is what separates them. */
+  --Alt-Display-Small-Font-Size:     36px;
+  --Alt-Display-Small-Font-Weight:   600;
+  --Alt-Display-Small-Line-Height:   44px;
+  --Alt-Display-Small-Letter-Spacing: 0px;
+  --Alt-Display-Medium-Font-Size:     45px;
+  --Alt-Display-Medium-Font-Weight:   600;
+  --Alt-Display-Medium-Line-Height:   52px;
+  --Alt-Display-Medium-Letter-Spacing: 0px;
+  --Alt-Display-Large-Font-Size:     57px;
+  --Alt-Display-Large-Font-Weight:   600;
+  --Alt-Display-Large-Line-Height:   64px;
+  --Alt-Display-Large-Letter-Spacing: 0px;
+
+}
+
+
+[data-device="Android-Mobile"] {
 
 
 
@@ -920,12 +1160,12 @@
  * platforms. Desktop is absent on purpose: there the brand's heights ARE the
  * answer, and base.css already states them.
  *
- * :root[data-platform="…"], not the bare [data-platform="…"] the type ramps
+ * :root[data-device="…"], not the bare [data-device="…"] the type ramps
  * above use, and the difference is load-bearing. --Button-Height is declared
  * at :root in base.css, which the provider injects at slot 5 — AFTER this file
  * at slot 3. A bare attribute selector ties with :root at (0,1,0), so the later
  * file would win and these overrides would do nothing, with no error anywhere.
- * :root[data-platform] scores (0,2,0) and wins on specificity instead, which
+ * :root[data-device] scores (0,2,0) and wins on specificity instead, which
  * does not depend on anyone preserving the load order.
  *
  * The type ramps above can stay as they are: their :root counterpart is in
@@ -937,7 +1177,7 @@
  * spellings follow these overrides on their own.
  */
 
-:root[data-platform="IOS-Mobile"] {
+:root[data-device="IOS-Mobile"] {
   --Button-Height: 44px;
   --Sm-Button-Height: 32px;
   --Lg-Button-Height: 50px;
@@ -946,7 +1186,7 @@
   --Lg-Button-Icon: 24px;
 }
 
-:root[data-platform="IOS-Tablet"] {
+:root[data-device="IOS-Tablet"] {
   --Button-Height: 44px;
   --Sm-Button-Height: 32px;
   --Lg-Button-Height: 50px;
@@ -955,7 +1195,16 @@
   --Lg-Button-Icon: 24px;
 }
 
-:root[data-platform="Android"] {
+:root[data-device="Android-Tablet"] {
+  --Button-Height: 48px;
+  --Sm-Button-Height: 32px;
+  --Lg-Button-Height: 56px;
+  --Button-Icon: 18px;
+  --Sm-Button-Icon: 18px;
+  --Lg-Button-Icon: 24px;
+}
+
+:root[data-device="Android-Mobile"] {
   --Button-Height: 48px;
   --Sm-Button-Height: 32px;
   --Lg-Button-Height: 56px;

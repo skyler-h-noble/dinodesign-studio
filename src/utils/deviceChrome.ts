@@ -138,7 +138,7 @@ export function overlayOffsetNames(): string[] {
  * It collapses cleanly TODAY: both iPad orientations reserve the same chrome,
  * and Android's phone and tablet both sit at 88/24. That is a fact about the
  * current numbers, not a guarantee — if Android tablets ever take a different
- * gesture bar from Android phones, one `[data-platform="Android"]` block can no
+ * gesture bar from Android phones, one `[data-device="Android"]` block can no
  * longer say what both devices need, and the CSS would silently ship one
  * device's answer for both.
  *
@@ -166,7 +166,7 @@ export function devicesFor(platform: CSSPlatform): DeviceMode[] {
  */
 export function platformOverlayOffsets(platform: CSSPlatform): Record<string, number> {
   const devices = devicesFor(platform);
-  if (devices.length === 0) throw new Error(`No device feeds [data-platform="${platform}"]`);
+  if (devices.length === 0) throw new Error(`No device feeds [data-device="${platform}"]`);
 
   const [first, ...rest] = devices;
   const base = overlayOffsets(first);
@@ -175,7 +175,7 @@ export function platformOverlayOffsets(platform: CSSPlatform): Record<string, nu
     for (const name of Object.keys(base)) {
       if (base[name] !== other[name]) {
         throw new Error(
-          `[data-platform="${platform}"] cannot carry one ${name}: ` +
+          `[data-device="${platform}"] cannot carry one ${name}: ` +
           `${first} needs ${base[name]}px, ${device} needs ${other[name]}px. ` +
           `Split the platform block or reconcile the device table in deviceChrome.ts.`
         );
@@ -190,7 +190,7 @@ export function platformOverlayOffsets(platform: CSSPlatform): Record<string, nu
  *
  * Desktop's are emitted too, at `:root`, even though its chrome is zero and
  * every value is therefore just the clearance. A consumer that never sets
- * data-platform still needs `--SnackBar-Top` to resolve — an unset custom
+ * data-device still needs `--SnackBar-Top` to resolve — an unset custom
  * property paints nothing and reports nothing, which is the failure mode
  * invariant 5 exists to catch.
  */

@@ -2428,7 +2428,7 @@ const BUTTON_BORDER_WIDTH = 1;
     // its height AND its bevel geometry both live here rather than in
     // Components/Button. Binding a component's height to
     // Platform/Button-Height in Figma makes it follow the platform mode, the
-    // same way [data-platform] does in CSS.
+    // same way [data-device] does in CSS.
     //
     // Target is the platform's minimum hit area. The SMALL button keeps its
     // visual size everywhere; a wrapper grows to Target using Platform-Spacer,

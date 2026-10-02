@@ -20,10 +20,15 @@
 // ── Sizes ────────────────────────────────────────────────────────────────────
 // Small and large keep one geometry each (their heights don't vary by
 // platform). Medium is the default size and its height DOES vary by platform,
-// so its geometry is emitted per platform — into the CSS [data-platform]
+// so its geometry is emitted per platform — into the CSS [data-device]
 // blocks and into the Figma Platform collection.
 
-export const PLATFORMS = ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android'] as const;
+/* 'Android' became 'Android-Tablet' + 'Android-Mobile'. Their METRICS are
+   identical — Figma gives both a 48px button and a 12px spacer — so nothing
+   below changes value. They are split because TYPOGRAPHY differs between
+   them, and a single list keeps the block names in step across the two. */
+export const PLATFORMS =
+  ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android-Tablet', 'Android-Mobile'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 /**
@@ -45,7 +50,8 @@ export type Platform = (typeof PLATFORMS)[number];
 export const PLATFORM_BUTTON_HEIGHT: Record<Exclude<Platform, 'Desktop'>, SizeTriple> = {
   'IOS-Mobile': { medium: 44, small: 32, large: 50 },
   'IOS-Tablet': { medium: 44, small: 32, large: 50 },
-  Android: { medium: 48, small: 32, large: 56 },
+  'Android-Tablet': { medium: 48, small: 32, large: 56 },
+  'Android-Mobile': { medium: 48, small: 32, large: 56 },
 };
 
 /** A metric that has a value per button size. */
@@ -64,7 +70,8 @@ export const PLATFORM_TARGET: Record<Platform, number> = {
   Desktop: 24,
   'IOS-Mobile': 44,
   'IOS-Tablet': 44,
-  Android: 48,
+  'Android-Tablet': 48,
+  'Android-Mobile': 48,
 };
 
 /**
@@ -77,7 +84,8 @@ export const PLATFORM_SPACER: Record<Platform, number> = {
   Desktop: 4,
   'IOS-Mobile': 10,
   'IOS-Tablet': 10,
-  Android: 12,
+  'Android-Tablet': 12,
+  'Android-Mobile': 12,
 };
 
 /**

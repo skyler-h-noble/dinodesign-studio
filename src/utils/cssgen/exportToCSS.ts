@@ -1670,27 +1670,47 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     console.log(`  ├─ Processing theme: ${themeName}`);
     console.log(`      Has Surfaces: ${!!theme.Surfaces}, Has Containers: ${!!theme.Containers}`);
     
+    /* NO THEME IS DEFAULT.
+     *
+     * Default's variables are emitted UNSCOPED as well as under
+     * [data-theme="Default"], so an element that names no theme gets Default
+     * rather than nothing. Previously `Default` existed only as an attribute
+     * value, which meant "no theme" inherited whatever an ancestor happened to
+     * carry — the dropdown could read Default while the box rendered Primary,
+     * and neither looked wrong.
+     *
+     * The unscoped forms are safe against a themed ancestor:
+     *   `:root` matches <html> only, so it cannot shadow a themed subtree.
+     *   A bare `[data-surface="Surface-Dim"]` is (0,1,0) while a themed
+     *   ancestor's `[data-theme="Primary"] [data-surface="Surface-Dim"]` is
+     *   (0,2,0) and still wins.
+     * So the bare rules supply a floor and lose to any real theme above them,
+     * which is exactly what a default should do. */
+    const isDefaultTheme = themeName === 'Default';
+    const bare = (surfaceAttr: string | null) =>
+      !isDefaultTheme ? '' : (surfaceAttr === null ? ':root,\n' : `[data-surface="${surfaceAttr}"],\n`);
+
     // Surfaces selectors: default (Surface) on theme element, variants on descendants
     const surfaceVariants: { key: string; selector: string }[] = [
       {
         key: 'Surfaces',
-        selector: `[data-theme="${themeName}"],\n[data-theme="${themeName}"][data-surface="Surface"]`
+        selector: `${bare(null)}${bare('Surface')}[data-theme="${themeName}"],\n[data-theme="${themeName}"][data-surface="Surface"]`
       },
       {
         key: 'Surfaces-Dim',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dim"],\n[data-theme="${themeName}"][data-surface="Surface-Dim"]`
+        selector: `${bare('Surface-Dim')}[data-theme="${themeName}"] [data-surface="Surface-Dim"],\n[data-theme="${themeName}"][data-surface="Surface-Dim"]`
       },
       {
         key: 'Surfaces-Dimmest',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Dimmest"],\n[data-theme="${themeName}"][data-surface="Surface-Dimmest"]`
+        selector: `${bare('Surface-Dimmest')}[data-theme="${themeName}"] [data-surface="Surface-Dimmest"],\n[data-theme="${themeName}"][data-surface="Surface-Dimmest"]`
       },
       {
         key: 'Surfaces-Bright',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Bright"],\n[data-theme="${themeName}"][data-surface="Surface-Bright"]`
+        selector: `${bare('Surface-Bright')}[data-theme="${themeName}"] [data-surface="Surface-Bright"],\n[data-theme="${themeName}"][data-surface="Surface-Bright"]`
       },
       {
         key: 'Surfaces-Brightest',
-        selector: `[data-theme="${themeName}"] [data-surface="Surface-Brightest"],\n[data-theme="${themeName}"][data-surface="Surface-Brightest"]`
+        selector: `${bare('Surface-Brightest')}[data-theme="${themeName}"] [data-surface="Surface-Brightest"],\n[data-theme="${themeName}"][data-surface="Surface-Brightest"]`
       }
     ];
 
@@ -3997,8 +4017,30 @@ function generateSurfacesContainersCSS(jsonData: any): string {
   // Container types — map --Background to container var. Dropshadow-Color comes from theme selectors.
   const containerKeys = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
 
+  /* TWO selectors per container, and the second one is the whole point.
+   *
+   * `[data-surface="Container"]` is (0,1,0). So is the mode sheet's bare
+   * `[data-theme="Default"] { --Background: ... }`. Equal specificity means
+   * load order decides, and the mode sheet loads AFTER base.css — the Provider
+   * inserts it there deliberately. So on any element carrying BOTH attributes,
+   * which is the ordinary case, the theme's Surface value overwrote the
+   * container's and every container painted as plain Surface.
+   *
+   * Measured before fixing, Default theme: Container resolved to #fcfcfc in
+   * light and #0b0b0b in dark — the Surface value — where Figma says #f3f3f3
+   * and #1c1c1c. All five container levels were identical to each other and to
+   * Surface, so `data-surface="Container"` did nothing at all.
+   *
+   * `[data-theme][data-surface="Container"]` is (0,2,0) and wins regardless of
+   * order. The bare rule stays for an element that sets a surface without a
+   * theme — the pattern CLAUDE.md documents for a card — where nothing
+   * competes and inheritance supplies the theme. */
   containerKeys.forEach(key => {
     lines.push(`[data-surface="${key}"] {`);
+    lines.push(`  --Background: var(--${key});`);
+    lines.push('}');
+    lines.push('');
+    lines.push(`[data-theme][data-surface="${key}"] {`);
     lines.push(`  --Background: var(--${key});`);
     lines.push('}');
     lines.push('');

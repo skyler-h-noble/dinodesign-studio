@@ -13,13 +13,13 @@ import '@omni-design/components/public/styles/Light-Mode.css';
 import '@omni-design/components/public/styles/base.css';
 import '@omni-design/components/public/styles/styles.css';
 // Per-platform typography sizing tokens (Button-Small-Font-Size,
-// Body-Small-Line-Height, etc.). Gated on [data-platform="Desktop"] which we
+// Body-Small-Line-Height, etc.). Gated on [data-device="Desktop"] which we
 // set on <html> below — without that attribute the tokens stay undefined and
 // Typography components fall back to inherited defaults.
 import '@omni-design/components/public/styles/typography-tokens.css';
 import { applyStudioDesignSystem } from './utils/studioDesignSystem';
 
-document.documentElement.setAttribute('data-platform', 'Desktop');
+document.documentElement.setAttribute('data-device', 'Desktop');
 
 /* OmniDesign wearing one of its own design systems.
  *

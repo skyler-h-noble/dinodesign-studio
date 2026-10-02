@@ -70,11 +70,14 @@ export type FaceMode = (typeof FACE_MODES)[number];
 export const SEEDS_FROM: Record<DeviceType, string> = {
   'Desktop': 'Desktop',
   'IOS-Mobile': 'IOS-Mobile',
-  'Android-Mobile': 'Android',
+  'Android-Mobile': 'Android-Mobile',
   'IOS-Tablet-Vertical': 'IOS-Tablet',
   'IOS-Tablet-Horizontal': 'IOS-Tablet',
-  'Android-Tablet-Vertical': 'Android',
-  'Android-Tablet-Horizontal': 'Android',
+  /* The Android tablets no longer seed the same block as the phone. They
+     disagree on Floating-Label-Large-Line-Height (24 against 16) in both
+     faces, so the old shared 'Android' block dropped one of the two. */
+  'Android-Tablet-Vertical': 'Android-Tablet',
+  'Android-Tablet-Horizontal': 'Android-Tablet',
 };
 
 /**
@@ -244,10 +247,10 @@ export function aliasTo(face: FaceMode, token: string): string {
  *   data-device="IOS-Mobile"    which device type   (Devices-Type)
  *   data-fonts="Omni"|"System"  which face          (Typography, its 2 modes)
  *
- * ── Why data-platform does not simply go away ─────────────────────────────
+ * ── Why data-device does not simply go away ─────────────────────────────
  *
  * A design system's CSS is FROZEN per system in Storage and cannot be
- * regenerated. A page written against an older system sets data-platform and
+ * regenerated. A page written against an older system sets data-device and
  * always will. Emitting only data-device would mean that page silently gets no
  * platform block at all — no error, no fallback, just Desktop's values (or
  * none) on a phone.
@@ -257,13 +260,13 @@ export function aliasTo(face: FaceMode, token: string): string {
  * resolving; the new name is the one to write.
  *
  * So every block is emitted under BOTH attributes. A selector list costs one
- * comma and nothing at runtime. data-device is the name to use; data-platform
+ * comma and nothing at runtime. data-device is the name to use; data-device
  * keeps working and is not documented for new work.
  *
  * ── The value names moved too ─────────────────────────────────────────────
  *
  * `Android` became `Android-Mobile`, and the tablets split by orientation. An
- * old page says data-platform="Android" and means the phone, so that spelling
+ * old page says data-device="Android" and means the phone, so that spelling
  * has to keep resolving to Android-Mobile rather than matching nothing.
  */
 export const LEGACY_DEVICE_ALIAS: Record<string, DeviceType> = {
@@ -279,7 +282,7 @@ export function deviceSelector(device: DeviceType, extra = ''): string {
   const names = [device, ...Object.entries(LEGACY_DEVICE_ALIAS)
     .filter(([, to]) => to === device).map(([from]) => from)];
   return names
-    .flatMap((n) => [`[data-device="${n}"]`, `[data-platform="${n}"]`])
+    .flatMap((n) => [`[data-device="${n}"]`, `[data-device="${n}"]`])
     .map((sel) => sel + extra)
     .join(',\n');
 }
@@ -293,8 +296,8 @@ export function deviceSelector(device: DeviceType, extra = ''): string {
  *
  * That also fixes the cascade rather than relying on it. What ships today is
  *
- *     [data-platform="X"][data-fonts]           -> the brand faces
- *     [data-platform="X"][data-fonts="Default"] -> the system faces
+ *     [data-device="X"][data-fonts]           -> the brand faces
+ *     [data-device="X"][data-fonts="Default"] -> the system faces
  *
  * and a BARE attribute selector matches any value, "Default" included. Both
  * rules have identical specificity, so which one wins is decided purely by
@@ -385,10 +388,10 @@ export function resolveVar(value: string, declared: Record<string, string>, dept
   return v;
 }
 
-/** Parse one `[data-platform="X"] { … }` block into style -> prop -> value. */
+/** Parse one `[data-device="X"] { … }` block into style -> prop -> value. */
 export function parsePlatformBlock(css: string, platform: string):
   { styles: Record<string, StyleProps>; families: Record<string, string> } {
-  const re = new RegExp(`\\[data-platform="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`);
+  const re = new RegExp(`\\[data-device="${platform}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`);
   const m = css.match(re);
   const styles: Record<string, StyleProps> = {};
   const families: Record<string, string> = {};
