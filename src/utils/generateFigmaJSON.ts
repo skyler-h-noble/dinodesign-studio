@@ -2103,6 +2103,19 @@ export function generateFigmaJSON(
          case. It is only the duplicate spelling that goes. */
       'Header-Caps': typo['Set-Header-Caps']?.value === 'uppercase',
       'Display-Caps': typo['Set-Decorative-Caps']?.value === 'uppercase',
+      /* Eyebrow is ALWAYS uppercase, and the flag has to say so.
+         There was no Eyebrow flag at all, and these flags are the only thing
+         the plugin has to write case from — so every import wrote Eyebrow's
+         case from nothing and the caps came off. The styles were correct right
+         up until the design system was re-imported, which is the worst shape
+         for a bug: it only appears when you sync.
+
+         Not a user choice, unlike Header and Display. typeScale hardcodes
+         textTransform: 'uppercase' for the Eyebrow steps and the CSS emits
+         --Eyebrow-*-Text-Transform: uppercase, so `true` is the value that
+         makes Figma agree with the stylesheet rather than a preference being
+         expressed. An eyebrow in sentence case is a Subtitle. */
+      'Eyebrow-Caps': true,
     };
 
     // ── The full type scale ──
