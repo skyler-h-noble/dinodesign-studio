@@ -1026,7 +1026,28 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   const bevelPx = Math.round(buttonHeight * bevelPercent / 100);
   const r = computeRadii(sc);
 
+  /* The three picks, as stored on the design system record. */
+  const coreColors = input.colorScheme.colors || [];
+
   const foundationCSS = `:root {
+
+  /* ── The brand's CORE colours ────────────────────────────────────────────
+     The three hexes the user actually picked, verbatim.
+
+     Nothing else in the published CSS says which colour a brand chose.
+     generateScaledTones writes the pick into the tone NEAREST ITS LIGHTNESS,
+     so the index differs per colour — a dark pick lands low, a pale one high
+     — and no fixed tone can stand for it. Color-Vibrant is not it either: that
+     is hardcoded to Color-8, which on a light brand is a pale tint. The
+     library's own Colors page showed Color-11 and then Color-8 and was wrong
+     both times, because the information was never published.
+
+     Emitted here rather than derived, so a consumer can show the brand's
+     colours without reaching into Firestore — which a published stylesheet
+     cannot do. */
+  --Primary-Core: ${coreColors[0]};
+  --Secondary-Core: ${coreColors[1]};
+  --Tertiary-Core: ${coreColors[2]};
 
   /* Button */
   --Button-Radius: ${r.buttonRadius}px;

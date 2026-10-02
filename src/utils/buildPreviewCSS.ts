@@ -2028,7 +2028,20 @@ ${(() => {
   // --Button-Radius (accordions, swatches). Mirrors the export cap.
   const largeButtonHeight = sc.largeButtonHeight ?? 56;
   const cappedButtonRadius = Math.min(r.buttonRadius, largeButtonHeight);
+  /* The three picks, emitted exactly as exportToCSS does — invariant 5, which
+     is the rule these two files break most often. The preview showing a brand's
+     real colours while the published CSS did not would be the same divergence
+     as the container surfaces, and just as quiet. */
+  const coreColors = colorScheme.colors || [];
+
   return `:root {
+  /* The brand's CORE colours, verbatim. Nothing else in the CSS records which
+     colour was chosen: the pick is written into the tone NEAREST ITS
+     LIGHTNESS, so its index differs per colour, and Color-Vibrant is hardcoded
+     to Color-8 rather than being the pick. */
+  --Primary-Core: ${coreColors[0] ?? 'transparent'};
+  --Secondary-Core: ${coreColors[1] ?? 'transparent'};
+  --Tertiary-Core: ${coreColors[2] ?? 'transparent'};
   --Style-Border-Radius: ${cappedStyleRadius}px;
   --Button-Radius: ${cappedButtonRadius}px;
   --Sm-Button-Radius: ${Math.min(r.smButtonRadius, largeButtonHeight)}px;
