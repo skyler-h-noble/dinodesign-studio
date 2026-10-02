@@ -31,10 +31,15 @@ describe('platforms, not breakpoints', () => {
     expect(s.trap).toMatch(/min-width/);
   });
 
-  it('lists the four platform blocks', () => {
+  it('lists the five device blocks', () => {
+    /* Five, not four. Android split into tablet and phone because their
+       typography differs on Floating-Label-Large-Line-Height — 24 against 16 —
+       so the shared block dropped one of the two values. Orientation still
+       collapses: across all 379 Typography variables the vertical and
+       horizontal modes are identical. */
     const rows = section('Platforms').table!.rows.map(r => r[0]);
-    expect(rows).toHaveLength(4);
-    for (const p of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android']) {
+    expect(rows).toHaveLength(5);
+    for (const p of ['Desktop', 'IOS-Mobile', 'IOS-Tablet', 'Android-Tablet', 'Android-Mobile']) {
       expect(rows.some(r => r.includes(p)), p).toBe(true);
     }
   });
