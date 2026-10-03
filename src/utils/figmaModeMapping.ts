@@ -341,8 +341,9 @@ export const DEVICE_TO_SIZE_CLASS: Record<string, string> = {
 //
 // Three modes, two variables, both colour stops for the Alt-Display face:
 //
-//   Default    Color-Stop-1 = Surface::Header
-//              Color-Stop-2 = Surface::Header                 (one flat colour)
+//   Default    Color-Stop-1 = Surface::Alt-Color-Gradient-Stop-1
+//              Color-Stop-2 = Surface::Alt-Color-Gradient-Stop-2
+//              (the gradient — see the note below; this was Header/Header)
 //   Colored    Color-Stop-1 = Theme::Surface/Alt-Display-Color
 //              Color-Stop-2 = Surface::Alt-Display-Color      (two tones)
 //   Gradient   Color-Stop-1 = Surface::Alt-Color-Gradient-Stop-1
@@ -366,10 +367,36 @@ export const DEVICE_TO_SIZE_CLASS: Record<string, string> = {
 // mode has to be read to know WHICH construction to emit, then the stops read
 // to fill it — two steps, unlike every other collection here.
 //
-// Both stops resolving to the SAME variable in Default is the tell that this is
-// a strategy and not a ramp. A ramp with identical ends would be redundant
-// (invariant 2); a one-colour strategy expressed through a two-stop interface
-// is not, because the interface has to serve all three modes.
+// A one-colour strategy expressed through a two-stop interface is not redundant
+// under invariant 2, because the interface has to serve all three modes. That
+// is still true of Colored, which points both stops at one variable.
+//
+// DEFAULT CHANGED on 2026-10-02, and the reason is worth keeping because the
+// diagnosis was wrong first. Default used to alias both stops to Surface::Header,
+// which made an Alt Display identical to a plain Display — the brand's second
+// display face existed and never looked like one.
+//
+// The first explanation was that the Alt-Display-Gradient paint style rendered
+// flat because the collection sat on Default. That was only half of it. The
+// Alt-Display-* TEXT NODES carried no fill style at all: they painted
+// Surface::Header directly, so they never read Color-Stop-1/2 and the mode
+// could not have affected them either way. The style was correct, bound on
+// both stops, and used by nothing — authored, exported, never consumed, which
+// is the fourth time that shape has turned up in this system.
+//
+// Both halves are fixed: the style is assigned to the Alt-Display-* nodes, and
+// Default now carries the gradient aliases, so a brand gets the gradient
+// without choosing it.
+//
+// Gradient now holds the same pair as Default. That is NOT the redundancy
+// invariant 2 warns about — the test is whether anything SELECTS between the
+// copies, and a frame pinned to Gradient survives Default being repointed
+// again. Compare the Light/Medium button shades, where the Theme layer chose
+// between identical values, against BlackWhite, where nothing did.
+//
+// The plugin does not write this collection: the payload carries typographic
+// flags (family, size, caps, noise, bounce) and no fills or paint styles, so
+// an import does not undo either half.
 
 export const ALT_DISPLAY_MODES = ['Default', 'Colored', 'Gradient'] as const;
 export type AltDisplayMode = (typeof ALT_DISPLAY_MODES)[number];
