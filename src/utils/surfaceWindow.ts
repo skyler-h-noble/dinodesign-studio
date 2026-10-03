@@ -8,7 +8,7 @@
  * state themes held another (3-4-5-6). Nothing selected between them — the
  * palette was already the selector — so eighteen themes were really two axes
  * enumerated as one flat list, and Figma's ten-mode limit was being spent on the
- * duplication rather than on colour.
+ * duplication rather than on color.
  *
  * Widening each theme from four levels to five absorbs `-Light` into the theme it
  * belongs to, which is what frees the mode slots for Info/Success/Warning/Error.
@@ -24,7 +24,7 @@
  *   Brightest  11, unless Bright has reached it — then 12, then white
  *
  * Brightest lands on 11 because that is the tone `<Palette>-Light`'s Surface
- * used, so the replacement is the same colour rather than an approximation of it.
+ * used, so the replacement is the same color rather than an approximation of it.
  *
  * ── Paint is not the same as index ─────────────────────────────────────────
  * A level can PAINT black or white while still being INDEXED by a tone. That is

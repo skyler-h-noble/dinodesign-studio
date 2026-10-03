@@ -71,7 +71,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
      the lookup only covered chromatic palettes, returned undefined, and the
      shadow fell back to a cream default, so a green brand cast warm shadows.
      Measuring the resolved --Background cannot disagree with what is painted.
-     useLayoutEffect runs before paint, so the corrected colour lands in the
+     useLayoutEffect runs before paint, so the corrected color lands in the
      same frame; the state guard stops it looping. */
   const wrapRef = useRef<HTMLDivElement>(null);
   const [measuredBg, setMeasuredBg] = useState<string | null>(null);
@@ -143,7 +143,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
                 value={c.shadowIntensity} aria-label="Intensity"
                 onChange={(_: unknown, v: number | number[]) => set('shadowIntensity', v as number)} />
               <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-                The weight every level composites to. Also deepens the shadow colour.
+                The weight every level composites to. Also deepens the shadow color.
               </BodySmall>
             </VStack>
 
@@ -229,7 +229,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
                 bought nothing and cost the background.
 
                 The background: var(--Background) STAYS, now inheriting the right
-                value. It paints the same colour as the page, so the seam is
+                value. It paints the same color as the page, so the seam is
                 invisible — and the layout effect below measures this element to
                 feed the shadow maths. Painting nothing would make that read
                 rgba(0,0,0,0), fail the regex, and fall back to the cream default:

@@ -10,7 +10,7 @@
 // Progress Dial, and all three have a single option.
 //
 // So a converter that reads only `componentProperties` learns nothing about
-// size or colour, emits every component at the default, and is silently wrong
+// size or color, emits every component at the default, and is silently wrong
 // on every screen that pinned a mode. Nothing reports it, because the design
 // looks right in Figma and the code compiles.
 //
@@ -77,28 +77,28 @@ export const COMPONENT_SIZE_DEFAULT = 'medium';
 //
 // TWO Figma axes compose into ONE lib string:
 //
-//   colour  the Buttons MODE      default · primary · … · black-white
+//   color  the Buttons MODE      default · primary · … · black-white
 //   shape   the `Style` VARIANT   solid · outline · ghost
 //
 //   variant="primary"           = mode primary  + Style solid
 //   variant="primary-outline"   = mode primary  + Style outline
-//   variant="ghost"             = Style ghost   + colour DISCARDED
+//   variant="ghost"             = Style ghost   + color DISCARDED
 //
 // That last line is a real capability gap, not a naming one. Figma can draw a
 // ghost button in any of the ten palettes, because the mode drives
-// Buttons::Text, ::Hover and ::Pressed. The lib's ghost takes no colour at all
-// — `ghostStyles(isTextContent, selected)` in Button.js has no colour
+// Buttons::Text, ::Hover and ::Pressed. The lib's ghost takes no color at all
+// — `ghostStyles(isTextContent, selected)` in Button.js has no color
 // parameter, and a text ghost reads --Hotlink while an icon ghost reads
 // something else. So ten Figma combinations collapse to one lib variant and
 // the palette is lost in translation.
 //
-// SETTLED 2026-09-28: ghost stays colourless, and Figma drops its fill effects.
+// SETTLED 2026-09-28: ghost stays colorless, and Figma drops its fill effects.
 //
-// The question arrived as "ghost needs colour to get the drop shadows to work",
+// The question arrived as "ghost needs color to get the drop shadows to work",
 // which was half right. Figma's ghost variants carried four DROP_SHADOWs AND an
 // inner bevel, while the lib gives ghost `boxShadow: 'none'` at rest, hover and
 // active. A bevel's GEOMETRY comes from Component-Size (Button-Highlight-Offset-x)
-// but its COLOUR comes from Buttons::Highlight — per mode — so a colourless
+// but its COLOUR comes from Buttons::Highlight — per mode — so a colorless
 // ghost genuinely could not have drawn one.
 //
 // The premise was the thing to question. A bevel is a lighting effect on a
@@ -107,10 +107,10 @@ export const COMPONENT_SIZE_DEFAULT = 'medium';
 // the effects left on. And elevation says "this floats", which is the opposite
 // of what the lowest-emphasis control in the set should say.
 //
-// So the fill effects come off in Figma, and the lib is unchanged. The colour
+// So the fill effects come off in Figma, and the lib is unchanged. The color
 // is still DISCARDED here, because Figma can render a ghost in any of the ten
 // modes and the lib's ghost reads --Hotlink for text and --Quiet for icons by
-// design. That loss is real but small, and `buttonVariantLosesColour` reports
+// design. That loss is real but small, and `buttonVariantLosesColor` reports
 // it so a converted line can carry a note rather than lose it silently.
 //
 // Do NOT "fix" it by inventing `{color}-ghost`. The tokens exist
@@ -120,20 +120,20 @@ export const COMPONENT_SIZE_DEFAULT = 'medium';
 
 export type ButtonShape = 'solid' | 'outline' | 'ghost';
 
-export function buttonVariant(colourMode: string, shape: ButtonShape): string {
+export function buttonVariant(colorMode: string, shape: ButtonShape): string {
   if (shape === 'ghost') {
-    /* Colour discarded — see above. The caller should emit a note beside the
+    /* Color discarded — see above. The caller should emit a note beside the
        line so a reviewer can see the design asked for a palette the component
        cannot express. */
     return 'ghost';
   }
-  const colour = colourMode === 'black-white' ? 'black-white' : colourMode;
-  return shape === 'outline' ? `${colour}-outline` : colour;
+  const color = colorMode === 'black-white' ? 'black-white' : colorMode;
+  return shape === 'outline' ? `${color}-outline` : color;
 }
 
 /** True when the mapping drops information the design carried. */
-export function buttonVariantLosesColour(shape: ButtonShape, colourMode: string): boolean {
-  return shape === 'ghost' && colourMode !== 'default';
+export function buttonVariantLosesColor(shape: ButtonShape, colorMode: string): boolean {
+  return shape === 'ghost' && colorMode !== 'default';
 }
 
 // ── 3. Menu-Levels → nesting depth ──────────────────────────────────────────
@@ -339,7 +339,7 @@ export const DEVICE_TO_SIZE_CLASS: Record<string, string> = {
 
 // ── 8. Alt-Display → ambient, and the one collection that is a TREATMENT ────
 //
-// Three modes, two variables, both colour stops for the Alt-Display face:
+// Three modes, two variables, both color stops for the Alt-Display face:
 //
 //   Default    Color-Stop-1 = Surface::Alt-Color-Gradient-Stop-1
 //              Color-Stop-2 = Surface::Alt-Color-Gradient-Stop-2
@@ -356,18 +356,18 @@ export const DEVICE_TO_SIZE_CLASS: Record<string, string> = {
 //
 // The other three ambient collections select a MEASUREMENT: a platform's
 // button height, a viewport's margin, a face's letter-spacing. Alt-Display
-// selects a RENDERING STRATEGY. Default paints one flat colour; Colored paints
+// selects a RENDERING STRATEGY. Default paints one flat color; Colored paints
 // two tones; Gradient paints a gradient between two stops. Those are not three
 // values of one property — they are three different paint constructions, and a
-// consumer cannot express "Gradient" by reading a colour token, because a
-// gradient is not a colour.
+// consumer cannot express "Gradient" by reading a color token, because a
+// gradient is not a color.
 //
 // Consequence for the converter: reading Color-Stop-1 alone produces a flat
 // fill on every mode, and Gradient silently renders as its first stop. The
 // mode has to be read to know WHICH construction to emit, then the stops read
 // to fill it — two steps, unlike every other collection here.
 //
-// A one-colour strategy expressed through a two-stop interface is not redundant
+// A one-color strategy expressed through a two-stop interface is not redundant
 // under invariant 2, because the interface has to serve all three modes. That
 // is still true of Colored, which points both stops at one variable.
 //
@@ -401,14 +401,14 @@ export const DEVICE_TO_SIZE_CLASS: Record<string, string> = {
 export const ALT_DISPLAY_MODES = ['Default', 'Colored', 'Gradient'] as const;
 export type AltDisplayMode = (typeof ALT_DISPLAY_MODES)[number];
 
-/** How a mode paints — the thing a colour lookup alone cannot tell you. */
+/** How a mode paints — the thing a color lookup alone cannot tell you. */
 export const ALT_DISPLAY_PAINT: Record<AltDisplayMode, 'flat' | 'two-tone' | 'gradient'> = {
   Default: 'flat',
   Colored: 'two-tone',
   Gradient: 'gradient',
 };
 
-/** True when both stops are one colour, so a single fill is faithful. */
+/** True when both stops are one color, so a single fill is faithful. */
 export function altDisplayIsFlat(mode: AltDisplayMode): boolean {
   return ALT_DISPLAY_PAINT[mode] === 'flat';
 }
@@ -417,7 +417,7 @@ export function altDisplayIsFlat(mode: AltDisplayMode): boolean {
 //
 //   COLLECTION         MODES  →  WHAT THE CONVERTER DOES
 //   Component-Size       3       size prop, 1:1, emit even at the default
-//   Buttons             10       colour half of the `variant` string
+//   Buttons             10       color half of the `variant` string
 //   Icons & Avatars     10       size prop, NAMES OFFSET TWO STEPS (now fixed
 //                                in the lib), plus 3 context modes that mean
 //                                emit no size at all

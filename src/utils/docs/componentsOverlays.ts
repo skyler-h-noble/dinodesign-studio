@@ -141,7 +141,7 @@ export const TOOLTIP_DOC: ComponentDoc = {
     { name: 'title', type: 'ReactNode', default: 'undefined', note: 'The content. Keep it to a phrase.' },
     { name: 'placement', type: 'string', values: ['top', 'bottom', 'left', 'right'], default: 'bottom' },
     { name: 'color', type: 'string', default: 'black-white',
-      note: 'Which Buttons mode paints the bubble. The default matches the mode Figma pins on `Button-Theme-Tooltip`; pass another palette to recolour.' },
+      note: 'Which Buttons mode paints the bubble. The default matches the mode Figma pins on `Button-Theme-Tooltip`; pass another palette to recolor.' },
     { name: 'arrow', type: 'boolean', default: 'true',
       note: 'On by default — every Figma variant carries the arrow, and the component root uses a -2px gap to seat it against the bubble.' },
     { name: 'enterDelay', type: 'number', default: '100' },
@@ -155,9 +155,9 @@ export const TOOLTIP_DOC: ComponentDoc = {
   ],
   theming: [
     { collection: 'Buttons', inCode: '`color` — `<Tooltip color="primary">` resolves the bubble to `--Buttons-Primary-Button`. Defaults to `black-white`.',
-      inFigma: 'One pin, on the inner `Button-Theme-Tooltip` frame: `Buttons = black-white`. The bubble, the arrow, the label and the icon all inherit it, so that frame is the only place to change a tooltip\'s colour.' },
+      inFigma: 'One pin, on the inner `Button-Theme-Tooltip` frame: `Buttons = black-white`. The bubble, the arrow, the label and the icon all inherit it, so that frame is the only place to change a tooltip\'s color.' },
     { collection: 'Theme', inCode: '`data-theme` on an ancestor.',
-      inFigma: 'Pins nothing and inherits — deliberately. The drop shadow sits on the component ROOT, one level above the themed frame, so it reads the ambient surface rather than the tooltip\'s own colour.' },
+      inFigma: 'Pins nothing and inherits — deliberately. The drop shadow sits on the component ROOT, one level above the themed frame, so it reads the ambient surface rather than the tooltip\'s own color.' },
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'the bubble and its arrow', variesWith: 'Buttons mode + surface',
@@ -176,7 +176,7 @@ export const TOOLTIP_DOC: ComponentDoc = {
   ],
   gotchas: [
     'A tooltip on a `disabled` control never shows: a disabled element fires no pointer events. Wrap it in a span if the explanation matters.',
-    'The bubble is a Buttons colour, not a surface colour. It used to read `--Background`, which painted it the colour of whatever it floated over and left no way to recolour it. `variant="light"` still works, because the Buttons tokens are surface-aware and light moves the SURFACE rather than tinting the fill.',
+    'The bubble is a Buttons color, not a surface color. It used to read `--Background`, which painted it the color of whatever it floated over and left no way to recolor it. `variant="light"` still works, because the Buttons tokens are surface-aware and light moves the SURFACE rather than tinting the fill.',
   ],
 };
 

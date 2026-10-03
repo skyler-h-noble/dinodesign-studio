@@ -7,7 +7,7 @@
  * buildPreviewCSS / exportColorSystemToJSON / generateFigmaJSON and compare
  * their outputs.
  *
- * Why it matters: every colour bug found this week was preview-side while the
+ * Why it matters: every color bug found this week was preview-side while the
  * export was correct, because the preview carries its own private contrast
  * implementation (getAccessibleTones lives in buildPreviewCSS.ts and is used
  * nowhere else). Nothing failed when they diverged — a person had to notice a
@@ -27,7 +27,7 @@ import type { ColorScheme, UserSelections } from '../types';
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
- *  the picked colours (see the lockedHex fix in ColorStage). */
+ *  the picked colors (see the lockedHex fix in ColorStage). */
 function makeScheme(colors: [string, string, string]): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
@@ -129,7 +129,7 @@ import { generateFigmaJSON as figmaGen } from '../utils/generateFigmaJSON';
  * Surface-Brightest — the fifth surface level.
  *
  * It absorbs the <Palette>-Light themes: their Surface was tone 11, so landing
- * there makes the replacement the same colour rather than an approximation.
+ * there makes the replacement the same color rather than an approximation.
  * When Surface sits at 10 its Bright already occupies 11, so Brightest steps to
  * 12; above that the ramp is exhausted and it paints white.
  *
@@ -146,7 +146,7 @@ import { generateFigmaJSON as figmaGen } from '../utils/generateFigmaJSON';
  * The cheapest guard against this codebase's most common failure: one concept
  * declared in several places, one copy falling behind. An undefined custom
  * property is NOT an error — CSS drops the declaration and the element keeps
- * what it inherited — so a broken reference looks like a slightly wrong colour,
+ * what it inherited — so a broken reference looks like a slightly wrong color,
  * or like nothing at all.
  *
  * It caught a real one on its first run: --Default-Background-Surface-Brightest.

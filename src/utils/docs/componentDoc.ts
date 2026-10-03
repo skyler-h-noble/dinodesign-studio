@@ -68,16 +68,16 @@ export interface TokenDoc {
 }
 
 /**
- * The three mode collections that carry colour, and what each one moves.
+ * The three mode collections that carry color, and what each one moves.
  *
  * This is the fact a component doc cannot carry on its own, because getting it
  * wrong sends an agent to the right node in the wrong collection — and the
  * change appears to do nothing rather than erroring.
  *
- * `Icons` is new: its colours lived as ~27 flat variables inside Surface, so a
+ * `Icons` is new: its colors lived as ~27 flat variables inside Surface, so a
  * component had to bind to ONE of them. Badge bound to `Icons/Error` and could
  * therefore only ever be an error badge in Figma, while the library offered
- * nine colours. Collapsing them into 3 variables × 10 modes fixed that the same
+ * nine colors. Collapsing them into 3 variables × 10 modes fixed that the same
  * way Buttons already had.
  */
 export const COLOUR_COLLECTIONS = [
@@ -95,17 +95,17 @@ export const COLOUR_COLLECTIONS = [
   },
   {
     name: 'Icons',
-    moves: 'an icon or badge colour, plus its variant and on-colour',
+    moves: 'an icon or badge color, plus its variant and on-color',
     inCode: 'the `color` prop on `Icon` — `<Icon color="primary">`',
     inFigma: 'set the Icons mode on an `Icon-Theme-*` layer',
   },
 ] as const;
 
-export type ColourCollection = typeof COLOUR_COLLECTIONS[number]['name'] | '—';
+export type ColorCollection = typeof COLOUR_COLLECTIONS[number]['name'] | '—';
 
-export function renderColourSystem(): string {
-  const out = ['## How colour works', '',
-    'Three mode collections carry colour, and they are not interchangeable.',
+export function renderColorSystem(): string {
+  const out = ['## How color works', '',
+    'Three mode collections carry color, and they are not interchangeable.',
     'Changing the right node in the wrong collection appears to do nothing —',
     'it does not error.', ''];
   out.push('| Collection | What it moves | In code | In Figma |');
@@ -117,8 +117,8 @@ export function renderColourSystem(): string {
     'A `Theme-*`, `Button-Theme-*` or `Icon-Theme-*` layer marks **where** a',
     'mode goes. Most are unpinned, which means the component inherits — set the',
     'mode on the frame around it. A pinned one is a deliberate choice: Alert',
-    'pins Error and Warning because there the colour *is* the message.', '',
-    'A component with no such layer has nothing of its own to recolour.', '');
+    'pins Error and Warning because there the color *is* the message.', '',
+    'A component with no such layer has nothing of its own to recolor.', '');
   return out.join('\n');
 }
 
@@ -151,7 +151,7 @@ export interface ComponentDoc {
    */
   theming: Array<{
     /** Which mode collection this row is about — the thing that cannot be guessed. */
-    collection: ColourCollection;
+    collection: ColorCollection;
     inCode: string;
     inFigma: string;
   }>;

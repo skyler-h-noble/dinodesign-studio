@@ -164,7 +164,7 @@ const darkModeHeaderSurfaces = {
  * Color-2..Color-4 ramp regardless of background. Color-4 is the lightest
  * level and therefore the hardest case for light text.
  * Every index therefore resolves to the Surfaces entry for Color-4, the
- * correct pairing for that container colour. Deriving rather than hand-
+ * correct pairing for that container color. Deriving rather than hand-
  * maintaining a second table means the two cannot drift apart.
  */
 function containersFromSurfaces<T extends Record<string, Record<string, unknown>>>(

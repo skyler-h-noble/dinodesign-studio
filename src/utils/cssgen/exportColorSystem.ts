@@ -297,7 +297,7 @@ interface ModeSection {
     Surfaces: { [paletteKey: string]: { [colorKey: string]: ColorToken } };
     Containers: { [paletteKey: string]: { [colorKey: string]: ColorToken } };
   };
-  /** Small label above a heading — a brand-coloured text role per background.
+  /** Small label above a heading — a brand-colored text role per background.
    *  Same shape as Text; built from it by reference. */
   Eyebrows?: {
     Surfaces: { [backgroundKey: string]: { [colorKey: string]: ColorToken } };
@@ -464,7 +464,7 @@ interface SpacingSection {
 }
 
 interface ColorSystemExport {
-  /** Which Color-N each brand colour sits at — Default Primary/Secondary/
+  /** Which Color-N each brand color sits at — Default Primary/Secondary/
    *  Tertiary Tone. Emitted so consumers (and the CSS + Figma exports) can read
    *  the brand's position on the scale instead of inferring it from hexes. */
   Brand: {
@@ -1757,7 +1757,7 @@ function generateTagsForBackground(
  * This is consistent across all modes and never changes
  */
 /**
- * Focus ring colours, keyed by the background tone the ring sits on.
+ * Focus ring colors, keyed by the background tone the ring sits on.
  *
  * A focus indicator is non-text UI, so WCAG 1.4.11 requires 3:1 against the
  * background — the same requirement a Border has. These therefore use Border's
@@ -1810,7 +1810,7 @@ function generateFocusVisibleSection(isDark: boolean = false): FocusVisibleSecti
 // ─── Shared hover/active step math — MUST stay identical to
 // buildPreviewCSS.ts's activeAndHoverFor so the hosted CSS/JSON matches the
 // studio preview exactly. Pressed/hover move ALONG the palette one tone away
-// from the text colour so contrast is preserved:
+// from the text color so contrast is preserved:
 //   - dark (light-text) button  → active = tone n-1 (next darker)
 //   - light (dark-text) button  → active = tone n+1 (next lighter)
 //   - hover = 50% mix(base tone, active tone)
@@ -3375,7 +3375,7 @@ export function exportColorSystemToJSON(
   
   // ── Brand tones ────────────────────────────────────────────────────────
   //
-  // Which Color-N each brand colour actually sits at. The generator computes
+  // Which Color-N each brand color actually sits at. The generator computes
   // this in half a dozen places (toneToColorNumber(extractedTones.primary))
   // and then throws it away, so nothing downstream can tell you where the
   // brand lives without reverse-engineering it from hexes.
@@ -4427,8 +4427,8 @@ export function exportColorSystemToJSON(
   /* BW (Black/White) goes in BOTH modes.
      It was Light-Mode only, and Dark-Mode.css REFERENCES it — `--Eyebrow:
      var(--BW-Color-8)` — so in dark mode that token resolved to nothing and the
-     eyebrow silently lost its colour. Anything else reading a BW tone in dark
-     mode failed the same way: a mesh gradient's solved text colour came back
+     eyebrow silently lost its color. Anything else reading a BW tone in dark
+     mode failed the same way: a mesh gradient's solved text color came back
      undefined, `color` fell back to inherited, and light text landed on a light
      mesh.
      Black and white are not mode-dependent. The table is the same both sides —
@@ -4456,7 +4456,7 @@ export function exportColorSystemToJSON(
   // not a lightness scale like Neutral (whose Color-1 is dark and Color-12
   // light in BOTH modes). The tone a role picks — --Eyebrow takes BW-Color-8 —
   // has to answer that question for the mode it is in, so the same index must
-  // give the opposite colour on a dark surface.
+  // give the opposite color on a dark surface.
   const bwDark = Object.fromEntries(
     Object.entries(bwPalette).map(([k, v]) => [
       k,
@@ -4505,11 +4505,11 @@ export function exportColorSystemToJSON(
   // ── Eyebrows ──────────────────────────────────────────────────────────
   //
   // An eyebrow is the small label above a heading, and it reads best in a
-  // BRAND colour rather than the body text colour — but not the same brand
-  // colour as the background it sits on, or it disappears. So each background
-  // borrows the next colour round the rotation.
+  // BRAND color rather than the body text color — but not the same brand
+  // color as the background it sits on, or it disappears. So each background
+  // borrows the next color round the rotation.
   //
-  // Text.Surfaces.<Palette>.<Color-N> already means "the <Palette>-coloured
+  // Text.Surfaces.<Palette>.<Color-N> already means "the <Palette>-colored
   // text role, on a background at tone N" — it is exactly what the Theme layer
   // reads for Text-Primary / Text-Secondary / Text-Tertiary. Eyebrows is
   // emitted as REFERENCES into it rather than copied hexes, so it tracks the
@@ -4519,7 +4519,7 @@ export function exportColorSystemToJSON(
     Primary: 'Secondary',
     Secondary: 'Tertiary',
     Tertiary: 'Primary',
-    Info: 'BW',             // the states carry enough colour already
+    Info: 'BW',             // the states carry enough color already
     Success: 'BW',
     Warning: 'BW',
     Error: 'BW',
@@ -4530,7 +4530,7 @@ export function exportColorSystemToJSON(
   // They used to be pure references into Text.<scope>.<role>.<Color-N>, which
   // guaranteed they could never fail contrast — but it also meant they inherited
   // a decision made for BODY COPY. Text is deliberately restrained: a paragraph
-  // set in a vivid brand colour is tiring over a large field, so the Text table
+  // set in a vivid brand color is tiring over a large field, so the Text table
   // picks tone 1-3, essentially near-black. Measured on two shipped systems the
   // Surface eyebrow came out at chroma 0.02-0.13 — indistinguishable from body
   // text, which is exactly what an eyebrow must not be.
@@ -4555,7 +4555,7 @@ export function exportColorSystemToJSON(
     return (src as any)[key] as { tone: number; color: string }[] | undefined;
   };
 
-  /** HSV chroma — how much colour a tone carries. A proxy for "pop", and the
+  /** HSV chroma — how much color a tone carries. A proxy for "pop", and the
    *  thing being maximised subject to the contrast floor. */
   const popOf = (hex: string): number => {
     const m = /^#?([0-9a-f]{6})/i.exec(hex);
@@ -4596,7 +4596,7 @@ export function exportColorSystemToJSON(
           // accessibility report checks exactly that — all eight entries against
           // each real surface. Solving against a single assumed background
           // produced 285 failures: an eyebrow tuned for Neutral tone-7 was then
-          // measured on a Secondary tone-7 surface, which is a different colour
+          // measured on a Secondary tone-7 surface, which is a different color
           // entirely.
           //
           // This is also why Text's answer is so dark. Near-black is not
@@ -5646,11 +5646,11 @@ export function exportColorSystemToJSON(
 
       // ── Icons.On-<palette> ────────────────────────────────────────────
       //
-      // The foreground for text or glyphs sitting ON an icon colour, at 4.5:1.
+      // The foreground for text or glyphs sitting ON an icon color, at 4.5:1.
       //
       // Icons-<pal> is chosen to contrast with the SURFACE, so it can land on
       // any tone of its palette depending on theme, surface scope and mode.
-      // Rather than compute a fresh colour, resolve which tone the icon
+      // Rather than compute a fresh color, resolve which tone the icon
       // actually renders at and reuse Text.Surfaces.<pal>.Color-<tone> — the
       // same fixed mapping every other foreground uses. That guarantees 4.5:1
       // by construction instead of by a separate calculation, and it stays
@@ -5697,7 +5697,7 @@ export function exportColorSystemToJSON(
         // above finds nothing and On-Default silently never gets written — 138
         // contexts short. Falling back to the closest Neutral tone keeps the
         // pairing on the audited Text.Surfaces table instead of inventing a
-        // colour, and white/black land on the ends of the ramp as expected.
+        // color, and white/black land on the ends of the ramp as expected.
         const lum = relLum(target);
         if (lum === null) return null;
         let best: { palette: string; n: number } | null = null;
@@ -5718,7 +5718,7 @@ export function exportColorSystemToJSON(
       // hex. Icon refs are none of those: most themes use
       // {Icon.<scope>.<pal>.Color-N}, but Icons.Default is a TEXT ref —
       // {Text.Surfaces.BW.Color-5} — because the default icon follows the
-      // theme's text colour. Each shape that isn't handled returns null, the
+      // theme's text color. Each shape that isn't handled returns null, the
       // loop below hits `continue`, and the role is silently never written.
       // Walking the tree handles every shape including ones added later.
       const resolveRef = (ref: any, depth = 0): string | null => {
@@ -5747,11 +5747,11 @@ export function exportColorSystemToJSON(
 
           // Verify the pairing rather than trusting the tone lookup.
           //
-          // Icons.Default is often itself a TEXT colour ({Text.Surfaces.BW
+          // Icons.Default is often itself a TEXT color ({Text.Surfaces.BW
           // .Color-5} resolves to #ffffff). Feeding that back through findTone
           // matches a BW entry whose text is also white, so the table hands
-          // back the icon's own colour — 1.00:1. The table is right for real
-          // palette tones and circular for text colours, and nothing about the
+          // back the icon's own color — 1.00:1. The table is right for real
+          // palette tones and circular for text colors, and nothing about the
           // lookup distinguishes the two, so check the result and correct it.
           const candidate = `{Text.Surfaces.${tone.palette}.Color-${tone.n}}`;
           const candHex = resolveRef(candidate);
@@ -6314,7 +6314,7 @@ export function exportColorSystemToJSON(
   // Because the Theme layer is mode-independent, one {Hover.<pal>.Color-N} ref
   // cannot serve both modes: light containers need to move lighter, dark ones
   // darker. So containers get their own group, computed from the container
-  // colour rather than the background's.
+  // color rather than the background's.
   //
   // The rule: move AWAY from the text. A light container darkens; a dark one
   // lightens. Since the text is itself chosen by the container's lightness,
@@ -6386,7 +6386,7 @@ export function exportColorSystemToJSON(
   // verbatim, so Icon-Variant shipped as an exact duplicate of Icon — 208
   // variables with identical values and no differentiation at all.
   //
-  // Icon-Variant is the de-emphasised form of an icon, so it is the icon colour
+  // Icon-Variant is the de-emphasised form of an icon, so it is the icon color
   // at reduced opacity, exactly as Border-Variant relates to Border. Baked here
   // rather than in the structure builder because that emits {Colors.*} token
   // references, and a reference cannot carry an alpha channel — it has to become
@@ -6511,7 +6511,7 @@ export function exportColorSystemToJSON(
                 // Color-1 → Color-2 gap is the largest jump on the ramp in
                 // relative terms — L1 to L10 is a tenfold change in luminance,
                 // where the same step at the light end (L98 → L99) is nothing.
-                // A full step there reads as the button changing colour rather
+                // A full step there reads as the button changing color rather
                 // than responding: #040404 → #1b1b1b is a near-black going
                 // visibly grey.
                 //
@@ -6836,13 +6836,13 @@ export function exportColorSystemToJSON(
   // resolves a cross-mode reference, though — the CSS writer and the Figma
   // payload both look up names inside ONE mode, so an unbaked reference would
   // ship as the literal string "{Modes.Light-Mode.Colors.Primary.Color-8}" and
-  // the token would silently have no colour.
+  // the token would silently have no color.
   //
   // So resolve them at the very END of the export — Hover and Pressed are
   // filled in hundreds of lines below where the buttons are generated, and
   // then swapped again, so baking any earlier silently loses those two slots.
   // Write the hex in place. This is the hard-coding: from this point on the dark button carries
-  // a colour, not a link, and editing the dark ramp will not move it.
+  // a color, not a link, and editing the dark ramp will not move it.
   const resolveInLightMode = (ref: string): string | null => {
     let value = ref.startsWith('{Modes.Light-Mode.')
       ? `{${ref.slice('{Modes.Light-Mode.'.length)}`
@@ -6923,7 +6923,7 @@ export function exportColorSystemToJSON(
   // back to `colors[palette]['Color-' + colorN]` — the tone sitting in the same
   // slot on the CURRENT mode's ramp. In dark mode that is the dark ramp's
   // Color-8 (#8ba0ff) while the button actually paints light Color-8 (#b7c0ff),
-  // so every dark bevel was built from a colour the button never shows.
+  // so every dark bevel was built from a color the button never shows.
   //
   // The highlight hid it: both bases clamp at L=92, so they landed on the same
   // value and only the lowlight visibly diverged from the Figma payload (which
@@ -7062,7 +7062,7 @@ export function exportColorSystemToJSON(
         modeData?.Themes?.Default?.Surfaces?.Background?.value,
       );
       // Always emit the key. If it is skipped, the Default theme's reference
-      // resolves to nothing and the button silently loses its colour — which
+      // resolves to nothing and the button silently loses its color — which
       // is exactly what happened when this was written behind a guard.
       const bgIsLight = defaultBgHex.startsWith('#')
         ? (() => {
@@ -7260,14 +7260,14 @@ export function exportColorSystemToJSON(
 
   // ── Outline-Text ──────────────────────────────────────────────────────
   //
-  // The text colour of an OUTLINE or GHOST button — the variants with no fill.
+  // The text color of an OUTLINE or GHOST button — the variants with no fill.
   //
   // Those have no token of their own today: the lib's outlineStyles() sets
-  // `color: var(--Text)`, the surface's body-text colour. So an outline Primary
+  // `color: var(--Text)`, the surface's body-text color. So an outline Primary
   // button is not primary in any visible way — only its border carries the
   // palette, and the label reads exactly like the paragraph beside it.
   //
-  // A filled button's label is Buttons.<Pal>.Text, which is the colour that sits
+  // A filled button's label is Buttons.<Pal>.Text, which is the color that sits
   // ON the fill (white on a solid primary). Reusing that here would be wrong in
   // the other direction: white on the surface, not on a fill.
   //
@@ -7294,7 +7294,7 @@ export function exportColorSystemToJSON(
           const tone = String(entry.Border?.value || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
           if (!tone) continue;
           // Default has no Text palette of its own — it is whichever palette the
-          // user picked — so it takes the surface's own text colour, which is
+          // user picked — so it takes the surface's own text color, which is
           // what a default outline button should read as anyway.
           // BlackWhite maps to the BW text table.
           const target = OUTLINE_TEXT_PALETTES.has(pal) ? pal
@@ -7361,12 +7361,12 @@ export function exportColorSystemToJSON(
   //
   // Neutral and BlackWhite survive because they are the two neutral voices: a
   // quiet secondary action and a high-contrast one, neither of which competes
-  // with the state's colour. Default already resolved to the state's button
+  // with the state's color. Default already resolved to the state's button
   // before this pass — it is the theme's own default, so it needs no redirect.
   //
   // The WHOLE entry is copied, not just the fill. Copying Button alone would
   // leave the border, hover, pressed, bevel and Outline-Text on the old palette,
-  // producing a button that is Info-coloured with a Primary edge — worse than
+  // producing a button that is Info-colored with a Primary edge — worse than
   // either, and the kind of mismatch that reads as a rendering bug.
   const STATE_THEMES = ['Info', 'Success', 'Warning', 'Error'];
   const ALWAYS_ALLOWED = new Set(['Neutral', 'BlackWhite', 'Default']);

@@ -9,7 +9,7 @@
 // Proposed API: <Button variant="chip" preview={<span/>} meta="88%" selected>
 //   Lora
 // </Button>  — content left, meta right, truncating label, selected state via
-//   the border + a tint of the button colour.
+//   the border + a tint of the button color.
 // Lib-track: add to @omni-design/components/src/components/Button/ as a variant,
 //   or a dedicated Chip-style component if Button's API can't carry `meta`.
 
@@ -56,11 +56,11 @@ export function FontChip({
         opacity: disabled ? 0.38 : 1,
         // Selected reads as a FILLED default button; the rest as outlines. The
         // selected chip previously differed only by a tinted --Hover background
-        // and a coloured edge, which is the same weight as a hover state and did
+        // and a colored edge, which is the same weight as a hover state and did
         // not survive a glance down a list of ten.
         //
         // The fill uses the Default button tokens, so the chosen face is shown
-        // in the brand's own primary action colour rather than a UI grey.
+        // in the brand's own primary action color rather than a UI grey.
         border: `1px solid ${selected
           ? 'var(--Buttons-Default-Border, var(--Buttons-Default-Button))'
           : 'var(--Border)'}`,

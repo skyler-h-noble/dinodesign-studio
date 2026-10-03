@@ -2376,7 +2376,7 @@ function DetectionDetails({
   onPickRegion: () => void;
   /** Ignore the lettering and suggest from the image's mood instead.
    *  IMAGE, not palette: matchMood() scores the mood board's own brightness,
-   *  saturation, contrast and hue family. The design system's chosen colours
+   *  saturation, contrast and hue family. The design system's chosen colors
    *  are not an input, so changing them does not move the mood. */
   ignoreTextDetection: boolean;
   onIgnoreTextDetectionChange: (v: boolean) => void;
@@ -2420,7 +2420,7 @@ function DetectionDetails({
                           .join(', ')}, which is not lettering — usually a photograph read as
                          characters. Nothing on the board describes a typeface, so the
                          suggestions below come from the ${result.mood?.label ?? 'detected'} mood
-                         of your colours instead.`
+                         of your colors instead.`
                       : `Nothing on the board describes a typeface, so the suggestions below come
                          from the ${result.mood?.label ?? 'detected'} mood of your image instead.`}
                   </Caption>

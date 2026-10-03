@@ -499,7 +499,7 @@ function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
     if (!snapshot || !snapshot.colorScheme || !snapshot.userSelections) return '';
     try {
       const style = snapshot.componentStyle || 'modern';
-      // buildPreviewCSS covers colour and typography ONLY. The button/card
+      // buildPreviewCSS covers color and typography ONLY. The button/card
       // sliders live in snapshot.styleCustomizations and were never emitted
       // here, so this page rendered every system's buttons at the lib's
       // default radius while the create flow rendered the user's actual
@@ -513,7 +513,7 @@ function BrandCSSInjector({ snapshot }: { snapshot: any | null }) {
           mode: 'light',
           typographyStyles: snapshot.typographyStyles,
           // Same reason the componentStyleCSS line below exists: the sliders
-          // are not colour or typography, so they have to be handed over
+          // are not color or typography, so they have to be handed over
           // explicitly. The Shadow step's controls ride here.
           styleCustomizations: snapshot.styleCustomizations,
         }),
@@ -1422,7 +1422,7 @@ function VersionsTab({
                 <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>
                   <HStack spacing={1} style={{ alignItems: 'center' }}>
                     <BodySmall style={{ fontWeight: 700 }}>v{v.version}</BodySmall>
-                    {/* data-theme + data-surface, not a guessed colour: `-light` in this
+                    {/* data-theme + data-surface, not a guessed color: `-light` in this
                         system means the palette's Surface-Brightest. The lib's `-light`
                         chip shape is gone — it painted the SOLID button fill — so this
                         is a `-outline` chip, whose bg is var(--Background) and label

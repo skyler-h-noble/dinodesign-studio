@@ -7,7 +7,7 @@
  * buildPreviewCSS / exportColorSystemToJSON / generateFigmaJSON and compare
  * their outputs.
  *
- * Why it matters: every colour bug found this week was preview-side while the
+ * Why it matters: every color bug found this week was preview-side while the
  * export was correct, because the preview carries its own private contrast
  * implementation (getAccessibleTones lives in buildPreviewCSS.ts and is used
  * nowhere else). Nothing failed when they diverged — a person had to notice a
@@ -28,7 +28,7 @@ import type { ColorScheme, UserSelections } from '../types';
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
- *  the picked colours (see the lockedHex fix in ColorStage). */
+ *  the picked colors (see the lockedHex fix in ColorStage). */
 function makeScheme(colors: [string, string, string]): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
@@ -130,7 +130,7 @@ import { generateFigmaJSON as figmaGen } from '../utils/generateFigmaJSON';
  * Surface-Brightest — the fifth surface level.
  *
  * It absorbs the <Palette>-Light themes: their Surface was tone 11, so landing
- * there makes the replacement the same colour rather than an approximation.
+ * there makes the replacement the same color rather than an approximation.
  * When Surface sits at 10 its Bright already occupies 11, so Brightest steps to
  * 12; above that the ramp is exhausted and it paints white.
  *
@@ -364,7 +364,7 @@ describe('Surface-Brightest', () => {
 
   it('keeps Neutral Surface-Brightest mode-aware rather than a literal white', () => {
     // Color-12 is already pure white in light mode, so the reference paints the
-    // same colour AND still aliases into Modes. A hard #ffffff would light up
+    // same color AND still aliases into Modes. A hard #ffffff would light up
     // dark mode's brightest surface as pure white.
     const light = json.Modes['Light-Mode'].Themes.Neutral?.['Surfaces-Brightest']?.Background?.value;
     /* An ALIAS, not a literal — Neutral keeps aliasing even though its locked
@@ -410,7 +410,7 @@ describe('Surface-Brightest', () => {
      * WHITE stays a literal, and that is not the same compromise. White's
      * Highlight and Lowlight are IDENTICAL in both modes — #ffffff80 and
      * #b3b3b380 — because white does not move; the 70% dark-mode alpha lives in
-     * the fill's own colour, not in its bevel. Freezing a constant costs
+     * the fill's own color, not in its bevel. Freezing a constant costs
      * nothing. Freezing a variable costs dark mode. */
     const f: any = withStyle();
     const seen = new Set<string>();
@@ -578,7 +578,7 @@ describe('Surface-Brightest', () => {
        whole (theme, level) pair into :root; Figma names each half as the first
        mode of its collection. If the two halves disagree with the pair, a
        layer with no modes set and an element with no data-theme show different
-       colours — and both sides look self-consistent, which is exactly how the
+       colors — and both sides look self-consistent, which is exactly how the
        last divergence survived a passing parity suite. */
     for (const bg of ['primary', 'white', 'primary-light']) {
       const built: any = buildAll(SCHEME, { ...(sel as any), background: bg } as never, 'light');
@@ -780,7 +780,7 @@ describe('Surface-Brightest', () => {
       const body = blk.split('{')[1] || '';
       const g = (n: string) => ((body.match(new RegExp(`--${n}:\\s*([^;]+);`)) || [])[1] || '').trim();
       // The five levels are one tone at five opacities over the background, so
-      // only the top level is a palette colour and can stay a token reference.
+      // only the top level is a palette color and can stay a token reference.
       expect(g('Container-Highest'), `${t} container top`).toBe(`var(--${t}-Color-10)`);
       // The rest are blends, so they are hex — a token ref here would put the
       // ramp on two different curves (the dark-mode non-monotonic bug).
@@ -791,11 +791,11 @@ describe('Surface-Brightest', () => {
     expect(checked, 'every theme must declare a container').toBe(THEMES.length);
 
     // Figma resolves it to a hex, so compare against the palette entry itself
-    // rather than restating the colour.
+    // rather than restating the color.
     const lm = (withStyle() as any).Modes['Light-Mode'];
     const expected = lm.Colors.Primary['Color-10'].value;
     // The ramp tops out at Color-10 on every light background EXCEPT
-    // Background-10, where the surface IS Color-10: blending a colour with
+    // Background-10, where the surface IS Color-10: blending a color with
     // itself makes the card vanish, so that one steps up to Color-11.
     for (const row of ['Background-8', 'Background-12']) {
       expect(lm.Backgrounds.Primary[row]?.Containers?.['Container-Highest']?.value, `${row}`)
@@ -848,7 +848,7 @@ describe('Surface-Brightest', () => {
    * The failure is silent in the worst way: the MODE still exists in the file, so
    * a designer selects Surface-Brightest and every variable in it keeps whatever
    * it last held. On Error that painted #ef5854 — Color-6, the BRIGHT value —
-   * where Color-11's #fff3ef was expected. A plausible colour, not a broken one.
+   * where Color-11's #fff3ef was expected. A plausible color, not a broken one.
    *
    * Asserted against the Theme groups rather than a hardcoded list, so a sixth
    * level added to Themes fails here instead of quietly not being written.

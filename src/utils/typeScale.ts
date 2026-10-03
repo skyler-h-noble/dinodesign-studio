@@ -317,7 +317,7 @@ export const SUBTITLE_WEIGHT = 700;
  *  for the body role's weight to carry it.
  *
  *  This used to be called Overline, and the size tokens carried that name even
- *  after the face and colour role became Eyebrow — which meant an eyebrow was
+ *  after the face and color role became Eyebrow — which meant an eyebrow was
  *  spelled two ways depending on which property you were setting. The tokens
  *  are Eyebrow now; --Overline-* is still emitted as an alias so design systems
  *  and lib versions from before the rename keep resolving. */
@@ -824,7 +824,7 @@ export function buildTypeScale(styles: TypographyStyle[] | undefined | null): Ty
    * display pool ships exactly one weight — Anton, Bangers, Lobster, Great
    * Vibes, Alfa Slab One are all [400] — so altDisplayWeight returns undefined
    * more often than not, and the style then simply reads the face's weight
-   * like Display does. Colour is what always separates them; see
+   * like Display does. Color is what always separates them; see
    * altDisplay.ts, which holds both decisions. */
   const altWeight = altDisplayWeight(roles.display.weight, weightsFor(roles.display.family));
   for (const step of displaySteps(roles.display.size ?? DEFAULT_DISPLAY_SIZE)) {

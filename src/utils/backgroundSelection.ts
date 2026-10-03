@@ -24,12 +24,12 @@ export type BackgroundTheme = typeof ALL_THEMES[number];
 /**
  * What the BACKGROUND picker offers — Primary or Neutral only.
  *
- * A page background is the one surface every other colour is judged against, so
- * it is either the brand's own colour or a neutral. Secondary and Tertiary are
+ * A page background is the one surface every other color is judged against, so
+ * it is either the brand's own color or a neutral. Secondary and Tertiary are
  * accents: they exist to be seen AGAINST the background, and a page painted in
  * one leaves the palette with nothing to push off. Users who want a different
- * hue there reorder their core colours instead, which moves Primary rather than
- * adding a fourth page colour.
+ * hue there reorder their core colors instead, which moves Primary rather than
+ * adding a fourth page color.
  *
  * Narrower than ALL_THEMES on purpose — see the note there.
  */
@@ -100,7 +100,7 @@ const CHROMATIC_BRIGHTEST = 11;
  *
  * The core is clamped to [3, 9] so there is always a tone on each side —
  * at core 2 the midpoint of 1 and 2 rounds back onto the core itself. A brand
- * whose core sits outside that band is one whose own colour is already at the
+ * whose core sits outside that band is one whose own color is already at the
  * end of the ramp, where it makes a poor page background anyway.
  */
 export function toneFor(

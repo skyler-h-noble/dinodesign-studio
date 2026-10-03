@@ -110,7 +110,7 @@ const STUDIO_STYLE_ID = 'omni-studio-design-system';
  * then appends its <style> to <head> — while these <link>s are appended
  * synchronously when the effect runs. With an id already in localStorage the
  * studio's sheet lands AFTER the brand's and wins on equal specificity, so the
- * workbench showed the studio's colours and claimed to show the brand's. Which
+ * workbench showed the studio's colors and claimed to show the brand's. Which
  * one won depended on network timing, which is the worst kind of bug to chase.
  *
  * So the studio's sheet is disabled outright while a brand is active, and
@@ -1167,7 +1167,7 @@ function DriftPanel({ frameJson, jsx }: { frameJson: unknown; jsx: string }) {
   if (findings.length === 0) {
     return (
       <Alert severity="success" color="success" data-theme="Success" data-surface="Surface-Brightest">
-        No drift found. No hardcoded colours, no hidden layers rendered, every
+        No drift found. No hardcoded colors, no hidden layers rendered, every
         variant and string accounted for.
       </Alert>
     );

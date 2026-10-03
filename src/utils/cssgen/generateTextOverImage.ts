@@ -9,7 +9,7 @@
  * legible over ANY image.
  *
  * ── Why it can be computed without an image ───────────────────────────────
- * Alpha compositing is monotonic in the backdrop: the composited colour always
+ * Alpha compositing is monotonic in the backdrop: the composited color always
  * lies on the segment between the overlay and whatever is behind it. So the
  * worst backdrop is always one of the two extremes of the sRGB cube — pure
  * black or pure white — and solving for both covers every pixel of every photo
@@ -195,7 +195,7 @@ export function solveThemeScrims(
  * The scrim is painted with `color-mix(in srgb, var(--Background) N%,
  * transparent)` rather than a baked rgba, matching dino-overlay's non-literal
  * output — so the overlay keeps following the theme instead of freezing one
- * theme's colour into the rule.
+ * theme's color into the rule.
  */
 export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
   if (!scrims.length) return '';
@@ -240,7 +240,7 @@ export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
   //
   // The tool emits literal hexes there because it has no design system behind
   // it. In a generated bundle those would OVERRIDE the brand with the tool's own
-  // colours on every theme — so the rules are dropped and `data-theme` resolves
+  // colors on every theme — so the rules are dropped and `data-theme` resolves
   // through the design system exactly as it does everywhere else.
   lines.push('');
   lines.push('/* Text-over-image component. Put data-theme on the figure to');

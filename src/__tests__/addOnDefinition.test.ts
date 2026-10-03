@@ -12,7 +12,7 @@ const divider = spec.root.children[1];
 
 describe('nothing resolved travels in a spec', () => {
   it('carries no hex, anywhere', () => {
-    /* A literal colour ships the AUTHOR's brand to every customer who imports
+    /* A literal color ships the AUTHOR's brand to every customer who imports
        the add-on, and nothing reports it — it only appears when someone opens
        it in a different palette, by which point it is published. */
     expect(JSON.stringify(spec)).not.toMatch(/#[0-9a-fA-F]{6}/);

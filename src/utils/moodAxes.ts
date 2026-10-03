@@ -55,7 +55,7 @@ export const MOODS = Object.keys(MOOD_AXES);
 
 /**
  * The studio's mood vocabulary is wider than the nine the axes are defined for
- * — the moodboard classifier and the older colour-derived moods both feed in.
+ * — the moodboard classifier and the older color-derived moods both feed in.
  * Anything unrecognised lands on Modern, which is the neutral setting.
  */
 /**
@@ -98,7 +98,7 @@ export const SERVER_AXIS_MOOD: Record<string, string> = {
 };
 
 const MOOD_ALIASES: Record<string, string> = {
-  // colour-derived moods (TypographyStage v1)
+  // color-derived moods (TypographyStage v1)
   business: 'Professional', security: 'Professional', timeless: 'Professional',
   formal: 'Professional', determined: 'Professional', ambitious: 'Professional',
   healthy: 'Calm', balanced: 'Calm', pensive: 'Calm', quiet: 'Calm',

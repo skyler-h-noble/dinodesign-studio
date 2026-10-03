@@ -70,12 +70,12 @@ describe('icon names are typed, so they have to be resolved', () => {
 });
 
 describe('button variants compose the way the lib expects', () => {
-  it('solid is the bare colour, outline is suffixed', () => {
+  it('solid is the bare color, outline is suffixed', () => {
     expect(buttonVariant('primary', 'solid')).toBe('primary');
     expect(buttonVariant('primary', 'outline')).toBe('primary-outline');
   });
 
-  it('ghost and text carry no colour — the lib has no "{colour}-ghost"', () => {
+  it('ghost and text carry no color — the lib has no "{color}-ghost"', () => {
     /* "error-ghost" is not a variant Button.js knows; an unknown one falls
        through to the solid default, so the old composition rendered every
        ghost as a filled green button. */

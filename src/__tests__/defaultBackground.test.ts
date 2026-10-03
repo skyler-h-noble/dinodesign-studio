@@ -33,7 +33,7 @@ const EXPECTED_ROLES = [
   ...ACCENTS.map(p => `Text-${p}`),
   ...ACCENTS.map(p => `Header-${p}`),
   ...['Default', ...ACCENTS].flatMap(p => [`Icons-${p}`, `Icons-${p}-Variant`]),
-  // On-<pal>: foreground for content sitting ON the icon colour, at 4.5:1.
+  // On-<pal>: foreground for content sitting ON the icon color, at 4.5:1.
   // exportColorSystem computes these for the other 17 themes, but it runs after
   // the themes are built and cannot resolve Default's {Default-Background.*}
   // icon refs — so Default has to route them, or it becomes the one theme
@@ -148,7 +148,7 @@ describe('Default theme routes every surface role through Default-Background', (
     // override does not cover — kept their own borders, leaving a light border
     // on a light surface (1.47:1, under the 3:1 floor).
     expect(dimmestRef).not.toMatch(/Default-Background/);
-    // A colour alias now, not a Backgrounds row: the row's own end was only
+    // A color alias now, not a Backgrounds row: the row's own end was only
     // ever {Colors.<palette>.Color-N}, and the ends are anchored per theme, so
     // a copy on every row was 378 variables saying one thing.
     expect(dimmestRef).toMatch(/^\{Colors\.[\w-]+\.Color-\d+\}$/);

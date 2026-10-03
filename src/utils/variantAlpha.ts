@@ -1,21 +1,21 @@
 /**
  * Adaptive alpha for the "-Variant" tokens (Border-Variant, Icon-Variant).
  *
- * A variant is its base colour at reduced opacity. A FLAT alpha does not read
+ * A variant is its base color at reduced opacity. A FLAT alpha does not read
  * consistently, because what the eye registers is the luminance shift the
- * overlay produces — roughly `alpha × |L(colour) − L(background)|`. Where the
- * variant colour sits close to its background that product collapses and the
+ * overlay produces — roughly `alpha × |L(color) − L(background)|`. Where the
+ * variant color sits close to its background that product collapses and the
  * token becomes invisible; where they are far apart it reads heavy.
  *
  * Measured across all 324 theme × surface contexts at a flat 20%, the perceived
  * shift ranged 0.0125 → 0.3421 — a 27× spread. The Black theme's border was
  * effectively invisible while Success containers were strong.
  *
- * So alpha adapts: the base is a FLOOR, raised as the colour approaches its
+ * So alpha adapts: the base is a FLOOR, raised as the color approaches its
  * background, capped so it can never become opaque.
  *
  *   targetShift = baseAlpha × 0.5      calibrated for a mid-luminance pairing
- *   required    = targetShift / |L(colour) − L(background)|
+ *   required    = targetShift / |L(color) − L(background)|
  *   alpha       = clamp(required, baseAlpha, cap)
  *
  * This restores the semantics of the `adaptiveAlpha` helper that used to live in
@@ -38,7 +38,7 @@ export const BORDER_VARIANT_ALPHA = 0.20;
 /* Icon-Variant is FLAT, not adaptive — the one exception to everything above.
  *
  * In Figma it is now an alias to Surface/Icons/<palette> whose opacity is
- * bound to a single Colors/Icon-Variant-Opacity float, the same colour +
+ * bound to a single Colors/Icon-Variant-Opacity float, the same color +
  * sibling-float split Drop-Colors uses. One number cannot vary per
  * theme/surface pairing, so the adaptive lift is not expressible there, and a
  * CSS side that stayed adaptive would silently disagree with the file
@@ -78,7 +78,7 @@ function luminance(hex: string): number {
 
 /**
  * Alpha for `colorHex` overlaid on `backgroundHex`, floored at `baseAlpha`.
- * Falls back to the base when either colour is unusable.
+ * Falls back to the base when either color is unusable.
  */
 export function adaptiveVariantAlpha(
   baseAlpha: number,

@@ -51,10 +51,10 @@ export const STEPPER_DOC: ComponentDoc = {
   composition: ['Steps are children; the connecting line is drawn by the stepper, not by you.'],
   accessibility: [
     'A non-clickable stepper is a status display, not a control — it should not be in the tab order.',
-    'The current step needs `aria-current="step"`. Colour alone does not say which one you are on.',
+    'The current step needs `aria-current="step"`. Color alone does not say which one you are on.',
   ],
   gotchas: [
-    'A step signalling focus by lightening its fill is not a focus indicator: the two colours measured 1.46:1 and 1.55:1 against each other, where an indicator needs 3:1. The ring carries it; the fill stays put.',
+    'A step signalling focus by lightening its fill is not a focus indicator: the two colors measured 1.46:1 and 1.55:1 against each other, where an indicator needs 3:1. The ring carries it; the fill stays put.',
   ],
 };
 
@@ -79,7 +79,7 @@ export const SLIDER_DOC: ComponentDoc = {
   states: [
     { state: 'Hover', setBy: 'interaction' },
     { state: 'Dragging', setBy: 'interaction' },
-    { state: 'Focus-visible', setBy: 'interaction', note: 'A DUAL ring: a blue inner and a background-coloured outer, so it survives any backdrop.' },
+    { state: 'Focus-visible', setBy: 'interaction', note: 'A DUAL ring: a blue inner and a background-colored outer, so it survives any backdrop.' },
     { state: 'Disabled', setBy: 'prop' },
   ],
   theming: [
@@ -87,7 +87,7 @@ export const SLIDER_DOC: ComponentDoc = {
       inFigma: 'The Slider sets pin nothing and inherit.' },
   ],
   themingNotes: [
-    'The thumb recolours on its own: it reads `--Border` and `--Background`, which are zone tokens, so moving the zone moves the thumb without the component knowing about themes.',
+    'The thumb recolors on its own: it reads `--Border` and `--Background`, which are zone tokens, so moving the zone moves the thumb without the component knowing about themes.',
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'the filled track', variesWith: 'theme + surface', figma: 'Buttons → Button' },
@@ -102,7 +102,7 @@ export const SLIDER_DOC: ComponentDoc = {
     'It needs an accessible name and announces min, max and current value — a bare slider says "50" with no unit or meaning.',
   ],
   gotchas: [
-    'The dual focus ring is deliberate: a single-colour ring disappears on a background close to its own colour. The outer ring is bound to `--Background`, so on a dark surface it goes dark and the pair still separates.',
+    'The dual focus ring is deliberate: a single-color ring disappears on a background close to its own color. The outer ring is bound to `--Background`, so on a dark surface it goes dark and the pair still separates.',
   ],
 };
 
@@ -196,7 +196,7 @@ export const LINK_DOC: ComponentDoc = {
     { name: 'disabled', type: 'boolean', default: 'false' },
   ],
   states: [
-    { state: 'Hover', setBy: 'interaction', note: 'The underline THICKENS. The colour does not change.' },
+    { state: 'Hover', setBy: 'interaction', note: 'The underline THICKENS. The color does not change.' },
     { state: 'Visited', setBy: 'interaction' },
     { state: 'Focus-visible', setBy: 'interaction' },
   ],
@@ -205,7 +205,7 @@ export const LINK_DOC: ComponentDoc = {
       inFigma: 'Link and Hotlink Group pin nothing and inherit.' },
   ],
   tokens: [
-    { name: '--Hotlink', sets: 'the link colour', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
+    { name: '--Hotlink', sets: 'the link color', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
     { name: '--Hotlink-Visited', sets: 'a visited link', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' },
   ],
   composition: ['The text is the child. Link text should say where it goes — "Read the pricing guide", never "click here".'],
@@ -214,7 +214,7 @@ export const LINK_DOC: ComponentDoc = {
     'A link that opens a new tab should say so in its text or its accessible name.',
   ],
   gotchas: [
-    '**Links do not change colour on hover** — the underline thickens instead. The system emits no hover tone for links, and inventing one would put an unverified value on text carrying a 4.5:1 requirement.',
+    '**Links do not change color on hover** — the underline thickens instead. The system emits no hover tone for links, and inventing one would put an unverified value on text carrying a 4.5:1 requirement.',
     'The library reads `--Link` / `--Link-Visited`, which nothing generates, and falls back to `--Hotlink` / `--Hotlink-Visited`, which is what the studio actually emits. Define the Link names yourself or rely on the fallback.',
   ],
 };

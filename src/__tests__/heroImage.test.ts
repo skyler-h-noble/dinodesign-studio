@@ -3,11 +3,11 @@ import { scorePanel, pickHero, landscapeCrop, DEFAULT_HERO_ASPECT, type PanelSta
 
 /** The three panel kinds a moodboard actually contains. */
 const photo = (box: any): PanelStats =>
-  ({ box, flatShare: 0.08, colourSpread: 0.72, edgeDensity: 0.20, saturation: 0.30 });
+  ({ box, flatShare: 0.08, colorSpread: 0.72, edgeDensity: 0.20, saturation: 0.30 });
 const typeSpecimen = (box: any): PanelStats =>
-  ({ box, flatShare: 0.86, colourSpread: 0.04, edgeDensity: 0.42, saturation: 0.02 });
+  ({ box, flatShare: 0.86, colorSpread: 0.04, edgeDensity: 0.42, saturation: 0.02 });
 const swatchBlock = (box: any): PanelStats =>
-  ({ box, flatShare: 0.34, colourSpread: 0.02, edgeDensity: 0.005, saturation: 0.28 });
+  ({ box, flatShare: 0.34, colorSpread: 0.02, edgeDensity: 0.005, saturation: 0.28 });
 
 describe('hero selection', () => {
   it('ranks a photograph above type and swatches', () => {
@@ -61,7 +61,7 @@ describe('hero selection', () => {
     // legitimate hero, so the terms are weighted rather than gating.
     const moody: PanelStats = {
       box: { x: 0, y: 0, w: 400, h: 225 },
-      flatShare: 0.22, colourSpread: 0.38, edgeDensity: 0.16, saturation: 0.05,
+      flatShare: 0.22, colorSpread: 0.38, edgeDensity: 0.16, saturation: 0.05,
     };
     expect(scorePanel(moody)).toBeGreaterThan(scorePanel(typeSpecimen({ x: 0, y: 0, w: 400, h: 225 })));
   });

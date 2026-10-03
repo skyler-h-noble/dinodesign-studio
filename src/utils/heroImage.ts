@@ -2,7 +2,7 @@
  * Pull a hero image out of a moodboard collage.
  *
  * A moodboard is usually a board of separate panels on a flat background —
- * photographs, colour swatches, type specimens — not a single picture. Using the
+ * photographs, color swatches, type specimens — not a single picture. Using the
  * whole board as a hero shows the gaps, the white background and the type
  * samples, which is not what anyone means by "the image from my moodboard".
  *
@@ -14,8 +14,8 @@
  * gaps, which is the easy case for connected-component analysis. The judgement
  * that DOES need care is telling a photograph from a type specimen, and that is
  * a statistics question rather than a recognition one: a type specimen is mostly
- * one flat colour with small high-contrast marks, a swatch block is a handful of
- * flat regions, a photograph has a broad colour distribution and busy edges.
+ * one flat color with small high-contrast marks, a swatch block is a handful of
+ * flat regions, a photograph has a broad color distribution and busy edges.
  *
  * ── What is deliberately separated ────────────────────────────────────────
  * Everything below the canvas boundary is pure. `scorePanel`, `pickHero` and
@@ -33,11 +33,11 @@ export interface Box {
 /** What the pixel pass measures about one panel. */
 export interface PanelStats {
   box: Box;
-  /** Share of pixels that are the single most common colour, 0–1. High means
+  /** Share of pixels that are the single most common color, 0–1. High means
    *  flat — a type specimen's paper, or a swatch. */
   flatShare: number;
-  /** Distinct quantised colours, normalised 0–1. Photographs run high. */
-  colourSpread: number;
+  /** Distinct quantised colors, normalised 0–1. Photographs run high. */
+  colorSpread: number;
   /** Share of pixels differing sharply from the pixel to their right, 0–1.
    *  Type is all edge; a swatch block has almost none. */
   edgeDensity: number;
@@ -65,10 +65,10 @@ export const DEFAULT_HERO_ASPECT = 16 / 9;
  */
 export function scorePanel(s: PanelStats): number {
   // Flatness is the strongest signal against. A type specimen is typically
-  // 80%+ one colour; a photograph rarely exceeds 30% even with a plain sky.
+  // 80%+ one color; a photograph rarely exceeds 30% even with a plain sky.
   const notFlat = clamp01(1 - (s.flatShare - 0.25) / 0.5);
   // Spread is the strongest signal for.
-  const spread = clamp01(s.colourSpread / 0.5);
+  const spread = clamp01(s.colorSpread / 0.5);
   // Edge density is bimodal: type is very high, swatches very low, photographs
   // in between. So the useful shape is a band, not "more is better".
   const edges = clamp01(1 - Math.abs(s.edgeDensity - 0.18) / 0.28);
@@ -153,7 +153,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-/** The board's ground colour, taken from the border ring. A collage is padded,
+/** The board's ground color, taken from the border ring. A collage is padded,
  *  so the outermost pixels are background far more often than not. */
 function estimateBackground(d: Uint8ClampedArray, w: number, h: number): [number, number, number] {
   const counts = new Map<string, number>();
@@ -221,7 +221,7 @@ function measure(d: Uint8ClampedArray, w: number, box: Box): PanelStats {
     box,
     flatShare: n ? top / n : 1,
     // 4096 is the quantised space; a photograph typically fills a few hundred.
-    colourSpread: Math.min(1, counts.size / 400),
+    colorSpread: Math.min(1, counts.size / 400),
     edgeDensity: n ? edges / n : 0,
     saturation: n ? satSum / n : 0,
   };

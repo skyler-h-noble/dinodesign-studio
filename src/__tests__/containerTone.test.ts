@@ -121,7 +121,7 @@ describe('tonal container tone follows the background', () => {
   // ramp that runs backwards (elevation reads inverted) or one that is flat
   // (the card is invisible against the page). The flat case was real — on
   // Background-10 and Background-2 the surface IS the container tone, so every
-  // opacity blended a colour with itself. That was 16 of 103 combos.
+  // opacity blended a color with itself. That was 16 of 103 combos.
   it('export: the ramp is monotonic and never flat, on every Background-N', () => {
     for (let n = 1; n <= 12; n++) {
       const out = generateSimplifiedLightModeBackgrounds(

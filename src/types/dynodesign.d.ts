@@ -93,7 +93,7 @@ declare module '@omni-design/components' {
   export const CheckboxWithDescription: FC<any>;
   export const IndeterminateCheckbox: FC<any>;
   export const Radio: FC<any>;
-  /* Swatch — a colour chip, optionally labelled, optionally with a radio.
+  /* Swatch — a color chip, optionally labelled, optionally with a radio.
      Figma's set carries Style=No-Radio|Radio, a Label boolean and a Selected
      state, which is exactly the Core Colors picker.
 

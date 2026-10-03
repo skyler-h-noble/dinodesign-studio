@@ -7,7 +7,7 @@
  * reached the published CSS, both at :root in base.css, and the correct one
  * won only because it was emitted second.
  *
- * The model is Josh Comeau's SHADOW PALETTE GENERATOR — one colour, alpha
+ * The model is Josh Comeau's SHADOW PALETTE GENERATOR — one color, alpha
  * ramping down across the layers — and NOT the ELEVATIONS map in his article,
  * which holds one flat alpha per tier. The two disagree and we follow the
  * generator; see the header of src/utils/dropshadow.ts.
@@ -121,12 +121,12 @@ describe('geometry — exponential inside a fixed envelope', () => {
   });
 });
 
-describe('one colour, one flat alpha per level', () => {
+describe('one color, one flat alpha per level', () => {
   /* The whole point. Every layer of every level on a surface is the SAME
-     colour; only the alpha moves. That is what lets a Figma effect style bind
-     one colour variable per surface plus a set of per-layer opacities, and it
+     color; only the alpha moves. That is what lets a Figma effect style bind
+     one color variable per surface plus a set of per-layer opacities, and it
      is why --Dropshadow-Color-1..5 could collapse. */
-  it('uses one colour for every level and every layer', () => {
+  it('uses one color for every level and every layer', () => {
     for (const surface of ['#a3b8fc', '#8a9a5b', '#f5f5f5', '#2b1a3d']) {
       const seen = new Set<string>();
       for (const l of LEVELS) {
@@ -258,10 +258,10 @@ describe('one colour, one flat alpha per level', () => {
     }
   });
 
-  /* The recipe references ONE colour var and writes the alphas as literals —
-     Comeau's own shape, hsl(var(--shadow-color) / 0.34). A per-level colour
+  /* The recipe references ONE color var and writes the alphas as literals —
+     Comeau's own shape, hsl(var(--shadow-color) / 0.34). A per-level color
      token on every layer is the old model and cannot express a ramp. */
-  it('emits one colour var with literal alphas', () => {
+  it('emits one color var with literal alphas', () => {
     const recipe = effectLevelRecipe(5);
     expect(`per-level token: ${/--Dropshadow-Color-\d/.test(recipe)}`).toBe('per-level token: false');
     const vars = [...recipe.matchAll(/rgba\(var\(--Dropshadow-Color\), /g)].length;
@@ -291,7 +291,7 @@ describe('tint follows the surface, and stays grey when it should', () => {
     expect(sat(dropshadowBaseHex('#f2f2f2'))).toBeLessThan(0.05);
   });
 
-  it('exposes the colour as an R G B triple for rgb(... / alpha)', () => {
+  it('exposes the color as an R G B triple for rgb(... / alpha)', () => {
     expect(/^\d{1,3}, \d{1,3}, \d{1,3}$/.test(dropshadowRGB('#8a9a5b'))).toBe(true);
   });
 });

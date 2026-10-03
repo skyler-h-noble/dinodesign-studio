@@ -95,7 +95,7 @@ export default function ColorAssignmentStage({
   const palettes = colorScheme?.tonePalettes;
   const PC = toneToColorNumber(colorScheme?.extractedTones?.primary || 60);
   // Secondary and Tertiary anchor on their OWN core tone — a chromatic theme's
-  // Surface level IS the brand colour, so each ramp needs its own centre.
+  // Surface level IS the brand color, so each ramp needs its own centre.
   const SC = toneToColorNumber(colorScheme?.extractedTones?.secondary || 60);
   const TC = toneToColorNumber(colorScheme?.extractedTones?.tertiary || 60);
   const mediumIndex = PC >= 11 ? 8 : 7;
@@ -160,7 +160,7 @@ export default function ColorAssignmentStage({
     }
     // Only four of the ten background combinations have a legacy name; the
     // rest are stored as 'Theme/Surface' and used to fall through to white
-    // here, so the stage previewed the wrong page colour for six of them.
+    // here, so the stage previewed the wrong page color for six of them.
     const sel = parseBackground(userSelections.background);
     const n = toneFor(sel.theme, sel.surface, PC);
     return sel.theme === 'Neutral' ? { palette: neutral, n } : { palette: p, n };

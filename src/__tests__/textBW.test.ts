@@ -7,7 +7,7 @@
  * buildPreviewCSS / exportColorSystemToJSON / generateFigmaJSON and compare
  * their outputs.
  *
- * Why it matters: every colour bug found this week was preview-side while the
+ * Why it matters: every color bug found this week was preview-side while the
  * export was correct, because the preview carries its own private contrast
  * implementation (getAccessibleTones lives in buildPreviewCSS.ts and is used
  * nowhere else). Nothing failed when they diverged — a person had to notice a
@@ -28,7 +28,7 @@ import type { ColorScheme, UserSelections } from '../types';
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
- *  the picked colours (see the lockedHex fix in ColorStage). */
+ *  the picked colors (see the lockedHex fix in ColorStage). */
 function makeScheme(colors: [string, string, string]): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
@@ -227,7 +227,7 @@ describe('Text-BW', () => {
 
        The property itself is unchanged and still worth guarding: Text-BW has
        to be present on each of Default's surfaces AND actually flip between
-       the dark and light ends, rather than being one colour everywhere. */
+       the dark and light ends, rather than being one color everywhere. */
     const themes = (json as any).Modes['Light-Mode'].Themes;
     const roles = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Bright'] as const;
     for (const role of roles) {

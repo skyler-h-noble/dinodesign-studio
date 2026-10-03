@@ -61,7 +61,7 @@ export function generateBaseButtons(
   // Cross-mode references are an established form in this export: Quiet's
   // Color-Vibrant already reads {Modes.Light-Mode.Colors.X.Color-9}. They
   // resolve to a baked hex in both the CSS bundle and the Figma payload, so
-  // downstream this IS a hard-coded colour — the reference only exists so the
+  // downstream this IS a hard-coded color — the reference only exists so the
   // value keeps tracking the light ramp when the brand changes.
   const DARK_BUTTON_N = 8;
 
@@ -75,7 +75,7 @@ export function generateBaseButtons(
   // It contradicted the rule below ("SECONDARY BUTTON — both shades use
   // Color-SC") and it silently swallowed every dark, saturated pick: a
   // secondary of #2563eb lands on SC=5, tripped `raw <= 5`, and shipped as
-  // Color-8 (#b7c0ff) — the colour never appeared in the design at all. Button
+  // Color-8 (#b7c0ff) — the color never appeared in the design at all. Button
   // TEXT contrast is not this function's job; it is computed per button against
   // whatever fill is chosen, so a dark fill simply gets a light label.
   //
@@ -97,7 +97,7 @@ export function generateBaseButtons(
   // So the tone silently decided whether an error button read white-on-red or
   // black-on-salmon, depending on an unrelated choice of primary. Color-5 is
   // the tone that carries a white label everywhere, which is what a state
-  // colour is for — the meaning should not shift with the brand.
+  // color is for — the meaning should not shift with the brand.
   const OB = 5;
   
   console.log(`🔘 [generateBaseButtons] Mode: ${mode}`);
@@ -116,7 +116,7 @@ export function generateBaseButtons(
   const buttons: any = {};
 
   /**
-   * The four colour slots for one palette at one tone.
+   * The four color slots for one palette at one tone.
    *
    * In dark mode the prefix sends every lookup into the Light-Mode collection
    * and the tone is forced to Color-8, so fill, label, hover and pressed all
@@ -164,7 +164,7 @@ export function generateBaseButtons(
   // black button "Light" is bad enough; having it mean the opposite depending
   // on mode made every reference to it a guess.
   //
-  // They are now two palettes named for the colour they are, stable across
+  // They are now two palettes named for the color they are, stable across
   // modes. Only the states differ per mode: a black face on a dark background
   // has to step lighter to show a hover at all, and vice versa.
   //
@@ -172,7 +172,7 @@ export function generateBaseButtons(
   // curated Text.Surfaces.BW-Button table, and Dark-Mode has no such group at
   // all. Pointing dark at it shipped the literal string
   // "{Text.Surfaces.BW-Button.Color-12}" into the Figma payload and the CSS,
-  // so the black/white button's label had no colour in dark mode. Dark points
+  // so the black/white button's label had no color in dark mode. Dark points
   // straight at the neutral ends instead.
   // Quiet on a BW face reads the NEUTRAL ladder directly.
   //

@@ -23,7 +23,7 @@ import NavIconGlyph from './NavIconGlyph';
 export interface NavItemEditorProps {
   open: boolean;
   item: NavItem | NavButtonItem | null;
-  /** Buttons carry a colour and treatment; tabs do not — a tab's treatment is
+  /** Buttons carry a color and treatment; tabs do not — a tab's treatment is
    *  a selector bar, not a fill. */
   kind: 'tab' | 'button';
   onChange: (next: NavItem | NavButtonItem) => void;
@@ -99,7 +99,7 @@ export default function NavItemEditor(
             </Tabs>
           ) : (
             <Button
-              variant={buttonVariant(asButton.colour, asButton.treatment)}
+              variant={buttonVariant(asButton.color, asButton.treatment)}
               size="small"
               iconOnly={!item.text}
               aria-label={!item.text ? item.label || 'Unnamed button' : undefined}
@@ -240,13 +240,13 @@ export default function NavItemEditor(
             )}
             <Caption color="quiet">
               A photo, initials and a glyph are different CONTENT rather than different
-              styling, which is why it is a choice and not a colour.
+              styling, which is why it is a choice and not a color.
             </Caption>
           </>
         )}
 
         {/* Buttons only. A tab is built from Button TOKENS but its treatment is a
-            selector — an indicator bar and a track — not a fill. Offering colour
+            selector — an indicator bar and a track — not a fill. Offering color
             here would produce a solid tab, which the design system does not have. */}
         {kind === 'button' && (
           <>
@@ -274,14 +274,14 @@ export default function NavItemEditor(
             </Caption>
 
             <Divider />
-            <Label>Colour</Label>
+            <Label>Color</Label>
             <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
               {BUTTON_VARIANTS.map((c) => (
                 <Button
                   key={c}
                   size="small"
-                  variant={asButton.colour === c ? c : `${c}-outline`}
-                  onClick={() => set('colour', c)}
+                  variant={asButton.color === c ? c : `${c}-outline`}
+                  onClick={() => set('color', c)}
                 >
                   {c}
                 </Button>

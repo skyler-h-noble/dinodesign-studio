@@ -1,6 +1,6 @@
 /**
- * The shadow model reaches Figma and the CSS as ONE colour per surface plus a
- * global per-layer opacity set — not five colours per surface.
+ * The shadow model reaches Figma and the CSS as ONE color per surface plus a
+ * global per-layer opacity set — not five colors per surface.
  *
  * Invariant 5 says the preview and the export diverge silently, so both are
  * asserted here. Invariant 7 says parity alone is not correctness: the SHAPE is
@@ -77,7 +77,7 @@ function buildFigma(componentStyle?: Record<string, unknown>) {
   return generateFigmaJSON(json as never);
 }
 
-describe('Figma carries one shadow colour, not five', () => {
+describe('Figma carries one shadow color, not five', () => {
   const figma = buildFigma();
 
   it('emits a Dropshadow-Color section and no numbered ones', () => {
@@ -87,9 +87,9 @@ describe('Figma carries one shadow colour, not five', () => {
       .toBe('single: true, numbered: 0');
   });
 
-  /* The colour must be OPAQUE. The opacity lives on the effect layer and is
-     bound separately; baking an alpha into the colour would apply it twice. */
-  it('emits the colour opaque, as 6-digit hex', () => {
+  /* The color must be OPAQUE. The opacity lives on the effect layer and is
+     bound separately; baking an alpha into the color would apply it twice. */
+  it('emits the color opaque, as 6-digit hex', () => {
     const sec = (figma as never as Record<string, any>).Modes['Light-Mode']['Dropshadow-Color'];
     const vals = Object.values(sec).flatMap((p) => Object.values(p as object)).map((v: any) => v.value);
     expect(vals.length).toBeGreaterThan(0);
@@ -157,7 +157,7 @@ describe('the user\'s Shadow controls actually reach the exports', () => {
   /* Intensity moves the COLOUR, not only the alpha. A call site that drops the
      options emits a plausible-but-wrong hex, which is exactly the failure this
      pins — light position 0 also proves the geometry is straight-down. */
-  it('changes the Figma shadow colour', () => {
+  it('changes the Figma shadow color', () => {
     const custom = buildFigma(CUSTOM) as never as Record<string, any>;
     const dflt = buildFigma() as never as Record<string, any>;
     /* Compare the WHOLE section, not one tone. LIGHT_MAX caps shadow lightness
@@ -222,7 +222,7 @@ describe('the lib\'s own components are repointed at the recipes', () => {
   /* The shadow override that used to be asserted here is gone: the lib reads
      var(--Effect-Level-N) itself now, and a :root-declared custom property has
      its inner var() resolved at :root — so the override gave every card the
-     root's shadow colour instead of its own surface's. */
+     root's shadow color instead of its own surface's. */
   it('emits no box-shadow override for lib components', () => {
     expect(/\.card\.card\s*\{\s*box-shadow/.test(css)).toBe(false);
     expect(/\.appbar\.appbar\s*\{\s*box-shadow/.test(css)).toBe(false);
@@ -276,7 +276,7 @@ describe('the shadow controls have defaults for a system that never set them', (
 
 /* ── Every consumer must hand over the sliders ──────────────────────────────
  *
- * buildPreviewCSS covers colour and typography from its own arguments, but the
+ * buildPreviewCSS covers color and typography from its own arguments, but the
  * component-style sliders arrive only through styleCustomizations. A call site
  * that omits them renders a PLAUSIBLE design system that silently ignores the
  * user's choices — there is no error, the shadows are simply the defaults.
@@ -477,14 +477,14 @@ describe('the Elevation payload matches the Figma collection', () => {
    briefly existed to have somewhere to bake the alpha. What it must still do is
    reference them from Component-Elevations, and keep Modes/Dropshadow-Color —
    the opaque base the whole Surface chain tints from. */
-describe('Drop-Colors: opacity written, colour left aliased', () => {
+describe('Drop-Colors: opacity written, color left aliased', () => {
   const figma = buildFigma() as never as Record<string, any>;
   const LEVELS = [1, 2, 3, 4, 5] as const;
 
   it('emits the per-level OPACITY and nothing else for Drop-Colors', () => {
-    /* The colour is aliased in Figma and must never be written from here: a
+    /* The color is aliased in Figma and must never be written from here: a
        plugin cannot express "this alias, dimmed" (a variable value is one RGBA
-       or one pointer, no modifier field), but Figma can bind a colour's opacity
+       or one pointer, no modifier field), but Figma can bind a color's opacity
        to a NUMBER variable — so the alias survives and the alpha rides in as a
        plain float. If a Drop-Color key ever appears here, something is trying to
        write the tint and will detach the alias. */
@@ -497,7 +497,7 @@ describe('Drop-Colors: opacity written, colour left aliased', () => {
       expect(Object.keys(section[`Level-${level}`])).toEqual(['Opacity']);
       const entry = section[`Level-${level}`].Opacity;
       expect(entry.type).toBe('number');
-      /* A PERCENT, 0..100. A number variable bound to a colour's opacity is
+      /* A PERCENT, 0..100. A number variable bound to a color's opacity is
          rendered by appending "%", so a variable holding 0.345 displays as
          "0.345%" and paints nothing. This assertion is the guard against that
          off-by-100 coming back — it is invisible in a diff and near-invisible

@@ -9,13 +9,13 @@
 import chroma from 'chroma-js';
 
 /**
- * The Alt Display wears the HEADER colour family, not the Text family.
+ * The Alt Display wears the HEADER color family, not the Text family.
  *
  * --Header-Primary / --Header-Secondary, never --Text-Primary /
  * --Text-Secondary. A Display is a heading, and the two families are tuned to
  * different thresholds: Text carries 4.5:1, Header 3:1. Reaching for the Text
  * tokens would put body-text contrast on a 48px headline, which is not a
- * stricter reading of the rule so much as a different colour — the tables pick
+ * stricter reading of the rule so much as a different color — the tables pick
  * different tones, so the headline would simply come out the wrong shade.
  *
  * 3:1 is also what WCAG asks of this text on its own terms: every Display size
@@ -39,7 +39,7 @@ export const ALT_DISPLAY_MIN_CONTRAST = 3;
  * How far apart two hues may sit and still count as analogous, in degrees.
  *
  * 60 is the conventional span of an analogous set — adjacent positions on a
- * twelve-spoke wheel, which is what "analogous" names in every colour-theory
+ * twelve-spoke wheel, which is what "analogous" names in every color-theory
  * text the rest of this codebase follows (see colorSchemes.ts, which builds an
  * Analogous scheme from a base plus its two nearest neighbours).
  *
@@ -55,7 +55,7 @@ export function hueDelta(a: string, b: string): number {
   const [, , h2] = chroma(b).lch();
   /* NaN hue is what chroma returns for a true grey — it has no direction on the
      wheel. Treat it as maximally distant rather than as 0: a grey Secondary
-     gradient-blended into a coloured Primary looks like a rendering fault, and
+     gradient-blended into a colored Primary looks like a rendering fault, and
      0 would be the one answer that turns the gradient ON. */
   if (!Number.isFinite(h1) || !Number.isFinite(h2)) return 180;
   const raw = Math.abs(h1 - h2) % 360;
@@ -100,7 +100,7 @@ export function altDisplayGradient(primary?: string, secondary?: string): AltDis
   try {
     delta = hueDelta(primary, secondary);
   } catch {
-    return { kind: 'mono', delta: NaN };   // not a colour chroma can parse
+    return { kind: 'mono', delta: NaN };   // not a color chroma can parse
   }
   return { kind: delta <= ANALOGOUS_MAX_HUE_DELTA ? 'duo' : 'mono', delta };
 }
@@ -170,7 +170,7 @@ export const ALT_DISPLAY_WEIGHT_DROP = 300;
  * on every real family. It exists for a ramp that is sparse in a way none
  * currently are — [200, 800] with nothing between, where the nearest candidate
  * to 500 would otherwise be a 200. Such a family returns undefined instead, so
- * the Alt tracks the face and colour carries the distinction, which is the
+ * the Alt tracks the face and color carries the distinction, which is the
  * same answer a single-weight family gets.
  */
 export const ALT_DISPLAY_MIN_WEIGHT = 300;
@@ -184,7 +184,7 @@ export const ALT_DISPLAY_MIN_WEIGHT = 300;
  * display faces usually do. Inventing 400 for a family that ships only 700
  * gets a synthesised thin on the web and a font Figma will not load.
  *
- * So weight is an ENHANCEMENT, not the distinction. Colour is what separates
+ * So weight is an ENHANCEMENT, not the distinction. Color is what separates
  * the Alt on every brand; this sharpens it on the 44% that can carry it.
  *
  * `shipped` is the family's own weight list, from googleFontWeights.json —
@@ -197,7 +197,7 @@ export const ALT_DISPLAY_MIN_WEIGHT = 300;
  * faces do. The two arrive together: a family with one usually has the other,
  * and the display faces that have neither (Anton, Bangers, Lobster, Great
  * Vibes, Alfa Slab One, every script) have neither. So italic would add
- * nothing precisely where weight runs out, which is why colour carries the
+ * nothing precisely where weight runs out, which is why color carries the
  * distinction and this only sharpens it.
  */
 export function altDisplayWeight(
@@ -259,7 +259,7 @@ export const ANALOGOUS_SCHEMES: ReadonlySet<string> = new Set(['monochromatic', 
  * and two derivations of one fact drift — which is the failure this file's
  * threshold comment warns about.
  *
- * altDisplayGradient() stays for the case where only the colours are known and
+ * altDisplayGradient() stays for the case where only the colors are known and
  * no scheme is recorded. Both answer the same question; this one has better
  * evidence.
  */
@@ -282,7 +282,7 @@ export type AltStop2 = 'Secondary' | 'Tertiary' | 'mono';
  * midpoint lands at chroma 5 — flat grey — against ends of 53 and 62. Moving
  * the blend to OKLCH keeps the chroma but invents a third hue the brand does
  * not own (green through ORANGE to pink), and Figma interpolates in sRGB
- * regardless, so the two would then disagree. The fix has to be which colours
+ * regardless, so the two would then disagree. The fix has to be which colors
  * are blended, not how.
  *
  * 'mono' is the honest last resort rather than a worse two-hue blend: one hue
@@ -299,7 +299,7 @@ export function altStop2Palette(
     if (secondary && isAnalogous(primary, secondary)) return 'Secondary';
     if (tertiary && isAnalogous(primary, tertiary)) return 'Tertiary';
   } catch {
-    return 'mono';                 // not colours chroma can parse
+    return 'mono';                 // not colors chroma can parse
   }
   return 'mono';
 }
@@ -309,14 +309,14 @@ export function altStop2Palette(
  *
  * Backgrounds 1-6 are dark and 7-12 light — the background tables say so in
  * their own comments. Contrast is distance from the background, and the first
- * stop is already the accessible Header colour for it, so moving FURTHER from
+ * stop is already the accessible Header color for it, so moving FURTHER from
  * the background can only raise contrast; moving toward it is the only way to
  * break 3:1. Hence light on dark, dark on light.
  *
  * 12 and 2 rather than a step either side of the header's own tone, because a
  * near neighbour collapses. Header.Surfaces.Primary resolves backgrounds 9-12
  * to one tone and 1-4 to another, so "the next index along" is frequently the
- * SAME colour — a gradient that renders as a flat fill and looks like it
+ * SAME color — a gradient that renders as a flat fill and looks like it
  * worked. These two are distinct from every tone that table produces in their
  * half (light: 3, 4, 5; dark: 10, 8, 2).
  */

@@ -105,7 +105,7 @@ const RGB_HSL = /\b(?:rgba?|hsla?)\s*\([^)]*\)/gi;
 /**
  * Compare a Figma frame against the JSX generated from it.
  *
- * Ordered most to least actionable: a hardcoded colour is always wrong, a
+ * Ordered most to least actionable: a hardcoded color is always wrong, a
  * missing component is usually wrong, a missing string is often fine.
  */
 /* Values that mean "the default", beyond the literal word.
@@ -162,18 +162,18 @@ export function computeDrift(frameJson: unknown, jsx: string): DriftFinding[] {
   const visible = located.filter(l => l.node.visible !== false);
   const hidden = located.filter(l => l.node.visible === false);
 
-  // ── Hardcoded colour ────────────────────────────────────────────────────
+  // ── Hardcoded color ────────────────────────────────────────────────────
   // The rule the generated code most often breaks, and the one that is
   // invisible in a preview: #3794ff and var(--Focus-Visible) render the same
   // until the theme changes.
-  const colours = new Set<string>();
-  for (const m of code.matchAll(HEX)) colours.add(m[0]);
-  for (const m of code.matchAll(RGB_HSL)) colours.add(m[0]);
-  for (const c of colours) {
+  const colors = new Set<string>();
+  for (const m of code.matchAll(HEX)) colors.add(m[0]);
+  for (const m of code.matchAll(RGB_HSL)) colors.add(m[0]);
+  for (const c of colors) {
     findings.push({
       severity: 'error',
       kind: 'hardcoded-color',
-      message: 'Hardcoded colour — should be a token.',
+      message: 'Hardcoded color — should be a token.',
       detail: c,
     });
   }

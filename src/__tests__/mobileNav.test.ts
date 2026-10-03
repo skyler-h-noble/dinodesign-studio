@@ -194,7 +194,7 @@ describe('fixed or floating — the frame does one thing or the other', () => {
   });
 });
 
-describe('nothing carries a colour', () => {
+describe('nothing carries a color', () => {
   it('at any layout or setting', () => {
     for (const l of ALL) {
       const json = JSON.stringify(toAddonSpec(mobileNavDefinition({

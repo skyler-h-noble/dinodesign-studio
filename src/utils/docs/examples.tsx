@@ -92,7 +92,7 @@ export const EXAMPLES: Record<string, () => React.ReactElement> = {
       <Icon color="error"><span>✕</span></Icon>
     </HStack>
   ),
-  Link: () => <Link href="#example">A link, which thickens rather than recolours on hover</Link>,
+  Link: () => <Link href="#example">A link, which thickens rather than recolors on hover</Link>,
   Divider: () => <Divider indicatorText="OR" />,
   Checkbox: () => (
     <VStack gap="var(--Sizing-Half)">

@@ -370,13 +370,13 @@ ${offsets.join('\n')}`;
 }
 
 /**
- * The Alt Display's colour, in three selectable variants.
+ * The Alt Display's color, in three selectable variants.
  *
  * Mirrors the Figma `Alt-Display` collection: one pair of stop variables,
  * three modes deciding what they point at.
  *
  *     Default    both stops -> --Header            the Alt reads as a heading
- *     Colored    both stops -> --Alt-Display-Color a flat Alt colour
+ *     Colored    both stops -> --Alt-Display-Color a flat Alt color
  *     Gradient   stop 1/2   -> the two stop tokens the themes publish
  *
  * The pair is the whole trick. Figma cannot bind a fill's TYPE — no variable
@@ -388,7 +388,7 @@ ${offsets.join('\n')}`;
  *
  * Where the two deliberately differ is the painting. Figma pays no penalty for
  * a flat gradient; CSS does. background-clip: text needs `color: transparent`,
- * which costs the selection highlight, anything inheriting the text colour,
+ * which costs the selection highlight, anything inheriting the text color,
  * and — without the block at the end — the text itself in forced-colors mode.
  * So the flat variants paint with `color` and only the gradient variant clips,
  * which is invisible to a designer and strictly better for a reader.
@@ -399,11 +399,11 @@ function altDisplayColorRules(styles: TypeStyle[]): string {
   const sel = alt.map((s) => `.${libClass(s.token)}`).join(',\n');
   const gradSel = alt.map((s) => `.${libClass(s.token)}[data-alt-display="gradient"],\n[data-alt-display="gradient"] .${libClass(s.token)}`).join(',\n');
   return `/* ---------------------------------------------------------------------------
-   Alt Display colour — three variants, one pair of stops
+   Alt Display color — three variants, one pair of stops
 
    Set data-alt-display on the element or any ancestor:
      default   (or unset)  the Alt reads as a heading
-     colored               a flat Alt colour
+     colored               a flat Alt color
      gradient              the two stops the theme publishes
 
    The stops are re-published per theme and surface, so every variant follows
@@ -426,7 +426,7 @@ function altDisplayColorRules(styles: TypeStyle[]): string {
 }
 
 ${sel} {
-  /* Stop 1 alone: in the flat variants the two agree, and a plain colour keeps
+  /* Stop 1 alone: in the flat variants the two agree, and a plain color keeps
      the selection highlight, print, and forced-colors working. */
   color: var(--Alt-Display-Color-Stop-1);
 }
@@ -449,7 +449,7 @@ ${gradSel} {
 @media (forced-colors: active) {
 ${gradSel} {
     /* The UA drops background-image here, and transparent text would leave
-       nothing on screen. Hand the glyphs back to the system colour. */
+       nothing on screen. Hand the glyphs back to the system color. */
     background-image: none;
     -webkit-background-clip: border-box;
     background-clip: border-box;

@@ -50,7 +50,7 @@ export const APPBAR_DOC: ComponentDoc = {
   ],
   accessibility: [
     'It is a `<header>` with a `<nav>` inside, not a row of buttons.',
-    'The current page link needs `aria-current="page"`; colour alone does not say which one you are on.',
+    'The current page link needs `aria-current="page"`; color alone does not say which one you are on.',
   ],
   gotchas: [
     '`Other/App-Bar-Height` was `App-Bar Height` with a space until 2026-09-30. Its sibling `Nav-Bar Height` still has one, because the rule is "use the file’s name", not "hyphenate".',

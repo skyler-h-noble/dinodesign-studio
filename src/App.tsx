@@ -60,9 +60,9 @@ import NavDesignerPage from './components/NavDesignerPage';
  * Re-map a scheme's tone palettes onto a new role order.
  *
  * `newColors` is a permutation of `scheme.colors`, so each role's palette
- * already exists — it just belongs to a different slot now. Looking the colour
+ * already exists — it just belongs to a different slot now. Looking the color
  * up and moving its palette preserves the chroma peak, locked hex and hue
- * easing that produced it. A colour that is somehow not in the original list
+ * easing that produced it. A color that is somehow not in the original list
  * (defensive only) falls back to a fresh scale.
  */
 function reorderedPalettes(scheme: any, newColors: [string, string, string]) {
@@ -543,10 +543,10 @@ function MainApp() {
                 },
                 // REORDER the existing palettes; do not regenerate them.
                 //
-                // A reorder changes which colour plays which ROLE — the colours
+                // A reorder changes which color plays which ROLE — the colors
                 // themselves are unchanged. Rebuilding here called the scale
                 // generator with no maxChroma, no locked hex and no hue easing,
-                // so every per-colour setting the Colors step established was
+                // so every per-color setting the Colors step established was
                 // silently discarded the moment you dragged a card. The ramps
                 // that came back were defaults wearing the right hues.
                 ...reorderedPalettes(selectedColorScheme, newColors),
@@ -690,7 +690,7 @@ function MainApp() {
   // from Firestore at mount, so the brand chrome can show from the very
   // first stage instead of switching on mid-flow.
   const applyBrand = pendingReExport
-    /* Every stage from colour-assignment on, i.e. once there is enough of a
+    /* Every stage from color-assignment on, i.e. once there is enough of a
        system to paint with. Derived from STAGE_ORDER rather than listed by
        name: the hand-written list silently omitted 'shadow' when that stage
        was added, so the Shadow step rendered in the lib's default theme while

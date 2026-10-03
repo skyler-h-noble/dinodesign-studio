@@ -48,7 +48,7 @@ describe('Eyebrow / Overline aliasing', () => {
   });
 
   it('leaves the Eyebrow FACE tokens alone', () => {
-    // --Font-Family-Eyebrow / --Font-Weight-Eyebrow are the colour-and-face
+    // --Font-Family-Eyebrow / --Font-Weight-Eyebrow are the color-and-face
     // role and already exist; the alias must not collide with them.
     const out = css();
     expect(out).not.toContain('--Eyebrow-Font-Size');

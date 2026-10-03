@@ -156,7 +156,7 @@ export const CODE_BLOCK_DOC: ComponentDoc = {
     'Copying is announced; a purely visual tick tells a screen-reader user nothing.',
   ],
   gotchas: [
-    'Its dark region is NOT a hardcoded colour. The wrapper declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"`, so it follows the brand\'s neutrals and stays legible in both modes. Do not override its background — that is the one change that breaks dark mode for it.',
+    'Its dark region is NOT a hardcoded color. The wrapper declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"`, so it follows the brand\'s neutrals and stays legible in both modes. Do not override its background — that is the one change that breaks dark mode for it.',
     'Any block of code, shell command or copyable URL uses this. Hand-rolling a `<pre>`/`<code>` panel with its own copy button is what it replaces, and the studio still has ten of those.',
   ],
 };
@@ -307,7 +307,7 @@ export const REST_DOCS: ComponentDoc[] = [
     [{ name: '--Background', sets: 'the dark region', variesWith: 'theme + surface', figma: 'Modes → Theme → Surface' }],
     ['Code goes in `code`, not as children. The copy button is built in — do not add one.'],
     ['The copy button needs a name and its confirmation must be announced, not only drawn.'],
-    ['Its dark region is NOT a hardcoded colour: it declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"`, so it follows the brand’s own neutrals and stays legible in both modes. Do not override its background.',
+    ['Its dark region is NOT a hardcoded color: it declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"`, so it follows the brand’s own neutrals and stays legible in both modes. Do not override its background.',
      'It brings its own copy state and timer, so the surrounding component must not keep a `copied` flag.']),
 
   undesigned('IconBadge',

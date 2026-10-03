@@ -3,7 +3,7 @@
  *
  * This is the whole of Component-Elevations. The collection currently holds 150
  * variables restating shadow geometry per component — x, y, blur, spread and a
- * colour, per layer, per state, per mode — and every one of those numbers is a
+ * color, per layer, per state, per mode — and every one of those numbers is a
  * prefix of the one ladder the Elevation collection already carries. What is
  * actually component-specific is a single number: how high it sits.
  *
@@ -181,16 +181,16 @@ export function componentElevationRowSlots(
 }
 
 /**
- * The full Component-Elevations payload: geometry written out, colour aliased.
+ * The full Component-Elevations payload: geometry written out, color aliased.
  *
  * The split is not arbitrary. Shadow GEOMETRY does not depend on the theme, so
  * it can be a literal number on a collection whose modes are Standard/Elevated.
  * Shadow COLOUR does depend on the theme, and Component-Elevations has no theme
- * mode to vary it along — so the colour is an ALIAS into Drop-Colors, which
+ * mode to vary it along — so the color is an ALIAS into Drop-Colors, which
  * does. A node then resolves its shadow hue through its own Drop-Colors mode,
  * and Component-Elevations never needs a theme axis of its own.
  *
- * Aliasing the colour is possible here for the same reason the geometry no
+ * Aliasing the color is possible here for the same reason the geometry no
  * longer needs to be: the LEVEL is part of the variable name rather than a
  * mode, so `{Drop-Colors.Level-3.Drop-Color-2}` names one specific value.
  * While Level was a mode, no alias could reach a particular level — which is
@@ -245,7 +245,7 @@ export function componentElevationGeometryFigma(
           out[mode][`${row}/Shadow-${i + 1}/y`] = { value: y, type: 'number' };
           out[mode][`${row}/Shadow-${i + 1}/Blur`] = { value: blur, type: 'number' };
           out[mode][`${row}/Shadow-${i + 1}/Spread`] = { value: spread, type: 'number' };
-          /* Live slots alias the level's ONE colour — the alpha is flat across a
+          /* Live slots alias the level's ONE color — the alpha is flat across a
              level, so there is nothing per-slot to point at. Slots past the
              current layer count carry a transparent literal instead: this is
              where liveness is encoded now that Drop-Colors is one per level.

@@ -176,7 +176,7 @@ const darkModeTextSurfaces = {
  * Color-2..Color-4 ramp regardless of which background it sits on. Color-4 is
  * the lightest of those levels and therefore the hardest case for light text.
  * Every index therefore resolves to the Surfaces entry for Color-4, which is
- * the correct pairing for that container colour.
+ * the correct pairing for that container color.
  *
  * Keeping Containers derived (rather than a second hand-maintained table) means
  * the two can't drift: fix a Surfaces tone and the container inherits it.

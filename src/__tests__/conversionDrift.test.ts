@@ -18,7 +18,7 @@ describe('computeDrift', () => {
     expect(computeDrift(frame([]), '')).toEqual([]);
   });
 
-  it('flags hardcoded colours, in every notation', () => {
+  it('flags hardcoded colors, in every notation', () => {
     const jsx = '<Box style={{ color: "#3794ff", background: "rgb(10, 20, 30)" }} />';
     const kinds = computeDrift(frame([]), jsx).filter(f => f.kind === 'hardcoded-color');
     expect(kinds).toHaveLength(2);

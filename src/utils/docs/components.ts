@@ -43,10 +43,10 @@ export const BUTTON_DOC: ComponentDoc = {
     { collection: 'Theme', inCode: '`data-theme` on the button, or on any ancestor — it inherits.',
       inFigma: 'The Button component pins no Theme mode, so it inherits too. Set the mode on the frame it sits in.' },
     { collection: 'Buttons', inCode: '`variant` picks the palette — `variant="success"`.',
-      inFigma: 'Set the Buttons mode. Colour is not a variant axis in Figma either — it arrives as a mode.' },
+      inFigma: 'Set the Buttons mode. Color is not a variant axis in Figma either — it arrives as a mode.' },
   ],
   themingNotes: [
-    'Colour and theme are different things. `variant="success"` picks a palette; a theme moves the whole surface, including the text and border tones that have to stay readable on it.',
+    'Color and theme are different things. `variant="success"` picks a palette; a theme moves the whole surface, including the text and border tones that have to stay readable on it.',
     'A button carries no shadow at rest, so theming it is safe. Components that DO — Fab, Chip, AppBar — pin the theme on an inner node instead, so the shadow keeps reading the page.',
   ],
   tokens: [

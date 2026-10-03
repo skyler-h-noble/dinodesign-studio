@@ -76,7 +76,7 @@ function buildIconPaletteLines(
   const lines: string[] = [];
   const n = Math.max(1, Math.min(12, backgroundN));
 
-  /* The 4.5:1 mark that sits ON an icon colour.
+  /* The 4.5:1 mark that sits ON an icon color.
    *
    * The first choice is the Text table indexed at the ICON's own tone — the
    * icon is picked to contrast with the SURFACE, so it lands on an arbitrary
@@ -110,7 +110,7 @@ function buildIconPaletteLines(
     /* Icon-Variant holds the SAME value as Icon — generateIconVariantPaletteStructure
        returns generateIconPaletteStructure verbatim. The variant's transparency is a
        separate float in the Icons collection (Icon-Variant-Opacity), not a second
-       colour, so emitting a different hex here would invent one. */
+       color, so emitting a different hex here would invent one. */
     lines.push(`  --Icons-${pal}-Variant: ${iconVar};`);
     lines.push(`  --Icons-On-${pal}: ${tokenRefToVar(onTokenFor(pal, iconTone))};`);
   }
@@ -151,7 +151,7 @@ function buildHeaderPaletteLines(backgroundN: number, isContainer: boolean): str
    * three aliases generateCompleteThemes writes become CSS without anyone
    * naming them. The preview builds its tokens by hand, so it does not, and a
    * token present in one and absent from the other is invariant 5 exactly: no
-   * error, no unresolved var, just an Alt that is coloured in the export and
+   * error, no unresolved var, just an Alt that is colored in the export and
    * inherits in the preview.
    *
    * Derived through getFixedHeaderToken rather than restated, so the preview
@@ -389,7 +389,7 @@ function hexToRgb(hex: string): string {
 /* --Dropshadow-Color-1..5 used to be emitted at every scope here, mirroring
    the CSS export. Both sides dropped them together: the Effect-Level recipes
    reference the single --Dropshadow-Color with per-layer alpha literals, so
-   the five per-surface colours were dead output on each of the six scopes
+   the five per-surface colors were dead output on each of the six scopes
    below. Removing them from only one side is the classic invariant-5 failure —
    see src/__tests__/shadowExport.test.ts, which asserts neither side emits
    them. */
@@ -446,7 +446,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   const { colorScheme, userSelections: sel, mode } = input;
   /* The user's Shadow controls, resolved once. Both the Effect-Level recipes
      and the per-surface --Dropshadow-Color depend on them — INTENSITY moves
-     the colour as well as the alpha, so a call site that skips these emits a
+     the color as well as the alpha, so a call site that skips these emits a
      different hex from the CSS export for the same design system. */
   const shadowOpts = shadowOptionsFromStyle(input.styleCustomizations as Record<string, unknown> | undefined);
   const isDark = mode === 'dark';
@@ -501,7 +501,7 @@ export function buildPreviewCSS(input: BuildInput): string {
        collection and in the export — and the LAST of the scales the preview
        referenced without defining. --Hotlink-Visited and --Link-Visited both
        resolve through it, so visited links painted nothing in the playground
-       while the export and Figma had the colour all along. */
+       while the export and Figma had the color all along. */
     'Hotlink-Visited': (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS['hotlink-visited'])
                                : generateSemanticLightModeScale(SEMANTIC_SEEDS['hotlink-visited'])),
   };
@@ -509,7 +509,7 @@ export function buildPreviewCSS(input: BuildInput): string {
      :root and [data-theme="Brand"] blocks emit, and it is deliberate (the same
      reason dark-mode buttons bake to a Light-Mode tone). Neutral and the
      semantic four are mode-dependent. Reading the dark ramp here instead made
-     every contrast check in dark mode compare against a colour the stylesheet
+     every contrast check in dark mode compare against a color the stylesheet
      never paints, so the On- fallback silently declined to fire. */
   const hexOfPalette = (palette: string, n: number): string | null => {
     const arr = palette === 'Primary' ? primaryLight
@@ -583,7 +583,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // matching block in generateButtonsSimplified.ts. That means both halves
   // change in dark mode: the tone becomes 8, AND the palette the tone is read
   // from becomes the light one. Getting only the tone right would produce a
-  // dark-ramp Color-8, which is a different colour entirely.
+  // dark-ramp Color-8, which is a different color entirely.
   const DARK_BUTTON_N = 8;
   const btnPC = isDark ? DARK_BUTTON_N : PC;
   const btnSC = isDark ? DARK_BUTTON_N : SC;
@@ -657,7 +657,7 @@ export function buildPreviewCSS(input: BuildInput): string {
      to stop, and it is invisible in the usual case because most brands put
      their bar on Primary.
 
-     It shows up as a control inside the bar wearing a colour from somewhere
+     It shows up as a control inside the bar wearing a color from somewhere
      else — SearchField rests on --Hover, so on a blue Tertiary bar the search
      field came out in the primary's pink. The bar's --Background is computed
      separately and stayed right, which is why the bar looked correct and only
@@ -709,7 +709,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     const activeN = stepN;
     const stepHex = palette[activeN - 1]?.hex || baseHex;
     // Color-1 moves a HALF step. Its gap to Color-2 is a tenfold luminance
-    // change, so a full step reads as the button changing colour rather than
+    // change, so a full step reads as the button changing color rather than
     // responding. Matches the export.
     const active = n === 1 ? mixHex(baseHex, stepHex) : stepHex;
     return { active, hover: mixHex(baseHex, active) };
@@ -854,11 +854,11 @@ export function buildPreviewCSS(input: BuildInput): string {
   let containerHighest = containerBg;
   if (!isDark && effectiveCardColoring === 'tonal') {
     // Same collision rule as the export: when the surface IS the container tone
-    // (Background-10 light / Background-2 dark) every opacity blends a colour
+    // (Background-10 light / Background-2 dark) every opacity blends a color
     // with itself and the card vanishes. Step one tone away from the page.
     const faceTone = surfaceN === tonalContainerN ? (tonalIsLight ? 11 : 3) : tonalContainerN;
     const face = p(surfacePalette, faceTone);
-    // Blend against the colour --Surface actually RESOLVES to, not surfaceBg.
+    // Blend against the color --Surface actually RESOLVES to, not surfaceBg.
     // For a black background those differ (surfaceBg is #1a1a1a, the token is
     // Neutral-Color-1), which put the ramp on a different base than the page
     // and made the first step move the wrong way.
@@ -1052,7 +1052,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   const nFor = (name: SurfaceTheme): number =>
     name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
   // Button equivalents of palFor/nFor. Tonal and laddered buttons take their
-  // colour from a surface's palette, but they are still buttons — in dark mode
+  // color from a surface's palette, but they are still buttons — in dark mode
   // that has to resolve to the light ramp at Color-8, not the dark surface tone.
   const btnPalFor = (name: SurfaceTheme): typeof bPrimary =>
     name === 'Secondary' ? bSecondary : name === 'Tertiary' ? bTertiary : bPrimary;
@@ -1062,7 +1062,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // from the light ramp (buttons cross over in dark mode); the BORDER has to
   // read the same family out of the CURRENT mode's ramp, because the border's
   // job is to hold 3:1 against the surface and the surface is a dark-ramp
-  // colour in dark mode. The export does this by construction — its
+  // color in dark mode. The export does this by construction — its
   // Border.Surfaces refs resolve inside whichever Modes block is being
   // written — so the preview has to name the family to match it.
   const getDefaultBtnPalForSurface = (
@@ -1406,7 +1406,7 @@ ${(() => {
      wrapper only exists in the PhonePreview. The lib's AppBar sets a bare
      data-theme="App-Bar" on its own root, so on a real page nothing matched:
      --Background and --Text fell through to the page scope and the bar rendered
-     white with a wordmark in the page's text colour — unreadable, and looking
+     white with a wordmark in the page's text color — unreadable, and looking
      like a contrast bug rather than a missing selector.
      The published CSS carries 12 bare [data-theme="App-Bar"] rules; the preview
      carried none. This is the divergence invariant 5 is about. */
@@ -1614,7 +1614,7 @@ ${(() => {
   const contDefActive = contIsBW ? (isLight(contDefBg) ? '#cccccc' : '#2e2e2e') : contBtnActive;
   // Quiet ON the Default button's own fill — the button-mode palette at the
   // button's tone, same table and index its Text reads. BW mirrors the
-  // export's Quiet.Surfaces.BW row: grey on the white face, the text colour
+  // export's Quiet.Surfaces.BW row: grey on the white face, the text color
   // itself on the black face.
   const contDefQuiet = contIsBW
     ? (isLight(contDefBg) ? NEUTRAL[5] : '#ffffff')
@@ -1622,7 +1622,7 @@ ${(() => {
   /* NO --Background here, and its absence is the fix.
    *
    * This rule covers all five container levels, so setting --Background once
-   * painted every one of them the same colour — the value of Container-HIGHEST
+   * painted every one of them the same color — the value of Container-HIGHEST
    * — while the published system gave each its own. A Container-Low card and a
    * Container-Highest card looked identical in the studio and different once
    * published.
@@ -1832,8 +1832,8 @@ ${(() => {
   // The button sits ON the nav bar, so its border has to contrast with the BAR,
   // not with the page surface. btnBorder is derived from surfaceBg, so when
   // Default Buttons = Primary and the nav bar is also Primary, the border lands
-  // on the bar's own colour and the button dissolves into the strip — a solid
-  // band of colour with a label on it and no button shape at all.
+  // on the bar's own color and the button dissolves into the strip — a solid
+  // band of color with a label on it and no button shape at all.
   const navBtnBorder = p(navDefPal, getAccessibleTones(navBarBg, nc.n, navDefPal).border);
 
   /* Bare [data-theme="Nav-Bar"] for the same reason as App-Bar above: the
@@ -1909,7 +1909,7 @@ ${(() => {
      The arm that used to be here matched at (0,2,0) — the same score as
      [data-theme="App-Bar"][data-surface="Surface"] — and was emitted 480 lines
      later, so it won on source order and repainted the app bar with the page's
-     surface. In devtools the brand's App-Bar colour showed struck through,
+     surface. In devtools the brand's App-Bar color showed struck through,
      which reads as a missing selector rather than an extra one.
      
      The App-Bar block above already warns about exactly this shape: "Keep this
@@ -2066,14 +2066,14 @@ ${(() => {
   const cappedButtonRadius = Math.min(r.buttonRadius, largeButtonHeight);
   /* The three picks, emitted exactly as exportToCSS does — invariant 5, which
      is the rule these two files break most often. The preview showing a brand's
-     real colours while the published CSS did not would be the same divergence
+     real colors while the published CSS did not would be the same divergence
      as the container surfaces, and just as quiet. */
   const coreColors = colorScheme.colors || [];
 
   return `:root {
-  /* The brand's CORE colours, verbatim. Nothing else in the CSS records which
-     colour was chosen: the pick is written into the tone NEAREST ITS
-     LIGHTNESS, so its index differs per colour, and Color-Vibrant is hardcoded
+  /* The brand's CORE colors, verbatim. Nothing else in the CSS records which
+     color was chosen: the pick is written into the tone NEAREST ITS
+     LIGHTNESS, so its index differs per color, and Color-Vibrant is hardcoded
      to Color-8 rather than being the pick. */
   --Primary-Core: ${coreColors[0] ?? 'transparent'};
   --Secondary-Core: ${coreColors[1] ?? 'transparent'};

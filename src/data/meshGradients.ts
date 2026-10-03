@@ -33,7 +33,7 @@ export const SEED_MESH_GRADIENTS: Record<string, MeshGradient> = {
   },
 
 
-  // Chocolate — two stops. Authored deliberately sparse; the base colour repeats
+  // Chocolate — two stops. Authored deliberately sparse; the base color repeats
   // the first stop, so the field reads as one wash rather than a mesh of blobs.
   'b36585cd-f290-4a74-9749-4ae99e1986c0': {
     background:

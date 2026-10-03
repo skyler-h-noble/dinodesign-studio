@@ -162,7 +162,7 @@ const lightModeTonalHeaderSurfaces = {
  * Containers no longer vary with the background tone — in light mode every container is flat at Color-11
  * regardless of background (elevation comes from drop shadows, not tone).
  * Every index therefore resolves to the Surfaces entry for Color-11, the
- * correct pairing for that container colour. Deriving rather than hand-
+ * correct pairing for that container color. Deriving rather than hand-
  * maintaining a second table means the two cannot drift apart.
  */
 function containersFromSurfaces<T extends Record<string, Record<string, unknown>>>(

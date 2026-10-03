@@ -600,7 +600,7 @@ All typography components (H1–H6, Body, BodySmall, Caption, Label, etc.) accep
 
 ---
 
-## Colour Balance — the 60/30/10 pass
+## Color Balance — the 60/30/10 pass
 
 Your system ships three brand palettes. A page built entirely from Primary is
 correct, and it looks monotonous. After the markup is right, do a second pass
@@ -645,7 +645,7 @@ shape and contrast.
 ### Tertiary move 2 — a left border on NON-CLICKABLE cards
 
 A clickable card already earns emphasis from hover: it lifts, it shadows, its
-border brightens. A colour bar competes with that and reads as a second
+border brightens. A color bar competes with that and reads as a second
 affordance. An informational card has no such signal, so it's the right place
 for a Tertiary edge:
 
@@ -684,9 +684,9 @@ switch the whole region's \`data-theme\` and let the surface carry it.
 - **Don't** paint a section \`data-theme="Tertiary"\` to hit the 10%. That
   makes it 30%+ and leaves no palette for accents.
 - **Don't** use \`color="tertiary"\` on body text. Text carries a 4.5:1
-  requirement and recoloured paragraphs read as links.
+  requirement and recolored paragraphs read as links.
 - **Don't** hand-write a hex to balance a page. Every share of the ratio is an
-  existing token; if the colour you want isn't one, the ratio isn't the problem.
+  existing token; if the color you want isn't one, the ratio isn't the problem.
 
 ---
 
@@ -1031,19 +1031,19 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
 
   const foundationCSS = `:root {
 
-  /* ── The brand's CORE colours ────────────────────────────────────────────
+  /* ── The brand's CORE colors ────────────────────────────────────────────
      The three hexes the user actually picked, verbatim.
 
-     Nothing else in the published CSS says which colour a brand chose.
+     Nothing else in the published CSS says which color a brand chose.
      generateScaledTones writes the pick into the tone NEAREST ITS LIGHTNESS,
-     so the index differs per colour — a dark pick lands low, a pale one high
+     so the index differs per color — a dark pick lands low, a pale one high
      — and no fixed tone can stand for it. Color-Vibrant is not it either: that
      is hardcoded to Color-8, which on a light brand is a pale tint. The
      library's own Colors page showed Color-11 and then Color-8 and was wrong
      both times, because the information was never published.
 
      Emitted here rather than derived, so a consumer can show the brand's
-     colours without reaching into Firestore — which a published stylesheet
+     colors without reaching into Firestore — which a published stylesheet
      cannot do. */
   --Primary-Core: ${coreColors[0]};
   --Secondary-Core: ${coreColors[1]};

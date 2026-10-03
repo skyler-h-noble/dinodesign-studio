@@ -46,7 +46,7 @@ export interface ColorEdits {
   /**
    * The three below used to be local-only state, so every one of them was
    * lost the moment this stage unmounted — walk forward to Assign Colors and
-   * back and the core colours returned to their pre-edit values with nothing
+   * back and the core colors returned to their pre-edit values with nothing
    * reporting it.
    *
    * anchorColors cannot be recovered from savedTopColors: the two diverge on
@@ -143,7 +143,7 @@ export default function ColorStage({
   const [primaryIndex, setPrimaryIndex] = useState(savedColorEdits?.primaryIndex ?? 0);
   const [schemes, setSchemes] = useState<ColorScheme[]>(savedSchemes || []);
   /**
-   * The Custom scheme's AUTHORED colours.
+   * The Custom scheme's AUTHORED colors.
    *
    * Custom is the one scheme that is not derived. The other five are rebuilt
    * from topColors on every regenerate — correct, because they are pure
@@ -218,12 +218,12 @@ export default function ColorStage({
   // Local slider value during drag — committed to chromaPerColor on release for smooth dragging
   const [chromaDragValue, setChromaDragValue] = useState<number | null>(null);
 
-  // Colours the generator had to move.
+  // Colors the generator had to move.
   //
   // A locked hex is written verbatim into the tone nearest its lightness. If
-  // that colour cannot carry accessible text — nothing in its own ramp reaches
+  // that color cannot carry accessible text — nothing in its own ramp reaches
   // 4.5:1 — the generator shifts its lightness to the nearest value that can
-  // and records what it did. Silently altering someone's brand colour would be
+  // and records what it did. Silently altering someone's brand color would be
   // worse than the adjustment, so it is surfaced here.
   const colorAdjustments = useMemo(() => {
     const palettes: Array<[string, any]> = [
@@ -287,11 +287,11 @@ export default function ColorStage({
         next[hexEditIndex] = { ...next[hexEditIndex], hex: hexEditValue };
         return next;
       });
-      // Re-derive THIS colour's chroma peak from the new hex.
+      // Re-derive THIS color's chroma peak from the new hex.
       //
-      // Without this the ramp keeps the peak derived from the colour that used
+      // Without this the ramp keeps the peak derived from the color that used
       // to be here, so a vivid new pick renders as a muted ramp with one
-      // saturated tone stamped into it — the whole curve describing a colour
+      // saturated tone stamped into it — the whole curve describing a color
       // that is no longer there. The auto-derive effect below cannot do it: it
       // is keyed on the LENGTH of the list, which does not change when a hex is
       // edited in place.
@@ -413,7 +413,7 @@ export default function ColorStage({
     // Returning to this stage is NOT a fresh start. This effect overwrites
     // topColors, anchorColors and both chroma arrays with whatever the image
     // yields, so re-running it on a remount threw away every edit made here —
-    // walk forward to Assign Colors and back and the core colours were the
+    // walk forward to Assign Colors and back and the core colors were the
     // originals again. savedTopColors is the "we have been here" signal: it is
     // populated by the [topColors] effect above on the first pass, so its
     // presence means extraction already ran and its result has since been
@@ -461,11 +461,11 @@ export default function ColorStage({
   /**
    * Re-derive one slot's chroma peak from the hex now sitting in it.
    *
-   * Both ways a colour can change — swapping it out, or typing a new hex —
+   * Both ways a color can change — swapping it out, or typing a new hex —
    * have to do this, and neither did. The auto-derive effect cannot: it is
-   * guarded on the LENGTH of the colour list, which is identical before and
-   * after a colour is replaced in place. So the ramp kept the peak derived
-   * from the colour that used to be here, and a vivid new pick rendered as a
+   * guarded on the LENGTH of the color list, which is identical before and
+   * after a color is replaced in place. So the ramp kept the peak derived
+   * from the color that used to be here, and a vivid new pick rendered as a
    * muted ramp of the right hue — a #ec5a63 red drawn at peak 21 reads as
    * dusty rose, which is what made the tone rows disagree with the swatches
    * above them.
@@ -499,9 +499,9 @@ export default function ColorStage({
     // Callers pass the freshly-edited overrides here to bypass that.
     const hOverrides = overrides || hueOverridesByTop;
     // Same stale-closure problem as the hue overrides above: swapping or
-    // re-hexing a colour clears or sets its lock via setState, so a caller
+    // re-hexing a color clears or sets its lock via setState, so a caller
     // firing this immediately after would still read the OLD lock and pin the
-    // ramp to the colour that was just replaced.
+    // ramp to the color that was just replaced.
     const lockedMap = lockedOverride || lockedColorMap;
     const primary = tops[pIdx].hex;
     const others = tops.filter((_, i) => i !== pIdx).map(c => c.hex);
@@ -523,23 +523,23 @@ export default function ColorStage({
         hueOverridesForScheme[schemeIdx] = hOverrides[origIdx];
       }
     });
-    /* No global cap here — every colour keeps its own.
+    /* No global cap here — every color keeps its own.
      *
      * This passed lc[pIdx] / dc[pIdx]: the PRIMARY's chroma, applied as the cap
      * for all three roles of every scheme. Selecting a different Core Color as
-     * Primary therefore rebuilt every other colour under a cap belonging to a
-     * colour it has nothing to do with, and the tones visibly moved.
+     * Primary therefore rebuilt every other color under a cap belonging to a
+     * color it has nothing to do with, and the tones visibly moved.
      *
-     * Undefined lets each colour derive its own peak from its own hue and
-     * lightness. `refined` below then applies the per-colour ceiling from that
-     * colour's own chromaPerColor entry — which is where a cap belongs. */
+     * Undefined lets each color derive its own peak from its own hue and
+     * lightness. `refined` below then applies the per-color ceiling from that
+     * color's own chromaPerColor entry — which is where a cap belongs. */
     const generated = generateColorSchemes(reordered, undefined, undefined, locked, hueOverridesForScheme);
 
     // Restore the authored Custom triple. generateColorSchemes always builds
     // Custom as [c1, c2, c3] — the default first three swatches — which is only
     // right before the user has picked roles. `refined` below regenerates the
-    // tone palettes per role colour, so substituting here (not after) means the
-    // ramps are built for the colours actually chosen.
+    // tone palettes per role color, so substituting here (not after) means the
+    // ramps are built for the colors actually chosen.
     const authored = customColorsRef.current;
     const withCustom = authored
       ? generated.map(sc => (sc.name === 'Custom'
@@ -547,16 +547,16 @@ export default function ColorStage({
           ...sc,
           colors: [...authored] as [string, string, string],
           originalColors: [...authored],
-          // extractedTones must be recomputed from the AUTHORED colours.
+          // extractedTones must be recomputed from the AUTHORED colors.
           //
           // It is calculated inside generateColorSchemes from `reordered` —
           // the Core Colors in radio order — so leaving it alone gave Custom
-          // authored colours with somebody else's tones. Downstream that is
+          // authored colors with somebody else's tones. Downstream that is
           // not cosmetic: buildPreviewCSS derives
           // `PC = toneToColorNumber(extractedTones.primary)` and uses it as the
           // nav's tone index, so changing the Core Colors radio slid the app
           // bar up and down the ramp while Custom's palette sat still. The
-          // colours looked stable and the chrome moved, which is why it read
+          // colors looked stable and the chrome moved, which is why it read
           // as "the tones are changing".
           extractedTones: {
             primary: chroma(authored[0]).lch()[0],
@@ -576,19 +576,19 @@ export default function ColorStage({
     const refined = withCustom.map(scheme => {
       const roles = scheme.colors.map(colorHex => {
         const topIdx = tops.findIndex(t => t.hex === colorHex);
-        // A scheme colour is not always one of the user's Core Colors.
+        // A scheme color is not always one of the user's Core Colors.
         // Analogous, Triadic, Complementary and Split-Complementary ROTATE the
-        // primary's hue, so two of their three colours never appear in `tops`
+        // primary's hue, so two of their three colors never appear in `tops`
         // and the lookup fails. This used to `return null`, which made the
         // whole scheme fall through unrefined and keep generateColorSchemes'
         // palettes — where primary's chroma is applied to all three roles.
         //
         // That is exactly what the refinement below exists to prevent, and it
         // was silently skipping the four schemes that need it most: the tone
-        // rows in Settings showed the per-colour ramps while the export shipped
+        // rows in Settings showed the per-color ramps while the export shipped
         // the unrefined ones.
         //
-        // A derived colour has no Core Color to inherit from, so it derives its
+        // A derived color has no Core Color to inherit from, so it derives its
         // own peak from itself — the same rule a Core Color follows.
         const isTop = topIdx >= 0;
         const anchorHex = isTop ? (anchorsArr[topIdx]?.hex || colorHex) : colorHex;
@@ -598,11 +598,11 @@ export default function ColorStage({
         const darkC = isTop
           ? (dc[topIdx] ?? 36)
           : Math.min(Math.round(getMatchingPeakChroma(colorHex, true)), 42);
-        // Pin the ramp to the colour the user actually sees. Without this the
+        // Pin the ramp to the color the user actually sees. Without this the
         // palette is generated from the ANCHOR plus a chroma value that need not
         // match the picked hex, so tone SC — the tone every Secondary button
         // reads — came out a desaturated cousin of the swatch beside it.
-        // lockedHex overwrites only the step nearest the colour's own lightness,
+        // lockedHex overwrites only the step nearest the color's own lightness,
         // so the anchor, chroma and hue easing still shape every other tone.
         const lockedHex = isTop ? (lockedMap[topIdx] ?? colorHex) : colorHex;
         const easing = isTop ? hOverrides[topIdx] : undefined;
@@ -651,9 +651,9 @@ export default function ColorStage({
     // A swap replaces the COLOUR, so the anchor has to move with it.
     //
     // anchorColors deliberately stays put when the user nudges to a different
-    // TONE of the same colour, which keeps the generated ramp stable. A swap is
+    // TONE of the same color, which keeps the generated ramp stable. A swap is
     // a different thing: the hue changes entirely. Leaving the old anchor meant
-    // every palette kept being generated from the colour that was swapped out —
+    // every palette kept being generated from the color that was swapped out —
     // an olive seed with plum-tinted containers, because the ramp was still
     // being built from the plum.
     setAnchorColors(prev => {
@@ -661,9 +661,9 @@ export default function ColorStage({
       next[swapIndex] = replacement;
       return next;
     });
-    // Anything tuned for the OLD colour at this slot is now meaningless: a hue
+    // Anything tuned for the OLD color at this slot is now meaningless: a hue
     // easing dialled for plum is wrong for olive, and a locked hex pins the
-    // ramp to a colour that is no longer in the scheme.
+    // ramp to a color that is no longer in the scheme.
     setLockedColorMap(prev => {
       if (!(swapIndex in prev)) return prev;
       const next = { ...prev };
@@ -676,16 +676,16 @@ export default function ColorStage({
       delete next[swapIndex];
       return next;
     });
-    // The chroma peak was derived from the colour being replaced, so it is as
+    // The chroma peak was derived from the color being replaced, so it is as
     // stale as the locked hex and the hue easing cleared above.
     const peaks = rederiveChromaFor(swapIndex, replacement.hex);
 
     // Rebuild the schemes NOW rather than at export.
     //
-    // Every other way of changing a colour — clicking a tone, moving the
+    // Every other way of changing a color — clicking a tone, moving the
     // primary, dragging chroma, applying a hue edit — calls this explicitly.
-    // The two paths that change a Core Colour outright did not, so the schemes
-    // (and the export that reads them) kept the previous colours until some
+    // The two paths that change a Core Color outright did not, so the schemes
+    // (and the export that reads them) kept the previous colors until some
     // unrelated action happened to trigger a rebuild.
     //
     // Every value is passed explicitly: the setState calls above are async, so
@@ -1179,7 +1179,7 @@ export default function ColorStage({
                       size="medium"
                       className="dino-swatch"
                       style={{ ['--swatch-color' as any]: color.hex }}
-                      // Single click SWITCHES the colour, double click opens the
+                      // Single click SWITCHES the color, double click opens the
                       // editor. These were the other way round: the common action
                       // (swap this swatch for another) needed a double click while
                       // the rare one (type a hex, lock it) fired on a single.
@@ -1439,7 +1439,7 @@ export default function ColorStage({
           <VStack spacing={1}>
             <BodySmall style={{ fontWeight: 600 }}>Core Colors</BodySmall>
             <BodySmall color="quiet">
-              <strong>Click</strong> a colour to swap it for another.
+              <strong>Click</strong> a color to swap it for another.
               {' '}<strong>Double-click</strong> to type an exact hex or lock it.
             </BodySmall>
           </VStack>
@@ -1449,8 +1449,8 @@ export default function ColorStage({
               <VStack spacing={1}>
                 <Body>
                   {colorAdjustments.length === 1
-                    ? 'One colour was adjusted to meet contrast requirements'
-                    : `${colorAdjustments.length} colours were adjusted to meet contrast requirements`}
+                    ? 'One color was adjusted to meet contrast requirements'
+                    : `${colorAdjustments.length} colors were adjusted to meet contrast requirements`}
                 </Body>
                 {colorAdjustments.map((adj) => (
                   <BodySmall key={adj.role}>
@@ -1471,7 +1471,7 @@ export default function ColorStage({
               lib's <Button swatch> hardcoded its corner radius, so a brand with
               a large --Button-Radius got square chips. That variant is RETIRED
               and the Swatch component replaced it — a swatch was never a kind of
-              button, since Button's axes are style and colour and a swatch uses
+              button, since Button's axes are style and color and a swatch uses
               neither. The workaround outlived the thing it worked around.
 
               Selection is delegated to the radio rather than drawn twice. The
@@ -1538,10 +1538,10 @@ export default function ColorStage({
               </ButtonGroup>
 
               <BodySmall style={{ fontSize: '0.75rem' }}>
-                Each row is the full 12-tone scale built from that colour.
-                {' '}<strong>Click any tone</strong> to choose which one represents the colour —
+                Each row is the full 12-tone scale built from that color.
+                {' '}<strong>Click any tone</strong> to choose which one represents the color —
                 {' '}the scale itself does not change.
-                {' '}<strong>Edit</strong> adjusts the colour's hue and saturation.
+                {' '}<strong>Edit</strong> adjusts the color's hue and saturation.
               </BodySmall>
 
               {topColors.map((color, colorIdx) => {
@@ -1567,7 +1567,7 @@ export default function ColorStage({
                         {colorName}
                       </Body>
                       {/* Editing is a LIGHT-mode action: the modal tunes the
-                          colour itself, and the dark ramp is derived from it.
+                          color itself, and the dark ramp is derived from it.
                           Offering it in dark mode implies you can tune the two
                           independently, which you cannot — so it is rendered as
                           plain text rather than a link, with the reason on hover.
@@ -1580,7 +1580,7 @@ export default function ColorStage({
                       <div style={{ flexShrink: 0, textAlign: 'right', minWidth: 28, lineHeight: 1 }}>
                       {toneMode === 'dark' ? (
                         <BodySmall
-                          title="Switch to Light Mode to edit this colour — the dark scale is derived from it."
+                          title="Switch to Light Mode to edit this color — the dark scale is derived from it."
                           color="quiet" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap', display: 'inline' }}
                         >
                           Edit
@@ -1771,11 +1771,11 @@ export default function ColorStage({
                                       e.stopPropagation();
                                       const newColors = [...scheme.colors] as [string, string, string];
                                       newColors[roleIdx] = tc.hex;
-                                      // Chroma is keyed by the colour's index in
+                                      // Chroma is keyed by the color's index in
                                       // topColors, NOT by the role slot. Reading
                                       // chromaPerColor[roleIdx] meant assigning
                                       // topColors[4] to Primary generated its ramp
-                                      // at topColors[0]'s peak — the wrong colour's
+                                      // at topColors[0]'s peak — the wrong color's
                                       // saturation, the same mismatch that made the
                                       // Core Colors ramps disagree with the swatches.
                                       const peakFor = (hex: string, dark: boolean) => {

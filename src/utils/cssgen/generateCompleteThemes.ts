@@ -172,7 +172,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
      *
      * Three DISTINCT palettes rather than a computed shade of one. A shade has
      * to come from somewhere, and at background tones 5 and 6 the ramp can run
-     * out — the derived colour lands on the base it was derived from and the
+     * out — the derived color lands on the base it was derived from and the
      * gradient renders as a flat fill, with nothing to say it failed. Separate
      * palettes cannot collapse that way.
      *
@@ -181,7 +181,7 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
      * palette the SECOND stop came from — and a stop that moves per brand is a
      * stop a designer cannot reason about.
      *
-     * All three are ALIASES into the Header tables, never computed colours, so
+     * All three are ALIASES into the Header tables, never computed colors, so
      * the Alt follows data-surface exactly as the Header tokens it is built
      * from do, and every stop is already contrast-checked for the surface it
      * lands on. A baked pair could not be, and a gradient has to clear its
@@ -530,7 +530,7 @@ function generateSingleTheme(config: ThemeConfig): any {
   //              the dark ramp's top instead.
   //
   // So neutralSurfaceWindow's whiteStep is honoured through the tone it indexes
-  // (12) rather than through its paint. Same colour in light mode, still mode-
+  // (12) rather than through its paint. Same color in light mode, still mode-
   // aware in dark.
 
   // Base Surface — reference Backgrounds structure for Light/Dark mode adaptation
@@ -592,7 +592,7 @@ function generateSingleTheme(config: ThemeConfig): any {
   //
   // The light counterpart of Surface-Dimmest, and the level that absorbs
   // <Palette>-Light: that theme's Surface was tone 11, so landing here makes
-  // the replacement the same colour rather than an approximation of it.
+  // the replacement the same color rather than an approximation of it.
   //
   // 11 unless Bright has already taken it (Surface at 10), in which case 12.
   // Above that the ramp is exhausted and it paints white outright — the same
@@ -699,7 +699,7 @@ function generateSingleTheme(config: ThemeConfig): any {
     },
     /* Same three on the container side — a surface and a container resolve
        different tones, so the Alt must be stated for both or it keeps the
-       surface's colour on a card. */
+       surface's color on a card. */
     'Alt-Display-Color': {
       value: `{Header.Containers.Primary.Color-${config.contN}}`,
       type: 'color'
@@ -743,7 +743,7 @@ function generateSingleTheme(config: ThemeConfig): any {
       type: 'color'
     },
     // Containers have their own Hover/Pressed group, computed from the
-    // container colour rather than the background's tone. The flat
+    // container color rather than the background's tone. The flat
     // {Hover.<palette>.Color-N} family is indexed by BACKGROUND tone and steps
     // lighter for tones 6-12 — which sent dark containers to a light hover
     // under white text. See buildContainerStates in exportColorSystem.ts.
@@ -1005,7 +1005,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   },
   /* Which palette the Alt gradient's second stop uses. Decided once, from the
      palettes' own hues, by altStop2Palette — the theme layer never sees a hex,
-     so the question has to be answered where the colours are and carried in.
+     so the question has to be answered where the colors are and carried in.
      Defaults to 'mono', the answer that needs no second hue to be known. */
   altStop2: AltStop2 = 'mono',
 ): any {
@@ -1257,10 +1257,10 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Maps user selection → existing theme name
   /**
    * A nav selection resolves to a surviving theme AND the surface level that
-   * carries the colour it used to name.
+   * carries the color it used to name.
    *
    * `white`, `black` and `primary-light` were themes; they are now levels.
-   * Mapping only the theme would silently change the colour — 'primary-light'
+   * Mapping only the theme would silently change the color — 'primary-light'
    * would land on Primary's Surface (tone 6) instead of the tone 11 it means —
    * so the level travels with it and is promoted to Surfaces on the copy.
    */
@@ -1385,7 +1385,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   // window rather than per palette. Measured across shipped systems all seven
   // `-Light` themes held the identical tone window (9-10-11-12), so nothing
   // selected between them — the palette already did. Their Surface was tone 11,
-  // which is exactly where Surface-Brightest lands, so the colour survives:
+  // which is exactly where Surface-Brightest lands, so the color survives:
   //
   //   Primary-Light  ->  theme="Primary"  surface="Surface-Brightest"
   //   White          ->  theme="Neutral"  surface="Surface-Brightest"

@@ -432,7 +432,7 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 /* Render order. Body sits second and Eyebrow last: the panels wrap at roughly
    three across, so whichever role is fourth falls below the fold — and Body is
    the one people reach for. Only .map reads this, so the order is free to
-   change; the `ROLES` in App.tsx is a different constant (colour palettes). */
+   change; the `ROLES` in App.tsx is a different constant (color palettes). */
 const ROLES = ['Display', 'Body', 'Header', 'Eyebrow'] as const;
 export type RoleName = typeof ROLES[number];
 

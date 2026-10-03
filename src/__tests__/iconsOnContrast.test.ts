@@ -1,8 +1,8 @@
 /**
  * --Icons-On-<palette> must carry content at 4.5:1 on --Icons-<palette>.
  *
- * The pair exists so a badge, counter or dot painted in an icon colour has a
- * label colour that is legible ON it. --Icons-<pal> is picked to contrast with
+ * The pair exists so a badge, counter or dot painted in an icon color has a
+ * label color that is legible ON it. --Icons-<pal> is picked to contrast with
  * the SURFACE, so it can land on any tone of any palette — which means the
  * matching foreground cannot be a fixed token path and has to be resolved.
  * Three producers compute it (exportColorSystem for 17 themes,
@@ -216,7 +216,7 @@ describe('the preview emits the Icons collection', () => {
         /* Icons carry meaning, so WCAG 1.4.11 applies — the same 3:1 a Border
            gets, which is why the icon tones mirror Border's exactly.
            The eight ACCENTS only. Icons-Default is excluded on purpose: it is
-           defined as tracking --Text rather than as an independent colour, so
+           defined as tracking --Text rather than as an independent color, so
            its ratio is --Text's ratio and testing it here would just restate
            whatever --Text does. The contract it actually owes is the next
            test. */
@@ -282,7 +282,7 @@ describe('the preview emits the Icons collection', () => {
  * This is the guard that should have existed first. The preview referenced five
  * ramps it never defined — Info, Success, Warning, Error and Hotlink-Visited —
  * so --Text-Info, --Header-Error, --Hotlink, --Link and --Hotlink-Visited all
- * resolved to nothing while the export and Figma had the colours. Nothing
+ * resolved to nothing while the export and Figma had the colors. Nothing
  * reported it: an undefined custom property is not an error, the text just
  * inherits.
  *
@@ -304,7 +304,7 @@ describe('every palette scale the preview references is defined', () => {
       });
 
       it(`${name} / ${mode}: emits no --Link-Hover`, () => {
-        /* Links do not change colour on hover — the underline thickens instead.
+        /* Links do not change color on hover — the underline thickens instead.
            The preview used to emit a ±1 tone step off Info, which is an INVENTED
            value on text carrying a 4.5:1 requirement. The lib agrees it should
            not exist: Link documents --Link-Hover as intentionally absent, and

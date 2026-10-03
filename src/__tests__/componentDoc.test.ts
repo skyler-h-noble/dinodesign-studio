@@ -4,7 +4,7 @@
  * the wrong node, a default that is quietly missing.
  */
 import { describe, it, expect } from 'vitest';
-import { renderComponentDoc, renderFigmaSection, renderColourSystem,
+import { renderComponentDoc, renderFigmaSection, renderColorSystem,
   COLOUR_COLLECTIONS } from '../utils/docs/componentDoc';
 import { BUTTON_DOC, TABS_DOC, CARD_DOC, COMPONENT_DOCS } from '../utils/docs/components';
 import type { LinkedFigmaFileEntry } from '../utils/figmaLink';
@@ -190,7 +190,7 @@ describe('the sections a human doc would not have', () => {
   });
 });
 
-describe('the three colour collections', () => {
+describe('the three color collections', () => {
   it('every theming row names which collection it is about', () => {
     /* The fact that cannot be guessed. Change the right node in the wrong
        collection and nothing happens — it does not error, so an agent has no
@@ -218,7 +218,7 @@ describe('the three colour collections', () => {
   it('points each collection at its own layer prefix', () => {
     /* Theme-*, Button-Theme-*, Icon-Theme-*. One prefix per collection is what
        makes "which mode do I set?" answerable by looking at the layer name. */
-    const md = renderColourSystem();
+    const md = renderColorSystem();
     expect(md).toContain('`Theme-*`');
     expect(md).toContain('`Button-Theme-*`');
     expect(md).toContain('`Icon-Theme-*`');
@@ -227,12 +227,12 @@ describe('the three colour collections', () => {
   it('says an unpinned layer means inherit, not broken', () => {
     /* Most are unpinned. Without this an agent reads a missing mode as a gap
        and pins one, which turns an inheriting component into a fixed one. */
-    expect(renderColourSystem()).toMatch(/unpinned.*inherit/is);
+    expect(renderColorSystem()).toMatch(/unpinned.*inherit/is);
   });
 
   it('routes Badge to Icons, not Theme', () => {
     /* Badge binds Icon and On-Icon now. Sending someone to the Theme mode to
-       recolour a badge is the exact mistake this column exists to prevent. */
+       recolor a badge is the exact mistake this column exists to prevent. */
     const badge = COMPONENT_DOCS.find(d => d.name === 'Badge')!;
     expect(badge.theming.some(t => t.collection === 'Icons')).toBe(true);
   });

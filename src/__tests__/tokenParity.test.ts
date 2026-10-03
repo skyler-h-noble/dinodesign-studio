@@ -7,7 +7,7 @@
  * buildPreviewCSS / exportColorSystemToJSON / generateFigmaJSON and compare
  * their outputs.
  *
- * Why it matters: every colour bug found this week was preview-side while the
+ * Why it matters: every color bug found this week was preview-side while the
  * export was correct, because the preview carries its own private contrast
  * implementation (getAccessibleTones lives in buildPreviewCSS.ts and is used
  * nowhere else). Nothing failed when they diverged — a person had to notice a
@@ -27,7 +27,7 @@ import type { ColorScheme, UserSelections } from '../types';
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
- *  the picked colours (see the lockedHex fix in ColorStage). */
+ *  the picked colors (see the lockedHex fix in ColorStage). */
 function makeScheme(colors: [string, string, string]): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
@@ -149,7 +149,7 @@ const norm = (hex: string | null) => {
   if (!hex) return null;
   const h = hex.trim().toLowerCase();
   if (!h.startsWith('#')) return h;
-  // Compare colour, not alpha notation: #rrggbbaa and rgb() forms normalise.
+  // Compare color, not alpha notation: #rrggbbaa and rgb() forms normalise.
   try { return chroma(h).hex().toLowerCase(); } catch { return h; }
 };
 
@@ -187,7 +187,7 @@ describe('preview ↔ export ↔ figma parity', () => {
     expect(figma?.Modes).toBeTruthy();
   });
 
-  // The token every colour bug this week landed on.
+  // The token every color bug this week landed on.
   //
   // The export nests it under Modes.<mode>.Default-Button.Default.<size>.Button
   // as a {Buttons.<Palette>.<size>.Button} reference, so it has to be resolved
@@ -227,7 +227,7 @@ describe('preview ↔ export ↔ figma parity', () => {
   // Dark-mode buttons are pinned to Light-Mode Color-8 and baked to a literal
   // hex. Two things can silently break: the bake can run before Hover/Pressed
   // exist (leaving an unresolved "{Modes.Light-Mode.…}" string that ships as a
-  // colourless token), and the value can drift from the light ramp.
+  // colorless token), and the value can drift from the light ramp.
   it('dark-mode buttons are baked to Light-Mode Color-8 with a dark label', () => {
     const sel = { background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'secondary' } as UserSelections;
     const { json } = buildAll(SCHEME, sel, 'dark');
@@ -237,7 +237,7 @@ describe('preview ↔ export ↔ figma parity', () => {
       const [fill, text, hover, pressed] = ['Button', 'Text', 'Hover', 'Pressed'].map(slot);
       const light8 = String(at(json, `Modes.Light-Mode.Colors.${pal}.Color-8`)?.value ?? '');
 
-      // Every slot is a literal colour — no reference survived the bake.
+      // Every slot is a literal color — no reference survived the bake.
       for (const [name, v] of [['Button', fill], ['Text', text], ['Hover', hover], ['Pressed', pressed]]) {
         expect(v, `${pal}.${name} should be baked hex, got ${v}`).toMatch(/^#[0-9a-fA-F]{6}$/);
       }
@@ -249,7 +249,7 @@ describe('preview ↔ export ↔ figma parity', () => {
     }
   });
 
-  it('secondary buttons use the picked secondary colour', () => {
+  it('secondary buttons use the picked secondary color', () => {
     const sel = { background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'secondary' } as UserSelections;
     const { previewCss } = buildAll(SCHEME, sel, 'light');
     const btn = norm(previewToken(previewCss, /\[data-theme="Brand"\]/, 'Buttons-Default-Button'));
@@ -257,18 +257,18 @@ describe('preview ↔ export ↔ figma parity', () => {
     console.log(`  secondary button=${btn}  picked=${picked}`);
     expect(btn).toBeTruthy();
 
-    // Not byte-identical to the pick. A locked colour whose slot cannot carry
+    // Not byte-identical to the pick. A locked color whose slot cannot carry
     // 4.5:1 is moved in LIGHTNESS ONLY — hue and chroma are preserved, and the
     // UI tells the user it was adjusted. #2563eb is exactly that case: it sits
     // at L=46 but lands in the Color-5 slot, and at its picked lightness the
     // Quiet pairing measures 4.48.
     //
     // So the thing worth asserting is that the button is still the SECONDARY
-    // colour — same hue, and not the primary — rather than the same bytes.
+    // color — same hue, and not the primary — rather than the same bytes.
     const hueOf = (hex: string) => chroma(hex).lch()[2];
     const dHue = Math.abs(((hueOf(btn!) - hueOf(picked) + 540) % 360) - 180);
     expect(dHue, `button ${btn} is a different hue from the pick ${picked}`).toBeLessThan(8);
-    expect(btn, 'secondary button fell back to the primary colour')
+    expect(btn, 'secondary button fell back to the primary color')
       .not.toBe(norm(SCHEME.colors[0]));
   });
 });
@@ -592,7 +592,7 @@ describe('Text.Surfaces stays a reference table', () => {
 
 /* ── Container levels are FIVE, on both sides ────────────────────────────────
  *
- * The preview painted all five the same colour. Its container rule lists every
+ * The preview painted all five the same color. Its container rule lists every
  * level in one selector and set `--Background` once, so a Container-Low card
  * and a Container-Highest card looked identical in the studio and different
  * once published.

@@ -14,7 +14,7 @@
  * put it in different places. Figma names the variable group; here it becomes
  * a data-surface attribute and the fill is a plain var(--Background). Setting
  * the attribute is also the only correct way to paint in this codebase — it
- * exposes the whole paired token set rather than one colour.
+ * exposes the whole paired token set rather than one color.
  *
  * ── What this cannot do ───────────────────────────────────────────────────
  * Behaviour. A definition has no focus management, no keyboard handling and no
@@ -167,7 +167,7 @@ function renderNode(
     paddingBottom: tok(node.padding?.bottom),
     paddingLeft: tok(node.padding?.left),
     borderRadius: tok(node.radius),
-    // A hairline in the token's colour, so it follows the surface it sits on.
+    // A hairline in the token's color, so it follows the surface it sits on.
     border: node.border ? `1px solid ${tok(node.border)}` : undefined,
     borderBottom: node.borderBottom ? `1px solid ${tok(node.borderBottom)}` : undefined,
     /* A radius that does not clip is a radius on the background only: a row
@@ -209,7 +209,7 @@ function renderNode(
     ...(node.surface || node.theme ? { background: 'var(--Background)', color: 'var(--Text)' } : {}),
   };
 
-  /* Both attributes, never a named colour. data-theme and data-surface expose
+  /* Both attributes, never a named color. data-theme and data-surface expose
      the whole matched set — Background, Text, Quiet, Border and the rest — so
      painting var(--Background) below resolves correctly. Reaching for
      var(--Surface) instead would paint the box and leave everything in it on
@@ -305,7 +305,7 @@ function renderNode(
   const children = (node.children || []).map((c, i) => renderNode(c, opts, `${node.name}-${i}`, dir));
 
   /* A band paints edge to edge and caps what is INSIDE it. Capping the band
-     itself would leave bare page either side of a floating coloured strip;
+     itself would leave bare page either side of a floating colored strip;
      this gives an unbroken bar with its content aligned to the rest of the
      page, which is what a content ceiling means everywhere else. */
   if (node.band && opts.contentMaxWidth) {
@@ -346,7 +346,7 @@ export default function DefinitionRenderer(
 
   /* A wrapper rather than padding ON the root: the root paints the nav's
      surface, and padding it would put the bar's reserved space inside that
-     paint — a band of nav-coloured nothing above the content. The wrapper
+     paint — a band of nav-colored nothing above the content. The wrapper
      carries the space and the root keeps its own box. */
   return (
     <div style={{

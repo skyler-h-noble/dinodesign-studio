@@ -18,7 +18,7 @@
 export interface MeshGradient {
   /** The layered background value: the radial-gradient stack plus its base. */
   background: string;
-  /** Foreground colour for text sitting on the mesh. A token, not a hex. */
+  /** Foreground color for text sitting on the mesh. A token, not a hex. */
   color?: string;
 }
 
@@ -66,7 +66,7 @@ export function parseMeshGradient(input: string): MeshGradient | null {
  *
  * Dark-Mode.css references --BW-Color-N (e.g. `--Eyebrow: var(--BW-Color-8)`)
  * but never DEFINES one, so every BW token is undefined there. A mesh's text
- * colour is solved as a BW tone, which meant the card read correctly in light
+ * color is solved as a BW tone, which meant the card read correctly in light
  * mode and, in dark, resolved to nothing — `color` fell back to inherited, and
  * on a dark page that is light text on a light mesh. Invisible, silent, and
  * indistinguishable from a styling choice.
@@ -74,7 +74,7 @@ export function parseMeshGradient(input: string): MeshGradient | null {
  * The mesh itself does NOT have this problem: it is built from --Primary-Color-N
  * and friends, which every mode defines, so the same mesh renders in both. Its
  * text has to be equally mode-independent, and it can be — the composition is
- * fixed, so the colour solved against it is a fixed answer.
+ * fixed, so the color solved against it is a fixed answer.
  *
  * The token stays FIRST so the value tracks a system that does define it; the
  * literal only fires when nothing does. BlackWhite is black and white, and the
@@ -128,7 +128,7 @@ export function generateMeshGradientCSS(mesh: MeshGradient): string {
 }
 
 /* Text sitting on the mesh. Type comes from the system's own roles — the
-   authored mesh decides colour and position, never which face to set. */
+   authored mesh decides color and position, never which face to set. */
 .gradient-figure .gradient-text {
   position: absolute;
   left: 6%;

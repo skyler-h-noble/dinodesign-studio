@@ -196,25 +196,25 @@ CONVERSION RULES:
        applies to EVERY node, including list rows and media slots.
      - layout → auto-layout: gap, padding, and axis alignment per rule 2a.
      - modes.Buttons → the COLOUR of Button, Checkbox and Radio. The design system
-       carries button colour as a MODE, not as a variant property, so a Secondary
+       carries button color as a MODE, not as a variant property, so a Secondary
        button and a Primary one can be the identical component with a different
-       mode applied. Map the mode name to the component's colour:
+       mode applied. Map the mode name to the component's color:
            modes.Buttons "Secondary" → <Button variant="secondary">
                                        <Checkbox variant="secondary">
                                        <Radio color="secondary">
        Valid modes: Default, Primary, Secondary, Tertiary, Neutral, Info,
        Success, Warning, Error, Black-White. ABSENT → Default → omit the prop
        (never emit variant="primary" for an unmarked control; Default is the
-       brand colour and primary is a different one).
-       CHECKBOX AND RADIO HAVE NO SHAPE AXIS. Their "variant" prop is the colour and
+       brand color and primary is a different one).
+       CHECKBOX AND RADIO HAVE NO SHAPE AXIS. Their "variant" prop is the color and
        nothing else — never emit variant="secondary-outline" or "error-light" on
        a Checkbox. Those shapes were removed from the lib; they still resolve to
-       their colour but warn. The shape rule below applies to Button ONLY.
+       their color but warn. The shape rule below applies to Button ONLY.
        On a BUTTON, a Style/Appearance VARIANT property still selects the SHAPE
        — solid vs -outline vs ghost vs text — and composes with the
        mode:
            modes.Buttons "Error" + variant Style "Outline" → variant="error-outline"
-       If a colour appears BOTH as a mode and as a variant property, the MODE
+       If a color appears BOTH as a mode and as a variant property, the MODE
        wins: the variant property is the leftover of a component that has not
        been migrated yet.
    NEVER guess theme/surface from fill color when _aaid.modes exists. The
@@ -710,7 +710,7 @@ CONVERSION RULES:
     So never infer outline from the Style variant, and never strip an _outline
     or _border suffix thinking it is decoration — it is the icon's identity.
 
-    ALWAYS WRAP IT IN THE LIB'S <Icon>. A bare <AddIcon /> takes MUI's colour
+    ALWAYS WRAP IT IN THE LIB'S <Icon>. A bare <AddIcon /> takes MUI's color
     and sizing rather than the brand's. <Icon> is aria-hidden by default, which
     is what a decorative glyph inside a labelled control should be.
 
@@ -838,7 +838,7 @@ CONVERSION RULES:
 4f. BUTTON VARIANT + COLOR — "default" is the default; NEVER emit "primary" unless asked.
 
     ONE code <Button> covers every Figma Button. Size, Elevation and Type are
-    variant PROPERTIES; colour is a Buttons MODE. Older files split size and
+    variant PROPERTIES; color is a Buttons MODE. Older files split size and
     elevation across six component NAMES (Button, Button-Small, Button-Large and
     their -Elevated forms) — those names are still honoured as a fallback, but a
     variant property always wins over the name.
@@ -869,10 +869,10 @@ CONVERSION RULES:
         DOM, so the button renders as an ordinary text button at the wrong width
         with nothing logged — sizing keys off the prop, not off the content.
       - COLOR comes from modes.Buttons (rule 0), NOT from a variant property.
-        The design system carries button colour as a MODE. If the component also
+        The design system carries button color as a MODE. If the component also
         has a Color variant property it is un-migrated; the MODE wins.
       - STYLE = the SHAPE. Values: Solid | Outline | Ghost — there is no Text
-        style. It composes with the colour into ONE variant string (there is no
+        style. It composes with the color into ONE variant string (there is no
         separate color prop):
           Style=Solid   + Buttons mode X -> variant="x"          ("primary", "default")
           Style=Outline + Buttons mode X -> variant="x-outline"
@@ -885,9 +885,9 @@ CONVERSION RULES:
         uses.
           palette X in default|primary|secondary|tertiary|neutral|info|success|
           warning|error|black-white. Per the PALETTE rules below it is "default"
-          UNLESS a Buttons mode names another colour.
+          UNLESS a Buttons mode names another color.
         THERE IS NO "-light" SHAPE. variant="x-light" was removed from the lib;
-        it resolves to the solid button of that colour and warns. Never emit it.
+        it resolves to the solid button of that color and warns. Never emit it.
         NO Style PROPERTY AT ALL -> solid. Do not infer outline or ghost from a
         transparent fill: say solid and let the Drift tab report the mismatch,
         rather than guessing a shape the design never stated.
@@ -1185,7 +1185,7 @@ export interface ConvertResult {
   missingComponents: string[];
   rawResponse: string;
   /** Plugin-note coverage for the frame that was converted. Zero notes means
-   *  the conversion ran on fill-colour guesses alone, which is worth SAYING
+   *  the conversion ran on fill-color guesses alone, which is worth SAYING
    *  rather than leaving to be inferred from wrong output. */
   notes: { nodes: number; withNote: number; modes: Record<string, string> };
 }
@@ -1195,7 +1195,7 @@ export interface ConvertResult {
  *  Existed as a console.log for the hidden-node prune only, which proved
  *  nothing about the notes: Figma's REST returns `visible: false` natively, so
  *  pruning works whether or not a single note arrived. Everything else the
- *  notes carry — theme, surface, elevation — has a fill-colour or default
+ *  notes carry — theme, surface, elevation — has a fill-color or default
  *  fallback, so a frame with NO notes converts to plausible, confident, wrong
  *  output and looks like a converter bug. */
 function summariseAaid(node: any, acc: { nodes: number; withNote: number; modes: Record<string, string> }) {

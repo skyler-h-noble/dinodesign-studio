@@ -178,7 +178,7 @@ const lightModeTonalTextSurfaces = {
  * regardless of which background it sits on (elevation is conveyed by drop
  * shadows, not tone).
  * Every index therefore resolves to the Surfaces entry for Color-11, which is
- * the correct pairing for that container colour.
+ * the correct pairing for that container color.
  *
  * Keeping Containers derived (rather than a second hand-maintained table) means
  * the two can't drift: fix a Surfaces tone and the container inherits it.

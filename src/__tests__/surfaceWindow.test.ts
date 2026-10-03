@@ -23,7 +23,7 @@ describe('surfaceWindow', () => {
 
   it('lands Brightest on 11 — the tone -Light\'s Surface used', () => {
     // This is what makes the merge a replacement rather than an approximation:
-    // <Palette>-Light's Surface was tone 11, so Brightest is the same colour.
+    // <Palette>-Light's Surface was tone 11, so Brightest is the same color.
     for (const s of [5, 6, 7, 8, 9]) {
       expect(shape(surfaceWindow(s))[4]).toBe(11);
     }

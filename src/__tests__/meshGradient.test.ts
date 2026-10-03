@@ -13,10 +13,10 @@ const PASTED = `.gradient-figure {
 }`;
 
 describe('parsing an authored mesh', () => {
-  it('takes the background and colour out of a pasted rule', () => {
+  it('takes the background and color out of a pasted rule', () => {
     const m = parseMeshGradient(PASTED)!;
     expect(m.background.startsWith('radial-gradient(circle at 0% 0%')).toBe(true);
-    // the base colour after the last stack layer must survive
+    // the base color after the last stack layer must survive
     expect(m.background.endsWith('var(--Primary-Color-10)')).toBe(true);
     expect(m.color).toBe('var(--BW-Color-6)');
   });

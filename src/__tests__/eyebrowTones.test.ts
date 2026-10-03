@@ -7,7 +7,7 @@
  * buildPreviewCSS / exportColorSystemToJSON / generateFigmaJSON and compare
  * their outputs.
  *
- * Why it matters: every colour bug found this week was preview-side while the
+ * Why it matters: every color bug found this week was preview-side while the
  * export was correct, because the preview carries its own private contrast
  * implementation (getAccessibleTones lives in buildPreviewCSS.ts and is used
  * nowhere else). Nothing failed when they diverged — a person had to notice a
@@ -27,7 +27,7 @@ import type { ColorScheme, UserSelections } from '../types';
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
- *  the picked colours (see the lockedHex fix in ColorStage). */
+ *  the picked colors (see the lockedHex fix in ColorStage). */
 function makeScheme(colors: [string, string, string]): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
@@ -137,7 +137,7 @@ describe('Eyebrows own their tones', () => {
     }
     expect(vals.length).toBeGreaterThan(0);
     // The state backgrounds rotate to BW, which has no chroma to solve for —
-    // "most colourful black" is not a question. Those keep the Text reference
+    // "most colorful black" is not a question. Those keep the Text reference
     // by design, so they are excluded rather than counted as failures.
     const solvable = vals.filter((v) => !v.includes('.BW.'));
     const own = solvable.filter((v) => v.startsWith('{Colors.'));
@@ -193,7 +193,7 @@ describe('Eyebrows own their tones', () => {
         if (pop(now) > pop(was)) better++; else if (pop(now) < pop(was)) worse++;
       }
     }
-    // The whole point of the change: it must move toward colour, not away.
+    // The whole point of the change: it must move toward color, not away.
     expect(better).toBeGreaterThan(worse);
   });
 });

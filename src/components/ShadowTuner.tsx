@@ -27,7 +27,7 @@ import {
 
 /** The surface the shadows are judged against. Fixed rather than picked — a
  *  shadow is derived from the background it falls on, and one default keeps
- *  the tuner about the shadow rather than about colour. */
+ *  the tuner about the shadow rather than about color. */
 const SURFACE = '#f0ebe0';
 
 /** Label row: name left, live value right. */
@@ -87,8 +87,8 @@ export default function ShadowTuner() {
       <div className="shadow-tuner-split">
       {/* ── Preview, left. Sticky so it stays put while the tables scroll. ──
           Painted with the literal surface hex rather than a token: the whole
-          point is to judge the shadow against the colour it was DERIVED from,
-          and that colour is an input to the maths, not a theme surface. */}
+          point is to judge the shadow against the color it was DERIVED from,
+          and that color is an input to the maths, not a theme surface. */}
       <aside
         className="shadow-tuner-preview"
         /* The panel paints the SURFACE the shadows fall onto, as a literal hex:
@@ -112,7 +112,7 @@ export default function ShadowTuner() {
         {SHADOW_LEVELS.map((l) => (
           /* A Container Card sitting ON the surface, which is what a real card
              is — so the shadow falls onto the panel behind it rather than onto
-             a box its own colour.
+             a box its own color.
 
              sx carries boxShadow, which is normally a lib-component override to
              avoid. Here the generated shadow IS the subject: there is no
@@ -281,7 +281,7 @@ export default function ShadowTuner() {
                 Shadow Palette Generator
               </Link>
               , adapted to work with Omni Design — five elevation levels instead of three, a
-              shadow colour derived from the brand surface it falls on, and values that carry
+              shadow color derived from the brand surface it falls on, and values that carry
               straight through to the CSS export and the Figma variables.
             </Caption>
           </VStack>

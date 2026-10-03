@@ -7,7 +7,7 @@
  * A diagram promises only what it is: where the parts sit relative to each
  * other.
  *
- * Every colour is a token, so the previews follow the brand rather than being
+ * Every color is a token, so the previews follow the brand rather than being
  * grey boxes that look the same in every design system.
  */
 import type { NavLayout, NavOptions } from '../utils/addOns/navDefinition';

@@ -7,7 +7,7 @@ const near = (a: number, b: number, tol = 0.02) =>
 describe('circularMeanHue', () => {
   it('averages two reds to red, not cyan', () => {
     // The regression: the arithmetic mean of 0.02 and 0.98 is 0.50 — cyan,
-    // the opposite colour. Both inputs are red; the mean must be red.
+    // the opposite color. Both inputs are red; the mean must be red.
     const m = circularMeanHue([0.02, 0.98]);
     expect(near(m, 0)).toBe(true);
   });
@@ -63,7 +63,7 @@ describe('hue spread', () => {
     const s = circularHueStats(rainbow);
     expect(s.spread).toBeGreaterThan(0.95);
     // The distinction the old code could not make: a rainbow and a grey board
-    // both have no mean direction, but only one of them is colourful.
+    // both have no mean direction, but only one of them is colorful.
     expect(Number.isNaN(s.mean)).toBe(true);
   });
 

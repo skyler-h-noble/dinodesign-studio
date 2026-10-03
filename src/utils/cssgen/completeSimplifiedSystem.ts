@@ -756,13 +756,13 @@ export function generateCompleteSimplifiedSystem(
   const PC = toneToColorNumber(extractedTones.primary);
   // Tag Medium is fixed at Color-6.
   //
-  // It used to be `PC >= 9 ? 6 : 5`, so the primary colour decided the tag's
+  // It used to be `PC >= 9 ? 6 : 5`, so the primary color decided the tag's
   // tone — and the tone decides the LABEL, because the contrast logic follows
   // the fill (Color-5 carries white text, Color-6 carries near-black). A tag
   // therefore changed appearance because of an unrelated brand choice.
   //
   // Color-6 also puts weight between a tag and a button: at Color-5 a Primary
-  // tag rendered #7b3f9d — the exact colour of the Primary button — so a label
+  // tag rendered #7b3f9d — the exact color of the Primary button — so a label
   // read as heavy as an action. Color-6 is a tinted chip that still separates
   // from a white surface (3.40) without the 3:1 a button's border needs.
   //

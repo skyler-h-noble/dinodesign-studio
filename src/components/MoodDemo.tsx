@@ -10,7 +10,7 @@
  * be a surface those foreign stylesheets paint.
  *
  * Closest in spirit to PhonePreview: chrome that displays someone else's
- * system. `.card-title` sets its own weight, size and colour, so swapping in
+ * system. `.card-title` sets its own weight, size and color, so swapping in
  * the lib's H3 would change nothing visible while adding a cascade to reason
  * about.
  *

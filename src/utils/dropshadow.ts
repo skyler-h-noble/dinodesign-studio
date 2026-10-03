@@ -4,7 +4,7 @@
 // ELEVATIONS map in his shadows article:
 //
 //   article  — one alpha per tier, flat across that tier's layers
-//   GENERATOR — ONE colour, and the alpha RAMPS DOWN across the layers
+//   GENERATOR — ONE color, and the alpha RAMPS DOWN across the layers
 //
 // The generator is what we follow. Its output was reverse-engineered from
 // three captures of the same settings at Resolution 0 / 0.5 / 1; the formulas
@@ -26,7 +26,7 @@
 // Second most important: every layer shares ONE COLOUR and differs only in
 // geometry and alpha. The alphas depend on (level, layer index, N) and never
 // on the surface, so they are the same numbers on every background — which is
-// what lets Figma bind one colour variable per surface plus a global set of
+// what lets Figma bind one color variable per surface plus a global set of
 // per-layer opacities.
 
 export type ShadowLevel = 1 | 2 | 3 | 4 | 5;
@@ -53,7 +53,7 @@ export interface ShadowOptions {
    *  keeps elevation reading as elevation while the light is being dragged. */
   lightX?: number;
   lightY?: number;
-  /** Colourful vs grey. */
+  /** Colorful vs grey. */
   tint?: boolean;
 }
 
@@ -137,12 +137,12 @@ const Y_MIN = 0.5;
  *  and the spread between contact and cast was invented rather than measured. */
 const Y_CURVE = 12.14;
 
-// ─── Goldilocks shadow colour ───────────────────────────────────────────────
+// ─── Goldilocks shadow color ───────────────────────────────────────────────
 // Match the surface HUE; pull SATURATION into a moderate band (never grey,
 // never full); LOWER lightness. Fit to Comeau's published examples:
 //   hsl(220,100%,80%) -> hsl(220,60%,50%)  and  hsl(285,51%,61%) -> hsl(286,43%,36%)
-// ONE colour per surface. Elevation is the alpha ramp and the layer count,
-// never the colour.
+// ONE color per surface. Elevation is the alpha ramp and the layer count,
+// never the color.
 const SAT_SLOPE = 0.35;
 const SAT_BASE = 25;
 const SAT_MIN = 22;
@@ -151,11 +151,11 @@ const SAT_MAX = 70;
  *
  * This used to be a flat 0.6, taken from the two worked examples in Comeau's
  * ARTICLE. That put a hard ceiling on how dark a shadow could ever get: every
- * layer paints the same colour, so the stack saturates at that colour no matter
+ * layer paints the same color, so the stack saturates at that color no matter
  * how high the alpha goes. At intensity 1 on a cream surface the darkest
  * possible pixel was #b29657 — a mid-tone tan — and "more intense" did nothing.
  *
- * His GENERATOR moves the colour with Oomph. Two published captures pin it:
+ * His GENERATOR moves the color with Oomph. Two published captures pin it:
  *     #F1CFFC -> hsl(286 36% 56%)  at Oomph 0.5  ->  L factor 0.62
  *     #b9e5ee -> hsl(191 31% 37%)  at Oomph 1.0  ->  L factor 0.45
  * which is linear in Oomph. Fitted from two points, so it is a good curve
@@ -232,7 +232,7 @@ function alphaToHex(a: number): string {
 
 /** An alpha as it will actually EXIST, in both targets: one 8-bit step.
  *
- *  A Figma colour is 8-bit, so a Drop-Color holds a byte and nothing finer.
+ *  A Figma color is 8-bit, so a Drop-Color holds a byte and nothing finer.
  *  CSS alpha is a float, so the same ramp written straight out lands between
  *  two bytes and the two exports disagree in the last digit — 0.35875 becomes
  *  the byte 91 (0.3569) in Figma and the literal 0.359 in CSS.
@@ -250,8 +250,8 @@ export function quantizeAlpha(a: number): number {
   return Math.round(Math.round(clamp(a, 0, 1) * 255) / 255 * 1000) / 1000;
 }
 
-/** The single (opaque) shadow colour for a surface: hue matched, saturation in
- *  a moderate band, lightness lowered. Takes NO level — there is one colour per
+/** The single (opaque) shadow color for a surface: hue matched, saturation in
+ *  a moderate band, lightness lowered. Takes NO level — there is one color per
  *  surface, and elevation lives entirely in the alphas. */
 export function dropshadowBaseHex(surfaceHex: string, o?: ShadowOptions): string {
   const { tint, intensity } = opts(o);
@@ -267,7 +267,7 @@ export function dropshadowBaseHex(surfaceHex: string, o?: ShadowOptions): string
   });
 }
 
-/** `R, G, B` triple for `rgba(var(--Dropshadow-Color), <alpha>)`. ONE colour
+/** `R, G, B` triple for `rgba(var(--Dropshadow-Color), <alpha>)`. ONE color
  *  var per surface, alphas written as literals in the Effect-Level recipe —
  *  Comeau's `hsl(var(--shadow-color) / 0.34)` shape, in the syntax this system
  *  already speaks.
@@ -275,7 +275,7 @@ export function dropshadowBaseHex(surfaceHex: string, o?: ShadowOptions): string
  *  COMMA separated, and that is load-bearing: `@omni-design/components` reads
  *  `rgba(var(--Dropshadow-Color), 0.22)`. A space triple is invalid inside
  *  `rgba()` and paints NOTHING — silently, which is how a shadow bug survives.
- *  The separator and the colour function have to be chosen together. */
+ *  The separator and the color function have to be chosen together. */
 export function dropshadowRGB(surfaceHex: string, o?: ShadowOptions): string {
   const h = dropshadowBaseHex(surfaceHex, o).replace('#', '');
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).join(', ');
@@ -498,16 +498,16 @@ export function libRadiusOverrideCSS(): string {
    var() inside it substituted AT THE DECLARING ELEMENT, so --Effect-Level-N
    resolves --Dropshadow-Color against :root and descendants inherit that
    already-resolved string. Every card would have taken the ROOT's shadow
-   colour rather than its own surface's. The lib avoids this by inlining the
+   color rather than its own surface's. The lib avoids this by inlining the
    rgba in JS so the var() lands on the consuming element — see
    DinoDesign/src/components/_shadows.js. */
 
 /** Map the studio's persisted `_componentStyle` record onto ShadowOptions.
  *
  *  The single place the studio's field names meet the generator's. Every
- *  exporter goes through this, so a surface's shadow colour cannot drift
+ *  exporter goes through this, so a surface's shadow color cannot drift
  *  between the preview, the CSS bundle and the Figma payload — which matters
- *  more than it looks, because INTENSITY now moves the colour as well as the
+ *  more than it looks, because INTENSITY now moves the color as well as the
  *  alpha. A call site that forgets to pass options gets the DEFAULT intensity
  *  and therefore a different hex, with nothing to show for it. */
 export function shadowOptionsFromStyle(cs: Record<string, unknown> | undefined | null): ShadowOptions {
@@ -527,12 +527,12 @@ export const SHADOW_LEVELS: ReadonlyArray<ShadowLevel> = [1, 2, 3, 4, 5];
 
 /** Box-shadow recipe for `--Effect-Level-N`.
  *
- *  One colour var, per-layer alpha literals — the same shape Comeau emits:
+ *  One color var, per-layer alpha literals — the same shape Comeau emits:
  *      0.3px 0.5px 0.4px hsl(var(--shadow-color) / 0.81), ...
  *  written as rgba(var(--Dropshadow-Color), 0.81) because that is what the lib
  *  and the rest of the cascade already consume.
- *  The previous version referenced a per-level colour token on every layer,
- *  which cost five colour variables per surface and could not express a ramp. */
+ *  The previous version referenced a per-level color token on every layer,
+ *  which cost five color variables per surface and could not express a ramp. */
 export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions): string {
   const alphas = dropshadowAlphas(level, o);
   return shadowLayers(level, o)
@@ -543,8 +543,8 @@ export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions): string
 
 // ─── Drop-Colors: the Figma collection ──────────────────────────────────────
 //
-// Figma cannot express "this colour, at that opacity" on a shadow. A fill can:
-// SolidPaint splits `color` (RGB) from `opacity`, so a fill binds one colour
+// Figma cannot express "this color, at that opacity" on a shadow. A fill can:
+// SolidPaint splits `color` (RGB) from `opacity`, so a fill binds one color
 // variable and sets its own alpha. A shadow cannot — DropShadowEffect.color is
 // a single RGBA, "the color of the shadow, INCLUDING its opacity" — and a
 // variable alias is `{ type, id }` with no modifier, so aliasing cannot add an
@@ -553,7 +553,7 @@ export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions): string
 // So the multiplication that would happen in Figma happens here instead: ONE
 // dropshadowBaseHex per background, times the level's alpha ramp, written out
 // as literal 8-digit values. The single source survives — all 31 slots are
-// regenerated from that one colour on every import — it is just resolved at
+// regenerated from that one color on every import — it is just resolved at
 // generation time rather than at resolution time.
 //
 // Sized to LAYERS_MAX, not to a flat ten: the collection in the file is
@@ -584,7 +584,7 @@ export const DROP_COLOR_SLOTS: Record<ShadowLevel, number> = { 1: 3, 2: 4, 3: 5,
  *  Returns `{ 'Level-1': ['#rrggbbaa', ...], ... }`, each array DROP_COLOR_SLOTS
  *  long, innermost layer first. Entries past the current Resolution's layer
  *  count carry the surface's own shadow hue at alpha 00 — transparent, but the
- *  right colour, so a slot that comes back into use at a higher Resolution is
+ *  right color, so a slot that comes back into use at a higher Resolution is
  *  never briefly the wrong hue. */
 export function dropColorTable(
   surfaceHex: string,
@@ -606,7 +606,7 @@ export function dropColorTable(
  *
  *  Drop-Colors is hand-authored: five variables, `Level-<n>/Drop-Color`, each
  *  aliasing Surface/Dropshadow-Color with that level's opacity applied. Figma
- *  can alias a colour or set an opacity, never both from a plugin — a variable
+ *  can alias a color or set an opacity, never both from a plugin — a variable
  *  value is one RGBA or one `{type, id}` pointer, with no field for a modifier
  *  — so these five are typed in the UI rather than written by the importer.
  *
@@ -618,7 +618,7 @@ export function shadowLevelOpacities(o?: ShadowOptions): Array<{ level: ShadowLe
   return SHADOW_LEVELS.map((level) => {
     const alpha = quantizeAlpha(dropshadowAlphas(level, o)[0]);
     /* PERCENT is what Figma's Opacity variable holds, not the 0..1 fraction.
-       A number variable bound to a colour's opacity is rendered by appending
+       A number variable bound to a color's opacity is rendered by appending
        "%" to its value: a variable holding 0.33 displays as "0.33%", which is a
        thousandth of the intended shadow and reads as no shadow at all. So the
        variable carries 34.5, not 0.345.

@@ -99,7 +99,7 @@ function lightModeBackgroundsBase(
   const surfaceBrightColor = blendColors('#FFFFFF', surfaceColor, surfaceBrightWhite);
 
   // (Tonal light containers used to blend from Color-10 toward the surface.
-  // They're now flat at Color-11, emitted as a token ref, so no base colour
+  // They're now flat at Color-11, emitted as a token ref, so no base color
   // needs computing here.)
 
   // ========================================================================
@@ -141,7 +141,7 @@ function lightModeBackgroundsBase(
 
     // Professional mode: WHITE cards, as an elevation ramp rather than five
     // identical whites. Same idea as the tonal ramp below and as dark mode —
-    // one colour at five opacities over the background — but the opacities sit
+    // one color at five opacities over the background — but the opacities sit
     // much higher, because white cards are meant to read as white: the lower
     // levels only let a little of the page through.
     //
@@ -151,7 +151,7 @@ function lightModeBackgroundsBase(
     //   Container-High    = 98%
     //   Container-Highest = Neutral Color-12
     //
-    // Only the top level is a real colour, so only it keeps a token reference;
+    // Only the top level is a real color, so only it keeps a token reference;
     // the rest are blends and stay hex. Mixing refs and blends is what made the
     // dark-mode ramp non-monotonic.
     if (containerStyle === 'professional') {
@@ -197,7 +197,7 @@ function lightModeBackgroundsBase(
     }
 
     // Black mode: BLACK cards, as an elevation ramp. This one runs the OTHER
-    // way: the floor is the pure colour and the higher levels let a little of
+    // way: the floor is the pure color and the higher levels let a little of
     // the page bleed through, so a raised card lightens against a light page.
     //
     //   Container-Lowest  = Neutral Color-1 (100%)
@@ -251,7 +251,7 @@ function lightModeBackgroundsBase(
     }
     
     // Tonal mode, light: all five container levels share ONE tone. Light mode
-    // conveys elevation with drop shadows, so the container colour does not
+    // conveys elevation with drop shadows, so the container color does not
     // step — unlike dark mode, where shadows don't read and the tone steps
     // Color-2 → Color-4 instead (see generateSimplifiedDarkModeBackgrounds).
     //
@@ -277,7 +277,7 @@ function lightModeBackgroundsBase(
     // split sits at surfaceBaseTone (0-based) >= 5.
     //
     // The previous logic blended Color-10 toward the surface by a per-level
-    // percentage (0.12 → 0.22), producing five distinct off-palette colours.
+    // percentage (0.12 → 0.22), producing five distinct off-palette colors.
     // That put containers on tones the foreground tables were never keyed for,
     // which is what broke Quiet/Text/Header contrast on tonal themes.
     const backgroundIsLight = surfaceBaseTone >= 5;
@@ -297,7 +297,7 @@ function lightModeBackgroundsBase(
     //   Container-High    = 90%
     //   Container-Highest = no blend — the tone itself (Color-10 / Color-2)
     //
-    // Only Container-Highest is a palette colour, so only it can be a token
+    // Only Container-Highest is a palette color, so only it can be a token
     // reference. Emitting refs for the others is what produced a NON-MONOTONIC
     // ramp in dark mode: the refs resolved to whole tones while the neighbours
     // resolved to blends, so the levels came off two different curves.
@@ -475,7 +475,7 @@ function darkModeBackgroundsBase(
   // background you're on — they do NOT shift with the background tone. The
   // previous logic collapsed all five levels onto a single tone (Color-5 for
   // backgrounds 1-7, Color-4 for 8-12), which left dark mode with no elevation
-  // cue at all and put every container on one colour.
+  // cue at all and put every container on one color.
   // The Neutral (black) theme anchors its ramp ONE tone lower so cards read as
   // near-black (Container = Color-2 #111111) on a true-black Color-1 surface,
   // instead of the Color-3 grey that looked too light. Colored dark themes keep
@@ -556,7 +556,7 @@ function darkModeBackgroundsBase(
         // Neutral (black) anchors one tone lower (Color-1/2/3) so cards read
         // near-black; colored dark themes use Color-2/3/4.
         // Four blends and one pure tone. Only Container-Highest is a palette
-        // colour, so only it can be a token reference — the rest are Color-3
+        // color, so only it can be a token reference — the rest are Color-3
         // composited over Color-2 and have no token to point at.
         //
         // Emitting token refs for Lowest/Container as well is what produced a
@@ -673,7 +673,7 @@ function addSurfaceEnds(
      both ends move with the row: Background-6 got Dimmest Color-4,
      Background-9 got Color-7. That is what a "dimmest" surface must not do,
      because it is the same level on every background — the darkest surface the
-     theme offers — and a level that changes colour per background cannot be
+     theme offers — and a level that changes color per background cannot be
      hoisted to the theme, which is where it belongs.
 
      surfaceWindow has held this rule, with tests, the whole time; nothing

@@ -335,7 +335,7 @@ function collectChecks(
 
     // Eyebrow — a small label above a heading, so it is body-sized text and
     // carries the full 4.5, not the 3:1 large-text allowance a Header gets.
-    // Each background borrows a different brand colour (Primary → Secondary,
+    // Each background borrows a different brand color (Primary → Secondary,
     // Secondary → Tertiary, Tertiary/Neutral → Primary, states → BW), and the
     // Eyebrows table already encodes that rotation — so it is read from there
     // rather than assumed to match Text.
@@ -482,7 +482,7 @@ function collectChecks(
  *
  * A `data-theme="Primary"` + `data-surface="Surface"` block paints its
  * Background from that palette's OWN tone, and the tone is whatever the user's
- * colour extracted to — any of the twelve.
+ * color extracted to — any of the twelve.
  *
  * The four BACKGROUND_CHOICES above only ever reach tones 1, 11, 12 and
  * Vibrant, and the derived levels (Dim/Bright/Containers) land near them. So

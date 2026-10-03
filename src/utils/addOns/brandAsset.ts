@@ -11,7 +11,7 @@
  * external references are not fetched, and it cannot reach the document around
  * it. That is the whole mitigation, and it costs nothing here because a brand
  * mark only needs to be looked at. Anything that later needs the SVG's INSIDES
- * — recolouring paths with brand tokens, say — has to sanitise first, and this
+ * — recoloring paths with brand tokens, say — has to sanitise first, and this
  * comment is the reason why.
  *
  * ── And it does not go into the spec ──────────────────────────────────────

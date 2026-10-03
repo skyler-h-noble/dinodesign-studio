@@ -6,7 +6,7 @@
  * wrapper exists only in the PhonePreview. The lib's AppBar, BottomNavigation
  * and Sidebar set a BARE data-theme on their own roots, so on a real page
  * nothing matched — --Background and --Text fell through to the page scope and
- * the header rendered white with a wordmark in the page's text colour.
+ * the header rendered white with a wordmark in the page's text color.
  *
  * It read as a contrast bug. It was a missing selector, and the published CSS
  * had the rules all along: 12 bare [data-theme="App-Bar"] blocks against zero
@@ -61,7 +61,7 @@ describe('preview defines the bar themes the lib sets', () => {
         const i = out.search(new RegExp(`(^|[,{}\\n])\\s*\\[data-theme="${bar}"\\]`, 'm'));
         const block = out.slice(i, out.indexOf('}', i));
         // A background with no paired text is the failure mode itself: the bar
-        // paints and the label keeps the page's colour.
+        // paints and the label keeps the page's color.
         expect(`${mode}/${bar} bg+text: ${/--Background:/.test(block)} ${/--Text:/.test(block)}`)
           .toBe(`${mode}/${bar} bg+text: true true`);
       });
@@ -80,7 +80,7 @@ describe('preview defines the bar themes the lib sets', () => {
  * It hides well. --Background is computed separately and stayed correct, so the
  * bar looked right and only the controls inside it did not: SearchField rests
  * on --Hover, so a blue tertiary app bar carried a search field in the primary's
- * colour. Most brands put the bar on Primary, where the bug cannot show.
+ * color. Most brands put the bar on Primary, where the bug cannot show.
  *
  * Asserting the token RESOLVES to the right ramp, not merely that both sides
  * emit something — invariant 5 and invariant 7 in one.

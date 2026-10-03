@@ -181,7 +181,7 @@ export function signedInOnly(node: NodeDef): NodeDef {
  * system instead of one rounder or squarer than the rest.
  *
  * It separates from the bar by SURFACE, not by a stroke. The definition has no
- * stroke field — a panel that carried a literal border colour would ship this
+ * stroke field — a panel that carried a literal border color would ship this
  * library's border to everyone, which is the one thing a definition may not do
  * — so the level does the work, and a level resolves in each design system's
  * own palette on both targets.

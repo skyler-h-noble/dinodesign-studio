@@ -100,7 +100,7 @@ export const SYSTEM_FACE: Record<DeviceType, string> = {
 /**
  * The properties that switch with the face.
  *
- * Family, weight and tracking. A face has its own colour and its own natural
+ * Family, weight and tracking. A face has its own color and its own natural
  * weight at a given size, and tracking is tuned per face.
  */
 export const SWITCHED_PROPS = [

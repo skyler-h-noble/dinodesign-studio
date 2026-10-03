@@ -41,9 +41,9 @@ describe('Drop-Colors — shape', () => {
   });
 });
 
-describe('Drop-Colors — one colour per background', () => {
+describe('Drop-Colors — one color per background', () => {
   /* The whole point of the collection: 31 values, ONE hue. Figma cannot alias a
-     colour and add an alpha (a shadow's colour is a single RGBA, unlike a fill,
+     color and add an alpha (a shadow's color is a single RGBA, unlike a fill,
      which splits RGB from opacity), so the multiplication happens in the
      generator — and this is what proves it stayed a single source. */
   it('gives every slot of every level the same RGB, equal to dropshadowBaseHex', () => {
@@ -100,21 +100,21 @@ describe('Drop-Colors — the unused tail', () => {
   });
 });
 
-describe('Component-Elevations — geometry written, colour aliased', () => {
+describe('Component-Elevations — geometry written, color aliased', () => {
   const ce = componentElevationGeometryFigma();
 
   it('emits both modes and nothing else', () => {
     expect(Object.keys(ce).sort()).toEqual(['Elevated', 'Standard']);
   });
 
-  it('gives every shadow slot four numbers and one colour alias', () => {
+  it('gives every shadow slot four numbers and one color alias', () => {
     for (const mode of ['Standard', 'Elevated'] as const) {
       for (const [name, entry] of Object.entries(ce[mode])) {
         if (name.endsWith('/Level')) { expect((entry as any).type).toBe('number'); continue; }
         const e = entry as any;
         if (name.endsWith('/Drop-Color')) {
           expect(e.type).toBe('color');
-          // A live slot aliases its level's ONE colour; a dead one is transparent.
+          // A live slot aliases its level's ONE color; a dead one is transparent.
           expect(e.value).toMatch(/^(\{Drop-Colors\.Level-[1-5]\.Drop-Color\}|#00000000)$/);
         } else {
           expect(name).toMatch(/\/(x|y|Blur|Spread)$/);
@@ -126,7 +126,7 @@ describe('Component-Elevations — geometry written, colour aliased', () => {
   });
 
   it('aliases live slots to its level, and marks the rest transparent', () => {
-    /* Drop-Colors is ONE colour per level — the alpha is flat across a level's
+    /* Drop-Colors is ONE color per level — the alpha is flat across a level's
        layers, so there is nothing per-slot to point at. Which slots are LIVE at
        the current Resolution is encoded HERE instead, as a transparent literal
        on the spares. Transparent rather than merely zero-geometry: a 0/0/0/0
@@ -308,7 +308,7 @@ describe('Component-Elevations — geometry matches the ladder and the CSS', () 
 
        Asserted EXACTLY, not within a tolerance. The two used to disagree in the
        last digit — CSS rounded the alpha to three decimals (0.35875 -> 0.359)
-       while a Figma colour is 8-bit (0.35875 -> byte 91 -> 0.3569) — and the
+       while a Figma color is 8-bit (0.35875 -> byte 91 -> 0.3569) — and the
        obvious repair, allowing one 8-bit step of slack, would have been the
        wrong one: a tolerance is exactly where a real divergence hides. Both
        sides now quantise through quantizeAlpha() at the emission boundary, so
@@ -339,7 +339,7 @@ describe('Component-Elevations — geometry matches the ladder and the CSS', () 
         const unsign = (n: number) => (n === 0 ? 0 : n);
         expect([+x, +y, +blur, +spread]).toEqual(layers[i].map(unsign));
 
-        // Hue is the single per-background colour on both sides.
+        // Hue is the single per-background color on both sides.
         expect(rgbOf(drops[i])).toBe(base);
 
         // Alpha is the same number on both sides, not merely a close one:

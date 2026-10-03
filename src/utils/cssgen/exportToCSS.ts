@@ -296,8 +296,8 @@ function pressedToneHex(palette: string, colorN: number, colorsData: any): strin
   // staticTokenStructures.ts — the implementation that produces the baked
   // Hover/Pressed tokens — and docs/hover-active-calculation.md.
   //
-  // This previously used a YIQ brightness threshold on the base colour, which
-  // disagrees with the tone split on colours sitting near the boundary. Success
+  // This previously used a YIQ brightness threshold on the base color, which
+  // disagrees with the tone split on colors sitting near the boundary. Success
   // Color-6 (#2f9e5a) measures 0.459 by YIQ ("dark" → step darker → #006531)
   // while the tone rule says 6 → lighter → #6abf84. The CSS and figma.json
   // therefore described the same token differently, and the CSS direction moved
@@ -319,7 +319,7 @@ function pressedToneHex(palette: string, colorN: number, colorsData: any): strin
   const an = darkBtn ? colorN - 1 : colorN + 1;
   const stepHex = colorsData[palette]?.[`Color-${an}`]?.value || null;
   // Color-1 moves a HALF step: the Color-1 → Color-2 gap is a tenfold change
-  // in luminance, so a full step reads as a colour change rather than a state.
+  // in luminance, so a full step reads as a color change rather than a state.
   // Matches the softening in exportColorSystem's Hover/Pressed pass.
   if (colorN === 1 && stepHex && base) return _haMix50(base, stepHex);
   return stepHex;
@@ -1259,7 +1259,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // describes the LIGHT background; in dark mode the Default theme sits on the
     // dark end of the ramp instead. Mirrors generateFigmaJSON.ts, which already
     // did this — without it the CSS resolved Default-Background.Surface to
-    // Backgrounds.Neutral.Background-12, a LIGHT colour in the dark palette, so
+    // Backgrounds.Neutral.Background-12, a LIGHT color in the dark palette, so
     // the Default theme rendered light-on-dark in Figma and dark-on-light on the
     // web. Both files were internally consistent, so contrast checks passed on
     // each; only a cross-artifact comparison caught it.
@@ -1331,7 +1331,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     tokenLookup['Default-Background.Hover'] = `{Hover.${defPal}.${colorN}}`;
     tokenLookup['Default-Background.Pressed'] = `{Pressed.${defPal}.${colorN}}`;
     // Container states come from the Containers group, which is computed from
-    // the container colour. The flat family is indexed by background tone and
+    // the container color. The flat family is indexed by background tone and
     // would send a dark container to a light hover.
     tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${defPal}.${contColorN}}`;
     tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${defPal}.${contColorN}}`;
@@ -1405,7 +1405,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         tokenLookup[`Default-Background.${prefix}Icons-${pal}`] = `{Icon.Surfaces.${pal}.${vColorN}}`;
         tokenLookup[`Default-Background.${prefix}Icons-${pal}-Variant`] = `{Icon-Variant.Surfaces.${pal}.${vColorN}}`;
 
-        // On-<pal>: foreground for content sitting ON the icon colour.
+        // On-<pal>: foreground for content sitting ON the icon color.
         //
         // Unlike the roles above this cannot be expressed as a static token
         // path. Icons-<pal> is chosen to contrast with the SURFACE, so the tone
@@ -1758,8 +1758,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
               }
             }
             if (bgHex) {
-              /* ONE colour per surface. --Dropshadow-Color-1..5 used to be
-                 emitted alongside it — five colours per surface, from the model
+              /* ONE color per surface. --Dropshadow-Color-1..5 used to be
+                 emitted alongside it — five colors per surface, from the model
                  where each elevation had its own hex. The Effect-Level recipes
                  now reference this single var with per-layer alpha literals, so
                  those five were dead output on every surface of every theme. */
@@ -3147,7 +3147,7 @@ function generateCSSHeader(jsonData: any): string {
  * Resolve every theme's Background/Text pair and solve its scrim.
  *
  * Reads the SAME two tokens the theme publishes, so a scrim can never protect
- * a colour the theme is not actually using. Light-Mode only: a scrim is a
+ * a color the theme is not actually using. Light-Mode only: a scrim is a
  * property of the theme's own pair, and the dark pair gets its own entry from
  * the Dark-Mode tree when a consumer switches.
  */
@@ -3246,7 +3246,7 @@ const LG_BUTTON_PADDING = 16;
  * The lib reads --Text-Quiet 364 times — it is what `<Body color="quiet">` and
  * every Caption resolve — and the export emitted it ZERO times. Nine sibling
  * roles ship (--Text-Primary, --Text-Error, …); quiet was simply missing, so
- * the colour declaration was invalid at computed-value time and the text
+ * the color declaration was invalid at computed-value time and the text
  * silently inherited whatever was around it. Intermittent-looking, because
  * whether it read correctly depended on the ancestor it happened to sit under.
  *
@@ -4890,7 +4890,7 @@ export function generateBaseCSS(jsonData: any): string {
   lines.push('');
   
   // DEPRECATED (2026-03-03): Old Theme-Colors section - REMOVED
-  // NOTE: a theme-colours block guarded by `if (false && …)` sat here. Its
+  // NOTE: a theme-colors block guarded by `if (false && …)` sat here. Its
   // own comment said it generated duplicate/incorrect theme CSS and that
   // generateThemeDataAttributesCSS replaced it. Deleted rather than left
   // disabled: `if (false)` is dead code that still reads as a live branch.
@@ -4949,7 +4949,7 @@ export function generateBaseCSS(jsonData: any): string {
     // than recomputed, so the CSS cannot disagree with Figma.
     const brand = (jsonData as any)?.Brand;
     if (brand?.DPT?.value) {
-      lines.push(`  /* Default Primary / Secondary / Tertiary Tone — the Color-N each brand colour sits at. */`);
+      lines.push(`  /* Default Primary / Secondary / Tertiary Tone — the Color-N each brand color sits at. */`);
       lines.push(`  --DPT: ${brand.DPT.value};`);
       lines.push(`  --DST: ${brand.DST?.value ?? brand.DPT.value};`);
       lines.push(`  --DTT: ${brand.DTT?.value ?? brand.DPT.value};`);
@@ -5055,7 +5055,7 @@ export function generateBaseCSS(jsonData: any): string {
     // The row inside it, and its inset ring — concentric off the frame.
     lines.push(`  --Menu-Item-Radius: ${r.menuItemRadius}px;`);
     lines.push(`  --Menu-Focus-Radius: ${r.menuFocusRadius}px;`);
-    /* The colour chip inside a menu row — a Select in colour mode, or a menu
+    /* The color chip inside a menu row — a Select in color mode, or a menu
        item with its Swatch boolean on. A density constant, like the rail width
        above, read from Figma's Menu/Menu-Swatch: 16 / 24 / 32.
 

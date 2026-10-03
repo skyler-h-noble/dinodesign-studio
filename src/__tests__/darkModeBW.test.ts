@@ -4,8 +4,8 @@
  * The BW (Black/White) palette was added to Light-Mode only, while Dark-Mode.css
  * emits `--Eyebrow: var(--BW-Color-8)`. So in dark mode that name resolved to
  * nothing: the declaration was invalid at computed-value time, `color` fell back
- * to inherited, and the eyebrow silently lost its colour. A mesh gradient's
- * solved text colour failed the same way and put light text on a light mesh —
+ * to inherited, and the eyebrow silently lost its color. A mesh gradient's
+ * solved text color failed the same way and put light text on a light mesh —
  * which is what it looked like from outside, rather than a missing token.
  *
  * Nothing caught it because an undefined custom property is not an error

@@ -186,7 +186,7 @@ describe('what a design system must provide', () => {
     expect(tokens.filter((t) => t.startsWith('Sizing/'))).toEqual([]);
   });
 
-  it('carries no hardcoded colour or size', () => {
+  it('carries no hardcoded color or size', () => {
     for (const l of ALL) {
       const json = JSON.stringify(toAddonSpec(full(l)));
       expect(json, l).not.toMatch(/#[0-9a-fA-F]{6}/);
@@ -538,7 +538,7 @@ describe('theme and surface travel as names', () => {
     /* They are not two spellings of one idea. In Figma a surface level is part
        of the variable's own path, while a theme is a mode of the Theme
        collection — so a themed subtree pins the mode rather than reading a
-       differently-named variable. Storing either as a colour would bake one
+       differently-named variable. Storing either as a color would bake one
        brand into an add-on every design system imports. */
     const spec: any = toAddonSpec(navDefinition({
       layout: 'brand-left', theme: 'Primary', surface: 'Surface-Bright',
@@ -555,7 +555,7 @@ describe('theme and surface travel as names', () => {
     expect(spec.root.fills[0].color).toEqual({ var: 'Surface/Background' });
   });
 
-  it('carries no colour at any setting', () => {
+  it('carries no color at any setting', () => {
     for (const theme of NAV_THEMES) {
       for (const surface of NAV_SURFACES) {
         const json = JSON.stringify(toAddonSpec(navDefinition({ layout: 'rail', theme, surface })));

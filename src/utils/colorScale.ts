@@ -22,8 +22,8 @@ export interface ToneStep {
   lightness: number;
   hex: string;
   colorNumber: number; // 1-12
-  /** Set when the user's chosen colour had to be moved to meet WCAG. The UI
-   *  must surface this — a silently altered brand colour is worse than the
+  /** Set when the user's chosen color had to be moved to meet WCAG. The UI
+   *  must surface this — a silently altered brand color is worse than the
    *  adjustment itself. */
   adjusted?: {
     from: string;
@@ -299,7 +299,7 @@ function generateScaledTones(
   // If a locked hex is provided, replace the closest tone with the exact hex.
   //
   // The generated ramp never lands in the dead zone — that is the whole point
-  // of the 12-tone scale. But this override writes the user's colour in
+  // of the 12-tone scale. But this override writes the user's color in
   // verbatim, so a mid-range pick puts a lightness back into the gap the scale
   // was built to exclude, at the one tone the user controls. Downstream,
   // nothing can then reach 4.5:1 against it, and the contrast repair is forced
@@ -307,15 +307,15 @@ function generateScaledTones(
   //
   // No failing contrast ships. If the pick is inside the gap, its LIGHTNESS is
   // moved to the nearer edge — hue and chroma are preserved, so it stays
-  // recognisably the chosen colour — and the change is recorded so the UI can
-  // tell the user their colour was adjusted and why.
+  // recognisably the chosen color — and the change is recorded so the UI can
+  // tell the user their color was adjusted and why.
   if (lockedHex) {
     const [lockedL, lockedCRaw, lockedH] = chroma(lockedHex).lch();
 
     let placedHex = lockedHex;
     let adjustment: ToneStep['adjusted'];
 
-    /* The chroma cap applies to the placed colour too.
+    /* The chroma cap applies to the placed color too.
      *
      * This block guarded the dead zone and guarded contrast, but never chroma —
      * `maxChroma` was in scope and simply not consulted. So a pick above the cap
@@ -326,7 +326,7 @@ function generateScaledTones(
      *
      * Clamped rather than refused, and the same shape as the dead-zone nudge
      * below: lightness and hue are kept, so it stays recognisably the chosen
-     * colour, and the change is RECORDED so the UI can say it moved. A pick
+     * color, and the change is RECORDED so the UI can say it moved. A pick
      * silently altered is the failure mode that rule exists to prevent. */
     let lockedC = lockedCRaw;
     if (maxChroma !== undefined && lockedCRaw > maxChroma) {
@@ -343,14 +343,14 @@ function generateScaledTones(
       };
     }
 
-    // Only adjust a colour that ACTUALLY fails.
+    // Only adjust a color that ACTUALLY fails.
     //
     // The dead-zone band is the worst case at maximum chroma (62-70). Being
     // inside it is not itself a failure: measured across 413 picks spanning
     // 360 hues, 229 landed in the band and NONE of them failed — real picks
-    // sit below peak chroma. Snapping on the band alone moved working colours
+    // sit below peak chroma. Snapping on the band alone moved working colors
     // (a #7b3f9d at L=38 carrying 6.91:1 was being nudged for nothing), which
-    // breaks the more important promise: the user's colour is theirs.
+    // breaks the more important promise: the user's color is theirs.
     //
     // Test what the TABLE will actually pair it with — not the best case.
     //
@@ -360,7 +360,7 @@ function generateScaledTones(
     // whichever happens to score better.
     //
     // Taking max(dark end, light end) was too lenient and is what let a 4.54:1
-    // primary through: the light end scored 4.64, but the colour landed in a
+    // primary through: the light end scored 4.64, but the color landed in a
     // slot the table pairs with the DARK end, which measures 4.49 — under the
     // line. The repair pass then substituted a raw hex, so that one cell was
     // no longer driven by the table at all.
@@ -381,7 +381,7 @@ function generateScaledTones(
     // lightness is 37 — so Color-5 ends up much lighter than its slot expects.
     // Against Color-12 it measures 4.98 and sailed through; but Quiet pairs a
     // Color-5 foreground with backgrounds down to Color-9, where it measures
-    // 4.48. One cell shipped under the line, and it was the user's own colour.
+    // 4.48. One cell shipped under the line, and it was the user's own color.
     //
     // So: find every background tone the Text and Quiet tables point AT this
     // slot, and require the worst of them to clear 4.5.
@@ -419,7 +419,7 @@ function generateScaledTones(
       // Nothing in its own ramp reaches 4.5, which only happens in the
       // dead zone. Move the LIGHTNESS to the nearer edge of that zone —
       // the smallest change that makes an accessible pair possible — and
-      // keep hue and chroma so it stays recognisably the chosen colour.
+      // keep hue and chroma so it stays recognisably the chosen color.
       const target = (lockedL - DEAD_ZONE_LOW) <= (DEAD_ZONE_HIGH - lockedL)
         ? DEAD_ZONE_LOW
         : DEAD_ZONE_HIGH;
@@ -427,7 +427,7 @@ function generateScaledTones(
       const direction = target < lockedL ? 'darkened' : 'lightened';
       adjustment = {
         // `from` is the ORIGINAL pick even if chroma was already clamped above —
-        // the user cares what happened to the colour they chose, not to an
+        // the user cares what happened to the color they chose, not to an
         // intermediate.
         from: lockedHex,
         to: placedHex,
@@ -439,9 +439,9 @@ function generateScaledTones(
       };
     }
 
-    // Match against the PLACED colour, so the slot and its metadata agree with
+    // Match against the PLACED color, so the slot and its metadata agree with
     // the hex actually stored. Previously only .hex was replaced, leaving
-    // .tone and .lightness describing a colour that was no longer there.
+    // .tone and .lightness describing a color that was no longer there.
     const [placedL] = chroma(placedHex).lch();
     let closestIdx = 0;
     let closestDist = Infinity;
@@ -464,7 +464,7 @@ function generateScaledTones(
 
 /**
  * Generate a 12-tone light mode scale from a hex color.
- * maxChroma is a CEILING. The peak is always derived from the colour's own
+ * maxChroma is a CEILING. The peak is always derived from the color's own
  * position on the bell curve; the cap only lowers it, never raises it.
  * Per-tone chroma is always gamut-clipped by step.chroma in generateScaledTones.
  */
@@ -477,14 +477,14 @@ export function generateSemanticLightModeScale(
   /* maxChroma is a CEILING, not a target.
    *
    * It used to replace the peak outright, so a slider value did not cap a
-   * colour — it RESHAPED it, pulling a quiet colour UP to the cap as readily as
-   * pulling a loud one down. Every colour built under one number came out at
+   * color — it RESHAPED it, pulling a quiet color UP to the cap as readily as
+   * pulling a loud one down. Every color built under one number came out at
    * that number, which is why swapping which swatch is Primary visibly moved
    * the others: they were all being rebuilt to the primary's peak.
    *
-   * Each colour now derives its own peak from where it sits on the bell curve,
-   * exactly as an uncapped colour always did, and the cap only ever lowers it.
-   * No colour or tone goes above the maximum; nothing is dragged up to it. */
+   * Each color now derives its own peak from where it sits on the bell curve,
+   * exactly as an uncapped color always did, and the cap only ever lowers it.
+   * No color or tone goes above the maximum; nothing is dragged up to it. */
   const [l, c, h] = chroma(hex).lch();
   const colorNumber = toneToColorNumber(l);
   const bellCurve = getChromaBellCurve(h);
@@ -499,7 +499,7 @@ export function generateSemanticLightModeScale(
 
 /**
  * Generate a 12-tone dark mode scale from a hex color.
- * maxChroma is a CEILING. The peak is always derived from the colour's own
+ * maxChroma is a CEILING. The peak is always derived from the color's own
  * position on the bell curve; the cap only lowers it, never raises it.
  */
 export function generateSemanticDarkModeScale(

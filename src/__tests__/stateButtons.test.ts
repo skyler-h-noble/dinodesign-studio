@@ -7,7 +7,7 @@
  * buildPreviewCSS / exportColorSystemToJSON / generateFigmaJSON and compare
  * their outputs.
  *
- * Why it matters: every colour bug found this week was preview-side while the
+ * Why it matters: every color bug found this week was preview-side while the
  * export was correct, because the preview carries its own private contrast
  * implementation (getAccessibleTones lives in buildPreviewCSS.ts and is used
  * nowhere else). Nothing failed when they diverged — a person had to notice a
@@ -27,7 +27,7 @@ import type { ColorScheme, UserSelections } from '../types';
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
- *  the picked colours (see the lockedHex fix in ColorStage). */
+ *  the picked colors (see the lockedHex fix in ColorStage). */
 function makeScheme(colors: [string, string, string]): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
@@ -158,7 +158,7 @@ describe('state background buttons', () => {
 
   it('keeps Neutral and BlackWhite as their own', () => {
     // The two neutral voices — a quiet secondary action and a high-contrast
-    // one. Neither competes with the state colour, so both survive.
+    // one. Neither competes with the state color, so both survive.
     for (const st of STATES) {
       const b = buttonsOf('Light-Mode', st);
       expect(b.Neutral?.Button?.value).toContain('Buttons.Neutral');

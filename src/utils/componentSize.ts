@@ -857,11 +857,11 @@ export function componentSizePayload(
        * It came across with the rest of the deleted `Components` payload, and
        * carrying it looked like part of the move. But nothing in Figma draws
        * the thing it measures: the Dropdown and Input pages have no swatch
-       * node, and the Input component set has no colour mode — its properties
+       * node, and the Input component set has no color mode — its properties
        * are Input Buttons, Input Button Slot, State and Type.
        *
        * The library does have it. Select.js reads
-       * `var(--Input-Swatch-Radius, var(--Button-Radius))` for the colour-mode
+       * `var(--Input-Swatch-Radius, var(--Button-Radius))` for the color-mode
        * swatch, and exportToCSS and buildPreviewCSS both emit all three sizes.
        * So the token is real and stays in the CSS; it simply has no Figma
        * counterpart to write to.
@@ -872,7 +872,7 @@ export function componentSizePayload(
        * on the known-missing list where a real gap would be indistinguishable
        * from this deliberate one.
        *
-       * If a colour Select is ever built in Figma, this comes back with it. */
+       * If a color Select is ever built in Figma, this comes back with it. */
       /* `Input-Inner-Focus-Visible` is deliberately NOT carried over. The flat
          payload computed it as Math.max(0, inputRadius - 1), which is exactly
          `inner(inputRadius)` — the same number as Input-Inner-Focus-Radius on

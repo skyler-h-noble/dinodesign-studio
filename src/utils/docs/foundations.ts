@@ -121,11 +121,11 @@ export const FOUNDATIONS: FoundationSection[] = [
       'The gradient comes in two kinds, and the palette decides which — not whether. Denying the treatment to the roughly half of brands whose Primary and Secondary sit far apart on the wheel would make it a lottery.',
       '**duo** — Header-Primary to Header-Secondary, when the two hues are near enough to blend.',
       '**mono** — Header-Primary to a lighter or darker shade of ITSELF, chosen against the background. One hue, so it cannot collide.',
-      'A brand whose palette cannot be read at all lands on `mono`, because that is the treatment that needs only one hue to be known. A grey Secondary counts as maximally distant rather than as zero — a grey blended into a coloured Primary looks like a rendering fault, and zero would be the one answer that turns the gradient on.',
+      'A brand whose palette cannot be read at all lands on `mono`, because that is the treatment that needs only one hue to be known. A grey Secondary counts as maximally distant rather than as zero — a grey blended into a colored Primary looks like a rendering fault, and zero would be the one answer that turns the gradient on.',
       'Solid Header-Secondary is the sibling VARIANT, not the failure case: a designer picks between them. Two values are fine when something selects between them, and here the selector is a person.',
       'Its WEIGHT is a contrast with Display\'s, in whichever direction has room — a drop alone cannot work at both ends, because a Display already at 600 has nowhere light to go without becoming thin at Alt-Display-Small.',
     ],
-    trap: 'The gradient is not a brand choice to override with two colours of your own. It is derived from the palette, and hand-picking the stops produces a pair nothing guarantees is legible against the background.',
+    trap: 'The gradient is not a brand choice to override with two colors of your own. It is derived from the palette, and hand-picking the stops produces a pair nothing guarantees is legible against the background.',
   },
 
   {
@@ -136,7 +136,7 @@ export const FOUNDATIONS: FoundationSection[] = [
       'Direction is decided by the LABEL, not by the tone number. The index is a proxy that assumes every palette\'s text flips at tone 6, and the one palette where it does not took a 4.54:1 button to 2.17:1.',
       'A narrow pass is a pass. Do not pad a value that already meets its threshold.',
     ],
-    trap: 'Never invent a hover or focus colour. Links in particular have NO hover tone — the underline thickens instead — and any value you supply would be unverified against a 4.5:1 requirement.',
+    trap: 'Never invent a hover or focus color. Links in particular have NO hover tone — the underline thickens instead — and any value you supply would be unverified against a 4.5:1 requirement.',
   },
 ];
 

@@ -139,7 +139,7 @@ export default function TypographyStageV2({
           <VStack spacing={1} alignItems="center">
             <H2>Analyzing your moodboard…</H2>
             <Body color="quiet">
-              Reading the colours and lettering to match your typography.
+              Reading the colors and lettering to match your typography.
             </Body>
           </VStack>
         </Card>

@@ -147,21 +147,21 @@ export type HueFamily =
   | 'cyan' | 'blue' | 'purple' | 'pink' | 'neutral';
 
 /**
- * How colourful this image is, as the mean saturation of its most colourful
+ * How colorful this image is, as the mean saturation of its most colorful
  * quarter.
  *
  * NOT the mean over every pixel, which is what this used to be. That statistic
  * is area-weighted, so a large flat background outvotes the subject: a board of
  * vivid popsicles on pale peach measured 0.33 when the popsicles themselves are
- * 0.78. The colours a person would describe the board by were averaged away by
- * the colours they would not mention.
+ * 0.78. The colors a person would describe the board by were averaged away by
+ * the colors they would not mention.
  *
  * That mattered because match_mood() weights this heavily in both directions —
  * whimsical_playful scores s * 0.5 while editorial_modern scores (1 - s) * 0.4
  * — so diluting it handed vivid boards to the mood that rewards being drab.
  *
  * The top quartile was chosen against alternatives (see below); it degrades
- * gracefully as the colourful area shrinks, where the others cliff-edge:
+ * gracefully as the colorful area shrinks, where the others cliff-edge:
  *
  *   vivid coverage:        30%    10%     5%    none
  *   whole-image mean      0.32   0.19   0.15   0.12   <- outvoted by area
@@ -169,7 +169,7 @@ export type HueFamily =
  *   saturated pixels only 0.78   0.78   0.78   0.00   <- one dot reads vivid
  *   TOP QUARTILE MEAN     0.78   0.38   0.25   0.12   <- degrades smoothly
  *
- * A single vivid dot reads 0.25: noticeably colourful, not maximal. That is the
+ * A single vivid dot reads 0.25: noticeably colorful, not maximal. That is the
  * intended behaviour — coverage should count for something, just not for
  * everything.
  */
@@ -220,8 +220,8 @@ function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
  *
  * Hue wraps: 0.0 and 1.0 are the same red. The arithmetic mean does not know
  * that, so it returns a value that can be nowhere near any input. Two red
- * pixels at 0.02 and 0.98 averaged to 0.50 — cyan, the opposite colour. A
- * rainbow board averaged to green. Every image whose colours straddle the
+ * pixels at 0.02 and 0.98 averaged to 0.50 — cyan, the opposite color. A
+ * rainbow board averaged to green. Every image whose colors straddle the
  * red/pink wrap got a hue family that appeared nowhere in it, and that family
  * then gated which moods could score at all.
  *
@@ -243,7 +243,7 @@ export function circularMeanHue(hues: number[]): number {
  * `spread` is 1 - R, where R is the length of the mean resultant vector:
  *
  *   spread 0.0  every sampled pixel is the same hue — a monochrome board
- *   spread 0.5  colours favour one region of the wheel
+ *   spread 0.5  colors favour one region of the wheel
  *   spread 1.0  hues cancel out entirely — a rainbow, no dominant direction
  *
  * This costs nothing: R was already computed to decide when the mean is
@@ -253,7 +253,7 @@ export function circularMeanHue(hues: number[]): number {
  * 'neutral', the same label a grey board gets, because their average direction
  * is the same: none.
  *
- * "How many colours" is a mood signal in its own right. Kids' primaries and
+ * "How many colors" is a mood signal in its own right. Kids' primaries and
  * rainbows are high spread; editorial, Scandinavian and industrial palettes are
  * low. Nothing else in ImageProps can express that distinction.
  */

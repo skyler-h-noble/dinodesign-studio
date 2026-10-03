@@ -3,7 +3,7 @@
  * at any surface level.
  *
  * The two halves have opposite arguments. A page background is the surface
- * every other colour is judged against, so it is the brand's colour or a
+ * every other color is judged against, so it is the brand's color or a
  * neutral — an accent page leaves the palette nothing to push off. A bar is a
  * band ON the page, so an accent reads as intended there because it has the
  * background to sit against.
@@ -108,7 +108,7 @@ describe('Design A / the preview paints the chosen bar theme', () => {
     expect(secondary).not.toBe(primary);
   });
 
-  it('each theme gives the app bar a distinct colour', () => {
+  it('each theme gives the app bar a distinct color', () => {
     const seen = new Set(
       BAR_THEMES.map((t) => bgOf(preview({ appBar: `${t}/Surface` }), '[data-theme="App-Bar"]')),
     );
@@ -124,7 +124,7 @@ describe('Design A / the preview paints the chosen bar theme', () => {
   });
 
   it('a chromatic Surface-Brightest stays tinted rather than going white', () => {
-    // Colour-12 on a chromatic ramp is so desaturated it reads as white, which
+    // Color-12 on a chromatic ramp is so desaturated it reads as white, which
     // throws away the tint that makes the bar branded. Capped at 11.
     expect(toneFor('Primary', 'Surface-Brightest', 6)).toBe(11);
     expect(toneFor('Neutral', 'Surface-Brightest', 6)).toBe(12);

@@ -60,7 +60,7 @@ describe('which gradient the Alt Display gets', () => {
        missing or unparseable palette. */
     expect(altDisplayGradient(undefined, '#5b2d9e').kind).toBe('mono');
     expect(altDisplayGradient('#7b2d8e', undefined).kind).toBe('mono');
-    expect(altDisplayGradient('not-a-colour', '#5b2d9e').kind).toBe('mono');
+    expect(altDisplayGradient('not-a-color', '#5b2d9e').kind).toBe('mono');
   });
 
   it('agrees with isAnalogous', () => {
@@ -82,7 +82,7 @@ describe('the Alt Display weight', () => {
     /* The COMMON case, not an edge: 56% of the curated display pool ships one
        weight — Anton, Bangers, Lobster, Great Vibes, Alfa Slab One. Returning
        a number here would mean a synthesised thin on the web and a font Figma
-       refuses to load. Colour is what distinguishes the Alt; weight only
+       refuses to load. Color is what distinguishes the Alt; weight only
        sharpens it where the family can. */
     expect(altDisplayWeight(400, [400])).toBeUndefined();
     expect(altDisplayWeight(700, [700])).toBeUndefined();
@@ -147,12 +147,12 @@ describe('the Alt Display weight', () => {
   });
 });
 
-describe('the colour family the Alt Display wears', () => {
+describe('the color family the Alt Display wears', () => {
   it('is Header, never Text', () => {
     /* A Display is a heading. The two families are tuned to different
        thresholds — Text 4.5:1, Header 3:1 — so they pick different tones, and
        using the Text tokens would not be a stricter reading of the rule, it
-       would be a different colour on the page. */
+       would be a different color on the page. */
     expect(ALT_DISPLAY_COLOR_TOKENS.primary).toBe('--Header-Primary');
     expect(ALT_DISPLAY_COLOR_TOKENS.secondary).toBe('--Header-Secondary');
     expect(JSON.stringify(ALT_DISPLAY_COLOR_TOKENS)).not.toContain('Text-');
@@ -210,7 +210,7 @@ describe('the Alt Display type styles', () => {
 
     /* Anton ships [400] alone. The Alt must track the FACE rather than pin a
        number — pinning would stop it following the user's slider, and there is
-       no lighter weight to pin anyway. Colour carries the distinction here. */
+       no lighter weight to pin anyway. Color carries the distinction here. */
     const single = alt('Anton', '400');
     expect(single?.weight).toBe(400);
     expect(single?.weightFromFace).toBe(true);
@@ -254,7 +254,7 @@ describe('the Alt Display theme tokens', () => {
        to pink (350) is 160 degrees apart and the sRGB midpoint lands at
        chroma 5, flat grey, against ends of 53 and 62. OKLCH keeps the chroma
        but invents a third hue the brand does not own, and Figma interpolates
-       in sRGB anyway. So the fix is WHICH colours are blended. */
+       in sRGB anyway. So the fix is WHICH colors are blended. */
     const gen = (await import('../utils/cssgen/generateCompleteThemes'))
       .generateAllThemesWithSurfacesAndContainers;
     const at = (stop2: string) => {
@@ -266,7 +266,7 @@ describe('the Alt Display theme tokens', () => {
     expect(at('Tertiary')).toContain('Header.Surfaces.Tertiary');
     /* mono is a tone of PRIMARY, and reaches past the Header table on purpose:
        that table gives one tone per background, so a neighbouring index is
-       frequently the same colour — backgrounds 9-12 all resolve alike — and a
+       frequently the same color — backgrounds 9-12 all resolve alike — and a
        gradient whose stops collapse renders as a flat fill that looks like it
        worked. */
     expect(at('mono')).toMatch(/^\{Colors\.Primary\.Color-\d+\}$/);
@@ -274,7 +274,7 @@ describe('the Alt Display theme tokens', () => {
 
   it('sends the mono stop AWAY from the background, never toward it', async () => {
     /* Contrast is distance from the background, and stop 1 is already the
-       accessible Header colour for it — so moving further can only raise
+       accessible Header color for it — so moving further can only raise
        contrast, and moving toward it is the only way to break 3:1.
        Backgrounds 1-6 are dark, 7-12 light, per the background tables' own
        comments. */
@@ -305,12 +305,12 @@ describe('the Alt Display theme tokens', () => {
 
   it('keeps the two STOPS on different palettes, so the gradient cannot go flat', async () => {
     /* The solid and stop 1 are both Primary, deliberately: the gradient is the
-       solid extended, not a third colour. What must never collapse is the pair
+       solid extended, not a third color. What must never collapse is the pair
        of STOPS — equal stops render a flat fill that looks like a working
        gradient and is not one.
 
        Different PALETTES rather than derived shades is what guarantees it at
-       background tones 5 and 6, where a ramp can run out and a derived colour
+       background tones 5 and 6, where a ramp can run out and a derived color
        lands back on the one it came from. */
     const s = (await build('analogous')).Default.Surfaces;
     expect(String(s['Alt-Display-Color'].value)).toBe(String(s['Alt-Color-Gradient-Stop-1'].value));
@@ -331,11 +331,11 @@ describe('the Alt Display theme tokens', () => {
 });
 
 describe('the Alt Display CSS', () => {
-  it('publishes the three colour tokens in the PREVIEW as well as the export', async () => {
+  it('publishes the three color tokens in the PREVIEW as well as the export', async () => {
     /* Invariant 5. The export gets them free — processTokens walks the theme
        JSON — while the preview builds its tokens by hand. A token in one and
        not the other raises nothing: no error, no unresolved var, just an Alt
-       that is coloured in the export and inherits in the preview. */
+       that is colored in the export and inherits in the preview. */
     const { buildPreviewCSS } = await import('../utils/buildPreviewCSS');
     const chroma = (await import('chroma-js')).default;
     const { generateSemanticLightModeScale, generateSemanticDarkModeScale } =
@@ -395,7 +395,7 @@ describe('the Alt Display CSS', () => {
     expect(dflt).toContain('--Alt-Display-Color-Stop-1: var(--Header)');
     expect(dflt).toContain('--Alt-Display-Color-Stop-2: var(--Header)');
 
-    /* colored: both stops on the Alt colour — equal, therefore flat. */
+    /* colored: both stops on the Alt color — equal, therefore flat. */
     expect(scope('colored')).toContain('--Alt-Display-Color-Stop-1: var(--Alt-Display-Color');
     expect(scope('colored')).toContain('--Alt-Display-Color-Stop-2: var(--Alt-Display-Color');
 
@@ -408,7 +408,7 @@ describe('the Alt Display CSS', () => {
     /* Where CSS deliberately differs from Figma. Figma pays nothing for a flat
        gradient; CSS does — background-clip: text needs color: transparent,
        which costs the selection highlight, anything inheriting the text
-       colour, and the text itself in forced-colors. So the flat variants paint
+       color, and the text itself in forced-colors. So the flat variants paint
        with `color` and only the gradient clips. Invisible to a designer,
        strictly better for a reader. */
     const { buildTypographyTokensCSS } = await import('../utils/typographyTokens');
@@ -418,7 +418,7 @@ describe('the Alt Display CSS', () => {
       { type: 'body', family: 'Inter', weight: '400' },
     ] as never);
 
-    /* The bare class paints with colour, not a clipped background. */
+    /* The bare class paints with color, not a clipped background. */
     const base = css.match(
       /\.typography-alt-display-large,[\s\S]{0,400}?\n\}/)?.[0] ?? '';
     expect(base).toContain('color: var(--Alt-Display-Color-Stop-1)');
@@ -428,9 +428,9 @@ describe('the Alt Display CSS', () => {
     expect(css).toMatch(/\[data-alt-display="gradient"\][\s\S]{0,1400}?background-clip: text/);
     expect(css).toMatch(/@media \(forced-colors: active\)[\s\S]{0,1400}?color: CanvasText/);
 
-    /* No literal colour anywhere in the block — an add-on re-points a stop per
+    /* No literal color anywhere in the block — an add-on re-points a stop per
        hero, and every variant follows data-surface. */
-    const block = css.slice(css.indexOf('Alt Display colour'));
+    const block = css.slice(css.indexOf('Alt Display color'));
     expect(block.slice(0, block.indexOf('forced-colors') + 400)).not.toMatch(/#[0-9a-f]{3,8}\b/i);
   });
 });
@@ -555,7 +555,7 @@ describe('the Alt Display weight across devices', () => {
   it('leaves a one-weight family tracking its face rather than pinning a number', async () => {
     /* Anton ships [400] alone, so there is no lighter step to drop to. The Alt
        must follow the face — pinning 400 would stop it moving with the user's
-       slider — and colour carries the distinction instead. */
+       slider — and color carries the distinction instead. */
     const { css } = await FIG('Anton', '400');
     const desktop = css.match(/\[data-device="Desktop"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
     expect(desktop).toMatch(/--Alt-Display-Large-Font-Weight:\s*var\(--Font-Weight-Display\)/);

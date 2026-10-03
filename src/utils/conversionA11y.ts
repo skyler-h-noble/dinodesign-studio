@@ -2,7 +2,7 @@
  * Accessibility findings for one conversion.
  *
  * Sibling of conversionDrift, and deliberately separate from it. Drift asks
- * "does the code match the design" — hardcoded colours, dropped variants,
+ * "does the code match the design" — hardcoded colors, dropped variants,
  * unmapped instances. This asks "can the code be used", which is a different
  * question with a different failure mode: drift is visible the moment you look
  * at the preview, and almost nothing here is. A button with no accessible name

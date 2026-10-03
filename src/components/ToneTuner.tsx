@@ -18,7 +18,7 @@ const INITIAL_QUIET: number[] =   [7, 7, 8, 8, 9, 2, 3, 4, 4, 5, 5, 5];
 
 /* Raw hex below is the DATA, not styling: these are the sample hues being
    tuned, and the black/white picks further down are contrast decisions computed
-   against an arbitrary test colour rather than a design-system surface. The
+   against an arbitrary test color rather than a design-system surface. The
    tool's own chrome uses tokens. */
 const TEST_COLORS = [
   { name: 'Pink/Rose', hex: '#c9a08a' },

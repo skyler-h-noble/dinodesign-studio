@@ -6,7 +6,7 @@
  * few lines inside App.tsx, and the design-system detail page never got them.
  * The create flow rendered the user's 86%-radius buttons as near-pills and the
  * detail page rendered the same system's buttons at the lib's default 4px,
- * because the detail page's brand CSS carried colour and typography only. Both
+ * because the detail page's brand CSS carried color and typography only. Both
  * pages looked deliberate; neither showed an error. That is invariant 5 — the
  * preview and the export are separate implementations and diverge silently —
  * playing out between two previews.

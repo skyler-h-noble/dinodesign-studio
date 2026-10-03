@@ -38,7 +38,7 @@ describe('background selection', () => {
   });
 
   // The BACKGROUND picker is Primary or Neutral only: the page is the surface
-  // every other colour is judged against, so it is the brand's colour or a
+  // every other color is judged against, so it is the brand's color or a
   // neutral. Accents exist to be seen against it.
   it('offers 10 background combinations, and 20 for bars', () => {
     expect(BACKGROUND_THEMES).toEqual(['Primary', 'Neutral']);

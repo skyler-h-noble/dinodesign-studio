@@ -56,7 +56,7 @@ export interface NavOptions {
    *  which is a design decision about the product rather than about the
    *  moment. */
   railExpandable?: boolean;
-  /** Palette and surface level the nav paints on. Names, never colours — the
+  /** Palette and surface level the nav paints on. Names, never colors — the
    *  same definition lands in each design system's own brand. */
   theme?: string;
   surface?: string;
@@ -81,7 +81,7 @@ export const NAV_THEMES = [
   'Info', 'Success', 'Warning', 'Error',
 ] as const;
 
-/** Surface levels, dimmest to brightest. Names, not colours: what each paints
+/** Surface levels, dimmest to brightest. Names, not colors: what each paints
  *  depends on the theme, which is the point. */
 export const NAV_SURFACES = [
   'Surface-Dimmest', 'Surface-Dim', 'Surface', 'Surface-Bright', 'Surface-Brightest',
@@ -635,7 +635,7 @@ function railNode(fullHeight: boolean): NodeDef {
        across the page instead. */
     height: fullHeight ? 'fill' : 'fill',
     /* One step dimmer than the bar, so the rail reads as a distinct region
-       without naming a second colour. Relative to whatever the nav is set to,
+       without naming a second color. Relative to whatever the nav is set to,
        which is why it is a level rather than a fixed surface. */
     surface: 'Surface-Dim',
     /* VERTICAL only. The horizontal inset belongs to the Rail component — the

@@ -73,8 +73,8 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
     spec.strokeAlign = 'INSIDE';
   }
 
-  /* One edge. Figma has no per-side stroke colour, but it does have per-side
-     WEIGHT — so the stroke is the colour and the other three sides are zeroed,
+  /* One edge. Figma has no per-side stroke color, but it does have per-side
+     WEIGHT — so the stroke is the color and the other three sides are zeroed,
      which is how a designer draws the same rule by hand. */
   if (node.borderBottom) {
     spec.strokes = [{ type: 'SOLID', color: ref(node.borderBottom) }];
@@ -98,7 +98,7 @@ function nodeToSpec(node: NodeDef): Record<string, unknown> {
      Theme collection for this subtree rather than changing which variable is
      read. Every token below it then resolves against that palette, which is
      what makes one nav definition work on a Primary bar and a Neutral one
-     without naming a single colour differently. */
+     without naming a single color differently. */
   if (node.theme) {
     spec.explicitModes = { ...(spec.explicitModes as Record<string, string> | undefined), Theme: node.theme };
   }

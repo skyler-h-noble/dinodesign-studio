@@ -28,7 +28,7 @@
 export const MOTION_DURATION = {
   /** Feedback on something already under the pointer — press, thumb travel. */
   Instant: 100,
-  /** The default. Colour, background and border swaps. */
+  /** The default. Color, background and border swaps. */
   Fast: 150,
   /** Things that move or resize a little. */
   Moderate: 200,

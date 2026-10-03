@@ -69,7 +69,7 @@ describe('the avatar with a menu', () => {
     expect(find(node, 'Account-Menu')!.kind).toBe('slot');
   });
 
-  it('carries no colour anywhere — only levels and token names', () => {
+  it('carries no color anywhere — only levels and token names', () => {
     const panel = find(node, 'Account-Menu')!;
     expect(panel.surface).toBe('Surface-Brightest');
     expect(panel.radius).toEqual({ token: 'Other/Dropdown-Frame-Radius' });

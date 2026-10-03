@@ -416,7 +416,7 @@ function pressedHexFor(colorKey: string, btnHex: string, palette: string, colors
   const an = Math.min(Math.max(labelIsLight ? n - 1 : n + 1, 1), 12);
   const stepHex = colors[palette]?.[`Color-${an}`]?.value || btnHex;
   // Color-1 moves a HALF step — its gap to Color-2 is a tenfold luminance
-  // change, so a full step reads as a colour change. Matches the export.
+  // change, so a full step reads as a color change. Matches the export.
   return n === 1 ? mixHex(btnHex, stepHex) : stepHex;
 }
 
@@ -599,14 +599,14 @@ export function generateFigmaJSON(
   const figma: any = { Modes: {}, Themes: {}, SurfacesContainers: {} };
 
   /* The user's Shadow controls. Same mapper the CSS exporter and the preview
-     use, so a surface's shadow colour cannot differ between the three —
-     INTENSITY moves the colour, not just the alpha, so this is not optional. */
+     use, so a surface's shadow color cannot differ between the three —
+     INTENSITY moves the color, not just the alpha, so this is not optional. */
   const shadowOpts = shadowOptionsFromStyle(designSystemJSON?._componentStyle);
 
 
   /* Elevation — geometry and opacity per (level, layer), GLOBAL.
      These depend only on the level, the layer index and the layer count, never
-     on the surface, which is what lets one colour variable per surface serve
+     on the surface, which is what lets one color variable per surface serve
      every elevation. Ten slots per level regardless of how many are in use:
      the effect styles in Figma are built once at full width, and lowering
      Resolution zeroes the tail rather than restructuring the style.
@@ -779,7 +779,7 @@ export function generateFigmaJSON(
     modeSection.Colors['Transparent'] = {
       'Color-1': { value: '#00000000', type: 'color' },
     };
-    /* A FLOAT, not a colour: Figma binds a colour variable's opacity to a
+    /* A FLOAT, not a color: Figma binds a color variable's opacity to a
        number, which is how an Icon-Variant alias gets dimmed without the
        payload having to bake an alpha into it.
        PERCENT (0..100), never a 0..1 fraction — a number bound to an opacity
@@ -811,7 +811,7 @@ export function generateFigmaJSON(
         // #70947b is DARKER than a #d4e3d9 face, inverting it.
         //
         // In dark mode every tone's BEVEL derives from the real button fill,
-        // not from that tone's own colour. This looks like the table lying —
+        // not from that tone's own color. This looks like the table lying —
         // all twelve keys carry one value — and it is deliberate.
         //
         // The Theme collection is MODE-INDEPENDENT: a Theme variable aliases to
@@ -819,7 +819,7 @@ export function generateFigmaJSON(
         // So a theme referencing {Button-Lowlight.Primary.Color-8} cannot point
         // somewhere else in dark mode — whatever dark value sits in Color-8 is
         // what the dark button gets. The dark button's fill is Light-Mode
-        // Color-8, so Color-8's dark slot must hold THAT colour's bevel.
+        // Color-8, so Color-8's dark slot must hold THAT color's bevel.
         //
         // Deriving each tone from the dark ramp instead was tried and reverted:
         // it made the table honest and every dark bevel wrong (Primary resolved
@@ -878,7 +878,7 @@ export function generateFigmaJSON(
       // from Button-Hover, Button-Pressed, Button-Highlight and Button-Lowlight
       // in BOTH modes, while sitting present in Buttons. A theme referencing
       // {Button-Lowlight.BlackWhite.Color-N} found nothing and resolved to no
-      // colour, which reads as "no bevel" rather than as an error.
+      // color, which reads as "no bevel" rather than as an error.
       //
       // Mirrored from the Buttons table rather than recomputed, so the two
       // cannot disagree about a black button's shadow.
@@ -886,7 +886,7 @@ export function generateFigmaJSON(
       // The formats differ and must be reconciled: Buttons stores Highlight and
       // Lowlight as "r, g, b" triples (they feed rgba() in CSS), while these
       // sections store 8-digit hex carrying the bevel opacity as alpha. A
-      // triple written here would not parse as a colour.
+      // triple written here would not parse as a color.
       const bwButtons: any = (modeSection as any).Buttons?.BlackWhite;
       if (bwButtons) {
         const SLOT_FOR: Record<string, string> = {
@@ -984,7 +984,7 @@ export function generateFigmaJSON(
           // It used to force the button's own fill into EVERY tone, which made
           // the whole dark table one repeated value — 1 distinct of 12 against
           // light's 6 — and that is what it looks like in Figma: every tone of
-          // every colour showing the same swatch.
+          // every color showing the same swatch.
           //
           // That blanket was compensating for a Theme-layer problem. The Theme
           // collection is mode-independent, so the Default theme bakes the
@@ -1066,12 +1066,12 @@ export function generateFigmaJSON(
 
       /* Icon-Variant — NOTHING is generated for it here, by design.
        *
-       * It used to be 192 baked hex8 variables: the icon colour at an ADAPTIVE
+       * It used to be 192 baked hex8 variables: the icon color at an ADAPTIVE
        * alpha (variantAlpha.ts, floor 0.50 lifted toward a 0.95 cap as the
-       * colour approached its background), because a token reference cannot
+       * color approached its background), because a token reference cannot
        * carry an alpha channel.
        *
-       * Figma can now bind a colour's OPACITY to a number variable, which is
+       * Figma can now bind a color's OPACITY to a number variable, which is
        * the same split Drop-Colors already uses — see the Drop-Colors block
        * below. So in the file an Icon-Variant is an ALIAS to its sibling
        * Surface/Icons/<palette> with its opacity bound to the single
@@ -1091,10 +1091,10 @@ export function generateFigmaJSON(
        * the same FLAT 50%, and the two agree. Border-Variant is unaffected and
        * stays adaptive. */
 
-      /* Dropshadow-Color — ONE colour per surface.
-         This was Dropshadow-Color-1..5: five colours per palette per tone per
+      /* Dropshadow-Color — ONE color per surface.
+         This was Dropshadow-Color-1..5: five colors per palette per tone per
          mode, from the model where each elevation had its own hex. Comeau's
-         generator uses a single colour and moves the OPACITY per layer, so the
+         generator uses a single color and moves the OPACITY per layer, so the
          five collapsed into one and the opacities moved to the Shadow
          collection below, where they are global rather than per surface.
          Emitted OPAQUE: the alpha lives on the effect layer, bound separately.
@@ -1488,7 +1488,7 @@ export function generateFigmaJSON(
     }
   }
 
-  /* Drop-Colors -- the colour is aliased in Figma, the OPACITY is written here.
+  /* Drop-Colors -- the color is aliased in Figma, the OPACITY is written here.
    *
    * Each Level group holds two variables:
    *
@@ -1501,8 +1501,8 @@ export function generateFigmaJSON(
    * "this alias, dimmed" -- checked against plugin-typings 1.138, a variable's
    * value is `boolean | string | number | RGB | RGBA | MotionEasing |
    * VariableAlias`, one or the other, with no field for a modifier. But Figma
-   * can BIND a colour's opacity to a number variable, and a number is something
-   * a plugin can write. So the colour keeps the alias (and with it the entire
+   * can BIND a color's opacity to a number variable, and a number is something
+   * a plugin can write. So the color keeps the alias (and with it the entire
    * Modes -> Theme -> Surface chain, meaning a shadow follows theme, surface
    * level AND light/dark for free) while the alpha arrives as a plain float.
    *
@@ -1516,7 +1516,7 @@ export function generateFigmaJSON(
    * Elevations, whose spare slots carry a transparent literal.
    *
    * Emitted as a PERCENT (0..100), not a 0..1 fraction. A number variable bound
-   * to a colour's opacity is rendered by appending "%" to its value, so a
+   * to a color's opacity is rendered by appending "%" to its value, so a
    * variable holding 0.345 displays as "0.345%" and paints no shadow at all.
    * Still quantised through the same quantizeAlpha() the CSS uses, so the value
    * Figma holds and the alpha the CSS paints are one number rather than two
@@ -1539,7 +1539,7 @@ export function generateFigmaJSON(
    * Nothing reported it, for the usual reason: the MODE still exists in the
    * file, so a designer can select Surface-Brightest and every variable in it
    * simply keeps whatever it last held. On a themed surface that reads as the
-   * BRIGHT colour rather than as an error — Error/Surface-Brightest painted
+   * BRIGHT color rather than as an error — Error/Surface-Brightest painted
    * #ef5854 (Color-6) instead of Color-11's #fff3ef.
    *
    * Derived from the Themes shape rather than listed would be better still,
@@ -1785,7 +1785,7 @@ export function generateFigmaJSON(
       const resolveRoleAt = (role: typeof ROLE_SOURCES[number], tone: number): string | null => {
         // Falls back to modeSection, the payload being BUILT, because some
         // sections exist only there. Border-Variant is computed in this file —
-        // the border colour at 20% opacity — and never appears in the source
+        // the border color at 20% opacity — and never appears in the source
         // colorSystem, so reading modeData alone returned null for it, the role
         // was skipped, and every {Default-Background.*Border-Variant} reference
         // the Theme collection emits pointed at a variable that was never
@@ -1818,7 +1818,7 @@ export function generateFigmaJSON(
 
       const writeExtras = (prefix: string, tone: number) => {
         /* Both, and the -Variant twin reads the SAME 'Icon' section — it is the
-           icon colour at full strength, not a dimmed copy.
+           icon color at full strength, not a dimmed copy.
            The dimming is no longer in the value. In the file an Icon-Variant is
            an alias to its Surface/Icons/<palette> sibling whose OPACITY is
            bound to Colors/Icon-Variant-Opacity, so baking an alpha here would
@@ -1839,7 +1839,7 @@ export function generateFigmaJSON(
             if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
             if (hex?.startsWith('#')) defBg[`${prefix}Icons-${pal}${suffix}`] = { value: hex, type: 'color' };
 
-            // On-<pal>: the foreground for content sitting ON the icon colour.
+            // On-<pal>: the foreground for content sitting ON the icon color.
             //
             // Only the non-variant icon gets one — the -Variant roles are
             // decorative alphas and carry no content. Icons-<pal> is picked to
@@ -2777,7 +2777,7 @@ const BUTTON_BORDER_WIDTH = 1;
 
   // ── Outline-Text and Outline-Quiet are NOT per-theme tokens in Figma ────
   //
-  // The colour an outline button's label takes is the surface's own
+  // The color an outline button's label takes is the surface's own
   // Text-<Palette>. In CSS that resolves through the cascade, so the export
   // writes one value per theme x surface x palette and lets the surface it
   // lands on decide — which is why the CSS side still carries it.

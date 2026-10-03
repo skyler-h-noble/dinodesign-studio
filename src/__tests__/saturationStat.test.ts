@@ -17,7 +17,7 @@ describe('saturation statistic', () => {
     expect(saturationFromPixels(board(0.30))).toBeCloseTo(0.78, 2);
   });
 
-  it('degrades as the colourful area shrinks', () => {
+  it('degrades as the colorful area shrinks', () => {
     const a = saturationFromPixels(board(0.30));
     const b = saturationFromPixels(board(0.10));
     const c = saturationFromPixels(board(0.05));

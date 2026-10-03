@@ -12,7 +12,7 @@ const surfaceToken = (name: string, sets: string) =>
 
 export const ICON_DOC: ComponentDoc = {
   name: 'Icon',
-  summary: 'Wraps an icon glyph so it takes a system colour and size. Decorative unless you name it.',
+  summary: 'Wraps an icon glyph so it takes a system color and size. Decorative unless you name it.',
   insteadUse: [
     { when: 'It is clickable', use: 'Button with iconOnly' },
     { when: 'It is a person or entity', use: 'Avatar' },
@@ -21,9 +21,9 @@ export const ICON_DOC: ComponentDoc = {
   props: [
     { name: 'color', type: 'string', default: 'default',
       values: ['default', 'primary', 'secondary', 'tertiary', 'neutral', 'info', 'success', 'warning', 'error', 'quiet'],
-      note: 'Picks the Icons mode. This is the only way to recolour an icon — do not pass `style={{ color }}`.' },
+      note: 'Picks the Icons mode. This is the only way to recolor an icon — do not pass `style={{ color }}`.' },
     { name: 'size', type: 'string', values: ['xxs', 'xs', 'small', 'medium', 'large', 'xl', 'xxl'], default: 'medium' },
-    { name: 'twoTone', type: 'boolean', default: 'false', note: 'Draws the glyph in the icon colour with its secondary shapes at the variant alpha.' },
+    { name: 'twoTone', type: 'boolean', default: 'false', note: 'Draws the glyph in the icon color with its secondary shapes at the variant alpha.' },
     { name: 'disabled', type: 'boolean', default: 'false' },
   ],
   states: [{ state: 'Disabled', setBy: 'prop', note: 'An icon is decoration; it has no interactive states of its own.' }],
@@ -33,25 +33,25 @@ export const ICON_DOC: ComponentDoc = {
       inFigma: 'The Icon component binds `Vector → Icon` from the Icons collection and pins nothing, so it inherits. Set the Icons mode on it or an ancestor.' },
   ],
   themingNotes: [
-    'The Icons collection is 3 variables across 10 modes, the same shape as Buttons. Before it existed each colour was its own variable in Surface, so a component had to bind to ONE — which is why Badge could only ever be an error badge in Figma.',
+    'The Icons collection is 3 variables across 10 modes, the same shape as Buttons. Before it existed each color was its own variable in Surface, so a component had to bind to ONE — which is why Badge could only ever be an error badge in Figma.',
     'In CSS there are no modes: the generator flattens each one into a name, so `--Icons-Primary` is what a consumer writes and always has been.',
   ],
   tokens: [
     { name: '--Icons-{Color}', sets: 'the glyph', variesWith: 'theme + surface', figma: 'Icons → Icon' },
     { name: '--Icons-Variant-{Color}', sets: "the glyph's secondary shapes", variesWith: 'theme + surface', figma: 'Icons → Icon-Variant' },
-    { name: '--Icons-On-{Color}', sets: 'a glyph sitting ON that colour', variesWith: 'theme + surface', figma: 'Icons → On-Icon' },
+    { name: '--Icons-On-{Color}', sets: 'a glyph sitting ON that color', variesWith: 'theme + surface', figma: 'Icons → On-Icon' },
     { name: '--Icon-Size', sets: 'the glyph box', variesWith: 'size mode', figma: 'Icons & Avatars → Icon-Size' },
   ],
   composition: [
-    'Pass a MUI icon as the child — `<Icon color="primary"><CheckIcon/></Icon>`. The wrapper is what makes it take a system colour.',
+    'Pass a MUI icon as the child — `<Icon color="primary"><CheckIcon/></Icon>`. The wrapper is what makes it take a system color.',
   ],
   accessibility: [
     'Icons are `aria-hidden` by default. That is correct: an icon beside a label is decoration, and announcing it repeats the label.',
     'An icon carrying meaning on its own needs an `aria-label` — but if it is also clickable, the name belongs on the Button, not the Icon, or it is announced twice.',
   ],
   gotchas: [
-    '`Icons & Avatars` sounds like a colour collection and is not — it holds Icon-Size and Avatar-Size, and its modes (`in-button`, `in-check`, `xxs`…) are SIZES. A containing component pins it automatically; you never choose it.',
-    'The variant alpha is one flat number across every theme and surface (`Colors/Icon-Variant-Opacity`, 50). It was adaptive once; flattening it is what let Figma express it as alias-plus-opacity instead of 192 baked colours.',
+    '`Icons & Avatars` sounds like a color collection and is not — it holds Icon-Size and Avatar-Size, and its modes (`in-button`, `in-check`, `xxs`…) are SIZES. A containing component pins it automatically; you never choose it.',
+    'The variant alpha is one flat number across every theme and surface (`Colors/Icon-Variant-Opacity`, 50). It was adaptive once; flattening it is what let Figma express it as alias-plus-opacity instead of 192 baked colors.',
   ],
 };
 
@@ -128,8 +128,8 @@ export const SNACKBAR_DOC: ComponentDoc = {
   ],
   theming: [
     { collection: 'Theme',
-      inCode: '`color` picks the semantic palette. A snackbar rarely wants `data-theme` — the colour is the message.',
-      inFigma: 'Set the Theme mode on `Theme-Container`. All eight colours are pinned there, one per variant, alongside `Surface-Brightest`.' },
+      inCode: '`color` picks the semantic palette. A snackbar rarely wants `data-theme` — the color is the message.',
+      inFigma: 'Set the Theme mode on `Theme-Container`. All eight colors are pinned there, one per variant, alongside `Surface-Brightest`.' },
   ],
   tokens: [
     surfaceToken('--Background', 'the bar'),
@@ -176,7 +176,7 @@ export const ACCORDION_DOC: ComponentDoc = {
   theming: [
     { collection: 'Theme',
       inCode: '`data-theme` on the accordion or an ancestor.',
-      inFigma: 'Set the Theme mode on `Theme-Container`. It is UNPINNED, so an accordion inherits until you choose otherwise — the layer marks the place, it does not fix a colour.' },
+      inFigma: 'Set the Theme mode on `Theme-Container`. It is UNPINNED, so an accordion inherits until you choose otherwise — the layer marks the place, it does not fix a color.' },
   ],
   themingNotes: [
     'Its structure is the model for the shadow rule: `Vertical Container` carries four drop shadows, `Theme-Container` inside it carries the fill and stroke. Theme the inner one and the shadow keeps reading the page.',

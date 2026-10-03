@@ -11,11 +11,11 @@ import { toAddonSpec } from '../utils/addOns/toAddonSpec';
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 
-describe('the surface level becomes an attribute, not a colour', () => {
+describe('the surface level becomes an attribute, not a color', () => {
   it('sets data-surface and paints var(--Background)', () => {
     /* The definition stores a LEVEL because the two targets place it
        differently: Figma names the variable group, the DOM carries an
-       attribute. Naming the colour directly here would bypass the cascade and
+       attribute. Naming the color directly here would bypass the cascade and
        leave text and border on the parent's tone. */
     const out = html(<DefinitionRenderer definition={navDefinition({ layout: 'brand-left' })} />);
     expect(out).toContain('data-surface="Surface"');
@@ -213,7 +213,7 @@ describe('a filled slot holds its content at natural size', () => {
 
 describe('a capped band paints edge to edge', () => {
   it('caps its CONTENT, not itself', () => {
-    /* Capping the band left bare page either side of a floating coloured
+    /* Capping the band left bare page either side of a floating colored
        strip. Capping only what is inside gives an unbroken bar with its
        content aligned to the rest of the page, which is what a content
        ceiling means everywhere else. */

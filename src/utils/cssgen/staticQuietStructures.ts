@@ -11,7 +11,7 @@
  * from the Color-2..Color-4 ramp regardless of which background it sits on.
  * A per-tone container table is therefore meaningless — every index resolves
  * to the Surfaces entry for the anchor tone, which is the correct pairing for
- * the colour the container actually renders at.
+ * the color the container actually renders at.
  *
  * Dark anchors on Color-4. Anchors Color-1..5 all clear 4.5:1 on every container level
  * (worst 6.85-10.00); Color-4 is chosen for its tone, sitting between the

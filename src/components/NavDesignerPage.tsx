@@ -418,7 +418,7 @@ export default function NavDesignerPage() {
           return (
             <Button
               key={a.id}
-              variant={buttonVariant(a.colour, a.treatment)}
+              variant={buttonVariant(a.color, a.treatment)}
               size={componentSize}
               iconOnly={!a.text}
               aria-label={!a.text ? a.label || 'Unnamed button' : undefined}
@@ -1319,7 +1319,7 @@ export default function NavDesignerPage() {
             <VStack gap="var(--Sizing-3)">
               <H4>Theme and surface</H4>
               <Body color="quiet">
-                Names, not colours. The same definition lands in each design system's
+                Names, not colors. The same definition lands in each design system's
                 own brand — what these paint depends on the palette it is imported
                 into, which is why nothing here is a hex.
               </Body>
@@ -1358,7 +1358,7 @@ export default function NavDesignerPage() {
               </HStack>
               <Caption color="quiet">
                 A rail sits one step dimmer than whatever the bar is, so it reads as a
-                distinct region without naming a second colour.
+                distinct region without naming a second color.
               </Caption>
             </VStack>
           </Card>
@@ -1654,7 +1654,7 @@ export default function NavDesignerPage() {
               <H4>Spec</H4>
               <Body>
                 What gets published. Every value is a variable NAME, so it rebinds to
-                each design system rather than carrying these colours.
+                each design system rather than carrying these colors.
               </Body>
               <CodeBlock
                 code={JSON.stringify(fullSpec, null, 2)}
@@ -1733,7 +1733,7 @@ export default function NavDesignerPage() {
                 >
                   {/* The cap goes THROUGH the renderer rather than around it.
                       Wrapped outside, it capped the whole bar and left bare
-                      page either side of a floating coloured strip; passed in,
+                      page either side of a floating colored strip; passed in,
                       each band paints edge to edge and only its content caps. */}
                   <DefinitionRenderer
                     definition={definition}

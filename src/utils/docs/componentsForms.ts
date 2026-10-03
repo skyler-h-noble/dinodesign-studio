@@ -119,7 +119,7 @@ export const SWITCH_DOC: ComponentDoc = {
     { when: 'It is one of several options', use: 'RadioGroup' },
   ],
   props: [
-    { name: 'variant', type: 'string', default: 'default', note: 'Picks which Icons colour the on state paints with: `primary` resolves the track to `--Icons-Primary`. Also takes `{color}-outline`.' },
+    { name: 'variant', type: 'string', default: 'default', note: 'Picks which Icons color the on state paints with: `primary` resolves the track to `--Icons-Primary`. Also takes `{color}-outline`.' },
     { name: 'size', type: 'string', values: ['small', 'medium', 'large'], default: 'medium' },
     { name: 'checked / defaultChecked', type: 'boolean', default: 'undefined' },
     { name: 'label', type: 'ReactNode', default: 'undefined' },
@@ -138,7 +138,7 @@ export const SWITCH_DOC: ComponentDoc = {
     { collection: 'Theme', inCode: '`data-theme` on an ancestor.',
       inFigma: 'The variant root pins `Theme=Primary`. Change the mode there. This drives the OFF state, which is drawn in `--Quiet` / `--Border`.' },
     { collection: 'Icons', inCode: '`variant` — `<SwitchInput variant="primary">` resolves the on track to `--Icons-Primary`.',
-      inFigma: 'The ON variants bind Switch-Body\'s fill AND stroke to `Icon`, and the Dot to `On-Icon`, and pin nothing — so they inherit. Set the Icons mode on the switch or an ancestor; that is what recolours an on switch.' },
+      inFigma: 'The ON variants bind Switch-Body\'s fill AND stroke to `Icon`, and the Dot to `On-Icon`, and pin nothing — so they inherit. Set the Icons mode on the switch or an ancestor; that is what recolors an on switch.' },
   ],
   tokens: [
     { name: '--Icons-{Color}', sets: 'the on track — fill and edge are the same token', variesWith: 'theme + surface', figma: 'Icons → Icon' },
@@ -222,9 +222,9 @@ export const ALERT_DOC: ComponentDoc = {
     { name: 'size', type: 'string', values: ['small', 'medium', 'large'], default: 'medium' },
     { name: 'startDecorator / endDecorator', type: 'ReactNode', default: 'undefined' },
   ],
-  states: [{ state: 'None', setBy: 'prop', note: 'An alert is not interactive; its colour is the message.' }],
+  states: [{ state: 'None', setBy: 'prop', note: 'An alert is not interactive; its color is the message.' }],
   theming: [
-    { collection: 'Theme', inCode: '`color` picks the semantic palette. `data-theme` on an ancestor is rarely wanted — an error alert should stay an error colour.',
+    { collection: 'Theme', inCode: '`color` picks the semantic palette. `data-theme` on an ancestor is rarely wanted — an error alert should stay an error color.',
       inFigma: '`Alert Container` pins both Theme (Error / Warning) and `Surface=Surface-Brightest`. That container is the node to change.' },
   ],
   tokens: [
@@ -235,7 +235,7 @@ export const ALERT_DOC: ComponentDoc = {
   composition: ['The icon goes in `startDecorator`, a dismiss or action in `endDecorator`.'],
   accessibility: [
     'An error or warning that appears in response to something needs `role="alert"` so it is announced.',
-    'Colour alone is not the message — an error alert needs an icon or a word that says so.',
+    'Color alone is not the message — an error alert needs an icon or a word that says so.',
   ],
   gotchas: [
     'It defaults to `variant="light"`, which is a surface treatment here and not the removed `-light` shape.',
@@ -261,8 +261,8 @@ export const BADGE_DOC: ComponentDoc = {
   ],
   states: [{ state: 'None', setBy: 'prop', note: 'A badge is decoration on its child; it has no states of its own.' }],
   theming: [
-    { collection: 'Icons', inCode: '`data-theme` on an ancestor; the fill follows the Icons colour.',
-      inFigma: 'Badge Counter binds `Icon` and `On-Icon` from the Icons collection and pins nothing. Set the Icons mode on it or an ancestor — that is what recolours a badge.' },
+    { collection: 'Icons', inCode: '`data-theme` on an ancestor; the fill follows the Icons color.',
+      inFigma: 'Badge Counter binds `Icon` and `On-Icon` from the Icons collection and pins nothing. Set the Icons mode on it or an ancestor — that is what recolors a badge.' },
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'the badge fill', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },
@@ -302,7 +302,7 @@ export const AVATAR_DOC: ComponentDoc = {
   ],
   theming: [
     { collection: 'Buttons', inCode: '`data-theme` on an ancestor.',
-      inFigma: 'The `Button-Theme-Avatar` and `Button-Theme-Initials` layers mark where the Buttons mode goes. Both are unpinned, so an avatar inherits. The Style variant chooses Photo / Initials / Default, which is content, not colour.' },
+      inFigma: 'The `Button-Theme-Avatar` and `Button-Theme-Initials` layers mark where the Buttons mode goes. Both are unpinned, so an avatar inherits. The Style variant chooses Photo / Initials / Default, which is content, not color.' },
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'the initials background', variesWith: 'theme + surface', figma: 'Modes → Theme → Buttons' },

@@ -10,7 +10,7 @@
  * data-surface="Surface" but no data-theme matches neither
  * [data-theme="X"][data-surface="Surface"] nor any descendant arm, so it falls
  * through to base.css's generic mapping — near-white. It renders a panel the
- * user never chose, in a colour that appears nowhere in their brand, and the
+ * user never chose, in a color that appears nowhere in their brand, and the
  * attribute that caused it looks like the one thing making it correct.
  *
  * This asserts the emission rule so the arm is not "helpfully" added later.

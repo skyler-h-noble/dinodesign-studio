@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  resolveMode, buttonVariant, buttonVariantLosesColour,
+  resolveMode, buttonVariant, buttonVariantLosesColor,
   COMPONENT_SIZE_TO_PROP, COMPONENT_SIZE_DEFAULT,
   MENU_LEVEL_LEFT_MARGIN, irregularMenuLevels, menuLevelIfRegular,
   MENU_LEVEL_BASE, MENU_LEVEL_STEP,
@@ -61,20 +61,20 @@ describe('Component-Size → size prop', () => {
 });
 
 describe('Buttons → variant string (TWO Figma axes compose into ONE)', () => {
-  it('solid is the colour alone', () => {
+  it('solid is the color alone', () => {
     expect(buttonVariant('primary', 'solid')).toBe('primary');
     expect(buttonVariant('default', 'solid')).toBe('default');
   });
 
-  it('outline suffixes the colour', () => {
+  it('outline suffixes the color', () => {
     expect(buttonVariant('primary', 'outline')).toBe('primary-outline');
     expect(buttonVariant('black-white', 'outline')).toBe('black-white-outline');
   });
 
-  it('ghost DISCARDS the colour — a real capability gap', () => {
+  it('ghost DISCARDS the color — a real capability gap', () => {
     /* Figma can draw a ghost button in any of the ten palettes, because the
        mode drives Buttons::Text / ::Hover / ::Pressed. The lib's ghost takes no
-       colour at all — `ghostStyles(isTextContent, selected)` has no colour
+       color at all — `ghostStyles(isTextContent, selected)` has no color
        parameter. So ten Figma combinations collapse to one lib variant.
 
        Asserted rather than worked around: inventing `{color}-ghost` would be a
@@ -86,9 +86,9 @@ describe('Buttons → variant string (TWO Figma axes compose into ONE)', () => {
   });
 
   it('flags when the mapping loses information', () => {
-    expect(buttonVariantLosesColour('ghost', 'primary')).toBe(true);
-    expect(buttonVariantLosesColour('ghost', 'default')).toBe(false);
-    expect(buttonVariantLosesColour('solid', 'primary')).toBe(false);
+    expect(buttonVariantLosesColor('ghost', 'primary')).toBe(true);
+    expect(buttonVariantLosesColor('ghost', 'default')).toBe(false);
+    expect(buttonVariantLosesColor('solid', 'primary')).toBe(false);
   });
 });
 
@@ -233,7 +233,7 @@ describe('ambient collections — five of eight write no prop', () => {
 describe('Alt-Display — a paint STRATEGY, not a value', () => {
   it('each mode is a different construction', () => {
     /* The other ambient collections select a measurement. This one selects how
-       to paint: one flat colour, two tones, or a gradient between two stops.
+       to paint: one flat color, two tones, or a gradient between two stops.
        Reading Color-Stop-1 alone renders Gradient as its first stop and
        reports nothing. */
     expect(ALT_DISPLAY_PAINT).toEqual({

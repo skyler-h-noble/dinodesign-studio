@@ -25,7 +25,7 @@ import { systemCssUrls, systemExists } from '../utils/docs/systemCss';
 import { suppressStudioSkin } from '../utils/studioSkin';
 import { EXAMPLES, hasExample } from '../utils/docs/examples';
 import { renderFoundations } from '../utils/docs/foundations';
-import { renderColourSystem } from '../utils/docs/componentDoc';
+import { renderColorSystem } from '../utils/docs/componentDoc';
 
 const TABS = ['Example', 'Props', 'States', 'Theming', 'Tokens', 'Composition', 'Accessibility', 'Gotchas'] as const;
 type TabName = typeof TABS[number];
@@ -202,7 +202,7 @@ export function ComponentDocsIndex() {
   return (
     <div style={wrap} {...CHROME}>
       <H1 style={{ fontSize: 28 }}>Component reference</H1>
-      <pre style={{ ...mono, whiteSpace: 'pre-wrap' }}>{renderColourSystem()}</pre>
+      <pre style={{ ...mono, whiteSpace: 'pre-wrap' }}>{renderColorSystem()}</pre>
       <pre style={{ ...mono, whiteSpace: 'pre-wrap' }}>{renderFoundations()}</pre>
       <H2>Components</H2>
       <ul style={{ ...mono, paddingLeft: 20 }}>

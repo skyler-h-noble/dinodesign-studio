@@ -151,7 +151,7 @@ export default function PhonePreview({
                       small label introducing the line beneath it. It was below,
                       reading as a subtitle. And it takes the Eyebrow/Overline
                       tokens, not Decorative: the sizes live under Overline while
-                      the face and colour live under Eyebrow. */}
+                      the face and color live under Eyebrow. */}
                   <span style={{
                     fontFamily: 'var(--Font-Family-Eyebrow, var(--Set-Font-Family-Eyebrow, sans-serif))',
                     fontWeight: 'var(--Font-Weight-Eyebrow, 600)' as any,

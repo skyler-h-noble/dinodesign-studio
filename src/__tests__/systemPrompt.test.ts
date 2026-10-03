@@ -17,7 +17,7 @@ describe('SYSTEM_PROMPT integrity', () => {
     for (const marker of [
       'You are a Figma-to-React converter',   // first line
       '0. RESOLVED NOTES (_aaid)',            // rule 0
-      'modes.Buttons',                        // the colour axis
+      'modes.Buttons',                        // the color axis
       '4f. BUTTON VARIANT + COLOR',           // deep in the middle
       'letterNumber',                         // the Type mapping
     ]) {

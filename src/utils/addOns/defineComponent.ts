@@ -19,7 +19,7 @@
  * reports it — the same failure mode as every silent bug in this codebase.
  *
  * ── What a definition may NOT contain ──────────────────────────────────────
- * No colours, no pixel sizes, no font names. Only token NAMES. A literal here
+ * No colors, no pixel sizes, no font names. Only token NAMES. A literal here
  * would ship the author's brand to every customer who imports the add-on, and
  * that is invisible until someone opens it in a different palette. The type
  * enforces it: there is nowhere to put a hex.
@@ -76,7 +76,7 @@ export interface NodeDef {
   radius?: TokenRef;
   /** A hairline outline, named by the token its COLOUR comes from.
    *
-   *  The colour is a token because it has to be — a literal would ship this
+   *  The color is a token because it has to be — a literal would ship this
    *  library's border to everyone. The WEIGHT is not in the definition at all:
    *  a hairline is one pixel on both targets, the way the 4px under a dropdown
    *  is, and putting a number here would be the first pixel in a format whose
@@ -87,14 +87,14 @@ export interface NodeDef {
    *  is already Surface-Brightest has no visible boundary, and the panel reads
    *  as text lying loose on the page. */
   border?: TokenRef;
-  /** A hairline on the BOTTOM edge only, named by its colour token.
+  /** A hairline on the BOTTOM edge only, named by its color token.
    *
    *  Separate from `border` rather than a side option on it, because the two
    *  are different things: `border` outlines a floating panel, and this draws
    *  a rule between two stacked regions. A rail's brand block ends where the
    *  app bar beside it ends, and the line is what says so. */
   borderBottom?: TokenRef;
-  /** Surface level, NOT a colour. In Figma this is the variable group the
+  /** Surface level, NOT a color. In Figma this is the variable group the
    *  fill comes from; in CSS it is a data-surface attribute and the fill is
    *  var(--Background). The level lives in different places on each target,
    *  which is why it cannot be stored as a paint. */
@@ -102,18 +102,18 @@ export interface NodeDef {
   /** Palette this subtree resolves against.
    *
    *  Travels differently from `surface` on each target, which is the reason
-   *  both are stored as names rather than as a colour: in Figma a theme is a
+   *  both are stored as names rather than as a color: in Figma a theme is a
    *  MODE of the Theme collection, so it becomes an explicit mode pin, while
    *  the surface is part of the variable's own path. In the DOM both are
    *  attributes — data-theme and data-surface — and the pair is what exposes
-   *  the whole matched token set rather than one colour. */
+   *  the whole matched token set rather than one color. */
   theme?: string;
   presence?: Presence;
   /** A full-bleed band: paints edge to edge, but its CONTENT respects the
    *  page's content ceiling.
    *
    *  The distinction is the whole point of a capped breakpoint. Capping the
-   *  bar itself leaves bare page either side of a floating coloured strip;
+   *  bar itself leaves bare page either side of a floating colored strip;
    *  capping only what is inside it gives an unbroken band with the content
    *  aligned to everything else on the page. The second is what every capped
    *  layout means and the first is never what anyone wants. */

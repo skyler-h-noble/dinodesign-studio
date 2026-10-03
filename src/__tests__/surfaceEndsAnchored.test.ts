@@ -5,7 +5,7 @@ import {
 } from '../utils/cssgen/generateSimplifiedBackgrounds';
 import { surfaceWindow } from '../utils/surfaceWindow';
 
-/* The two ends are ANCHORED — the same colour on every background — and that
+/* The two ends are ANCHORED — the same color on every background — and that
    property is the whole licence for hoisting them to the theme in Figma. A
    level that changes per background cannot live above the background.
 
@@ -34,12 +34,12 @@ const ends = (n: number, mode: 'light' | 'dark' = 'light') => {
 const SELECTABLE = [5, 6, 7, 8, 9];
 
 describe('the ends do not move with the background', () => {
-  it('Surface-Dimmest is one colour across every selectable background', () => {
+  it('Surface-Dimmest is one color across every selectable background', () => {
     const seen = new Set(SELECTABLE.map((n) => ends(n).dimmest));
     expect([...seen]).toEqual(['{Colors.Primary.Color-3}']);
   });
 
-  it('Surface-Brightest is one colour across every selectable background', () => {
+  it('Surface-Brightest is one color across every selectable background', () => {
     const seen = new Set(SELECTABLE.map((n) => ends(n).brightest));
     expect([...seen]).toEqual(['{Colors.Primary.Color-11}']);
   });

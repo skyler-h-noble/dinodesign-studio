@@ -14,7 +14,7 @@
  *
  * ICONS DO NOT travel as artwork. Baking MUI's vector paths into the spec
  * would put this library's icon set into every customer's file, where they
- * already have their own — the same mistake as baking a colour. The NAME
+ * already have their own — the same mistake as baking a color. The NAME
  * travels and the Figma side leaves an icon-sized frame for the customer's own
  * component, which is the names-not-values rule applied to shapes.
  */
@@ -37,33 +37,33 @@ export const ICON_REFERENCE_URL = 'https://mui.com/material-ui/material-icons/';
 export const AVATAR_TYPES = ['photo', 'initials', 'icon'] as const;
 export type AvatarType = (typeof AVATAR_TYPES)[number];
 
-/** The library's Button colours. Kept in step with Button.js by hand, so a
+/** The library's Button colors. Kept in step with Button.js by hand, so a
  *  variant offered here is one that renders — an invented one falls back to
  *  default and looks like a bug in the component rather than in this list. */
 export const BUTTON_VARIANTS = [
   'default', 'primary', 'secondary', 'tertiary', 'neutral',
   'info', 'success', 'warning', 'error',
 ] as const;
-/* `light` is gone: the lib removed the shape, and "{colour}-light" now
-   resolves to the SOLID colour with a dev warning — so offering it here was
+/* `light` is gone: the lib removed the shape, and "{color}-light" now
+   resolves to the SOLID color with a dev warning — so offering it here was
    offering a second solid. */
 export const BUTTON_TREATMENTS = ['solid', 'outline', 'ghost', 'text'] as const;
 export type ButtonTreatment = (typeof BUTTON_TREATMENTS)[number];
 
 /** Compose what the lib expects — and the lib's shapes are NOT all
- *  colour-suffixed.
+ *  color-suffixed.
  *
- *  Solid is the bare colour and outline is "{colour}-outline". Ghost and text
- *  are the bare words "ghost" / "text": they carry no colour, because the lib
+ *  Solid is the bare color and outline is "{color}-outline". Ghost and text
+ *  are the bare words "ghost" / "text": they carry no color, because the lib
  *  paints them from the surface (--Hotlink for a text label, --Text for an
  *  icon) rather than from a palette. This used to emit "error-ghost", which
  *  Button.js has never had — an unknown variant falls through to
  *  `variantMap.default`, so every ghost in the nav preview rendered as a
  *  solid brand-green button and the mistake looked like a component bug. */
-export function buttonVariant(colour: string, treatment: ButtonTreatment): string {
+export function buttonVariant(color: string, treatment: ButtonTreatment): string {
   switch (treatment) {
-    case 'solid': return colour;
-    case 'outline': return `${colour}-outline`;
+    case 'solid': return color;
+    case 'outline': return `${color}-outline`;
     default: return treatment;
   }
 }
@@ -163,7 +163,7 @@ export const SESSION_LABEL: Record<Session, string> = {
 };
 
 export interface NavButtonItem extends NavItem {
-  colour: string;
+  color: string;
   treatment: ButtonTreatment;
   session?: Session;
 }
@@ -180,7 +180,7 @@ export const sessionOf = (item: NavButtonItem): Session => item.session ?? 'alwa
    --Text while the others carry --Quiet. A button's treatment is a fill, an
    outline or nothing.
    
-   So a tab has no colour and no treatment to choose. Giving it button variants
+   So a tab has no color and no treatment to choose. Giving it button variants
    would offer a solid or outlined tab, which the design system does not have,
    and would lose the indicator that makes a tab legible as one. */
 export const DEFAULT_TABS: NavItem[] = [
@@ -195,13 +195,13 @@ export const DEFAULT_ACTIONS: NavButtonItem[] = [
      the page, so it survives signing in rather than being duplicated into
      both sessions. */
   { id: 'act-0', label: 'Cart', startIcon: true, startIconName: 'ShoppingCart',
-    colour: 'default', treatment: 'ghost', session: 'always' },
-  { id: 'act-1', label: 'Sign in', text: true, colour: 'default', treatment: 'text',
+    color: 'default', treatment: 'ghost', session: 'always' },
+  { id: 'act-1', label: 'Sign in', text: true, color: 'default', treatment: 'text',
     session: 'signed-out' },
-  { id: 'act-2', label: 'Get started', text: true, colour: 'default', treatment: 'solid',
+  { id: 'act-2', label: 'Get started', text: true, color: 'default', treatment: 'solid',
     session: 'signed-out' },
   { id: 'act-3', label: 'Notifications', startIcon: true, startIconName: 'Notifications',
-    colour: 'default', treatment: 'ghost', session: 'signed-in' },
+    color: 'default', treatment: 'ghost', session: 'signed-in' },
 ];
 
 export const newId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
