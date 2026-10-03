@@ -12,12 +12,12 @@ import {
   Checkbox,
   Divider,
   Link,
-  Radio,
   Modal,
   TextInput,
   Alert,
   SliderInput,
   Icon,
+  Swatch,
 } from '@omni-design/components';
 import StarIcon from '@mui/icons-material/Star';
 import LockIcon from '@mui/icons-material/Lock';
@@ -1461,46 +1461,41 @@ export default function ColorStage({
             </Alert>
           )}
 
-          {/* Primary color swatches with radio buttons. We use a plain
-              <button> here instead of the lib's <Button swatch> because the
-              lib variant hardcodes its corner radius — when the brand sets
-              a large --Button-Radius the swatches stayed square. */}
+          {/* The lib's Swatch, which is exactly this control.
+              Figma's Swatch set carries Style=No-Radio|Radio, a Label boolean
+              and a Selected state — a chip, a radio under it and a name, which
+              is what this was building by hand out of a raw <button>, a Radio
+              and a BodySmall.
+
+              The comment that used to be here explained the raw button: the
+              lib's <Button swatch> hardcoded its corner radius, so a brand with
+              a large --Button-Radius got square chips. That variant is RETIRED
+              and the Swatch component replaced it — a swatch was never a kind of
+              button, since Button's axes are style and colour and a swatch uses
+              neither. The workaround outlived the thing it worked around.
+
+              Selection is delegated to the radio rather than drawn twice. The
+              component declines to mark the chip as well when a radio is
+              present, which is why the 2px ring is gone and not missing. */}
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             {topColors.map((color, i) => {
               const isPrimary = i === primaryIndex;
-              const swatchSize = isNarrow ? 40 : 56;
+              const pick = () => {
+                setPrimaryIndex(i);
+                regenerateSchemes(topColors, i);
+              };
               return (
                 <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
-                  <button
-                    type="button"
+                  <Swatch
+                    color={color.hex}
+                    size={isNarrow ? 'medium' : 'large'}
+                    radio
+                    selected={isPrimary}
+                    onClick={pick}
                     aria-label={`Set Core Color ${i + 1} as Primary`}
-                    onClick={() => {
-                      setPrimaryIndex(i);
-                      regenerateSchemes(topColors, i);
-                    }}
-                    style={{
-                      width: swatchSize,
-                      height: swatchSize,
-                      borderRadius: SWATCH_RADIUS,
-                      background: color.hex,
-                      border: isPrimary
-                        ? '2px solid var(--Buttons-Default-Border, var(--Border))'
-                        : '1px solid var(--Border, rgba(0,0,0,0.1))',
-                      cursor: 'pointer',
-                      padding: 0,
-                      flexShrink: 0,
-                    }}
                   />
-                  <Radio
-                    variant="default-outline"
-                    size="small"
-                    name="primaryColor"
-                    checked={isPrimary}
-                    onChange={() => {
-                      setPrimaryIndex(i);
-                      regenerateSchemes(topColors, i);
-                    }}
-                  />
+                  {/* Only the chosen one is named, so the row says which is
+                      Primary rather than repeating the word six times. */}
                   {isPrimary && (
                     <BodySmall style={{ color: 'var(--Text)', fontWeight: 700, fontSize: '0.65rem', textAlign: 'center' }}>
                       Primary
@@ -1716,7 +1711,11 @@ export default function ColorStage({
                         e.stopPropagation();
                         setCustomEditing(!customEditing);
                       }}
-                      style={{ marginLeft: 'auto', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      /* marginRight clears the card edge. marginLeft:auto
+                         pushes it to the end of the row, which put the
+                         underline hard against the Card's border with nothing
+                         between them. */
+                      style={{ marginLeft: 'auto', marginRight: 4, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                     >
                       {customEditing ? 'Done' : 'Edit Colors'}
                     </Link>

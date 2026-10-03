@@ -93,6 +93,19 @@ declare module '@omni-design/components' {
   export const CheckboxWithDescription: FC<any>;
   export const IndeterminateCheckbox: FC<any>;
   export const Radio: FC<any>;
+  /* Swatch — a colour chip, optionally labelled, optionally with a radio.
+     Figma's set carries Style=No-Radio|Radio, a Label boolean and a Selected
+     state, which is exactly the Core Colors picker.
+
+     Declared only after checking it is REALLY there: typeof Swatch is
+     'function' in the installed dist, and the package ships its own
+     Swatch.d.ts. That matters because of the AvatarMenu rule — a shim that
+     promises an export the package does NOT have is worse than no shim, since
+     the import typechecks and crashes at runtime with the compiler no longer
+     able to tell you. This is the opposite case: the export exists and only
+     this hand-written module declaration, which shadows the package's real
+     types wholesale, was hiding it. */
+  export const Swatch: FC<any>;
   /** Aspect-ratio slot. fit="width" fills the parent and derives the height. */
   export const Ratio: FC<any>;
   export const RadioInput: FC<any>;
