@@ -1329,6 +1329,11 @@ export default function TypographyTestPage({
       mood: result?.mood?.key ?? result?.mood?.label,
       categoryPools: CATEGORY_FAMILY_POOLS,
       detected: () => detectedDisplayChoices(),
+      /* So the picker can show what the design is ALREADY set to. A saved
+         family outside the resolved pool used to be absent from the list, which
+         left nothing highlighted and read as the font having been lost — and
+         then the next click replaced it with one the user never chose. */
+      current: currentDecorative,
     }).choices;
     function detectedDisplayChoices(): FontChoice[] {
       // The ordering rule lives in displayPool.ts so it can be tested — every
@@ -1344,7 +1349,7 @@ export default function TypographyTestPage({
     }
   }, [displayPoolOverride, ignoreTextDetection, result?.mood?.key, result?.mood?.label,
       sampledClip.category, sampledBranchStyle.style, sampledBranchStyle.branch,
-      sampledBranchStyle.pixelOverride]);
+      sampledBranchStyle.pixelOverride, currentDecorative]);
   // Every face the picker is about to render has to be FETCHED, not just named
   // in a font-family. Without this each chip fell back to sans-serif and the
   // whole list looked like one typeface — Moo Lah Lah indistinguishable from
