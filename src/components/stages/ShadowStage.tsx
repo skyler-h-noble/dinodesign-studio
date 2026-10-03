@@ -10,7 +10,7 @@ import {
 } from '../../utils/dropshadow';
 import type { StageProps, ComponentStyle } from '../../types';
 import type { StyleCustomizations } from './ComponentStyleStage';
-import { CREATION_TOP_BAR_HEIGHT, CREATION_BOTTOM_BAR_RESERVE } from '../CreationNav';
+import { CREATION_CHROME } from '../CreationNav';
 
 /**
  * Shadow — the step after Component Style Settings.
@@ -117,7 +117,7 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
        <main>, and what showed below it was the body — which carries data-theme
        but deliberately no data-surface, so it paints nothing and the gap came
        out in the UA's colour rather than the brand's. */
-    <div style={{ display: 'flex', minHeight: `calc(100vh - ${CREATION_TOP_BAR_HEIGHT + CREATION_BOTTOM_BAR_RESERVE}px)` }}>
+    <div style={{ display: 'flex', minHeight: `calc(100vh - ${CREATION_CHROME})` }}>
 
       {/* ─── Left: persistent sidebar. Same frame as Component Style Settings —
              data-surface + the painted --Background and the right border are what
@@ -132,9 +132,9 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
            container had given up. sticky + an explicit height makes the rail a
            fixed frame that scrolls inside itself. */
         position: 'sticky',
-        top: CREATION_TOP_BAR_HEIGHT,
+        top: 'var(--creation-top-h, 49px)',
         alignSelf: 'flex-start',
-        height: `calc(100vh - ${CREATION_TOP_BAR_HEIGHT + CREATION_BOTTOM_BAR_RESERVE}px)`,
+        height: `calc(100vh - ${CREATION_CHROME})`,
         overflowY: 'auto',
         overflowX: 'hidden',
         borderRight: '1px solid var(--Border)',
