@@ -2105,6 +2105,20 @@ ${(() => {
 ${navMetricsCSS('  ').join('\n')}
   --Accordion-Radius: ${cappedAccordionRadius}px;
   --Input-Radius: ${r.inputRadius}px;
+  /* The per-SIZE radii, which the preview never emitted.
+     Input.js reads --Sm-Input-Radius / --Lg-Input-Radius FIRST and falls back
+     to --Input-Radius only if they are undefined. They were defined — by the
+     lib's own base.css, at 3px and 7px — so the fallback never fired and every
+     small or large input kept the library default no matter where the Border
+     Radius slider was dragged. Only medium inputs responded, which reads as
+     "the slider does nothing" because the demo shows the other two.
+
+     computeRadii has returned both all along, and the EXPORT emits them. The
+     preview is the only side that did not: invariant 5, in the shape where one
+     side is simply silent rather than wrong, so a value-for-value diff of what
+     both emit finds nothing to compare. */
+  --Sm-Input-Radius: ${r.smInputRadius}px;
+  --Lg-Input-Radius: ${r.lgInputRadius}px;
   --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;
