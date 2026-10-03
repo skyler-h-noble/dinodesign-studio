@@ -114,3 +114,41 @@ describe('a bar on a non-Primary palette takes its states from that palette', ()
     });
   }
 });
+
+/**
+ * A solid button in the App Bar is painted, so it can be bevelled.
+ *
+ * The scope emitted --Buttons-Default-Button: transparent while also emitting
+ * --Buttons-Default-Highlight and -Lowlight — the two tokens whose only job is
+ * to bevel a fill. Every variant="default" button in the bar therefore came out
+ * flat and unfilled, looking like an outline button.
+ *
+ * Both the design and the published CSS say otherwise: Figma's AppBar binds its
+ * solid button to Buttons::Button with two INNER_SHADOWs, and the exported
+ * [data-theme="App-Bar"] sets the fill to the button palette's tone.
+ */
+describe('the App Bar paints its default button', () => {
+  const appBarScope = (out: string) => {
+    const i = out.search(/(^|[,{}\n])\s*\[data-theme="App-Bar"\]/m);
+    return out.slice(i, out.indexOf('}', i));
+  };
+
+  for (const mode of ['light', 'dark'] as const) {
+    it(`${mode}: --Buttons-Default-Button is a color, not transparent`, () => {
+      const v = appBarScope(css(mode)).match(/--Buttons-Default-Button:\s*([^;]+);/)?.[1].trim();
+      expect(`${mode} fill: ${v}`).not.toBe(`${mode} fill: transparent`);
+      expect(v).toMatch(/^(#|var\(|rgb)/);
+    });
+
+    it(`${mode}: it emits a bevel only alongside a fill`, () => {
+      /* The pair is the invariant. A highlight with nothing under it is the
+         exact state this scope shipped in, and it is invisible: the tokens
+         resolve, the button just never uses them. */
+      const block = appBarScope(css(mode));
+      const fill = block.match(/--Buttons-Default-Button:\s*([^;]+);/)?.[1].trim();
+      const hasBevel = /--Buttons-Default-Highlight:/.test(block);
+      expect(`bevel:${hasBevel} fill-painted:${fill !== 'transparent' && !!fill}`)
+        .toBe(`bevel:${hasBevel} fill-painted:${hasBevel}`);
+    });
+  }
+});

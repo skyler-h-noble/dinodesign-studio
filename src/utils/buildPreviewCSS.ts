@@ -1378,6 +1378,23 @@ ${(() => {
   const appBarSurfacePalette = rampFor(ac.palette);
   const { active: appBarActive, hover: appBarHover } = activeAndHoverFor(appBarSurfacePalette, ac.n);
 
+  /* A solid button in the bar is FILLED, and the design says so plainly: the
+     Figma AppBar's Style=solid button binds Buttons::Button and carries two
+     INNER_SHADOWs — the bevel. Its Style=outline sibling has neither. The
+     published CSS agrees, setting --Buttons-Default-Button in the App-Bar scope
+     to the button palette's tone.
+
+     This emitted "transparent", so every variant="default" button in the bar
+     came out unfilled and unbevelled, reading as an outline button where
+     someone had asked for a solid one. The block gave the game away: it was
+     already emitting --Buttons-Default-Highlight and -Lowlight from btnBg, the
+     two tokens that exist only to bevel a fill that was never painted.
+
+     Fill, text and border move together. Once the button is filled its label
+     has to contrast with the BUTTON rather than the bar, so leaving the text on
+     the bar's tone would have traded a missing fill for a failing one. Quiet
+     stays on the BAR's palette on purpose — that is what a ghost or text button
+     reads, and those sit directly on the bar with no fill between. */
   // Library components like AppBar set their own data-theme="App-Bar" on their
   // root element, which would otherwise override these vars. The nested
   // descendant selector lets that inner element still inherit the branded
@@ -1413,10 +1430,10 @@ ${(() => {
   --Buttons-Primary-Border: ${btnBorder};
   --Buttons-Primary-Hover: ${abHoverHex};
   --Buttons-Primary-Pressed: ${abOldHoverHex};
-  --Buttons-Default-Button: transparent;
-  --Buttons-Default-Text: var(--${ac.palette}-Color-${tones.text});
+  --Buttons-Default-Button: ${btnBg};
+  --Buttons-Default-Text: ${btnText};
   --Buttons-Default-Quiet: var(--${ac.palette}-Color-${tones.quiet});
-  --Buttons-Default-Border: var(--${ac.palette}-Color-${tones.border});
+  --Buttons-Default-Border: ${btnBorder};
   --Buttons-Default-Highlight: ${highlightFor(btnBg)};
   --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
   --Buttons-Default-Hover: ${abHoverHex};
