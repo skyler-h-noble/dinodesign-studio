@@ -59,6 +59,27 @@ interface BottomBarProps {
   themed?: boolean;
 }
 
+/**
+ * How much vertical space the creation chrome occupies.
+ *
+ * Exported so a stage's sidebar can anchor BETWEEN the two bars instead of
+ * guessing. They were content-height with `overflow: hidden`, which left a band
+ * of page showing under a short panel and silently CLIPPED a tall one — the
+ * controls past the fold could not be reached at all, and nothing about it
+ * looked like a scroll container that had given up.
+ *
+ * Kept here, beside the bars themselves, because these two numbers are only
+ * correct as long as the styles below are. The top bar's minHeight and the
+ * 1px border are a few lines up; change either and this moves with it.
+ *
+ * The bottom figure is a RESERVE rather than a measurement: the bar's height is
+ * padding plus a Button, and --Button-Height is brand-generated, so there is no
+ * fixed number to read. 120 is the same reserve <main> already pads by, so the
+ * sidebar now ends exactly where the scrollable content does.
+ */
+export const CREATION_TOP_BAR_HEIGHT = 49;      // 48 minHeight + 1px border
+export const CREATION_BOTTOM_BAR_RESERVE = 120; // matches <main>'s paddingBottom
+
 export function CreationBottomBar({ onNext, nextLabel = 'Continue', disabled, themed }: BottomBarProps) {
   return (
     <div

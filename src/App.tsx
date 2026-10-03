@@ -29,7 +29,7 @@ import { loadGoogleFonts } from './utils/googleFontsManager';
 import { componentStyleVars } from './utils/componentStyleVars';
 
 import AppHeader from './components/AppHeader';
-import { CreationTopBar, CreationBottomBar } from './components/CreationNav';
+import { CreationTopBar, CreationBottomBar, CREATION_BOTTOM_BAR_RESERVE } from './components/CreationNav';
 import DesignSystemNameStage from './components/stages/DesignSystemNameStage';
 import UploadStage from './components/stages/UploadStage';
 import ColorStage from './components/stages/ColorStage';
@@ -1000,7 +1000,7 @@ function MainApp() {
             actually scrolls (it grows with its content) — and that silently
             disables position:sticky for every descendant. `clip` prevents the
             same horizontal overflow without creating a scrollport. */}
-        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 120 : 0, overflowX: 'clip', background: 'var(--Background)' }}>
+        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? CREATION_BOTTOM_BAR_RESERVE : 0, overflowX: 'clip', background: 'var(--Background)' }}>
           {showPricingModal ? (
             <PricingPage
               onCheckout={async (selection: PurchaseSelection) => {

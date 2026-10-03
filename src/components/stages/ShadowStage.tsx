@@ -10,6 +10,7 @@ import {
 } from '../../utils/dropshadow';
 import type { StageProps, ComponentStyle } from '../../types';
 import type { StyleCustomizations } from './ComponentStyleStage';
+import { CREATION_TOP_BAR_HEIGHT, CREATION_BOTTOM_BAR_RESERVE } from '../CreationNav';
 
 /**
  * Shadow — the step after Component Style Settings.
@@ -112,83 +113,94 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
     <div style={{ display: 'flex', minHeight: '100vh' }}>
 
       {/* ─── Left: persistent sidebar. Same frame as Component Style Settings —
-           data-surface + the painted --Background and the right border are what
-           make it read as a rail rather than floating controls. ─── */}
+             data-surface + the painted --Background and the right border are what
+             make it read as a rail rather than floating controls. ─── */}
       <div data-surface="Surface-Dim" style={{
         width: 296,
         flexShrink: 0,
-        overflow: 'hidden',
+        /* Anchored between the two bars, not sized by its content.
+           It was content-height with overflow: hidden, so a short panel left a
+           band of page showing beneath it and a tall one was CLIPPED — the
+           controls past the fold unreachable, with nothing to suggest a scroll
+           container had given up. sticky + an explicit height makes the rail a
+           fixed frame that scrolls inside itself. */
+        position: 'sticky',
+        top: CREATION_TOP_BAR_HEIGHT,
+        alignSelf: 'flex-start',
+        height: `calc(100vh - ${CREATION_TOP_BAR_HEIGHT + CREATION_BOTTOM_BAR_RESERVE}px)`,
+        overflowY: 'auto',
+        overflowX: 'hidden',
         borderRight: '1px solid var(--Border)',
         background: 'var(--Background)',
       }}>
         <div style={{ width: 296, padding: '8px 16px', boxSizing: 'border-box' }}>
         <VStack spacing={2}>
-          <H3 style={{ fontSize: '1rem', margin: 0 }}>Shadow Settings</H3>
+            <H3 style={{ fontSize: '1rem', margin: 0 }}>Shadow Settings</H3>
 
-          <VStack spacing={0}>
-            <ControlLabel name="Intensity" value={c.shadowIntensity.toFixed(2)} />
-            <Slider variant="default" size="small" min={0.05} max={1} step={0.01}
-              value={c.shadowIntensity} aria-label="Intensity"
-              onChange={(_: unknown, v: number | number[]) => set('shadowIntensity', v as number)} />
-            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-              The weight every level composites to. Also deepens the shadow colour.
-            </BodySmall>
-          </VStack>
+            <VStack spacing={0}>
+              <ControlLabel name="Intensity" value={c.shadowIntensity.toFixed(2)} />
+              <Slider variant="default" size="small" min={0.05} max={1} step={0.01}
+                value={c.shadowIntensity} aria-label="Intensity"
+                onChange={(_: unknown, v: number | number[]) => set('shadowIntensity', v as number)} />
+              <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
+                The weight every level composites to. Also deepens the shadow colour.
+              </BodySmall>
+            </VStack>
 
-          <VStack spacing={0}>
-            <ControlLabel name="Crispy" value={c.shadowCrispy.toFixed(2)} />
-            <Slider variant="default" size="small" min={0} max={1} step={0.01}
-              value={c.shadowCrispy} aria-label="Crispy"
-              onChange={(_: unknown, v: number | number[]) => set('shadowCrispy', v as number)} />
-            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-              Blur {(1.8 - 0.9 * c.shadowCrispy).toFixed(2)}× the offset, tuck-in
-              −{(5 * c.shadowCrispy).toFixed(1)}px. Crisper = tighter.
-            </BodySmall>
-          </VStack>
+            <VStack spacing={0}>
+              <ControlLabel name="Crispy" value={c.shadowCrispy.toFixed(2)} />
+              <Slider variant="default" size="small" min={0} max={1} step={0.01}
+                value={c.shadowCrispy} aria-label="Crispy"
+                onChange={(_: unknown, v: number | number[]) => set('shadowCrispy', v as number)} />
+              <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
+                Blur {(1.8 - 0.9 * c.shadowCrispy).toFixed(2)}× the offset, tuck-in
+                −{(5 * c.shadowCrispy).toFixed(1)}px. Crisper = tighter.
+              </BodySmall>
+            </VStack>
 
-          <VStack spacing={0}>
-            <ControlLabel name="Resolution" value={c.shadowResolution.toFixed(2)} />
-            <Slider variant="default" size="small" min={0} max={1} step={0.01}
-              value={c.shadowResolution} aria-label="Resolution"
-              onChange={(_: unknown, v: number | number[]) => set('shadowResolution', v as number)} />
-            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-              Layers {SHADOW_LEVELS.map((l) => shadowLayerCount(l, o)).join(' / ')}. More layers,
-              same size shadow.
-            </BodySmall>
-          </VStack>
+            <VStack spacing={0}>
+              <ControlLabel name="Resolution" value={c.shadowResolution.toFixed(2)} />
+              <Slider variant="default" size="small" min={0} max={1} step={0.01}
+                value={c.shadowResolution} aria-label="Resolution"
+                onChange={(_: unknown, v: number | number[]) => set('shadowResolution', v as number)} />
+              <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
+                Layers {SHADOW_LEVELS.map((l) => shadowLayerCount(l, o)).join(' / ')}. More layers,
+                same size shadow.
+              </BodySmall>
+            </VStack>
 
-          <VStack spacing={0} style={{ width: '100%' }}>
-            <ControlLabel name="Light Position" value={`${c.shadowLightX.toFixed(2)}, ${c.shadowLightY.toFixed(2)}`} />
-            <LightPad
-              x={c.shadowLightX}
-              y={c.shadowLightY}
-              onChange={(lx, ly) => commit({ ...c, shadowLightX: lx, shadowLightY: ly })}
-            />
-            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-              The shadow falls away from the light. Centre it horizontally for a
-              straight-down offset.
-            </BodySmall>
-          </VStack>
+            <VStack spacing={0} style={{ width: '100%' }}>
+              <ControlLabel name="Light Position" value={`${c.shadowLightX.toFixed(2)}, ${c.shadowLightY.toFixed(2)}`} />
+              <LightPad
+                x={c.shadowLightX}
+                y={c.shadowLightY}
+                onChange={(lx, ly) => commit({ ...c, shadowLightX: lx, shadowLightY: ly })}
+              />
+              <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
+                The shadow falls away from the light. Centre it horizontally for a
+                straight-down offset.
+              </BodySmall>
+            </VStack>
 
-          <VStack spacing={0}>
-            <ControlLabel name="Tint Shadow" value={c.shadowTint ? 'on' : 'neutral grey'} />
-            {/* The lib's Switch ignores `checked` on first render — it mounts
-                from defaultChecked and then keeps its own state, so
-                checked={true} alone renders an OFF switch. The key remounts it
-                so Reset can move it back. */}
-            <SwitchInput
-              key={`tint-${c.shadowTint}`}
-              defaultChecked={c.shadowTint}
-              checked={c.shadowTint}
-              aria-label="Tint shadow"
-              onChange={(e: { target: { checked: boolean } }) => set('shadowTint', e.target.checked)}
-            />
-            <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-              Off gives a neutral grey. A neutral surface stays grey either way.
-            </BodySmall>
-          </VStack>
+            <VStack spacing={0}>
+              <ControlLabel name="Tint Shadow" value={c.shadowTint ? 'on' : 'neutral grey'} />
+              {/* The lib's Switch ignores `checked` on first render — it mounts
+                  from defaultChecked and then keeps its own state, so
+                  checked={true} alone renders an OFF switch. The key remounts it
+                  so Reset can move it back. */}
+              <SwitchInput
+                key={`tint-${c.shadowTint}`}
+                defaultChecked={c.shadowTint}
+                checked={c.shadowTint}
+                aria-label="Tint shadow"
+                onChange={(e: { target: { checked: boolean } }) => set('shadowTint', e.target.checked)}
+              />
+              <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
+                Off gives a neutral grey. A neutral surface stays grey either way.
+              </BodySmall>
+            </VStack>
 
-          <Button size="small" variant="neutral-outline" onClick={reset}>Reset to defaults</Button>
+            <Button size="small" variant="neutral-outline" onClick={reset}>Reset to defaults</Button>
         </VStack>
         </div>
       </div>
@@ -196,65 +208,65 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
       {/* ─── Right: the five elevations on the brand's own surface ─── */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <VStack spacing={3} style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px' }}>
-          {/* NO data-surface here, and that is the fix rather than an omission.
-              It carried data-surface="Surface" and painted near-white while the
-              page around it was the brand's pink — the cards sat on a panel the
-              user never chose.
+            {/* NO data-surface here, and that is the fix rather than an omission.
+                It carried data-surface="Surface" and painted near-white while the
+                page around it was the brand's pink — the cards sat on a panel the
+                user never chose.
 
-              The brand's CSS deliberately emits no DESCENDANT arm for plain
-              Surface: it is the default level, so an element marked Surface has
-              not opted into anything and custom properties already inherit.
-              (Measured off a published bundle: 48 descendant arms for
-              Surface-Dim/-Dimmest/-Bright/-Brightest, zero for Surface.) So this
-              div matched neither [data-theme="Brand"][data-surface="Surface"] —
-              it has no data-theme — nor any descendant arm, and fell through to
-              base.css's generic mapping, which is near-white.
+                The brand's CSS deliberately emits no DESCENDANT arm for plain
+                Surface: it is the default level, so an element marked Surface has
+                not opted into anything and custom properties already inherit.
+                (Measured off a published bundle: 48 descendant arms for
+                Surface-Dim/-Dimmest/-Bright/-Brightest, zero for Surface.) So this
+                div matched neither [data-theme="Brand"][data-surface="Surface"] —
+                it has no data-theme — nor any descendant arm, and fell through to
+                base.css's generic mapping, which is near-white.
 
-              The attribute was added so Cards inside would resolve, since the
-              brand keys containers off `[data-surface] [data-surface="Container"]`.
-              That ancestor already exists: the app shell's <main> carries
-              data-theme="Brand" AND data-surface="Surface". Re-declaring it here
-              bought nothing and cost the background.
+                The attribute was added so Cards inside would resolve, since the
+                brand keys containers off `[data-surface] [data-surface="Container"]`.
+                That ancestor already exists: the app shell's <main> carries
+                data-theme="Brand" AND data-surface="Surface". Re-declaring it here
+                bought nothing and cost the background.
 
-              The background: var(--Background) STAYS, now inheriting the right
-              value. It paints the same colour as the page, so the seam is
-              invisible — and the layout effect below measures this element to
-              feed the shadow maths. Painting nothing would make that read
-              rgba(0,0,0,0), fail the regex, and fall back to the cream default:
-              the warm-shadows-on-a-green-brand bug the comment there describes. */}
-          <div
-            ref={wrapRef}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: 36, padding: '48px 32px', borderRadius: 12,
-              background: 'var(--Background)',
-            }}
-          >
-            {SHADOW_LEVELS.map((l) => (
-              <Card
-                key={l}
-                padding="medium"
-                sx={{
-                  width: '100%', maxWidth: 320,
-                  /* The Card ROOT is transparent — border and shadow only. The
-                     background lives on its inner content Box, so height and
-                     centring have to go THERE or the card paints a band in the
-                     middle and shows the page through the top and bottom. */
-                  '& > *': {
-                    minHeight: 76, display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', textAlign: 'center',
-                  },
-                  /* boxShadow is normally a lib-component override to avoid.
-                     Here the generated shadow IS the subject — there is no
-                     variant for "this arbitrary elevation". Nothing else about
-                     the Card's appearance is touched. */
-                  boxShadow: resolve(l),
-                }}
-              >
-                <Caption color="quiet">Level {l}</Caption>
-              </Card>
-            ))}
-          </div>
+                The background: var(--Background) STAYS, now inheriting the right
+                value. It paints the same colour as the page, so the seam is
+                invisible — and the layout effect below measures this element to
+                feed the shadow maths. Painting nothing would make that read
+                rgba(0,0,0,0), fail the regex, and fall back to the cream default:
+                the warm-shadows-on-a-green-brand bug the comment there describes. */}
+            <div
+              ref={wrapRef}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 36, padding: '48px 32px', borderRadius: 12,
+                background: 'var(--Background)',
+              }}
+            >
+              {SHADOW_LEVELS.map((l) => (
+                <Card
+                  key={l}
+                  padding="medium"
+                  sx={{
+                    width: '100%', maxWidth: 320,
+                    /* The Card ROOT is transparent — border and shadow only. The
+                       background lives on its inner content Box, so height and
+                       centring have to go THERE or the card paints a band in the
+                       middle and shows the page through the top and bottom. */
+                    '& > *': {
+                      minHeight: 76, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', textAlign: 'center',
+                    },
+                    /* boxShadow is normally a lib-component override to avoid.
+                       Here the generated shadow IS the subject — there is no
+                       variant for "this arbitrary elevation". Nothing else about
+                       the Card's appearance is touched. */
+                    boxShadow: resolve(l),
+                  }}
+                >
+                  <Caption color="quiet">Level {l}</Caption>
+                </Card>
+              ))}
+            </div>
         </VStack>
       </div>
     </div>

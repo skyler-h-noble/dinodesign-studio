@@ -11,6 +11,7 @@ import { loadGoogleFonts } from '../../utils/googleFontsManager';
 import { computeRadii, migrateLegacyRadii } from '../../utils/componentRadii';
 import { shadowOptionsFromStyle, type ShadowOptions } from '../../utils/dropshadow';
 import '../../styles/component-style.css';
+import { CREATION_TOP_BAR_HEIGHT, CREATION_BOTTOM_BAR_RESERVE } from '../CreationNav';
 
 interface Props extends StageProps {
   colorScheme: ColorScheme | null;
@@ -100,8 +101,8 @@ export default function ComponentStyleStage({
     for (const key of STYLE_KEYS) {
       if (savedCustomizations[key]) {
         merged[key] = migrateLegacyRadii({
-          ...DEFAULT_CUSTOMIZATIONS[key],
-          ...savedCustomizations[key],
+            ...DEFAULT_CUSTOMIZATIONS[key],
+            ...savedCustomizations[key],
         }) as StyleCustomizations;
       }
     }
@@ -140,71 +141,84 @@ export default function ComponentStyleStage({
       <div data-surface="Surface-Dim" style={{
         width: settingsOpen ? 296 : 0,
         flexShrink: 0,
-        overflow: 'hidden',
+        /* Anchored between the two bars, not sized by its content.
+           It was content-height with overflow: hidden, so a short panel left a
+           band of page showing beneath it and a tall one was CLIPPED — the
+           controls past the fold unreachable, with nothing to suggest a scroll
+           container had given up. sticky + an explicit height makes the rail a
+           fixed frame that scrolls inside itself. */
+        position: 'sticky',
+        top: CREATION_TOP_BAR_HEIGHT,
+        alignSelf: 'flex-start',
+        height: `calc(100vh - ${CREATION_TOP_BAR_HEIGHT + CREATION_BOTTOM_BAR_RESERVE}px)`,
+        /* overflowX stays hidden for the width collapse — the panel animates
+             to 0 and its 296px content must be clipped, not scrolled sideways. */
+        overflowX: 'hidden',
+        overflowY: 'auto',
         transition: 'width 0.2s ease',
         borderRight: settingsOpen ? '1px solid var(--Border)' : 'none',
         background: 'var(--Background)',
       }}>
         <div style={{ width: 296, padding: '8px 16px', boxSizing: 'border-box' }}>
-          <VStack spacing={2}>
-            <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style Settings</H3>
+            <VStack spacing={2}>
+              <H3 style={{ fontSize: '1rem', margin: 0 }}>Component Style Settings</H3>
 
-            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', marginTop: 8 }}>Components</BodySmall>
-            {[
-              { key: 'button', label: 'Button', defaultOpen: true, content: (
-                <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider variant="default"
-                    label="Desktop Button Height"
-                    min={24}
-                    max={48}
-                    step={null}
-                    marks={[
-                      { value: 24 }, { value: 32 }, { value: 40 }, { value: 44 }, { value: 48 },
-                    ]}
-                    value={custom.buttonHeight}
-                    onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)}
-                    size="small"
-                    valueLabelDisplay="auto"
-                  />
-                  <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
-                  <Slider variant="default" label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider variant="default" label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
-                  <Slider variant="default" label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider variant="default" label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
-                  <Slider variant="default" label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
-                </VStack>
-              )},
-              { key: 'icon', label: 'Icon Button', defaultOpen: false, content: (
-                <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.iconButtonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
-                </VStack>
-              )},
-              { key: 'input', label: 'Input', defaultOpen: false, content: (
-                <VStack spacing={2} style={{ width: '100%' }}>
-                  <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.inputRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
-                  <Slider variant="default" label="Padding" min={0} max={16} step={4} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
-                </VStack>
-              )},
-            ].map(section => {
-              const isOpen = openSections[section.key] ?? section.defaultOpen;
-              return (
-                <div key={section.key} style={{ borderBottom: '1px solid var(--Border)' }}>
-                  <div
-                    onClick={() => setOpenSections(prev => ({ ...prev, [section.key]: !isOpen }))}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', cursor: 'pointer' }}
-                  >
-                    <H3 style={{ fontSize: '0.9rem', margin: 0 }}>{section.label}</H3>
-                    {isOpen
-                      ? <ExpandMoreIcon style={{ color: 'var(--Quiet)', fontSize: 18 }} />
-                      : <ChevronRightIcon style={{ color: 'var(--Quiet)', fontSize: 18 }} />
-                    }
+              <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem', marginTop: 8 }}>Components</BodySmall>
+              {[
+                { key: 'button', label: 'Button', defaultOpen: true, content: (
+                  <VStack spacing={2} style={{ width: '100%' }}>
+                    <Slider variant="default"
+                      label="Desktop Button Height"
+                      min={24}
+                      max={48}
+                      step={null}
+                      marks={[
+                        { value: 24 }, { value: 32 }, { value: 40 }, { value: 44 }, { value: 48 },
+                      ]}
+                      value={custom.buttonHeight}
+                      onChange={(_: any, v: number | number[]) => updateCustom('buttonHeight', v as number)}
+                      size="small"
+                      valueLabelDisplay="auto"
+                    />
+                    <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
+                    <Slider variant="default" label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
+                  </VStack>
+                )},
+                { key: 'icon', label: 'Icon Button', defaultOpen: false, content: (
+                  <VStack spacing={2} style={{ width: '100%' }}>
+                    <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.iconButtonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('iconButtonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                  </VStack>
+                )},
+                { key: 'input', label: 'Input', defaultOpen: false, content: (
+                  <VStack spacing={2} style={{ width: '100%' }}>
+                    <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.inputRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Padding" min={0} max={16} step={4} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
+                  </VStack>
+                )},
+              ].map(section => {
+                const isOpen = openSections[section.key] ?? section.defaultOpen;
+                return (
+                  <div key={section.key} style={{ borderBottom: '1px solid var(--Border)' }}>
+                    <div
+                      onClick={() => setOpenSections(prev => ({ ...prev, [section.key]: !isOpen }))}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', cursor: 'pointer' }}
+                    >
+                      <H3 style={{ fontSize: '0.9rem', margin: 0 }}>{section.label}</H3>
+                      {isOpen
+                        ? <ExpandMoreIcon style={{ color: 'var(--Quiet)', fontSize: 18 }} />
+                        : <ChevronRightIcon style={{ color: 'var(--Quiet)', fontSize: 18 }} />
+                      }
+                    </div>
+                    {isOpen && <div style={{ paddingBottom: 8 }}>{section.content}</div>}
                   </div>
-                  {isOpen && <div style={{ paddingBottom: 8 }}>{section.content}</div>}
-                </div>
-              );
-            })}
-          </VStack>
+                );
+              })}
+            </VStack>
         </div>
       </div>
 
@@ -212,199 +226,199 @@ export default function ComponentStyleStage({
       <div style={{ flex: 1, minWidth: 0, transition: 'margin 0.2s ease' }}>
         <VStack spacing={4} style={{ maxWidth: 600, margin: '0 auto', padding: '40px 24px' }}>
 
-          {/* Presets — base style picker. Lives in the main column so the
-              full row of options stays visible (the left nav crops them). */}
-          <VStack spacing={1} alignItems="center">
-            <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>Presets</BodySmall>
-            <BodySmall color="quiet" style={{ textAlign: 'center' }}>Choose a base style then fine-tune the details.</BodySmall>
-            <ButtonGroup
-              size="small"
-              fit="equal"
-              value={selected}
-              onChange={(val: typeof selected) => {
-                setSelected(val);
-                setCustomizations(prev => ({
-                  ...prev,
-                  [val]: DEFAULT_CUSTOMIZATIONS[val],
-                }));
-              }}
-            >
-              {STYLE_KEYS.map(styleKey => {
-                const style = STYLE_DEFAULTS[styleKey];
-                return (
-                  <Button key={styleKey} value={styleKey} size="small">
-                    {style.label}
-                  </Button>
-                );
-              })}
-            </ButtonGroup>
-          </VStack>
-
-          {!settingsOpen && (
-            <HStack spacing={2} style={{ justifyContent: 'center' }}>
-              <Button variant="outline" size="small" onClick={() => setSettingsOpen(true)}>
-                Customize
-              </Button>
-            </HStack>
-          )}
-
-          {/* Preview */}
-          {(() => {
-            const radii = computeRadii(custom);
-            return (
-            <div
-              style={{
-                '--Style-Border-Radius': `${radii.buttonRadius}px`,
-                '--Button-Radius': `${radii.buttonRadius}px`,
-                '--Sm-Button-Radius': `${radii.smButtonRadius}px`,
-                '--Lg-Button-Radius': `${radii.lgButtonRadius}px`,
-                '--Card-Radius': `${radii.cardRadius}px`,
-                '--Card-Padding': `${radii.cardPadding}px`,
-                '--Icon-Button-Radius': `${radii.iconButtonRadius}px`,
-                '--Sm-Icon-Button-Radius': `${radii.smIconButtonRadius}px`,
-                '--Lg-Icon-Button-Radius': `${radii.lgIconButtonRadius}px`,
-                '--Button-Height': `${custom.buttonHeight}px`,
-                '--Small-Button-Height': `${custom.smallButtonHeight}px`,
-                '--Large-Button-Height': `${custom.largeButtonHeight}px`,
-                // --Button-Min-Width, not --Min-Button-Width: the reversed name
-                // matched nothing, so this panel's preview never showed the floor.
-                '--Button-Min-Width': `${custom.minButtonWidth}px`,
-                '--Lg-Button-Min-Width': `${custom.minButtonWidth + 40}px`,
-                '--Input-Radius': `${radii.inputRadius}px`,
-                '--Input-Padding': `${custom.inputPadding}px`,
-                '--Modal-Padding': `${radii.modalPadding}px`,
-                '--Modal-Radius': `${radii.modalRadius}px`,
-                '--Button-Padding': '8px',
-                '--Sm-Button-Padding': 'var(--Button-Padding)',
-                '--Lg-Button-Padding': '16px',
-                '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
-                '--Button-Border-Width': '2px',
-                // Inject the user's bevel settings so the live preview matches
-                // the exported CSS exactly. Without these, the lib's Button
-                // falls back to its static --Button-Bevel (foundation.css)
-                // and --Button-Bevel-Opacity: 0.5 — which doesn't reflect what
-                // ships with the design system.
-                '--Button-Bevel': custom.bevel,
-                '--Button-Bevel-Opacity': custom.bevelOpacity / 100,
-              } as React.CSSProperties}
-            >
-            <Card
-              padding="medium"
-              style={{
-                borderRadius: radii.cardRadius,
-                maxWidth: 400,
-                width: '100%',
-                margin: '0 auto',
-              }}
+            {/* Presets — base style picker. Lives in the main column so the
+                full row of options stays visible (the left nav crops them). */}
+            <VStack spacing={1} alignItems="center">
+              <BodySmall color="quiet" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>Presets</BodySmall>
+              <BodySmall color="quiet" style={{ textAlign: 'center' }}>Choose a base style then fine-tune the details.</BodySmall>
+              <ButtonGroup
+                size="small"
+                fit="equal"
+                value={selected}
+                onChange={(val: typeof selected) => {
+                  setSelected(val);
+                  setCustomizations(prev => ({
+                    ...prev,
+                    [val]: DEFAULT_CUSTOMIZATIONS[val],
+                  }));
+                }}
               >
-                <VStack spacing={4}>
-                  {/* Style: Solid, Outline, Ghost */}
-                  <VStack spacing={2}>
-                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Style</Label>
-                    <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
-                      <Button variant="default" size="medium"
-                        sx={{ minHeight: `${custom.buttonHeight}px` }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        Solid
-                      </Button>
-                      <Button variant="default-outline" size="medium"
-                        sx={{ minHeight: `${custom.buttonHeight}px` }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        Outline
-                      </Button>
-                      <Button variant="ghost" size="medium"
-                        sx={{ minHeight: `${custom.buttonHeight}px` }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        Ghost
-                      </Button>
-                    </HStack>
-                  </VStack>
+                {STYLE_KEYS.map(styleKey => {
+                  const style = STYLE_DEFAULTS[styleKey];
+                  return (
+                    <Button key={styleKey} value={styleKey} size="small">
+                      {style.label}
+                    </Button>
+                  );
+                })}
+              </ButtonGroup>
+            </VStack>
 
-                  {/* Size: Small, Medium, Large */}
-                  <VStack spacing={2}>
-                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Size</Label>
-                    <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Button variant="default" size="small"
-                        sx={{ minHeight: `${custom.smallButtonHeight}px` }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        Small
-                      </Button>
-                      <Button variant="default" size="medium"
-                        sx={{ minHeight: `${custom.buttonHeight}px` }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        Medium
-                      </Button>
-                      <Button variant="default" size="large"
-                        sx={{ minHeight: `${custom.largeButtonHeight}px` }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        Large
-                      </Button>
-                    </HStack>
-                  </VStack>
+            {!settingsOpen && (
+              <HStack spacing={2} style={{ justifyContent: 'center' }}>
+                <Button variant="outline" size="small" onClick={() => setSettingsOpen(true)}>
+                  Customize
+                </Button>
+              </HStack>
+            )}
 
-                  {/* Icon Buttons: Solid, Outline, Ghost */}
-                  <VStack spacing={2}>
-                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Icon Buttons</Label>
-                    <HStack spacing={2}>
-                      <Button variant="default" size="medium" iconOnly
-                        sx={{
-                          minHeight: `${custom.buttonHeight}px`,
-                          minWidth: `${custom.buttonHeight}px`,
-                          maxWidth: `${custom.buttonHeight}px`,
-                          borderRadius: `${radii.iconButtonRadius}px`,
-                        }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        <CalendarTodayIcon style={{ fontSize: 20 }} />
-                      </Button>
-                      <Button variant="default-outline" size="medium" iconOnly
-                        sx={{
-                          minHeight: `${custom.buttonHeight}px`,
-                          minWidth: `${custom.buttonHeight}px`,
-                          maxWidth: `${custom.buttonHeight}px`,
-                          borderRadius: `${radii.iconButtonRadius}px`,
-                        }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        <CalendarTodayIcon style={{ fontSize: 20 }} />
-                      </Button>
-                      <Button variant="ghost" size="medium" iconOnly
-                        sx={{
-                          minHeight: `${custom.buttonHeight}px`,
-                          minWidth: `${custom.buttonHeight}px`,
-                          maxWidth: `${custom.buttonHeight}px`,
-                          borderRadius: `${radii.iconButtonRadius}px`,
-                        }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                        <CalendarTodayIcon style={{ fontSize: 20 }} />
-                      </Button>
-                    </HStack>
-                  </VStack>
-
-                  {/* Inputs: text, search, dropdown */}
-                  <VStack spacing={2}>
-                    <Label color="quiet" style={{ fontSize: '0.7rem' }}>Inputs</Label>
+            {/* Preview */}
+            {(() => {
+              const radii = computeRadii(custom);
+              return (
+              <div
+                style={{
+                  '--Style-Border-Radius': `${radii.buttonRadius}px`,
+                  '--Button-Radius': `${radii.buttonRadius}px`,
+                  '--Sm-Button-Radius': `${radii.smButtonRadius}px`,
+                  '--Lg-Button-Radius': `${radii.lgButtonRadius}px`,
+                  '--Card-Radius': `${radii.cardRadius}px`,
+                  '--Card-Padding': `${radii.cardPadding}px`,
+                  '--Icon-Button-Radius': `${radii.iconButtonRadius}px`,
+                  '--Sm-Icon-Button-Radius': `${radii.smIconButtonRadius}px`,
+                  '--Lg-Icon-Button-Radius': `${radii.lgIconButtonRadius}px`,
+                  '--Button-Height': `${custom.buttonHeight}px`,
+                  '--Small-Button-Height': `${custom.smallButtonHeight}px`,
+                  '--Large-Button-Height': `${custom.largeButtonHeight}px`,
+                  // --Button-Min-Width, not --Min-Button-Width: the reversed name
+                  // matched nothing, so this panel's preview never showed the floor.
+                  '--Button-Min-Width': `${custom.minButtonWidth}px`,
+                  '--Lg-Button-Min-Width': `${custom.minButtonWidth + 40}px`,
+                  '--Input-Radius': `${radii.inputRadius}px`,
+                  '--Input-Padding': `${custom.inputPadding}px`,
+                  '--Modal-Padding': `${radii.modalPadding}px`,
+                  '--Modal-Radius': `${radii.modalRadius}px`,
+                  '--Button-Padding': '8px',
+                  '--Sm-Button-Padding': 'var(--Button-Padding)',
+                  '--Lg-Button-Padding': '16px',
+                  '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
+                  '--Button-Border-Width': '2px',
+                  // Inject the user's bevel settings so the live preview matches
+                  // the exported CSS exactly. Without these, the lib's Button
+                  // falls back to its static --Button-Bevel (foundation.css)
+                  // and --Button-Bevel-Opacity: 0.5 — which doesn't reflect what
+                  // ships with the design system.
+                  '--Button-Bevel': custom.bevel,
+                  '--Button-Bevel-Opacity': custom.bevelOpacity / 100,
+                } as React.CSSProperties}
+              >
+              <Card
+                padding="medium"
+                style={{
+                  borderRadius: radii.cardRadius,
+                  maxWidth: 400,
+                  width: '100%',
+                  margin: '0 auto',
+                }}
+                >
+                  <VStack spacing={4}>
+                    {/* Style: Solid, Outline, Ghost */}
                     <VStack spacing={2}>
-                      <TextInput label="Text" placeholder="Type here..." size="small" fullWidth />
-                      <SearchField placeholder="Search..." size="small" fullWidth />
-                      <Select
-                        label="Dropdown"
-                        labelPosition="top"
-                        size="small"
-                        fullWidth
-                        value=""
-                        onChange={() => {}}
-                        options={[
-                          { value: 'opt1', label: 'Option 1' },
-                          { value: 'opt2', label: 'Option 2' },
-                          { value: 'opt3', label: 'Option 3' },
-                        ]}
-                      />
+                      <Label color="quiet" style={{ fontSize: '0.7rem' }}>Style</Label>
+                      <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
+                        <Button variant="default" size="medium"
+                          sx={{ minHeight: `${custom.buttonHeight}px` }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          Solid
+                        </Button>
+                        <Button variant="default-outline" size="medium"
+                          sx={{ minHeight: `${custom.buttonHeight}px` }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          Outline
+                        </Button>
+                        <Button variant="ghost" size="medium"
+                          sx={{ minHeight: `${custom.buttonHeight}px` }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          Ghost
+                        </Button>
+                      </HStack>
+                    </VStack>
+
+                    {/* Size: Small, Medium, Large */}
+                    <VStack spacing={2}>
+                      <Label color="quiet" style={{ fontSize: '0.7rem' }}>Size</Label>
+                      <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Button variant="default" size="small"
+                          sx={{ minHeight: `${custom.smallButtonHeight}px` }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          Small
+                        </Button>
+                        <Button variant="default" size="medium"
+                          sx={{ minHeight: `${custom.buttonHeight}px` }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          Medium
+                        </Button>
+                        <Button variant="default" size="large"
+                          sx={{ minHeight: `${custom.largeButtonHeight}px` }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          Large
+                        </Button>
+                      </HStack>
+                    </VStack>
+
+                    {/* Icon Buttons: Solid, Outline, Ghost */}
+                    <VStack spacing={2}>
+                      <Label color="quiet" style={{ fontSize: '0.7rem' }}>Icon Buttons</Label>
+                      <HStack spacing={2}>
+                        <Button variant="default" size="medium" iconOnly
+                          sx={{
+                            minHeight: `${custom.buttonHeight}px`,
+                            minWidth: `${custom.buttonHeight}px`,
+                            maxWidth: `${custom.buttonHeight}px`,
+                            borderRadius: `${radii.iconButtonRadius}px`,
+                          }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          <CalendarTodayIcon style={{ fontSize: 20 }} />
+                        </Button>
+                        <Button variant="default-outline" size="medium" iconOnly
+                          sx={{
+                            minHeight: `${custom.buttonHeight}px`,
+                            minWidth: `${custom.buttonHeight}px`,
+                            maxWidth: `${custom.buttonHeight}px`,
+                            borderRadius: `${radii.iconButtonRadius}px`,
+                          }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          <CalendarTodayIcon style={{ fontSize: 20 }} />
+                        </Button>
+                        <Button variant="ghost" size="medium" iconOnly
+                          sx={{
+                            minHeight: `${custom.buttonHeight}px`,
+                            minWidth: `${custom.buttonHeight}px`,
+                            maxWidth: `${custom.buttonHeight}px`,
+                            borderRadius: `${radii.iconButtonRadius}px`,
+                          }}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          <CalendarTodayIcon style={{ fontSize: 20 }} />
+                        </Button>
+                      </HStack>
+                    </VStack>
+
+                    {/* Inputs: text, search, dropdown */}
+                    <VStack spacing={2}>
+                      <Label color="quiet" style={{ fontSize: '0.7rem' }}>Inputs</Label>
+                      <VStack spacing={2}>
+                        <TextInput label="Text" placeholder="Type here..." size="small" fullWidth />
+                        <SearchField placeholder="Search..." size="small" fullWidth />
+                        <Select
+                          label="Dropdown"
+                          labelPosition="top"
+                          size="small"
+                          fullWidth
+                          value=""
+                          onChange={() => {}}
+                          options={[
+                            { value: 'opt1', label: 'Option 1' },
+                            { value: 'opt2', label: 'Option 2' },
+                            { value: 'opt3', label: 'Option 3' },
+                          ]}
+                        />
+                      </VStack>
                     </VStack>
                   </VStack>
-                </VStack>
-              </Card>
-          </div>
-            );
-          })()}
+                </Card>
+            </div>
+              );
+            })()}
         </VStack>
       </div>
     </div>
