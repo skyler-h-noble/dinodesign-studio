@@ -196,16 +196,34 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
       {/* ─── Right: the five elevations on the brand's own surface ─── */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <VStack spacing={3} style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px' }}>
-          {/* data-surface is what makes the Cards inside resolve: the brand CSS
-              keys containers off `[data-surface] [data-surface="Container"]`, so
-              a wrapper carrying only data-theme leaves --Background undefined
-              and every Card renders transparent — the panel showing straight
-              through it. Painted from the cascade rather than the literal hex
-              for the same reason; surfaceHex still feeds the shadow MATHS, and
-              both come from the same background selection. */}
+          {/* NO data-surface here, and that is the fix rather than an omission.
+              It carried data-surface="Surface" and painted near-white while the
+              page around it was the brand's pink — the cards sat on a panel the
+              user never chose.
+
+              The brand's CSS deliberately emits no DESCENDANT arm for plain
+              Surface: it is the default level, so an element marked Surface has
+              not opted into anything and custom properties already inherit.
+              (Measured off a published bundle: 48 descendant arms for
+              Surface-Dim/-Dimmest/-Bright/-Brightest, zero for Surface.) So this
+              div matched neither [data-theme="Brand"][data-surface="Surface"] —
+              it has no data-theme — nor any descendant arm, and fell through to
+              base.css's generic mapping, which is near-white.
+
+              The attribute was added so Cards inside would resolve, since the
+              brand keys containers off `[data-surface] [data-surface="Container"]`.
+              That ancestor already exists: the app shell's <main> carries
+              data-theme="Brand" AND data-surface="Surface". Re-declaring it here
+              bought nothing and cost the background.
+
+              The background: var(--Background) STAYS, now inheriting the right
+              value. It paints the same colour as the page, so the seam is
+              invisible — and the layout effect below measures this element to
+              feed the shadow maths. Painting nothing would make that read
+              rgba(0,0,0,0), fail the regex, and fall back to the cream default:
+              the warm-shadows-on-a-green-brand bug the comment there describes. */}
           <div
             ref={wrapRef}
-            data-surface="Surface"
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 36, padding: '48px 32px', borderRadius: 12,
