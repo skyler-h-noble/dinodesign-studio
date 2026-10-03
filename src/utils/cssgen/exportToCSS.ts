@@ -11,6 +11,7 @@
 import chroma from 'chroma-js';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS } from '../componentSize';
+import { EYEBROW_WEB_FAMILY } from '../typographyPlatform';
 import { CSS_THEME_NAMES } from '../themes';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
@@ -4197,6 +4198,21 @@ function generateGoogleFontsImports(jsonData: any): string {
 
   // Add every family; the Set dedupes roles that share one.
   for (const fam of roleFamilies.values()) fontFamilies.add(fam);
+
+  /* The eyebrow face, which no role above can reveal.
+   *
+   * Every family here is discovered by scanning Set-Font-Family-* — the brand's
+   * PICKED faces. The eyebrow is not picked: Devices-Type fixes it to Inter on
+   * Desktop and the native UI face elsewhere, so it appears in no Set-* key and
+   * the scan cannot see it. Without this line the stylesheet asks for Inter and
+   * nothing fetches it, and the eyebrow renders in whatever sans the UA
+   * defaults to — right genre, wrong face, and nothing to see in a diff.
+   *
+   * The native faces need no import; they are already on the device. Inter is
+   * the only one that has to arrive over the wire. */
+  fontFamilies.add(EYEBROW_WEB_FAMILY);
+  addWeight(EYEBROW_WEB_FAMILY, typography['Set-Eyebrow-Font-Weight']?.value ?? 600);
+  addWeight(EYEBROW_WEB_FAMILY, 500);
   
   // List of system fonts that shouldn't be imported from Google Fonts
   const systemFonts = [

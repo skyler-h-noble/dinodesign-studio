@@ -43,7 +43,14 @@ const FACE_SOURCE: Record<FamilyRole, string> = {
   // Set-Font-Family-Display is the token now; Decorative is kept as the
   // fallback so designs saved before the four faces still resolve.
   display: 'var(--Set-Font-Family-Display, var(--Platform-Font-Families-Decorative, var(--Set-Font-Family-Decorative)))',
-  eyebrow: `var(--Set-Font-Family-Eyebrow, ${SYSTEM_UI_STACK})`,
+  /* Eyebrow is PLATFORM-owned, not brand-owned, and it is the one role where
+     that is true. Devices-Type gives it Inter on Desktop and the native UI face
+     on a phone or tablet, in BOTH Omni and System — an eyebrow is an interface
+     label, so the design's voice never reaches it.
+     --Set-Font-Family-Eyebrow stays in the chain so a brand that deliberately
+     overrides it still wins, and the OS stack stays last so the token resolves
+     on a page that sets no data-device at all. */
+  eyebrow: `var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow, ${SYSTEM_UI_STACK}))`,
   body: 'var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body))',
 };
 

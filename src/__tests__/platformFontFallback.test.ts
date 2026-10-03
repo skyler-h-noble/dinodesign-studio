@@ -25,7 +25,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildTypographyTokensCSS } from '../utils/typographyTokens';
-import { DEVICE_TYPES, FACE_MODES } from '../utils/typographyPlatform';
+import { DEVICE_TYPES, FACE_MODES, EYEBROW_WEB_FAMILY } from '../utils/typographyPlatform';
 
 const CSS = buildTypographyTokensCSS([
   { type: 'decorative', family: 'Fredoka', weight: '700', displaySize: '76' },
@@ -60,7 +60,7 @@ describe('every face resolves to a real family', () => {
           ? `[data-device="${device}"],`
           : `[data-device="${device}"][data-typography="System"]`;
         const block = declsFor(sel);
-        for (const root of ['Header', 'Body', 'Decorative']) {
+        for (const root of ['Header', 'Body', 'Decorative', 'Eyebrow']) {
           if (!block.includes(`--Platform-Font-Families-${root}:`)) {
             missing.push(`${face}/${device}/${root}`);
           }
@@ -87,13 +87,65 @@ describe('every face resolves to a real family', () => {
     }
   });
 
-  it('passes a family for the overline, on the BODY face', () => {
-    /* Figma aliases Eyebrow-Font-Family to Body-Font-Family in both Omni and
-       System. Three declarations pointed at Decorative instead, which is the
-       display face — the eyebrow-in-the-display-font bug, in the one place
-       nobody reads. */
+  it('passes a family for the overline, on the EYEBROW face', () => {
+    /* Overline is the back-compat name for Eyebrow, so it reads the eyebrow
+       hook. It has pointed at two wrong things: first Decorative — the display
+       face, which is the eyebrow-in-the-display-font bug in the one block
+       nobody reads — then Body, which was right only while Figma had Eyebrow
+       aliased to Body and stopped being right the moment it got its own
+       variable. Both wrong answers rendered a real font. */
     const decls = CSS.match(/--Font-Family-Overline:[^;]+;/g) || [];
     expect(`overline declared: ${decls.length > 0}`).toBe('overline declared: true');
-    for (const d of decls) expect(d).toMatch(/--Platform-Font-Families-Body/);
+    for (const d of decls) expect(d).toMatch(/--Platform-Font-Families-Eyebrow/);
+  });
+});
+
+/**
+ * The eyebrow wears the PLATFORM's face, never the brand's.
+ *
+ * It is the one role that is not a picked face: an eyebrow is an interface
+ * label, so Devices-Type fixes it to Inter on Desktop and the native UI face on
+ * a phone or tablet — in BOTH Omni and System. Everything else in the ramp
+ * follows the face mode; this must not.
+ *
+ * Inter rather than SF Pro on Desktop for licensing as much as rendering:
+ * Apple grants SF only for designing interfaces for Apple platforms, so it
+ * cannot ship inside a design system handed to other people.
+ */
+describe('the eyebrow face', () => {
+  const block = (d: string, face: 'Omni' | 'System') => declsFor(
+    face === 'Omni' ? `[data-device="${d}"],` : `[data-device="${d}"][data-typography="System"]`);
+
+  it('is Inter on Desktop in both face modes', () => {
+    for (const face of ['Omni', 'System'] as const) {
+      expect(`${face}: ${/--Platform-Font-Families-Eyebrow:\s*Inter/.test(block('Desktop', face))}`)
+        .toBe(`${face}: true`);
+    }
+  });
+
+  it('is the native face on a device, in both face modes', () => {
+    for (const face of ['Omni', 'System'] as const) {
+      expect(block('IOS-Mobile', face)).toMatch(/--Platform-Font-Families-Eyebrow:[^;]*apple-system/);
+      expect(block('Android-Mobile', face)).toMatch(/--Platform-Font-Families-Eyebrow:\s*Roboto/);
+    }
+  });
+
+  it('never follows the brand, on any device or face', () => {
+    /* The failure this prevents is the quiet one: a brand token in this slot
+       still produces a real font, so the eyebrow would simply start speaking
+       in the design's voice with nothing to see. */
+    for (const face of ['Omni', 'System'] as const) {
+      for (const d of DEVICE_TYPES) {
+        const decl = block(d, face).match(/--Platform-Font-Families-Eyebrow:[^;]+;/)?.[0] ?? '';
+        expect(`${face}/${d}: ${/--Set-Font-Family-/.test(decl)}`).toBe(`${face}/${d}: false`);
+      }
+    }
+  });
+
+  it('asks nothing of the web for a face the device already has', () => {
+    /* Only Inter has to arrive over the wire. If a native stack ever ended up
+       in the import list it would 404 against Google Fonts — "SF Pro" is not a
+       webfont and no CDN serves it. */
+    expect(EYEBROW_WEB_FAMILY).toBe('Inter');
   });
 });

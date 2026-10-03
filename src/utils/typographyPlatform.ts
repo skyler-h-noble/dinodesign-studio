@@ -1205,9 +1205,38 @@ export function payloadIsAdditive(bag: VarBag): boolean {
 // ALIAS of Body-Font-Family. Only Headers, Body and Display hold their own.
 // So three custom properties carry the whole table.
 const NATIVE_FACE: Record<string, string> = {
+  /* "SF Pro" is not requestable by name on the web — it is not a webfont and
+     no CDN serves it. -apple-system / BlinkMacSystemFont IS how a browser is
+     asked for the Apple system face, so the literal name goes AFTER them as a
+     courtesy to anyone who has it installed, not as the thing doing the work.
+     Writing `font-family: "SF Pro"` alone would silently render the UA default
+     on every machine. */
   IOS: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", Arial, sans-serif',
   Android: 'Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif',
 };
+
+/**
+ * The eyebrow face. Always a neutral sans, never a picked one.
+ *
+ * It is the only role that is NOT the brand's choice: an eyebrow is an
+ * interface label, so it wears the platform's UI face rather than the design's
+ * voice. Devices-Type says so in both modes — Omni is Inter everywhere, System
+ * is Inter on Desktop and the native face on a phone or tablet.
+ *
+ * Inter rather than SF Pro on Desktop, and the reason is licensing as much as
+ * rendering: Apple grants SF only for designing interfaces for Apple platforms,
+ * so it cannot ship in a design system handed to other people, and it would not
+ * render for a collaborator on Windows. Inter is SIL OFL, purpose-built as a UI
+ * face, and sits in the same genre as SF Pro and Roboto so the three read as
+ * one decision rather than three.
+ */
+const EYEBROW_DESKTOP = 'Inter, sans-serif';
+
+/** The one family the eyebrow needs FETCHED. The native faces are already on
+ *  the device; Inter is not, so it has to be imported like any other webfont.
+ *  Exported because the import builder has no other way to know it is used —
+ *  it scans the brand's picked roles, and the eyebrow is not one of them. */
+export const EYEBROW_WEB_FAMILY = 'Inter';
 
 /** The brand's own faces — what Omni resolves to on every device. */
 const BRAND_FACE = {
@@ -1243,10 +1272,15 @@ export function platformFontFamilyCSS(): string {
       const v = native
         ? { Header: native, Body: native, Decorative: native }
         : BRAND_FACE;
+      /* Eyebrow does NOT follow the face mode — it is Inter on Desktop in both
+         Omni and System, and the native face on a device in both. The brand's
+         voice never reaches it, which is the point of the role. */
+      const eyebrow = nativeFor(device) ?? EYEBROW_DESKTOP;
       out.push(`${blockSelector(device, face)} {`);
       out.push(`  --Platform-Font-Families-Header: ${v.Header};`);
       out.push(`  --Platform-Font-Families-Body: ${v.Body};`);
       out.push(`  --Platform-Font-Families-Decorative: ${v.Decorative};`);
+      out.push(`  --Platform-Font-Families-Eyebrow: ${eyebrow};`);
       out.push('}');
     }
   }

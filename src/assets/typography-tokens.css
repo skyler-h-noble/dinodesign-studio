@@ -140,17 +140,17 @@
   --Legal-Semibold-Font-Weight: 600;
 
   /* Overline */
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Small-Font-Size:     14px;
   --Overline-Small-Font-Weight:   500;
   --Overline-Small-Line-Height:   21px;
   --Overline-Small-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Medium-Font-Size:     16px;
   --Overline-Medium-Font-Weight:   600;
   --Overline-Medium-Line-Height:   24px;
   --Overline-Medium-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Large-Font-Size:     18px;
   --Overline-Large-Font-Weight:   600;
   --Overline-Large-Line-Height:   27px;
@@ -363,17 +363,17 @@
   --Legal-Semibold-Font-Weight: 600;
 
   /* Overline */
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Small-Font-Size:     14px;
   --Overline-Small-Font-Weight:   500;
   --Overline-Small-Line-Height:   21px;
   --Overline-Small-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Medium-Font-Size:     16px;
   --Overline-Medium-Font-Weight:   600;
   --Overline-Medium-Line-Height:   24px;
   --Overline-Medium-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Large-Font-Size:     18px;
   --Overline-Large-Font-Weight:   600;
   --Overline-Large-Line-Height:   27px;
@@ -602,17 +602,17 @@
   --Legal-Semibold-Font-Weight: 600;
 
   /* Overline */
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Small-Font-Size:     14px;
   --Overline-Small-Font-Weight:   500;
   --Overline-Small-Line-Height:   21px;
   --Overline-Small-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Medium-Font-Size:     16px;
   --Overline-Medium-Font-Weight:   600;
   --Overline-Medium-Line-Height:   24px;
   --Overline-Medium-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Large-Font-Size:     18px;
   --Overline-Large-Font-Weight:   600;
   --Overline-Large-Line-Height:   27px;
@@ -841,17 +841,17 @@
   --Legal-Semibold-Font-Weight: 600;
 
   /* Overline */
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Small-Font-Size:     14px;
   --Overline-Small-Font-Weight:   500;
   --Overline-Small-Line-Height:   21px;
   --Overline-Small-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Medium-Font-Size:     16px;
   --Overline-Medium-Font-Weight:   600;
   --Overline-Medium-Line-Height:   24px;
   --Overline-Medium-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Large-Font-Size:     18px;
   --Overline-Large-Font-Weight:   600;
   --Overline-Large-Line-Height:   27px;
@@ -1081,17 +1081,17 @@
   --Legal-Semibold-Font-Weight: 600;
 
   /* Overline */
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Small-Font-Size:     14px;
   --Overline-Small-Font-Weight:   500;
   --Overline-Small-Line-Height:   21px;
   --Overline-Small-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Medium-Font-Size:     16px;
   --Overline-Medium-Font-Weight:   600;
   --Overline-Medium-Line-Height:   24px;
   --Overline-Medium-Letter-Spacing: 0px;
-  --Font-Family-Overline: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  --Font-Family-Overline: var(--Platform-Font-Families-Eyebrow, var(--Set-Font-Family-Eyebrow));
   --Overline-Large-Font-Size:     18px;
   --Overline-Large-Font-Weight:   600;
   --Overline-Large-Line-Height:   27px;
