@@ -110,7 +110,14 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    /* Fill what is LEFT, not a whole viewport.
+       minHeight: 100vh asked for a full screen inside a <main> that already
+       guarantees one and then adds the bottom bar's reserve as padding, so the
+       stage overflowed by exactly the chrome. The document scrolled past
+       <main>, and what showed below it was the body — which carries data-theme
+       but deliberately no data-surface, so it paints nothing and the gap came
+       out in the UA's colour rather than the brand's. */
+    <div style={{ display: 'flex', minHeight: `calc(100vh - ${CREATION_TOP_BAR_HEIGHT + CREATION_BOTTOM_BAR_RESERVE}px)` }}>
 
       {/* ─── Left: persistent sidebar. Same frame as Component Style Settings —
              data-surface + the painted --Background and the right border are what
