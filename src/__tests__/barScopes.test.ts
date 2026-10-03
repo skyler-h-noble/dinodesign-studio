@@ -32,9 +32,9 @@ const SCHEME = {
   darkModeTonePalettes: { primary: d(COLORS[0]), secondary: d(COLORS[1]), tertiary: d(COLORS[2]) },
 } as unknown as ColorScheme;
 
-const css = (mode: 'light' | 'dark') => buildPreviewCSS({
+const css = (mode: 'light' | 'dark', sel: Record<string, string> = {}) => buildPreviewCSS({
   colorScheme: SCHEME,
-  userSelections: { background: 'default', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as unknown as UserSelections,
+  userSelections: { background: 'default', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal', ...sel } as unknown as UserSelections,
   componentStyle: 'modern',
   mode,
   typographyStyles: [
@@ -66,5 +66,51 @@ describe('preview defines the bar themes the lib sets', () => {
           .toBe(`${mode}/${bar} bg+text: true true`);
       });
     }
+  }
+});
+
+/**
+ * A bar on a non-Primary palette must take its STATES from that palette.
+ *
+ * Each bar resolved its own hover/pressed ramp with a two-branch ternary that
+ * fell back to the primary for anything that was not Primary or Neutral. The
+ * line's own comment said it existed to stop "Primary-Light leaking through",
+ * and it was the leak.
+ *
+ * It hides well. --Background is computed separately and stayed correct, so the
+ * bar looked right and only the controls inside it did not: SearchField rests
+ * on --Hover, so a blue tertiary app bar carried a search field in the primary's
+ * colour. Most brands put the bar on Primary, where the bug cannot show.
+ *
+ * Asserting the token RESOLVES to the right ramp, not merely that both sides
+ * emit something — invariant 5 and invariant 7 in one.
+ */
+describe('a bar on a non-Primary palette takes its states from that palette', () => {
+  const scopeOf = (out: string, bar: string) => {
+    const i = out.search(new RegExp(`(^|[,{}\\n])\\s*\\[data-theme="${bar}"\\]`, 'm'));
+    return out.slice(i, out.indexOf('}', i));
+  };
+  const hexesIn = (block: string, prop: string) =>
+    (block.match(new RegExp(`--${prop}:\\s*([^;]+);`)) || [])[1]?.trim();
+
+  for (const [bar, key] of [['App-Bar', 'appBar'], ['Nav-Bar', 'navBar']] as const) {
+    it(`${bar}: --Hover moves when the bar's palette changes`, () => {
+      /* The only thing that differs between these two runs is which palette the
+         bar sits on. If --Hover is identical across them it is not reading the
+         bar's palette at all, which is precisely the old behaviour. */
+      const onSecondary = hexesIn(scopeOf(css('light', { [key]: 'Secondary/Surface' }), bar), 'Hover');
+      const onTertiary  = hexesIn(scopeOf(css('light', { [key]: 'Tertiary/Surface' }), bar), 'Hover');
+      expect(onSecondary).toBeTruthy();
+      expect(`${bar} hover secondary===tertiary: ${onSecondary === onTertiary}`)
+        .toBe(`${bar} hover secondary===tertiary: false`);
+    });
+
+    it(`${bar}: --Pressed moves too`, () => {
+      const onSecondary = hexesIn(scopeOf(css('light', { [key]: 'Secondary/Surface' }), bar), 'Pressed');
+      const onTertiary  = hexesIn(scopeOf(css('light', { [key]: 'Tertiary/Surface' }), bar), 'Pressed');
+      expect(onSecondary).toBeTruthy();
+      expect(`${bar} pressed secondary===tertiary: ${onSecondary === onTertiary}`)
+        .toBe(`${bar} pressed secondary===tertiary: false`);
+    });
   }
 });

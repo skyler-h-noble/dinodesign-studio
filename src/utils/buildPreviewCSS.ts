@@ -649,6 +649,25 @@ export function buildPreviewCSS(input: BuildInput): string {
   //   tone 12    → Pressed = #ffffff,           Hover = mix(palette[11], #fff)
   // Endpoints clamp to pure black/white because there's no tone-1 of tone-1
   // and no tone+1 of tone-12 — the palette tops out at 12.
+  /* The tone ramp for a palette NAME — every palette, not a favoured two.
+     The bar themes each resolved their own with a two-branch ternary that fell
+     back to primaryLight for anything that was not Primary or Neutral, so a bar
+     on Secondary, Tertiary or a semantic palette drew its --Hover and --Pressed
+     off PRIMARY. That is the exact leak the line's own comment said it existed
+     to stop, and it is invisible in the usual case because most brands put
+     their bar on Primary.
+
+     It shows up as a control inside the bar wearing a colour from somewhere
+     else — SearchField rests on --Hover, so on a blue Tertiary bar the search
+     field came out in the primary's pink. The bar's --Background is computed
+     separately and stayed right, which is why the bar looked correct and only
+     the things inside it did not. */
+  const rampFor = (palette: string): Array<{ hex: string }> =>
+    palette === 'Neutral' ? (NEUTRAL.map(h => ({ hex: h })) as any)
+      : palette === 'Secondary' ? secondaryLight
+      : palette === 'Tertiary' ? tertiaryLight
+      : SEMANTIC_RAMPS[palette] || primaryLight;
+
   function activeAndHoverFor(palette: Array<{ hex: string }>, n: number): { active: string; hover: string } {
     const baseHex = palette[n - 1]?.hex || '#888888';
     // Pressed/hover move ALONG the palette, away from the text sitting on the
@@ -1356,7 +1375,7 @@ ${(() => {
   // Surface --Hover / --Pressed for the App Bar context: based on the App Bar's
   // own BG tone, not whatever is inherited from the page surface (Primary-Light
   // would otherwise leak through and make ghost-button hovers look near-white).
-  const appBarSurfacePalette = ac.palette === 'Primary' ? primaryLight : (ac.palette === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight);
+  const appBarSurfacePalette = rampFor(ac.palette);
   const { active: appBarActive, hover: appBarHover } = activeAndHoverFor(appBarSurfacePalette, ac.n);
 
   // Library components like AppBar set their own data-theme="App-Bar" on their
@@ -1791,7 +1810,7 @@ ${(() => {
   const { active: navDefOldHoverHex, hover: navDefHoverHex } = activeAndHoverFor(navDefPal, navDefN);
   const navBorderN = tones.border;
   // Surface --Hover/--Pressed for Nav Bar context — based on Nav Bar's own tone.
-  const navBarSurfacePalette = nc.palette === 'Primary' ? primaryLight : (nc.palette === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight);
+  const navBarSurfacePalette = rampFor(nc.palette);
   const { active: navBarActive, hover: navBarHover } = activeAndHoverFor(navBarSurfacePalette, nc.n);
   // The button sits ON the nav bar, so its border has to contrast with the BAR,
   // not with the page surface. btnBorder is derived from surfaceBg, so when
