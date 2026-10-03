@@ -11,6 +11,7 @@
 import chroma from 'chroma-js';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS } from '../componentSize';
+import { menuLevelCSS } from '../menuLevels';
 import { EYEBROW_WEB_FAMILY } from '../typographyPlatform';
 import { CSS_THEME_NAMES } from '../themes';
 import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
@@ -5064,6 +5065,19 @@ export function generateBaseCSS(jsonData: any): string {
        from 20 to 24 at the same time. */
     lines.push(`  --Sm-Menu-Swatch: 16px;`);
     lines.push(`  --Menu-Swatch: 24px;`);
+    /* Menu-Levels — the indent of a menu row at each nesting depth.
+         Seven modes, one variable (Left-Margin), a regular ladder of base 8 step
+         28. The table has existed in figmaModeMapping with tests since September
+         and nothing ever emitted it, so the collection reached neither stylesheet
+         and TreeView indents with a hardcoded 9px + 12px that compounds per level.
+         Figma's values are ABSOLUTE per depth, which is a different shape: a
+         compounding indent cannot reproduce 8/36/64 and then 176 at depth six.
+    
+         The literal lives on the per-level token and the scoped one reads it, the
+         same direction as Overline -> Eyebrow: one value, and a component may take
+         it either by indexing the depth it already knows or by setting
+         data-menu-level on the row. */
+    lines.push(menuLevelCSS('  '));
     lines.push(`  --Lg-Menu-Swatch: 32px;`);
     /* Nav chrome — the rail's width and the app bar's height, one per size.
        Constants rather than derived: a rail is 80 wide in every brand, and
