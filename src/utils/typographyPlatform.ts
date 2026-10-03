@@ -1281,6 +1281,21 @@ export function platformFontFamilyCSS(): string {
       out.push(`  --Platform-Font-Families-Body: ${v.Body};`);
       out.push(`  --Platform-Font-Families-Decorative: ${v.Decorative};`);
       out.push(`  --Platform-Font-Families-Eyebrow: ${eyebrow};`);
+      /* The role token, defined in the same rule as the hook it reads.
+         Without this the hook reached only the regenerated Desktop block, and
+         --Font-Family-Eyebrow on every other device fell through to core.css's
+         :root, which knows nothing about Devices-Type. Desktop got Inter from
+         the hook while iOS got SF Pro from the OS stack — the right answer by
+         coincidence rather than by wiring, which is the shape that breaks the
+         moment one of the two moves.
+
+         Overline ALIASES it rather than repeating the expression. Both names
+         must keep resolving — a published system's CSS is frozen and cannot be
+         regenerated — and the direction is load-bearing: Eyebrow is the name
+         now, so Overline is what does the reading. Two copies of one value
+         cannot be told apart in a diff until they disagree. */
+      out.push(`  --Font-Family-Eyebrow: var(--Platform-Font-Families-Eyebrow);`);
+      out.push(`  --Font-Family-Overline: var(--Font-Family-Eyebrow);`);
       out.push('}');
     }
   }

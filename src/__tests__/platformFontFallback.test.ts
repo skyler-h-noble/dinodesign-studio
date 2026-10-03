@@ -44,12 +44,16 @@ const declsFor = (selector: string): string => {
 };
 
 describe('every face resolves to a real family', () => {
-  it('never references the hook without a fallback', () => {
-    /* Belt as well as braces: the blocks below define the hook, but a ramp
-       declaration that forgot its fallback would still break on any page that
-       sets no data-device at all. */
-    const bare = CSS.match(/var\(--Platform-Font-Families-\w+\)\s*;/g) || [];
-    expect(`bare hook references: ${bare.length}`).toBe('bare hook references: 0');
+  it('never references the hook without a fallback OUTSIDE the block that defines it', () => {
+    /* Belt as well as braces for the ramp: a declaration there that forgot its
+       fallback breaks on any page that sets no data-device at all.
+       The platform blocks are exempt, and only they: a bare reference is safe
+       in the one rule that defines the hook two lines above it, where the two
+       cannot be separated. Elsewhere there is no such guarantee. */
+    const ramp = CSS.slice(0, CSS.indexOf('/* Platform font families'));
+    const bare = ramp.match(/var\(--Platform-Font-Families-\w+\)\s*;/g) || [];
+    expect(`bare hook references in the ramp: ${bare.length}`)
+      .toBe('bare hook references in the ramp: 0');
   });
 
   it('defines all three roots for every device and face', () => {
@@ -96,7 +100,11 @@ describe('every face resolves to a real family', () => {
        variable. Both wrong answers rendered a real font. */
     const decls = CSS.match(/--Font-Family-Overline:[^;]+;/g) || [];
     expect(`overline declared: ${decls.length > 0}`).toBe('overline declared: true');
-    for (const d of decls) expect(d).toMatch(/--Platform-Font-Families-Eyebrow/);
+    /* An ALIAS, not a second copy of the eyebrow's source. Both names have to
+       keep resolving — a published system's CSS is frozen — and the direction
+       is load-bearing: Eyebrow is the name, so Overline is what reads. Two
+       copies of one expression look identical in a diff until they disagree. */
+    for (const d of decls) expect(d).toMatch(/var\(--Font-Family-Eyebrow\)/);
   });
 });
 
