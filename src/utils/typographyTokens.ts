@@ -10,6 +10,7 @@
    by URL, so src/ is where it belongs. */
 import typographyTokensRaw from '../assets/typography-tokens.css?raw';
 import { buildTypographyTokensCSS as spliceDesktopBlock } from './cssgen/generateTypographyTokensCSS';
+import { platformFontFamilyCSS } from './typographyPlatform';
 import type { TypographyStyle } from '../types';
 
 /** The static file, verbatim. Kept for tooling that wants the shipped ramp. */
@@ -17,5 +18,11 @@ export const typographyTokensCSS = typographyTokensRaw;
 
 /** typography-tokens.css for one design system. */
 export function buildTypographyTokensCSS(typography: TypographyStyle[] | null | undefined): string {
-  return spliceDesktopBlock(typographyTokensRaw, typography);
+  /* The platform blocks go LAST on purpose.
+     They define --Platform-Font-Families-*, which every face in the ramp above
+     reads. Custom properties resolve at use, not at parse, so position does not
+     affect correctness — but it does put the whole Omni/System table in one
+     readable place at the end of the file instead of scattering six
+     declarations through each device block. */
+  return `${spliceDesktopBlock(typographyTokensRaw, typography)}\n\n${platformFontFamilyCSS()}\n`;
 }

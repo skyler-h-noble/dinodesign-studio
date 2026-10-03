@@ -1,30 +1,31 @@
 /**
- * No font-family token may resolve to nothing on a non-Desktop device.
+ * The platform font hook is real, and changing the device changes the face.
  *
- * `--Platform-Font-Families-Header` / `-Body` / `-Decorative` are the Figma-side
- * names. NOTHING ever defines them — not the lib, not foundation.css, not a
- * brand's generated bundle. They are an override hook that is, in practice,
- * always empty.
+ * --Platform-Font-Families-Header / -Body / -Decorative sit in front of every
+ * face in the ramp. NOTHING ever defined them, so outside the Desktop block
+ * they resolved to nothing: a var() on an undefined property with no fallback
+ * computes to the guaranteed-invalid value, the token is invalid at
+ * computed-value time, and `font-family: var(--Font-Family-Body)` becomes
+ * `unset` — the text inherits the ancestor's face rather than falling back to
+ * the brand's. 135 declarations shipped that way, and only Desktop escaped,
+ * because the generator regenerates that one block WITH fallbacks. The one
+ * device everybody previews on was the one device that worked.
  *
- * A `var()` on an undefined custom property with NO fallback computes to the
- * guaranteed-invalid value, so the token it is assigned to is invalid at
- * computed-value time and `font-family: var(--Font-Family-Body)` becomes
- * `unset`. The text does not fall back to the brand's face — it inherits
- * whatever the ancestor had, which on a plain page is the UA default.
+ * The hook was never wrong, only empty. What belongs in it is in Figma under
+ * Devices-Type, and it is a choice the design file has always expressed and
+ * the CSS could not:
  *
- * The shipped asset had 135 such declarations. Only the Desktop block escaped,
- * because generateTypographyTokensCSS splices Desktop away and regenerates it
- * WITH the fallbacks — so the one device every developer previews on was the
- * one device that worked, and every phone and tablet silently lost the brand's
- * body, label, button, number, subtitle and nav faces.
+ *   Typography mode   Desktop   iOS       Android
+ *   Omni              brand     brand     brand
+ *   System            brand     SF Pro    Roboto
  *
- * This is the var()-fallback rule in CLAUDE.md, in its least visible form:
- * the fallback does not fire when the variable is defined, and here the token
- * does not resolve at all when it is not. Either way, stating the brand's own
- * token is what makes the value right.
+ * Three roots carry it: in Devices-Type every other family — Caption, Subtitle,
+ * Label, Legal, Eyebrow, Number, Button, Mobile-Nav-Label — is an ALIAS of
+ * Body-Font-Family. Only Headers, Body and Display hold their own.
  */
 import { describe, it, expect } from 'vitest';
 import { buildTypographyTokensCSS } from '../utils/typographyTokens';
+import { DEVICE_TYPES, FACE_MODES } from '../utils/typographyPlatform';
 
 const CSS = buildTypographyTokensCSS([
   { type: 'decorative', family: 'Fredoka', weight: '700', displaySize: '76' },
@@ -32,34 +33,67 @@ const CSS = buildTypographyTokensCSS([
   { type: 'body', family: 'Poppins', weight: '400' },
 ] as never);
 
-describe('platform font hooks always name a brand fallback', () => {
-  it('leaves no var(--Platform-Font-Families-*) without one', () => {
-    /* Matching on the SHIPPED output, not the source asset: the Desktop block
-       is regenerated, so only the built file shows what a consumer receives. */
-    const bare = CSS.match(/var\(--Platform-Font-Families-[A-Za-z]+\)\s*;/g) || [];
-    expect(`bare platform vars: ${bare.length}`).toBe('bare platform vars: 0');
+/* Each block is a comma list — the new attribute, the legacy data-platform,
+   and for System the legacy face spellings too — so a block is located by ANY
+   one of its selectors rather than by an exact opening line. */
+const declsFor = (selector: string): string => {
+  const i = CSS.indexOf(selector);
+  if (i === -1) return '';
+  const open = CSS.indexOf('{', i);
+  return open === -1 ? '' : CSS.slice(open, CSS.indexOf('}', open));
+};
+
+describe('every face resolves to a real family', () => {
+  it('never references the hook without a fallback', () => {
+    /* Belt as well as braces: the blocks below define the hook, but a ramp
+       declaration that forgot its fallback would still break on any page that
+       sets no data-device at all. */
+    const bare = CSS.match(/var\(--Platform-Font-Families-\w+\)\s*;/g) || [];
+    expect(`bare hook references: ${bare.length}`).toBe('bare hook references: 0');
   });
 
-  it('falls back to the role that matches the hook', () => {
-    /* Header must not fall back to the body face, and vice versa — a mapping
-       slip here still produces a real font, so nothing looks wrong. */
-    for (const [hook, role] of [['Header', 'Header'], ['Body', 'Body'],
-                                ['Decorative', 'Decorative']] as const) {
-      const re = new RegExp(`var\\(--Platform-Font-Families-${hook},\\s*var\\(--Set-Font-Family-(\\w+)\\)`, 'g');
-      const roles = new Set(Array.from(CSS.matchAll(re), (m) => m[1]));
-      if (roles.size === 0) continue;
-      expect(`${hook} -> ${[...roles].join(',')}`).toBe(`${hook} -> ${role}`);
+  it('defines all three roots for every device and face', () => {
+    const missing: string[] = [];
+    for (const face of FACE_MODES) {
+      for (const device of DEVICE_TYPES) {
+        const sel = face === 'Omni'
+          ? `[data-device="${device}"],`
+          : `[data-device="${device}"][data-typography="System"]`;
+        const block = declsFor(sel);
+        for (const root of ['Header', 'Body', 'Decorative']) {
+          if (!block.includes(`--Platform-Font-Families-${root}:`)) {
+            missing.push(`${face}/${device}/${root}`);
+          }
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('wears the platform face under System and the brand face under Omni', () => {
+    /* The whole point of the hook. If these came out equal, the device switch
+       would do nothing and every wrong answer would still be a real font. */
+    const sys = (d: string) => declsFor(`[data-device="${d}"][data-typography="System"]`);
+    expect(sys('IOS-Mobile')).toMatch(/--Platform-Font-Families-Body:[^;]*SF Pro/);
+    expect(sys('Android-Mobile')).toMatch(/--Platform-Font-Families-Body:\s*Roboto/);
+    /* Desktop is the exception in the design: System there still means the
+       brand's own faces, because there is no "native desktop UI font" to mean. */
+    expect(sys('Desktop')).toMatch(/--Platform-Font-Families-Body:\s*var\(--Set-Font-Family-Body\)/);
+
+    for (const d of DEVICE_TYPES) {
+      const omni = declsFor(`[data-device="${d}"],`);
+      expect(`omni ${d} found: ${omni.length > 0}`).toBe(`omni ${d} found: true`);
+      expect(omni).toMatch(/--Platform-Font-Families-Body:\s*var\(--Set-Font-Family-Body\)/);
     }
   });
 
-  it('every device block gets a body family that resolves', () => {
-    for (const device of ['Desktop', 'IOS-Mobile', 'IOS-Tablet',
-                          'Android-Tablet', 'Android-Mobile']) {
-      const block = CSS.match(
-        new RegExp(`\\[data-device="${device}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
-      const decls = block.match(/--Font-Family-Body:[^;]+;/g) || [];
-      const allResolve = decls.every((d) => /--Set-Font-Family-\w+\)/.test(d));
-      expect(`${device}: ${decls.length > 0} ${allResolve}`).toBe(`${device}: true true`);
-    }
+  it('passes a family for the overline, on the BODY face', () => {
+    /* Figma aliases Eyebrow-Font-Family to Body-Font-Family in both Omni and
+       System. Three declarations pointed at Decorative instead, which is the
+       display face — the eyebrow-in-the-display-font bug, in the one place
+       nobody reads. */
+    const decls = CSS.match(/--Font-Family-Overline:[^;]+;/g) || [];
+    expect(`overline declared: ${decls.length > 0}`).toBe('overline declared: true');
+    for (const d of decls) expect(d).toMatch(/--Platform-Font-Families-Body/);
   });
 });

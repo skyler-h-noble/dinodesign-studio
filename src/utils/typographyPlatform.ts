@@ -281,8 +281,13 @@ export const LEGACY_DEVICE_ALIAS: Record<string, DeviceType> = {
 export function deviceSelector(device: DeviceType, extra = ''): string {
   const names = [device, ...Object.entries(LEGACY_DEVICE_ALIAS)
     .filter(([, to]) => to === device).map(([from]) => from)];
+  /* The old attribute is data-PLATFORM. This emitted data-device twice — the
+     same selector listed next to itself — so the doc comment above promised
+     "the new attribute, the old one" and the function delivered the new one
+     with a duplicate. A page frozen on data-platform matched nothing, which is
+     the rename's whole failure case and the reason the line exists. */
   return names
-    .flatMap((n) => [`[data-device="${n}"]`, `[data-device="${n}"]`])
+    .flatMap((n) => [`[data-device="${n}"]`, `[data-platform="${n}"]`])
     .map((sel) => sel + extra)
     .join(',\n');
 }
@@ -1175,4 +1180,75 @@ export function payloadNames(bag: VarBag): string[] { return Object.keys(bag).so
  */
 export function payloadIsAdditive(bag: VarBag): boolean {
   return Object.keys(bag).every((n) => n.startsWith(DEVICES_TYPE_PREFIX));
+}
+
+// ── Platform font families: the hook, finally filled in ──────────────────────
+//
+// --Platform-Font-Families-Header / -Body / -Decorative sit in front of every
+// face in the ramp. NOTHING ever defined them, so for every device but Desktop
+// they resolved to nothing and the text fell back to whatever it inherited.
+// The hook was not wrong — it was empty.
+//
+// What belongs in it is in the Figma file, under Devices-Type, and it is the
+// reason the hook exists at all:
+//
+//   Typography mode   Desktop   iOS       Android
+//   Omni              brand     brand     brand
+//   System            brand     SF Pro    Roboto
+//
+// Omni keeps the brand's faces everywhere; System wears the platform's own on
+// a phone or tablet and the brand's on Desktop. That is a real choice the
+// design file has always expressed and the CSS has never been able to.
+//
+// Three roots, not twenty-four: in Devices-Type every other family — Caption,
+// Subtitle, Label, Legal, Eyebrow, Number, Button, Mobile-Nav-Label — is an
+// ALIAS of Body-Font-Family. Only Headers, Body and Display hold their own.
+// So three custom properties carry the whole table.
+const NATIVE_FACE: Record<string, string> = {
+  IOS: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", Arial, sans-serif',
+  Android: 'Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif',
+};
+
+/** The brand's own faces — what Omni resolves to on every device. */
+const BRAND_FACE = {
+  Header: 'var(--Set-Font-Family-Header)',
+  Body: 'var(--Set-Font-Family-Body)',
+  Decorative: 'var(--Set-Font-Family-Display, var(--Set-Font-Family-Decorative))',
+} as const;
+
+/** Which native stack a device wears under System. Desktop wears the brand's. */
+function nativeFor(device: DeviceType): string | null {
+  if (device.startsWith('IOS')) return NATIVE_FACE.IOS;
+  if (device.startsWith('Android')) return NATIVE_FACE.Android;
+  return null;
+}
+
+/**
+ * The --Platform-Font-Families-* blocks, for every device and both faces.
+ *
+ * Emitted for Omni as well as System, and deliberately so. Omni's values are
+ * just the brand tokens, which looks redundant until you remember what the
+ * alternative is: leaving the property undefined so the ramp's
+ * `var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body))` reaches its
+ * fallback. That works, but it means the hook is only ever real in one of the
+ * two modes, and a reader cannot tell by looking whether a device is on brand
+ * faces or on nothing at all. Stating both makes the table in the comment
+ * above something you can read off the stylesheet.
+ */
+export function platformFontFamilyCSS(): string {
+  const out: string[] = ['/* Platform font families — Devices-Type, both faces. */'];
+  for (const face of FACE_MODES) {
+    for (const device of DEVICE_TYPES) {
+      const native = face === 'System' ? nativeFor(device) : null;
+      const v = native
+        ? { Header: native, Body: native, Decorative: native }
+        : BRAND_FACE;
+      out.push(`${blockSelector(device, face)} {`);
+      out.push(`  --Platform-Font-Families-Header: ${v.Header};`);
+      out.push(`  --Platform-Font-Families-Body: ${v.Body};`);
+      out.push(`  --Platform-Font-Families-Decorative: ${v.Decorative};`);
+      out.push('}');
+    }
+  }
+  return out.join('\n');
 }
