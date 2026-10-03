@@ -1769,6 +1769,12 @@ export function generateFigmaJSON(
         { role: 'Icons-Default-Variant', section: 'Text', pal: null },
         ...ACCENT_PALETTES.map(pal => ({ role: `Text-${pal}`, section: 'Text', pal })),
         ...ACCENT_PALETTES.map(pal => ({ role: `Header-${pal}`, section: 'Header', pal })),
+        /* Quiet's accents, which this list carried for Text and Header and not
+           for Quiet. The Quiet section in Modes covers the same ten scopes as
+           Text — it was only ever exposed for one palette, so the muted role
+           could not speak in a palette's hue while the other two could.
+           Same section shape as Text, so it resolves the same way. */
+        ...ACCENT_PALETTES.map(pal => ({ role: `Quiet-${pal}`, section: 'Quiet', pal })),
         // Text-BW resolves from the BlackWhite map rather than a palette family
         // — white below tone 6, black from 6 up — but it is otherwise an
         // ordinary role and must appear here like the rest.

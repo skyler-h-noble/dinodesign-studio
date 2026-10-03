@@ -26,12 +26,17 @@ import { generateAllThemesWithSurfacesAndContainers } from '../utils/cssgen/gene
 const ACCENTS = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
   'Info', 'Success', 'Warning', 'Error'];
 
-/** The 44 roles Default-Background must define, per surface scope. */
+/** The roles Default-Background must define, per surface scope. */
 const EXPECTED_ROLES = [
   'Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
   'Hover', 'Pressed', 'Focus-Visible', 'Hotlink', 'Hotlink-Visited',
   ...ACCENTS.map(p => `Text-${p}`),
   ...ACCENTS.map(p => `Header-${p}`),
+  /* Quiet's accents. Text and Header were spelled out per palette in all three
+     lists and Quiet was named bare in all three, so the muted role was the only
+     one of the three that could not speak in a palette's hue — while the Quiet
+     section in Modes covered the same ten scopes as Text the whole time. */
+  ...ACCENTS.map(p => `Quiet-${p}`),
   ...['Default', ...ACCENTS].flatMap(p => [`Icons-${p}`, `Icons-${p}-Variant`]),
   // On-<pal>: foreground for content sitting ON the icon color, at 4.5:1.
   // exportColorSystem computes these for the other 17 themes, but it runs after

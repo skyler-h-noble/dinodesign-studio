@@ -1403,6 +1403,14 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       for (const pal of accentPalettes) {
         tokenLookup[`Default-Background.${prefix}Text-${pal}`] = `{Text.Surfaces.${pal}.${vColorN}}`;
         tokenLookup[`Default-Background.${prefix}Header-${pal}`] = `{Header.Surfaces.${pal}.${vColorN}}`;
+        /* Quiet's accents, at the SAME tone as the Text line above — which is
+           the whole rule: one tone, three roles, so the curated table's 4.5:1
+           transfers to all of them instead of being re-derived per role.
+           This is the third of the three lists that must stay in step
+           (generateCompleteThemes, generateFigmaJSON, here); Quiet was named
+           bare in all three while Text and Header were spelled out per
+           palette. */
+        tokenLookup[`Default-Background.${prefix}Quiet-${pal}`] = `{Quiet.Surfaces.${pal}.${vColorN}}`;
         tokenLookup[`Default-Background.${prefix}Icons-${pal}`] = `{Icon.Surfaces.${pal}.${vColorN}}`;
         tokenLookup[`Default-Background.${prefix}Icons-${pal}-Variant`] = `{Icon-Variant.Surfaces.${pal}.${vColorN}}`;
 

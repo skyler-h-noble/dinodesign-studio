@@ -111,6 +111,46 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
         : `{Quiet.Surfaces.${config.theme}.Color-${n}}`,
       type: 'color'
     },
+    /* Quiet's accents, mirroring Text's just below.
+       The Quiet section in Modes has always covered the same ten scopes as
+       Text; only one palette's worth was named here, so a muted label in a
+       palette's hue had no key — and the Default theme's Default-Background
+       indirection had nothing to rewrite, which is what the coverage test
+       caught.
+       SAME Color-${n} as Text-{Palette}: one tone, three roles, so the curated
+       table's 4.5:1 transfers rather than being re-derived per role. */
+    'Quiet-Primary': {
+      value: `{Quiet.Surfaces.Primary.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Secondary': {
+      value: `{Quiet.Surfaces.Secondary.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Tertiary': {
+      value: `{Quiet.Surfaces.Tertiary.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Neutral': {
+      value: `{Quiet.Surfaces.Neutral.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Info': {
+      value: `{Quiet.Surfaces.Info.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Success': {
+      value: `{Quiet.Surfaces.Success.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Warning': {
+      value: `{Quiet.Surfaces.Warning.Color-${n}}`,
+      type: 'color'
+    },
+    'Quiet-Error': {
+      value: `{Quiet.Surfaces.Error.Color-${n}}`,
+      type: 'color'
+    },
     'Text': {
       // Both branches now reference the Text.Surfaces family — BW simply has
       // its own greyscale entry in that same table, so it needs no special
