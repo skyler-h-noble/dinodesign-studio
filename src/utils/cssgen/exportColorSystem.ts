@@ -2440,6 +2440,24 @@ function generateModesThemes(
         'Text-Error': { value: `{Text.Surfaces.${cont.ContError}.Color-${n}}`, type: 'color' },
         'Text-Neutral': { value: `{Text.Surfaces.${cont.ContNeutral}.Color-${n}}`, type: 'color' },
         Quiet: { value: `{Quiet.Surfaces.${cont.SurfaceDefaultTextTheme}.Color-${n}}`, type: 'color' },
+        /* Quiet-{Palette} — muted text in each palette's hue.
+           Modes already holds the whole table: Quiet/Surfaces/{BW, Error,
+           Hotlink-Visited, Info, Neutral, Primary, Secondary, Success,
+           Tertiary, Warning} and the same under Containers, matching Text
+           scope for scope. Only one palette's worth was ever exposed, so
+           Text-{Palette} had nine siblings and Quiet had none — and a muted
+           label in a palette hue had no token to reach for.
+           Same Color-${N} as the Text row beside it, which is what keeps the
+           pair at one tone and means no new contrast solving: the index is
+           the one the curated table already chose. */
+        'Quiet-Primary': { value: `{Quiet.Surfaces.${cont.ContPrimary}.Color-${n}}`, type: 'color' },
+        'Quiet-Secondary': { value: `{Quiet.Surfaces.${cont.ContSecondary}.Color-${n}}`, type: 'color' },
+        'Quiet-Tertiary': { value: `{Quiet.Surfaces.${cont.ContTertiary}.Color-${n}}`, type: 'color' },
+        'Quiet-Neutral': { value: `{Quiet.Surfaces.${cont.ContNeutral}.Color-${n}}`, type: 'color' },
+        'Quiet-Info': { value: `{Quiet.Surfaces.${cont.ContInfo}.Color-${n}}`, type: 'color' },
+        'Quiet-Success': { value: `{Quiet.Surfaces.${cont.ContSuccess}.Color-${n}}`, type: 'color' },
+        'Quiet-Warning': { value: `{Quiet.Surfaces.${cont.ContWarning}.Color-${n}}`, type: 'color' },
+        'Quiet-Error': { value: `{Quiet.Surfaces.${cont.ContError}.Color-${n}}`, type: 'color' },
         Border: { value: `{Border.Surfaces.${cont.SurfaceDefaultTextTheme}.Color-${n}}`, type: 'color' },
         'Border-Variant': { value: `{Border-Variant.Surfaces.${cont.SurfaceDefaultTextTheme}.Color-${n}}`, type: 'color' },
         Hotlink: { value: `{Text.Surfaces.Info.Color-${n}}`, type: 'color' },
@@ -2569,6 +2587,24 @@ function generateModesThemes(
         'Text-Warning': { value: `{Text.Containers.${cont.ContWarning}.Color-${cont.ContN}}`, type: 'color' },
         'Text-Error': { value: `{Text.Containers.${cont.ContError}.Color-${cont.ContN}}`, type: 'color' },
         Quiet: { value: `{Quiet.Containers.${cont.ContQuiet}.Color-${cont.ContN}}`, type: 'color' },
+        /* Quiet-{Palette} — muted text in each palette's hue.
+           Modes already holds the whole table: Quiet/Surfaces/{BW, Error,
+           Hotlink-Visited, Info, Neutral, Primary, Secondary, Success,
+           Tertiary, Warning} and the same under Containers, matching Text
+           scope for scope. Only one palette's worth was ever exposed, so
+           Text-{Palette} had nine siblings and Quiet had none — and a muted
+           label in a palette hue had no token to reach for.
+           Same Color-${N} as the Text row beside it, which is what keeps the
+           pair at one tone and means no new contrast solving: the index is
+           the one the curated table already chose. */
+        'Quiet-Primary': { value: `{Quiet.Containers.${cont.ContPrimary}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Secondary': { value: `{Quiet.Containers.${cont.ContSecondary}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Tertiary': { value: `{Quiet.Containers.${cont.ContTertiary}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Neutral': { value: `{Quiet.Containers.${cont.ContNeutral}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Info': { value: `{Quiet.Containers.${cont.ContInfo}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Success': { value: `{Quiet.Containers.${cont.ContSuccess}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Warning': { value: `{Quiet.Containers.${cont.ContWarning}.Color-${cont.ContN}}`, type: 'color' },
+        'Quiet-Error': { value: `{Quiet.Containers.${cont.ContError}.Color-${cont.ContN}}`, type: 'color' },
         Border: { value: `{Border.Containers.${cont.ContDefaultTextTheme}.Color-${cont.ContN}}`, type: 'color' },
         'Border-Variant': { value: `{Border-Variant.Containers.${cont.ContDefaultTextTheme}.Color-${cont.ContN}}`, type: 'color' },
         Hover: { value: `{Hover.${cont.ContTheme}.Color-${cont.ContN}}`, type: 'color' },
@@ -2928,6 +2964,24 @@ function generateThemesSection(
       'Text-Warning': { value: `{Text.Surfaces.Warning.Color-${backgroundNum}}`, type: 'color' },
       'Text-Error': { value: `{Text.Surfaces.Error.Color-${backgroundNum}}`, type: 'color' },
       Quiet: { value: `{Quiet.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
+      /* Quiet-{Palette} — muted text in each palette's hue.
+           Modes already holds the whole table: Quiet/Surfaces/{BW, Error,
+           Hotlink-Visited, Info, Neutral, Primary, Secondary, Success,
+           Tertiary, Warning} and the same under Containers, matching Text
+           scope for scope. Only one palette's worth was ever exposed, so
+           Text-{Palette} had nine siblings and Quiet had none — and a muted
+           label in a palette hue had no token to reach for.
+           Same Color-${N} as the Text row beside it, which is what keeps the
+           pair at one tone and means no new contrast solving: the index is
+           the one the curated table already chose. */
+      'Quiet-Primary': { value: `{Quiet.Surfaces.Primary.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Secondary': { value: `{Quiet.Surfaces.Secondary.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Tertiary': { value: `{Quiet.Surfaces.Tertiary.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Neutral': { value: `{Quiet.Surfaces.Neutral.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Info': { value: `{Quiet.Surfaces.Info.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Success': { value: `{Quiet.Surfaces.Success.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Warning': { value: `{Quiet.Surfaces.Warning.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Error': { value: `{Quiet.Surfaces.Error.Color-${backgroundNum}}`, type: 'color' },
       Border: { value: `{Border.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
       'Border-Variant': { value: `{Border-Variant.Surfaces.${palette}.Color-${backgroundNum}}`, type: 'color' },
       Hotlink: { value: `{Text.Surfaces.Info.Color-${backgroundNum}}`, type: 'color' },
@@ -3070,6 +3124,24 @@ function generateThemesSection(
       'Text-Warning': { value: `{Text.Containers.Warning.Color-${backgroundNum}}`, type: 'color' },
       'Text-Error': { value: `{Text.Containers.Error.Color-${backgroundNum}}`, type: 'color' },
       Quiet: { value: `{Quiet.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
+      /* Quiet-{Palette} — muted text in each palette's hue.
+           Modes already holds the whole table: Quiet/Surfaces/{BW, Error,
+           Hotlink-Visited, Info, Neutral, Primary, Secondary, Success,
+           Tertiary, Warning} and the same under Containers, matching Text
+           scope for scope. Only one palette's worth was ever exposed, so
+           Text-{Palette} had nine siblings and Quiet had none — and a muted
+           label in a palette hue had no token to reach for.
+           Same Color-${N} as the Text row beside it, which is what keeps the
+           pair at one tone and means no new contrast solving: the index is
+           the one the curated table already chose. */
+      'Quiet-Primary': { value: `{Quiet.Containers.Primary.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Secondary': { value: `{Quiet.Containers.Secondary.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Tertiary': { value: `{Quiet.Containers.Tertiary.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Neutral': { value: `{Quiet.Containers.Neutral.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Info': { value: `{Quiet.Containers.Info.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Success': { value: `{Quiet.Containers.Success.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Warning': { value: `{Quiet.Containers.Warning.Color-${backgroundNum}}`, type: 'color' },
+      'Quiet-Error': { value: `{Quiet.Containers.Error.Color-${backgroundNum}}`, type: 'color' },
       Border: { value: `{Border.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
       'Border-Variant': { value: `{Border-Variant.Containers.${palette}.Color-${backgroundNum}}`, type: 'color' },
       Hotlink: { value: `{Text.Containers.Info.Color-${backgroundNum}}`, type: 'color' },

@@ -1146,6 +1146,16 @@ export function generateAllThemesWithSurfacesAndContainers(
     'Hotlink', 'Hotlink-Visited',
     ...DEFAULT_ACCENTS.map(p => `Text-${p}`),
     ...DEFAULT_ACCENTS.map(p => `Header-${p}`),
+    /* Quiet gets its accents too, and listing it bare was the gap.
+       Text and Header were spelled out per palette here and Quiet appeared once,
+       so the Default theme routed Text-Primary and Header-Primary through
+       Default-Background and had nowhere to send Quiet-Primary. The muted role
+       was the only one of the three that could not speak in a palette's hue.
+
+       The data was never the problem: Modes carries Quiet/Surfaces and
+       Quiet/Containers across all ten scopes, matching Text scope for scope.
+       Only the wiring named fewer roles than the collection holds. */
+    ...DEFAULT_ACCENTS.map(p => `Quiet-${p}`),
   ];
   // Icons are NOT flat — they live in a nested `Icons` object keyed 'Default',
   // 'Default-Variant', 'Primary', 'Primary-Variant', ... and only get flattened
