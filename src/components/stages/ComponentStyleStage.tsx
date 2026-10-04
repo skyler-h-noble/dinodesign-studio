@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { INPUT_RADIUS_MAX } from '../../utils/componentRadii';
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
-  TextInput, SearchField, Select,
+  TextInput, SearchField,
 } from '@omni-design/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -436,25 +436,17 @@ export default function ComponentStyleStage({
                       </HStack>
                     </VStack>
 
-                    {/* Inputs: text, search, dropdown */}
+                    {/* Inputs: text and search.
+                        The Select that sat here is gone. All three read the
+                        same --Input-Radius, so it was a third sample of one
+                        decision — and the only one of the three that opens a
+                        panel on click, inside a preview card the user is
+                        clicking to select a style. */}
                     <VStack spacing={2}>
                       <Label color="quiet" style={{ fontSize: '0.7rem' }}>Inputs</Label>
                       <VStack spacing={2}>
                         <TextInput label="Text" placeholder="Type here..." size="small" fullWidth />
                         <SearchField placeholder="Search..." size="small" fullWidth />
-                        <Select
-                          label="Dropdown"
-                          labelPosition="top"
-                          size="small"
-                          fullWidth
-                          value=""
-                          onChange={() => {}}
-                          options={[
-                            { value: 'opt1', label: 'Option 1' },
-                            { value: 'opt2', label: 'Option 2' },
-                            { value: 'opt3', label: 'Option 3' },
-                          ]}
-                        />
                       </VStack>
                     </VStack>
                   </VStack>
