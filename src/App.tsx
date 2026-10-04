@@ -1000,7 +1000,18 @@ function MainApp() {
             actually scrolls (it grows with its content) — and that silently
             disables position:sticky for every descendant. `clip` prevents the
             same horizontal overflow without creating a scrollport. */}
-        <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: '100vh', paddingBottom: (showBottomBar && !showPricingModal) ? 'var(--creation-bottom-h, 120px)' : 0, overflowX: 'clip', background: 'var(--Background)' }}>
+        {/* The two chrome bars are subtracted, not stacked on top of 100vh.
+            This was `minHeight: '100vh'` with a padding-bottom reserving room
+            for the FIXED bottom bar, on a content-box element sitting after a
+            STICKY top bar that is still in flow. So the document came out at
+            the top bar plus a full viewport plus the padding — about 169px
+            past the fold — and that surplus is the empty strip under the left
+            rail, with nothing in it and nothing to scroll to.
+            The top bar is subtracted only when it is shown, or a page without
+            one would come up short by its height. Border-box so the reserved
+            space for the bottom bar sits INSIDE the height rather than being
+            added to it a second time. */}
+          <main data-theme={applyBrand ? 'Brand' : 'Default'} data-surface="Surface" style={{ minHeight: showTopBar ? 'calc(100vh - var(--creation-top-h, 49px))' : '100vh', boxSizing: 'border-box', paddingBottom: (showBottomBar && !showPricingModal) ? 'var(--creation-bottom-h, 120px)' : 0, overflowX: 'clip', background: 'var(--Background)' }}>
           {showPricingModal ? (
             <PricingPage
               onCheckout={async (selection: PurchaseSelection) => {
