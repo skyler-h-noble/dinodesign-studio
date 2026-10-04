@@ -34,6 +34,18 @@ export interface ComputedRadii {
   smButtonFocusRadius: number;
   lgButtonFocusRadius: number;
 
+  /* The end segments of a VERTICAL button group.
+     A vertical group rounds the top of its first segment and the bottom of
+     its last, and those corners take HALF the button's radius rather than all
+     of it: the full corner is drawn for a control as wide as a button is, and
+     on the short edge of a stacked segment it reads as a pill cap. */
+  verticalButtonRadius: number;
+  smVerticalButtonRadius: number;
+  lgVerticalButtonRadius: number;
+  verticalButtonFocusRadius: number;
+  smVerticalButtonFocusRadius: number;
+  lgVerticalButtonFocusRadius: number;
+
   // Icon Buttons (icon button is square — height = corresponding button height)
   iconButtonRadius: number;
   smIconButtonRadius: number;
@@ -125,6 +137,11 @@ const pct = (percent: number, height: number) =>
 
 const inner = (r: number) => Math.max(0, r - 1);
 const focus = (r: number) => r + 3;
+/* Half, rounded. The focus ring is then the usual +3 ON THE HALVED value, not
+   half of the focus radius — the ring tracks the corner it surrounds, so
+   halving the corner and re-deriving is the only order that keeps the 3px
+   gap even. */
+const half = (r: number) => Math.round(r / 2);
 
 export function computeRadii(cs: RadiiInput): ComputedRadii {
   /**
@@ -484,6 +501,13 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
     buttonFocusRadius: focus(buttonRadius),
     smButtonFocusRadius: focus(smButtonRadius),
     lgButtonFocusRadius: focus(lgButtonRadius),
+
+    verticalButtonRadius: half(buttonRadius),
+    smVerticalButtonRadius: half(smButtonRadius),
+    lgVerticalButtonRadius: half(lgButtonRadius),
+    verticalButtonFocusRadius: focus(half(buttonRadius)),
+    smVerticalButtonFocusRadius: focus(half(smButtonRadius)),
+    lgVerticalButtonFocusRadius: focus(half(lgButtonRadius)),
 
     iconButtonRadius,
     smIconButtonRadius,

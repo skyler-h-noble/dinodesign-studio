@@ -4981,6 +4981,22 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Button-Focus-Radius: ${r.buttonFocusRadius}px;`);
     lines.push(`  --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;`);
     lines.push(`  --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;`);
+    /* Half of the CAPPED radius, not half of the authored one.
+       --Button-Radius above is capped here and is not in the Figma payload or
+       in generateDesignSystem, so "half the button's radius" resolves to a
+       different number per file. Taking the half from `r` would make a
+       pill-radius brand draw a vertical cap of half an uncapped number beside
+       a button that had been capped — the two would disagree by more the
+       rounder the brand got. Each file halves what IT emits. */
+    const vBtn = Math.round(cappedButtonRadius / 2);
+    const vSmBtn = Math.round(cappedSmButtonRadius / 2);
+    const vLgBtn = Math.round(cappedLgButtonRadius / 2);
+    lines.push(`  --Vertical-Button-Radius: ${vBtn}px;`);
+    lines.push(`  --Sm-Vertical-Button-Radius: ${vSmBtn}px;`);
+    lines.push(`  --Lg-Vertical-Button-Radius: ${vLgBtn}px;`);
+    lines.push(`  --Vertical-Button-Focus-Radius: ${vBtn + 3}px;`);
+    lines.push(`  --Sm-Vertical-Button-Focus-Radius: ${vSmBtn + 3}px;`);
+    lines.push(`  --Lg-Vertical-Button-Focus-Radius: ${vLgBtn + 3}px;`);
     lines.push(`  --Button-Icon-Radius: ${r.iconButtonRadius}px;`);
     lines.push(`  --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;`);
     lines.push(`  --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;`);

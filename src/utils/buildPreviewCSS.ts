@@ -2083,6 +2083,12 @@ ${(() => {
   --Button-Radius: ${cappedButtonRadius}px;
   --Sm-Button-Radius: ${Math.min(r.smButtonRadius, largeButtonHeight)}px;
   --Lg-Button-Radius: ${Math.min(r.lgButtonRadius, largeButtonHeight)}px;
+  --Vertical-Button-Radius: ${Math.round(cappedButtonRadius / 2)}px;
+  --Sm-Vertical-Button-Radius: ${Math.round(Math.min(r.smButtonRadius, largeButtonHeight) / 2)}px;
+  --Lg-Vertical-Button-Radius: ${Math.round(Math.min(r.lgButtonRadius, largeButtonHeight) / 2)}px;
+  --Vertical-Button-Focus-Radius: ${Math.round(cappedButtonRadius / 2) + 3}px;
+  --Sm-Vertical-Button-Focus-Radius: ${Math.round(Math.min(r.smButtonRadius, largeButtonHeight) / 2) + 3}px;
+  --Lg-Vertical-Button-Focus-Radius: ${Math.round(Math.min(r.lgButtonRadius, largeButtonHeight) / 2) + 3}px;
   --Button-Icon-Radius: ${r.iconButtonRadius}px;
   --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
   --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;

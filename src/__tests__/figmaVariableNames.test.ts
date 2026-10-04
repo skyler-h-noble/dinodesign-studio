@@ -87,7 +87,19 @@ const MISSING_FROM_FILE: Record<string, string[]> = {
      A name belongs here only when the payload deliberately writes something the
      file does not have yet. Anything else means the import is silently skipping
      it, which is the failure this whole suite exists to catch. */
-  'Component-Size': [],
+  'Component-Size': [
+    /* Pending in Figma: being created in the Component-Size collection now.
+       The payload writes them deliberately, which is the one case this list is
+       for — until the variables exist, the plugin's update-only writer matches
+       by name and skips them, so a vertical button group would take no corner
+       radius at all rather than erroring.
+       Component-Size only, not Devices-Type: the value follows the SIZE mode,
+       not the device, so there is nothing for a device to say about it.
+       Drop these two lines once the snapshot is refreshed against a file that
+       has them. */
+    'Button/Vertical-Button-Focus-Radius',
+    'Button/Vertical-Button-Radius',
+  ],
   'Devices-Type': [],
 };
 

@@ -176,6 +176,8 @@ export interface RadiiForSize {
   buttonRadius: number; smButtonRadius: number; lgButtonRadius: number;
   buttonInnerRadius: number; smButtonInnerRadius: number; lgButtonInnerRadius: number;
   buttonFocusRadius: number; smButtonFocusRadius: number; lgButtonFocusRadius: number;
+  verticalButtonRadius: number; smVerticalButtonRadius: number; lgVerticalButtonRadius: number;
+  verticalButtonFocusRadius: number; smVerticalButtonFocusRadius: number; lgVerticalButtonFocusRadius: number;
   iconButtonRadius: number; smIconButtonRadius: number; lgIconButtonRadius: number;
   iconButtonFocusRadius: number; smIconButtonFocusRadius: number; lgIconButtonFocusRadius: number;
   iconButtonInnerRadius: number; smIconButtonInnerRadius: number; lgIconButtonInnerRadius: number;
@@ -775,6 +777,16 @@ export function componentSizePayload(
       'Button-Focus-Radius': r.buttonFocusRadius,
       'Sm-Button-Focus-Radius': r.smButtonFocusRadius,
       'Lg-Button-Focus-Radius': r.lgButtonFocusRadius,
+      /* The end caps of a VERTICAL button group — half the button's radius,
+         with the focus ring re-derived from the halved value so its 3px gap
+         stays even. Component-Size only: these follow the size mode, not the
+         device, so there is nothing for Device-Sizes to say about them. */
+      'Vertical-Button-Radius': r.verticalButtonRadius,
+      'Sm-Vertical-Button-Radius': r.smVerticalButtonRadius,
+      'Lg-Vertical-Button-Radius': r.lgVerticalButtonRadius,
+      'Vertical-Button-Focus-Radius': r.verticalButtonFocusRadius,
+      'Sm-Vertical-Button-Focus-Radius': r.smVerticalButtonFocusRadius,
+      'Lg-Vertical-Button-Focus-Radius': r.lgVerticalButtonFocusRadius,
       'Button-Inner-Focus-Radius': r.buttonInnerRadius,
       'Sm-Button-Inner-Focus-Radius': r.smButtonInnerRadius,
       'Lg-Button-Inner-Focus-Radius': r.lgButtonInnerRadius,

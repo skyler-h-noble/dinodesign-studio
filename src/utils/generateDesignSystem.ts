@@ -1059,6 +1059,12 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Focus-Radius: ${r.buttonFocusRadius}px;
   --Sm-Button-Focus-Radius: ${r.smButtonFocusRadius}px;
   --Lg-Button-Focus-Radius: ${r.lgButtonFocusRadius}px;
+  --Vertical-Button-Radius: ${r.verticalButtonRadius}px;
+  --Sm-Vertical-Button-Radius: ${r.smVerticalButtonRadius}px;
+  --Lg-Vertical-Button-Radius: ${r.lgVerticalButtonRadius}px;
+  --Vertical-Button-Focus-Radius: ${r.verticalButtonFocusRadius}px;
+  --Sm-Vertical-Button-Focus-Radius: ${r.smVerticalButtonFocusRadius}px;
+  --Lg-Vertical-Button-Focus-Radius: ${r.lgVerticalButtonFocusRadius}px;
   --Button-Icon-Radius: ${r.iconButtonRadius}px;
   --Sm-Button-Icon-Radius: ${r.smIconButtonRadius}px;
   --Lg-Button-Icon-Radius: ${r.lgIconButtonRadius}px;
