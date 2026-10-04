@@ -140,8 +140,13 @@ export function fabMetricsFlat(): Record<string, number> {
 /* ── The groups the studio can fill ────────────────────────────────────────
  *
  * Component-Size in Figma holds more than the studio computes. Authored by
- * hand, and NOT written by this payload: Switch, Slider, Rating, most of
- * Other — and Divider, Step bar and No Count Step.
+ * hand, and NOT written by this payload: Slider, Rating, most of Other.
+ *
+ * Switch came off that list on 2026-10-04, for the reason the list exists:
+ * its width and height lived in Figma and again as literals in the lib, and
+ * they had drifted — 28x16 and 40x24 against 35x20 and 42x24, with large
+ * matching so the set looked consistent. Its handle and icon stay unwritten;
+ * see SWITCH_METRICS.
  *
  * FAB used to be on that list and no longer is. Its three sizes are FIXED,
  * so there was never a reason for them to be typed rather than stated; they
@@ -289,6 +294,33 @@ export const LINE_METRICS = {
   'Divider':       { medium: 1,  small: 0.5, large: 2 },
   'Step bar':      { medium: 2,  small: 1,   large: 4 },
   'No Count Step': { medium: 12, small: 8,   large: 16 },
+} as const;
+
+/* ── Switch ───────────────────────────────────────────────────────────────
+ *
+ * Static, like NAV_METRICS and LINE_METRICS. A switch is 42x24 at medium in
+ * every brand: the track is a shape, not a derivation, and nothing in it
+ * follows the brand's radius or type scale.
+ *
+ * Written rather than left hand-authored, because the configuration it was in
+ * is the one this file already records catching Divider and the Step bar in —
+ * a number living in Figma and re-typed in the library, with nothing able to
+ * see them diverge. They had diverged: the lib held 28x16 and 40x24 against
+ * the file's 35x20 and 42x24, and LARGE matched, which is why it survived.
+ * One size agreeing reads as the set agreeing.
+ *
+ * The group is `Switch`, which is what the file calls it — the writer is
+ * update-only and matches on the full `Group/Name`, so `Other/Switch-Width`
+ * against a file holding `Switch/Switch-Width` would skip in silence and
+ * report success. Same shape as the `Accordian` rename and `Radio-Size`.
+ *
+ * Switch-Handle and Icon are in that group too and are NOT written here: the
+ * handle is derived from the track in the lib (THUMB_INSET) rather than typed,
+ * and the icon size belongs to the icon ramp. Adding them would mean claiming
+ * a source this file does not have. */
+export const SWITCH_METRICS = {
+  'Switch-Width':  { medium: 42, small: 35, large: 56 },
+  'Switch-Height': { medium: 24, small: 20, large: 32 },
 } as const;
 
 /* ── Radio and Checkbox ───────────────────────────────────────────────────
@@ -504,6 +536,10 @@ export function navMetricsFlat(): Record<string, number> {
 
 export function lineMetricsFlat(): Record<string, number> {
   return flattenByMode(LINE_METRICS as never);
+}
+
+export function switchMetricsFlat(): Record<string, number> {
+  return flattenByMode(SWITCH_METRICS as never);
 }
 
 export function radioMetricsFlat(): Record<string, number> {
@@ -918,6 +954,8 @@ export function componentSizePayload(
        versions did. */
     Radio: radioMetricsFlat(),
     Checkbox: checkboxMetricsFlat(),
+    /* Its own group, because that is the group the file has. */
+    Switch: switchMetricsFlat(),
     Tooltip: tooltipMetricsFlat(),
     FAB: fabMetricsFlat(),
     /* The dropdown panel, its rows and their focus ring — one group, because
