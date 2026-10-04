@@ -63,6 +63,13 @@ export interface ComputedRadii {
   lgInputRadius: number;
   inputInnerRadius: number;
   inputFocusRadius: number;
+  /* Per size, because the corner is per size and the ring tracks the corner.
+     There was ONE focus radius against three input radii, so the ring matched
+     the medium field and was wrong on the other two — too tight on the large
+     one, too loose on the small. Only invisible because at the round end of
+     the scale the cap makes all three equal. */
+  smInputFocusRadius: number;
+  lgInputFocusRadius: number;
 
   // Input swatch — square swatch rendered inside an input (e.g. Select
   // color swatch). Size = input height − 6 (3px gap on every side, matching
@@ -135,6 +142,23 @@ export const pctRadius = (percent: number, height: number) =>
 const pct = (percent: number, height: number) =>
   Math.round(Math.max(0, Math.min(100, percent)) * height / 100);
 
+/* An input never gets as round as a button can.
+ *
+ * The radius is a PERCENT of the control's height, so at the round end of the
+ * scale a button becomes a pill — which is a shape a button can carry and a
+ * text field cannot. A pill-shaped field pushes its own text away from the
+ * leading edge, and the taller the field the worse it gets, because the
+ * corner grows with the height while the text stays where it is.
+ *
+ * 16px, and the number is not new: --Dropdown-Frame-Radius has capped there
+ * since it was written, on the reasoning that a panel opening from an input
+ * must not be rounder than the input. Capping the input at the same place
+ * makes that rule hold from both ends rather than only from the panel's.
+ *
+ * Exported because the UI clamps its own control to it — a slider that can
+ * ask for 40 and silently get 16 is a control that lies about what it does. */
+export const INPUT_RADIUS_MAX = 16;
+
 const inner = (r: number) => Math.max(0, r - 1);
 const focus = (r: number) => r + 3;
 /* Half, rounded. The focus ring is then the usual +3 ON THE HALVED value, not
@@ -177,9 +201,16 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   const smIconButtonRadius = sized(iconButtonRadius, cs.smallButtonHeight, cs.buttonHeight);
   const lgIconButtonRadius = sized(iconButtonRadius, cs.largeButtonHeight, cs.buttonHeight);
 
-  const inputRadius = pct(cs.inputRadius, cs.buttonHeight);
-  const smInputRadius = pct(cs.inputRadius, cs.smallButtonHeight);
-  const lgInputRadius = pct(cs.inputRadius, cs.largeButtonHeight);
+  /* Capped at source, not at the writers.
+     --Button-Radius is capped in exportToCSS and buildPreviewCSS and NOT in
+     the Figma payload or generateDesignSystem, so "the button's radius" is
+     two different numbers depending on which file you ask. That split is
+     already paid for; it is not worth repeating here. One cap, applied once,
+     and every writer carries the same value. */
+  const capInput = (r: number) => Math.min(r, INPUT_RADIUS_MAX);
+  const inputRadius = capInput(pct(cs.inputRadius, cs.buttonHeight));
+  const smInputRadius = capInput(pct(cs.inputRadius, cs.smallButtonHeight));
+  const lgInputRadius = capInput(pct(cs.inputRadius, cs.largeButtonHeight));
 
   // Swatch sizes derived from the input height per size (same -6 pattern
   // the Figma button swatch already uses).
@@ -523,7 +554,12 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
     smInputRadius,
     lgInputRadius,
     inputInnerRadius: inner(inputRadius),
+    /* focus() is +3 on the CAPPED corner — the cap is applied at source, so
+       the ring follows the value the input actually paints rather than the
+       one the percent asked for. */
     inputFocusRadius: focus(inputRadius),
+    smInputFocusRadius: focus(smInputRadius),
+    lgInputFocusRadius: focus(lgInputRadius),
 
     inputSwatchRadius,
     smInputSwatchRadius,

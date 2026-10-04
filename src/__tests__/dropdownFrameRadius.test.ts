@@ -13,10 +13,19 @@ describe('Dropdown-Frame-Radius', () => {
     expect(r.dropdownFrameRadius).toBeLessThanOrEqual(16);
   });
 
-  it('never exceeds 16px, however round the input is', () => {
-    // A pill input: 50% of a 44px field = 22px, well over the ceiling.
+  it('never exceeds 16px, however round the input is asked to be', () => {
+    /* This asserted the INPUT came out over 16 — a pill field at 50% of 44px
+       is 22 — and that the frame capped anyway. The input is capped at 16 at
+       source now, so that premise is gone by construction: the frame can no
+       longer be pulled past the ceiling by the input, because the input
+       cannot get there.
+       The guarantee is unchanged and still worth asserting; what changed is
+       that it now holds for a second reason. Kept rather than deleted,
+       because a ceiling that is only redundant while another rule happens to
+       agree is one worth keeping a test on — the input cap could be raised by
+       someone who never reads this file. */
     const r = computeRadii({ ...base, inputRadius: 50 });
-    expect(r.inputRadius).toBeGreaterThan(16);
+    expect(r.inputRadius).toBeLessThanOrEqual(16);
     expect(r.dropdownFrameRadius).toBe(16);
   });
 

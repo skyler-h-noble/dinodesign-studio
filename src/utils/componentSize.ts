@@ -193,7 +193,8 @@ export interface RadiiForSize {
   cardPadding: number;
   smCardPadding: number; lgCardPadding: number;
   inputRadius: number; smInputRadius: number; lgInputRadius: number;
-  inputFocusRadius: number; inputInnerRadius: number;
+  inputFocusRadius: number; smInputFocusRadius: number; lgInputFocusRadius: number;
+  inputInnerRadius: number;
   inputSwatchRadius: number; smInputSwatchRadius: number; lgInputSwatchRadius: number;
   accordionRadius: number; accordionFocusRadius: number; accordionInnerFocusRadius: number;
   modalRadius: number; modalPadding: number;
@@ -862,6 +863,8 @@ export function componentSizePayload(
       'Sm-Input-Radius': r.smInputRadius,
       'Lg-Input-Radius': r.lgInputRadius,
       'Input-Focus-Radius': r.inputFocusRadius,
+      'Sm-Input-Focus-Radius': r.smInputFocusRadius,
+      'Lg-Input-Focus-Radius': r.lgInputFocusRadius,
       'Input-Inner-Focus-Radius': r.inputInnerRadius,
       ...inputExtras,
       /* Input-Swatch-Radius is deliberately NOT here — it is a WEB-ONLY token.

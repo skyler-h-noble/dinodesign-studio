@@ -5113,6 +5113,8 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Lg-Input-Radius: ${r.lgInputRadius}px;`);
     lines.push(`  --Input-Inner-Focus-Radius: ${r.inputInnerRadius}px;`);
     lines.push(`  --Input-Focus-Radius: ${r.inputFocusRadius}px;`);
+    lines.push(`  --Sm-Input-Focus-Radius: ${r.smInputFocusRadius}px;`);
+    lines.push(`  --Lg-Input-Focus-Radius: ${r.lgInputFocusRadius}px;`);
     /* Inset focus-ring corner radius — the same number as
        --Input-Inner-Focus-Radius above, not a second calculation of it.
        inputInnerRadius IS inner(inputRadius), and inner() is

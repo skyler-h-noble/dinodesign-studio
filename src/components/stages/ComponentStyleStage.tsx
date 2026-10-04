@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { INPUT_RADIUS_MAX } from '../../utils/componentRadii';
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
   TextInput, SearchField, Select,
@@ -125,6 +126,41 @@ export default function ComponentStyleStage({
     }));
   };
 
+  /* The radii are stored as a PERCENT of the control's height; both sliders
+     work in pixels against the large button, so each converts on the way in. */
+  const asPercent = (px: number) =>
+    Math.round(Math.min(100, px / Math.max(1, custom.largeButtonHeight) * 100));
+
+  /* The input FOLLOWS the button, clamped.
+     Three of the four presets already ship them equal — only `playful`
+     diverges, at button 100 / input 38 — so the slider pair was two controls
+     for one decision, and moving the button alone left an input that no
+     longer matched the brand.
+     The clamp is what makes following safe: a button can be a pill and an
+     input cannot, because a pill-shaped field pushes its own text away from
+     the leading edge, and worse the taller it gets. */
+  const setButtonRadiusPx = (px: number) => {
+    const pct = asPercent(px);
+    setCustomizations(prev => {
+      const cur = prev[selected];
+      const cappedPct = asPercent(Math.min(px, INPUT_RADIUS_MAX));
+      return {
+        ...prev,
+        [selected]: { ...cur, buttonRadius: pct, inputRadius: cappedPct },
+      };
+    });
+  };
+
+  /* An explicit override still wins — moving the input's own slider sets only
+     the input, and the next button change does NOT silently take it back,
+     because the button's handler writes the clamped button value either way.
+     What the user cannot do is ask for more than the cap: the slider's max IS
+     the cap, so the control cannot report a number the generator will not
+     honour. A slider that can ask for 40 and silently get 16 is a control
+     that lies about what it does. */
+  const setInputRadiusPx = (px: number) =>
+    updateCustom('inputRadius', asPercent(Math.min(px, INPUT_RADIUS_MAX)));
+
   // Save customizations whenever they change
   useEffect(() => {
     onStyleSelected(selected, customizations[selected]);
@@ -190,7 +226,7 @@ export default function ComponentStyleStage({
                     <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>iOS: 44px, Android: 48px</BodySmall>
                     <Slider variant="default" label="Small Button Height" min={24} max={32} value={custom.smallButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('smallButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
-                    <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('buttonRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => setButtonRadiusPx(v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
@@ -203,7 +239,7 @@ export default function ComponentStyleStage({
                 )},
                 { key: 'input', label: 'Input', defaultOpen: false, content: (
                   <VStack spacing={2} style={{ width: '100%' }}>
-                    <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.inputRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => updateCustom('inputRadius', Math.round(Math.min(100, (v as number) / Math.max(1, custom.largeButtonHeight) * 100)))} size="small" valueLabelDisplay="auto" />
+                    <Slider variant="default" label="Border Radius (px)" min={0} max={Math.min(INPUT_RADIUS_MAX, custom.largeButtonHeight)} value={Math.min(INPUT_RADIUS_MAX, Math.round(custom.inputRadius * custom.largeButtonHeight / 100))} onChange={(_: any, v: number | number[]) => setInputRadiusPx(v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Padding" min={0} max={16} step={4} value={custom.inputPadding} onChange={(_: any, v: number | number[]) => updateCustom('inputPadding', v as number)} size="small" valueLabelDisplay="auto" />
                   </VStack>
                 )},

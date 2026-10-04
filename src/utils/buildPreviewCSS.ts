@@ -2139,6 +2139,14 @@ ${navMetricsCSS('  ').join('\n')}
      both emit finds nothing to compare. */
   --Sm-Input-Radius: ${r.smInputRadius}px;
   --Lg-Input-Radius: ${r.lgInputRadius}px;
+  /* The preview emitted NO focus radius at all — three input radii and not
+     one ring to go round them, so a focused field in the preview fell back to
+     whatever the lib's own default was while the export shipped the real
+     number. Invariant 5 in its quiet form: not two sides disagreeing, but one
+     side silent. */
+  --Input-Focus-Radius: ${r.inputFocusRadius}px;
+  --Sm-Input-Focus-Radius: ${r.smInputFocusRadius}px;
+  --Lg-Input-Focus-Radius: ${r.lgInputFocusRadius}px;
   --Input-Inner-Focus-Visible: ${Math.max(0, r.inputRadius - 1)}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;

@@ -1136,6 +1136,8 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Lg-Input-Radius: ${r.lgInputRadius}px;
   --Input-Inner-Focus-Radius: ${r.inputInnerRadius}px;
   --Input-Focus-Radius: ${r.inputFocusRadius}px;
+  --Sm-Input-Focus-Radius: ${r.smInputFocusRadius}px;
+  --Lg-Input-Focus-Radius: ${r.lgInputFocusRadius}px;
   --Input-Swatch-Radius: ${r.inputSwatchRadius}px;
   --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;
   --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;
