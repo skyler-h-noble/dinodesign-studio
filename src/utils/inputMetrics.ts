@@ -24,7 +24,7 @@
 // applied to a known height — so all seven devices are written rather than
 // Desktop alone.
 
-import { pctRadius } from './componentRadii';
+import { pctRadius, INPUT_RADIUS_MAX } from './componentRadii';
 
 /** Heights for one device, in the order the size modes use. */
 export interface FieldHeights { small: number; medium: number; large: number }
@@ -77,10 +77,16 @@ export function inputMetrics(m: InputMetricsInput): Record<string, number> {
     const S = SIZE_SUFFIX[size];
     const field = m.heights[size];
 
-    /* The field's own radius, as the CSS computes it. Recomputed here would be
-       a second implementation; pctRadius is the same helper componentRadii
-       uses, so the two cannot answer differently. */
-    const inputR = pctRadius(m.inputRadiusPct, field);
+    /* The field's own radius, as the CSS computes it — CAP INCLUDED.
+       This read "pctRadius is the same helper componentRadii uses, so the two
+       cannot answer differently", and that held right up until componentRadii
+       gained a cap that pctRadius knows nothing about. Sharing the helper was
+       never the same as sharing the rule: the helper does the arithmetic, the
+       cap is a decision applied after it.
+       Without this the field painted a 16px corner while the button inside it
+       was sized against the uncapped number — an inner element cut for a
+       corner its container no longer has. */
+    const inputR = Math.min(pctRadius(m.inputRadiusPct, field), INPUT_RADIUS_MAX);
 
     /* Concentric: the button sits `border + ring` inside the field, so its
        corner is that much tighter. Floors at 0 — a field rounder than its
@@ -92,7 +98,10 @@ export function inputMetrics(m: InputMetricsInput): Record<string, number> {
     const floating = field + m.labelLeading[size];
     out[`Floating-Input-${S}`] = floating;
 
-    const floatingR = pctRadius(m.inputRadiusPct, floating);
+    /* A floating field is TALLER than its plain twin — field plus the shrunk
+       label's leading — so the percent overshoots further here than anywhere
+       else, and the cap matters more rather than less. */
+    const floatingR = Math.min(pctRadius(m.inputRadiusPct, floating), INPUT_RADIUS_MAX);
     out[`Floating-Input-Radius-${S}`] = floatingR;
     out[`Floating-Input-Focus-Radius-${S}`] = floatingR + INPUT_FOCUS_OFFSET;
   }

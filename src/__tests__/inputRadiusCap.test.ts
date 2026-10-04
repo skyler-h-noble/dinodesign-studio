@@ -20,6 +20,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { computeRadii, INPUT_RADIUS_MAX } from '../utils/componentRadii';
+import { inputMetrics, INPUT_FOCUS_OFFSET } from '../utils/inputMetrics';
 
 const radiiFor = (inputPct: number, heights = {}) => computeRadii({
   buttonRadius: 100,
@@ -114,6 +115,54 @@ describe('the focus ring follows the corner', () => {
       .toEqual([INPUT_RADIUS_MAX, INPUT_RADIUS_MAX, INPUT_RADIUS_MAX]);
     expect([r.smInputFocusRadius, r.inputFocusRadius, r.lgInputFocusRadius])
       .toEqual([19, 19, 19]);
+  });
+});
+
+describe('everything inside the field follows the cap', () => {
+  /* inputMetrics makes its OWN pctRadius call, so the cap in componentRadii
+     did not reach it. Its comment said the shared helper meant the two "cannot
+     answer differently" — true until componentRadii gained a rule the helper
+     knows nothing about. Sharing the arithmetic is not sharing the decision. */
+  const metrics = (pct: number) => inputMetrics({
+    heights: { small: 32, medium: 44, large: 56 },
+    inputRadiusPct: pct,
+    labelLeading: { small: 16, medium: 20, large: 24 },
+  });
+
+  it('never gives the inner button a corner its field cannot have', () => {
+    for (const pct of [0, 25, 50, 100]) {
+      const m = metrics(pct);
+      for (const S of ['Small', 'Medium', 'Large']) {
+        /* Concentric: the button sits inside the field, so its corner is
+           TIGHTER than the field's — never rounder, and never cut for a
+           corner the field stopped having. */
+        expect(m[`Input-Button-Radius-${S}`]).toBeLessThanOrEqual(INPUT_RADIUS_MAX);
+        expect(m[`Input-Button-Focus-Radius-${S}`])
+          .toBeLessThanOrEqual(INPUT_RADIUS_MAX + INPUT_FOCUS_OFFSET);
+      }
+    }
+  });
+
+  /* The floating field is TALLER than its plain twin, so the percent
+     overshoots further here than anywhere else — the cap matters more. */
+  /* INPUT_FOCUS_OFFSET is 2, where componentRadii's focus() is +3. Asserted
+     against the constant rather than a literal: the two differ on purpose or
+     by accident, but either way a test that hardcodes one of them turns a
+     question about the system into a question about the test. */
+  it('caps the floating field, where the percent overshoots most', () => {
+    const m = metrics(100);
+    for (const S of ['Small', 'Medium', 'Large']) {
+      expect(m[`Floating-Input-Radius-${S}`]).toBe(INPUT_RADIUS_MAX);
+      expect(m[`Floating-Input-Focus-Radius-${S}`])
+        .toBe(INPUT_RADIUS_MAX + INPUT_FOCUS_OFFSET);
+    }
+  });
+
+  it('still tracks the percent below the cap', () => {
+    const low = metrics(10);
+    const high = metrics(25);
+    expect(high['Floating-Input-Radius-Medium'])
+      .toBeGreaterThan(low['Floating-Input-Radius-Medium']);
   });
 });
 
