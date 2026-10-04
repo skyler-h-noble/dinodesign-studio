@@ -116,7 +116,23 @@ const LAYERS_MAX: Record<ShadowLevel, number> = { 1: 3, 2: 4, 3: 5, 4: 7, 5: 10 
    (the outermost layer of each tier). Levels 2 and 4 are the geometric means,
    so the ladder reads as even steps rather than a linear ramp that would
    crowd the low end. Previously 2.5 / 12.5 / 74, from an earlier reading. */
-const DISTANCE: Record<ShadowLevel, number> = { 1: 2, 2: 4.5, 3: 10, 4: 22.4, 5: 50 };
+/* 1 / 3 / 5 were his low / medium / high — 2, 10, 50 — with 2 and 4 the
+ * geometric means (sqrt(2*10)=4.47, sqrt(10*50)=22.36).
+ *
+ * LEVEL 5 IS NOW OURS, DELIBERATELY. 50px of reach made a dialog's shadow read
+ * as a glow rather than an edge: the envelope drives the blur as well as the
+ * offset (blur = y * blurRatio), so the outermost layer was both far down and
+ * very soft, and at a tinted shadow that haze is the most visible part of the
+ * component. 36 keeps Level-5 clearly above Level-4 while bringing the halo
+ * back inside the card's own footprint.
+ *
+ * Levels 1-4 are untouched and still reproduce his output exactly. One
+ * consequence to know: 4 remains the geometric mean of the MEASURED 3 and 5,
+ * not of 3 and the value below it, so the top of the ladder now steps 22.4 ->
+ * 36 rather than 22.4 -> 50. That is the point rather than an oversight — the
+ * instruction was to tone back level 5 and nothing else. */
+const MEASURED_DISTANCE_5 = 50;
+const DISTANCE: Record<ShadowLevel, number> = { 1: 2, 2: 4.5, 3: 10, 4: 22.4, 5: 36 };
 
 /** Vertical offset of the innermost (contact) layer. Comeau's constant, and
  *  visible in every capture: each tier's first layer is `0.3px 0.5px 0.7px`
@@ -394,9 +410,22 @@ export function shadowLayers(level: ShadowLevel, o?: ShadowOptions): Array<[numb
 /** Total opacity a level's stack sums to, at REFERENCE_INTENSITY. Levels 1/3/5
  *  are his low/medium/high; 2 and 4 are the geometric means, matching how
  *  DISTANCE interpolates. */
+/* LEVEL 5 IS OURS HERE TOO. His high tier totals 2.68; 2.2 is this system's
+ * value, chosen with the reach above because the two compound — a long
+ * envelope at full opacity is what made the halo read as weight rather than
+ * lift. Recorded beside it so the deviation stays visible rather than becoming
+ * the new story about what was measured. */
+const MEASURED_TOTAL_5 = 2.68;
 const LEVEL_TOTAL: Record<ShadowLevel, number> = {
-  1: 1.03, 2: 1.218, 3: 1.44, 4: 1.965, 5: 2.68,
+  1: 1.03, 2: 1.218, 3: 1.44, 4: 1.965, 5: 2.2,
 };
+
+/** What his generator printed for the high tier, kept so a test can assert the
+ *  deviation is the size we meant rather than drift. */
+export const REFERENCE_LEVEL_5 = {
+  total: MEASURED_TOTAL_5,
+  distance: MEASURED_DISTANCE_5,
+} as const;
 
 /** The Oomph the totals above were measured at. INTENSITY scales them linearly,
  *  so the default preset reproduces his output exactly. */

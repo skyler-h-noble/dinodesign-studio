@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   effectLevelRecipe, shadowLayers, shadowLayerCount, shadowStyleSplit, dropshadowBaseHex,
   dropshadowAlphas, dropshadowHex8, dropshadowRGB, SHADOW_LEVELS, SHADOW_DEFAULTS,
+  REFERENCE_LEVEL_5,
 } from '../utils/dropshadow';
 
 const LEVELS = SHADOW_LEVELS;
@@ -58,12 +59,34 @@ describe('geometry — exponential inside a fixed envelope', () => {
      subdivides the same envelope instead of growing the shadow. Comeau's
      captures at resolution 0 / 0.5 / 1 all start at 0.5px and end at the same
      max, which is what this pins. */
+  /* The departure from his high tier, stated as a number rather than left as
+     the absence of a failing test. If someone later "restores" 50 this fails
+     and says why; if someone drifts it further, the same. */
+  it('pulls Level-5 in from the measured 50, and only Level-5', () => {
+    const ys = shadowLayers(5).map(([, y]) => y);
+    expect(ys[ys.length - 1]).toBe(36);
+    expect(REFERENCE_LEVEL_5.distance).toBe(50);
+    /* Everything below it still reproduces him exactly. */
+    for (const [l, measured] of [[1, 2], [2, 4.5], [3, 10], [4, 22.4]] as const) {
+      const lys = shadowLayers(l).map(([, y]) => y);
+      expect(`L${l}: ${lys[lys.length - 1]}`).toBe(`L${l}: ${measured}`);
+    }
+  });
+
   it('starts at the contact offset and ends at the level\'s distance', () => {
     /* MEASURED off ten captures of his generator, not inferred: his low,
        medium and high tiers end at y = 2 / 10 / 50, and those land on levels
        1, 3 and 5. Levels 2 and 4 are the geometric means. A previous reading
-       put them at 2.5 / 12.3 / 73.7 — same pass that got the alpha wrong. */
-    const DISTANCE = { 1: 2, 2: 4.5, 3: 10, 4: 22.4, 5: 50 } as const;
+       put them at 2.5 / 12.3 / 73.7 — same pass that got the alpha wrong.
+
+       LEVEL 5 IS OURS. 50px of reach made a dialog read as a glow rather than
+       a lift — the envelope drives the blur as well as the offset, so the
+       outermost layer was both far down and very soft, and on a tinted shadow
+       that haze is the most visible part of the component. 36 is this
+       system's value, chosen deliberately; the measured 50 is asserted
+       separately below so the size of the departure stays visible rather than
+       becoming the new story about what was measured. */
+    const DISTANCE = { 1: 2, 2: 4.5, 3: 10, 4: 22.4, 5: 36 } as const;
     for (const l of LEVELS) {
       const ys = shadowLayers(l).map(([, y]) => y);
       expect(`L${l} last: ${ys[ys.length - 1]}`).toBe(`L${l} last: ${DISTANCE[l]}`);
@@ -177,15 +200,25 @@ describe('one color, one flat alpha per level', () => {
     const OBSERVED: [1 | 3 | 5, number, number][] = [
       [1, 2, 0.52], [1, 3, 0.34],
       [3, 2, 0.72], [3, 3, 0.48], [3, 4, 0.36], [3, 5, 0.29],
-      [5, 3, 0.89], [5, 4, 0.67], [5, 5, 0.54], [5, 6, 0.45],
-      [5, 7, 0.38], [5, 8, 0.34], [5, 9, 0.30], [5, 10, 0.27],
+      /* His level-5 alphas, scaled to our total. 2.2/2.68 = 0.8209, so each
+         of his printed values moves by that factor — the SHAPE of the stack
+         (flat across layers, TOTAL/N) is unchanged, which is the law this
+         test exists to pin. Only the total moved. */
+      [5, 3, 0.73], [5, 4, 0.55], [5, 5, 0.44], [5, 6, 0.37],
+      [5, 7, 0.31], [5, 8, 0.28], [5, 9, 0.24], [5, 10, 0.22],
     ];
     /* Figma renders at most eight shadows on one effect, so N=9 and N=10 are no
        longer reachable through the ladder — see MAX_EFFECT_LAYERS. Those two
        samples still pin the TOTAL, so they are checked against the law directly
        rather than dropped: they are the two that most tightly bound the high
        tier's 2.68 (a nine-layer stack at 0.30 and a ten at 0.27). */
-    const TOTALS: Record<number, number> = { 1: 1.03, 3: 1.44, 5: 2.68 };
+    /* Levels 1 and 3 reproduce him exactly and are asserted as such. Level 5
+       no longer does — its total is deliberately 2.2 against his 2.68 — so its
+       samples are checked against OUR total, with his kept beside them. A
+       test that quietly dropped the level-5 rows would have made the
+       deviation invisible, which is the opposite of what it is for. */
+    const TOTALS: Record<number, number> = { 1: 1.03, 3: 1.44, 5: 2.2 };
+    const HIS: Record<number, number> = { 1: 1.03, 3: 1.44, 5: REFERENCE_LEVEL_5.total };
     for (const [level, n, alpha] of OBSERVED) {
       // the Resolution that yields n layers for this level
       let res = -1;

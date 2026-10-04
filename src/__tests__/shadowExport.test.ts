@@ -459,13 +459,16 @@ describe('the Elevation payload matches the Figma collection', () => {
   });
 
   it('reaches the depth the CSS does — not the old hand-authored 32px', () => {
-    /* The hand-authored collection topped out at y=32. Level-5 now ends at 50,
-       which is his high tier measured off the captures (it was 74, from an
-       earlier reading). Still comfortably past the old ceiling, which is what
-       this guards: if the two ever agree again it means someone pinned the
-       generator to the old numbers rather than the other way round. */
+    /* The hand-authored collection topped out at y=32. Level-5 ends at 36:
+       this system's value, pulled in deliberately from the 50 measured off
+       his high tier, because 50px of reach made a dialog read as a glow
+       rather than a lift.
+       Still past the old ceiling, which is what this guards — if the two ever
+       agree again it means someone pinned the generator to the old numbers
+       rather than the other way round. The margin is narrower now (36 vs 32),
+       so that check matters more than it did, not less. */
     const deepest = Math.max(...slotValues(figma.Elevation['Level-5'], 'y'));
-    expect(deepest).toBe(50);
+    expect(deepest).toBe(36);
     expect(deepest).toBeGreaterThan(32);
   });
 });
