@@ -87,19 +87,19 @@ const MISSING_FROM_FILE: Record<string, string[]> = {
      A name belongs here only when the payload deliberately writes something the
      file does not have yet. Anything else means the import is silently skipping
      it, which is the failure this whole suite exists to catch. */
-  'Component-Size': [
-    /* Pending in Figma: being created in the Component-Size collection now.
-       The payload writes them deliberately, which is the one case this list is
-       for — until the variables exist, the plugin's update-only writer matches
-       by name and skips them, so a vertical button group would take no corner
-       radius at all rather than erroring.
-       Component-Size only, not Devices-Type: the value follows the SIZE mode,
-       not the device, so there is nothing for a device to say about it.
-       Drop these two lines once the snapshot is refreshed against a file that
-       has them. */
-    'Button/Vertical-Button-Focus-Radius',
-    'Button/Vertical-Button-Radius',
-  ],
+  /* Empty again. The two Vertical-Button-* variables now exist in the file,
+     correctly spelled — they were created as `Veritical-` first, which is the
+     failure this suite exists to catch: the writer matches by NAME, so a
+     payload spelling a variable correctly and a file spelling it wrong agree
+     about everything except the one thing that decides whether the value
+     lands. Nothing errors; the number simply never arrives.
+
+     Note what did NOT need adding: `Sm-` and `Lg-` variants. The three sizes
+     are MODES of one variable in Figma — medium / small / large columns — and
+     componentSizeFigma folds the Name / Sm-Name / Lg-Name triple into those
+     modes. The triple is how the modes are fed, not three variables to
+     create. */
+  'Component-Size': [],
   'Devices-Type': [],
 };
 

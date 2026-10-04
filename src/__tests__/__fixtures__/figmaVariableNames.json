@@ -1,5 +1,5 @@
 {
-  "_note": "Snapshot of the library file's variable names, read 2026-10-01 from Qv2dqF7mYoAGY77EkdrwTv (Omni-Designs-Aug12). Component-Size omits the Dynamic-Typography/* group (36 names) and Devices-Type omits Typography/* (379 names); both are covered by figmaTypographyEmission.test.ts. This is a snapshot and will go stale — that is the point. A variable is created or renamed by a person, and this moves in the same pass.",
+  "_note": "Snapshot of the library file's variable names, read 2026-10-01 from Qv2dqF7mYoAGY77EkdrwTv (Omni-Designs-Aug12). Component-Size omits the Dynamic-Typography/* group (36 names) and Devices-Type omits Typography/* (379 names); both are covered by figmaTypographyEmission.test.ts. This is a snapshot and will go stale \u2014 that is the point. A variable is created or renamed by a person, and this moves in the same pass.",
   "Component-Size": [
     "Accordion/Accordion-Focus-Radius",
     "Accordion/Accordion-Inner-Focus-Radius",
@@ -39,6 +39,8 @@
     "Button/FAB-Lowlight-Offset-x",
     "Button/FAB-Lowlight-Offset-y",
     "Button/FAB-Lowlight-Spread",
+    "Button/Vertical-Button-Focus-Radius",
+    "Button/Vertical-Button-Radius",
     "Card/Card-Focus-Radius",
     "Card/Card-Header",
     "Card/Card-Header-Line-Height",
