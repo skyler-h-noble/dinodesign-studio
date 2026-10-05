@@ -314,13 +314,23 @@ export const LINE_METRICS = {
  * against a file holding `Switch/Switch-Width` would skip in silence and
  * report success. Same shape as the `Accordian` rename and `Radio-Size`.
  *
- * Switch-Handle and Icon are in that group too and are NOT written here: the
- * handle is derived from the track in the lib (THUMB_INSET) rather than typed,
- * and the icon size belongs to the icon ramp. Adding them would mean claiming
- * a source this file does not have. */
+ * Switch-Handle and Icon were left out of the first pass, on the reasoning that
+ * the handle is derived from the track in the lib and the icon belongs to the
+ * icon ramp — so writing them would claim a source this file does not have.
+ * The file has both, and the lib disagreed with both: the handle came out as
+ * `trackH - 4`, which is 16 at small where the collection says 15, and the icon
+ * was 8 and 16 against a published 12 and 24.
+ *
+ * Medium agreed in every case. That is the third time in this one component
+ * that one size matching made the set look consistent, which is the argument
+ * for writing a number rather than deriving it: a derivation that fits two of
+ * three points is indistinguishable from a correct one until something checks
+ * the third. */
 export const SWITCH_METRICS = {
   'Switch-Width':  { medium: 42, small: 35, large: 56 },
   'Switch-Height': { medium: 24, small: 20, large: 32 },
+  'Switch-Handle': { medium: 20, small: 15, large: 28 },
+  'Icon':          { medium: 16, small: 12, large: 24 },
 } as const;
 
 /* ── Radio and Checkbox ───────────────────────────────────────────────────
