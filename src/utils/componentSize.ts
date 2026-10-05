@@ -113,6 +113,20 @@ export function componentSizeNames(payload: ComponentSizePayload): string[] {
  * per-platform table like PLATFORM_BUTTON and the columns are already there.
  */
 export const FAB_SIZE = { small: 32, medium: 48, large: 56 } as const;
+
+/* The SpeedDial's gap, which lives in the FAB group because the dial and its
+ * actions are FABs — `FAB/SpeedDial-Gap`, read from the file on 2026-10-05.
+ *
+ * Three consecutive steps of the SIZING scale: --Sizing-1, -1-and-Half, -2.
+ * Spacing comes off that scale, and a fourth set of numbers for one component
+ * is how two scales start to drift.
+ *
+ * Static, like NAV_METRICS and LINE_METRICS: the gap between a dial and its
+ * fan is a shape rather than a derivation, so writing it is about giving the
+ * number one home, not about computing it. Which is the point — the library
+ * holds 8 / 12 / 16 as literals too, and that is the configuration this file
+ * already records catching Divider and the Step bar in. */
+export const SPEED_DIAL_GAP = { small: 8, medium: 12, large: 16 } as const;
 export const FAB_ICON = { small: 16, medium: 24, large: 32 } as const;
 
 /** The focus ring's corner, one per size. Derived — see above. */
@@ -131,6 +145,12 @@ export function fabMetricsFlat(): Record<string, number> {
     'FAB-Icon': FAB_ICON.medium,
     'Sm-FAB-Icon': FAB_ICON.small,
     'Lg-FAB-Icon': FAB_ICON.large,
+    /* In the FAB group, not a SpeedDial one. The name in the file is
+       `FAB/SpeedDial-Gap`, and the writer matches on the full Group/Name — so
+       a SpeedDial group here would skip in silence and report success. */
+    'SpeedDial-Gap': SPEED_DIAL_GAP.medium,
+    'Sm-SpeedDial-Gap': SPEED_DIAL_GAP.small,
+    'Lg-SpeedDial-Gap': SPEED_DIAL_GAP.large,
     'FAB-Focus-Radius': FAB_FOCUS_RADIUS.medium,
     'Sm-FAB-Focus-Radius': FAB_FOCUS_RADIUS.small,
     'Lg-FAB-Focus-Radius': FAB_FOCUS_RADIUS.large,
