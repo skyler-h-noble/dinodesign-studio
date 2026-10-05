@@ -1007,11 +1007,12 @@ CONVERSION RULES:
     each child <Button> (never set variant="default"/"outline" on the children —
     that double-borders).
 
-    The Fit variant is GONE from the file. It held Default | Fill, and Fill is
-    what native auto-layout sizing already says, so a variant for it was a
-    second way to state one thing. Read the group's horizontal sizing instead:
-      - HUG   → <ButtonGroup>            (each button hugs its text)
-      - FILL  → <ButtonGroup fit="fill">  (group fills its container, equal share)
+    The group still HAS a Fit variant: Default | Fill. (Button's was removed —
+    one button filling its parent is native sizing — but the group's survived,
+    and these are different properties on different sets.) Read it:
+      - Fit=Default → <ButtonGroup>            (each button hugs its text)
+      - Fit=Fill    → <ButtonGroup fit="fill">  (group fills its container, equal share)
+    Fall back to the group's horizontal sizing only when the variant is absent.
 
     NEVER emit fit="equal" from a conversion. It means the group hugs while
     every button matches the widest, which Figma auto-layout cannot express at
