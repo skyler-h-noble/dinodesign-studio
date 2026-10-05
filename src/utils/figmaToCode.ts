@@ -1002,6 +1002,16 @@ CONVERSION RULES:
     off wrongly falls back to --Border-Variant (the lighter line). Read the
     variant; only omit the prop when it's actually Border-Variant.
 
+4f-3b. BUTTON — fullWidth comes from SIZING, not a variant.
+    The Button set's Fit property (default | fullWidth) was removed: one button
+    filling its parent is what native auto-layout sizing already says, and a
+    variant for it was a second way to state one thing. So read the node:
+      - HUG / FIXED → <Button>              (hugs its label)
+      - FILL        → <Button fullWidth>    (stretches to the container)
+    Skip it entirely for iconOnly and letterNumber, which are square by
+    definition — a fullWidth icon button is a stretched circle, which the
+    component ignores anyway.
+
 4f-4. BUTTONGROUP — controlled, and read the group's SIZING, not a Fit variant.
     Always controlled: pass value + onChange on the <ButtonGroup> and value= on
     each child <Button> (never set variant="default"/"outline" on the children —
