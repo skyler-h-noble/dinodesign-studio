@@ -1002,17 +1002,23 @@ CONVERSION RULES:
     off wrongly falls back to --Border-Variant (the lighter line). Read the
     variant; only omit the prop when it's actually Border-Variant.
 
-4f-4. BUTTONGROUP — controlled, and map the WIDTH (Fit) variant.
+4f-4. BUTTONGROUP — controlled, and read the group's SIZING, not a Fit variant.
     Always controlled: pass value + onChange on the <ButtonGroup> and value= on
     each child <Button> (never set variant="default"/"outline" on the children —
-    that double-borders). Map the Figma "Fit"/"Width" variant (_aaid.variant) to
-    the fit prop:
-      - "Hug" / none → <ButtonGroup>            (default; each button hugs its text)
-      - "Fill"       → <ButtonGroup fit="fill">  (group fills its container, equal share)
-      - "Equal"      → <ButtonGroup fit="equal"> (group hugs, every button = the widest)
-    "Equal" is the one to watch: a Figma group whose buttons are visually the same
-    width but the group is NOT full-width is fit="equal", NOT fit="fill" and NOT
-    fixed px. Read the variant; don't infer from rendered widths.
+    that double-borders).
+
+    The Fit variant is GONE from the file. It held Default | Fill, and Fill is
+    what native auto-layout sizing already says, so a variant for it was a
+    second way to state one thing. Read the group's horizontal sizing instead:
+      - HUG   → <ButtonGroup>            (each button hugs its text)
+      - FILL  → <ButtonGroup fit="fill">  (group fills its container, equal share)
+
+    NEVER emit fit="equal" from a conversion. It means the group hugs while
+    every button matches the widest, which Figma auto-layout cannot express at
+    all: children share space only when the parent has width to share, and a
+    hugging parent has none. The prop exists for code that needs it; nothing in
+    a Figma file can mean it, so inferring it from rendered widths — several
+    buttons that happen to look equal — is a guess, and usually wrong.
 
 4g. IMAGE FILLS ARE NOT URLs.
 
