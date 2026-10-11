@@ -870,27 +870,28 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerHigh = at(0.90);
     containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'black') {
-    // Black cards ramp the other way: the floor is the pure tone and the higher
-    // levels let the page bleed through, so a raised card lightens.
+    // Black cards intensify toward Highest, like every light-mode style: the
+    // lower levels let the page bleed through and the top level is pure.
     //
     // The face is Neutral Color-1, matching the export. The preview used to use
     // Color-3 while the export emitted a flat Color-2 — a silent divergence in
     // the flat value, invisible because both looked like a plausible dark card.
     const at = (a: number) => blendColors(neutral(1), p(surfacePalette, surfaceN), a);
-    containerLowest = neutral(1);
-    containerLow = at(0.96);
+    containerLowest = at(0.90);
+    containerLow = at(0.92);
     containerBg = at(0.94);
-    containerHigh = at(0.92);
-    containerHighest = at(0.90);
+    containerHigh = at(0.96);
+    containerHighest = neutral(1);
   } else if (!isDark && effectiveCardColoring === 'white') {
     // White cards ramp too, at much higher opacities — they must still read as
-    // white, so the lower levels only let a little of the page through.
+    // white. The floor is pure white and each raised level takes on more of
+    // the page, so color intensifies toward Highest as in the other styles.
     const at = (a: number) => blendColors(neutral(12), p(surfacePalette, surfaceN), a);
-    containerLowest = at(0.92);
-    containerLow = at(0.94);
+    containerLowest = neutral(12);
+    containerLow = at(0.98);
     containerBg = at(0.97);
-    containerHigh = at(0.98);
-    containerHighest = neutral(12);
+    containerHigh = at(0.94);
+    containerHighest = at(0.92);
   }
 
   // Tertiary container always uses its own palette — never white/black

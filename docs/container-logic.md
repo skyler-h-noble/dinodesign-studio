@@ -78,34 +78,41 @@ a dark one. Rising elevation moves *away* from the page.
 | `Container-High` | 90% |
 | `Container-Highest` | **the tone itself** |
 
+**In light mode, color intensifies toward `Container-Highest` in every card
+style.** Tonal reaches the pure tone, white takes on the most page, black
+reaches pure black. White and black used to run the other way, so Highest was
+their *least* colored level; they were reversed on 2026-10-10 using the same
+five values, so `Container` itself did not move.
+
 ### White cards (light mode)
 
 Face is **Neutral Color-12**. The opacities sit high because white cards must
-still read as white — the lower levels only let a little of the page through.
+still read as white — even the top level only lets a little of the page
+through. The floor is pure white.
 
 | Level | Opacity |
 | --- | --- |
-| `Container-Lowest` | 92% |
-| `Container-Low` | 94% |
+| `Container-Lowest` | **Neutral Color-12** |
+| `Container-Low` | 98% |
 | `Container` | 97% |
-| `Container-High` | 98% |
-| `Container-Highest` | **Neutral Color-12** |
+| `Container-High` | 94% |
+| `Container-Highest` | 92% |
+
+On a very pale page (Color-11 and up) the steps are tiny and neighbours can
+round to the same hex — see [Known-flat cases](#known-flat-cases).
 
 ### Black cards (light mode)
 
-Face is **Neutral Color-1**. This ramp runs the **other way**: the floor is the
-pure colour and the higher levels let the page bleed through, so a raised card
-lightens against a light page.
+Face is **Neutral Color-1**. The lower levels let the page bleed through and
+the top level is the pure colour.
 
 | Level | Opacity |
 | --- | --- |
-| `Container-Lowest` | **Neutral Color-1** |
-| `Container-Low` | 96% |
+| `Container-Lowest` | 90% |
+| `Container-Low` | 92% |
 | `Container` | 94% |
-| `Container-High` | 92% |
-| `Container-Highest` | 90% |
-
-Note the pure level is `Lowest` here, not `Highest`.
+| `Container-High` | 96% |
+| `Container-Highest` | **Neutral Color-1** |
 
 ### Dark mode
 
@@ -177,7 +184,7 @@ keyed to Neutral.
 Not every ramp has range. These are correct rather than broken:
 
 - **White cards on a white page.** 92% of Neutral Color-12 over Color-12 is
-  Color-12. There is nothing to blend with; elevation comes from the drop
+  Color-12, so all five levels are white. There is nothing to blend with; elevation comes from the drop
   shadow, which is what light mode uses anyway.
 - **Any card style whose face equals its background**, outside the two tonal
   collisions handled above.

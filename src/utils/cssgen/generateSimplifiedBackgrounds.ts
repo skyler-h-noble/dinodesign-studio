@@ -142,16 +142,24 @@ function lightModeBackgroundsBase(
     // Professional mode: WHITE cards, as an elevation ramp rather than five
     // identical whites. Same idea as the tonal ramp below and as dark mode —
     // one color at five opacities over the background — but the opacities sit
-    // much higher, because white cards are meant to read as white: the lower
-    // levels only let a little of the page through.
+    // much higher, because white cards are meant to read as white: even the
+    // top level only lets a little of the page through.
     //
-    //   Container-Lowest  = 92% Neutral Color-12 over the background
-    //   Container-Low     = 94%
+    // COLOR INTENSIFIES TOWARD HIGHEST, in every light-mode card style. The
+    // floor is pure white and each raised level takes on more of the page:
+    //
+    //   Container-Lowest  = Neutral Color-12
+    //   Container-Low     = 98% Neutral Color-12 over the background
     //   Container         = 97%
-    //   Container-High    = 98%
-    //   Container-Highest = Neutral Color-12
+    //   Container-High    = 94%
+    //   Container-Highest = 92%
     //
-    // Only the top level is a real color, so only it keeps a token reference;
+    // This used to run the other way (92% at Lowest, pure white at Highest),
+    // so Highest was the LEAST coloured level — the opposite of tonal cards,
+    // where Highest is the pure tone. Same five values, reversed; Container
+    // itself did not move.
+    //
+    // Only the pure level is a real color, so only it keeps a token reference;
     // the rest are blends and stay hex. Mixing refs and blends is what made the
     // dark-mode ramp non-monotonic.
     if (containerStyle === 'professional') {
@@ -177,37 +185,38 @@ function lightModeBackgroundsBase(
             type: 'color'
           },
           'Container-Lowest': {
-            value: atWhite(0.92),
+            value: '{Colors.Neutral.Color-12}',
             type: 'color'
           },
           'Container-Low': {
-            value: atWhite(0.94),
-            type: 'color'
-          },
-          'Container-High': {
             value: atWhite(0.98),
             type: 'color'
           },
+          'Container-High': {
+            value: atWhite(0.94),
+            type: 'color'
+          },
           'Container-Highest': {
-            value: '{Colors.Neutral.Color-12}',
+            value: atWhite(0.92),
             type: 'color'
           }
         }
       };
     }
 
-    // Black mode: BLACK cards, as an elevation ramp. This one runs the OTHER
-    // way: the floor is the pure color and the higher levels let a little of
-    // the page bleed through, so a raised card lightens against a light page.
+    // Black mode: BLACK cards, as an elevation ramp. Color intensifies toward
+    // Highest, as in the other two styles: the lower levels let a little of
+    // the page bleed through and the top level is the pure color.
     //
-    //   Container-Lowest  = Neutral Color-1 (100%)
-    //   Container-Low     = 96% Neutral Color-1 over the background
+    //   Container-Lowest  = 90% Neutral Color-1 over the background
+    //   Container-Low     = 92%
     //   Container         = 94%
-    //   Container-High    = 92%
-    //   Container-Highest = 90%
+    //   Container-High    = 96%
+    //   Container-Highest = Neutral Color-1 (100%)
     //
-    // So the pure level — the one that keeps a token reference — is Lowest
-    // here, not Highest. Everything else is a blend and stays hex.
+    // This used to run the other way (pure at Lowest, 90% at Highest). Same
+    // five values, reversed; Container itself did not move. The pure level is
+    // the one that keeps a token reference; the rest are blends and stay hex.
     if (containerStyle === 'black') {
       const atBlack = (a: number) => blendColors(NEUTRAL_BLACK, surfaceColor, a);
       return {
@@ -231,19 +240,19 @@ function lightModeBackgroundsBase(
             type: 'color'
           },
           'Container-Lowest': {
-            value: '{Colors.Neutral.Color-1}',
+            value: atBlack(0.90),
             type: 'color'
           },
           'Container-Low': {
-            value: atBlack(0.96),
-            type: 'color'
-          },
-          'Container-High': {
             value: atBlack(0.92),
             type: 'color'
           },
+          'Container-High': {
+            value: atBlack(0.96),
+            type: 'color'
+          },
           'Container-Highest': {
-            value: atBlack(0.90),
+            value: '{Colors.Neutral.Color-1}',
             type: 'color'
           }
         }

@@ -151,22 +151,24 @@ describe('tonal container tone follows the background', () => {
     }
   });
 
-  // WHITE cards ramp too, at 92/94/97/98/100 — high enough that they still read
-  // as white. They used to be five identical {White} values.
-  it('export: white cards ramp toward white over a tinted page', () => {
+  // WHITE cards ramp too, at 100/98/97/94/92 — high enough that they still read
+  // as white. They used to be five identical {White} values, then a ramp that
+  // ran the wrong way (pure white at Highest).
+  it('export: white cards take on the page toward Highest', () => {
     const primary = generateSemanticLightModeScale('#7b3f9d', undefined, '#7b3f9d')
       .map((t) => ({ tone: t.tone, color: t.hex }));
     const out = generateSimplifiedLightModeBackgrounds(
       primary[5].color, primary[5].tone, primary, false, 'Primary', 'professional',
     );
-    expect(out.Containers['Container-Highest'].value).toBe('{Colors.Neutral.Color-12}');
-    const steps = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High']
+    expect(out.Containers['Container-Lowest'].value).toBe('{Colors.Neutral.Color-12}');
+    const steps = ['Container-Low', 'Container', 'Container-High', 'Container-Highest']
       .map((l) => chroma(out.Containers[l as 'Container'].value as string).lch()[0]);
+    // Each raised level lets more of the darker page through, so it darkens.
     for (let i = 1; i < steps.length; i++) {
-      expect(`white/step${i}:${steps[i] > steps[i - 1]}`).toBe(`white/step${i}:true`);
+      expect(`white/step${i}:${steps[i] < steps[i - 1]}`).toBe(`white/step${i}:true`);
     }
-    // and the floor is visibly tinted by the page, not plain white
-    expect(out.Containers['Container-Lowest'].value).not.toBe(NEUTRAL_LIGHT[11]);
+    // and the top is visibly tinted by the page, not plain white
+    expect(out.Containers['Container-Highest'].value).not.toBe(NEUTRAL_LIGHT[11]);
   });
 
   // On an already-white page there is nothing to blend with: 92% white over
@@ -178,26 +180,26 @@ describe('tonal container tone follows the background', () => {
     const out = generateSimplifiedLightModeBackgrounds(
       neutral[11].color, neutral[11].tone, neutral, false, 'Neutral', 'professional',
     );
-    for (const l of ['Container-Lowest', 'Container-Low', 'Container', 'Container-High']) {
+    for (const l of ['Container-Low', 'Container', 'Container-High', 'Container-Highest']) {
       expect(out.Containers[l as 'Container'].value).toBe(NEUTRAL_LIGHT[11]);
     }
-    expect(out.Containers['Container-Highest'].value).toBe('{Colors.Neutral.Color-12}');
+    expect(out.Containers['Container-Lowest'].value).toBe('{Colors.Neutral.Color-12}');
   });
 
-  // BLACK cards ramp the other way — the floor is the pure tone and the higher
-  // levels let the page through, so a raised card lightens against a light page.
-  it('export: black cards ramp down from Neutral Color-1', () => {
+  // BLACK cards intensify toward Highest too — the lower levels let the light
+  // page through, and the top level is the pure tone.
+  it('export: black cards ramp up to Neutral Color-1 at Highest', () => {
     const primary = generateSemanticLightModeScale('#7b3f9d', undefined, '#7b3f9d')
       .map((t) => ({ tone: t.tone, color: t.hex }));
     const out = generateSimplifiedLightModeBackgrounds(
       primary[10].color, primary[10].tone, primary, false, 'Primary', 'black',
     );
-    expect(out.Containers['Container-Lowest'].value).toBe('{Colors.Neutral.Color-1}');
-    const steps = ['Container-Low', 'Container', 'Container-High', 'Container-Highest']
+    expect(out.Containers['Container-Highest'].value).toBe('{Colors.Neutral.Color-1}');
+    const steps = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High']
       .map((l) => chroma(out.Containers[l as 'Container'].value as string).lch()[0]);
-    // Rising elevation lets more of the light page through, so each step lightens.
+    // Rising elevation lets less of the light page through, so each step darkens.
     for (let i = 1; i < steps.length; i++) {
-      expect(`black/step${i}:${steps[i] > steps[i - 1]}`).toBe(`black/step${i}:true`);
+      expect(`black/step${i}:${steps[i] < steps[i - 1]}`).toBe(`black/step${i}:true`);
     }
   });
 
@@ -241,6 +243,40 @@ describe('tonal container tone follows the background', () => {
       for (let i = 1; i < steps.length; i++) {
         expect(`${background}/step${i}:${steps[i] > steps[i - 1]}`)
           .toBe(`${background}/step${i}:true`);
+      }
+    }
+  });
+
+  // White and black cards had no preview test, so the preview could run its
+  // ladder the opposite way to the export and nothing would say so. In light
+  // mode every card style intensifies toward Highest: white cards start pure
+  // white and take on the page, black cards end at pure Neutral Color-1.
+  it('preview: white and black cards intensify toward Highest, like the export', () => {
+    const levels = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest'];
+    for (const cardColoring of ['white', 'black']) {
+      const css = buildPreviewCSS({
+        colorScheme: SCHEME,
+        userSelections: { ...tonal('primary-light'), cardColoring } as unknown as UserSelections,
+        componentStyle: 'modern', mode: 'light', typographyStyles: TYPOGRAPHY,
+      } as never);
+      const L = levels.map((t) =>
+        chroma(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, t)))!).lch()[0]);
+      if (cardColoring === 'white') {
+        expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Lowest'))))
+          .toBe(norm(NEUTRAL_LIGHT[11]));
+        // On a pale page the white steps are tiny and neighbours can round to
+        // the same hex, so: never lighter going up, and the top is tinted.
+        for (let i = 1; i < L.length; i++) {
+          expect(`white/step${i}:${L[i] <= L[i - 1]}`).toBe(`white/step${i}:true`);
+        }
+        expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest'))))
+          .not.toBe(norm(NEUTRAL_LIGHT[11]));
+      } else {
+        expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest'))))
+          .toBe(norm(NEUTRAL_LIGHT[0]));
+        for (let i = 1; i < L.length; i++) {
+          expect(`black/step${i}:${L[i] < L[i - 1]}`).toBe(`black/step${i}:true`);
+        }
       }
     }
   });
