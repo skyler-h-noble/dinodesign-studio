@@ -17,7 +17,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
-import { H1, H2, Body, BodySmall, Link, Tabs, TabList, Tab } from '@omni-design/components';
+import { H1, H2, Body, BodySmall, Link, Tabs, TabList, Tab, OmniDesignProvider } from '@omni-design/components';
 import { COMPONENT_DOCS } from '../utils/docs/components';
 import type { ComponentDoc } from '../utils/docs/componentDoc';
 import { docsSlug } from '../utils/docs/docsLink';
@@ -176,7 +176,6 @@ export function ComponentDocsPage() {
      fallbacks and look like a brand that happens to be grey. */
   if (exists !== true) return body;
 
-  const OmniDesignProvider = (require('@omni-design/components') as any).OmniDesignProvider;
   return (
     <OmniDesignProvider {...systemCssUrls(uuid!)}
       defaultTheme="Default" defaultStyle="Modern" defaultSurface="Surface">

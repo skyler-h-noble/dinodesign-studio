@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import {
   IconBadge,
-  AppBar, Button, H1, H2, H3, Body, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, Section, Footer, Icon,
+  AppBar, Button, H2, H3, Body, DisplayMedium, AltDisplayMedium, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, Section, Footer, Icon,
 } from '@omni-design/components';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -112,7 +112,9 @@ export default function LandingPage() {
         brand="OmniDesign"
         onBrandClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         centerSlot={
-          <Tabs value={activeSection} onChange={(val: string) => handleNavClick(val)}>
+          /* No baseline rule under the nav — it read as an underline across the
+             bar. The 2px marker under the current section stays. */
+          <Tabs value={activeSection} onChange={(val: string) => handleNavClick(val)} baseline={false}>
             <TabList aria-label="Page sections">
               {NAV_LINKS.map(link => (
                 <Tab key={link.id} value={link.id}>{link.label}</Tab>
@@ -141,15 +143,20 @@ export default function LandingPage() {
       </Section>
 
       {/* ─── Hero ─── */}
-      <Section theme="Neutral" surface="Surface-Dimmest" padding="80px 24px 60px">
+      {/* The hero sits on the applied system's Default background, so choosing
+          a demo card below repaints it in that brand. */}
+      <Section theme="Default" surface="Surface" padding="80px 24px 60px">
         <VStack spacing={4} alignItems="center" style={{ maxWidth: 1000, margin: '0 auto' }}>
           <VStack spacing={2} alignItems="center">
             <BodySmall color="primary" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.75rem', textAlign: 'center' }}>
               Branded, Scalable and Accessible Design Systems, Automated
             </BodySmall>
-            <H1 style={{ textAlign: 'center', maxWidth: 700 }}>
-              One image. One complete design system.
-            </H1>
+            {/* Display, with the one word that carries the promise in Alt
+                Display. Still the page's <h1> — the style changes, the outline
+                does not. */}
+            <DisplayMedium component="h1" style={{ textAlign: 'center', maxWidth: 900, margin: 0 }}>
+              One image. One <AltDisplayMedium component="span" width="hug">complete</AltDisplayMedium> design system.
+            </DisplayMedium>
             <Body color="quiet" style={{ textAlign: 'center', maxWidth: 560 }}>
               Upload a mood board and get a fully accessible, coded design system with Figma library,
               49 React components, and hosted playground — live in minutes.
@@ -272,10 +279,13 @@ export default function LandingPage() {
           </VStack>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-            {FEATURES.map(f => (
-              <Card key={f.title} padding="medium">
+            {FEATURES.map((f, i) => (
+              /* A lone card on the last row sits in the middle column rather
+                 than hanging off the left edge. */
+              <Card key={f.title} padding="medium"
+                style={i === FEATURES.length - 1 && FEATURES.length % 3 === 1 ? { gridColumn: 2 } : undefined}>
                 <VStack spacing={2}>
-                  <IconBadge color="primary">{f.icon}</IconBadge>
+                  <IconBadge color="tertiary">{f.icon}</IconBadge>
                   <BodySmall style={{ fontWeight: 700 }}>{f.title}</BodySmall>
                   <BodySmall color="quiet">{f.description}</BodySmall>
                 </VStack>

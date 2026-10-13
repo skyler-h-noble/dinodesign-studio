@@ -93,6 +93,9 @@ const THEMES: string[] = [...THEME_MODES];
  * The user's pick still follows Default, which costs nothing and keeps the
  * palette they chose next to the default that resolves it.
  */
+import { solveChartPalette } from './chartPalette';
+import { solveQuietOpacities } from './quietOpacity';
+
 export function themeOrder(defaultTheme?: string): string[] {
   const rest = THEMES.filter((t) => t !== 'Default');
   if (!defaultTheme || !rest.includes(defaultTheme)) return ['Default', ...rest];
@@ -729,7 +732,11 @@ export function generateFigmaJSON(
 
     // Export all sections from the design system (except Themes which go in their own collection)
     const MODES_SECTIONS = [
-      'Colors', 'Text', 'Eyebrows', 'Header', 'Quiet', 'Border', 'Border-Variant',
+      /* 'Quiet' is deliberately absent. It is now twelve FLOAT opacities, written
+         below — a variable's resolvedType is fixed at creation, so shipping the
+         old 240 colours would recreate them beside the floats rather than
+         replace them. The colorSystem still carries them for the CSS side. */
+      'Colors', 'Text', 'Eyebrows', 'Header', 'Border', 'Border-Variant',
       'Hover', 'Pressed', 'Focus-Visible',
       'Icon', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
@@ -1279,6 +1286,22 @@ export function generateFigmaJSON(
               // Quiet, Icon-Variant, Focus-Visible, Border-Variant, Highlight, Lowlight
               // are all now in Modes and get kept as token refs via MODES_GROUPS check.
 
+              /* NUMBERS pass through with their type intact.
+               *
+               * Everything below this stamps `type: 'color'` on whatever it
+               * writes, which was fine while every theme token was one. It is
+               * not fine for Quiet-Opacity: the VALUE came through correctly —
+               * {Quiet.Color-5-Opacity} matches a Modes group and is kept as a
+               * reference — but the type said colour, and the importer creates
+               * a variable from the type, so the file got a COLOR variable
+               * aliased to a FLOAT. resolvedType is fixed at creation, so that
+               * is not something a later import can repair. */
+              if (val && typeof val === 'object' && 'value' in val
+                  && (val as any).type === 'number') {
+                target[key] = { value: (val as any).value, type: 'number' };
+                continue;
+              }
+
               if (val && typeof val === 'object' && 'value' in val && 'type' in val) {
                 /* {Icon-Variant.X} -> {Icon.X} for the FIGMA payload only.
                  *
@@ -1529,6 +1552,121 @@ export function generateFigmaJSON(
     }
   }
 
+  /* Chart colours — the eight generated hues, as literals in Modes.
+   *
+   * Only the generated eight are written. The brand four and the state four are
+   * ALIASES in the Chart collection, pointing at ramps that already exist and
+   * already carry their own Light/Dark values, so a literal for them would
+   * freeze one mode. Nothing here touches the Chart collection: its aliases
+   * point at these variables by id, and ids survive a value change.
+   *
+   * Written as `Chart/Surface-Brightest/Color-5` .. `/Color-12` and the same
+   * under Surface-Dimmest, which is the shape the file already has.
+   *
+   * TWO grounds, not ten surface levels: a chart is drawn on the brightest or
+   * the dimmest surface and --Chart-BG names which. And the HUES are chosen
+   * once, from Light-Mode, then reused — a series that changed hue between
+   * modes or grounds would make the legend name a colour the chart never uses.
+   *
+   * Theme-independence is verified, not assumed: solveGround is handed EVERY
+   * theme's version of a ground and a tone is usable only if it clears 3:1
+   * against all of them. If one cannot, the series is reported in `unsolvable`
+   * and warned about here rather than written at a tone that fails somewhere.
+   *
+   * Full reasoning, and the two approaches measured and rejected:
+   * docs/chart-colors.md. */
+  /* Chart series per ground — solved in chartPalette.ts so the CSS export
+     reads the same result (see solveChartPalette). */
+  {
+    const palette = solveChartPalette(designSystemJSON, Object.keys(figma.Modes));
+    for (const [mode, grounds] of Object.entries(palette)) {
+      if (figma.Modes[mode]) Object.assign((figma.Modes[mode].Chart ||= {}), grounds);
+    }
+  }
+
+  /* Quiet as an OPACITY on Text, not a tone of its own.
+   *
+   * Quiet used to be its own ramp position, picked per background by
+   * findAccessibleTone(..., 4.5). It was already choosing the closest tone
+   * above the line in nearly every case — the overshoot to 5.0-7.0:1 is the
+   * ramp's granularity, not mistuning, because no tone sits between 4.5 and
+   * 7.04 on Neutral against #fcfcfc. An alpha lands wherever you want.
+   *
+   * ONE FLOAT PER TONE, shared across palettes AND across Surfaces and
+   * Containers — twelve in all, which is the shape the file now has. Tones at
+   * the same
+   * index share a lightness by construction, so their luminance barely moves
+   * — measured 45.9-46.7% at t1 and 71.0-74.5% at t5 across eight palettes.
+   * Taking the MAX puts every palette at or above 4.5 with the worst
+   * overshoot at 4.81. That is 24 floats where the colour table is 240.
+   *
+   * It does NOT collapse any further: one opacity per SURFACE (shared across
+   * themes) was measured and blew out to 7.3-10.5:1, because themes start
+   * from genuinely different contrasts.
+   *
+   * Emitted as a PERCENT (0..100), like Drop-Colors Level-<n>/Opacity — a
+   * number bound to a colour's opacity renders by appending "%", so a 0..1
+   * fraction would paint nothing.
+   *
+   * Written as `Quiet/{branch}/Color-{N}-Opacity`, matching the variables in
+   * the file. A FLOAT cannot replace a COLOR in place — resolvedType is fixed
+   * at creation — so these are new variables beside the old ones, and the 240
+   * colours get deleted only once nothing is bound to them (invariant 8). */
+  {
+    const QUIET_TARGET = 4.5;
+    for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+      const modeData = designSystemJSON.Modes?.[modeName];
+      if (!modeData?.Colors || !figma.Modes[modeName]) continue;
+
+      /* The ground each branch is measured against.
+       *
+       * Surfaces  the palette's own tone — Text.Surfaces.X.Color-N is the text
+       *           for a background that IS X's Color-N.
+       *
+       * Containers NOT the palette tone. A container is its own colour derived
+       *           from the background, so the text sits on Container-Highest
+       *           rather than on Color-N, and measuring against the tone would
+       *           compute an opacity for a ground that is never painted. */
+      /* Both the Text table and the Containers are mostly ALIASES, not hexes:
+         Text.Surfaces.Primary.Color-1 is `{Colors.Primary.Color-9}` and
+         Container-Highest is `{Colors.Primary.Color-2}`. An earlier version
+         tested the raw value against /^#[0-9a-f]{6}$/, so every pair was
+         rejected, `max` stayed 0 and all twelve tones were dropped — which is
+         what shipped a payload with no Quiet section at all. Resolve first,
+         THEN check the shape. */
+      const quietLookup = buildTokenLookup(modeData);
+      const toHex = (raw: any): string | null => {
+        const v = typeof raw === 'string' ? raw : raw?.value;
+        if (typeof v !== 'string') return null;
+        const hex = v.startsWith('#') ? v : resolveToHex(v, quietLookup, modeData.Colors);
+        return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex.slice(0, 7))
+          ? hex.slice(0, 7) : null;
+      };
+
+      /* The solve itself lives in quietOpacity.ts, not here, because the CSS
+         export has to paint the colour this number describes — invariant 5,
+         and a table computed twice is a table that drifts. */
+      const solved = solveQuietOpacities(modeData, toHex, QUIET_TARGET);
+      for (const note of solved.notes)
+        console.warn(`[figma] Quiet-Opacity ${modeName}: ${note}`);
+
+      const group: any = {};
+      for (const [n, pct] of Object.entries(solved.percent))
+        group[`Color-${n}-Opacity`] = { value: pct, type: 'number' };
+
+      if (Object.keys(group).length) {
+        figma.Modes[modeName].Quiet = group;
+        console.warn(`[figma] Quiet-Opacity ${modeName}: ${Object.keys(group).length} of 12 tones written ` +
+          `(${Object.entries<any>(group).map(([k, v]) => k.replace('Color-', '').replace('-Opacity', '') + ':' + v.value + '%').join(' ')})`);
+      } else {
+        console.warn(`[figma] Quiet-Opacity ${modeName}: NOTHING written. ` +
+          `Text.Surfaces present=${!!designSystemJSON.Modes?.[modeName]?.Text?.Surfaces}, ` +
+          `Text.Containers present=${!!designSystemJSON.Modes?.[modeName]?.Text?.Containers}, ` +
+          `Backgrounds present=${!!designSystemJSON.Modes?.[modeName]?.Backgrounds}.`);
+      }
+    }
+  }
+
   // ── SurfacesContainers section ──
   // Links to Themes.Default for surface variables, Modes for container backgrounds
   /* All FIVE surface levels. Brightest was missing here long after the level
@@ -1751,6 +1889,10 @@ export function generateFigmaJSON(
         { role: 'Text', section: 'Text', pal: null },
         { role: 'Quiet', section: 'Quiet', pal: null },
         { role: 'Header', section: 'Header', pal: null },
+        /* Match rotates onto the theme's OWN palette, which for Default is the
+           background palette — so `pal: null` is the rotation, not a default. */
+        { role: 'Text-Match', section: 'Text', pal: null },
+        { role: 'Header-Match', section: 'Header', pal: null },
         { role: 'Border', section: 'Border', pal: null },
         { role: 'Border-Variant', section: 'Border-Variant', pal: null },
         { role: 'Hotlink', section: 'Text', pal: 'Info' },
@@ -1767,13 +1909,16 @@ export function generateFigmaJSON(
            Default theme aliases {Default-Background.<prefix>Icons-Default-
            Variant} at all four surface prefixes. */
         { role: 'Icons-Default-Variant', section: 'Text', pal: null },
+        /* Icons-Match reads the Icon table at the theme's own palette, which
+           for Default is the background palette — the same rotation Text-Match
+           and Header-Match make. */
+        { role: 'Icons-Match', section: 'Icon', pal: null },
         ...ACCENT_PALETTES.map(pal => ({ role: `Text-${pal}`, section: 'Text', pal })),
         ...ACCENT_PALETTES.map(pal => ({ role: `Header-${pal}`, section: 'Header', pal })),
         /* Quiet's accents, which this list carried for Text and Header and not
            for Quiet. The Quiet section in Modes covers the same ten scopes as
            Text — it was only ever exposed for one palette, so the muted role
-           could not speak in a palette's hue while the other two could.
-           Same section shape as Text, so it resolves the same way. */
+           could not speak in a palette's hue while the other two could. */
         ...ACCENT_PALETTES.map(pal => ({ role: `Quiet-${pal}`, section: 'Quiet', pal })),
         // Text-BW resolves from the BlackWhite map rather than a palette family
         // — white below tone 6, black from 6 up — but it is otherwise an
@@ -1862,16 +2007,17 @@ export function generateFigmaJSON(
             if (onHex?.startsWith('#')) defBg[`${prefix}On-${pal}`] = { value: onHex, type: 'color' };
           }
         }
-        // On-Default. Icons-Default is written by the ROLE_SOURCES loop, which
-        // runs before this, so its resolved hex is already on defBg. It follows
-        // the theme's own palette rather than an accent one, which is why it
-        // sits outside the loop above.
-        const defIconHex = defBg[`${prefix}Icons-Default`]?.value;
-        const defTone = findTone(defIconHex || '');
-        if (defTone) {
-          let onHex = modeData.Text?.Surfaces?.[defTone.palette]?.[`Color-${defTone.n}`]?.value;
+        /* On-Default and On-Match. Both their icons are written by the
+           ROLE_SOURCES loop, which runs before this, so the resolved hex is
+           already on defBg. They follow the theme's own palette rather than an
+           accent one, which is why they sit outside the loop above. */
+        for (const role of ['Default', 'Match']) {
+          const iconHex = defBg[`${prefix}Icons-${role}`]?.value;
+          const tone = findTone(iconHex || '');
+          if (!tone) continue;
+          let onHex = modeData.Text?.Surfaces?.[tone.palette]?.[`Color-${tone.n}`]?.value;
           if (onHex?.includes('{')) onHex = resolveToHex(onHex, modeLookup, modeColors) || onHex;
-          if (onHex?.startsWith('#')) defBg[`${prefix}On-Default`] = { value: onHex, type: 'color' };
+          if (onHex?.startsWith('#')) defBg[`${prefix}On-${role}`] = { value: onHex, type: 'color' };
         }
 
         for (const state of ['Hover', 'Pressed']) {
@@ -1919,12 +2065,24 @@ export function generateFigmaJSON(
         prefix: 'Surface-Brightest-',
         tone: defBrightTone >= 11 ? 12 : 11,
       });
+      /* The Default theme's tone differs per mode (light Neutral-12, dark
+         Neutral-2) and the Theme collection is mode-independent, so Default's
+         alpha cannot alias {Quiet.Color-N-Opacity} with a fixed N the way the
+         other themes do — it has to come through Default-Background like every
+         other role, at whatever tone this mode actually resolved to. */
+      const quietAlphaAt = (tone: number): number | null => {
+        const v = figma.Modes[modeName]?.Quiet?.[`Color-${tone}-Opacity`]?.value;
+        return typeof v === 'number' ? v : null;
+      };
+
       for (const { prefix, tone } of surfaceTargets) {
         if (tone === null) continue;
         for (const role of ROLE_SOURCES) {
           const hex = resolveRoleAt(role, tone);
           if (hex) defBg[`${prefix}${role.role}`] = { value: hex, type: 'color' };
         }
+        const alpha = quietAlphaAt(tone);
+        if (alpha !== null) defBg[`${prefix}Quiet-Opacity`] = { value: alpha, type: 'number' };
         writeExtras(prefix, tone);
       }
 
@@ -1980,6 +2138,22 @@ export function generateFigmaJSON(
         if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
         if (hex) defBg[`Container-${section}`] = { value: hex, type: 'color' };
       }
+      /* Container-{Text,Header}-Match: the theme's own palette at the
+         container's tone. For Default that palette IS contPalette, so these
+         carry the same value as Container-Text / Container-Header — the point
+         is the NAME, which is what a themed Alert binds to so it does not need
+         a variant per state. */
+      for (const [role, section] of [['Text-Match', 'Text'], ['Header-Match', 'Header']]) {
+        const sectionData = modeData[section] ?? figma.Modes[modeName]?.[section];
+        const token = sectionData?.Containers?.[contPalette]?.[contColorN];
+        let hex = token?.value;
+        if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        if (hex) defBg[`Container-${role}`] = { value: hex, type: 'color' };
+      }
+
+      const contAlpha = quietAlphaAt(contN);
+      if (contAlpha !== null)
+        defBg['Container-Quiet-Opacity'] = { value: contAlpha, type: 'number' };
 
       figma.Modes[modeName]['Default-Background'] = defBg;
     }
@@ -2828,6 +3002,86 @@ const BUTTON_BORDER_WIDTH = 1;
     `\u25AD [Figma] Outline-Text / Outline-Quiet removed from the Theme collection ` +
     `(${outlineTextStripped} tokens) — Outline-Text lives in Buttons, one variable with a ` +
     `mode per palette; Outline-Quiet is the section's own Quiet.`,
+  );
+
+  /* ── Quiet is a NUMBER in the Theme collection, not nine colours ────────
+   *
+   * CSS keeps `Quiet` and the eight `Quiet-{Palette}` because a custom
+   * property cannot carry an opacity: there, Quiet is the composited solid.
+   * Figma keeps only `Quiet-Opacity`, because there it CAN bind a colour's
+   * opacity to a FLOAT — each Theme/{Surface}/Quiet-* is an alias to its
+   * Text-* sibling with this number bound to it, which is both nine fewer
+   * variables per section and a Quiet that follows Text on its own.
+   *
+   * Stripped HERE rather than never emitted, for the same reason Outline-Text
+   * is: the themes are one structure feeding two consumers, and the shape each
+   * side can express is a property of that side.
+   *
+   * The nine colours this removes are the ones the importer kept recreating in
+   * a Modes collection already at its ceiling — and, once the 240-entry
+   * Quiet table stopped shipping, kept recreating as UNRESOLVED. */
+  /* ── Roles the Theme collection expresses as alias + opacity ───────────
+   *
+   * Two groups come out here, for one reason: Figma can bind a colour's
+   * OPACITY to a variable and CSS cannot. So each is a single alias plus a
+   * number in the file, and a baked colour in the stylesheet.
+   *
+   *   Quiet, Quiet-{Palette}   nine colours -> the Text-* alias at
+   *                            Quiet-Opacity
+   *   Icons/{Role}-Variant     nine colours -> the Icons/{Role} alias at 50%
+   *
+   * Stripped HERE rather than never emitted, because the themes are one
+   * structure feeding two consumers and the shape each side can express is a
+   * property of that side — the same reason Outline-Text is stripped above.
+   *
+   * It also protects hand-made wiring. The importer only upserts, and
+   * populateSurfaceCollection recreates a Surface variable for every key the
+   * Theme template carries — so while these were in the payload, every
+   * regenerate overwrote the alias-plus-opacity bindings made by hand in the
+   * Surface collection. A key the template does not carry is a key the
+   * importer leaves alone. */
+  let themeAliasRolesStripped = 0;
+  const ACCENTS_8 = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
+    'Info', 'Success', 'Warning', 'Error'];
+  const QUIET_COLOR_KEYS = new Set(['Quiet', ...ACCENTS_8.map(p => `Quiet-${p}`)]);
+
+  const stripAliasRoles = (tree: any) => {
+    for (const theme of Object.values<any>(tree ?? {}))
+      for (const section of Object.values<any>(theme ?? {})) {
+        if (!section || typeof section !== 'object') continue;
+        /* Section level only. A recursive walk would also reach
+           Buttons.<Pal>.Quiet — muted text on a button's FILL, a different
+           role that keeps its own colour — and Quiet-Opacity, the number that
+           replaces these and must survive. */
+        for (const k of Object.keys(section)) {
+          const child = section[k];
+          if (QUIET_COLOR_KEYS.has(k) && child && typeof child === 'object'
+              && 'value' in child && child.type !== 'number') {
+            delete section[k];
+            themeAliasRolesStripped++;
+          }
+        }
+        /* The icon variants live one level down, in the Icons group. Matched by
+           suffix inside THAT group only, so the flat Border-Variant — a real
+           colour with no alias form — is untouched. */
+        const icons = section.Icons;
+        if (!icons || typeof icons !== 'object') continue;
+        for (const k of Object.keys(icons)) {
+          if (!k.endsWith('-Variant')) continue;
+          const child = icons[k];
+          if (child && typeof child === 'object' && 'value' in child) {
+            delete icons[k];
+            themeAliasRolesStripped++;
+          }
+        }
+      }
+  };
+  stripAliasRoles(figma.Themes);
+  stripAliasRoles(figma.SurfacesContainers);
+  console.log(
+    `\u25AD [Figma] Quiet / Quiet-{Palette} / Icons-{Role}-Variant removed from the ` +
+    `Theme collection (${themeAliasRolesStripped} tokens) — each is an alias plus an ` +
+    `opacity in the file, and CSS still emits the baked colours.`,
   );
 
   // Page canvas background — precomputed hex so the Figma plugin sets it from

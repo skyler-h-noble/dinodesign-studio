@@ -34,6 +34,9 @@ export const ADD_ONS: AddOn[] = [
   { slug: 'glass-effects',     title: 'Glass Effects',                description: 'Frosted-glass surfaces using backdrop-filter blur, tinted with your brand palette.',                              priceUsdCents: 500, available: false },
   { slug: 'curved-text',       title: 'Curved Text',                  description: 'SVG-path text that follows arcs, waves, and custom curves — for headers and editorial layouts.',                  priceUsdCents: 500, available: false },
   { slug: 'image-effects',     title: 'Image Effects',                description: 'Filters and tinting (duotone, monochrome, brand-color overlays) for product photography.',                        priceUsdCents: 500, available: false },
+  // One-off generator: a chart in the brand, emitted as code AND as a Figma
+  // build from the file's own chart components (see /add-ons/charts).
+  { slug: 'charts',            title: 'Charts',                       description: 'Bar, 3D bar and line charts in your brand — copy the code, or build the same chart in Figma from your components.', priceUsdCents: 500, available: false },
 ];
 
 export const getAddOn = (slug: string): AddOn | undefined => ADD_ONS.find(a => a.slug === slug);

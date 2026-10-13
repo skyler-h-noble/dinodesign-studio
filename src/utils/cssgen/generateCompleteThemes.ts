@@ -105,51 +105,63 @@ function getContainerHeaderPalette(contTheme: string, config: ThemeConfig): stri
 function buildSurfaceTokens(config: ThemeConfig, n: number): any {
   const shade = n >= 9 ? 'Medium' as const : 'Light' as const;
   return {
+    /* MATCH: the theme speaking in its own hue.
+     *
+     * Text-{Palette} names a palette, so a component that wants "whatever
+     * colour this theme is" has to pick one — which is why an Alert ends up
+     * with an Info, Success, Warning and Error variant that differ only in
+     * which Text-* they read. Text-Match is the same token under every theme,
+     * so one variant switches theme and the background, icon and label move
+     * together.
+     *
+     * It is a ROTATION onto the theme's own palette, the way --Eyebrow rotates
+     * off the surface's: not a new colour, a different route to an existing
+     * one. On theme Error it IS Text-Error; the value of the name is that a
+     * component never has to know that. */
+    'Text-Match': {
+      value: `{Text.Surfaces.${config.theme}.Color-${n}}`,
+      type: 'color'
+    },
+    'Header-Match': {
+      value: `{Header.Surfaces.${config.theme}.Color-${n}}`,
+      type: 'color'
+    },
     'Quiet': {
       value: config.defaultText === 'BW'
         ? `{Quiet.Surfaces.Neutral.Color-${n}}`
         : `{Quiet.Surfaces.${config.theme}.Color-${n}}`,
       type: 'color'
     },
-    /* Quiet's accents, mirroring Text's just below.
-       The Quiet section in Modes has always covered the same ten scopes as
-       Text; only one palette's worth was named here, so a muted label in a
-       palette's hue had no key — and the Default theme's Default-Background
-       indirection had nothing to rewrite, which is what the coverage test
-       caught.
-       SAME Color-${n} as Text-{Palette}: one tone, three roles, so the curated
-       table's 4.5:1 transfers rather than being re-derived per role. */
-    'Quiet-Primary': {
-      value: `{Quiet.Surfaces.Primary.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Secondary': {
-      value: `{Quiet.Surfaces.Secondary.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Tertiary': {
-      value: `{Quiet.Surfaces.Tertiary.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Neutral': {
-      value: `{Quiet.Surfaces.Neutral.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Info': {
-      value: `{Quiet.Surfaces.Info.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Success': {
-      value: `{Quiet.Surfaces.Success.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Warning': {
-      value: `{Quiet.Surfaces.Warning.Color-${n}}`,
-      type: 'color'
-    },
-    'Quiet-Error': {
-      value: `{Quiet.Surfaces.Error.Color-${n}}`,
-      type: 'color'
+    /* Quiet's accents, mirroring Text's just below, at the SAME Color-${n}:
+       one tone, three roles, so the 4.5:1 transfers rather than being
+       re-derived per role. */
+    'Quiet-Primary':   { value: `{Quiet.Surfaces.Primary.Color-${n}}`,   type: 'color' },
+    'Quiet-Secondary': { value: `{Quiet.Surfaces.Secondary.Color-${n}}`, type: 'color' },
+    'Quiet-Tertiary':  { value: `{Quiet.Surfaces.Tertiary.Color-${n}}`,  type: 'color' },
+    'Quiet-Neutral':   { value: `{Quiet.Surfaces.Neutral.Color-${n}}`,   type: 'color' },
+    'Quiet-Info':      { value: `{Quiet.Surfaces.Info.Color-${n}}`,      type: 'color' },
+    'Quiet-Success':   { value: `{Quiet.Surfaces.Success.Color-${n}}`,   type: 'color' },
+    'Quiet-Warning':   { value: `{Quiet.Surfaces.Warning.Color-${n}}`,   type: 'color' },
+    'Quiet-Error':     { value: `{Quiet.Surfaces.Error.Color-${n}}`,     type: 'color' },
+    /* The same Quiet, expressed as an OPACITY for Figma.
+     *
+     * The nine colours above and this one number say the same thing in the two
+     * shapes each side can hold. CSS gets the composited solid, because a
+     * custom property has no opacity channel and an rgba() Quiet would
+     * composite over whatever is actually behind the text — a Card, say —
+     * rather than the surface its alpha was solved against, so the 4.5:1 floor
+     * would quietly stop holding. Figma gets the number, because it CAN bind a
+     * colour's opacity to a FLOAT (the shape Drop-Colors already uses), and
+     * Quiet then follows its Text sibling automatically instead of being a
+     * second ramp position someone has to keep in step.
+     *
+     * exportColorSystem replaces the nine values above with the composite this
+     * alpha produces, so both sides land on one colour; generateFigmaJSON then
+     * strips them from the Theme payload and ships only this. One float per
+     * TONE serves every palette and both Surfaces and Containers. */
+    'Quiet-Opacity': {
+      value: `{Quiet.Color-${n}-Opacity}`,
+      type: 'number'
     },
     'Text': {
       // Both branches now reference the Text.Surfaces family — BW simply has
@@ -448,8 +460,21 @@ function buildSurfaceTokens(config: ThemeConfig, n: number): any {
 
     // Icons in Surfaces — tonal: theme color, BW: same as text
     'Icons': {
-      'Default': { value: config.defaultText === 'BW' ? `{Text.Surfaces.BW.Color-${n}}` : `{Icon.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
+      /* Icons/Default follows the section's own TEXT, so a default icon reads
+         like body copy beside it — BW or neutral where textColoring says so,
+         the palette where it does not. It used to read the Icon table at the
+         theme's palette, which made it the theme-hued icon; that role is now
+         Icons/Match, and the two are genuinely different tokens rather than
+         the same value under two names.
+         The BW branch is gone because it is no longer a special case:
+         defaultText IS 'BW' there, so one expression covers both. */
+      'Default': { value: `{Text.Surfaces.${config.defaultText}.Color-${n}}`, type: 'color' },
       'Default-Variant': { value: config.defaultText === 'BW' ? `{Text.Surfaces.BW.Color-${n}}` : `{Icon-Variant.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
+      /* The icon half of the Match rotation — the theme's own palette under one
+         name, so an Alert's icon moves with its background instead of needing
+         a variant per state. No -Variant twin: the variant is a dimmed
+         decoration, and a Match icon is carrying the meaning. */
+      'Match': { value: `{Icon.Surfaces.${config.theme}.Color-${n}}`, type: 'color' },
       'Primary': { value: `{Icon.Surfaces.Primary.Color-${n}}`, type: 'color' },
       'Primary-Variant': { value: `{Icon-Variant.Surfaces.Primary.Color-${n}}`, type: 'color' },
       'Secondary': { value: `{Icon.Surfaces.Secondary.Color-${n}}`, type: 'color' },
@@ -675,11 +700,30 @@ function generateSingleTheme(config: ThemeConfig): any {
       value: `{Backgrounds.${config.contTheme}.Background-${config.contN}.Containers.Container-Highest}`,
       type: 'color'
     },
+    /* Same rotation on the container side. The PALETTE is the theme's own;
+       the TONE is the container's — identical to how Text-{Palette} works
+       here, so a card in an Error theme gets Error text at the card's tone
+       rather than the surface's. */
+    'Text-Match': {
+      value: `{Text.Containers.${config.theme}.Color-${config.contN}}`,
+      type: 'color'
+    },
+    'Header-Match': {
+      value: `{Header.Containers.${config.theme}.Color-${config.contN}}`,
+      type: 'color'
+    },
     'Quiet': {
       value: getContainerTextPalette(config.contTheme, config) === 'BW'
         ? `{Quiet.Containers.Neutral.Color-${config.contN}}`
         : `{Quiet.Containers.${config.contTheme}.Color-${config.contN}}`,
       type: 'color'
+    },
+    /* Same opacity, read at the CONTAINER's tone. One table serves both —
+       the generator measures each tone against Color-N for a surface and
+       against Container-Highest for a container, and takes the max. */
+    'Quiet-Opacity': {
+      value: `{Quiet.Color-${config.contN}-Opacity}`,
+      type: 'number'
     },
     'Text': {
       // Same BW/branded split as the surface Text token, both resolving
@@ -930,8 +974,11 @@ function generateSingleTheme(config: ThemeConfig): any {
     
     // Icons in Containers
     'Icons': {
-      'Default': { value: `{Icon.Containers.Neutral.Color-${config.contN}}`, type: 'color' },
+      /* Same rule on the container side: the container's own text palette,
+         which is not always the surface's. */
+      'Default': { value: `{Text.Containers.${getContainerTextPalette(config.contTheme, config)}.Color-${config.contN}}`, type: 'color' },
       'Default-Variant': { value: `{Icon-Variant.Containers.Neutral.Color-${config.contN}}`, type: 'color' },
+      'Match': { value: `{Icon.Containers.${config.theme}.Color-${config.contN}}`, type: 'color' },
       'Primary': { value: `{Icon.Containers.Primary.Color-${config.contN}}`, type: 'color' },
       'Primary-Variant': { value: `{Icon-Variant.Containers.Primary.Color-${config.contN}}`, type: 'color' },
       'Secondary': { value: `{Icon.Containers.Secondary.Color-${config.contN}}`, type: 'color' },
@@ -1182,27 +1229,32 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Flat roles sit directly on the surface section.
   const DEFAULT_BG_ROLES = [
     'Text', 'Header', 'Quiet', 'Border', 'Border-Variant',
+    /* Match rotates onto the theme's own palette, and Default's palette moves
+       per mode like everything else here — so it needs the indirection too. */
+    'Text-Match', 'Header-Match',
     'Hover', 'Pressed', 'Focus-Visible',
     'Hotlink', 'Hotlink-Visited',
     ...DEFAULT_ACCENTS.map(p => `Text-${p}`),
     ...DEFAULT_ACCENTS.map(p => `Header-${p}`),
-    /* Quiet gets its accents too, and listing it bare was the gap.
-       Text and Header were spelled out per palette here and Quiet appeared once,
-       so the Default theme routed Text-Primary and Header-Primary through
-       Default-Background and had nowhere to send Quiet-Primary. The muted role
-       was the only one of the three that could not speak in a palette's hue.
-
-       The data was never the problem: Modes carries Quiet/Surfaces and
-       Quiet/Containers across all ten scopes, matching Text scope for scope.
-       Only the wiring named fewer roles than the collection holds. */
+    /* Quiet gets its accents too. Text and Header were spelled out per palette
+       here while Quiet appeared once, so the Default theme routed Text-Primary
+       and Header-Primary through Default-Background and had nowhere to send
+       Quiet-Primary — the muted role was the only one of the three that could
+       not speak in a palette's hue. */
     ...DEFAULT_ACCENTS.map(p => `Quiet-${p}`),
   ];
+  /* Quiet-Opacity needs the same routing — Default's tone differs per mode, so
+     its alpha does too — but it is a number, and the loop above writes
+     `type: 'color'`, so it is kept in its own list. */
+  const DEFAULT_NUMBER_ROLES = ['Quiet-Opacity'];
   // Icons are NOT flat — they live in a nested `Icons` object keyed 'Default',
   // 'Default-Variant', 'Primary', 'Primary-Variant', ... and only get flattened
   // to --Icons-Primary when the CSS is emitted. Writing section['Icons-Primary']
   // would create a key nothing reads and silently leave the real one untouched.
   const DEFAULT_ICON_KEYS = ['Default', ...DEFAULT_ACCENTS]
-    .flatMap(p => [p, `${p}-Variant`]);
+    .flatMap(p => [p, `${p}-Variant`])
+    /* Match has no -Variant twin, so it is appended rather than flat-mapped. */
+    .concat('Match');
   /**
    * @param group   key on themes.Default (e.g. 'Surfaces-Dim')
    * @param bgKey   Default-Background key holding this surface's background
@@ -1215,6 +1267,10 @@ export function generateAllThemesWithSurfacesAndContainers(
     for (const role of DEFAULT_BG_ROLES) {
       if (section[role] === undefined) continue;
       section[role] = { value: `{Default-Background.${fgPrefix}${role}}`, type: 'color' };
+    }
+    for (const role of DEFAULT_NUMBER_ROLES) {
+      if (section[role] === undefined) continue;
+      section[role] = { value: `{Default-Background.${fgPrefix}${role}}`, type: 'number' };
     }
     if (section['Icons']) {
       for (const key of DEFAULT_ICON_KEYS) {
@@ -1229,7 +1285,7 @@ export function generateAllThemesWithSurfacesAndContainers(
       // so Default would silently end up as the one theme without On-*. Routing
       // it through Default-Background is the same treatment Icons and
       // Icon-Variant already get, and the producers compute the value.
-      for (const pal of DEFAULT_ACCENTS.concat('Default')) {
+      for (const pal of DEFAULT_ACCENTS.concat('Default', 'Match')) {
         section['Icons'][`On-${pal}`] = {
           value: `{Default-Background.${fgPrefix}On-${pal}}`, type: 'color',
         };
@@ -1292,7 +1348,10 @@ export function generateAllThemesWithSurfacesAndContainers(
     themes.Default.Containers['Container-Highest'] = { value: '{Default-Background.Container-Highest}', type: 'color' };
     themes.Default.Containers['Text'] = { value: '{Default-Background.Container-Text}', type: 'color' };
     themes.Default.Containers['Header'] = { value: '{Default-Background.Container-Header}', type: 'color' };
+    themes.Default.Containers['Text-Match'] = { value: '{Default-Background.Container-Text-Match}', type: 'color' };
+    themes.Default.Containers['Header-Match'] = { value: '{Default-Background.Container-Header-Match}', type: 'color' };
     themes.Default.Containers['Quiet'] = { value: '{Default-Background.Container-Quiet}', type: 'color' };
+    themes.Default.Containers['Quiet-Opacity'] = { value: '{Default-Background.Container-Quiet-Opacity}', type: 'number' };
     themes.Default.Containers['Border'] = { value: '{Default-Background.Container-Border}', type: 'color' };
     themes.Default.Containers['Border-Variant'] = { value: '{Default-Background.Container-Border-Variant}', type: 'color' };
     themes.Default.Containers['Focus-Visible'] = { value: '{Default-Background.Container-Focus-Visible}', type: 'color' };

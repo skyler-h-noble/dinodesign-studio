@@ -17,6 +17,9 @@ import '@omni-design/components/public/styles/styles.css';
 // set on <html> below — without that attribute the tokens stay undefined and
 // Typography components fall back to inherited defaults.
 import '@omni-design/components/public/styles/typography-tokens.css';
+// After the lib's sheets: per-rule fixes for published lib bugs, each naming
+// the release that retires it.
+import './styles/lib-workarounds.css';
 import { applyStudioDesignSystem } from './utils/studioDesignSystem';
 
 document.documentElement.setAttribute('data-device', 'Desktop');

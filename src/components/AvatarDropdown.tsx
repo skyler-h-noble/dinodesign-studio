@@ -73,7 +73,12 @@ export default function AvatarDropdown({ user, onSignOut }: AvatarDropdownProps)
         <Avatar
           src={user.photoURL || undefined}
           alt={user.displayName || user.email || 'Account'}
-          initials={!user.photoURL ? initial : undefined}
+          /* Always passed. The Avatar shows initials only when it has no
+             working image, so this costs nothing while the photo loads — and
+             when the photo FAILS (Google's profile URLs often refuse
+             cross-site requests) it is the only thing left to show. Passing it
+             only for users without a photo left an empty colored circle. */
+          initials={initial}
           size="small"
         />
       </button>

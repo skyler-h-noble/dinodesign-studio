@@ -2439,25 +2439,28 @@ function generateModesThemes(
         'Text-Warning': { value: `{Text.Surfaces.${cont.ContWarning}.Color-${n}}`, type: 'color' },
         'Text-Error': { value: `{Text.Surfaces.${cont.ContError}.Color-${n}}`, type: 'color' },
         'Text-Neutral': { value: `{Text.Surfaces.${cont.ContNeutral}.Color-${n}}`, type: 'color' },
-        Quiet: { value: `{Quiet.Surfaces.${cont.SurfaceDefaultTextTheme}.Color-${n}}`, type: 'color' },
-        /* Quiet-{Palette} — muted text in each palette's hue.
-           Modes already holds the whole table: Quiet/Surfaces/{BW, Error,
-           Hotlink-Visited, Info, Neutral, Primary, Secondary, Success,
-           Tertiary, Warning} and the same under Containers, matching Text
-           scope for scope. Only one palette's worth was ever exposed, so
-           Text-{Palette} had nine siblings and Quiet had none — and a muted
-           label in a palette hue had no token to reach for.
-           Same Color-${N} as the Text row beside it, which is what keeps the
-           pair at one tone and means no new contrast solving: the index is
-           the one the curated table already chose. */
-        'Quiet-Primary': { value: `{Quiet.Surfaces.${cont.ContPrimary}.Color-${n}}`, type: 'color' },
-        'Quiet-Secondary': { value: `{Quiet.Surfaces.${cont.ContSecondary}.Color-${n}}`, type: 'color' },
-        'Quiet-Tertiary': { value: `{Quiet.Surfaces.${cont.ContTertiary}.Color-${n}}`, type: 'color' },
-        'Quiet-Neutral': { value: `{Quiet.Surfaces.${cont.ContNeutral}.Color-${n}}`, type: 'color' },
-        'Quiet-Info': { value: `{Quiet.Surfaces.${cont.ContInfo}.Color-${n}}`, type: 'color' },
-        'Quiet-Success': { value: `{Quiet.Surfaces.${cont.ContSuccess}.Color-${n}}`, type: 'color' },
-        'Quiet-Warning': { value: `{Quiet.Surfaces.${cont.ContWarning}.Color-${n}}`, type: 'color' },
-        'Quiet-Error': { value: `{Quiet.Surfaces.${cont.ContError}.Color-${n}}`, type: 'color' },
+        /* QUIET IS AN OPACITY NOW, not a colour.
+         *
+         * It used to be its own ramp position per background — Modes held the
+         * whole 240-entry table, and this layer referenced one cell of it per
+         * palette. That table was already choosing the closest tone above 4.5
+         * in nearly every case; the overshoot to 5.0-7.0:1 was the ramp's
+         * granularity, since no tone sits between 4.5 and 7.04 on Neutral
+         * against #fcfcfc.
+         *
+         * So Quiet-* are now ALIASES to their Text-* sibling with this opacity
+         * bound to them, which lands them at 4.5-4.8 and makes Quiet follow
+         * Text automatically. The alias-plus-opacity pair is bound by hand in
+         * Figma once — a plugin cannot write "alias plus modifier", the same
+         * constraint Drop-Colors works around — and the payload writes only
+         * the number.
+         *
+         * One float per TONE serves every palette and both Surfaces and
+         * Containers: tones at the same index share a lightness, so the alpha
+         * each needs barely moves (measured 45.9-46.7% at t1, 71.0-74.5% at
+         * t5 across eight palettes). The generator takes the max and verifies
+         * every palette against it before emitting. */
+        'Quiet-Opacity': { value: `{Quiet.Color-${n}-Opacity}`, type: 'number' },
         Border: { value: `{Border.Surfaces.${cont.SurfaceDefaultTextTheme}.Color-${n}}`, type: 'color' },
         'Border-Variant': { value: `{Border-Variant.Surfaces.${cont.SurfaceDefaultTextTheme}.Color-${n}}`, type: 'color' },
         Hotlink: { value: `{Text.Surfaces.Info.Color-${n}}`, type: 'color' },
@@ -5732,7 +5735,7 @@ export function exportColorSystemToJSON(
       // searching all palettes rather than assuming <pal>: Icons.Default
       // follows the theme's own palette (or BW), so its tone does not live in
       // a palette named "Default".
-      const ON_PALETTES = ['Default', 'Primary', 'Secondary', 'Tertiary',
+      const ON_PALETTES = ['Default', 'Match', 'Primary', 'Secondary', 'Tertiary',
         'Neutral', 'Info', 'Success', 'Warning', 'Error'];
       const relLum = (hex: string): number | null => {
         const m = /^#([0-9a-f]{6})/i.exec(hex);

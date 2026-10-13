@@ -9,6 +9,8 @@
  */
 
 import chroma from 'chroma-js';
+import { solveChartPalette } from '../chartPalette';
+import { compositeOver, solveQuietOpacities, QUIET_PALETTES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS } from '../componentSize';
 import { menuLevelCSS } from '../menuLevels';
@@ -1317,6 +1319,12 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
       tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${contColorN}}`;
     }
+    tokenLookup['Default-Background.Container-Quiet-Opacity'] =
+      `{Quiet.${contColorN}-Opacity}`;
+    tokenLookup['Default-Background.Container-Text-Match'] =
+      `{Text.Containers.${defPal}.${contColorN}}`;
+    tokenLookup['Default-Background.Container-Header-Match'] =
+      `{Header.Containers.${defPal}.${contColorN}}`;
     tokenLookup['Default-Background.Container-Text-BW'] =
       `{Default-Button-Border.Containers.BlackWhite.${contColorN}}`;
     // Focus-Visible uses a flat path (no palette nesting) AND is keyed by
@@ -1435,14 +1443,32 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         tokenLookup[`Default-Background.${prefix}On-Default`] =
           `{Text.Surfaces.${defOnTone.palette}.Color-${defOnTone.n}}`;
       }
+      // On-Match pairs with Icons-Match, so it resolves from the ICON table at
+      // the theme's palette rather than the Text one.
+      const matchOnTone = iconToneFor(modeData?.Icon?.Surfaces?.[defPal]?.[vColorN]?.value);
+      if (matchOnTone) {
+        tokenLookup[`Default-Background.${prefix}On-Match`] =
+          `{Text.Surfaces.${matchOnTone.palette}.Color-${matchOnTone.n}}`;
+      }
       // Icons-Default tracks --Text in every other theme (verified across all
       // 20); Default must not be the exception. Its -Variant is the alpha form,
       // matching generateSingleTheme's non-BW branch.
+      /* Match: the theme's own palette, which for Default IS defPal. Listed
+         because the Default theme routes every role through this table, and a
+         role left out keeps a hardcoded light-mode tone. */
+      tokenLookup[`Default-Background.${prefix}Text-Match`] = `{Text.Surfaces.${defPal}.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Header-Match`] = `{Header.Surfaces.${defPal}.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Icons-Match`] = `{Icon.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Icons-Default`] = `{Text.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Icons-Default-Variant`] = `{Icon-Variant.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Hotlink`] = `{Text.Surfaces.Info.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Hotlink-Visited`] = `{Text.Surfaces.Hotlink-Visited.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Focus-Visible`] = `{Focus-Visible.Surfaces.Background-${tone}}`;
+      /* The surface's alpha, carried in the same {Quiet.Color-N-Opacity} shape
+         every other theme writes directly, so one resolver handles all of them.
+         Default differs only in that its tone has to be looked up rather than
+         written into the reference by generateCompleteThemes. */
+      tokenLookup[`Default-Background.${prefix}Quiet-Opacity`] = `{Quiet.${vColorN}-Opacity}`;
       tokenLookup[`Default-Background.${prefix}Hover`] = `{Hover.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Pressed`] = `{Pressed.${defPal}.${vColorN}}`;
     }
@@ -1619,6 +1645,77 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
    * Recursively process nested token structures
    * Resolves intermediate references to final Color variables for smaller CSS
    */
+  /** A resolved CSS value back to a hex, so Quiet can be composited. */
+  function hexForCSSValue(v: string): string | null {
+    if (!v) return null;
+    if (v.startsWith('#')) return v.length >= 7 ? v.slice(0, 7) : null;
+    const m = v.match(/^var\(--([A-Za-z0-9-]+)-(Color-\d+)\)$/);
+    if (!m) return null;
+    const hex = modeData?.Colors?.[m[1]]?.[m[2]]?.value;
+    return typeof hex === 'string' && hex.startsWith('#') ? hex.slice(0, 7) : null;
+  }
+
+  /** Any token in a theme section, resolved to a hex. */
+  function hexForToken(token: any): string | null {
+    const raw = typeof token === 'string' ? token : token?.value;
+    if (typeof raw !== 'string') return null;
+    return hexForCSSValue(resolveTokenForCSS(raw, '--Quiet-probe'));
+  }
+
+  /* The per-tone alphas, solved ONCE per mode from the same module the Figma
+     payload reads. Solving them again here independently is exactly the
+     divergence invariant 5 warns about: both sides would be self-consistent
+     and paint different colours. */
+  const quietTable = solveQuietOpacities(modeData, (raw: any) => hexForToken(raw));
+  for (const note of quietTable.notes)
+    console.warn(`[css] Quiet ${modeName ?? ''}: ${note}`);
+
+  /** Which Text sibling a Quiet role is the muted form of. */
+  const QUIET_SOURCE: Record<string, string> = {
+    Quiet: 'Text',
+    /* An outline or ghost button has no fill, so its label sits on the SURFACE
+       and its muted tone IS the surface's own Quiet. */
+    'Outline-Quiet': 'Text',
+    ...Object.fromEntries(QUIET_PALETTES.map((p) => [`Quiet-${p}`, `Text-${p}`])),
+  };
+
+  /**
+   * Quiet as the composited SOLID, which is what makes CSS and Figma agree.
+   *
+   * Figma binds the alpha to an alias; CSS has no opacity channel on a custom
+   * property, and an rgba() Quiet would composite over whatever is actually
+   * behind the text — a Card, say — rather than the surface the alpha was
+   * solved against, so the 4.5:1 floor would quietly stop holding. The solid
+   * is the same colour wherever it lands, and equals what Figma renders on the
+   * surface the alpha describes.
+   *
+   * The TONE comes from the section's own Quiet-Opacity reference, which
+   * resolves to {Quiet.Color-N-Opacity} for every theme — including Default,
+   * whose tone moves per mode and is supplied through Default-Background.
+   *
+   * Returns null when anything is missing, and the caller then falls back to
+   * the ordinary reference rather than emitting a colour it cannot justify.
+   */
+  function quietSolid(section: any, key: string): string | null {
+    const source = QUIET_SOURCE[key];
+    if (!source || !section) return null;
+    let ref: any = section['Quiet-Opacity']?.value;
+    for (let hop = 0; hop < 8 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
+      const path = ref.slice(1, -1);
+      if (/^Quiet\.Color-\d+-Opacity$/.test(path)) break;
+      const next = tokenLookup[path];
+      if (!next) break;
+      ref = next;
+    }
+    const tone = typeof ref === 'string' ? ref.match(/Quiet\.Color-(\d+)-Opacity/) : null;
+    const alpha = tone ? quietTable.alpha[Number(tone[1])] : undefined;
+    if (alpha === undefined) return null;
+    const bg = hexForToken(section['Background']);
+    const fg = hexForToken(section[source]);
+    if (!bg || !fg) return null;
+    return compositeOver(fg, bg, alpha);
+  }
+
   function processTokens(obj: any, prefix: string = ''): string[] {
     const lines: string[] = [];
 
@@ -1630,6 +1727,35 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         if (key !== 'Default' && ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].includes(key)) {
           return;
         }
+      }
+
+      /* Quiet-Opacity is a FIGMA-ONLY token and must not reach the stylesheet.
+       *
+       * It exists because Figma can bind a colour's opacity to a FLOAT, so
+       * Quiet there is its Text sibling plus a number. CSS has no such binding
+       * — and an rgba() Quiet would composite over whatever is actually behind
+       * the text, which may be a Card rather than the surface the alpha was
+       * solved against, so the 4.5:1 floor would silently stop holding. CSS
+       * therefore ships the SOLID that alpha produces, baked into --Quiet by
+       * exportColorSystem, and the number itself has no consumer here. Emitted,
+       * it was a `--Quiet-Opacity: var(--Quiet-Color-5-Opacity)` pointing at a
+       * variable no stylesheet defines. */
+      if (key === 'Quiet-Opacity') return;
+
+      /* Quiet-Opacity is a FIGMA-ONLY token and must not reach the stylesheet:
+         CSS consumes it by baking it into the colours below, and emitted it
+         would be a `--Quiet-Opacity: var(--Quiet-Color-5-Opacity)` pointing at
+         a variable no stylesheet defines. */
+      if (key === 'Quiet-Opacity') return;
+
+      if (QUIET_SOURCE[key] !== undefined) {
+        const solid = quietSolid(obj, key);
+        if (solid) {
+          lines.push(`  ${prefix ? `--${prefix}-${key}` : `--${key}`}: ${solid};`);
+          return;
+        }
+        /* fall through — an unresolvable section keeps its old reference
+           rather than losing the token entirely */
       }
 
       // Check if this is a token with a .value property
@@ -3324,6 +3450,7 @@ img {
 }
 `;
         }
+        validatedCSS += chartGroundCSS(jsonData, mode);
         cssFiles[`${mode}.css`] = validatedCSS;
         console.log(`✅ Generated ${mode}.css (${css.split('\n').length} lines)`);
       } else {
@@ -3386,7 +3513,8 @@ img {
         
         const css = generateModeCSSFromSingleMode(modesData[mode], mode, jsonData);
         // Validate and clean CSS before adding to output
-        const validatedCSS = css.split('\n').map(line => validateCSSLine(line)).join('\n');
+        const validatedCSS = css.split('\n').map(line => validateCSSLine(line)).join('\n')
+          + chartGroundCSS(jsonData, mode);
         cssFiles[`${mode}.css`] = validatedCSS;
         console.log(`✅ Generated ${mode}.css (${css.split('\n').length} lines)`);
       }
@@ -3538,7 +3666,52 @@ export function generateModeCSSFile(jsonData: DesignSystem, modeName: string): s
   // declared — a plain ReferenceError had anything called this. It picks the
   // Metadata block, falling back to the mode's own, so passing the whole
   // document is what was meant.
-  return generateModeCSS(modeName, jsonData.Modes[modeName], jsonData);
+  return generateModeCSS(modeName, jsonData.Modes[modeName], jsonData) + chartGroundCSS(jsonData, modeName);
+}
+
+/* Chart series per GROUND, keyed by data-surface (docs/chart-colors.md: a chart
+ * is drawn on Surface-Brightest or Surface-Dimmest, and that attribute is the
+ * only selector involved).
+ *
+ * This MIRRORS the Figma Chart collection, which is what the Charts add-on's
+ * Figma build paints with, so the code and the Figma chart agree:
+ *   Chart-1..4   the brand four alias the Icons on that surface —
+ *                .Theme/Surface-{ground}/Icons/{Primary,Secondary,Tertiary,Neutral}
+ *                in Figma, var(--Icons-*) here, which resolves per surface the
+ *                same way.
+ *   Chart-5..10  the solved palette — the SAME solveChartPalette() result the
+ *                Figma payload writes to .Modes/Chart/{ground}/Color-N.
+ *   Chart-Lines  Border-Variant on that surface. Gridlines are decorative, so
+ *                they take the no-contrast border token, not Text — solid
+ *                Text on the dark ground drew white rules over the bars.
+ *
+ * Without this the published CSS carried only the old :root palette, so a
+ * chart's code painted colors that existed nowhere in Figma. */
+export function chartGroundCSS(jsonData: any, modeName: string): string {
+  let palette;
+  try { palette = solveChartPalette(jsonData, Object.keys(jsonData?.Modes || {})); }
+  catch (e) { console.warn('[css] chart palette could not be solved:', e); return ''; }
+  const grounds = palette[modeName];
+  if (!grounds) return '';
+  const BRAND_ICONS = ['Primary', 'Secondary', 'Tertiary', 'Neutral'];
+  const LINES: Record<string, string> = {
+    'Surface-Brightest': 'var(--Border-Variant)',
+    'Surface-Dimmest': 'var(--Border-Variant)',
+  };
+  const out: string[] = ['', '/* Chart series per ground — mirrors the Figma Chart collection. */'];
+  for (const level of ['Surface-Brightest', 'Surface-Dimmest']) {
+    const g = grounds[level];
+    if (!g) continue;
+    out.push(`[data-surface="${level}"] {`);
+    BRAND_ICONS.forEach((icon, i) => out.push(`  --Chart-${i + 1}: var(--Icons-${icon});`));
+    for (let n = 5; n <= 10; n++) {
+      const hex = g[`Color-${n}`]?.value;
+      if (hex) out.push(`  --Chart-${n}: ${hex};`);
+    }
+    out.push(`  --Chart-Lines: ${LINES[level]};`);
+    out.push('}');
+  }
+  return out.join('\n') + '\n';
 }
 
 /**

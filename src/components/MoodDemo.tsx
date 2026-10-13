@@ -15,13 +15,25 @@
  * about.
  *
  * If this should be converted anyway, the card is a <Card> + <H3> + <Body>.
+ *
+ * The cards themselves ARE lib components: the clickable Card (SelectableCard)
+ * is the control — role="button", Enter/Space, focus ring, hover elevation,
+ * and the selected border on the applied one. Inside, the active card carries
+ * a Tag and the others show an Apply Button, drawn as a span, aria-hidden and
+ * out of the tab order: the card is already the button, and a real button
+ * nested inside a role="button" would be two controls in one.
  */
 import { useEffect, useRef, useState } from 'react';
+import { Button, Tag, SelectableCard } from '@omni-design/components';
 
+/* The portfolio's three showcase systems (portfolio-omni-styled
+   case-studies/omni-tokens.js names them). The previous three were deleted
+   from Storage, which left these cards on "Loading…" for good — if these move
+   too, change them here and in the portfolio together. */
 const DS_IDS = [
-  'ffa9b21d-9ee9-415e-9457-929da502acfd',
-  '22387e46-af26-4a3c-bc2e-dedb70b8a166',
-  '0b3a928c-34cb-4a55-9296-8f4097e53dcf',
+  'd1bd0ba4-4906-4801-93c3-49db251f10d2', // Cocktail Hour
+  'd7ad345c-33d7-43f6-8f30-41728bf395e6', // Popsicles
+  'b36585cd-f290-4a74-9749-4ae99e1986c0', // Chocolate
 ];
 
 const STORAGE_BASE = 'https://firebasestorage.googleapis.com/v0/b/dino-design.firebasestorage.app/o';
@@ -112,15 +124,6 @@ const STATIC_CSS = `
   font-weight: 600; font-size: 18px; margin: 0 0 6px;
   letter-spacing: -0.01em; color: var(--Container-Text, var(--Text));
 }
-.dino-mood-card .card-tag {
-  display: inline-block; padding: 4px 11px;
-  background: var(--Hover);
-  color: var(--Text-Primary);
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
-  border-radius: 999px; font-weight: 500;
-}
-.dino-mood-card.active .tag-default { display: none; }
-.dino-mood-card:not(.active) .tag-active { display: none; }
 
 ::view-transition-old(root),
 ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
@@ -179,6 +182,11 @@ const ACTIVE_STYLE_ID = 'dino-active-ds-css';
 
 export default function MoodDemo() {
   const [records, setRecords] = useState<DsRecord[]>([]);
+  /* "Loading…" is only true until the fetches settle. All three demo systems
+     were once deleted from Storage and the cards said Loading… forever — a
+     placeholder that never resolves reads as a broken page, so once loading is
+     over and nothing came back, the demo hides itself and says why. */
+  const [settled, setSettled] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [dark, setDark] = useState(false);
   const inFlight = useRef(false);
@@ -199,7 +207,12 @@ export default function MoodDemo() {
     Promise.all(DS_IDS.map(loadDS)).then(results => {
       if (cancelled) return;
       const valid = results.filter((r): r is DsRecord => r !== null);
+      if (valid.length < DS_IDS.length) {
+        console.warn(`[MoodDemo] ${DS_IDS.length - valid.length} of ${DS_IDS.length} demo design systems did not load — `
+          + 'check that DS_IDS still exist in Storage.');
+      }
       setRecords(valid);
+      setSettled(true);
     });
     return () => { cancelled = true; };
   }, []);
@@ -222,7 +235,13 @@ export default function MoodDemo() {
     }
     const combined = active.baseCss + '\n\n' + (dark ? active.darkCss : active.lightCss);
     const imports: string[] = [];
-    const body = combined.replace(/@import[^;]+;/g, (m) => {
+    /* The import's TARGET is matched whole — url(…) or a quoted string —
+       before the closing semicolon. `@import[^;]+;` stopped at the first ';',
+       and Google Fonts URLs carry them (`wght@400;600;700`): the import was
+       cut mid-URL, the unclosed url(" swallowed the rest of the sheet, and the
+       bundle parsed to three @import rules and nothing else — so clicking a
+       card applied nothing. */
+    const body = combined.replace(/@import\s+(?:url\((?:"[^"]*"|'[^']*'|[^)]*)\)|"[^"]*"|'[^']*')[^;]*;/g, (m) => {
       imports.push(m);
       return '';
     });
@@ -279,6 +298,8 @@ export default function MoodDemo() {
     rippleTo(() => setDark(d => !d), r.left + r.width / 2, r.top + r.height / 2);
   }
 
+  if (settled && records.length === 0) return null;
+
   return (
     <>
       <button
@@ -313,24 +334,30 @@ export default function MoodDemo() {
           : records.map((r, i) => {
               const active = i === activeIdx;
               return (
-                <button
+                <SelectableCard
                   key={r.id}
-                  type="button"
-                  className={`dino-mood-card${active ? ' active' : ''}`}
-                  data-surface="Container"
-                  onClick={e => handleCard(e, i)}
+                  selected={active}
+                  size="small"
+                  onClick={(e: React.MouseEvent) => handleCard(e, i)}
+                  aria-label={active ? `${r.name}, currently applied` : `Apply ${r.name}`}
+                  className="dino-mood-card"
                 >
+                  {/* CardOverflow / CardContent would bleed the image to the edge,
+                      but 0.14.1 does not export them — so it sits in the padding. */}
                   <div className="mood-image">
-                    <img src={r.moodboardUrl} alt={r.name} />
+                    <img src={r.moodboardUrl} alt="" />
                   </div>
                   <div className="card-content">
                     <h3 className="card-title">{r.name}</h3>
-                    <span className="card-tag">
-                      <span className="tag-default">Click to apply →</span>
-                      <span className="tag-active">● Currently applied</span>
-                    </span>
+                    {active
+                      ? <Tag color="primary">Currently applied</Tag>
+                      : (
+                        <Button variant="default" size="small" component="span" tabIndex={-1} aria-hidden="true">
+                          Apply
+                        </Button>
+                      )}
                   </div>
-                </button>
+                </SelectableCard>
               );
             })}
       </div>

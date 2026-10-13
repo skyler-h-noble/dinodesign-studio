@@ -254,6 +254,10 @@ declare module '@omni-design/components' {
   export const Section: FC<any>;
   export const Icon: FC<any>;
   export const DisplaySmall: FC<any>;
+  export const DisplayMedium: FC<any>;
+  export const AltDisplayMedium: FC<any>;
+  export const Tag: FC<any>;
+  export const SelectableCard: FC<any>;
   export const AccordionGroup: FC<any>;
   export const AccordionSummary: FC<any>;
   export const AccordionDetails: FC<any>;
