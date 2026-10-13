@@ -69,6 +69,10 @@ describe('chart colors: CSS mode sheets == Figma payload', () => {
           'var(--Icons-Primary)', 'var(--Icons-Secondary)', 'var(--Icons-Tertiary)', 'var(--Icons-Neutral)',
         ]);
         expect(decl['--Chart-Lines']).toBeDefined();
+        // The state four follow it too — Chart/Colors/{State} aliases Icons/{State}.
+        expect(['Info', 'Success', 'Warning', 'Error'].map((st) => decl[`--Chart-${st}`])).toEqual([
+          'var(--Icons-Info)', 'var(--Icons-Success)', 'var(--Icons-Warning)', 'var(--Icons-Error)',
+        ]);
       });
     }
   }

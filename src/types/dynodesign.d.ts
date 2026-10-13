@@ -258,6 +258,7 @@ declare module '@omni-design/components' {
   export const AltDisplayMedium: FC<any>;
   export const Tag: FC<any>;
   export const SelectableCard: FC<any>;
+  export const DropZone: FC<any>;
   export const AccordionGroup: FC<any>;
   export const AccordionSummary: FC<any>;
   export const AccordionDetails: FC<any>;

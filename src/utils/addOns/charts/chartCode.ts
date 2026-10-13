@@ -15,8 +15,9 @@
  * still agree and the gap stays visible in one place (CSS_GAPS below).
  */
 import type { ChartSpec } from './chartSpec';
+import { CHART_STATE_COLORS } from './chartSpec';
 import type { ChartLayout, LayoutItem, ChartMetrics } from './chartLayout';
-import { metricsForSize } from './chartLayout';
+import { metricsForSize, formatChartValue } from './chartLayout';
 
 /** Tokens the chart reads that a design system only has if it was published
  *  after they were added to the export. A system published earlier paints the
@@ -50,6 +51,18 @@ export function chartCSS(): string {
   color: var(--Text);
 }
 .omni-chart *, .omni-chart *::before, .omni-chart *::after { box-sizing: border-box; }
+/* In a card — the lib Card's light/dark variant: the chart's own ground,
+   --Card-Radius, a Border-Variant edge and its resting shadow. The edge is an
+   inset shadow, not a border, so nothing inside moves by its 1px and the
+   geometry still matches Figma (an INSIDE stroke). */
+.omni-chart--card {
+  /* The Card's padded slot (Figma: "Padded Card Content", Card-Padding). The
+     chart's own geometry sits inside it, so the canvas is unchanged. */
+  padding: var(--Card-Padding, 30px);
+  border-radius: var(--Card-Radius, 16px);
+  box-shadow: inset 0 0 0 1px var(--Border-Variant), var(--Effect-Level-1, 0 1px 3px rgb(0 0 0 / 0.12));
+  overflow: hidden;
+}
 
 /* Labels — Figma: Body-Font-Family, Body-Semibold, Labels/Mobile-Nav-Label-* */
 .omni-chart__label, .omni-chart__tick {
@@ -71,6 +84,20 @@ export function chartCSS(): string {
 
 /* Flat bar — Figma "Bar": Fill, with a 1px inside border in Chart-Background */
 .omni-chart__bar { position: absolute; background: var(--series); }
+/* Track — the Bar's Opaque Background: a 20-Fill pill the full length of the
+   plot behind each bar (corner radius = the bar's width, so a pill). */
+.omni-chart__track { position: absolute; background: color-mix(in srgb, var(--series) 20%, transparent); }
+/* The line through the bars' ends: drawn under the bars, so each topper covers its end. */
+.omni-chart__connector { position: absolute; top: 0; overflow: visible; pointer-events: none; }
+/* Topper — Figma "BarChartTopper" (the Bar's BarDecoration): a disc the bar's
+   width in the chart ground, a 4px ring outside it in the series color, and a
+   0 4 4 25% shadow, centered on the bar's end. content-box so the ring sits
+   outside the disc, as Figma's OUTSIDE stroke does. */
+.omni-chart__topper {
+  position: absolute; z-index: 2; box-sizing: content-box; border-radius: 50%;
+  background: var(--Background); border: 4px solid var(--series);
+  box-shadow: 0 4px 4px rgb(0 0 0 / 0.25);
+}
 .omni-chart__bar--gradient {
   background: linear-gradient(to bottom, var(--series), color-mix(in srgb, var(--series) 20%, transparent));
 }
@@ -79,7 +106,23 @@ export function chartCSS(): string {
 /* 3D bar — Figma "3dBar": two faces and a cap. Top and Bottom are fixed;
    only the middle grows. Overlays sit 1px inside each face so the Fill round
    them is the outline; the faces overlap by that 1px. */
-.omni-chart__b3 { position: absolute; display: flex; flex-direction: column; }
+.omni-chart__b3 { position: absolute; display: flex; flex-direction: column; isolation: isolate; }
+/* 3dBar shadow — Figma "3dBar" › shadow: a wedge at the bar's foot, cast to
+   the right, 60% black fading out, layer blur 4 (= CSS 2px). Its box is
+   24.04 x 19.8 at x 14, bottom 1.3px below the bar (constraint Bottom). The
+   gradient's 16.2% / 84.2% stops are Figma's 0 / 1 mapped onto CSS's
+   corner-to-corner gradient line at 72.2deg. */
+.omni-chart__b3-shadow {
+  position: absolute; left: 14px; bottom: -1.3px; width: 24.04px; height: 19.8px;
+  z-index: -1; filter: blur(2px); pointer-events: none;
+}
+/* The shape is on ::before so the blur, on the parent, softens its clipped
+   edge — CSS clips after filtering, so both on one element is a hard edge. */
+.omni-chart__b3-shadow::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(72.2deg, rgb(0 0 0 / 0.6) 16.2%, rgb(0 0 0 / 0) 84.2%);
+  clip-path: polygon(11.67px 15.2px, 16.26px 3.54px, 24.04px 0, 20.51px 14.14px, 0 19.8px);
+}
 .omni-chart__b3 > i { position: relative; display: block; flex: none; background: var(--series); }
 /* The three pieces overlap by 1px at each join. Butted edge to edge they
    land on fractional pixels and the anti-aliased seam lets the chart's
@@ -113,7 +156,7 @@ export function chartCSS(): string {
 /* Wide 3D bar — Figma "Wide-3dBar": front face, side at black 50% sloping
    5px down to the right, and a wedge shadow (Figma layer blur 4 = CSS 2px). */
 .omni-chart__bw { position: absolute; display: flex; isolation: isolate; }
-.omni-chart__bw-front { width: 48px; background: var(--series); }
+.omni-chart__bw-front { flex: 1; background: var(--series); }
 .omni-chart__bw-side {
   width: 4px;
   background: linear-gradient(rgb(0 0 0 / 0.5) 0 0), var(--series);
@@ -126,106 +169,483 @@ export function chartCSS(): string {
      Top & Bottom, so its tip moves down in proportion — 5.13% of the height
      past a 1.48px offset — rather than sitting at a fixed 11.43px, which is
      only right at the component's own 194px. */
-  clip-path: polygon(42.85px 1.56px, 63.94px calc(1.48px + 5.13%), 43.61px 100%);
+  /* Pinned to the bar's right edge (constraint Right), so the wedge follows
+     the front face as WideBar changes with the size mode. ::before runs 24px
+     past the bar, hence the 24px in each x. */
+  clip-path: polygon(calc(100% - 33.15px) 1.56px, calc(100% - 12.06px) calc(1.48px + 5.13%), calc(100% - 32.39px) 100%);
 }
 
-/* Line */
-.omni-chart__svg { position: absolute; inset: 0; overflow: visible; }
+/* Flat bar lying down: the gradient runs from the value end back to the base. */
+.omni-chart__bar--gradient.omni-chart__bar--h {
+  background: linear-gradient(to left, var(--series), color-mix(in srgb, var(--series) 20%, transparent));
+}
 
-/* The data, for screen readers — a chart is a picture of a table. */
+/* Horizontal 3dBar / Wide-3dBar — the front face carries the value; the 4px
+   end face is Fill under black 50%, angled 5px at top and bottom (the two
+   "top-angle" triangles, one flipped). */
+.omni-chart__bh { position: absolute; display: flex; isolation: isolate; }
+.omni-chart__bh-front { flex: 1; background: var(--series); }
+.omni-chart__bh-side {
+  flex: none; width: 4px;
+  background: linear-gradient(rgb(0 0 0 / 0.5) 0 0), var(--series);
+  clip-path: polygon(0 0, 100% 5px, 100% calc(100% - 5px), 0 100%);
+}
+.omni-chart__bh-shadow { position: absolute; z-index: -1; filter: blur(2px); pointer-events: none; }
+.omni-chart__bh-shadow::before { content: ''; position: absolute; inset: 0; }
+/* 3dBar: a dart under the bar's far end that stretches with it (constraint
+   Left & Right, and Bottom — the bar's thickness follows the size mode). */
+.omni-chart__bh-shadow--3d { left: 0; bottom: -5px; height: 10px; }
+.omni-chart__bh-shadow--3d::before {
+  background: linear-gradient(to right, rgb(0 0 0 / 0.03), rgb(0 0 0 / 0.15));
+  clip-path: polygon(92.31% 50%, 100% 0, 96.16% 100%, 0 50%);
+}
+/* Wide-3dBar: a fixed sliver pinned to the end (constraint Right), 30% black. */
+.omni-chart__bh-shadow--wide { right: -0.15px; bottom: -5.25px; width: 51.71px; height: 9.07px; }
+.omni-chart__bh-shadow--wide::before {
+  background: rgb(0 0 0 / 0.3);
+  clip-path: polygon(0 12.2%, 100% 0, 100% 100%);
+}
+
+/* FancyBar — Figma "FancyBar" / "FancyInnerBar": a 20-Fill track the full
+   length of the plot, a Fill bar with a center groove (a light strip and a
+   dark one, 4px each), and the value in a bubble centered on the bar's end:
+   20-Fill halo 56, Fill ring 40 with a 0 4 4 25% shadow, ground disc 32. */
+.omni-chart__fancy-track { position: absolute; background: color-mix(in srgb, var(--series) 20%, transparent); }
+.omni-chart__fancy-fill { position: absolute; background: var(--series); }
+.omni-chart__fancy-fill::before, .omni-chart__fancy-fill::after { content: ''; position: absolute; }
+/* The groove sits on the bar's center line: the light strip before it, the
+   dark strip after. Sizes come from Component-Size, so the center is 50%. */
+.omni-chart__fancy-fill::before { left: calc(50% - 4px); width: 4px; top: 0; bottom: 0; background: linear-gradient(to left, rgb(252 252 252 / 0.1), transparent); }
+.omni-chart__fancy-fill::after { left: 50%; width: 4px; top: 0; bottom: 0; background: linear-gradient(to right, rgb(0 0 0 / 0.2), transparent); }
+.omni-chart__fancy-fill--h::before { left: 0; right: 0; width: auto; top: calc(50% - 4px); bottom: auto; height: 4px; background: linear-gradient(to top, rgb(252 252 252 / 0.1), transparent); }
+.omni-chart__fancy-fill--h::after { left: 0; right: 0; width: auto; top: 50%; bottom: auto; height: 4px; background: linear-gradient(to top, rgb(0 0 0 / 0.2), transparent); }
+/* Halo (Fancy-LargeBar-Ring) and ring (Fancy-LargeBar) are set inline per
+   size mode; the disc is a fixed 32px, unbound in the component. */
+.omni-chart__fancy-bubble {
+  position: absolute; border-radius: 50%;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--series) 20%, transparent);
+}
+.omni-chart__fancy-bubble > i {
+  border-radius: 50%; display: grid; place-items: center;
+  background: var(--series); box-shadow: 0 4px 4px rgb(0 0 0 / 0.25);
+}
+.omni-chart__fancy-bubble > i > b {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--Background); color: var(--Text); font-style: normal;
+  /* Figma: the Numbers / Number-Small type style */
+  font-family: var(--Number-Small-Font-Family, var(--Body-Font-Family, sans-serif));
+  font-weight: var(--Number-Small-Font-Weight, 700);
+  font-size: var(--Number-Small-Font-Size, 16px);
+  line-height: var(--Number-Small-Line-Height, 16px);
+  letter-spacing: var(--Number-Small-Letter-Spacing, 0);
+}
+
+/* Line — the SVG spans the plot and stretches with it; strokes keep their
+   width (non-scaling), and markers are HTML so they never distort. */
+.omni-chart__svg { position: absolute; top: 0; overflow: visible; }
+.omni-chart__line--shadow { filter: drop-shadow(0 4px 4px rgb(0 0 0 / 0.25)); }
+.omni-chart__ribbon-shade { fill: rgb(0 0 0 / 0.3); }
+.omni-chart__mark { position: absolute; display: block; background: var(--series); }
+.omni-chart__mark--dot { border-radius: 50%; }
+.omni-chart__mark--triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.omni-chart__mark--disc { border-radius: 50%; background: var(--Background); border: 2px solid var(--series); }
+
+/* Vertical gridlines, one per category */
+.omni-chart__xgrid { position: absolute; width: 1px; background: var(--Chart-Lines, var(--Border-Variant)); }
+
+/* Legend — fixed columns, so it lays out the same in Figma */
+.omni-chart__legend { position: absolute; display: flex; align-items: center; gap: 6px; }
+.omni-chart__swatch { flex: none; width: 12px; height: 12px; background: var(--series); }
+.omni-chart__legend > .omni-chart__label { position: static; }
+/* A line's key is its marker; a line without one keys as a short stroke. */
+.omni-chart__swatch--dot { border-radius: 50%; }
+.omni-chart__swatch--disc { border-radius: 50%; background: var(--Background); border: 2px solid var(--series); }
+.omni-chart__swatch--triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.omni-chart__swatch--none { height: 2px; border-radius: 1px; }
+
+/* Pie and donut — each slice is outlined in the chart's own ground, which
+   is what separates the slices. */
+.omni-chart__slice { fill: var(--series); stroke: var(--Background); }
+/* 3D: the pie casts one shadow as a whole — a filter on the SVG, so slices
+   do not shade each other. Figma: a DROP_SHADOW on the slices' group. */
+.omni-chart__pie--shadow { filter: drop-shadow(0 4px 8px rgb(0 0 0 / 0.25)); }
+.omni-chart__hole {
+  position: absolute; border-radius: 50%;
+  /* Filled with the ground, as in Figma: it covers the part of the pie's
+     outer shadow that would otherwise fall into the hole. */
+  background: var(--Background);
+  box-shadow: inset 0 4px 8px rgb(0 0 0 / 0.25);
+}
+
+.omni-chart__canvas { position: relative; }
+
+/* Title — the chart's name, Figma: the H5 text style */
+.omni-chart__title {
+  /* Sizing-2 under the title before the chart starts. */
+  margin: 0; padding: 16px 16px var(--Sizing-2, 16px); color: var(--Header, var(--Text));
+  font-family: var(--Header-Font-Family, var(--Font-Family-Header, sans-serif));
+  font-weight: var(--Header-Font-Weight, 700);
+  font-size: var(--H5-Font-Size, 18px); line-height: var(--H5-Line-Height, 1.3);
+}
+
+/* "Show as table" — a link that opens the data in place. A native
+   <details>, so it works with the keyboard and screen readers and needs no
+   script. Links keep their colour on hover; the underline thickens. */
+.omni-chart__more { padding: 0 16px 16px; }
+.omni-chart__more > summary {
+  display: inline-block; list-style: none; cursor: pointer;
+  color: var(--Hotlink, var(--Link)); text-decoration: underline;
+  text-underline-offset: 2px; text-decoration-thickness: 1px;
+  font-family: var(--Body-Font-Family, var(--Font-Family-Body, sans-serif));
+  font-size: var(--Body-Small-Font-Size, 14px);
+}
+.omni-chart__more > summary::-webkit-details-marker { display: none; }
+.omni-chart__more > summary:hover { text-decoration-thickness: 2px; }
+.omni-chart__more > summary:focus-visible { outline: 3px solid var(--Focus-Visible, currentColor); outline-offset: 2px; border-radius: 2px; }
+.omni-chart__more > summary .omni-chart__hide,
+.omni-chart__more[open] > summary .omni-chart__show { display: none; }
+.omni-chart__more[open] > summary .omni-chart__hide { display: inline; }
+.omni-chart__more .omni-chart__table { margin: 8px 0 0; }
+.omni-chart__table {
+  margin: 16px; border-collapse: collapse; color: var(--Text);
+  font-family: var(--Body-Font-Family, var(--Font-Family-Body, sans-serif));
+  font-size: var(--Body-Small-Font-Size, 14px);
+}
+.omni-chart__table th, .omni-chart__table td {
+  padding: 6px 12px; text-align: left; border-bottom: 1px solid var(--Border-Variant);
+}
+.omni-chart__table td { text-align: right; font-variant-numeric: tabular-nums; }
 .omni-chart__data {
-  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
 }`;
 }
 
+/** A mark's color. The state four fall back to the ground's Icons-{State},
+ *  which is what Figma's Chart/Colors/{State} aliases — so they work on a
+ *  system published before --Chart-{State} reached its CSS. */
 function seriesVar(color: string) {
+  if (CHART_STATE_COLORS.indexOf(color) !== -1) return `--series: var(--Chart-${color}, var(--Icons-${color}));`;
   return `--series: var(--${color});`;
 }
 
-function barMarkup(spec: ChartSpec, it: LayoutItem): string {
-  const pos = `left:${px(it.x)};top:${px(it.frameY)};width:${px(it.width)};height:${px(it.frameHeight)};`;
+/** Along the value axis of a horizontal chart: where a fraction of the plot
+ *  sits, and how long a fraction of it is. Responsive charts write calc() so
+ *  the bars grow with the container. */
+function hAt(L: ChartLayout, frac: number, offset: number): string {
+  if (!L.responsive) return px(L.plot.x + frac * L.plot.width + offset);
+  const rest = round(L.width - L.plot.x - L.plot.width);
+  return `calc(${round(L.plot.x + offset)}px + ${round(frac)} * (100% - ${round(L.plot.x + rest)}px))`;
+}
+function hLen(L: ChartLayout, frac: number, extra: number): string {
+  if (!L.responsive) return px(frac * L.plot.width + extra);
+  const rest = round(L.width - L.plot.x - L.plot.width);
+  return `calc(${round(frac)} * (100% - ${round(L.plot.x + rest)}px) + ${round(extra)}px)`;
+}
+
+/** The value as the FancyBar bubble prints it: the number alone, no
+ *  prefix or suffix — the bubble holds about three characters. */
+function bubbleText(spec: ChartSpec, v: number): string {
+  return formatChartValue(v, { step: spec.axis.step });
+}
+
+/** The value bubble at (left, top), sized for the size mode. */
+function bubble(spec: ChartSpec, m: ChartMetrics, v: number, left: string, top: string, sv: string): string {
+  const b = px(m.fancyBubble);
+  const r = px(m.fancyTrack);
+  return `<span class="omni-chart__fancy-bubble" style="left:${left};top:${top};width:${b};height:${b};${sv}" aria-hidden="true"><i style="width:${r};height:${r}"><b>${esc(bubbleText(spec, v))}</b></i></span>`;
+}
+
+/** The topper on a bar's end: (left, top) are where the end's center is. */
+function topper(m: ChartMetrics, left: string, top: string, sv: string): string {
+  const r = m.barWidth / 2 + 4;
+  return `<span class="omni-chart__topper" style="left:calc(${left} - ${px(r)});top:calc(${top} - ${px(r)});width:${px(m.barWidth)};height:${px(m.barWidth)};${sv}" aria-hidden="true"></span>`;
+}
+
+function hBarMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMetrics): string {
+  const top = px(it.frameY);
+  const h = px(it.frameHeight);
+  const sv = seriesVar(it.color);
+  if (spec.type === 'stacked') {
+    const segs = (it.segments || []).filter((sg) => sg.len > 0);
+    const last = segs[segs.length - 1];
+    return segs.map((sg) =>
+      `<div class="omni-chart__bar omni-chart__bar--h${spec.bar.outline ? ' omni-chart__bar--outline' : ''}" style="left:${hAt(L, sg.startFrac, 0)};top:${top};width:${hLen(L, sg.lenFrac, 0)};height:${h};${seriesVar(sg.color)}" aria-hidden="true"></div>`,
+    ).join('') + (spec.bar.topper && last ? topper(m, hAt(L, last.startFrac + last.lenFrac, 0), px(it.frameY + it.frameHeight / 2), seriesVar(last.color)) : '');
+  }
+  if (spec.type === 'fancy') {
+    const t = m.fancyTrack;
+    const inset = (it.frameHeight - t) / 2;
+    return `<div class="omni-chart__fancy-track" style="left:${px(L.plot.x)};top:${px(it.frameY + inset)};width:${hLen(L, 1, 0)};height:${px(t)};border-radius:0 ${px(t / 2)} ${px(t / 2)} 0;${sv}" aria-hidden="true"></div>`
+      + `<div class="omni-chart__fancy-fill omni-chart__fancy-fill--h" style="left:${px(L.plot.x)};top:${px(it.frameY + inset)};width:${hLen(L, it.valueFrac, 0)};height:${px(t)};${sv}" aria-hidden="true"></div>`
+      + bubble(spec, m, it.value, hAt(L, it.valueFrac, -m.fancyBubble / 2), top, sv);
+  }
+  if (spec.type === 'bar3d' || spec.type === 'bar3dWide') {
+    const shadow = !spec.bar.shadow ? ''
+      : spec.type === 'bar3d'
+        ? `<span class="omni-chart__bh-shadow omni-chart__bh-shadow--3d" style="width:calc(100% - 2.65px)"></span>`
+        : `<span class="omni-chart__bh-shadow omni-chart__bh-shadow--wide"></span>`;
+    /* The wrapper carries the length (value + the 4px end face), measured
+       against the chart; the front face fills what the end face leaves. A
+       percentage on the front face itself would resolve against this
+       wrapper's own width, which is what it is trying to set. */
+    return `<div class="omni-chart__bh" style="left:${px(L.plot.x)};top:${top};width:${hLen(L, it.valueFrac, 4)};height:${h};${sv}" aria-hidden="true">`
+      + shadow
+      + `<span class="omni-chart__bh-front"></span><span class="omni-chart__bh-side"></span></div>`;
+  }
+  const mods = ' omni-chart__bar--h' + (spec.bar.fill === 'gradient' ? ' omni-chart__bar--gradient' : '')
+    + (spec.bar.outline ? ' omni-chart__bar--outline' : '');
+  const track = spec.bar.track
+    ? `<div class="omni-chart__track" style="left:${px(L.plot.x)};top:${top};width:${hLen(L, 1, 0)};height:${h};border-radius:${h};${sv}" aria-hidden="true"></div>`
+    : '';
+  return track + `<div class="omni-chart__bar${mods}" style="left:${px(L.plot.x)};top:${top};width:${hLen(L, it.valueFrac, 0)};height:${h};${sv}" aria-hidden="true"></div>`
+    + (spec.bar.topper ? topper(m, hAt(L, it.valueFrac, 0), px(it.frameY + it.frameHeight / 2), sv) : '');
+}
+
+function barMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMetrics): string {
+  if (L.horizontal) return hBarMarkup(spec, it, L, m);
+  const pos = `left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(it.frameY)};width:${px(it.width)};height:${px(it.frameHeight)};`;
+  if (spec.type === 'stacked') {
+    const base = L.plot.baseline;
+    const segs = (it.segments || []).filter((sg) => sg.len > 0);
+    const last = segs[segs.length - 1];
+    return segs.map((sg) =>
+      `<div class="omni-chart__bar${spec.bar.outline ? ' omni-chart__bar--outline' : ''}" style="left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(base - sg.start - sg.len)};width:${px(it.width)};height:${px(sg.len)};${seriesVar(sg.color)}" aria-hidden="true"></div>`,
+    ).join('') + (spec.bar.topper && last ? topper(m, xAt(L, m, it.centerFrac, 0), px(base - last.start - last.len), seriesVar(last.color)) : '');
+  }
+  if (spec.type === 'fancy') {
+    const t = m.fancyTrack;
+    const base = L.plot.baseline;
+    const sv = seriesVar(it.color);
+    return `<div class="omni-chart__fancy-track" style="left:${xAt(L, m, it.centerFrac, -t / 2)};top:${px(L.plot.y)};width:${px(t)};height:${px(L.plot.height)};border-radius:${px(t / 2)} ${px(t / 2)} 0 0;${sv}" aria-hidden="true"></div>`
+      + `<div class="omni-chart__fancy-fill" style="left:${xAt(L, m, it.centerFrac, -t / 2)};top:${px(base - it.valueHeight)};width:${px(t)};height:${px(it.valueHeight)};${sv}" aria-hidden="true"></div>`
+      + bubble(spec, m, it.value, xAt(L, m, it.centerFrac, -m.fancyBubble / 2), px(base - it.valueHeight - m.fancyBubble / 2), sv);
+  }
   if (spec.type === 'bar3d') {
     return `<div class="omni-chart__b3" style="${pos}${seriesVar(it.color)}" aria-hidden="true">`
       + `<i class="omni-chart__b3-top"><b></b></i>`
       + `<i style="height:${px(it.valueHeight + 2)}"></i>`
-      + `<i class="omni-chart__b3-bottom"><b></b></i></div>`;
+      + `<i class="omni-chart__b3-bottom"><b></b></i>`
+      + (spec.bar.shadow ? `<span class="omni-chart__b3-shadow"></span>` : '') + `</div>`;
   }
   if (spec.type === 'bar3dWide') {
     return `<div class="omni-chart__bw" style="${pos}${seriesVar(it.color)}" aria-hidden="true">`
-      + `<span class="omni-chart__bw-shadow"></span>`
+      + (spec.bar.shadow ? `<span class="omni-chart__bw-shadow"></span>` : '')
       + `<span class="omni-chart__bw-front"></span><span class="omni-chart__bw-side"></span></div>`;
   }
   const mods = (spec.bar.fill === 'gradient' ? ' omni-chart__bar--gradient' : '')
     + (spec.bar.outline ? ' omni-chart__bar--outline' : '');
-  return `<div class="omni-chart__bar${mods}" style="${pos}${seriesVar(it.color)}" aria-hidden="true"></div>`;
+  const track = spec.bar.track
+    ? `<div class="omni-chart__track" style="left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(L.plot.y)};width:${px(it.width)};height:${px(L.plot.height)};border-radius:${px(it.width)};${seriesVar(it.color)}" aria-hidden="true"></div>`
+    : '';
+  return track + `<div class="omni-chart__bar${mods}" style="${pos}${seriesVar(it.color)}" aria-hidden="true"></div>`
+    + (spec.bar.topper ? topper(m, xAt(L, m, it.centerFrac, 0), px(it.frameY), seriesVar(it.color)) : '');
 }
 
 /** Where each component puts its label: centered under a flat bar (hug), a
  *  centered Label Width box under the 3dBar, centered across the Wide-3dBar's
  *  front face (its Label-Area spans the bar with the side as right padding). */
-function labelMarkup(spec: ChartSpec, it: LayoutItem, m: ChartMetrics): string {
+function labelMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMetrics): string {
+  if (L.horizontal) {
+    // Beside the bar, aligned the way the component's Label-Area aligns it.
+    return `<p class="omni-chart__label" style="left:${px(it.labelX || 0)};top:${px(it.labelY)};width:${px(it.labelW || 0)};height:${px(m.labelHeight)};text-align:${it.labelAlign || 'right'}" aria-hidden="true">${esc(it.label)}</p>`;
+  }
   let left: number; let width: number; let align: string;
   if (spec.type === 'bar3dWide') {
-    left = it.x; width = m.wideFront; align = 'center';
+    left = -it.width / 2; width = m.wideFront; align = 'center';
+  } else if (spec.type === 'fancy') {
+    left = -it.width / 2; width = it.width; align = 'center';
   } else {
-    width = m.labelWidth; left = it.centerX - width / 2; align = 'center';
+    width = m.labelWidth; left = -width / 2; align = 'center';
   }
-  return `<p class="omni-chart__label" style="left:${px(left)};top:${px(it.labelY)};width:${px(width)};height:${px(m.labelHeight)};text-align:${align}" aria-hidden="true">${esc(it.label)}</p>`;
-}
-
-function lineMarkup(spec: ChartSpec, L: ChartLayout): string {
-  if (!L.line || !L.line.points.length) return '';
-  const pts = L.line.points;
-  const id = `oc-fill-${slug(spec.name)}`;
-  const d = 'M ' + pts.map((p) => `${round(p.x)} ${round(p.y)}`).join(' L ');
-  const base = round(L.plot.baseline);
-  const area = `${d} L ${round(pts[pts.length - 1].x)} ${base} L ${round(pts[0].x)} ${base} Z`;
-  const t = spec.line.thickness;
-  let fill = '';
-  if (spec.line.fill === 'gradient') {
-    fill = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">`
-      + `<stop offset="0" style="stop-color:var(--series);stop-opacity:0.5"/>`
-      + `<stop offset="1" style="stop-color:var(--series);stop-opacity:0"/></linearGradient></defs>`
-      + `<path d="${area}" fill="url(#${id})"/>`;
-  } else if (spec.line.fill === 'solid') {
-    fill = `<path d="${area}" style="fill:var(--series);fill-opacity:0.2"/>`;
-  }
-  const r = 4;
-  const markers = spec.line.marker === 'none' ? '' : pts.map((p) => (spec.line.marker === 'square'
-    ? `<rect x="${round(p.x - r)}" y="${round(p.y - r)}" width="${r * 2}" height="${r * 2}" style="fill:var(--series)"/>`
-    : `<circle cx="${round(p.x)}" cy="${round(p.y)}" r="${r}" style="fill:var(--series)"/>`)).join('');
-  return `<svg class="omni-chart__svg" width="${round(L.width)}" height="${round(L.height)}" viewBox="0 0 ${round(L.width)} ${round(L.height)}" style="${seriesVar(spec.line.color)}" aria-hidden="true" focusable="false">`
-    + fill
-    + `<path d="${d}" style="fill:none;stroke:var(--series);stroke-width:${t};stroke-linecap:round;stroke-linejoin:round"/>`
-    + markers + `</svg>`;
+  return `<p class="omni-chart__label" style="left:${xAt(L, m, it.centerFrac, left)};top:${px(it.labelY)};width:${px(width)};height:${px(m.labelHeight)};text-align:${align}" aria-hidden="true">${esc(it.label)}</p>`;
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/** An x position. Fixed charts write px; responsive ones write where the
+ *  point sits as a fraction of the plot, so it moves with the container. */
+function xAt(L: ChartLayout, m: ChartMetrics, frac: number, offset: number): string {
+  if (!L.responsive) return px(L.plot.x + frac * L.plot.width + offset);
+  const off = round(L.plot.x + offset);
+  const rest = round(L.width - L.plot.x - L.plot.width);
+  return `calc(${off}px + ${round(frac)} * (100% - ${round(L.plot.x + rest)}px))`;
+}
+
+function lineMarkup(spec: ChartSpec, L: ChartLayout, m: ChartMetrics): string {
+  if (!L.lines.length) return '';
+  const t = spec.line.thickness;
+  const vb = `${round(L.plot.x)} 0 ${round(L.plot.width)} ${round(L.height)}`;
+  const shadow = spec.line.effect === 'shadow' ? ' class="omni-chart__line--shadow"' : '';
+  const body = L.lines.map((ln) => {
+    const id = `oc-fill-${slug(spec.name)}-${ln.series}`;
+    let fill = '';
+    if (ln.fill === 'gradient' && ln.area) {
+      fill = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">`
+        + `<stop offset="0" style="stop-color:var(--series);stop-opacity:0.5"/>`
+        + `<stop offset="1" style="stop-color:var(--series);stop-opacity:0"/></linearGradient></defs>`
+        + `<path d="${ln.area}" fill="url(#${id})"/>`;
+    } else if (ln.fill === 'solid' && ln.area) {
+      fill = `<path d="${ln.area}" style="fill:var(--series);fill-opacity:0.2"/>`;
+    }
+    const ribbon = ln.ribbon
+      ? `<path d="${ln.ribbon}" style="fill:var(--series)"/><path d="${ln.ribbon}" class="omni-chart__ribbon-shade"/>`
+      : '';
+    return `<g style="${seriesVar(ln.color)}">${fill}<g${shadow}>${ribbon}`
+      + `<path d="${ln.path}" vector-effect="non-scaling-stroke" style="fill:none;stroke:var(--series);stroke-width:${t};stroke-linecap:round;stroke-linejoin:round"/></g></g>`;
+  }).join('');
+  /* An explicit width: left + right alone do not stretch an <svg> — it is a
+     replaced element and falls back to 300px, which squeezed every line into
+     the left of a wide chart while the HTML markers stayed where they belong. */
+  const rest = L.width - L.plot.x - L.plot.width;
+  const svgW = L.responsive ? `calc(100% - ${px(L.plot.x + rest)})` : px(L.plot.width);
+  const svg = `<svg class="omni-chart__svg" style="left:${px(L.plot.x)};width:${svgW};height:${px(L.height)}" viewBox="${vb}" preserveAspectRatio="none" aria-hidden="true" focusable="false">${body}</svg>`;
+
+  const marks = L.lines.map((ln) => {
+    if (ln.marker === 'none') return '';
+    const size = ln.marker === 'disc' ? m.discSize : m.dotSize;
+    return ln.points.map((p) =>
+      `<i class="omni-chart__mark omni-chart__mark--${ln.marker}" style="left:${xAt(L, m, p.frac, -size / 2)};top:${px(p.y - size / 2)};width:${px(size)};height:${px(size)};${seriesVar(ln.color)}" aria-hidden="true"></i>`,
+    ).join('');
+  }).join('');
+  return svg + marks;
+}
+
+/** An annular sector (or a pie wedge when inner is 0), clockwise from 12. */
+function slicePath(cx: number, cy: number, r: number, inner: number, a0: number, a1: number): string {
+  const pt = (rad: number, a: number) => `${round(cx + Math.sin(a) * rad)} ${round(cy - Math.cos(a) * rad)}`;
+  const large = a1 - a0 > Math.PI ? 1 : 0;
+  if (inner <= 0) return `M ${round(cx)} ${round(cy)} L ${pt(r, a0)} A ${r} ${r} 0 ${large} 1 ${pt(r, a1)} Z`;
+  return `M ${pt(r, a0)} A ${r} ${r} 0 ${large} 1 ${pt(r, a1)} L ${pt(inner, a1)} A ${inner} ${inner} 0 ${large} 0 ${pt(inner, a0)} Z`;
+}
+
+function pieMarkup(spec: ChartSpec, L: ChartLayout, m: ChartMetrics): string {
+  const P = L.pie!;
+  const parts: string[] = [];
+  // The pie sits centered; responsive charts keep it centered as they stretch.
+  const hx = (x: number) => (L.responsive ? `calc(50% + ${round(x - P.cx)}px)` : px(x));
+  const size = P.r * 2;
+  const live = P.slices.filter((sl) => sl.end > sl.start);
+  const shapes = live.map((sl) => {
+    const whole = sl.end - sl.start >= Math.PI * 2 - 1e-9;
+    const d = whole
+      // One slice is the whole circle; an arc cannot start and end on one point.
+      ? (P.innerR > 0
+        ? `M ${P.r} 0 A ${P.r} ${P.r} 0 1 1 ${P.r} ${size} A ${P.r} ${P.r} 0 1 1 ${P.r} 0 Z M ${P.r} ${round(P.r - P.innerR)} A ${round(P.innerR)} ${round(P.innerR)} 0 1 0 ${P.r} ${round(P.r + P.innerR)} A ${round(P.innerR)} ${round(P.innerR)} 0 1 0 ${P.r} ${round(P.r - P.innerR)} Z`
+        : `M ${P.r} 0 A ${P.r} ${P.r} 0 1 1 ${P.r} ${size} A ${P.r} ${P.r} 0 1 1 ${P.r} 0 Z`)
+      : slicePath(P.r, P.r, P.r, P.innerR, sl.start, sl.end);
+    return `<path class="omni-chart__slice" d="${d}" fill-rule="evenodd" style="${seriesVar(sl.color)}stroke-width:${m.sliceBorder}"/>`;
+  }).join('');
+  parts.push(`<svg class="omni-chart__svg${spec.pie.shadow ? ' omni-chart__pie--shadow' : ''}" style="left:${hx(P.cx - P.r)};top:${px(P.cy - P.r)};width:${px(size)};height:${px(size)}" viewBox="0 0 ${size} ${size}" aria-hidden="true" focusable="false">${shapes}</svg>`);
+
+  if (spec.type === 'donut' && spec.pie.shadow && P.innerR > 0) {
+    const d = P.innerR * 2;
+    parts.push(`<span class="omni-chart__hole" style="left:${hx(P.cx - P.innerR)};top:${px(P.cy - P.innerR)};width:${px(d)};height:${px(d)}" aria-hidden="true"></span>`);
+  }
+  if (spec.pie.labels === 'percent' || spec.pie.labels === 'both') {
+    for (const sl of live) {
+      const w = m.pieLabelRoom;
+      const left = sl.labelAlign === 'left' ? sl.labelX : sl.labelX - w;
+      parts.push(`<p class="omni-chart__label" style="left:${hx(left)};top:${px(sl.labelY - m.labelHeight / 2)};width:${px(w)};height:${px(m.labelHeight)};text-align:${sl.labelAlign}" aria-hidden="true">${sl.percent}%</p>`);
+    }
+  }
+  return parts.join('\n  ');
+}
+
+function legendMarkup(L: ChartLayout, m: ChartMetrics): string {
+  return L.legend.map((it) =>
+    `<div class="omni-chart__legend" style="left:${px(it.x)};top:${px(it.y)};width:${px(m.legendItemWidth)};height:${px(m.labelHeight)};${seriesVar(it.color)}" aria-hidden="true">`
+    + `<span class="omni-chart__swatch${it.marker ? ` omni-chart__swatch--${it.marker}` : ''}"></span><p class="omni-chart__label">${esc(it.label)}</p></div>`,
+  ).join('\n  ');
+}
+
+/** The numbers behind the picture — always in the page for screen readers,
+ *  and shown in place of the chart when the viewer ticks "Show as table". */
+function tableMarkup(spec: ChartSpec, L: ChartLayout): string {
+  const suf = esc(spec.axis.suffix || '');
+  const pre = esc(spec.axis.prefix || '');
+  const cls = spec.tableLink ? 'omni-chart__table' : 'omni-chart__data';
+  let head = '';
+  let rows = '';
+  if (L.pie) {
+    head = `<tr><th scope="col">Category</th><th scope="col">Value</th><th scope="col">Share</th></tr>`;
+    rows = L.pie.slices.map((sl) => `<tr><th scope="row">${esc(sl.label)}</th><td>${pre}${esc(String(sl.value))}${suf}</td><td>${sl.percent}%</td></tr>`).join('');
+  } else if (spec.type === 'line' || spec.type === 'stacked') {
+    head = `<tr><th scope="col">Category</th>${spec.series.map((sr) => `<th scope="col">${esc(sr.name)}</th>`).join('')}</tr>`;
+    rows = spec.data.map((d) => `<tr><th scope="row">${esc(d.label)}</th>${spec.series.map((_, k) => `<td>${pre}${esc(String(d.values[k]))}${suf}</td>`).join('')}</tr>`).join('');
+  } else {
+    rows = L.items.map((it) => `<tr><th scope="row">${esc(it.label)}</th><td>${pre}${esc(String(it.value))}${suf}</td></tr>`).join('');
+  }
+  return `<table class="${cls}"><caption class="omni-chart__data">${esc(spec.name)}</caption>${head ? `<thead>${head}</thead>` : ''}<tbody>${rows}</tbody></table>`;
+}
 
 /** The chart's HTML. Pair it with chartCSS() once per page. */
 export function chartHTML(spec: ChartSpec, L: ChartLayout, metrics?: Partial<ChartMetrics>): string {
   const m: ChartMetrics = Object.assign(metricsForSize(spec.size), metrics || {});
   const parts: string[] = [];
+  // Whatever the layout left past the plot — the mirror of the left side.
+  const right = px(L.width - L.plot.x - L.plot.width);
 
-  if (spec.showGrid) {
-    for (const t of L.ticks) {
-      parts.push(`<div class="omni-chart__grid" style="left:${px(L.plot.x)};top:${px(t.y)};width:${px(L.plot.width)}" aria-hidden="true"></div>`);
+  if (L.pie) {
+    parts.push(pieMarkup(spec, L, m));
+  } else {
+    if (L.horizontal) {
+      // Value gridlines stand up; category gridlines run along each row.
+      if (spec.grid.y) {
+        for (const t of L.ticks) {
+          parts.push(`<div class="omni-chart__xgrid" style="left:${hAt(L, t.frac || 0, 0)};top:${px(L.plot.y)};height:${px(L.plot.height)}" aria-hidden="true"></div>`);
+        }
+      }
+      for (const rl of L.rowLines) {
+        parts.push(`<div class="omni-chart__grid" style="left:${px(L.plot.x)};right:${px(L.width - L.plot.x - L.plot.width)};top:${px(rl.y)}" aria-hidden="true"></div>`);
+      }
+    } else if (spec.grid.y) {
+      for (const t of L.ticks) {
+        parts.push(`<div class="omni-chart__grid" style="left:${px(L.plot.x)};right:${right};top:${px(t.y)}" aria-hidden="true"></div>`);
+      }
     }
-  }
-  if (spec.showAxis) {
-    for (const t of L.ticks) {
-      parts.push(`<p class="omni-chart__tick" style="left:${px(m.padding)};top:${px(t.y - m.labelHeight / 2)};width:${px(m.tickLabelWidth)};height:${px(m.labelHeight)}" aria-hidden="true">${esc(t.label)}</p>`);
+    for (const xl of L.xLines) {
+      parts.push(`<div class="omni-chart__xgrid" style="left:${xAt(L, m, xl.frac, 0)};top:${px(L.plot.y)};height:${px(L.plot.height)}" aria-hidden="true"></div>`);
     }
+    if (spec.showAxis && L.horizontal) {
+      for (const t of L.ticks) {
+        parts.push(`<p class="omni-chart__tick" style="left:${hAt(L, t.frac || 0, -L.tickWidth / 2)};top:${px(t.y)};width:${px(L.tickWidth)};height:${px(m.labelHeight)};text-align:center" aria-hidden="true">${esc(t.label)}</p>`);
+      }
+    } else if (spec.showAxis) {
+      for (const t of L.ticks) {
+        parts.push(`<p class="omni-chart__tick" style="left:${px(m.padding)};top:${px(t.y - m.labelHeight / 2)};width:${px(L.tickWidth)};height:${px(m.labelHeight)}" aria-hidden="true">${esc(t.label)}</p>`);
+      }
+    }
+    // The line through the bar ends goes UNDER the bars: each topper covers
+    // its end, as in Figma, where the toppers belong to the bar instances.
+    if (L.connector) {
+      const rest = L.width - L.plot.x - L.plot.width;
+      const w = L.responsive ? `calc(100% - ${px(L.plot.x + rest)})` : px(L.plot.width);
+      parts.push(`<svg class="omni-chart__connector" style="left:${px(L.plot.x)};width:${w};height:${px(L.height)}" viewBox="${round(L.plot.x)} 0 ${round(L.plot.width)} ${round(L.height)}" preserveAspectRatio="none" aria-hidden="true" focusable="false">`
+        + `<path d="${L.connector.path}" vector-effect="non-scaling-stroke" style="fill:none;stroke:var(--Text);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/></svg>`);
+    }
+    if (spec.type === 'line') parts.push(lineMarkup(spec, L, m));
+    else for (const it of L.items) parts.push(barMarkup(spec, it, L, m));
+    if (spec.showLabels) for (const it of L.items) parts.push(labelMarkup(spec, it, L, m));
   }
-  if (spec.type === 'line') parts.push(lineMarkup(spec, L));
-  else for (const it of L.items) parts.push(barMarkup(spec, it));
-  if (spec.showLabels) for (const it of L.items) parts.push(labelMarkup(spec, it, m));
+  if (L.legend.length) parts.push(legendMarkup(L, m));
 
-  const rows = L.items.map((it) => `<tr><th scope="row">${esc(it.label)}</th><td>${esc(String(it.value))}${esc(spec.axis.suffix)}</td></tr>`).join('');
-  const table = `<table class="omni-chart__data"><caption>${esc(spec.name)}</caption><tbody>${rows}</tbody></table>`;
-
-  return `<figure class="omni-chart" data-surface="${GROUND_SURFACE[spec.ground]}" style="width:${px(L.width)};height:${px(L.height)}" aria-label="${esc(spec.name)}">\n  `
+  // A card adds its padding on both sides; the chart inside keeps its size.
+  const width = L.responsive ? 'width:100%'
+    : spec.card ? `width:calc(${px(L.width)} + 2 * var(--Card-Padding, 30px))` : `width:${px(L.width)}`;
+  const title = spec.showTitle ? `<p class="omni-chart__title">${esc(spec.name)}</p>\n  ` : '';
+  // The table: behind a "Show as table" link, or hidden for screen readers.
+  const table = spec.tableLink
+    ? `<details class="omni-chart__more"><summary><span class="omni-chart__show">Show as table</span><span class="omni-chart__hide">Hide table</span></summary>\n  ${tableMarkup(spec, L)}\n  </details>`
+    : tableMarkup(spec, L);
+  /* The spec rides on the figure, so pasting this HTML back into the studio
+     reopens the chart for editing — nothing has to be saved anywhere. */
+  const specAttr = ` data-omni-spec="${esc(JSON.stringify(spec))}"`;
+  return `<figure class="omni-chart${spec.card ? ' omni-chart--card' : ''}" data-surface="${GROUND_SURFACE[spec.ground]}" style="${width}" aria-label="${esc(spec.name)}"${specAttr}>\n  `
+    + title
+    + `<div class="omni-chart__canvas" style="height:${px(L.height)}">\n  `
     + parts.join('\n  ')
-    + `\n  ${table}\n</figure>`;
+    + `\n  </div>\n  ${table}\n</figure>`;
 }

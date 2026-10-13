@@ -3708,6 +3708,8 @@ export function chartGroundCSS(jsonData: any, modeName: string): string {
       const hex = g[`Color-${n}`]?.value;
       if (hex) out.push(`  --Chart-${n}: ${hex};`);
     }
+    // The state four: the ground's Icons-{State}, as Figma's Chart/Colors/{State}.
+    for (const st of ['Info', 'Success', 'Warning', 'Error']) out.push(`  --Chart-${st}: var(--Icons-${st});`);
     out.push(`  --Chart-Lines: ${LINES[level]};`);
     out.push('}');
   }
