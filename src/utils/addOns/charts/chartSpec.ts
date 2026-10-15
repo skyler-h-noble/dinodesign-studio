@@ -102,6 +102,10 @@ export interface ChartSpec {
    *  place (a disclosure). Without it the table is still there, hidden, for
    *  screen readers. */
   tableLink: boolean;
+  /** Motion in code (Figma is static): bars grow from their baseline, lines
+   *  draw, a pie opens — on load, or when the chart scrolls into view. Off for
+   *  anyone who asks their system for reduced motion. */
+  animate: 'none' | 'load' | 'scroll';
   /** Drawn as a Card: the chart's ground with the card radius, a
    *  Border-Variant edge and the Card's resting shadow (Effect-Level-1). */
   card: boolean;
@@ -186,6 +190,7 @@ export function chartSpecWithDefaults(raw: any): ChartSpec {
     legend: chartPick(r.legend, ['top', 'bottom'], 'top') as 'top' | 'bottom',
     showTitle: chartBool(r.showTitle, false),
     tableLink: chartBool(r.tableLink, false),
+    animate: chartPick(r.animate, ['none', 'load', 'scroll'], 'none') as 'none' | 'load' | 'scroll',
     card: chartBool(r.card, false),
     data: data.map((d, i) => {
       const value = d ? d.value : undefined;

@@ -23,8 +23,14 @@ describe('chart layout', () => {
   it('item widths match the Figma components', () => {
     const m = metricsForSize('large');
     expect(chartItemWidth('bar', m)).toBe(16);        // Bar-Width, large
-    expect(chartItemWidth('bar3d', m)).toBe(23);      // two 12px faces sharing a 1px seam
+    expect(chartItemWidth('bar3d', m)).toBe(32);      // Data-Visualizations/3dBar, large
     expect(chartItemWidth('bar3dWide', m)).toBe(60);  // WideBar 56 at large + 4 side
+  });
+
+  it('the 3D bar follows the Component-Size mode, as its Figma component now does', () => {
+    // 12 / 24 / 32 — it used to be a fixed 23px whatever the size.
+    expect(['small', 'medium', 'large'].map((z) => chartItemWidth('bar3d', metricsForSize(z)))).toEqual([12, 24, 32]);
+    expect(['small', 'medium', 'large'].map((z) => metricsForSize(z).bar3dThick)).toEqual([12, 24, 32]);
   });
 
   it('Bar-Width follows the Component-Size mode', () => {

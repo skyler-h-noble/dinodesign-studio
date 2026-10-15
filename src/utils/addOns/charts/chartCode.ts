@@ -132,7 +132,10 @@ export function chartCSS(): string {
    overlapped rows are the same colors on both sides. */
 .omni-chart__b3 > i + i { margin-top: -1px; }
 .omni-chart__b3 > i::before, .omni-chart__b3 > i::after {
-  content: ''; position: absolute; top: 0; bottom: 0; width: 10px;
+  /* Each half's shading, 1px inside its outer edge: the bar is two halves
+     of (width + 1) / 2, so the overlay is half less 1.5px — 10px on the
+     old fixed 23px bar, and it now scales with Data-Visualizations/3dBar. */
+  content: ''; position: absolute; top: 0; bottom: 0; width: calc(50% - 1.5px);
 }
 .omni-chart__b3 > i::before { left: 1px; background: rgb(255 255 255 / 0.15); }
 .omni-chart__b3 > i::after { right: 1px; background: rgb(0 0 0 / 0.15); }
@@ -320,6 +323,35 @@ export function chartCSS(): string {
   position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+   Only when the chart asks for it (data-animate), and never for anyone whose
+   system asks for reduced motion. "load" plays at once; "scroll" waits,
+   paused on its first frame, until the script marks the chart data-in-view.
+   The individual scale / rotate properties compose with the transforms the
+   3D bars already use instead of replacing them. */
+@keyframes omni-chart-grow-y { from { scale: 1 0; } }
+@keyframes omni-chart-grow-x { from { scale: 0 1; } }
+@keyframes omni-chart-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes omni-chart-open { from { scale: 0.6; rotate: -30deg; opacity: 0; } }
+@keyframes omni-chart-fade { from { opacity: 0; } }
+/* A fancy bar's bubble rides the end of its fill: same length and easing as
+   the grow, starting from the baseline the fill grows out of. */
+@keyframes omni-chart-ride-y { from { top: var(--from-top); } }
+@keyframes omni-chart-ride-x { from { left: var(--from-left); } }
+@media (prefers-reduced-motion: no-preference) {
+  .omni-chart[data-animate] :is(.omni-chart__bar:not(.omni-chart__bar--h), .omni-chart__b3, .omni-chart__bw, .omni-chart__fancy-fill:not(.omni-chart__fancy-fill--h)) {
+    transform-origin: 50% 100%; animation: omni-chart-grow-y 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .omni-chart[data-animate] :is(.omni-chart__bar--h, .omni-chart__bh, .omni-chart__fancy-fill--h) {
+    transform-origin: 0 50%; animation: omni-chart-grow-x 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .omni-chart[data-animate] .omni-chart__fancy-bubble--v { animation: omni-chart-ride-y 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .omni-chart[data-animate] .omni-chart__fancy-bubble--h { animation: omni-chart-ride-x 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .omni-chart[data-animate] .omni-chart__svg:not(.omni-chart__pie) { animation: omni-chart-reveal 900ms ease-out both; }
+  .omni-chart[data-animate] .omni-chart__pie { animation: omni-chart-open 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .omni-chart[data-animate] :is(.omni-chart__mark, .omni-chart__label, .omni-chart__topper) { animation: omni-chart-fade 300ms 550ms ease-out both; }
+  .omni-chart[data-animate="scroll"]:not([data-in-view]) * { animation-play-state: paused; }
 }`;
 }
 
@@ -351,11 +383,15 @@ function bubbleText(spec: ChartSpec, v: number): string {
   return formatChartValue(v, { step: spec.axis.step });
 }
 
-/** The value bubble at (left, top), sized for the size mode. */
-function bubble(spec: ChartSpec, m: ChartMetrics, v: number, left: string, top: string, sv: string): string {
+/** The value bubble at (left, top), sized for the size mode. `from` is where
+ *  it sits at the baseline, so an animated chart can carry it up (or along)
+ *  with the growing fill instead of leaving it waiting at the end. */
+function bubble(spec: ChartSpec, m: ChartMetrics, v: number, left: string, top: string, sv: string, from: { top?: string; left?: string }): string {
   const b = px(m.fancyBubble);
   const r = px(m.fancyTrack);
-  return `<span class="omni-chart__fancy-bubble" style="left:${left};top:${top};width:${b};height:${b};${sv}" aria-hidden="true"><i style="width:${r};height:${r}"><b>${esc(bubbleText(spec, v))}</b></i></span>`;
+  const dir = from.left ? 'h' : 'v';
+  const fromVar = from.left ? `--from-left:${from.left};` : `--from-top:${from.top};`;
+  return `<span class="omni-chart__fancy-bubble omni-chart__fancy-bubble--${dir}" style="left:${left};top:${top};width:${b};height:${b};${fromVar}${sv}" aria-hidden="true"><i style="width:${r};height:${r}"><b>${esc(bubbleText(spec, v))}</b></i></span>`;
 }
 
 /** The topper on a bar's end: (left, top) are where the end's center is. */
@@ -380,7 +416,7 @@ function hBarMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMet
     const inset = (it.frameHeight - t) / 2;
     return `<div class="omni-chart__fancy-track" style="left:${px(L.plot.x)};top:${px(it.frameY + inset)};width:${hLen(L, 1, 0)};height:${px(t)};border-radius:0 ${px(t / 2)} ${px(t / 2)} 0;${sv}" aria-hidden="true"></div>`
       + `<div class="omni-chart__fancy-fill omni-chart__fancy-fill--h" style="left:${px(L.plot.x)};top:${px(it.frameY + inset)};width:${hLen(L, it.valueFrac, 0)};height:${px(t)};${sv}" aria-hidden="true"></div>`
-      + bubble(spec, m, it.value, hAt(L, it.valueFrac, -m.fancyBubble / 2), top, sv);
+      + bubble(spec, m, it.value, hAt(L, it.valueFrac, -m.fancyBubble / 2), top, sv, { left: px(L.plot.x - m.fancyBubble / 2) });
   }
   if (spec.type === 'bar3d' || spec.type === 'bar3dWide') {
     const shadow = !spec.bar.shadow ? ''
@@ -421,7 +457,7 @@ function barMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMetr
     const sv = seriesVar(it.color);
     return `<div class="omni-chart__fancy-track" style="left:${xAt(L, m, it.centerFrac, -t / 2)};top:${px(L.plot.y)};width:${px(t)};height:${px(L.plot.height)};border-radius:${px(t / 2)} ${px(t / 2)} 0 0;${sv}" aria-hidden="true"></div>`
       + `<div class="omni-chart__fancy-fill" style="left:${xAt(L, m, it.centerFrac, -t / 2)};top:${px(base - it.valueHeight)};width:${px(t)};height:${px(it.valueHeight)};${sv}" aria-hidden="true"></div>`
-      + bubble(spec, m, it.value, xAt(L, m, it.centerFrac, -m.fancyBubble / 2), px(base - it.valueHeight - m.fancyBubble / 2), sv);
+      + bubble(spec, m, it.value, xAt(L, m, it.centerFrac, -m.fancyBubble / 2), px(base - it.valueHeight - m.fancyBubble / 2), sv, { top: px(base - m.fancyBubble / 2) });
   }
   if (spec.type === 'bar3d') {
     return `<div class="omni-chart__b3" style="${pos}${seriesVar(it.color)}" aria-hidden="true">`
@@ -538,7 +574,7 @@ function pieMarkup(spec: ChartSpec, L: ChartLayout, m: ChartMetrics): string {
       : slicePath(P.r, P.r, P.r, P.innerR, sl.start, sl.end);
     return `<path class="omni-chart__slice" d="${d}" fill-rule="evenodd" style="${seriesVar(sl.color)}stroke-width:${m.sliceBorder}"/>`;
   }).join('');
-  parts.push(`<svg class="omni-chart__svg${spec.pie.shadow ? ' omni-chart__pie--shadow' : ''}" style="left:${hx(P.cx - P.r)};top:${px(P.cy - P.r)};width:${px(size)};height:${px(size)}" viewBox="0 0 ${size} ${size}" aria-hidden="true" focusable="false">${shapes}</svg>`);
+  parts.push(`<svg class="omni-chart__svg omni-chart__pie${spec.pie.shadow ? ' omni-chart__pie--shadow' : ''}" style="left:${hx(P.cx - P.r)};top:${px(P.cy - P.r)};width:${px(size)};height:${px(size)}" viewBox="0 0 ${size} ${size}" aria-hidden="true" focusable="false">${shapes}</svg>`);
 
   if (spec.type === 'donut' && spec.pie.shadow && P.innerR > 0) {
     const d = P.innerR * 2;
@@ -582,6 +618,20 @@ function tableMarkup(spec: ChartSpec, L: ChartLayout): string {
 }
 
 /** The chart's HTML. Pair it with chartCSS() once per page. */
+/** The script a "scroll" chart needs: it marks each chart data-in-view the
+ *  first time a third of it is on screen, which starts its animation. Without
+ *  IntersectionObserver the chart is simply marked at once. */
+export function chartScript(): string {
+  return `/* Omni charts — play each chart's animation when it scrolls into view. */
+document.querySelectorAll('.omni-chart[data-animate="scroll"]').forEach(function (chart) {
+  if (!('IntersectionObserver' in window)) { chart.setAttribute('data-in-view', ''); return; }
+  var io = new IntersectionObserver(function (entries) {
+    if (entries.some(function (e) { return e.isIntersecting; })) { chart.setAttribute('data-in-view', ''); io.disconnect(); }
+  }, { threshold: 0.3 });
+  io.observe(chart);
+});`;
+}
+
 export function chartHTML(spec: ChartSpec, L: ChartLayout, metrics?: Partial<ChartMetrics>): string {
   const m: ChartMetrics = Object.assign(metricsForSize(spec.size), metrics || {});
   const parts: string[] = [];
@@ -643,7 +693,8 @@ export function chartHTML(spec: ChartSpec, L: ChartLayout, metrics?: Partial<Cha
   /* The spec rides on the figure, so pasting this HTML back into the studio
      reopens the chart for editing — nothing has to be saved anywhere. */
   const specAttr = ` data-omni-spec="${esc(JSON.stringify(spec))}"`;
-  return `<figure class="omni-chart${spec.card ? ' omni-chart--card' : ''}" data-surface="${GROUND_SURFACE[spec.ground]}" style="${width}" aria-label="${esc(spec.name)}"${specAttr}>\n  `
+  const animate = spec.animate !== 'none' ? ` data-animate="${spec.animate}"` : '';
+  return `<figure class="omni-chart${spec.card ? ' omni-chart--card' : ''}" data-surface="${GROUND_SURFACE[spec.ground]}" style="${width}" aria-label="${esc(spec.name)}"${animate}${specAttr}>\n  `
     + title
     + `<div class="omni-chart__canvas" style="height:${px(L.height)}">\n  `
     + parts.join('\n  ')

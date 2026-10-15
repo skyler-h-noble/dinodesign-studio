@@ -24,9 +24,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   H1, H3, Body, BodySmall, Caption, Button, Card, VStack, HStack, Divider, Alert,
-  Tabs, TabList, Tab, TabPanel, Checkbox, TextField, TextArea, DropZone, NumberField, Select, SwitchInput, CodeBlock, ButtonGroup, Label,
+  Tabs, TabList, Tab, TabPanel, Link, Modal, Section, Checkbox, TextField, TextArea, DropZone, NumberField, Select, SwitchInput, CodeBlock, ButtonGroup, Label,
   OmniDesignProvider,
 } from '@omni-design/components';
+import AddOnTopNav, { AddOnBackLink, ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
@@ -35,7 +36,7 @@ import {
   type ChartFinding,
 } from '../utils/addOns/charts/chartSpec';
 import { layoutChart, metricsForSize, type ChartMetrics } from '../utils/addOns/charts/chartLayout';
-import { chartHTML, chartCSS, CSS_GAPS } from '../utils/addOns/charts/chartCode';
+import { chartHTML, chartCSS, chartScript, CSS_GAPS } from '../utils/addOns/charts/chartCode';
 import { encodeChartSpec, extractChartSpec } from '../utils/addOns/charts/chartShare';
 import { parseGrid, tableFromGrid, niceAxis } from '../utils/addOns/charts/chartData';
 
@@ -170,6 +171,10 @@ export default function ChartsAddOnPage() {
   const [gridX, setGridX] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [tableLink, setTableLink] = useState(false);
+  const [dataModal, setDataModal] = useState(false);
+  const [animate, setAnimate] = useState<'none' | 'load' | 'scroll'>('none');
+  // Bumped by Replay: remounting the chart restarts its animation.
+  const [replay, setReplay] = useState(0);
   const [card, setCard] = useState(false);
   /* fit = as wide as the data needs; fixed = a set px width; responsive = fills its container. */
   const [widthMode, setWidthMode] = useState('fit');
@@ -195,7 +200,7 @@ export default function ChartsAddOnPage() {
   const [sharedMarker, setSharedMarker] = useState('dot');
   const [pie, setPie] = useState({ labels: 'percent', hole: 0.6, shadow: false });
   const [rows, setRows] = useState<Row[]>(START_ROWS);
-  const [tab, setTab] = useState<'generate' | 'code' | 'figma' | 'import'>('generate');
+  const [tab, setTab] = useState<'build' | 'code' | 'figma' | 'import'>('build');
 
   const previewRef = useRef<HTMLDivElement>(null);
   const [resolvedColors, setResolvedColors] = useState<{ [k: string]: string }>({});
@@ -228,7 +233,7 @@ export default function ChartsAddOnPage() {
     setName(sp.name); setType(sp.type); setGround(sp.ground); setMode(sp.mode); setSize(sp.size);
     setPlotHeight(sp.plotHeight); setAxis({ ...sp.axis, prefix: sp.axis.prefix || '', suffix: sp.axis.suffix || '' });
     setShowAxis(sp.showAxis); setGridY(sp.grid.y); setGridX(sp.grid.x); setShowLabels(sp.showLabels);
-    setShowTitle(sp.showTitle); setTableLink(sp.tableLink); setCard(sp.card);
+    setShowTitle(sp.showTitle); setTableLink(sp.tableLink); setAnimate(sp.animate); setCard(sp.card);
     setWidthMode(sp.width.mode === 'responsive' ? 'responsive' : sp.width.px !== null ? 'fixed' : 'fit');
     if (sp.width.px !== null) setWidthPx(sp.width.px);
     setBarFill(sp.bar.fill); setBarOutline(sp.bar.outline); setBarShadow(sp.bar.shadow);
@@ -249,7 +254,7 @@ export default function ChartsAddOnPage() {
   };
   // Loaded charts open on Generate, ready to edit.
   const loadChart = (text: string) => {
-    try { applySpec(extractChartSpec(text)); setLoadError(null); setLoadText(''); setTab('generate'); }
+    try { applySpec(extractChartSpec(text)); setLoadError(null); setLoadText(''); setTab('build'); }
     catch (e) { setLoadError((e as Error).message); }
   };
   /* Import data: a spreadsheet's rows replace the chart's data and nothing
@@ -326,7 +331,7 @@ export default function ChartsAddOnPage() {
     version: CHART_SPEC_VERSION,
     name,
     designSystem: { id: uuid || null, name: null },
-    type, ground, mode, size, plotHeight, axis, showAxis, showLabels, showTitle, tableLink, card,
+    type, ground, mode, size, plotHeight, axis, showAxis, showLabels, showTitle, tableLink, animate, card,
     grid: { y: gridY, x: gridX },
     width: { mode: widthMode === 'responsive' ? 'responsive' : 'fixed', px: widthMode === 'fixed' ? widthPx : null },
     series: series.map((sr) => (sameMarker ? { ...sr, marker: sharedMarker } : sr)),
@@ -338,7 +343,7 @@ export default function ChartsAddOnPage() {
     bar: { fill: barFill, outline: barOutline, shadow: barShadow, orientation, topper: barTopper, track: barTrack, connect: barConnect },
     legend: legendPos,
     pie,
-  }), [name, uuid, type, ground, mode, size, plotHeight, axis, showAxis, gridY, gridX, showTitle, tableLink, widthMode, widthPx, card,
+  }), [name, uuid, type, ground, mode, size, plotHeight, axis, showAxis, gridY, gridX, showTitle, tableLink, animate, widthMode, widthPx, card,
     showLabels, rows, series, sameMarker, sharedMarker, line, barFill, barOutline, barShadow, orientation, barTopper, barTrack, barConnect, legendPos, pie]);
 
   const { spec, findings } = useMemo(() => normalizeChartSpec(raw), [raw]);
@@ -346,6 +351,19 @@ export default function ChartsAddOnPage() {
   const layout = useMemo(() => (refused ? null : layoutChart(spec, metrics)), [spec, metrics, refused]);
   const html = useMemo(() => (layout ? chartHTML(spec, layout, metrics) : ''), [spec, layout, metrics]);
   const css = useMemo(() => chartCSS(), []);
+  const js = useMemo(() => (spec.animate === 'scroll' ? chartScript() : ''), [spec.animate]);
+  /* The preview runs what the exported script does, so a "scroll" chart
+     plays here when it comes into view rather than staying on its first frame. */
+  const chartHostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fig = chartHostRef.current?.querySelector('.omni-chart[data-animate="scroll"]');
+    if (!fig) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { fig.setAttribute('data-in-view', ''); io.disconnect(); }
+    }, { threshold: 0.3 });
+    io.observe(fig);
+    return () => io.disconnect();
+  }, [html, replay]);
 
   // Read the series colors off the chart itself, on its ground.
   useEffect(() => {
@@ -453,6 +471,13 @@ export default function ChartsAddOnPage() {
           <Checkbox variant="default" size="small" checked={card}
             onChange={(e: { target: { checked: boolean } }) => setCard(e.target.checked)}
             label="Show in a card" />
+          {/* Motion is code only — Figma charts are static. */}
+          <Select label="Animation (code)" size="small" fullWidth value={animate}
+            options={[{ label: 'None', value: 'none' }, { label: 'On load', value: 'load' }, { label: 'When scrolled into view', value: 'scroll' }]}
+            onChange={(v: string) => { setAnimate(v as typeof animate); setReplay((n) => n + 1); }} />
+          {animate !== 'none' && (
+            <Button variant="default-outline" size="small" onClick={() => setReplay((n) => n + 1)}>Replay animation</Button>
+          )}
           <Select label="Type" size="small" fullWidth value={type} onChange={(v: string) => setType(v)} options={TYPE_OPTIONS} />
           {/* The two chart grounds (docs/chart-colors.md): Surface-Brightest or
               Surface-Dimmest. Each has its own tuned series colors. */}
@@ -629,7 +654,11 @@ export default function ChartsAddOnPage() {
 
       <Card padding="medium">
         <VStack spacing={2}>
-          <H3>Data</H3>
+          {/* Layout primitive: the title, and the import link to its right. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <H3 width="hug">Data</H3>
+            <Link onClick={() => { setDataMsg(null); setDataModal(true); }} style={{ whiteSpace: 'nowrap' }}>Import data</Link>
+          </div>
           {rows.map((r, i) => (
             <HStack key={i} spacing={1} alignItems="flex-end">
               <TextField label={`Label ${i + 1}`} size="small" value={r.label} onChange={(e: { target: { value: string } }) => editRow(i, { label: e.target.value })} />
@@ -659,22 +688,29 @@ export default function ChartsAddOnPage() {
       {/* Layout primitive only: the generated chart is injected here
           verbatim, so the preview is the code a user copies. The padding
           leaves room for a card's shadow. */}
+      {/* The preview sits on the system's own page background, so Light and
+          Dark mode read as they would on a real page — on the studio's light
+          page a dark-mode chart barely looked different. */}
+      <Section surface="Surface" padding="16px" style={{ borderRadius: 12 }}>
       <div ref={previewRef} style={{ padding: 8 }}>
         <style>{css}</style>
         {html
-          ? <div dangerouslySetInnerHTML={{ __html: html }} />
+          ? <div key={replay} ref={chartHostRef} dangerouslySetInnerHTML={{ __html: html }} />
           : <Body color="quiet">Fix the refusals below to see the chart.</Body>}
       </div>
+      </Section>
       <FindingList findings={allFindings} />
     </VStack>
   );
 
   const body = (
-    <VStack spacing={3} style={{ maxWidth: 1180, margin: '0 auto', padding: '32px 16px' }}>
+    <>
+    <AddOnTopNav title="Charts" />
+    <VStack spacing={3} style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 16px 32px' }}>
+      <AddOnBackLink uuid={exists ? uuid : undefined} />
       <VStack spacing={1}>
-        <H1>Charts</H1>
         <Body color="quiet">
-          A one-off chart in your design system — as code, and as a Figma build from your own chart components.
+          A one-off chart in your design system — as code, or built in Figma from your own chart components.
         </Body>
       </VStack>
 
@@ -707,22 +743,22 @@ export default function ChartsAddOnPage() {
 
       {/* overflow: clip, not the lib's hidden: hidden makes Tabs a scroll
           container, so nothing inside a panel can be sticky. clip still clips. */}
-      <Tabs value={tab} onChange={(v: 'generate' | 'code' | 'figma' | 'import') => setTab(v)} sx={{ overflow: 'clip' }}>
+      <Tabs value={tab} onChange={(v: 'build' | 'code' | 'figma' | 'import') => setTab(v)} sx={{ overflow: 'clip' }}>
         <TabList aria-label="Charts add-on">
-          <Tab value="generate">Generate</Tab>
+          <Tab value="build">Build</Tab>
           <Tab value="code">Code</Tab>
           <Tab value="figma">Export</Tab>
           <Tab value="import">Import</Tab>
         </TabList>
 
-        <TabPanel value="generate">
+        <TabPanel value="build">
           {/* Layout primitive: controls and preview side by side. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: 24, alignItems: 'start' }}>
             {controls}
             {/* Layout primitive: the preview stays in view while the controls
                 scroll, so a change below the fold is visible as it is made.
                 Never a scroll box of its own: the chart shows whole. */}
-            <div style={{ position: 'sticky', top: 88 }}>
+            <div style={{ position: 'sticky', top: ADD_ON_NAV_HEIGHT + 16 }}>
               {preview}
             </div>
           </div>
@@ -736,6 +772,8 @@ export default function ChartsAddOnPage() {
             </BodySmall>
             <CodeBlock code={html} language="HTML" maxHeight={360} />
             <CodeBlock code={css} language="CSS" maxHeight={360} />
+            {js && <BodySmall color="quiet">This chart animates when it scrolls into view — add this script once, after your charts:</BodySmall>}
+            {js && <CodeBlock code={js} language="JS" maxHeight={240} />}
             <BodySmall color="quiet">A link that reopens this chart here for editing:</BodySmall>
             <CodeBlock code={chartLink} language="URL" wrap maxHeight={120} />
             <Divider />
@@ -752,14 +790,14 @@ export default function ChartsAddOnPage() {
               To size it, select a frame and use <strong>Render in selected frame</strong>.
             </Body>
             {refused
-              ? <Alert color="error"><BodySmall>This spec would be refused — fix the items on the Generate tab first.</BodySmall></Alert>
+              ? <Alert color="error"><BodySmall>This spec would be refused — fix the items on the Build tab first.</BodySmall></Alert>
               : <CodeBlock code={exportSpec} language="JSON" maxHeight={420} />}
           </VStack>
         </TabPanel>
         <TabPanel value="import">
           {/* Layout primitive: the loader beside the chart it fills. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: 24, alignItems: 'start' }}>
-      {/* Layout primitive: the two imports, stacked. */}
+      {/* Layout primitive: the import, alone now that data imports from the Data card. */}
       <div style={{ display: 'grid', gap: 24 }}>
       <Card padding="medium">
         <VStack spacing={2}>
@@ -776,9 +814,16 @@ export default function ChartsAddOnPage() {
         </VStack>
       </Card>
 
-      <Card padding="medium">
+
+      </div>
+
+            {preview}
+          </div>
+        </TabPanel>
+      </Tabs>
+      {/* Import data: paste cells or drop a CSV, from the Data card's link. */}
+      <Modal open={dataModal} onClose={() => setDataModal(false)} title="Import data" size="medium">
         <VStack spacing={2}>
-          <H3>Import data</H3>
           <BodySmall color="quiet">
             Copy cells from Excel, Google Sheets or Numbers and paste them here, or drop a CSV file. The first
             column is the categories; a header row names the {type === 'line' ? 'lines' : type === 'stacked' ? 'segments' : 'columns'}.
@@ -790,15 +835,11 @@ export default function ChartsAddOnPage() {
           <Button variant="default-outline" size="small" onClick={() => importData(dataText)} disabled={!dataText.trim()}>Import data</Button>
           <DropZone accept=".csv,.tsv,.txt,.xlsx,.xls" size="small" label="Drop a CSV file" sublabel="or click to choose one" onFiles={importFile} />
           {dataMsg && <Alert color={dataMsg.level}><BodySmall>{dataMsg.text}</BodySmall></Alert>}
+          {dataMsg && dataMsg.level !== 'warning' && <Button variant="default" size="small" onClick={() => setDataModal(false)}>Done</Button>}
         </VStack>
-      </Card>
-      </div>
-
-            {preview}
-          </div>
-        </TabPanel>
-      </Tabs>
+      </Modal>
     </VStack>
+    </>
   );
 
   if (exists !== true || !uuid || !systemCss) return body;

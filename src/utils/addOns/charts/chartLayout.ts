@@ -72,7 +72,8 @@ export interface ChartMetrics {
   fancyTrack: number;
   /** Flat bar corners — Data-Visualizations/Bar-Radius */
   barRadius: number;
-  /** Horizontal 3dBar: the bar's thickness — Data-Visualizations/3dBar */
+  /** 3dBar: the vertical bar's whole width and the horizontal bar's
+   *  thickness — Data-Visualizations/3dBar (it follows Component-Size). */
   bar3dThick: number;
   /** Horizontal Wide-3dBar: the bar's thickness — Data-Visualizations/WideBar */
   wideThick: number;
@@ -112,9 +113,11 @@ export const DEFAULT_METRICS: ChartMetrics = {
 /** What changes with the Component-Size mode: the Data-Visualizations sizes,
  *  read from the Figma file (large is what Basic Bar Chart uses). */
 export const SIZE_METRICS: { [k: string]: Partial<ChartMetrics> } = {
-  small: { barWidth: 4, labelWidth: 60, fancyTrack: 32, fancyBubble: 48, barRadius: 4, bar3dThick: 32, wideFront: 32, wideThick: 32 },
+  // bar3dThick is Data-Visualizations/3dBar: the vertical bar's whole width
+  // and the horizontal bar's thickness (12 / 24 / 32, read 2026-10-14).
+  small: { barWidth: 4, labelWidth: 60, fancyTrack: 32, fancyBubble: 48, barRadius: 4, bar3dThick: 12, wideFront: 32, wideThick: 32 },
   medium: { barWidth: 8, labelWidth: 80, fancyTrack: 40, fancyBubble: 56, barRadius: 8, bar3dThick: 24, wideFront: 48, wideThick: 48 },
-  large: { barWidth: 16, labelWidth: 100, fancyTrack: 64, fancyBubble: 80, barRadius: 4, bar3dThick: 56, wideFront: 56, wideThick: 56 },
+  large: { barWidth: 16, labelWidth: 100, fancyTrack: 64, fancyBubble: 80, barRadius: 4, bar3dThick: 32, wideFront: 56, wideThick: 56 },
 };
 
 /** Fallbacks for a size mode, before the design system's own values. */
@@ -292,7 +295,9 @@ function chartTickWidth(spec: ChartSpec, m: ChartMetrics): number {
 
 /** Width of one item's column for a chart type. */
 export function chartItemWidth(type: string, m: ChartMetrics): number {
-  if (type === 'bar3d') return m.faceWidth * 2 - m.outline;
+  // The whole bar is Data-Visualizations/3dBar wide, in two halves; it used to
+  // be a fixed 12px face doubled (23px) before the component took the size.
+  if (type === 'bar3d') return m.bar3dThick;
   if (type === 'bar3dWide') return m.wideFront + m.wideSide;
   if (type === 'fancy') return m.fancyBubble;
   return m.barWidth;
