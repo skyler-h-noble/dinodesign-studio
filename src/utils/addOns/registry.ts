@@ -36,6 +36,10 @@ export const ADD_ONS: AddOn[] = [
   { slug: 'image-effects',     title: 'Image Effects',                description: 'Filters and tinting (duotone, monochrome, brand-color overlays) for product photography.',                        priceUsdCents: 500, available: false },
   // One-off generator: a chart in the brand, emitted as code AND as a Figma
   // build from the file's own chart components (see /add-ons/charts).
+  // One-off generator: a hero over a photo or a gradient, contrast solved, in
+  // the brand's own tokens (see /add-ons/hero). Grew from the text-over-image
+  // and text-on-gradient experiments.
+  { slug: 'hero-generator',    title: 'Hero Generator',               description: 'A hero over a photo or a gradient in your brand, with the overlay or the colors solved for contrast — as code, and built in Figma.', priceUsdCents: 500, available: false },
   { slug: 'charts',            title: 'Charts',                       description: 'Bar, 3D bar and line charts in your brand — copy the code, or build the same chart in Figma from your components.', priceUsdCents: 500, available: false },
 ];
 

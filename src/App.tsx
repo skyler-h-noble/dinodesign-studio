@@ -56,6 +56,7 @@ import TypographyTestPage from './components/TypographyTestPage';
 import AaidWorkbenchPage from './components/AaidWorkbenchPage';
 import NavDesignerPage from './components/NavDesignerPage';
 import ChartsAddOnPage from './components/ChartsAddOnPage';
+import HeroAddOnPage from './components/HeroAddOnPage';
 
 /**
  * Re-map a scheme's tone palettes onto a new role order.
@@ -1134,6 +1135,8 @@ function App() {
         <Route path="/add-ons/nav" element={<NavDesignerPage />} />
         <Route path="/add-ons/charts" element={<ChartsAddOnPage />} />
         <Route path="/add-ons/charts/:uuid" element={<ChartsAddOnPage />} />
+        <Route path="/add-ons/hero" element={<HeroAddOnPage />} />
+        <Route path="/add-ons/hero/:uuid" element={<HeroAddOnPage />} />
       </Routes>
     </BrowserRouter>
     </OmniDesignProvider>
