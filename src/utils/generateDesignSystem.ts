@@ -14,7 +14,7 @@ import { generateFigmaJSON } from './generateFigmaJSON';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { typographyDeclarations } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles, SYSTEM_UI_STACK } from './typeScale';
-import { overlayOffsetCSS } from './deviceChrome';
+import { overlayOffsetCSS, DEVICE_MARGIN } from './deviceChrome';
 
 /**
  * Returns a public download URL for a file in a design system.
@@ -1265,6 +1265,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
 
 /* Desktop Defaults */
 :root {
+  --Margin: ${DEVICE_MARGIN['Desktop']}px;
   --Container-Padding: var(--Sizing-4);
   --Platform-Label: "Desktop";
   --Button-Height: 32px;
@@ -1321,6 +1322,7 @@ ${overlayOffsetCSS('Desktop').slice(1).join('\n')}
 
 /* iOS Mobile */
 [data-device="IOS-Mobile"] {
+  --Margin: ${DEVICE_MARGIN['IOS-Mobile']}px;
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "IOS-Mobile";
   --Button-Height: ${platformButtonHeight('IOS-Mobile', buttonHeight)}px;
@@ -1367,6 +1369,7 @@ ${overlayOffsetCSS('IOS-Mobile').join('\n')}
 
 /* iOS Tablet */
 [data-device="IOS-Tablet"] {
+  --Margin: ${DEVICE_MARGIN['IOS-Tablet-Vertical']}px;
   --Container-Padding: var(--Sizing-3);
   --Platform-Label: "IOS-Tablet";
   --Button-Height: ${platformButtonHeight('IOS-Tablet', buttonHeight)}px;
@@ -1420,6 +1423,7 @@ ${overlayOffsetCSS('IOS-Tablet').join('\n')}
    exist as separate devices because TYPOGRAPHY differs between them. */
 /* Android tablet */
 [data-device="Android-Tablet"] {
+  --Margin: ${DEVICE_MARGIN['Android-Tablet-Vertical']}px;
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "Android";
   --Button-Height: ${platformButtonHeight('Android-Tablet', buttonHeight)}px;
@@ -1466,6 +1470,7 @@ ${overlayOffsetCSS('Android-Tablet').join('\n')}
 
 /* Android phone */
 [data-device="Android-Mobile"] {
+  --Margin: ${DEVICE_MARGIN['Android-Mobile']}px;
   --Container-Padding: var(--Sizing-2);
   --Platform-Label: "Android";
   --Button-Height: ${platformButtonHeight('Android-Mobile', buttonHeight)}px;

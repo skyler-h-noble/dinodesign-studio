@@ -39,6 +39,24 @@ export const DEVICE_MODES = [
 export type DeviceMode = (typeof DEVICE_MODES)[number];
 
 /**
+ * The content column's side margin — Figma's `Devices-Type::Default/Margin`.
+ *
+ * Mirrored from the file, like APP_AND_STATUS below. CSS had no margin token at
+ * all: --Container-Padding (32 / 24 / 16) is a different, web-only spacing, and
+ * reading it as the margin put a desktop hero's text half as far from the edge
+ * as the Figma frame does. Emitted as --Margin in every device block.
+ */
+export const DEVICE_MARGIN: Record<DeviceMode, number> = {
+  'Desktop': 64,
+  'IOS-Tablet-Vertical': 24,
+  'IOS-Tablet-Horizontal': 24,
+  'Android-Tablet-Vertical': 24,
+  'Android-Tablet-Horizontal': 24,
+  'IOS-Mobile': 16,
+  'Android-Mobile': 16,
+};
+
+/**
  * Top chrome — status bar plus app bar, as the file already holds it in
  * `Devices-Type::App and Status`.
  *

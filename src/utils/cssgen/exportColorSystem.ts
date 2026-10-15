@@ -7365,9 +7365,20 @@ export function exportColorSystemToJSON(
         const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
         for (const [pal, entry] of Object.entries<any>(buttons)) {
           if (!entry || typeof entry !== 'object') continue;
-          // The surface tone this button is drawn on.
-          const tone = String(entry.Border?.value || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
-          if (!tone) continue;
+          /* The surface tone this button is drawn on. Read from the Border
+             reference first; in DARK mode the Border aliases the button fill
+             ({Buttons.<Pal>.Medium.Button}) and carries no tone, and this used
+             to `continue` — so no dark-mode button got an Outline-Text, the
+             light value (near-black) leaked through, and an outline label went
+             dark on a dark surface on hover. The surface's own Text-Match
+             reference names the same tone, so it is the second source; if
+             neither has one, the surface's text color is used as-is. */
+          const toneOf = (ref: unknown) => String(ref || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
+          const tone = toneOf(entry.Border?.value) || toneOf(section['Text-Match']?.value);
+          if (!tone) {
+            if (section.Text?.value) { entry['Outline-Text'] = { value: section.Text.value, type: 'color' }; outlineTextTokens++; }
+            continue;
+          }
           // Default has no Text palette of its own — it is whichever palette the
           // user picked — so it takes the surface's own text color, which is
           // what a default outline button should read as anyway.

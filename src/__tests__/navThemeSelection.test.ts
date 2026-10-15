@@ -14,6 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { generateAllThemesWithSurfacesAndContainers } from '../utils/cssgen/generateCompleteThemes';
+import { toneFor } from '../utils/backgroundSelection';
 
 /* The mapper is module-private, so this drives the real entry point and
    asserts on the themes that come out — which is the thing that was broken,
@@ -40,14 +41,19 @@ describe('the Theme/Level vocabulary resolves', () => {
     }
   });
 
-  it('promotes the named level to be that theme\'s Surface', () => {
-    /* The level has to be translated too: a theme keys its levels
-       Surfaces-Bright (plural) while the user-facing name is Surface-Bright. */
+  it('paints a Theme/Level pick at the background-selection grid\'s tone, as the preview does', () => {
+    /* "Tertiary/Surface-Bright" is the grid's tone — the midpoint of the
+       theme's core and 11 (docs/background-selection.md) — not the theme's
+       own component level of that name. This used to promote the component
+       level, so Popsicles' bar exported at tone 7 while the preview, which
+       reads the grid, showed tone 9. Both now go through toneFor. */
     const t = themesFor({ appBar: 'Tertiary/Surface-Bright' }) as never as
-      Record<string, { Surfaces?: unknown }>;
-    const tertiary = t['Tertiary'] as unknown as Record<string, unknown>;
-    expect(JSON.stringify(t['App-Bar'].Surfaces))
-      .toBe(JSON.stringify(tertiary['Surfaces-Bright']));
+      Record<string, { Surfaces: { Background: { value: string } } }>;
+    const core = Number(/Background-(\d+)/.exec(t['Tertiary'].Surfaces.Background.value)![1]);
+    const n = toneFor('Tertiary', 'Surface-Bright', core);
+    expect(t['App-Bar'].Surfaces.Background.value).toBe(`{Backgrounds.Tertiary.Background-${n}.Surfaces.Surface}`);
+    // And it is brighter than the theme's base, as a Bright pick must be.
+    expect(n).toBeGreaterThan(core);
   });
 
   it('still honours the older flat names', () => {

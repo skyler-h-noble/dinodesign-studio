@@ -34,6 +34,8 @@ import {
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
 import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars } from '../componentSize';
+import { altDisplayWeight } from '../altDisplay';
+import { weightsFor } from '../googleFontWeights';
 
 /**
  * Determine the correct CSS font fallback category for a given font name
@@ -4382,6 +4384,22 @@ function generateGoogleFontsImports(jsonData: any): string {
 
   // Add every family; the Set dedupes roles that share one.
   for (const fam of roleFamilies.values()) fontFamilies.add(fam);
+
+  /* The Alt Display weight, which no Set-* key holds.
+   *
+   * Alt Display is the Display face at a CONTRASTING weight that typeScale
+   * computes (altDisplayWeight) and the CSS emits as --Alt-Display-*-Font-
+   * Weight. Nothing above could see it, so a brand whose Display is Fredoka
+   * 700 got a request for 700 alone: the Alt asked for 400, the browser had
+   * only the bold file, and every Alt word rendered bold — identical to the
+   * Display beside it, with no error anywhere. Derived here from the Display
+   * weights already collected, by the same function, so the two cannot differ. */
+  const displayFamily = roleFamilies.get('Display') || decorativeFamily;
+  if (displayFamily) {
+    for (const w of [...(familyWeights.get(displayFamily) || [])]) {
+      addWeight(displayFamily, altDisplayWeight(w, weightsFor(displayFamily)));
+    }
+  }
 
   /* The eyebrow face, which no role above can reveal.
    *

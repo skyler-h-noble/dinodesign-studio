@@ -762,6 +762,29 @@ describe('Surface-Brightest', () => {
     ).toBeGreaterThan(0);
   });
 
+  // Every button gets an Outline-Text in BOTH modes. Dark-mode Borders alias
+  // the fill and carry no tone, and the generator used to skip those buttons —
+  // the light value then leaked into dark mode and an outline label went
+  // near-black on a dark surface on hover.
+  it('gives every button an Outline-Text in dark mode too', () => {
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      let missing = 0;
+      let seen = 0;
+      for (const theme of Object.values<any>((json as any).Modes[mode].Themes)) {
+        for (const section of Object.values<any>(theme ?? {})) {
+          if (!section?.Buttons || !section.Text) continue;
+          for (const entry of Object.values<any>(section.Buttons)) {
+            if (!entry || typeof entry !== 'object' || !entry.Button) continue;
+            seen++;
+            if (!entry['Outline-Text']) missing++;
+          }
+        }
+      }
+      expect(seen, mode).toBeGreaterThan(0);
+      expect(missing, `${mode}: buttons with no Outline-Text`).toBe(0);
+    }
+  });
+
   // Tonal containers sit on Color-10 on a light background, Color-2 on a dark
   // one — flat across all five levels, because light-mode elevation comes from
   // drop shadows rather than tone.

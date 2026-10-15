@@ -14,6 +14,7 @@ import type { SurfaceLevel } from '../surfaceWindow';
  * Theme configuration for generating Surfaces and Containers
  */
 import { monoStopTone, type AltStop2 } from '../altDisplay';
+import { toneFor, type BackgroundTheme, type SurfaceLevel as BarLevel } from '../backgroundSelection';
 
 interface ThemeConfig {
   themeName: string;
@@ -1529,7 +1530,24 @@ export function generateAllThemesWithSurfacesAndContainers(
   const navPairs: Array<[string, { theme: string; level: string }]> = [
     ['App-Bar', appBarSource], ['Nav-Bar', navBarSource], ['Status', statusSource],
   ];
+  /* A "Theme/Level" pick is a TONE from the background-selection grid
+     (docs/background-selection.md) — Surface-Bright is the midpoint of the
+     theme's core and 11 — not the theme's own component level of that name.
+     Promoting the component level painted Popsicles' Tertiary/Surface-Bright
+     bar at tone 7 while the preview, which reads the grid, showed tone 9. So
+     the bar's theme is built around the grid's tone, the same toneFor the
+     preview uses. The legacy names keep their exact tones (navThemeFrom). */
+  const rawNav: Record<string, string | undefined> = { 'App-Bar': userSelections?.appBar, 'Nav-Bar': userSelections?.navBar, 'Status': userSelections?.status };
+  const coreFor = (t: string) => (t === 'Secondary' ? SC : t === 'Tertiary' ? TC : PC);
   for (const [name, src] of navPairs) {
+    const raw = String(rawNav[name] ?? '');
+    const slash = raw.split('/');
+    if (slash.length === 2 && themes[slash[0]]) {
+      const [t, level] = slash as [BackgroundTheme, BarLevel];
+      const n = toneFor(t, level, coreFor(t));
+      themes[name] = generateSingleTheme(makeConfig(t, t, n));
+      continue;
+    }
     const built = navThemeFrom(src);
     if (built) themes[name] = built;
     else console.error(`  ❌ ${name} source "${src.theme}" NOT FOUND in themes!`);
