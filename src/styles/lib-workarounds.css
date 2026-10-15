@@ -3,17 +3,6 @@
    the studio moves to a release that carries the fix; a workaround left behind
    hides the next regression of the same kind. */
 
-/* AppBar wordmark fills the bar — @omni-design/components 0.14.1.
- *
- * The wordmark became an H3 (lib 1c8db41) without width="hug", and headings
- * default to width="fill". With flexShrink: 0 it took the whole bar
- * (1322px of 1354) and pushed centerSlot and endSlot off the right edge, so
- * the landing page's Login and Get Started were rendered and unreachable at
- * every width.
- *
- * Fixed in the lib (AppBar.js passes width="hug"; AppBarWordmark.test.js
- * covers it). Remove this once package.json is on the release with that fix.
- * Two classes beat the one Emotion class that sets the width. */
-.appbar > .typography-width-fill {
-  width: auto;
-}
+/* None at the moment. @omni-design/components 0.14.3 carries the last two:
+   the AppBar wordmark that filled the bar (fixed in 0.14.2) and the Chip that
+   took the page's font (fixed in 0.14.3). */
