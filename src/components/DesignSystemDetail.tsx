@@ -3,6 +3,7 @@ import { useParams } from 'react-router';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import {
+  Swatch,
   Button,
   H2,
   H3,
@@ -630,8 +631,10 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
       <VStack spacing={3}>
         <HStack spacing={3} style={{ alignItems: 'center' }}>
           <HStack spacing={1} style={{ flexShrink: 0 }}>
+            {/* Swatch with no onClick is Figma's State=Non-clickable: it
+                shows the system's colors, with no button role or states. */}
             {colors.slice(0, 3).map((c, i) => (
-              <div key={i} style={{ width: 44, height: 44, borderRadius: 8, background: c, border: '1px solid var(--Border)' }} />
+              <Swatch key={i} color={c} size="large" aria-label={`Color ${i + 1}: ${c}`} />
             ))}
           </HStack>
           <VStack spacing={0} style={{ flex: 1, minWidth: 0 }}>

@@ -98,3 +98,21 @@ export async function fetchFigmaVariables(
     return {};
   }
 }
+
+/** The file's published component sets — name, node id and page. Only sets
+ *  that have been published to the team library appear here. */
+export async function fetchFigmaComponentSets(
+  fileKey: string,
+  token: string,
+): Promise<Array<{ nodeId: string; name: string; page: string }>> {
+  const res = await fetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, {
+    headers: { 'X-Figma-Token': token },
+  });
+  if (!res.ok) throw new Error(`Figma component sets API ${res.status}`);
+  const json = await res.json();
+  return (json.meta?.component_sets ?? []).map((s: any) => ({
+    nodeId: s.node_id,
+    name: s.name,
+    page: s.containing_frame?.pageName ?? '',
+  }));
+}
