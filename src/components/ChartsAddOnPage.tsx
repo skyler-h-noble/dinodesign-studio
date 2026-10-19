@@ -27,7 +27,7 @@ import {
   Tabs, TabList, Tab, TabPanel, Link, Modal, Section, Checkbox, TextField, TextArea, DropZone, NumberField, Select, SwitchInput, CodeBlock, ButtonGroup, Label,
   OmniDesignProvider,
 } from '@omni-design/components';
-import AddOnTopNav, { AddOnBackLink, ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
+import AddOnTopNav, { ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
@@ -136,13 +136,6 @@ export default function ChartsAddOnPage() {
   const [searchParams] = useSearchParams();
   const [exists, setExists] = useState<boolean | null>(null);
   const [systemCss, setSystemCss] = useState<LiveSystemCss | null>(null);
-  /* Any system by id — the picker only lists the signed-in user's own, and a
-     system someone shared (or one from Figma's Dino ID) is not in that list. */
-  const [idInput, setIdInput] = useState(uuid || '');
-  useEffect(() => { setIdInput(uuid || ''); }, [uuid]);
-  const idClean = idInput.trim();
-  const idValid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idClean);
-  const loadId = () => { if (idValid && idClean !== uuid) navigate(`/add-ons/charts/${idClean.toLowerCase()}`); };
 
   /* A link may pass the id as ?ds= (what the portfolio apps use); move it
      into the path so there is one place it lives. */
@@ -591,8 +584,11 @@ export default function ChartsAddOnPage() {
               <Select label="Fill" size="small" fullWidth value={barFill} onChange={(v: string) => setBarFill(v)}
                 options={[{ label: 'Solid', value: 'solid' }, { label: 'Gradient', value: 'gradient' }]} />
             )}
-            <SwitchInput checked={barOutline} onChange={(e: { target: { checked: boolean } }) => setBarOutline(e.target.checked)} label="Outline (separates touching bars)" />
-            <SwitchInput checked={barTopper} onChange={(e: { target: { checked: boolean } }) => setBarTopper(e.target.checked)} label="Topper (a ring on each bar's end)" />
+            {/* No Outline switch: only grouped bars are outlined in the design,
+                and a stack never wears a topper — the Figma components' own rules. */}
+            {type === 'bar' && (
+              <SwitchInput checked={barTopper} onChange={(e: { target: { checked: boolean } }) => setBarTopper(e.target.checked)} label="Topper (a ring on each bar's end)" />
+            )}
             {type === 'bar' && (
               <SwitchInput checked={barTrack} onChange={(e: { target: { checked: boolean } }) => setBarTrack(e.target.checked)} label="Background track behind each bar" />
             )}
@@ -705,9 +701,8 @@ export default function ChartsAddOnPage() {
 
   const body = (
     <>
-    <AddOnTopNav title="Charts" />
+    <AddOnTopNav title="Charts" uuid={uuid} exists={exists} basePath="/add-ons/charts" />
     <VStack spacing={3} style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 16px 32px' }}>
-      <AddOnBackLink uuid={exists ? uuid : undefined} />
       <VStack spacing={1}>
         <Body color="quiet">
           A one-off chart in your design system — as code, or built in Figma from your own chart components.
@@ -715,18 +710,6 @@ export default function ChartsAddOnPage() {
       </VStack>
 
       {/* Layout primitive: picker and id field side by side, wrapping on narrow screens. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-        <div style={{ flex: '1 1 340px', maxWidth: 460 }}>
-          <TextField label="Design system ID" size="small" fullWidth value={idInput}
-            placeholder="e.g. a2d6e6cf-d16a-4a6b-b4f6-8d4c282fb4f2"
-            helperText={idClean && !idValid ? 'A design system ID looks like 8-4-4-4-12 hex characters — the Dino ID in the Omni Design plugin\'s Settings.' : undefined}
-            onChange={(e: { target: { value: string } }) => setIdInput(e.target.value)}
-            onKeyDown={(e: { key: string }) => { if (e.key === 'Enter') loadId(); }} />
-        </div>
-        <Button variant="default" size="small" onClick={loadId} disabled={!idValid || idClean.toLowerCase() === uuid}>
-          Load
-        </Button>
-      </div>
       {systemCss && !systemCss.live && (
         <Alert color="warning"><BodySmall>{systemCss.reason}</BodySmall></Alert>
       )}
@@ -736,7 +719,7 @@ export default function ChartsAddOnPage() {
           <BodySmall>
             {uuid
               ? 'No design system has that ID, so the chart is drawn without a brand. Check the ID and load it again.'
-              : 'Enter your design system ID to draw the chart in your brand — it is the Dino ID in the Omni Design plugin\'s Settings.'}
+              : 'Use the settings cog at the top right to enter your design system ID and draw the chart in your brand — it is the Omni Design ID in the plugin’s Settings.'}
           </BodySmall>
         </Alert>
       )}

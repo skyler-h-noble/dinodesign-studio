@@ -108,7 +108,10 @@ describe('the payload writes names the file actually has', () => {
     /* Covered by figmaTypographyEmission.test.ts, and large enough to drown the
        signal here: 36 Dynamic-Typography names and 379 Typography ones. */
     'Component-Size': /^Dynamic-Typography\//,
-    'Devices-Type': /^Typography\//,
+    /* The layout grid (Columns, {Class}/[{Layout}/]Col-N, {Class}/{Nav}/Grid-Width) too: new names the Devices-Type
+       import CREATES — it is the one writer that does — covered by
+       layoutGrid.test.ts and figmaTypographyEmission.test.ts. */
+    'Devices-Type': /^(?:Typography\/|Columns$|Grid\/(?:12|8|4)$|(?:Default|Common|Wide|Narrow|Rare)\/(?:(?:(?:Standard|NoGutter)(?:-Rail(?:-Expanded)?)?\/)?Col-\d+|Rail(?:-Expanded)?\/Grid-Width)$)/,
   };
 
   for (const collection of ['Component-Size', 'Devices-Type'] as const) {

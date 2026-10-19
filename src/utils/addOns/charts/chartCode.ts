@@ -89,15 +89,20 @@ export function chartCSS(): string {
 .omni-chart__track { position: absolute; background: color-mix(in srgb, var(--series) 20%, transparent); }
 /* The line through the bars' ends: drawn under the bars, so each topper covers its end. */
 .omni-chart__connector { position: absolute; top: 0; overflow: visible; pointer-events: none; }
-/* Topper — Figma "BarChartTopper" (the Bar's BarDecoration): a disc the bar's
-   width in the chart ground, a 4px ring outside it in the series color, and a
-   0 4 4 25% shadow, centered on the bar's end. content-box so the ring sits
-   outside the disc, as Figma's OUTSIDE stroke does. */
+/* Topper — Figma "BarChartTopper" (a single Bar's BarDecoration; a stack
+   never has one): a disc the bar's width in the chart ground, a 4px ring
+   outside it in the series color, then the Outline layer — Topper-Border 5,
+   so a 1px edge beyond the ring in the Chart Outline color — which casts the
+   0 4 4 25% shadow. content-box so the ring sits outside the disc, as Figma's
+   OUTSIDE stroke does. Outline is the ground itself on a light chart and
+   Icons/Default on a dark one, where it keeps the cap off the dark ground. */
 .omni-chart__topper {
   position: absolute; z-index: 2; box-sizing: content-box; border-radius: 50%;
   background: var(--Background); border: 4px solid var(--series);
-  box-shadow: 0 4px 4px rgb(0 0 0 / 0.25);
+  --omni-topper-edge: var(--Background);
+  box-shadow: 0 0 0 1px var(--omni-topper-edge), 0 4px 4px 1px rgb(0 0 0 / 0.25);
 }
+.omni-chart[data-surface="Surface-Dimmest"] .omni-chart__topper { --omni-topper-edge: var(--Icons-Default, var(--Text)); }
 .omni-chart__bar--gradient {
   background: linear-gradient(to bottom, var(--series), color-mix(in srgb, var(--series) 20%, transparent));
 }
@@ -406,10 +411,9 @@ function hBarMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMet
   const sv = seriesVar(it.color);
   if (spec.type === 'stacked') {
     const segs = (it.segments || []).filter((sg) => sg.len > 0);
-    const last = segs[segs.length - 1];
     return segs.map((sg) =>
-      `<div class="omni-chart__bar omni-chart__bar--h${spec.bar.outline ? ' omni-chart__bar--outline' : ''}" style="left:${hAt(L, sg.startFrac, 0)};top:${top};width:${hLen(L, sg.lenFrac, 0)};height:${h};${seriesVar(sg.color)}" aria-hidden="true"></div>`,
-    ).join('') + (spec.bar.topper && last ? topper(m, hAt(L, last.startFrac + last.lenFrac, 0), px(it.frameY + it.frameHeight / 2), seriesVar(last.color)) : '');
+      `<div class="omni-chart__bar omni-chart__bar--h" style="left:${hAt(L, sg.startFrac, 0)};top:${top};width:${hLen(L, sg.lenFrac, 0)};height:${h};${seriesVar(sg.color)}" aria-hidden="true"></div>`,
+    ).join('');
   }
   if (spec.type === 'fancy') {
     const t = m.fancyTrack;
@@ -446,10 +450,9 @@ function barMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMetr
   if (spec.type === 'stacked') {
     const base = L.plot.baseline;
     const segs = (it.segments || []).filter((sg) => sg.len > 0);
-    const last = segs[segs.length - 1];
     return segs.map((sg) =>
-      `<div class="omni-chart__bar${spec.bar.outline ? ' omni-chart__bar--outline' : ''}" style="left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(base - sg.start - sg.len)};width:${px(it.width)};height:${px(sg.len)};${seriesVar(sg.color)}" aria-hidden="true"></div>`,
-    ).join('') + (spec.bar.topper && last ? topper(m, xAt(L, m, it.centerFrac, 0), px(base - last.start - last.len), seriesVar(last.color)) : '');
+      `<div class="omni-chart__bar" style="left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(base - sg.start - sg.len)};width:${px(it.width)};height:${px(sg.len)};${seriesVar(sg.color)}" aria-hidden="true"></div>`,
+    ).join('');
   }
   if (spec.type === 'fancy') {
     const t = m.fancyTrack;

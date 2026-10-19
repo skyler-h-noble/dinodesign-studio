@@ -57,6 +57,8 @@ import AaidWorkbenchPage from './components/AaidWorkbenchPage';
 import NavDesignerPage from './components/NavDesignerPage';
 import ChartsAddOnPage from './components/ChartsAddOnPage';
 import HeroAddOnPage from './components/HeroAddOnPage';
+import BrandAddOnPage from './components/BrandAddOnPage';
+import BentoAddOnPage from './components/BentoAddOnPage';
 
 /**
  * Re-map a scheme's tone palettes onto a new role order.
@@ -1137,6 +1139,13 @@ function App() {
         <Route path="/add-ons/charts/:uuid" element={<ChartsAddOnPage />} />
         <Route path="/add-ons/hero" element={<HeroAddOnPage />} />
         <Route path="/add-ons/hero/:uuid" element={<HeroAddOnPage />} />
+        <Route path="/add-ons/brand" element={<BrandAddOnPage />} />
+        <Route path="/add-ons/brand/:uuid" element={<BrandAddOnPage />} />
+        {/* Share Images is the Hero page at the sizes a shared link is read at. */}
+        <Route path="/add-ons/share" element={<HeroAddOnPage variant="share" key="share" />} />
+        <Route path="/add-ons/share/:uuid" element={<HeroAddOnPage variant="share" key="share" />} />
+        <Route path="/add-ons/bento" element={<BentoAddOnPage />} />
+        <Route path="/add-ons/bento/:uuid" element={<BentoAddOnPage />} />
       </Routes>
     </BrowserRouter>
     </OmniDesignProvider>

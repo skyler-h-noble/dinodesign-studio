@@ -7,6 +7,7 @@
  * - SurfacesContainers: links to Themes, containers get Background from Modes
  */
 
+import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
 import { componentSizePayload, desktopButtonMetrics } from './componentSize';
@@ -2325,6 +2326,18 @@ export function generateFigmaJSON(
          fine and every text style keeps whatever it was last bound to. */
       console.warn('\u26A0\uFE0F [Figma] no typography CSS passed; Devices-Type and the Typography modes were NOT written.');
     }
+    /* The layout grid: Columns and {Class}/Col-1…12 into Devices-Type (merged
+       into whatever typography wrote there), and Device-Sizes Col-N aliasing
+       them per class. Figma cannot compute "4 columns wide", so the widths
+       ship as numbers — the same formula the CSS writes as calc() (layoutGrid). */
+    const gridVars = devicesTypeGridVariables();
+    const devices = (figma[DEVICES_COLLECTION] || {}) as Record<string, Record<string, unknown>>;
+    for (const [mode, bag] of Object.entries(gridVars)) devices[mode] = { ...(devices[mode] || {}), ...bag };
+    figma[DEVICES_COLLECTION] = devices;
+    /* Page-Layout sits between them: the layout (Standard / NoGutter, with
+       or without a rail) is a mode, and Device-Sizes reads the grid through it. */
+    figma['Page-Layout'] = pageLayoutVariables();
+    figma['Device-Sizes'] = deviceSizesGridAliases();
   }
 
   // ── Component Style (Button, Card) ──

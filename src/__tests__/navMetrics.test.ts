@@ -20,8 +20,8 @@ describe('one table, three targets', () => {
       'Other/App-Bar-Height', 'Other/Nav-Bar Height', 'Other/Rail-Width',
     ]);
     expect(payload.medium['Other/Rail-Width']).toBe(80);
-    expect(payload.small['Other/Rail-Width']).toBe(72);
-    expect(payload.large['Other/Rail-Width']).toBe(96);
+    expect(payload.small['Other/Rail-Width']).toBe(80);
+    expect(payload.large['Other/Rail-Width']).toBe(80);
   });
 
   it('keeps the file’s own name, space and all', () => {
@@ -39,8 +39,8 @@ describe('one table, three targets', () => {
   it('emits the CSS triple a SIZE_MAP picks between', () => {
     const css = navMetricsCSS('').join('\n');
     expect(css).toContain('--Rail-Width: 80px;');
-    expect(css).toContain('--Sm-Rail-Width: 72px;');
-    expect(css).toContain('--Lg-Rail-Width: 96px;');
+    expect(css).toContain('--Sm-Rail-Width: 80px;');
+    expect(css).toContain('--Lg-Rail-Width: 80px;');
   });
 
   it('hyphenates the space for CSS, because a property cannot hold one', () => {
@@ -73,9 +73,16 @@ describe('the sizes are a real ladder', () => {
        as a design decision: nothing renders wrong, the large rail is just
        inexplicably the narrow one. */
     for (const [name, byMode] of Object.entries(NAV_METRICS)) {
+      if (name === 'Rail-Width') continue;
       expect(byMode.small, name).toBeLessThan(byMode.medium);
       expect(byMode.large, name).toBeGreaterThan(byMode.medium);
     }
+  });
+
+  it('except the rail, which is 80 at every size', () => {
+    /* Deliberately flat: the rail is part of the layout grid, and a width
+       that moved with Component-Size would need a set of Col-N per size. */
+    expect(NAV_METRICS['Rail-Width']).toEqual({ medium: 80, small: 80, large: 80 });
   });
 });
 

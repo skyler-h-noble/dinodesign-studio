@@ -190,6 +190,14 @@ export function heroOverlay(spec: HeroSpec): string {
   return dir ? `linear-gradient(${dir}, ${mix} 0%, transparent 100%)` : mix;
 }
 
+/** The headline's color, exactly as heroHTML paints it — the surface's
+ *  Header, the solved BW where that role fell back, or the hero's text color.
+ *  A logo set beside the headline takes this, so the contrast solved for the
+ *  headline covers the logo too. */
+export function heroHeadlineColor(spec: HeroSpec): string {
+  return roleColor(spec, 'headline', 'var(--Header)') || BW[heroTextColor(spec)];
+}
+
 export function heroTextColor(spec: HeroSpec): 'light' | 'dark' {
   return spec.mode === 'gradient'
     ? (spec.gradient.stops[0].tone <= 5 ? 'light' : 'dark')

@@ -153,7 +153,8 @@ export const HBAR_FIXED: { [k: string]: { thick: string | number; end: number; l
   bar: { thick: 'barWidth', end: 0, labelW: 0, labelGap: 8, align: 'right' },
   stacked: { thick: 'barWidth', end: 0, labelW: 0, labelGap: 8, align: 'right' },
   bar3d: { thick: 'bar3dThick', end: 4, labelW: 0, labelGap: 8, align: 'right' },
-  bar3dWide: { thick: 'wideThick', end: 4, labelW: 52, labelGap: 8, align: 'center' },
+  // Right, like every flat and 3D bar: the labels share the edge they sit against.
+  bar3dWide: { thick: 'wideThick', end: 4, labelW: 52, labelGap: 8, align: 'right' },
   // end is half the bubble; the layout reads it from fancyBubble.
   fancy: { thick: 'fancyBubble', end: 0, labelW: 0, labelGap: 8, align: 'left' },
 };
@@ -262,10 +263,17 @@ export interface ChartLayout {
   warnings: string[];
 }
 
+/** The BarChartTopper's rings, outside its disc: the 4px series ring, and the
+ *  Outline layer's Charts/Topper-Border (5 at every size) — a 1px edge in the
+ *  Chart Outline color beyond it. */
+export const CHART_TOPPER_RING = 4;
+export const CHART_TOPPER_EDGE = 5;
+
 /** How far the Bar's topper reaches past the bar's end: half its disc (the
- *  bar's width) plus its 4px ring. Zero when there is no topper. */
+ *  bar's width) plus its outer edge. Zero when there is no topper — and a
+ *  StackedBar never has one. */
 export function chartTopperReach(spec: ChartSpec, m: ChartMetrics): number {
-  return spec.bar.topper && (spec.type === 'bar' || spec.type === 'stacked') ? m.barWidth / 2 + 4 : 0;
+  return spec.bar.topper && spec.type === 'bar' ? m.barWidth / 2 + CHART_TOPPER_EDGE : 0;
 }
 
 /** The line through the bars' ends, for flat and stacked bars. Horizontal

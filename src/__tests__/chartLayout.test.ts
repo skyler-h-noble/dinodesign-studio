@@ -8,6 +8,8 @@ import {
   layoutChart, chartLinePath, chartItemWidth, chartTicks, formatChartValue, metricsForSize, DEFAULT_METRICS,
 } from '../utils/addOns/charts/chartLayout';
 import { normalizeChartSpec, worstChartLevel, parseChartSpecText, CHART_COLORS } from '../utils/addOns/charts/chartSpec';
+import { chartHTML } from '../utils/addOns/charts/chartCode';
+import { chartTopperReach } from '../utils/addOns/charts/chartLayout';
 
 const spec = (over: Record<string, unknown> = {}) => normalizeChartSpec({
   version: 'chart1',
@@ -237,5 +239,34 @@ describe('horizontal, stacked and fancy bars', () => {
     const L = layoutChart(spec);
     expect(L.items[0].frameHeight).toBe(56);
     expect(L.items[0].width - L.items[0].valueHeight).toBe(28);
+  });
+});
+
+describe('the Bar components\' own rules', () => {
+  const stacked = (bar: object) => spec({ type: 'stacked', bar, series: [{ name: 'A', color: 'Primary' }, { name: 'B', color: 'Secondary' }],
+    data: [{ label: 'A', values: [30, 20] }, { label: 'B', values: [10, 40] }] });
+
+  it('a stack never wears a topper, in the spec, the layout or the code', () => {
+    const s = stacked({ topper: true });
+    expect(s.bar.topper).toBe(false);
+    const m = metricsForSize('large');
+    expect(chartTopperReach(s, m)).toBe(0);
+    expect(chartHTML(s, layoutChart(s, m))).not.toContain('omni-chart__topper');
+  });
+
+  it('a single bar keeps its topper, which reaches to its outer edge', () => {
+    const s = spec({ bar: { topper: true } });
+    expect(s.bar.topper).toBe(true);
+    const m = metricsForSize('large');
+    // Half the disc, then the 4px ring and the Outline layer's 1px edge (Topper-Border 5).
+    expect(chartTopperReach(s, m)).toBe(m.barWidth / 2 + 5);
+    expect(chartHTML(s, layoutChart(s, m))).toContain('omni-chart__topper');
+  });
+
+  it('only grouped bars are outlined — no single bar or stack is', () => {
+    for (const s of [spec({ bar: { outline: true } }), stacked({ outline: true })]) {
+      expect(s.bar.outline).toBe(false);
+      expect(chartHTML(s, layoutChart(s, metricsForSize('large')))).not.toContain('omni-chart__bar--outline');
+    }
   });
 });

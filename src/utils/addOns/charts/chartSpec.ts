@@ -213,11 +213,15 @@ export function chartSpecWithDefaults(raw: any): ChartSpec {
     },
     bar: {
       fill: chartPick(bar.fill, CHART_BAR_FILLS, 'solid'),
-      outline: chartBool(bar.outline, true),
+      /* Only a GroupedBar outlines its bars (its bar-base segments have Border
+         on); a single Bar and a StackedBar never do. There is no grouped type
+         yet, so no chart here draws one — a spec that asks is read as off. */
+      outline: false,
       orientation: chartPick(bar.orientation, CHART_ORIENTATIONS, 'vertical'),
       // On by default, as the 3dBar and Wide-3dBar components' Shadow boolean is.
       shadow: chartBool(bar.shadow, true),
-      topper: chartBool(bar.topper, false),
+      // A StackedBar never wears a BarChartTopper; only a single Bar does.
+      topper: r.type === 'bar' && chartBool(bar.topper, false),
       track: chartBool(bar.track, false),
       connect: chartPick(bar.connect, ['none', 'straight', 'smooth'], 'none') as 'none' | 'straight' | 'smooth',
     },

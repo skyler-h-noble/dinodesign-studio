@@ -47,3 +47,19 @@ export function componentDocsIndexUrl(
 ): string {
   return `${origin.replace(/\/+$/, '')}/docs/${encodeURIComponent(designSystemId)}`;
 }
+
+/**
+ * The component library's gallery — the @omni-design/components showcase,
+ * which Netlify's omni-design project builds from the lib repo. Its own
+ * constant, not DOCS_ORIGIN: the two name different apps (the lib's gallery
+ * and the studio's hosted docs) even while they share a host.
+ */
+export const LIBRARY_ORIGIN = 'https://omni-design.netlify.app';
+
+/** One page of the library gallery (?section=<nav id>), drawn in a design
+ *  system when its id is given (?user=<id>). */
+export function libraryPageUrl(section: string, designSystemId?: string | null, origin: string = LIBRARY_ORIGIN): string {
+  const q = new URLSearchParams({ section });
+  if (designSystemId) q.set('user', designSystemId);
+  return `${origin.replace(/\/+$/, '')}/?${q.toString()}`;
+}

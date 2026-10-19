@@ -29,6 +29,7 @@ describe.skipIf(!existsSync(PLUGIN))('the plugin carries the studio\'s chart cod
   for (const [tag, file] of [
     ['chart-spec', '../utils/addOns/charts/chartSpec.ts'],
     ['chart-layout', '../utils/addOns/charts/chartLayout.ts'],
+    ['bento-spec', '../utils/addOns/bento/bentoSpec.ts'],
   ] as const) {
     it(`${tag} matches`, () => {
       const studio = block(readFileSync(resolve(__dirname, file), 'utf8'), tag);

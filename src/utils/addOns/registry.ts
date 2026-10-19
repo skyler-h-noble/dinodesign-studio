@@ -40,6 +40,14 @@ export const ADD_ONS: AddOn[] = [
   // the brand's own tokens (see /add-ons/hero). Grew from the text-over-image
   // and text-on-gradient experiments.
   { slug: 'hero-generator',    title: 'Hero Generator',               description: 'A hero over a photo or a gradient in your brand, with the overlay or the colors solved for contrast — as code, and built in Figma.', priceUsdCents: 500, available: false },
+  // The brand's logo and mark, saved per design system as one-color SVGs that
+  // adapt to every surface — for navs, footers, share images, favicons and
+  // the Figma Brand component (see /add-ons/brand).
+  { slug: 'brand',             title: 'Brand',                        description: 'Your logo and mark in one color that adapts to every surface — for nav bars, footers, share images, favicons and app icons, and in Figma.', priceUsdCents: 500, available: false },
+  // One-off generator: the hero at the sizes a shared link's preview card is
+  // read at, exported as PNGs and meta tags (see /add-ons/share).
+  { slug: 'share-images',      title: 'Share Images',                 description: 'The picture a link shows when it is shared — in your brand, at the sizes Facebook, LinkedIn, X, Slack and Pinterest read — as PNGs, meta tags and Figma frames.', priceUsdCents: 500, available: false },
+  { slug: 'bento-grid',        title: 'Bento Grid',                   description: 'Feature tiles on your layout grid, each on its own surface — reflowing from 12 columns to 8 to 4, as code and built in Figma.', priceUsdCents: 500, available: false },
   { slug: 'charts',            title: 'Charts',                       description: 'Bar, 3D bar and line charts in your brand — copy the code, or build the same chart in Figma from your components.', priceUsdCents: 500, available: false },
 ];
 

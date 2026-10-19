@@ -99,6 +99,11 @@ describe('the downloaded figma.json', () => {
        reads --Target and names the spacer only in a comment. A Figma frame
        packing small buttons together has to be told the gap explicitly. */
     const SPACER = 'Platform Spacer';
+    /* The layout grid: Columns, every page layout's {Class}/Col-1…12 and the
+       Grid-Width beside each rail. Figma cannot compute "N
+       columns wide", so the widths are numbers per device, the same formula
+       the CSS writes as calc() (layoutGrid.test holds them equal). */
+    const GRID = /^(?:Columns|Grid\/(?:12|8|4)|(?:Default|Common|Wide|Narrow|Rare)\/(?:(?:(?:Standard|NoGutter)(?:-Rail(?:-Expanded)?)?\/)?Col-(?:[1-9]|1[0-2])|Rail(?:-Expanded)?\/Grid-Width))$/;
     for (const d of DEVICE_TYPES) {
       const stray = Object.keys(out[DEVICES_COLLECTION][d])
         .filter((n) => !n.startsWith('Typography/')
@@ -106,7 +111,8 @@ describe('the downloaded figma.json', () => {
           && !BEVEL.test(n)
           && !INPUT.has(n)
           && !OVERLAY.has(n)
-          && n !== SPACER);
+          && n !== SPACER
+          && !GRID.test(n));
       expect(`${d}: ${stray.join(',') || 'none'}`).toBe(`${d}: none`);
     }
   });

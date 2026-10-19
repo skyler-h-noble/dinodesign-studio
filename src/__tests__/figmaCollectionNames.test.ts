@@ -39,12 +39,20 @@ const FILE_COLLECTIONS = [
   'Component-Size', 'Device-Sizes', 'Devices-Type', 'Drop-Colors', 'Elevation',
   'Icons & Avatars', 'Menu-Levels', 'Modes', 'Sizing', 'Spacing', 'Surface',
   'Theme', 'Typography',
+  /* Created by the plugin's own importer (populatePageLayout) on the first
+     import that carries it — the one collection here the file did not start
+     with. Deliberate: it is new, so a duplicate cannot happen. */
+  'Page-Layout',
 ] as const;
 
 /** Payload sections that ARE collections, and must name a real one. */
 const EMITS_COLLECTION = [
   'Modes', 'Drop-Colors', 'Elevation', 'Component-Elevations',
   'Component-Size', 'Typography', DEVICES_COLLECTION,
+  // The layout grid's Col-1…Col-12, aliasing Page-Layout {Class}/Col-N per size class.
+  'Device-Sizes',
+  // The page layout (Standard / NoGutter × nav) between Devices-Type and Device-Sizes.
+  'Page-Layout',
 ] as const;
 
 /**

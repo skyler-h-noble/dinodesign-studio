@@ -9,15 +9,22 @@
  *
  * Like Charts, the preview is the exported code itself, rendered on the
  * system loaded by its ID (/add-ons/hero/<id>), so what you see is what you copy.
+ *
+ * The same page is the Share Images add-on (variant="share", /add-ons/share):
+ * the hero at the fixed sizes a shared link's preview card is read at, with a
+ * site name and no buttons, exported as PNGs, meta tags and a Figma spec. The
+ * contrast solve is the hero's — it reads every rendered card, so one
+ * background passes at every size.
  */
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { toPng } from 'html-to-image';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
-  H1, H3, Body, BodySmall, Button, Card, VStack, HStack, Alert, Label,
+  H3, Body, BodySmall, Button, Card, VStack, HStack, Alert, Label, Checkbox,
   Tabs, TabList, Tab, TabPanel, TextField, TextArea, NumberField, Select, CodeBlock, ButtonGroup,
-  DropZone, OmniDesignProvider, Chip, ToggleButtonGroup, Caption,
+  DropZone, OmniDesignProvider, Chip, ToggleButtonGroup, Caption, Link,
 } from '@omni-design/components';
-import AddOnTopNav, { AddOnBackLink, ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
+import AddOnTopNav, { ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
@@ -36,6 +43,12 @@ import { AngleDial, GradientStopBar, AlignmentGrid, MeshPad, GRADIENT_CONTROLS_C
 import {
   DeviceFrame, heroBreakpoints, DEVICE_PREVIEW_CSS, type HeroPlatform,
 } from './hero/DevicePreview';
+import {
+  normalizeShareSpec, shareSafeSquare, SHARE_SIZES, SHARE_SPEC_VERSION, type ShareSizeKey,
+} from '../utils/addOns/share/shareSpec';
+import { shareCardHTML, shareMetaTags, SHARE_CSS } from '../utils/addOns/share/shareCode';
+import { extractShareSpec, encodeShareSpec } from '../utils/addOns/share/shareShare';
+import { loadBrand, type Brand } from '../utils/addOns/brand/brandStore';
 
 const opts = (list: readonly string[]) => list.map((v) => ({ label: v.replace('-', ' '), value: v }));
 /** "Bottom left", "Center", "Top right"… */
@@ -61,21 +74,18 @@ function PercentField({ label, value, min, max, onChange }: { label: string; val
   );
 }
 
-export default function HeroAddOnPage() {
+export default function HeroAddOnPage({ variant = 'hero' }: { variant?: 'hero' | 'share' } = {}) {
+  const isShare = variant === 'share';
+  const basePath = isShare ? '/add-ons/share' : '/add-ons/hero';
   const { uuid } = useParams<{ uuid?: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [exists, setExists] = useState<boolean | null>(null);
   const [systemCss, setSystemCss] = useState<LiveSystemCss | null>(null);
-  const [idInput, setIdInput] = useState(uuid || '');
-  useEffect(() => { setIdInput(uuid || ''); }, [uuid]);
-  const idClean = idInput.trim();
-  const idValid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idClean);
-  const loadId = () => { if (idValid && idClean !== uuid) navigate(`/add-ons/hero/${idClean.toLowerCase()}`); };
   useEffect(() => {
     const ds = searchParams.get('ds');
-    if (!uuid && ds && /^[0-9a-f-]{36}$/i.test(ds)) navigate(`/add-ons/hero/${ds.toLowerCase()}`, { replace: true });
-  }, [uuid, searchParams, navigate]);
+    if (!uuid && ds && /^[0-9a-f-]{36}$/i.test(ds)) navigate(`${basePath}/${ds.toLowerCase()}`, { replace: true });
+  }, [uuid, searchParams, navigate, basePath]);
   useEffect(() => {
     let live = true;
     if (!uuid) { setExists(false); setSystemCss(null); return; }
@@ -87,7 +97,38 @@ export default function HeroAddOnPage() {
   /* ── Settings ─────────────────────────────────────────────────────────── */
   const [mode, setMode] = useState<'image' | 'gradient'>('image');
   const [tab, setTab] = useState<'build' | 'code' | 'export' | 'import'>('build');
-  const [text, setText] = useState(normalizeHeroSpec({}).text);
+  // A share image has no buttons: a picture cannot be pressed.
+  const [text, setText] = useState(isShare ? normalizeShareSpec({}).hero.text : normalizeHeroSpec({}).text);
+  /* ── Share Images only ── */
+  const [siteName, setSiteName] = useState(normalizeShareSpec({}).siteName);
+  const [shareSizes, setShareSizes] = useState<ShareSizeKey[]>(SHARE_SIZES.map((z) => z.key));
+  const [sharePage, setSharePage] = useState(normalizeShareSpec({}).page);
+  const [shareKey, setShareKey] = useState<ShareSizeKey>('og');
+  const [showSafe, setShowSafe] = useState(false);
+  const [overflow, setOverflow] = useState<string[]>([]);
+  /* The system's saved brand (the Brand add-on), for the share image's logo. */
+  const [shareBrandChoice, setShareBrandChoice] = useState<'none' | 'logo' | 'stacked' | 'mark'>('none');
+  const [savedBrand, setSavedBrand] = useState<Brand | null>(null);
+  useEffect(() => {
+    if (!isShare || !uuid) { setSavedBrand(null); return; }
+    let live = true;
+    loadBrand(uuid).then((b) => {
+      if (!live) return;
+      setSavedBrand(b);
+      // A system with a brand shows it unless told otherwise.
+      if (b) setShareBrandChoice((c) => (c !== 'none' ? c : b.logo ? 'logo' : b.mark ? 'mark' : 'none'));
+    });
+    return () => { live = false; };
+  }, [isShare, uuid]);
+  const brandInk = useMemo(() => (savedBrand ? {
+    name: savedBrand.meta.name,
+    logo: savedBrand.logo && savedBrand.meta.logo ? { svg: savedBrand.logo, aspect: savedBrand.meta.logo.aspect } : null,
+    stacked: savedBrand.stacked && savedBrand.meta.stacked ? { svg: savedBrand.stacked, aspect: savedBrand.meta.stacked.aspect } : null,
+    mark: savedBrand.mark && savedBrand.meta.mark ? { svg: savedBrand.mark, aspect: savedBrand.meta.mark.aspect } : null,
+  } : null), [savedBrand]);
+  const exportCardsRef = useRef<HTMLDivElement>(null);
+  const [pngBusy, setPngBusy] = useState<string | null>(null);
+  const [pngError, setPngError] = useState<string | null>(null);
   const [box, setBox] = useState({ heightMode: 'ratio' as 'screen' | 'ratio' | 'fixed', ratio: '21:9', height: 560 });
   const [platform, setPlatform] = useState<HeroPlatform>('ios');
   const choosePlatform = (p: HeroPlatform) => setPlatform(p);
@@ -104,7 +145,9 @@ export default function HeroAddOnPage() {
     return () => ro.disconnect();
     // The Build tab unmounts its preview on the other tabs; re-attach on return.
   }, [tab]);
-  const devicesKey = devices.map((d) => `${d.width}x${d.height}m${d.margin}`).join('/');
+  /* What the contrast solve re-runs on when the frames change: the devices
+     for a hero, the sizes (and the site name, a line of text) for a share image. */
+  const devicesKey = isShare ? `${shareSizes.join('/')}|${siteName ? 1 : 0}|${shareBrandChoice}` : devices.map((d) => `${d.width}x${d.height}m${d.margin}`).join('/');
   const [image, setImage] = useState(normalizeHeroSpec({}).image);
   const [gradient, setGradient] = useState(normalizeHeroSpec({}).gradient);
   const [imageSrc, setImageSrc] = useState<string>('');
@@ -114,6 +157,15 @@ export default function HeroAddOnPage() {
     version: HERO_SPEC_VERSION, name: 'Hero', designSystem: { id: uuid || null },
     mode, ...box, text, image, gradient,
   }), [uuid, mode, box, text, image, gradient]);
+  const share = useMemo(() => normalizeShareSpec({
+    version: SHARE_SPEC_VERSION, name: 'Share image', designSystem: { id: uuid || null },
+    hero: spec, siteName, sizes: shareSizes, page: sharePage, brand: shareBrandChoice,
+  }), [uuid, spec, siteName, shareSizes, sharePage, shareBrandChoice]);
+  const shareSizesShown = useMemo(() => SHARE_SIZES.filter((z) => share.sizes.includes(z.key)), [share.sizes]);
+  const shareCards = useMemo(() => shareSizesShown.map((z) => ({ size: z, html: shareCardHTML(share, z, imageSrc || 'your-image.jpg', brandInk) })),
+    [share, shareSizesShown, imageSrc, brandInk]);
+  // A size that is switched off cannot stay the one on show.
+  useEffect(() => { if (isShare && !share.sizes.includes(shareKey)) setShareKey(share.sizes[0]); }, [isShare, share.sizes, shareKey]);
   const html = useMemo(() => heroHTML(spec, imageSrc || 'your-image.jpg'), [spec, imageSrc]);
   const codeHtml = useMemo(() => heroHTML(spec), [spec]);
   const css = useMemo(() => heroCSS(), []);
@@ -141,7 +193,9 @@ export default function HeroAddOnPage() {
       ? { left: Math.min(...kids.map((k) => k.left)), top: Math.min(...kids.map((k) => k.top)), right: Math.max(...kids.map((k) => k.right)), bottom: Math.max(...kids.map((k) => k.bottom)) }
       : (hero.querySelector('.omni-hero__content') as HTMLElement).getBoundingClientRect();
     const textBox = { x: (cr.left - hr.left) / hr.width, y: (cr.top - hr.top) / hr.height, w: (cr.right - cr.left) / hr.width, h: (cr.bottom - cr.top) / hr.height };
-    const device = devices.find((d) => d.key === hero.closest('[data-hero-device]')?.getAttribute('data-hero-device'));
+    const device = isShare
+      ? SHARE_SIZES.find((z) => z.key === hero.closest('[data-share]')?.getAttribute('data-share'))
+      : devices.find((d) => d.key === hero.closest('[data-hero-device]')?.getAttribute('data-hero-device'));
     return { hero, cs, light, dark, target, textBox, frame: { w: hr.width, h: hr.height }, device: device ? device.label : '' };
   };
   /** Every device's hero: one spec has to pass on all of them. */
@@ -274,7 +328,7 @@ export default function HeroAddOnPage() {
       setResult({
         ok: solved.ok, ratio: solved.ratio, target: solved.target,
         note: solved.ok
-          ? `${colorNote}${surfaceNote}${switched ? 'Solid overlay — a fading one could not clear the bright part behind the top of the text. ' : ''}Overlay ${Math.round(solved.alpha * 100)}% — the lightest that passes at every breakpoint. ${solved.device} needs the most: ${solved.ratio.toFixed(2)}:1 at the worst pixel under the text (needs ${solved.target}:1).`
+          ? `${colorNote}${surfaceNote}${switched ? 'Solid overlay — a fading one could not clear the bright part behind the top of the text. ' : ''}Overlay ${Math.round(solved.alpha * 100)}% — the lightest that passes at every ${isShare ? 'size' : 'breakpoint'}. ${solved.device} needs the most: ${solved.ratio.toFixed(2)}:1 at the worst pixel under the text (needs ${solved.target}:1).`
           : `Even a full overlay reaches only ${solved.ratio.toFixed(2)}:1 on ${solved.device} (needs ${solved.target}:1). Move the text, or choose the other text color.`,
       });
     };
@@ -497,15 +551,11 @@ export default function HeroAddOnPage() {
 
   /* ── Gradient stops ───────────────────────────────────────────────────── */
   const setStop = (i: number, patch: Partial<HeroStop>) => setGradient((g) => {
-    let stops = g.stops.map((s, j) => (j === i ? { ...s, ...patch } : s));
-    /* A new first tone resets the rest to work with it: each later stop
-       keeps its distance from the first (3 -> 1 takes a 4 to a 2), then the
-       side rule below and the snap effect move it onto a tone that passes. */
-    if (i === 0 && patch.tone !== undefined && patch.tone !== g.stops[0].tone) {
-      const delta = patch.tone - g.stops[0].tone;
-      stops = stops.map((s, j) => (j === 0 ? s : { ...s, tone: Math.max(1, Math.min(12, s.tone + delta)) }));
-    }
-    // The first stop decides the side; later stops follow it to the nearest legal tone.
+    const stops = g.stops.map((s, j) => (j === i ? { ...s, ...patch } : s));
+    /* A new first tone leaves the later stops alone while it stays on the
+       same side of the 5/6 line — they were chosen, and still sit on the
+       right side. Only when it crosses (dark 1–5 ↔ light 6–12) does each
+       later stop move, to its nearest tone on the new side. */
     const allowed = allowedTones(stops[0].tone);
     return { ...g, stops: stops.map((s, j) => (j === 0 || allowed.includes(s.tone) ? s
       : { ...s, tone: allowed.reduce((b, x) => (Math.abs(x - s.tone) < Math.abs(b - s.tone) ? x : b), allowed[0]) })) };
@@ -539,7 +589,13 @@ export default function HeroAddOnPage() {
   const [loadText, setLoadText] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const applySpec = (raw: unknown) => {
-    const h = normalizeHeroSpec(raw);
+    if (isShare) {
+      // A share spec, or a hero to start from: either way the hero part is the background and text.
+      const sh = normalizeShareSpec(raw);
+      setSiteName(sh.siteName); setShareSizes(sh.sizes); setSharePage(sh.page); setShareBrandChoice(sh.brand);
+      raw = sh.hero;
+    }
+    const h = isShare ? normalizeShareSpec({ hero: raw }).hero : normalizeHeroSpec(raw);
     setMode(h.mode);
     setText(h.text);
     setBox({ heightMode: h.heightMode, ratio: h.ratio, height: h.height });
@@ -548,13 +604,13 @@ export default function HeroAddOnPage() {
     setGradient(h.gradient);
   };
   const loadHero = (t: string) => {
-    try { applySpec(extractHeroSpec(t)); setLoadError(null); setLoadText(''); setTab('build'); }
+    try { applySpec(isShare ? extractShareSpec(t) : extractHeroSpec(t)); setLoadError(null); setLoadText(''); setTab('build'); }
     catch (e) { setLoadError((e as Error).message); }
   };
   // Opened from Figma or a saved link: the spec rides in the fragment.
   useEffect(() => {
     if (/[#&]spec=/.test(window.location.hash)) {
-      try { applySpec(extractHeroSpec(window.location.hash)); } catch { /* a broken link leaves the defaults */ }
+      try { applySpec(isShare ? extractShareSpec(window.location.hash) : extractHeroSpec(window.location.hash)); } catch { /* a broken link leaves the defaults */ }
     }
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -588,10 +644,29 @@ export default function HeroAddOnPage() {
           onChange={(v: string) => setText({ ...text, bodyStyle: v as typeof text.bodyStyle })} />
         <Select label="Eyebrow style" size="small" fullWidth value={text.eyebrowStyle} options={opts(HERO_EYEBROW_STYLES)}
           onChange={(v: string) => setText({ ...text, eyebrowStyle: v as typeof text.eyebrowStyle })} />
-        <TextField label="Button" size="small" value={text.primaryAction} helperText="Leave empty for no button."
-          onChange={(e: { target: { value: string } }) => setText({ ...text, primaryAction: e.target.value })} />
-        <TextField label="Second button (outline)" size="small" value={text.secondaryAction} helperText="Leave empty for no second button."
-          onChange={(e: { target: { value: string } }) => setText({ ...text, secondaryAction: e.target.value })} />
+        {isShare ? <>
+          <TextField label="Site name" size="small" value={siteName} helperText="The last line of the text — your site or brand. Leave empty for none."
+            onChange={(e: { target: { value: string } }) => setSiteName(e.target.value)} />
+          <VStack spacing={0.5}>
+            <Label>Logo</Label>
+            <ToggleButtonGroup value={shareBrandChoice} onChange={(v: string) => v && setShareBrandChoice(v as typeof shareBrandChoice)} size="small" aria-label="Logo">
+              <Button value="none" size="small">None</Button>
+              <Button value="logo" size="small" disabled={!brandInk?.logo}>Logo</Button>
+              <Button value="stacked" size="small" disabled={!brandInk?.stacked}>Stacked</Button>
+              <Button value="mark" size="small" disabled={!brandInk?.mark}>Mark</Button>
+            </ToggleButtonGroup>
+            <BodySmall color="quiet">
+              {brandInk && (brandInk.logo || brandInk.stacked || brandInk.mark)
+                ? 'Your saved brand, above the text, in the headline’s color — the contrast solved for the text covers it.'
+                : <>Save your logo in the <Link href={`/add-ons/brand${uuid ? `/${uuid}` : ''}`}>Brand add-on</Link> to show it here.</>}
+            </BodySmall>
+          </VStack>
+        </> : <>
+          <TextField label="Button" size="small" value={text.primaryAction} helperText="Leave empty for no button."
+            onChange={(e: { target: { value: string } }) => setText({ ...text, primaryAction: e.target.value })} />
+          <TextField label="Second button (outline)" size="small" value={text.secondaryAction} helperText="Leave empty for no second button."
+            onChange={(e: { target: { value: string } }) => setText({ ...text, secondaryAction: e.target.value })} />
+        </>}
       </VStack>
     </Card>
   );
@@ -626,6 +701,35 @@ export default function HeroAddOnPage() {
           Always the full width of its container. {box.heightMode === 'screen' ? 'At least the height of the screen.' : box.heightMode === 'ratio' ? 'Keeps its shape as it scales, and grows if the text needs more room.' : 'At least this tall; taller if the text needs it.'}
         </BodySmall>
         <BodySmall color="quiet">The space around the text is each device&rsquo;s margin from your design system — 64 on desktop, 24 on tablets, 16 on phones by default.</BodySmall>
+      </VStack>
+    </Card>
+  );
+
+  const sizesCard = (
+    <Card padding="medium">
+      <VStack spacing={2}>
+        <H3>Sizes</H3>
+        <VStack spacing={0.5}>
+          <Label>Text position</Label>
+          <HStack spacing={1.5} alignItems="center">
+            <AlignmentGrid label="Text position" v={text.v} h={text.h} onChange={(v, h) => setText({ ...text, v, h })} />
+            <BodySmall color="quiet">{posName(text.v, text.h)}</BodySmall>
+          </HStack>
+        </VStack>
+        {SHARE_SIZES.map((z) => (
+          <VStack key={z.key} spacing={0.25}>
+            <Checkbox variant="default" size="small" label={`${z.label} · ${z.w} × ${z.h}`} checked={shareSizes.includes(z.key)}
+              disabled={shareSizes.length === 1 && shareSizes.includes(z.key)}
+              onChange={(e: { target: { checked: boolean } }) => setShareSizes((ks) => SHARE_SIZES.map((x) => x.key)
+                .filter((k) => (k === z.key ? e.target.checked : ks.includes(k))))} />
+            <Caption color="quiet">{z.readBy}</Caption>
+          </VStack>
+        ))}
+        <BodySmall color="quiet">
+          Most apps read one image, the link preview: Facebook, LinkedIn, X, Slack, Discord, iMessage, WhatsApp and Teams all show it.
+          Some crop it to a square thumbnail, so keep the words inside the middle square — turn on its guide above the preview.
+          Drawn at desktop size, with your desktop margin and type.
+        </BodySmall>
       </VStack>
     </Card>
   );
@@ -746,7 +850,75 @@ export default function HeroAddOnPage() {
     </Card>
   );
 
-  const preview = (
+  const shareStageW = Math.max(240, stageW);
+  const sharePreview = (
+    <VStack spacing={2}>
+      <style>{css + DEVICE_PREVIEW_CSS + SHARE_CSS}</style>
+      {/* Layout primitive only: each card is the share image's HTML, drawn at
+          its real size and scaled to fit, so the PNG is exactly what shows. */}
+      <div ref={previewRef} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Layout primitive: the size tabs, and the square guide beside them. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+          <Tabs value={shareKey} onChange={(v: ShareSizeKey) => setShareKey(v)}>
+            <TabList aria-label="Size">
+              {shareSizesShown.map((z) => (
+                <Tab key={z.key} value={z.key}>{`${z.label} · ${z.w} × ${z.h}`}</Tab>
+              ))}
+            </TabList>
+          </Tabs>
+          {shareKey === 'og' && (
+            <Checkbox variant="default" size="small" label="Show square crop" checked={showSafe}
+              onChange={(e: { target: { checked: boolean } }) => setShowSafe(e.target.checked)} />
+          )}
+        </div>
+        <div ref={stageRef} style={{ position: 'relative' }}>
+          {shareCards.map(({ size: z, html: cardHtml }) => {
+            // Tall cards are capped at the stage's height budget rather than its width.
+            const scale = Math.min(1, shareStageW / z.w, 640 / z.h);
+            const shown = z.key === shareKey;
+            const safe = shareSafeSquare(z);
+            return (
+              <div key={z.key} aria-hidden={!shown || undefined}
+                style={shown ? { width: z.w * scale, height: z.h * scale, position: 'relative', margin: '0 auto' }
+                  : { position: 'absolute', top: 0, left: 0, width: z.w * scale, height: 0, overflow: 'hidden', visibility: 'hidden' }}>
+                <div style={{ width: z.w, height: z.h, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}
+                  dangerouslySetInnerHTML={{ __html: cardHtml }} />
+                {shown && showSafe && z.key === 'og' && (
+                  // Layout primitive: the square-crop guide over the card.
+                  <div aria-hidden="true" style={{ position: 'absolute', top: safe.y * scale, left: safe.x * scale, width: safe.w * scale, height: safe.h * scale,
+                    outline: '2px dashed var(--Focus-Visible)', boxShadow: '0 0 0 9999px color-mix(in srgb, var(--Background) 45%, transparent)', pointerEvents: 'none' }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {overflow.length > 0 && (
+        <Alert color="warning"><BodySmall>
+          The text is taller than the {overflow.join(' and ')} card, so the image would cut it off. Shorten it, or use a smaller headline style.
+        </BodySmall></Alert>
+      )}
+      {result && <Alert color={result.ok ? 'success' : 'warning'}><BodySmall>{result.note}</BodySmall></Alert>}
+    </VStack>
+  );
+
+  /* A card whose text does not fit grows past its size; the PNG is cut at
+     the size, so say which. Measured unscaled (offsetHeight ignores the
+     preview's transform). */
+  useEffect(() => {
+    if (!isShare) return;
+    const t = window.setTimeout(() => {
+      const over = [...(previewRef.current?.querySelectorAll('.omni-share') || [])].flatMap((card) => {
+        const z = SHARE_SIZES.find((x) => x.key === card.getAttribute('data-share'));
+        const hero = card.querySelector('.omni-hero') as HTMLElement | null;
+        return z && hero && hero.offsetHeight > z.h + 1 ? [z.label.toLowerCase()] : [];
+      });
+      setOverflow((prev) => (prev.join() === over.join() ? prev : over));
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [isShare, shareCards, systemCss]);
+
+  const preview = isShare ? sharePreview : (
     <VStack spacing={2}>
       <style>{css + DEVICE_PREVIEW_CSS}</style>
       {/* Layout primitive only: the generated hero is injected verbatim into
@@ -801,14 +973,22 @@ export default function HeroAddOnPage() {
     <div style={{ maxWidth: 560 }}>
       <Card padding="medium">
         <VStack spacing={2}>
-          <H3>Import a hero</H3>
-          <BodySmall color="quiet">
-            Edit a hero made with the Hero Generator: paste its HTML from your code, its spec, or its link.
-            Everything comes back — background, colors, text, buttons and layout — except the photo, which you
-            drop in again. From Figma, select a hero the Omni Design plugin built and use Open hero in studio.
-            Only Omni heroes can be opened: they carry their own spec, and other hero code does not.
-          </BodySmall>
-          <TextArea label="Hero HTML, spec or link" rows={4} fullWidth value={loadText}
+          <H3>{isShare ? 'Import a share image' : 'Import a hero'}</H3>
+          {isShare ? (
+            <BodySmall color="quiet">
+              Edit a share image: paste its spec or its link. Or start from a hero — paste a Hero Generator hero&rsquo;s HTML,
+              spec or link and its background, colors and text become the share image&rsquo;s (its buttons are left out).
+              The photo does not travel with a spec; drop it in again.
+            </BodySmall>
+          ) : (
+            <BodySmall color="quiet">
+              Edit a hero made with the Hero Generator: paste its HTML from your code, its spec, or its link.
+              Everything comes back — background, colors, text, buttons and layout — except the photo, which you
+              drop in again. From Figma, select a hero the Omni Design plugin built and use Open hero in studio.
+              Only Omni heroes can be opened: they carry their own spec, and other hero code does not.
+            </BodySmall>
+          )}
+          <TextArea label={isShare ? 'Share image or hero — spec, link or HTML' : 'Hero HTML, spec or link'} rows={4} fullWidth value={loadText}
             onChange={(e: { target: { value: string } }) => setLoadText(e.target.value)} />
           {loadError && <Alert color="warning"><BodySmall>{loadError}</BodySmall></Alert>}
           <Button variant="default-outline" size="small" onClick={() => loadHero(loadText)} disabled={!loadText.trim()}>Load</Button>
@@ -817,7 +997,82 @@ export default function HeroAddOnPage() {
     </div>
   );
 
-  const exportPanel = (
+  /* PNG: the card's own HTML, rasterized at its real size (pixelRatio 1, so a
+     1200 × 630 card is a 1200 × 630 file — what the platforms ask for). */
+  const downloadPng = async (key: ShareSizeKey) => {
+    const z = SHARE_SIZES.find((x) => x.key === key)!;
+    const card = exportCardsRef.current?.querySelector(`.omni-share[data-share="${key}"]`) as HTMLElement | null;
+    if (!card) return;
+    setPngBusy(key); setPngError(null);
+    try {
+      const url = await toPng(card, { width: z.w, height: z.h, pixelRatio: 1, cacheBust: true });
+      const a = document.createElement('a');
+      a.href = url; a.download = z.file;
+      a.click();
+    } catch (e) {
+      setPngError(`The ${z.label.toLowerCase()} image could not be drawn (${(e as Error).message || 'unknown error'}). Try again, or build it in Figma and export it there.`);
+    } finally { setPngBusy(null); }
+  };
+  const downloadAll = async () => { for (const z of shareSizesShown) await downloadPng(z.key); };
+  const shareExportSpec = useMemo(() => JSON.stringify(share, null, 2), [share]);
+  const shareMeta = useMemo(() => shareMetaTags(share), [share]);
+  const shareLink = useMemo(() => `${window.location.origin}/add-ons/share/${uuid || ''}#spec=${encodeShareSpec(share)}`, [share, uuid]);
+
+  const shareExportPanel = (
+    <VStack spacing={3}>
+      <style>{css + SHARE_CSS}</style>
+      {/* Off screen, real size: what the PNGs are drawn from. */}
+      <div ref={exportCardsRef} aria-hidden="true" style={{ position: 'fixed', left: -20000, top: 0, pointerEvents: 'none' }}
+        dangerouslySetInnerHTML={{ __html: shareCards.map((c) => c.html).join('') }} />
+      <Card padding="medium">
+        <VStack spacing={2}>
+          <H3>Images</H3>
+          {shareSizesShown.map((z) => (
+            // Layout primitive: a size, who reads it, and its download.
+            <div key={z.key} style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <VStack spacing={0.25}>
+                <Label>{`${z.label} · ${z.w} × ${z.h}`}</Label>
+                <Caption color="quiet">{`${z.file} — ${z.readBy}`}</Caption>
+              </VStack>
+              <Button variant="default-outline" size="small" disabled={!!pngBusy} onClick={() => downloadPng(z.key)}>
+                {pngBusy === z.key ? 'Drawing…' : 'Download PNG'}
+              </Button>
+            </div>
+          ))}
+          <div><Button variant="default" size="small" disabled={!!pngBusy} onClick={downloadAll}>Download all</Button></div>
+          {pngError && <Alert color="warning"><BodySmall>{pngError}</BodySmall></Alert>}
+          {mode === 'image' && <BodySmall color="quiet">Drawn with the photo on the Build tab — the overlay was solved for it.</BodySmall>}
+        </VStack>
+      </Card>
+      <Card padding="medium">
+        <VStack spacing={2}>
+          <H3>Meta tags</H3>
+          <BodySmall color="quiet">Upload the images, then paste these in the page&rsquo;s &lt;head&gt;. The title and description are the headline and body.</BodySmall>
+          <TextField label="Page URL" size="small" fullWidth value={sharePage.url}
+            onChange={(e: { target: { value: string } }) => setSharePage({ ...sharePage, url: e.target.value })} />
+          <TextField label="Where the images are uploaded" size="small" fullWidth value={sharePage.imageBase} helperText="The folder URL; the file names are added."
+            onChange={(e: { target: { value: string } }) => setSharePage({ ...sharePage, imageBase: e.target.value })} />
+          <TextField label="Image description" size="small" fullWidth value={sharePage.alt} helperText="For screen readers. Leave empty to use the image's own words."
+            onChange={(e: { target: { value: string } }) => setSharePage({ ...sharePage, alt: e.target.value })} />
+          <CodeBlock code={shareMeta} language="HTML" maxHeight={360} wrap />
+        </VStack>
+      </Card>
+      <Card padding="medium">
+        <VStack spacing={2}>
+          <H3>Figma</H3>
+          <Body>
+            In the <strong>Omni Design</strong> plugin, open <strong>Add-ons</strong> › <strong>Share Images</strong> and paste this spec. It builds one frame per size, on your variables and text styles.
+            {mode === 'image' ? ' Select a frame with your photo as its fill first — each size is built over it.' : ''}
+          </Body>
+          <CodeBlock code={shareExportSpec} language="JSON" maxHeight={320} />
+          <BodySmall color="quiet">A link that reopens this share image here for editing:</BodySmall>
+          <CodeBlock code={shareLink} language="URL" wrap maxHeight={120} />
+        </VStack>
+      </Card>
+    </VStack>
+  );
+
+  const exportPanel = isShare ? shareExportPanel : (
     <VStack spacing={2}>
       <Body>
         In Figma, open the <strong>Omni Design</strong> plugin, open the <strong>Add-ons</strong> tab, choose <strong>Hero Generator</strong>, and paste this spec.
@@ -839,33 +1094,25 @@ export default function HeroAddOnPage() {
 
   const body = (
     <>
-    <AddOnTopNav title="Hero Generator" />
+    <AddOnTopNav title={isShare ? 'Share Images' : 'Hero Generator'} uuid={uuid} exists={exists} basePath={basePath} />
     <VStack spacing={3} style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px 32px' }}>
-      <AddOnBackLink uuid={exists ? uuid : undefined} />
       <VStack spacing={1}>
-        <Body color="quiet">A hero in your design system, over a photo or a gradient — with the contrast solved, not just checked.</Body>
+        <Body color="quiet">{isShare
+          ? 'The picture a link shows when it is shared — in your design system, at the sizes the platforms read, with the contrast solved.'
+          : 'A hero in your design system, over a photo or a gradient — with the contrast solved, not just checked.'}</Body>
       </VStack>
-      {/* Layout primitive: the id field and its button, wrapping on narrow screens. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-        <div style={{ flex: '1 1 340px', maxWidth: 460 }}>
-          <TextField label="Design system ID" size="small" fullWidth value={idInput}
-            helperText={idClean && !idValid ? 'A design system ID looks like 8-4-4-4-12 hex characters — the Omni Design ID in the plugin.' : undefined}
-            onChange={(e: { target: { value: string } }) => setIdInput(e.target.value)}
-            onKeyDown={(e: { key: string }) => { if (e.key === 'Enter') loadId(); }} />
-        </div>
-        <Button variant="default" size="small" onClick={loadId} disabled={!idValid || idClean.toLowerCase() === uuid}>Load</Button>
-      </div>
       {exists === false && (
         <Alert color="warning"><BodySmall>
-          {uuid ? 'No design system has that ID, so the hero is drawn without a brand.' : 'Enter your design system ID to draw the hero in your brand — it is the Omni Design ID in the plugin.'}
+          {uuid ? `No design system has that ID, so the ${isShare ? 'image' : 'hero'} is drawn without a brand.` : `Use the settings cog at the top right to enter your design system ID and draw the ${isShare ? 'image' : 'hero'} in your brand — it is the Omni Design ID in the plugin’s Settings.`}
         </BodySmall></Alert>
       )}
       <style>{GRADIENT_CONTROLS_CSS}</style>
       {/* Build, Code, Export — the same three every add-on has. */}
       <Tabs value={tab} onChange={(v: 'build' | 'code' | 'export' | 'import') => setTab(v)} sx={{ overflow: 'clip' }}>
-        <TabList aria-label="Hero Generator">
+        <TabList aria-label={isShare ? 'Share Images' : 'Hero Generator'}>
           <Tab value="build">Build</Tab>
-          <Tab value="code">Code</Tab>
+          {/* A share image is a picture, not code to copy: its code is the meta tags, on Export. */}
+          {!isShare && <Tab value="code">Code</Tab>}
           <Tab value="export">Export</Tab>
           <Tab value="import">Import</Tab>
         </TabList>
@@ -875,12 +1122,12 @@ export default function HeroAddOnPage() {
           {panel(<>
             {/* Layout primitive: the background choice, centered over the controls. */}
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <ToggleButtonGroup value={mode} onChange={(v: string) => setMode(v as 'image' | 'gradient')} size="small" aria-label="Hero background">
+              <ToggleButtonGroup value={mode} onChange={(v: string) => setMode(v as 'image' | 'gradient')} size="small" aria-label={isShare ? 'Image background' : 'Hero background'}>
                 <Button value="image" size="small">Over image</Button>
                 <Button value="gradient" size="small">Over gradient</Button>
               </ToggleButtonGroup>
             </div>
-            {mode === 'image' ? <>{imageCard}{contentCard}{layoutCard}</> : <>{gradientCard}{contentCard}{layoutCard}</>}
+            {mode === 'image' ? <>{imageCard}{contentCard}{isShare ? sizesCard : layoutCard}</> : <>{gradientCard}{contentCard}{isShare ? sizesCard : layoutCard}</>}
           </>)}
         </TabPanel>
         <TabPanel value="code">{codePanel}</TabPanel>

@@ -50,6 +50,8 @@ import AccountMenuEditor from './AccountMenuEditor';
 import SpeedDialEditor from './SpeedDialEditor';
 import { DEFAULT_SPEED_DIAL, type SpeedDialItem } from '../utils/addOns/speedDial';
 import NavIconGlyph from './NavIconGlyph';
+import { loadBrand, type Brand } from '../utils/addOns/brand/brandStore';
+import { BRAND_CSS, BRAND_COLOR_TOKEN, svgDataUrl } from '../utils/addOns/brand/brandSpec';
 import { toAddonSpec, conditionsUsedBy } from '../utils/addOns/toAddonSpec';
 import { contentInsets, contentInsetCSS } from '../utils/addOns/contentInsets';
 import { tabsFit } from '../utils/addOns/barFit';
@@ -117,6 +119,17 @@ export default function NavDesignerPage() {
   const [brand, setBrand] = useState<BrandAsset | null>(null);
   const [brandError, setBrandError] = useState<string | null>(null);
   const brandInput = useRef<HTMLInputElement>(null);
+  /* ?ds=<id>: that design system's saved brand (the Brand add-on) — the logo
+     in Brand, the mark in Condensed-Brand, drawn as the adaptive mask the
+     code uses. Preview only, like an upload: it never reaches the spec. */
+  const [savedBrand, setSavedBrand] = useState<Brand | null>(null);
+  useEffect(() => {
+    const ds = new URLSearchParams(window.location.search).get('ds');
+    if (!ds || !/^[0-9a-f-]{36}$/i.test(ds)) return;
+    let live = true;
+    loadBrand(ds.toLowerCase()).then((b) => { if (live) setSavedBrand(b); });
+    return () => { live = false; };
+  }, []);
 
   /* Fills the Brand slots locally. It does NOT reach toAddonSpec: a published
      add-on is imported by every design system, so a brand baked into one would
@@ -333,6 +346,19 @@ export default function NavDesignerPage() {
     const mark = brand ? (
       <img src={brand.url} alt="" style={{ height: 24, width: 'auto', display: 'block' }} />
     ) : null;
+    /* The saved brand, as the code draws it: one color from the bar's surface. */
+    const saved = (slot: 'logo' | 'mark') => {
+      const svg = savedBrand?.[slot]; const m = savedBrand?.meta[slot];
+      if (!svg || !m) return null;
+      return (
+        <span className="omni-brand" role="img" aria-label={savedBrand!.meta.name || 'Brand'} style={{
+          '--omni-brand-src': `url("${svgDataUrl(svg)}")`, '--omni-brand-aspect': String(m.aspect), '--omni-brand-height': '24px',
+          ...(savedBrand!.meta.color !== 'brand' ? { '--omni-brand-color': BRAND_COLOR_TOKEN[savedBrand!.meta.color] } : {}),
+        } as CSSProperties} />
+      );
+    };
+    const savedLogo = saved('logo') || saved('mark');
+    const savedMark = saved('mark') || saved('logo');
 
     /* COMPONENT SIZE REACHES EVERY PART. Size is a Component-Size MODE — one
        setting for the whole nav — so every lib component in the preview takes
@@ -698,9 +724,11 @@ export default function NavDesignerPage() {
       Brand: brandPlaceholder,
       'Condensed-Brand': brandPlaceholder,
     };
+    if (savedLogo) { out.Brand = savedLogo; out['Condensed-Brand'] = savedMark; }
+    // An upload here wins: it is what is being tried right now.
     if (mark) { out.Brand = mark; out['Condensed-Brand'] = mark; }
     return out;
-  }, [brand, tabs, actions, mobile.showLabels, mobile.barStyle, mobile.toolbarOrientation, mobile.fab, mobile.fabPosition, mobile.fabSpeedDial, dialItems, mobile.itemCount,
+  }, [brand, savedBrand, tabs, actions, mobile.showLabels, mobile.barStyle, mobile.toolbarOrientation, mobile.fab, mobile.fabPosition, mobile.fabSpeedDial, dialItems, mobile.itemCount,
       avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap,
       options.railExpandable]);
   const [scale, setScale] = useState(1);
@@ -851,6 +879,7 @@ export default function NavDesignerPage() {
   return (
     <div data-theme="Default" data-surface="Surface"
       style={{ background: 'var(--Background)', color: 'var(--Text)', minHeight: '100vh' }}>
+      {savedBrand && <style>{BRAND_CSS}</style>}
       <AppBar />
       <Section padding="32px 24px 64px">
         {/* Wider when split. 960 is a comfortable measure for one column of

@@ -287,7 +287,7 @@ describe('the nav chrome and accordion focus radii reach the stylesheet', () => 
     out.split('\n').map((l) => l.trim()).find((l) => l.startsWith(name + ':'));
 
   it.each([
-    ['--Sm-Rail-Width', '72px'], ['--Rail-Width', '80px'], ['--Lg-Rail-Width', '96px'],
+    ['--Sm-Rail-Width', '80px'], ['--Rail-Width', '80px'], ['--Lg-Rail-Width', '80px'],
     ['--Sm-App-Bar-Height', '56px'], ['--App-Bar-Height', '64px'], ['--Lg-App-Bar-Height', '72px'],
     ['--Sm-Nav-Bar-Height', '73px'], ['--Nav-Bar-Height', '83px'], ['--Lg-Nav-Bar-Height', '93px'],
   ])('%s is %s', (name, value) => {

@@ -279,7 +279,12 @@ export interface RadiiForSize {
 export const DISABLED_OPACITY = 0.38;
 
 export const NAV_METRICS = {
-  'Rail-Width': { medium: 80, small: 72, large: 96 },
+  /* One width at every size: 80, Material 3's rail. The rail is part of the
+     page's layout grid (a Rail layout takes 80 off the content width), and a
+     width that moved with Component-Size would need a set of Col-N per size.
+     All three modes stay, so layers bound at small or large keep their
+     binding — they just read 80 now. */
+  'Rail-Width': { medium: 80, small: 80, large: 80 },
   'App-Bar-Height': { medium: 64, small: 56, large: 72 },
   /* The bottom bar. 83 at medium is the design's own figure (Nav-Bar
      7442:31305, 398x83); the other two follow App-Bar-Height's proportions
