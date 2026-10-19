@@ -6990,6 +6990,98 @@ export function exportColorSystemToJSON(
   const bakedButtonRefs = bakeCrossModeRefs(colorSystem.Modes['Dark-Mode'].Buttons, 'Dark-Mode.Buttons');
   console.log(`🔘 [JSON Export] Dark-mode buttons pinned to Light-Mode Color-8 (${bakedButtonRefs} values baked to hex)`);
 
+  // ── State buttons are tonal: the fill is the border ───────────────────
+  //
+  // An Info / Success / Warning / Error button used to paint one fixed tone
+  // (Color-5, or light Color-8 in dark mode) on every surface. Its border was
+  // already per surface — Border.<scope>.<state>.Color-<n>, the tone that
+  // clears 3:1 against a background of tone n — but the fill was not, so on a
+  // surface at the button's own tone the button WAS the background (1.00:1).
+  //
+  // Tonal means the fill takes the border's tone. The border is the 3:1 the
+  // control needs, so the fill now carries it on every surface level, in both
+  // modes, with no table of its own to tune. Everything painted ON the fill
+  // follows the fill's tone, from tables already indexed by fill tone: the
+  // label (Text.Surfaces — invariant 3, a new tone means a new label), the
+  // muted label (Quiet.Surfaces), hover and pressed (whose direction the label
+  // decides), and the bevel.
+  //
+  // It lives in a Modes group, Tonal-Button.<scope>.<state>.Color-<n> — one
+  // entry per BACKGROUND tone — because the tone differs by mode (the border
+  // tables do) and the Figma Theme layer is mode-independent: it can only
+  // point at a variable whose value changes with the mode, the way it already
+  // points at Border. The CSS resolves it inside each mode, the same way.
+  //
+  // Runs before the bevel rebuild below and before the state-surface redirect
+  // further down, which copies the state's (now tonal) entry over the foreign
+  // palettes on a state surface. The Default button on a state surface IS the
+  // state's button, so it takes the same entry.
+  const TONAL_STATES = ['Info', 'Success', 'Warning', 'Error'];
+  const TONAL_FIELDS = ['Button', 'Text', 'Quiet', 'Hover', 'Pressed'] as const;
+  const tonalRef = /^\{Border\.(Surfaces|Containers)\.(\w+)\.Color-(\w+)\}$/;
+  // The scopes the Theme layer's state buttons actually border on — built in
+  // full (every tone) in BOTH modes, so each Figma variable has both values.
+  const tonalScopes = new Set<string>();
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    for (const theme of Object.values<any>((colorSystem.Modes[modeName] as any)?.Themes ?? {})) {
+      for (const section of Object.values<any>(theme ?? {})) {
+        for (const pal of TONAL_STATES) {
+          const m = String(section?.Buttons?.[pal]?.Border?.value ?? '').match(tonalRef);
+          if (m) tonalScopes.add(m[1]);
+        }
+      }
+    }
+  }
+  let tonalEntries = 0;
+  for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+    const modeData: any = colorSystem.Modes[modeName];
+    const resolveHere = (ref: string): string | null => {
+      let value: any = ref;
+      for (let hop = 0; hop < 8 && typeof value === 'string' && value.startsWith('{'); hop++) {
+        let node: any = modeData;
+        for (const key of value.slice(1, -1).split('.')) { node = node?.[key]; if (node === undefined) return null; }
+        value = typeof node === 'string' ? node : node?.value;
+      }
+      return typeof value === 'string' && value.startsWith('#') ? value : null;
+    };
+    const table: any = {};
+    for (const scope of tonalScopes) {
+      table[scope] = {};
+      for (const pal of TONAL_STATES) {
+        table[scope][pal] = {};
+        for (const [colorN, border] of Object.entries<any>(modeData.Border?.[scope]?.[pal] ?? {})) {
+          const t = String(border?.value ?? '').match(/^\{Colors\.(\w+)\.Color-(\d+)\}$/);
+          if (!t) continue;   // a literal border (a container's #fcfcfc) has no tone to follow
+          const at = (group: string) => ({ value: `{${group}.${t[1]}.Color-${t[2]}}`, type: 'color' as const });
+          const entry: any = { Button: at('Colors'), Text: at('Text.Surfaces'), Quiet: at('Quiet.Surfaces'), Hover: at('Hover'), Pressed: at('Pressed') };
+          const hex = resolveHere(entry.Button.value);
+          if (hex) { entry.Highlight = { value: computeHighlight(hex), type: 'color' }; entry.Lowlight = { value: computeLowlight(hex), type: 'color' }; }
+          table[scope][pal][colorN] = entry;
+          tonalEntries++;
+        }
+      }
+    }
+    modeData['Tonal-Button'] = table;
+    for (const [themeName, theme] of Object.entries<any>(modeData.Themes ?? {})) {
+      const ownState = TONAL_STATES.find((st) => themeName === st || themeName === `${st}-Light`);
+      for (const section of Object.values<any>(theme ?? {})) {
+        const buttons = section?.Buttons;
+        if (!buttons || typeof buttons !== 'object') continue;
+        for (const pal of TONAL_STATES) {
+          const btn = buttons[pal];
+          const m = String(btn?.Border?.value ?? '').match(tonalRef);
+          if (!m || !table[m[1]]?.[m[2]]?.[`Color-${m[3]}`]) continue;
+          const base = `Tonal-Button.${m[1]}.${m[2]}.Color-${m[3]}`;
+          for (const k of TONAL_FIELDS) btn[k] = { value: `{${base}.${k}}`, type: 'color' };
+          if (pal === ownState && buttons.Default) {
+            for (const k of TONAL_FIELDS) buttons.Default[k] = { ...btn[k] };
+          }
+        }
+      }
+    }
+  }
+  console.log(`🚦 [JSON Export] State buttons made tonal — fill at the border's tone (${tonalEntries} Tonal-Button entries, scopes: ${[...tonalScopes].join(', ')})`);
+
   // Recompute the theme bevels from the button's REAL fill.
   //
   // Themes.<t>.<section>.Buttons.<X>.Highlight/Lowlight are derived hundreds of
@@ -7104,6 +7196,27 @@ export function exportColorSystemToJSON(
       }
       if (!faces.Black || !faces.White) continue;
 
+      /* The bevel is worked out from what the button SHOWS, not from its fill
+         alone. In dark mode the white face is white at 70% (#ffffffb3), so on
+         a dark surface it reads as a light gray; deriving the bevel from the
+         fill with its alpha dropped gave solid white's (#ffffff / #b3b3b3),
+         whose lowlight sat at the color the button shows — no bottom edge.
+         Composited over the surface it lands on (the Neutral tone of that
+         background — the scale is fixed-lightness, so every palette agrees),
+         an opaque face is unchanged and the white face gets a real bevel. */
+      const shownOver = (fill: string, bg: string): string => {
+        const f = fill.replace('#', ''); const b = bg.replace('#', '').slice(0, 6);
+        if (f.length < 8 || b.length < 6) return fill.slice(0, 7);
+        const a = parseInt(f.slice(6, 8), 16) / 255;
+        const ch = (i: number) => Math.round(parseInt(f.slice(i, i + 2), 16) * a + parseInt(b.slice(i, i + 2), 16) * (1 - a));
+        return '#' + [0, 2, 4].map((i) => ch(i).toString(16).padStart(2, '0')).join('');
+      };
+      const bevelOver = (face: any, bg: string) => {
+        if (!bg.startsWith('#')) return { Highlight: { ...face.Highlight }, Lowlight: { ...face.Lowlight } };
+        const shown = shownOver(face.Button.value, bg);
+        return { Highlight: { value: computeHighlight(shown), type: 'color' }, Lowlight: { value: computeLowlight(shown), type: 'color' } };
+      };
+
       // White face on tones 1-5, black from 6 up — the same threshold the
       // Default-Button-Border BlackWhite map uses, so the two cannot drift.
       const table: any = {};
@@ -7119,7 +7232,7 @@ export function exportColorSystemToJSON(
           Button: { ...face.Button }, Text: { ...face.Text }, Quiet: { ...face.Quiet },
           Border: { ...face.Border },
           Hover: { ...face.Hover }, Pressed: { ...face.Pressed },
-          Highlight: { ...face.Highlight }, Lowlight: { ...face.Lowlight },
+          ...bevelOver(face, resolveRef(modeData, modeData.Colors?.Neutral?.[colorKey])),
         };
       }
       // A `Default` key for the Default THEME.
@@ -7159,8 +7272,8 @@ export function exportColorSystemToJSON(
         Button: { ...defaultFace.Button }, Text: { ...defaultFace.Text },
         Quiet: { ...defaultFace.Quiet },
         Border: { ...defaultFace.Border }, Hover: { ...defaultFace.Hover },
-        Pressed: { ...defaultFace.Pressed }, Highlight: { ...defaultFace.Highlight },
-        Lowlight: { ...defaultFace.Lowlight },
+        Pressed: { ...defaultFace.Pressed },
+        ...bevelOver(defaultFace, defaultBgHex),
       };
 
       if (!modeData.Buttons) modeData.Buttons = {};

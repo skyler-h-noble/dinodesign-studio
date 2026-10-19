@@ -2,7 +2,7 @@ import chroma from 'chroma-js';
 import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
-import { SEMANTIC_SEEDS } from './generateFullPalettes';
+import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generateFullPalettes';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor } from './backgroundSelection';
@@ -490,21 +490,21 @@ export function buildPreviewCSS(input: BuildInput): string {
      export uses rather than restated here. */
   const SEMANTIC_RAMPS: Record<string, Array<{ hex: string }>> = {
     Neutral: NEUTRAL.map((hex) => ({ hex })),
-    Info:    (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.info)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.info)),
-    Success: (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.success)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.success)),
-    Warning: (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.warning)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.warning)),
-    Error:   (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.error)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.error)),
+    Info:    (isDark ? semanticDarkScale('info')
+                     : semanticLightScale('info')),
+    Success: (isDark ? semanticDarkScale('success')
+                     : semanticLightScale('success')),
+    Warning: (isDark ? semanticDarkScale('warning')
+                     : semanticLightScale('warning')),
+    Error:   (isDark ? semanticDarkScale('error')
+                     : semanticLightScale('error')),
     /* The tenth palette. Purple (#8B5CF6), a real ramp in Figma's Modes
        collection and in the export — and the LAST of the scales the preview
        referenced without defining. --Hotlink-Visited and --Link-Visited both
        resolve through it, so visited links painted nothing in the playground
        while the export and Figma had the color all along. */
-    'Hotlink-Visited': (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS['hotlink-visited'])
-                               : generateSemanticLightModeScale(SEMANTIC_SEEDS['hotlink-visited'])),
+    'Hotlink-Visited': (isDark ? semanticDarkScale('hotlink-visited')
+                               : semanticLightScale('hotlink-visited')),
   };
   /* The brand three resolve to the LIGHT ramp in BOTH modes — that is what the
      :root and [data-theme="Brand"] blocks emit, and it is deliberate (the same
@@ -1114,6 +1114,30 @@ export function buildPreviewCSS(input: BuildInput): string {
     }).join('\n');
   };
 
+  /* State buttons are TONAL: the fill takes the border's tone for the surface
+     it sits on — the same tone iconToneAt gives, the one table Border, Icons
+     and Focus share — so the fill clears 3:1 on every surface level. The label,
+     states and bevel follow the fill's tone. Mirrors the export's Tonal-Button
+     pass (exportColorSystem.ts); the preview used to emit no state buttons at
+     all, so they fell through to the lib's own colors. */
+  const emitStateButtonTokens = (surfaceNForBorder: number): string => {
+    const T = iconToneAt(Math.max(1, Math.min(12, surfaceNForBorder)), false, isDark);
+    return ['Info', 'Success', 'Warning', 'Error'].map((name) => {
+      const pal = SEMANTIC_RAMPS[name];
+      const fill = p(pal as typeof primary, T);
+      const tones = getAccessibleTones(fill, T, pal);
+      const { active, hover } = activeAndHoverFor(pal, T);
+      return `  --Buttons-${name}-Button: ${fill};
+  --Buttons-${name}-Text: ${p(pal as typeof primary, tones.text)};
+  --Buttons-${name}-Border: ${fill};
+  --Buttons-${name}-Hover: ${hover};
+  --Buttons-${name}-Pressed: ${active};
+  --Buttons-${name}-Highlight: ${highlightFor(fill)};
+  --Buttons-${name}-Lowlight: ${lowlightFor(fill)};
+  --Buttons-${name}-Quiet: ${p(pal as typeof primary, tones.quiet)};`;
+    }).join('\n');
+  };
+
   // Tag-{Color}-Text contrast-aware emission. The lib hardcodes this token
   // under every theme/surface combo using a tone-table lookup (Color-4 or
   // BW-Color-1) that assumes a standard palette. For low-chroma or pastel
@@ -1374,6 +1398,17 @@ ${(() => {
   }
   const abPalArr = abPal === 'Secondary' ? secondaryLight : abPal === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
   const { active: abOldHoverHex, hover: abHoverHex } = activeAndHoverFor(abPalArr, abN);
+  /* The filled button's Quiet is measured against the BUTTON. The lib rests a
+     solid button's label on --Buttons-{C}-Quiet (Text only on hover, pressed
+     and selected), so a Quiet taken from the bar's palette put a tone-7 label
+     on a tone-7-ish fill — 1.5:1 on a brown bar. Ghost and text buttons read
+     --Quiet / Outline-Quiet, which stay on the bar. Same rule as the Brand
+     root's Default button. btnBg is not always abPal at abN (tonal and
+     primary-on-primary take the border tone), so find its real tone. */
+  const abBtnN = (abPalArr as Array<{ hex: string }>).findIndex(t => t.hex.toLowerCase() === btnBg.toLowerCase()) + 1 || abN;
+  const abBtnQuiet = effectiveButton === 'black-white'
+    ? (isLight(btnBg) ? neutral(6) : WHITE_TEXT)
+    : p(abPalArr, getAccessibleTones(btnBg, abBtnN, abPalArr).quiet);
   // Surface --Hover / --Pressed for the App Bar context: based on the App Bar's
   // own BG tone, not whatever is inherited from the page surface (Primary-Light
   // would otherwise leak through and make ghost-button hovers look near-white).
@@ -1394,9 +1429,9 @@ ${(() => {
 
      Fill, text and border move together. Once the button is filled its label
      has to contrast with the BUTTON rather than the bar, so leaving the text on
-     the bar's tone would have traded a missing fill for a failing one. Quiet
-     stays on the BAR's palette on purpose — that is what a ghost or text button
-     reads, and those sit directly on the bar with no fill between. */
+     the bar's tone would have traded a missing fill for a failing one — and
+     that includes Quiet, which the lib uses as the resting label (abBtnQuiet
+     above). */
   // Library components like AppBar set their own data-theme="App-Bar" on their
   // root element, which would otherwise override these vars. The nested
   // descendant selector lets that inner element still inherit the branded
@@ -1434,7 +1469,7 @@ ${(() => {
   --Buttons-Primary-Pressed: ${abOldHoverHex};
   --Buttons-Default-Button: ${btnBg};
   --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Quiet: var(--${ac.palette}-Color-${tones.quiet});
+  --Buttons-Default-Quiet: ${abBtnQuiet};
   --Buttons-Default-Border: ${btnBorder};
   --Buttons-Default-Highlight: ${highlightFor(btnBg)};
   --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
@@ -1484,6 +1519,7 @@ ${vibrantLines()}
 ${buildTextPaletteLines(surfaceN, false)}
 ${buildIconPaletteLines(surfaceN, false, isDark, surfacePaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
 ${buildHeaderPaletteLines(surfaceN, false)}
+${emitStateButtonTokens(surfaceN)}
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
 ${SHADOW_LEVELS.map((l) => `  --Effect-Level-${l}: ${effectLevelRecipe(l, shadowOpts)};`).join('\n')}
@@ -1655,6 +1691,19 @@ ${(() => {
 [data-surface] [data-surface="Container-Highest"],
 [data-surface] [data-surface="Container-Low"],
 [data-surface] [data-surface="Container-Lowest"] {
+  /* The five level VALUES, restated on the card itself. Not --Background
+     (see above) — the values it reads. A page that wraps Brand inside
+     another theme (the studio shell is data-theme="Default") also matches
+     that theme's [data-theme="Default"] [data-surface^="Container"] rule,
+     which redeclares --Container on the card and beats what it inherits
+     from Brand. The card then painted the studio's near-white while
+     --Header and --Text below stayed tuned for this brand's container — on
+     a black-background system, near-white text on a near-white card. */
+  --Container-Lowest: ${containerLowest};
+  --Container-Low: ${containerLow};
+  --Container: ${containerBg};
+  --Container-High: ${containerHigh};
+  --Container-Highest: ${containerHighest};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
@@ -1781,6 +1830,7 @@ ${(() => {
   --Tag-Tertiary-Text: ${tagText};
 ${emitDefaultBtnTokens('Tertiary')}
 ${emitPerPaletteButtonTokens(tertiarySurfaceBg, TC)}
+${emitStateButtonTokens(TC)}
 ${emitTagTextTokens()}
 }`;
 })()}
@@ -1794,6 +1844,7 @@ ${emitTagTextTokens()}
   --Surface: var(--Secondary-Color-${SC});
 ${emitDefaultBtnTokens('Secondary')}
 ${emitPerPaletteButtonTokens(p(vSecondary, SC), SC)}
+${emitStateButtonTokens(SC)}
 ${emitTagTextTokens()}
 }
 
@@ -1806,6 +1857,7 @@ ${emitTagTextTokens()}
 [data-theme="Primary"][data-surface="Surface"] {
 ${emitDefaultBtnTokens('Primary')}
 ${emitPerPaletteButtonTokens(p(primaryLight, PC), PC)}
+${emitStateButtonTokens(PC)}
 ${emitTagTextTokens()}
 }
 

@@ -1,4 +1,4 @@
-import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from './colorScale';
+import { generateSemanticLightModeScale, generateSemanticDarkModeScale, type HueEasing } from './colorScale';
 
 /**
  * Generate all 9 palettes needed by the CSS generation pipeline.
@@ -10,12 +10,36 @@ import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '.
 // Fixed seed colors for semantic palettes
 export const SEMANTIC_SEEDS: Record<string, string> = {
   neutral: '#808080',           // Pure gray
-  info: '#4A7BF7',             // Blue
+  /* #3B82F6, not the earlier #4A7BF7: that blue's light tones climbed to
+     OKLCH hue 276–287 and read lavender, its dark ones 270–279 indigo. See
+     SEMANTIC_HUE_EASING for the other half of the fix. */
+  info: '#3B82F6',             // Blue
   success: '#2E9E5A',          // Green
   warning: '#D4941A',          // Amber/Orange
   error: '#D44040',            // Red
   'hotlink-visited': '#8B5CF6', // Purple
 };
+
+/**
+ * Hue bends for the semantic ramps (see HueEasing in colorScale.ts — hues in
+ * CIE LCH, at Color-1 and Color-12). A ramp built at one constant CIE LCH hue
+ * does not hold one PERCEIVED hue: blue drifts toward violet as it lightens.
+ * Info is pinned so every tone stays within ±5° of OKLCH 258, a true blue,
+ * in both modes (it spread 25° before). Measured, not guessed — the search
+ * scored seeds × easings on OKLCH hue across all 24 tones.
+ */
+export const SEMANTIC_HUE_EASING: Record<string, { light?: HueEasing; dark?: HueEasing } | undefined> = {
+  info: { light: { darkHue: 275, lightHue: 275 }, dark: { darkHue: 275, lightHue: 275 } },
+  /* Light mode only: the light tones drifted to OKLCH 30–39, peach rather than
+     red; held at 25 they stay within ±4.4° of 27. The dark-mode ramp was
+     already right and is left exactly as it was. */
+  error: { light: { darkHue: 25, lightHue: 25 } },
+};
+
+/** A semantic palette's light-mode ramp, with its hue easing. */
+export const semanticLightScale = (key: string) => generateSemanticLightModeScale(SEMANTIC_SEEDS[key], undefined, undefined, SEMANTIC_HUE_EASING[key]?.light);
+/** A semantic palette's dark-mode ramp, with its hue easing. */
+export const semanticDarkScale = (key: string) => generateSemanticDarkModeScale(SEMANTIC_SEEDS[key], undefined, SEMANTIC_HUE_EASING[key]?.dark);
 
 interface ToneEntry {
   tone: number;
@@ -35,12 +59,12 @@ export function generateFullLightPalettes(
     primary: convertPalette(primaryPalette),
     secondary: convertPalette(secondaryPalette),
     tertiary: convertPalette(tertiaryPalette),
-    neutral: convertPalette(generateSemanticLightModeScale(SEMANTIC_SEEDS.neutral)),
-    info: convertPalette(generateSemanticLightModeScale(SEMANTIC_SEEDS.info)),
-    success: convertPalette(generateSemanticLightModeScale(SEMANTIC_SEEDS.success)),
-    warning: convertPalette(generateSemanticLightModeScale(SEMANTIC_SEEDS.warning)),
-    error: convertPalette(generateSemanticLightModeScale(SEMANTIC_SEEDS.error)),
-    'hotlink-visited': convertPalette(generateSemanticLightModeScale(SEMANTIC_SEEDS['hotlink-visited'])),
+    neutral: convertPalette(semanticLightScale('neutral')),
+    info: convertPalette(semanticLightScale('info')),
+    success: convertPalette(semanticLightScale('success')),
+    warning: convertPalette(semanticLightScale('warning')),
+    error: convertPalette(semanticLightScale('error')),
+    'hotlink-visited': convertPalette(semanticLightScale('hotlink-visited')),
   };
 }
 
@@ -53,11 +77,11 @@ export function generateFullDarkPalettes(
     primary: convertPalette(primaryPalette),
     secondary: convertPalette(secondaryPalette),
     tertiary: convertPalette(tertiaryPalette),
-    neutral: convertPalette(generateSemanticDarkModeScale(SEMANTIC_SEEDS.neutral)),
-    info: convertPalette(generateSemanticDarkModeScale(SEMANTIC_SEEDS.info)),
-    success: convertPalette(generateSemanticDarkModeScale(SEMANTIC_SEEDS.success)),
-    warning: convertPalette(generateSemanticDarkModeScale(SEMANTIC_SEEDS.warning)),
-    error: convertPalette(generateSemanticDarkModeScale(SEMANTIC_SEEDS.error)),
-    'hotlink-visited': convertPalette(generateSemanticDarkModeScale(SEMANTIC_SEEDS['hotlink-visited'])),
+    neutral: convertPalette(semanticDarkScale('neutral')),
+    info: convertPalette(semanticDarkScale('info')),
+    success: convertPalette(semanticDarkScale('success')),
+    warning: convertPalette(semanticDarkScale('warning')),
+    error: convertPalette(semanticDarkScale('error')),
+    'hotlink-visited': convertPalette(semanticDarkScale('hotlink-visited')),
   };
 }

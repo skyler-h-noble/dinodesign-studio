@@ -396,39 +396,32 @@ describe('Surface-Brightest', () => {
     expect(aliased, 'no Themes entry may still alias the absent BlackWhite variable').toBe(0);
   });
 
-  it('keeps the black bevel MODE-AWARE, and freezes only what cannot move', () => {
-    /* This used to assert a hard `#00000080` for the black face — a literal in
-       the Themes collection, whose modes are the nine THEMES rather than
-       light/dark. It was defensible at the time (a shadow can never come out
-       lighter than the button it sits under, so pure black is safe in both),
-       but it FROZE a value that genuinely moves: Button-Lowlight.BlackWhite
-       carries #04040480 in light and #0b0b0b80 in dark.
-     *
-     * Now that every BlackWhite role is repointed at a variable the file has,
-     * the black face can take the real one and the split comes back.
-     *
-     * WHITE stays a literal, and that is not the same compromise. White's
-     * Highlight and Lowlight are IDENTICAL in both modes — #ffffff80 and
-     * #b3b3b380 — because white does not move; the 70% dark-mode alpha lives in
-     * the fill's own color, not in its bevel. Freezing a constant costs
-     * nothing. Freezing a variable costs dark mode. */
+  it('keeps every Black & White bevel MODE-AWARE — no frozen literal, white included', () => {
+    /* This used to allow one literal: the white face's bevel (#ffffff80 /
+       #b3b3b380), on the reasoning that white does not move. It does — the
+       dark-mode white face is white at 70%, so what it SHOWS on a dark surface
+       is a light gray, and solid white's lowlight sat at that color: no bottom
+       edge. The export now works the bevel out per tone from the composite, so
+       every face, every tone, takes its row's variable. */
     const f: any = withStyle();
     const seen = new Set<string>();
     const walk = (n: any, path: string, d: number) => {
       if (!n || typeof n !== 'object' || d > 14) return;
       if (typeof n.value === 'string') {
-        if (/Themes\/.*BlackWhite\/Lowlight$/.test(path)) seen.add(n.value);
+        if (/Themes\/.*BlackWhite\/(Lowlight|Highlight)$/.test(path)) seen.add(n.value);
         return;
       }
       for (const k of Object.keys(n)) if (k !== 'type') walk(n[k], path + '/' + k, d + 1);
     };
     walk({ Themes: f.Themes }, '', 0);
-    expect([...seen].sort())
-      .toEqual(['#b3b3b380', '{Button-Lowlight.BlackWhite.Color-12}']);
+    expect(seen.size).toBeGreaterThan(0);
+    for (const v of seen) expect(v, 'a frozen bevel').toMatch(/^\{Button-(Lowlight|Highlight)\.BlackWhite\.Color-\d+\}$/);
 
-    /* The literal must never be the black one again. A frozen black bevel is
-       the specific regression this replaced. */
-    expect([...seen]).not.toContain('#00000080');
+    /* And the white face's dark bevel is its own: darker than what the button
+       shows, not solid white's. */
+    const light = f.Modes['Light-Mode']['Button-Lowlight'].BlackWhite['Color-3'].value;
+    const dark = f.Modes['Dark-Mode']['Button-Lowlight'].BlackWhite['Color-3'].value;
+    expect(dark).not.toBe(light);
   });
 
   it('leaves no BlackWhite role pointing at a target Modes does not carry', () => {

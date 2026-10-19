@@ -742,6 +742,10 @@ export function generateFigmaJSON(
       'Icon', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
       'Backgrounds',
+      /* The state buttons' tonal entries, keyed by background tone: the fill
+         at the border's tone, with its label, states and bevel. A Modes group
+         because the tone is mode-dependent and the Theme layer is not. */
+      'Tonal-Button',
     ];
 
     for (const section of MODES_SECTIONS) {
@@ -750,6 +754,32 @@ export function generateFigmaJSON(
         extractTokens(modeData[section], modeSection[section]);
       }
     }
+    /* Tonal-Button's bevel arrives as "r, g, b" — the format the CSS feeds to
+       rgba() — which a Figma color variable cannot parse, so it would import
+       as no color. Convert to 8-digit hex carrying the bevel opacity as alpha,
+       as the BlackWhite rows of the Button-* groups are below. */
+    {
+      const bevelPct = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
+      const alpha = Math.round(bevelPct * 255 / 100).toString(16).padStart(2, '0');
+      const toHex = (v: unknown): string | null => {
+        if (typeof v !== 'string') return null;
+        if (v.startsWith('#')) return v.length === 7 ? v + alpha : v;
+        const parts = v.split(',').map((x) => parseInt(x.trim(), 10));
+        if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+        return '#' + parts.slice(0, 3).map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('') + alpha;
+      };
+      for (const scope of Object.values<any>(modeSection['Tonal-Button'] ?? {})) {
+        for (const pal of Object.values<any>(scope ?? {})) {
+          for (const entry of Object.values<any>(pal ?? {})) {
+            for (const k of ['Highlight', 'Lowlight']) {
+              const hex = toHex(entry?.[k]?.value);
+              if (hex) entry[k] = { value: hex, type: 'color' };
+            }
+          }
+        }
+      }
+    }
+
 
     /* Drop the anchored ends from every Background-N row.
      *
@@ -1343,7 +1373,7 @@ export function generateFigmaJSON(
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
                     'Dropshadow-Color',
-                    'Default-Background'];
+                    'Default-Background', 'Tonal-Button'];
 
                   // If the token already references a Modes group, keep it as-is
                   // (don't resolve further — the plugin will alias to the Modes variable)
@@ -1393,8 +1423,13 @@ export function generateFigmaJSON(
                       // and Pressed, and its light values are identical to the
                       // tone-keyed ones, so light output is unchanged.
                       const shadeMatch = String(btnToken.value).match(
-                        /\{((?:Buttons|Default-Button)\.[\w-]+\.[\w-]+)\.Button\}/
+                        /\{((?:Buttons|Default-Button)\.[\w-]+\.[\w-]+|Tonal-Button\.[\w-]+\.[\w-]+\.[\w-]+)\.Button\}/
                       );
+                      /* A tonal state button: everything — fill, label, states,
+                         bevel and the border, which IS the fill — comes from
+                         its Tonal-Button entry, which the Modes layer resolves
+                         per mode. Nothing to rewrite onto another table. */
+                      const tonal = !!shadeMatch && shadeMatch[1].startsWith('Tonal-Button.');
                       if (shadeMatch) {
                         target[key]['Hover'] = { value: `{${shadeMatch[1]}.Hover}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{${shadeMatch[1]}.Pressed}`, type: 'color' };
@@ -1423,7 +1458,9 @@ export function generateFigmaJSON(
                       // scope (Surfaces vs Containers) and the surface
                       // background's Color-N.
                       const existingBorder = target[key]['Border']?.value;
-                      if (typeof existingBorder === 'string') {
+                      if (tonal) {
+                        target[key]['Border'] = { value: `{${shadeMatch![1]}.Button}`, type: 'color' };
+                      } else if (typeof existingBorder === 'string') {
                         // Match any surface scope: Surfaces, Surface-Dim,
                         // Surface-Dimmest, Surface-Bright, Containers,
                         // Container-Low(est), Container-High(est). Preserves
@@ -2865,14 +2902,6 @@ const BUTTON_BORDER_WIDTH = 1;
   // NOTE: this is the only reference into Button-Lowlight in the whole payload;
   // nothing else aliases the four flat Button-* sections. If those are ever
   // dropped to reclaim variables, this line has to move with them.
-  // The black face carries the SAME bevel alpha as the white one, which arrives
-  // through {Button-Lowlight.Neutral.Color-12} with the opacity already baked in.
-  // Derived from bevelOpacity rather than written as a literal 80: a hardcoded
-  // alpha matches at the default 50% and silently splits the moment that slider
-  // moves, leaving black's shadow a different strength from white's.
-  const bwBevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
-  const bwBevelAlphaHex = Math.round(bwBevelOpacity * 255 / 100).toString(16).padStart(2, '0');
-
   const BW_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.(\w+)\}$/;
   const BW_BLACK_FROM_TONE = 6;   // Color-1..5 paint white, 6..12 paint black
 
@@ -2898,19 +2927,19 @@ const BUTTON_BORDER_WIDTH = 1;
    *   Button / Border   the face itself          Colors.White / Neutral.Color-1
    *   Text              the other face           the same two, swapped
    *   Quiet             a muted neutral          Neutral.Color-5 / Color-6
-   *   Hover / Pressed   Button-Hover|Pressed.BlackWhite, tone preserved
-   *   Highlight         white is mode-invariant, so a literal is safe there;
-   *   Lowlight          black moves, so it takes the variable
+   *   Hover / Pressed /
+   *   Highlight / Lowlight   Button-*.BlackWhite, tone preserved — the bevel is
+   *                          worked out per tone from what the button shows on
+   *                          that surface, in each mode
    *
    * Colors.White and Colors.Neutral.Color-1 carry the dark-mode alpha and the
    * #0b0b0b themselves, so light/dark comes for free rather than being restated.
    *
-   * The two bevel literals are the only frozen values, and they are frozen on
-   * purpose: white's Highlight and Lowlight are identical in both modes because
-   * white does not move — the 70% lives in the fill's own alpha, not in the
-   * bevel. Their alpha is derived from bevelOpacity rather than written as 80,
-   * because a hardcoded alpha matches at the default 50% and splits silently the
-   * moment that slider moves.
+   * No bevel is frozen any more. White's used to be: identical literals in
+   * both modes, on the reasoning that white does not move — but the dark-mode
+   * white face is 70% alpha, so what it SHOWS moves, and solid white's
+   * lowlight sat at that color. The export now works the bevel out from the
+   * composite per tone (exportColorSystem, Buttons.BlackWhite).
    *
    * Retires the old black-Lowlight literal (#000000 at the bevel alpha), which
    * was correct as far as it went but froze the black bevel to light mode.
@@ -2926,13 +2955,15 @@ const BUTTON_BORDER_WIDTH = 1;
     Border:    { white: '{Colors.White}', black: '{Colors.Neutral.Color-1}' },
     Text:      { white: '{Colors.Neutral.Color-1}', black: '{Colors.White}' },
     Quiet:     { white: '{Colors.Neutral.Color-5}', black: '{Colors.Neutral.Color-6}' },
-    Highlight: { white: `#ffffff${bwBevelAlphaHex}`, black: '{Button-Highlight.BlackWhite.Color-12}' },
-    Lowlight:  { white: `#b3b3b3${bwBevelAlphaHex}`, black: '{Button-Lowlight.BlackWhite.Color-12}' },
   };
-  /* These two keep the tone from the reference — their sections carry all
-     twelve, so there is nothing to collapse. */
+  /* These keep the tone from the reference — their sections carry all twelve.
+     Highlight and Lowlight joined them once the Modes trim made room: the bevel
+     is worked out per tone from what the button shows on that surface, in each
+     mode, so a white button's bevel in dark mode (white at 70% on a dark
+     surface) is its own, not solid white's frozen as a literal. */
   const BW_TONED_SECTION: Record<string, string> = {
     Hover: 'Button-Hover', Pressed: 'Button-Pressed',
+    Highlight: 'Button-Highlight', Lowlight: 'Button-Lowlight',
   };
 
   let bwRewritten = 0, bwUnmapped = 0;
@@ -3103,6 +3134,52 @@ const BUTTON_BORDER_WIDTH = 1;
   const pageBgHex = figma.Modes?.['Light-Mode']?.Colors?.Primary?.['Color-12']?.value;
   if (typeof pageBgHex === 'string') {
     figma.pageBackground = pageBgHex;
+  }
+
+    /* Drop what nothing in Figma reads.
+     *
+     * Measured across 480 builds (8 brands x every button, card, text and
+     * background setting, 2026-10-19): none of these is referenced by the
+     * Theme layer or any other collection, and none is bound by a layer in
+     * the template file. Modes sits near Figma's 5,000-variable ceiling, and
+     * an import is additive, so a name shipped and never read is a slot taken
+     * from a name that is. The CSS keeps every table — only Figma is trimmed.
+     *
+     *   Button-Hover / -Pressed / -Highlight / -Lowlight   BlackWhite only: the
+     *       black-and-white button reads them by surface tone; every other
+     *       palette's states come from its own Buttons entry.
+     *   Default-Button   the Default entry only, without Border (the border
+     *       comes from Default-Button-Border).
+     *   Buttons   no state palettes (Tonal-Button serves them), no .Border
+     *       (Default-Button-Border does) — except Neutral's, which a layer in
+     *       the template binds directly — and no BlackWhite per-tone rows.
+     *
+     * Runs LAST, after every Modes group is built and every reference in
+     * Themes is written: the BlackWhite rows of the Button-* groups are COPIED
+     * from Buttons.BlackWhite's per-tone rows further down, so trimming those
+     * earlier emptied the copy and left 5,360 references pointing at nothing —
+     * the trap the NOTE below warns about. figmaModesTrim.test.ts fails on any
+     * reference into a trimmed name, so a new reader cannot be cut off silently. */
+  for (const modeSection of Object.values<any>(figma.Modes ?? {})) {
+    const keepOnly = (group: string, keep: (key: string) => boolean) => {
+      const g = modeSection[group];
+      if (g && typeof g === 'object') for (const k of Object.keys(g)) if (!keep(k)) delete g[k];
+    };
+    for (const group of ['Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight']) keepOnly(group, (pal) => pal === 'BlackWhite');
+    keepOnly('Default-Button', (pal) => pal === 'Default');
+    if (modeSection['Default-Button']?.Default) delete modeSection['Default-Button'].Default.Border;
+    const btns = modeSection['Buttons'];
+    if (btns && typeof btns === 'object') {
+      for (const pal of ['Info', 'Success', 'Warning', 'Error']) delete btns[pal];
+      for (const [pal, entry] of Object.entries<any>(btns)) {
+        if (!entry || typeof entry !== 'object') continue;
+        if (pal !== 'Neutral' && entry.Border && 'value' in entry.Border) delete entry.Border;
+        if (pal === 'BlackWhite') {
+          for (const k of Object.keys(entry)) if (/^Color-/.test(k)) delete entry[k];
+          if (entry.Default) { delete entry.Default.Highlight; delete entry.Default.Lowlight; }
+        }
+      }
+    }
   }
 
   return figma;
