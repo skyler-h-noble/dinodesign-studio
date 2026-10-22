@@ -84,9 +84,13 @@ export function chartCSS(): string {
 
 /* Flat bar — Figma "Bar": Fill, with a 1px inside border in Chart-Background */
 .omni-chart__bar { position: absolute; background: var(--series); }
-/* Track — the Bar's Opaque Background: a 20-Fill pill the full length of the
+/* Track — the Bar's Background=Opaque: a tinted pill the full length of the
    plot behind each bar (corner radius = the bar's width, so a pill). */
 .omni-chart__track { position: absolute; background: color-mix(in srgb, var(--series) 20%, transparent); }
+/* Background=Recessed — Figma's InsetShadow layer: the same groove laid OVER the
+   bar with an inner shadow, so the bar reads as set into the surface. Drawn
+   after the bar; pointer-events off so it never takes a hover. */
+.omni-chart__recess { position: absolute; pointer-events: none; background: color-mix(in srgb, var(--series) 10%, transparent); box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.25); }
 /* The line through the bars' ends: drawn under the bars, so each topper covers its end. */
 .omni-chart__connector { position: absolute; top: 0; overflow: visible; pointer-events: none; }
 /* Topper — Figma "BarChartTopper" (a single Bar's BarDecoration; a stack
@@ -437,10 +441,11 @@ function hBarMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMet
   }
   const mods = ' omni-chart__bar--h' + (spec.bar.fill === 'gradient' ? ' omni-chart__bar--gradient' : '')
     + (spec.bar.outline ? ' omni-chart__bar--outline' : '');
-  const track = spec.bar.track
-    ? `<div class="omni-chart__track" style="left:${px(L.plot.x)};top:${top};width:${hLen(L, 1, 0)};height:${h};border-radius:${h};${sv}" aria-hidden="true"></div>`
-    : '';
+  const groove = `left:${px(L.plot.x)};top:${top};width:${hLen(L, 1, 0)};height:${h};border-radius:${h};${sv}`;
+  const track = spec.bar.background === 'opaque' ? `<div class="omni-chart__track" style="${groove}" aria-hidden="true"></div>` : '';
+  const recess = spec.bar.background === 'recessed' ? `<div class="omni-chart__recess" style="${groove}" aria-hidden="true"></div>` : '';
   return track + `<div class="omni-chart__bar${mods}" style="left:${px(L.plot.x)};top:${top};width:${hLen(L, it.valueFrac, 0)};height:${h};${sv}" aria-hidden="true"></div>`
+    + recess
     + (spec.bar.topper ? topper(m, hAt(L, it.valueFrac, 0), px(it.frameY + it.frameHeight / 2), sv) : '');
 }
 
@@ -476,10 +481,11 @@ function barMarkup(spec: ChartSpec, it: LayoutItem, L: ChartLayout, m: ChartMetr
   }
   const mods = (spec.bar.fill === 'gradient' ? ' omni-chart__bar--gradient' : '')
     + (spec.bar.outline ? ' omni-chart__bar--outline' : '');
-  const track = spec.bar.track
-    ? `<div class="omni-chart__track" style="left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(L.plot.y)};width:${px(it.width)};height:${px(L.plot.height)};border-radius:${px(it.width)};${seriesVar(it.color)}" aria-hidden="true"></div>`
-    : '';
+  const groove = `left:${xAt(L, m, it.centerFrac, -it.width / 2)};top:${px(L.plot.y)};width:${px(it.width)};height:${px(L.plot.height)};border-radius:${px(it.width)};${seriesVar(it.color)}`;
+  const track = spec.bar.background === 'opaque' ? `<div class="omni-chart__track" style="${groove}" aria-hidden="true"></div>` : '';
+  const recess = spec.bar.background === 'recessed' ? `<div class="omni-chart__recess" style="${groove}" aria-hidden="true"></div>` : '';
   return track + `<div class="omni-chart__bar${mods}" style="${pos}${seriesVar(it.color)}" aria-hidden="true"></div>`
+    + recess
     + (spec.bar.topper ? topper(m, xAt(L, m, it.centerFrac, 0), px(it.frameY), seriesVar(it.color)) : '');
 }
 

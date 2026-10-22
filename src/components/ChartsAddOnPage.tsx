@@ -184,7 +184,7 @@ export default function ChartsAddOnPage() {
   // The Bar's BarDecoration: a ring cap on each bar's end.
   const [barTopper, setBarTopper] = useState(false);
   // The Bar's Opaque Background, and a line through the bars' ends.
-  const [barTrack, setBarTrack] = useState(false);
+  const [barBackground, setBarBackground] = useState<'none' | 'opaque' | 'recessed'>('none');
   const [barConnect, setBarConnect] = useState('none');
   const [legendPos, setLegendPos] = useState('top');
   const [orientation, setOrientation] = useState('vertical');
@@ -235,7 +235,7 @@ export default function ChartsAddOnPage() {
     if (sp.width.px !== null) setWidthPx(sp.width.px);
     setBarFill(sp.bar.fill); setBarOutline(sp.bar.outline); setBarShadow(sp.bar.shadow);
     setBarTopper(sp.bar.topper); setOrientation(sp.bar.orientation);
-    setBarTrack(sp.bar.track); setBarConnect(sp.bar.connect); setLegendPos(sp.legend);
+    setBarBackground(sp.bar.background); setBarConnect(sp.bar.connect); setLegendPos(sp.legend);
     setLine({ thickness: sp.line.thickness, curve: sp.line.curve, effect: sp.line.effect });
     setSeries(sp.series.map((sr) => ({ name: sr.name, color: sr.color, marker: sr.marker, fill: sr.fill })));
     const marks = new Set(sp.series.map((sr) => sr.marker));
@@ -337,11 +337,11 @@ export default function ChartsAddOnPage() {
       return { label: r.label, value: num(r.values[0]), values: series.map((_, k) => num(r.values[k])), color: r.color };
     }),
     line,
-    bar: { fill: barFill, outline: barOutline, shadow: barShadow, orientation, topper: barTopper, track: barTrack, connect: barConnect },
+    bar: { fill: barFill, outline: barOutline, shadow: barShadow, orientation, topper: barTopper, background: barBackground, connect: barConnect },
     legend: legendPos,
     pie,
   }), [name, uuid, type, ground, mode, size, plotHeight, axis, showAxis, gridY, gridX, showTitle, tableLink, animate, widthMode, widthPx, card,
-    showLabels, rows, series, sameMarker, sharedMarker, line, barFill, barOutline, barShadow, orientation, barTopper, barTrack, barConnect, legendPos, pie]);
+    showLabels, rows, series, sameMarker, sharedMarker, line, barFill, barOutline, barShadow, orientation, barTopper, barBackground, barConnect, legendPos, pie]);
 
   const { spec, findings } = useMemo(() => normalizeChartSpec(raw), [raw]);
   const refused = worstChartLevel(findings) === 'refuse';
@@ -598,7 +598,9 @@ export default function ChartsAddOnPage() {
               <SwitchInput checked={barTopper} onChange={(e: { target: { checked: boolean } }) => setBarTopper(e.target.checked)} label="Topper (a ring on each bar's end)" />
             )}
             {type === 'bar' && (
-              <SwitchInput checked={barTrack} onChange={(e: { target: { checked: boolean } }) => setBarTrack(e.target.checked)} label="Background track behind each bar" />
+              <Select label="Bar background" size="small" fullWidth value={barBackground}
+                onChange={(v: string) => setBarBackground(v as typeof barBackground)}
+                options={[{ label: 'None', value: 'none' }, { label: 'Opaque (a tinted track behind the bar)', value: 'opaque' }, { label: 'Recessed (the bar sits in a groove)', value: 'recessed' }]} />
             )}
             <Select label="Connect the bar ends" size="small" fullWidth value={barConnect} onChange={(v: string) => setBarConnect(v)}
               options={[{ label: 'No line', value: 'none' }, { label: 'Straight line', value: 'straight' }, { label: 'Curved line', value: 'smooth' }]} />
