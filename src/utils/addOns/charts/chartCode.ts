@@ -86,7 +86,8 @@ export function chartCSS(): string {
 .omni-chart__bar { position: absolute; background: var(--series); }
 /* Track — the Bar's Background=Opaque: a tinted pill the full length of the
    plot behind each bar (corner radius = the bar's width, so a pill). */
-.omni-chart__track { position: absolute; background: color-mix(in srgb, var(--series) 20%, var(--Background)); }
+/* 10-Fill — the series at 10%, as the Figma Bar's Background layer binds. */
+.omni-chart__track { position: absolute; background: color-mix(in srgb, var(--series) 10%, var(--Background)); }
 /* Mixed with the chart's ground, not with transparent: the groove is OPAQUE, so
    gridlines stay behind it as they stay behind the bar. A see-through tint let
    every line show across the empty part of each groove. */
