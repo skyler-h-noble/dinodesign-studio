@@ -1343,20 +1343,53 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     tokenLookup['Default-Background.Container-High'] = `{${contBgKey}.Containers.Container-High}`;
     tokenLookup['Default-Background.Container-Highest'] = `{${contBgKey}.Containers.Container-Highest}`;
 
+    /* The text a Default-theme CARD carries is read at the tone of the card's
+       ACTUAL face, not at the page tone. The face follows the card setting —
+       on a primary-base page with white cards it is near-white (#f6f7f7) — but
+       the text was read at {Text.Containers.<pal>.Color-<pageTone>}, the table
+       for a TONAL card at the page tone: a dark card. Light text landed on a
+       light card. The face is resolved and matched to its nearest tone by
+       lightness; a tonal card still lands on the page tone, unchanged. */
+    const faceHex = (() => {
+      let ref: unknown = `{${contBgKey}.Containers.Container}`;
+      for (let hop = 0; hop < 10 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
+        const path = (ref as string).slice(1, -1);
+        if (tokenLookup[path]) { ref = tokenLookup[path]; continue; }
+        let node: any = modeData;
+        for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) break; }
+        if (node === undefined) { node = fullJsonData; for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) break; } }
+        ref = typeof node === 'string' ? node : node?.value;
+      }
+      return typeof ref === 'string' && /^#[0-9a-f]{6}/i.test(ref) ? ref.slice(0, 7) : null;
+    })();
+    const lightnessOf = (hex: string) => { const [r, g, b] = [1, 3, 5].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y; };
+    let faceN = contN;
+    if (faceHex) {
+      const tones = modeData?.Colors?.[defPal] ?? {};
+      let best = Infinity;
+      for (let n = 1; n <= 12; n++) {
+        let v: any = tones[`Color-${n}`]?.value;
+        if (typeof v !== 'string' || !v.startsWith('#')) continue;
+        const dist = Math.abs(lightnessOf(v.slice(0, 7)) - lightnessOf(faceHex));
+        if (dist < best) { best = dist; faceN = n; }
+      }
+    }
+    const faceColorN = `Color-${faceN}`;
+
     // Text, Header, Quiet, Border, etc. — reference {Section.Surfaces.Palette.Color-N}
     const props = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
     for (const prop of props) {
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
-      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${contColorN}}`;
+      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${faceColorN}}`;
     }
     tokenLookup['Default-Background.Container-Quiet-Opacity'] =
-      `{Quiet.${contColorN}-Opacity}`;
+      `{Quiet.${faceColorN}-Opacity}`;
     tokenLookup['Default-Background.Container-Text-Match'] =
-      `{Text.Containers.${defPal}.${contColorN}}`;
+      `{Text.Containers.${defPal}.${faceColorN}}`;
     tokenLookup['Default-Background.Container-Header-Match'] =
-      `{Header.Containers.${defPal}.${contColorN}}`;
+      `{Header.Containers.${defPal}.${faceColorN}}`;
     tokenLookup['Default-Background.Container-Text-BW'] =
-      `{Default-Button-Border.Containers.BlackWhite.${contColorN}}`;
+      `{Default-Button-Border.Containers.BlackWhite.${faceColorN}}`;
     // Focus-Visible uses a flat path (no palette nesting) AND is keyed by
     // Background-N, not Color-N. Using colorN here produced
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the

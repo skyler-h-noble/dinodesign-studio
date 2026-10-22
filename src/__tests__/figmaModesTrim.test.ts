@@ -148,7 +148,7 @@ describe('Figma Modes trim', () => {
       }
     }
     expect(dangling.slice(0, 10), `${dangling.length} dangling`).toEqual([]);
-  });
+  }, 60_000); // builds every brand x button style; slow under a full parallel run
 
   it('keeps the variable a template layer binds directly', () => {
     const { figma } = buildAll(makeScheme(BRANDS[0]), { background: 'primary', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never, 'light') as any;

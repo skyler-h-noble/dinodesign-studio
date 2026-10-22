@@ -728,3 +728,35 @@ describe("an outline button's resting label under Black & White text", () => {
     });
   }
 });
+
+/* A Default-theme card's text is read at the card's ACTUAL face. On a
+   primary-base page with white cards the face is near-white, but the text was
+   read at the page tone — the table for a dark tonal card — so light text sat
+   on a light card (design system b7d23138…, 2026-10-22). */
+describe('Default card text sits on the card it is drawn on', () => {
+  const resolveVar = (css: string, v: string): string | null => {
+    let cur = v.trim();
+    for (let hop = 0; hop < 8; hop++) {
+      if (/^#[0-9a-f]{6}/i.test(cur)) return cur.slice(0, 7);
+      const m = cur.match(/^var\(--([\w-]+)/); if (!m) return null;
+      const def = css.match(new RegExp(`--${m[1]}:\\s*([^;]+);`)); if (!def) return null;
+      cur = def[1].trim();
+    }
+    return null;
+  };
+  it.each([
+    ['primary-base · white cards', { background: 'primary-base', cardColoring: 'white', textColoring: 'black-white', button: 'secondary' }],
+    ['primary-base · tonal cards', { background: 'primary-base', cardColoring: 'tonal', textColoring: 'tonal', button: 'secondary' }],
+    ['white · tonal cards', { background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'primary' }],
+  ])('%s: card Text clears 4.5:1 on the card face', (_label, sel) => {
+    const { css } = exportCssFor(SCHEME, sel as unknown as UserSelections, 'light');
+    const i = css.indexOf('/* Theme: Default - Containers */');
+    const blk = css.slice(i, css.indexOf('}', i));
+    const line = (t: string) => (blk.split('\n').find((l) => l.trim().startsWith(`--${t}:`)) || '').split(':').slice(1).join(':').replace(/;\s*$/, '');
+    const face = resolveVar(css, line('Container'));
+    const text = resolveVar(css, line('Text'));
+    expect(face, 'card face').toBeTruthy();
+    expect(text, 'card text').toBeTruthy();
+    expect(chroma.contrast(text!, face!), `${text} on ${face}`).toBeGreaterThanOrEqual(4.5);
+  });
+});
