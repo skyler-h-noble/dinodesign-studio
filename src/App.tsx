@@ -136,6 +136,7 @@ function MainApp() {
     navBar: 'primary-light',
     status: 'primary-light',
     button: 'primary',
+    buttonTone: 'fixed',
     cardColoring: 'tonal',
     textColoring: 'tonal',
     decorativeMode: 'surface-components',

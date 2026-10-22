@@ -14,7 +14,7 @@ import type { SurfaceLevel } from '../surfaceWindow';
  * Theme configuration for generating Surfaces and Containers
  */
 import { monoStopTone, type AltStop2 } from '../altDisplay';
-import { toneFor, type BackgroundTheme, type SurfaceLevel as BarLevel } from '../backgroundSelection';
+import { toneFor, barToneFor, type BackgroundTheme, type SurfaceLevel as BarLevel } from '../backgroundSelection';
 
 interface ThemeConfig {
   themeName: string;
@@ -1087,7 +1087,7 @@ export function generateAllThemesWithSurfacesAndContainers(
       | 'primary-adaptive' | 'primary-fixed'
       | 'secondary-adaptive' | 'secondary-fixed'
       | 'tonal-adaptive' | 'tonal-fixed'
-      | 'laddered-adaptive' | 'laddered-fixed';
+      | 'laddered-adaptive' | 'laddered-fixed' | 'match-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black'; // CRITICAL FIX: Added to pass card coloring selection to generateModesThemes
   },
@@ -1544,7 +1544,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     const slash = raw.split('/');
     if (slash.length === 2 && themes[slash[0]]) {
       const [t, level] = slash as [BackgroundTheme, BarLevel];
-      const n = toneFor(t, level, coreFor(t));
+      const n = barToneFor(t, level, coreFor(t));
       themes[name] = generateSingleTheme(makeConfig(t, t, n));
       continue;
     }

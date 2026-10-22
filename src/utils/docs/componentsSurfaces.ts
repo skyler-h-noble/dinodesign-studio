@@ -198,6 +198,50 @@ export const ACCORDION_DOC: ComponentDoc = {
   ],
 };
 
+export const BRAND_ICON_DOC: ComponentDoc = {
+  name: 'BrandIcon',
+  summary: 'A third party\'s logo — a sign-in provider, a payment network, a social platform.',
+  insteadUse: [
+    { when: 'It is one of the system\'s own glyphs', use: 'Icon' },
+    { when: 'It represents a person or an account', use: 'Avatar' },
+  ],
+  props: [
+    { name: 'name', type: 'string', default: 'undefined',
+      note: 'Lowercase and hyphenated, exactly as Font Awesome Brands spells it and as Figma\'s text layer holds it: `github`, `x-twitter`, `linkedin`.' },
+    { name: 'icon', type: 'object', default: 'undefined', note: 'A Font Awesome icon object you imported yourself. Wins over `name`.' },
+    { name: 'size', type: 'string', default: '1em', note: 'Any CSS length. `1em` rides the text beside it.' },
+    { name: 'color', type: 'string', default: 'currentColor',
+      note: 'Any CSS color or token. The default takes the color of the text around it — usually what you want beside a label.' },
+    { name: 'title', type: 'string', default: 'undefined', note: 'The accessible name. Without it the mark is `aria-hidden`.' },
+  ],
+  states: [
+    { state: 'None', setBy: 'prop', note: 'A mark, not a control. Put it inside a Link or Button for anything clickable.' },
+  ],
+  theming: [
+    { collection: '—',
+      inCode: 'None to set — it is `currentColor`, so it follows the text color of the zone it sits in. Pass `color="var(--Icons-Primary)"` to tie it to a palette instead.',
+      inFigma: 'Pins nothing. It is a text layer in a ligature font, so its color is the layer\'s fill. Leave it on `Text` (one color, matching the words beside it), or use the brand\'s own required color where its guidelines ask for one. Never alter the glyph: a brand mark is somebody else\'s trademark.' },
+  ],
+  themingNotes: [
+    'Monochrome is the convention, and there is no "official brand color" mode. A row of logos in their own corporate colors cannot meet a contrast requirement, since each is a fixed hex that knows nothing about the surface behind it.',
+  ],
+  tokens: [
+    surfaceToken('--Text', 'the mark by default, through currentColor'),
+    { name: '--Icons-{Color}', sets: 'the mark, only when passed as `color`', variesWith: 'theme + surface', figma: 'Icons → Icon' },
+  ],
+  composition: [
+    'The library also exports `BRAND_ICON_NAMES` (every name this build can draw) and `hasBrandIcon(name)`. Use them for a free-text name field — something to autocomplete from, and a way to say a name does not exist.',
+  ],
+  accessibility: [
+    'Beside a visible label — a footer link that already says "GitHub" — omit `title`. The mark is then hidden and the label is announced once.',
+    'On its own, pass `title`; it becomes `role="img"` with that name. Inside an icon-only link or button the name belongs on the control instead, or it is announced twice.',
+  ],
+  gotchas: [
+    'An unknown name renders NOTHING and warns in development — the failure looks like a blank square. Check it with `hasBrandIcon` when the name comes from data.',
+    'It is not `<Icon>` with a brand prop. Icon draws the system\'s own Material Symbols and takes its Icons colors and size ramp; a brand mark is somebody else\'s artwork, and none of those rules apply to it.',
+  ],
+};
+
 export const SURFACE_DOCS: ComponentDoc[] = [
-  ICON_DOC, FAB_DOC, SNACKBAR_DOC, ACCORDION_DOC,
+  ICON_DOC, BRAND_ICON_DOC, FAB_DOC, SNACKBAR_DOC, ACCORDION_DOC,
 ];

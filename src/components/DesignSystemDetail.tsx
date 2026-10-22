@@ -68,6 +68,9 @@ interface Record {
   componentStyle: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  /** When the published files were last rebuilt (Regenerate). Older systems
+   *  predate the field and show nothing. */
+  regeneratedAt: Date | null;
   version: number;
   lastPushedVersion: number;
   lastPushedAt: Date | null;
@@ -240,6 +243,7 @@ export default function DesignSystemDetail() {
           componentStyle: data.componentStyle || 'modern',
           createdAt: data.createdAt?.toDate?.() || null,
           updatedAt: data.updatedAt?.toDate?.() || null,
+          regeneratedAt: data.regeneratedAt?.toDate?.() || null,
           version: Number(data.version || 0),
           lastPushedVersion: Number(data.lastPushedVersion || 0),
           lastPushedAt: data.lastPushedAt?.toDate?.() || null,
@@ -406,7 +410,7 @@ export default function DesignSystemDetail() {
         target={regenerateOpen ? { id, name: record.name } : null}
         onClose={() => setRegenerateOpen(false)}
         onRegenerated={(_, newVersion) => {
-          setRecord({ ...record, version: newVersion, updatedAt: new Date() });
+          setRecord({ ...record, version: newVersion, updatedAt: new Date(), regeneratedAt: new Date() });
           loadVersions(id);
           loadEvents(id);
         }}
@@ -644,6 +648,9 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
             <H2 style={{ ...headerStyle, margin: 0, fontSize: '1.6rem', fontWeight: 700 }}>{record.name}</H2>
             <BodySmall color="quiet">
               {record.componentStyle} · v{record.version} · created {record.createdAt?.toLocaleDateString() || 'unknown'}
+              {record.regeneratedAt && (
+                <> · regenerated {record.regeneratedAt.toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</>
+              )}
             </BodySmall>
           </VStack>
           <HStack spacing={1} style={{ flexShrink: 0, alignItems: 'center' }}>

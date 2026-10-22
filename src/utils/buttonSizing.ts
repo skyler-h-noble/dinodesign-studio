@@ -27,7 +27,10 @@
  * across small and medium, then jumps to 32) while the text rows are.
  *
  *     Button-Icon(h)      = snap(0.625h)
- *     Button-Icon-Only(h) = snap(0.70h)
+ *
+ * One icon ramp for a decorator and for an icon-only button alike — the
+ * separate Button-Icon-Only (snap(0.70h): 16 / 24 / 40) was retired
+ * 2026-10-20, when the smaller icon was chosen for icon-only buttons too.
  *
  * Fourteen of the design's fifteen sampled values now reproduce exactly. It
  * was thirteen: Button-Icon's small was the second divergence, and the design
@@ -92,8 +95,6 @@ const ICON_RATIOS: Record<string, number> = {
    * agree and the inversion is gone.
    */
   'Button-Icon': 0.625,
-  /** Glyph for an icon-ONLY button, which owns the whole button. */
-  'Button-Icon-Only': 0.70,
 };
 
 /**

@@ -31,6 +31,7 @@ import AddOnTopNav, { ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
+import { CHART_COLOR_VISION, type ColorVision } from '../utils/chartColorVision';
 import {
   normalizeChartSpec, worstChartLevel, CHART_COLORS, CHART_STATE_COLORS, CHART_ALL_COLORS, CHART_SPEC_VERSION,
   type ChartFinding,
@@ -155,6 +156,9 @@ export default function ChartsAddOnPage() {
   const [name, setName] = useState('Monthly totals');
   const [type, setType] = useState('bar3d');
   const [ground, setGround] = useState('light');
+  /* Preview a color-vision set: data-color-vision on the preview swaps every
+     --Chart-N and --Chart-{State} for that set (chartColorVision.ts). */
+  const [vision, setVision] = useState<'none' | ColorVision>('none');
   const [mode, setMode] = useState('light');
   const [size, setSize] = useState('large');
   const [plotHeight, setPlotHeight] = useState(160);
@@ -481,6 +485,10 @@ export default function ChartsAddOnPage() {
               <Button value="dark" size="small">Dark</Button>
             </ButtonGroup>
           </VStack>
+          <Select label="Color vision" size="small" fullWidth value={vision}
+            onChange={(v: string) => setVision(v as typeof vision)}
+            options={[{ label: 'Default (brand colors)', value: 'none' },
+              ...Object.entries(CHART_COLOR_VISION).map(([value, set]) => ({ label: set.label, value }))]} />
           {/* The palette has a light-mode and a dark-mode version. This sets
               the preview and the Figma frame; code follows its page. */}
           <VStack spacing={0.5}>
@@ -688,7 +696,7 @@ export default function ChartsAddOnPage() {
           Dark mode read as they would on a real page — on the studio's light
           page a dark-mode chart barely looked different. */}
       <Section surface="Surface" padding="16px" style={{ borderRadius: 12 }}>
-      <div ref={previewRef} style={{ padding: 8 }}>
+      <div ref={previewRef} style={{ padding: 8 }} data-color-vision={vision === 'none' ? undefined : vision}>
         <style>{css}</style>
         {html
           ? <div key={replay} ref={chartHostRef} dangerouslySetInnerHTML={{ __html: html }} />

@@ -1,3 +1,4 @@
+import { buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRadii';
 /**
  * The component-style custom properties — button radii, heights, padding,
  * bevel, card radius — derived ONCE from the user's slider values.
@@ -36,6 +37,8 @@ export interface StyleCustomizations {
   smallButtonHeight?: number;
   largeButtonHeight?: number;
   minButtonWidth?: number;
+  /** 1 or 2 (px). See buttonBorderWidthPx. */
+  buttonBorderWidth?: number;
   bevel?: number;
   bevelOpacity?: number;
 }
@@ -118,6 +121,8 @@ export function componentStyleVars(
        working rather than silently dropping them. */
     '--Small-Button-Height': 'var(--Sm-Button-Height)',
     '--Large-Button-Height': 'var(--Lg-Button-Height)',
+    '--Button-Border-Width': `${buttonBorderWidthPx(custom?.buttonBorderWidth)}px`,
+    '--Button-Selected-Border-Width': `${buttonSelectedBorderWidthPx(custom?.buttonBorderWidth)}px`,
     '--Button-Min-Width': `${minButtonWidth}px`,
     '--Lg-Button-Min-Width': `${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px`,
     '--Card-Radius': `${cardRadius}px`,

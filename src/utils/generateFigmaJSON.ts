@@ -7,8 +7,9 @@
  * - SurfacesContainers: links to Themes, containers get Background from Modes
  */
 
+import { parseBar, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
 import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
-import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
 import { componentSizePayload, desktopButtonMetrics } from './componentSize';
 import { inputMetrics, floatingLabelLeading, FLOATING_LABEL_SIZES } from './inputMetrics';
@@ -746,6 +747,10 @@ export function generateFigmaJSON(
          at the border's tone, with its label, states and bevel. A Modes group
          because the tone is mode-dependent and the Theme layer is not. */
       'Tonal-Button',
+      /* Every theme section's Default button, from the shared rule
+         (utils/cellButtons.ts): Cell-Button.<Theme>.<Section>.<field>. A Modes
+         group for the same reason as Tonal-Button. */
+      'Cell-Button',
     ];
 
     for (const section of MODES_SECTIONS) {
@@ -775,6 +780,15 @@ export function generateFigmaJSON(
               const hex = toHex(entry?.[k]?.value);
               if (hex) entry[k] = { value: hex, type: 'color' };
             }
+          }
+        }
+      }
+      // Cell-Button is one level shallower: <Theme>.<Section>.<field>.
+      for (const theme of Object.values<any>(modeSection['Cell-Button'] ?? {})) {
+        for (const entry of Object.values<any>(theme ?? {})) {
+          for (const k of ['Highlight', 'Lowlight']) {
+            const hex = toHex(entry?.[k]?.value);
+            if (hex) entry[k] = { value: hex, type: 'color' };
           }
         }
       }
@@ -1373,7 +1387,7 @@ export function generateFigmaJSON(
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
                     'Dropshadow-Color',
-                    'Default-Background', 'Tonal-Button'];
+                    'Default-Background', 'Tonal-Button', 'Cell-Button'];
 
                   // If the token already references a Modes group, keep it as-is
                   // (don't resolve further — the plugin will alias to the Modes variable)
@@ -1423,13 +1437,17 @@ export function generateFigmaJSON(
                       // and Pressed, and its light values are identical to the
                       // tone-keyed ones, so light output is unchanged.
                       const shadeMatch = String(btnToken.value).match(
-                        /\{((?:Buttons|Default-Button)\.[\w-]+\.[\w-]+|Tonal-Button\.[\w-]+\.[\w-]+\.[\w-]+)\.Button\}/
+                        /\{((?:Buttons|Default-Button|Cell-Button)\.[\w-]+\.[\w-]+|Tonal-Button\.[\w-]+\.[\w-]+\.[\w-]+)\.Button\}/
                       );
                       /* A tonal state button: everything — fill, label, states,
                          bevel and the border, which IS the fill — comes from
                          its Tonal-Button entry, which the Modes layer resolves
                          per mode. Nothing to rewrite onto another table. */
                       const tonal = !!shadeMatch && shadeMatch[1].startsWith('Tonal-Button.');
+                      /* A Cell-Button entry carries the whole button, border
+                         included — Fixed's border is NOT the fill — so every
+                         field already points into it. Leave it as written. */
+                      const cell = !!shadeMatch && shadeMatch[1].startsWith('Cell-Button.');
                       if (shadeMatch) {
                         target[key]['Hover'] = { value: `{${shadeMatch[1]}.Hover}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{${shadeMatch[1]}.Pressed}`, type: 'color' };
@@ -1458,7 +1476,9 @@ export function generateFigmaJSON(
                       // scope (Surfaces vs Containers) and the surface
                       // background's Color-N.
                       const existingBorder = target[key]['Border']?.value;
-                      if (tonal) {
+                      if (cell) {
+                        target[key]['Border'] = { value: `{${shadeMatch![1]}.Border}`, type: 'color' };
+                      } else if (tonal) {
                         target[key]['Border'] = { value: `{${shadeMatch![1]}.Button}`, type: 'color' };
                       } else if (typeof existingBorder === 'string') {
                         // Match any surface scope: Surfaces, Surface-Dim,
@@ -1794,12 +1814,10 @@ export function generateFigmaJSON(
     const defN = defaultSettings['Default-Theme']?.N?.value || 12;
     const userBg = designSystemJSON._userSelections?.background || 'white';
 
-    // Determine Dark Mode palette and N based on user's Light Mode selection:
-    // Primary/Primary-Light → Primary Color-2
-    // White/Black → Neutral Color-2
-    const darkUsePrimary = (userBg === 'primary-light' || userBg === 'primary-base' || userBg === 'primary');
-    const darkPalette = darkUsePrimary ? 'Primary' : 'Neutral';
-    const darkN = 2;
+    // Dark mode: the chosen background's theme at Color-2 (darkPageTheme,
+    // shared with the preview and the CSS export).
+    const darkPalette = darkPageTheme(userBg);
+    const darkN = DARK_PAGE_N;
     // Dark mode containers are always tonal: Primary Color-3 or Neutral Color-3
     const darkContainerN = 3;
 
@@ -2213,15 +2231,26 @@ export function generateFigmaJSON(
      * theme and nothing else — so a light App-Bar arrives on the palette's
      * default level and a designer sets the level. That is a smaller gap
      * than the one it replaces, where the palette was wrong too. */
-    function deriveThemeName(navSettings: any): string {
+    /* Read from the bar's SELECTION ("Tertiary/Surface-Bright"), decoded by
+       parseBar — the same decoder the CSS side uses. This read the `Theme`
+       field beside it, which was written stale: Popsicle's bars were
+       Tertiary · Bright and Figma was told Primary, so the import set the
+       wrong palette and no surface level at all. Now it carries both, and the
+       plugin sets Theme AND Surface on the bar's Theme-Container. */
+    function navTarget(navSettings: any): { theme: string; surface: string } {
+      const sel = navSettings?.Selection?.value;
+      if (sel) {
+        const p = parseBar(sel);
+        if (THEMES.includes(p.theme)) return { theme: p.theme, surface: p.surface };
+      }
       const theme = navSettings?.Theme?.value;
-      return THEMES.includes(theme) ? theme : 'Default';
+      return { theme: THEMES.includes(theme) ? theme : 'Default', surface: 'Surface' };
     }
 
     figma.Navigation = {
-      'Nav-Bar': { theme: deriveThemeName(defaultSettings['Nav-Bar']) },
-      'App-Bar': { theme: deriveThemeName(defaultSettings['App-Bar']) },
-      'Status': { theme: deriveThemeName(defaultSettings['Status']) },
+      'Nav-Bar': navTarget(defaultSettings['Nav-Bar']),
+      'App-Bar': navTarget(defaultSettings['App-Bar']),
+      'Status': navTarget(defaultSettings['Status']),
     };
   }
 
@@ -2397,23 +2426,16 @@ export function generateFigmaJSON(
     // this only kicks in defensively for restored designs or hand-edited input.
     const bevelPct = csRaw.bevel ?? 0;
     // Padding tokens derived from the computed medium button radius.
-    // Single source of truth for border width — referenced by both the
-    // emitted Button-Border-Width token and the height calculations
-    // (inner height = outer - border × 2).
-    //
-    // 1px. It was 2px, which also made every Figma inner height and swatch 2px
-    // shorter than it should be, since they subtract this twice.
-    //
-    // The token keeps being emitted even though the value is now a constant
-    // nobody varies: it already ships to Figma, and a deleted Figma variable
-    // cannot be recovered by re-importing — a recreated variable gets a new id,
-    // so every layer bound to the old one stays unbound (invariant 8).
+    // Button-Border-Width is a style choice now, 1px or 2px
+    // (buttonBorderWidthPx). It only moves the border: the swatches and
+    // heights are measured off the OUTER button size. The variable keeps its
+    // name and id across the change — a value update, not a recreate, so no
+    // binding is lost (invariant 8).
     /** Button padding. Small and standard share one value; large has its own.
  *  Mirrors BUTTON_PADDING / LG_BUTTON_PADDING in exportToCSS.ts. */
 const FIGMA_BUTTON_PADDING = 8;
 const FIGMA_LG_BUTTON_PADDING = 16;
 
-const BUTTON_BORDER_WIDTH = 1;
     // Motion. Durations are FLOATs and are directly usable as Smart Animate
     // durations; the easings can only be STRINGs, since Figma prototypes pick
     // from their own presets — those ship as reference values a designer pastes
@@ -2454,7 +2476,9 @@ const BUTTON_BORDER_WIDTH = 1;
       // Large's text floor is the standard floor + 40, derived rather than a
       // second number to keep in step.
       'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
-      'Button-Border-Width': BUTTON_BORDER_WIDTH,
+      'Button-Border-Width': buttonBorderWidthPx(csRaw?.buttonBorderWidth),
+      // The selected stroke: rest + 1px, its own variable (no arithmetic in Figma).
+      'Button-Selected-Border-Width': buttonSelectedBorderWidthPx(csRaw?.buttonBorderWidth),
       /* TWO paddings: small and standard share one, large has its own. Sm- is
          deliberately absent — it equals Button-Padding, so nothing selects
          between the copies (invariant 2). Lg- is a different number and

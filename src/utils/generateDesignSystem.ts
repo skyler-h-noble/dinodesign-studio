@@ -58,6 +58,7 @@ function mapButtonStyle(button: string): string {
     case 'secondary': return 'secondary-fixed';
     case 'tonal': return 'tonal-fixed';
     case 'laddered': return 'laddered-fixed';
+    case 'match': return 'match-fixed';
     case 'black-white': return 'black-white';
     default: return 'primary-fixed';
   }
@@ -862,6 +863,8 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
         navBar: input.userSelections.navBar as any,
         status: input.userSelections.status as any,
         button: mapButtonStyle(input.userSelections.button) as any,
+        buttonTone: input.userSelections.buttonTone,
+        buttonCellTones: input.userSelections.buttonCellTones,
         cardColoring: input.userSelections.cardColoring,
         textColoring: input.userSelections.textColoring,
       },
@@ -1610,6 +1613,10 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
           version: input.version ?? 1,
           lastModified: new Date().toISOString(),
           name: input.designSystemName,
+          /* The plugin points Buttons › Outline-Text / Outline-Quiet at the
+             surface's own Text / Quiet under Black & White text, and at the
+             button's palette under Tonal — the rule outlineFor applies in CSS. */
+          textColoring: (input.userSelections as { textColoring?: string } | undefined)?.textColoring ?? 'tonal',
         };
         return JSON.stringify(figmaPayload, null, 2);
       } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; }

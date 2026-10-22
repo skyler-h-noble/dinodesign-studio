@@ -12,7 +12,7 @@ export const BUTTON_DOC: ComponentDoc = {
   summary: 'Triggers an action. Not for navigation — a thing that changes the URL is a Link.',
   insteadUse: [
     { when: 'It navigates somewhere', use: 'Link' },
-    { when: 'It is one of a set of mutually exclusive options', use: 'ButtonGroup' },
+    { when: 'It is one of a set of mutually exclusive options', use: 'ToggleButtonGroup' },
     { when: 'It is the primary action floating over content', use: 'Fab' },
     { when: 'It toggles a single on/off value', use: 'SwitchInput' },
   ],

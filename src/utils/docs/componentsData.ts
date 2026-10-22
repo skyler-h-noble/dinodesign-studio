@@ -40,7 +40,7 @@ export const STEPPER_DOC: ComponentDoc = {
   ],
   theming: [
     { collection: 'Theme', inCode: '`theme` / `surface` props, or `data-theme` on an ancestor.',
-      inFigma: 'Count Step and No-Count Step pin Theme on their variant ROOT; the Stepper set pins it on a nested Count Step. Both are candidates for a named `Theme-*` layer.' },
+      inFigma: 'Only No-Count Step pins a mode: `Theme=Primary`, on its variant root. Count Step and the Stepper set pin nothing and inherit. The step indicators are painted from Buttons, so the Buttons mode is what recolors them.' },
   ],
   tokens: [
     { name: '--Buttons-{Color}-Button', sets: 'a completed step', variesWith: 'theme + surface', figma: 'Buttons → Button' },
@@ -63,7 +63,7 @@ export const SLIDER_DOC: ComponentDoc = {
   summary: 'Picks a value from a range by dragging, where the exact number matters less than the feel of it.',
   insteadUse: [
     { when: 'The exact value matters', use: 'NumberField' },
-    { when: 'There are a few discrete options', use: 'RadioGroup or ButtonGroup' },
+    { when: 'There are a few discrete options', use: 'RadioGroup or ToggleButtonGroup' },
     { when: 'It is on or off', use: 'SwitchInput' },
   ],
   props: [
@@ -84,7 +84,7 @@ export const SLIDER_DOC: ComponentDoc = {
   ],
   theming: [
     { collection: 'Theme', inCode: '`theme` / `surface` props, or `data-theme` on an ancestor.',
-      inFigma: 'The Slider sets pin nothing and inherit.' },
+      inFigma: 'Set the Buttons mode, not Theme — the handle and both bar edges bind Buttons::Border. The Slider sets pin no color mode (the handles pin only Elevation) and take Buttons from where they sit.' },
   ],
   themingNotes: [
     'The thumb recolors on its own: it reads `--Border` and `--Background`, which are zone tokens, so moving the zone moves the thumb without the component knowing about themes.',

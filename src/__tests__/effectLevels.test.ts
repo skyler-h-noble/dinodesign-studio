@@ -115,23 +115,27 @@ describe('geometry — exponential inside a fixed envelope', () => {
      is 2px, runs the spread to -2.5px, and its middle layer pairs blur 1px
      with spread -1.2px. The caps only ever fired on the small levels, so they
      silently made the bottom of the ladder differ in kind from the top. */
-  it('runs the spread linearly to the full tuck-in on every level', () => {
+  /* No spread on any layer. Figma ignores spread on the unfilled, unclipped
+     frames components carry their shadows on, so the shadow every design was
+     drawn against is the spread-0 one; with Comeau's tuck-in, CSS pulled the
+     outer layer under the element and the Accordion's shadow vanished. */
+  it('has no spread on any layer of any level', () => {
     for (const l of LEVELS) {
-      const layers = shadowLayers(l);
-      expect(`L${l} first spread: ${layers[0][3]}`).toBe(`L${l} first spread: 0`);
-      const last = layers[layers.length - 1][3];
-      // Same outermost spread whatever the level's envelope — no cap.
-      expect(`L${l} last spread: ${last}`).toBe(`L${l} last spread: -2.5`);
+      for (const crispy of [0, 0.5, 1]) {
+        const spreads = shadowLayers(l, { ...SHADOW_DEFAULTS, crispy }).map((x) => x[3]);
+        expect(`L${l} crispy ${crispy}: ${spreads.join(',')}`).toBe(`L${l} crispy ${crispy}: ${spreads.map(() => 0).join(',')}`);
+      }
     }
   });
 
   /* His low tier at 3 layers, verbatim from the capture at Oomph 0.5 /
      Crispness 0.5. Written out longhand: a formula-derived expectation would
      move with the formula and prove nothing. */
-  it('reproduces his low tier layer for layer', () => {
+  // Offsets and blur still his low tier verbatim; the spread column is 0 (see above).
+  it('reproduces his low tier layer for layer, without the spread', () => {
     const rows = shadowLayers(1, { ...SHADOW_DEFAULTS, resolution: 1 })
       .map(([x, y, b, sp]) => `${x} ${y} ${b} ${sp}`);
-    expect(rows).toEqual(['0.3 0.5 0.6 0', '0.4 0.8 1 -1.2', '1 2 2.5 -2.5']);
+    expect(rows).toEqual(['0.3 0.5 0.6 0', '0.4 0.8 1 0', '1 2 2.5 0']);
   });
 
   // The stale copy that used to live in exportColorSystem.ts. If any of these

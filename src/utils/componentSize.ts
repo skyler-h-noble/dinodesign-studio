@@ -544,9 +544,19 @@ export const TOOLTIP_METRICS = {
   },
 } as const;
 
+/* The gap between a selection control and its Form-Label — ONE variable for
+   Checkbox Field, RadioField and SwitchField, so a form mixing the three puts
+   every label the same distance from its control. Bound in the file
+   2026-10-22 (it had been Sizing-Half on Checkbox, Sizing-1 / Sizing-Half on
+   Switch, Radio-Gap on Radio). Same literal as Checkbox-Gap and Radio-Gap. */
+export const LABEL_METRICS = {
+  'Label-Gap': SELECTION_GAP,
+} as const;
+
 export const SELECTION_METRICS = {
   ...RADIO_METRICS,
   ...CHECKBOX_METRICS,
+  ...LABEL_METRICS,
 } as const;
 
 
@@ -638,6 +648,7 @@ const SELECTION_METRIC_CSS: Record<string, string> = {
   'Checkbox-Radius': 'Checkbox-Radius',
   'Checkbox-Icon': 'Checkbox-Icon',
   'Checkbox-Gap': 'Checkbox-Gap',
+  'Label-Gap': 'Label-Gap',
 };
 
 /**
@@ -1036,6 +1047,8 @@ export function componentSizePayload(
          the nav metrics: the lib holds these as literals too, so writing them
          keeps one number in one place. */
       ...lineMetricsFlat(),
+      /* Other/Label-Gap — see LABEL_METRICS. */
+      ...flattenByMode(LABEL_METRICS as never),
     },
   });
 }

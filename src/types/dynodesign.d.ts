@@ -267,4 +267,20 @@ declare module '@omni-design/components' {
   export const ListItem: FC<any>;
   export const EmailTextField: FC<any>;
   export const BreadcrumbItem: FC<any>;
+
+  /* Chart color-vision sets (0.14.31, Charts/colorVision.js) — verified in the
+     published bundle before being declared here. Typed, not `any`: the studio
+     generator reads them. [light ground, dark ground] per color. */
+  type ChartColorPair = readonly [string, string];
+  export const CHART_COLOR_VISION: Record<
+    'red-weak' | 'red-blind' | 'green-weak' | 'green-blind' | 'blue-weak' | 'blue-blind' | 'blue-cone',
+    {
+      figma: string;
+      label: string;
+      series: readonly ChartColorPair[];
+      states: { Error: ChartColorPair; Warning: ChartColorPair; Success: ChartColorPair; Info: ChartColorPair };
+    }
+  >;
+  export const COLOR_VISIONS: ReadonlyArray<keyof typeof CHART_COLOR_VISION>;
+  export function chartColorVisionCSS(levels?: ReadonlyArray<'Surface-Brightest' | 'Surface-Dimmest'>): string;
 }

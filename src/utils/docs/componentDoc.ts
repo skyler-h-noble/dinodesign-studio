@@ -200,7 +200,9 @@ export function renderFigmaSection(
   }
 
   const onPage = componentsOnPage(link, mapping.page);
-  const byName = new Map(onPage.map(c => [c.name, c]));
+  // Keyed by BARE name: a set hidden with a leading "." or "_" (a building
+  // block like .Breadcrumb-Segments) is still the set the map names.
+  const byName = new Map(onPage.map(c => [c.name.replace(/^[._]/, ''), c]));
   if (!mapping.sets.length) {
     lines.push(`[${mapping.page}](${link.fileUrl}) — styles, not component sets.`);
     if (mapping.note) lines.push('', mapping.note);

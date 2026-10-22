@@ -163,6 +163,11 @@ describe('Figma Modes trim', () => {
     expect(M.Buttons.Info).toBeUndefined();
     expect(M.Buttons.Primary.Border).toBeUndefined();
     let n = 0; walk(M, [], () => n++);
-    expect(n).toBeLessThan(4300);
+    /* 4,400, up from 4,300 for Cell-Button (utils/cellButtons.ts): every theme
+       section's Default button as its own light/dark entry, so Figma gets the
+       per-cell tones the Advanced grid sets. ~190 variables after sharing the
+       page and bar entries with the theme sections they sit on. Figma's hard
+       limit is 5,000; this keeps ~600 of room. */
+    expect(n).toBeLessThan(4400);
   });
 });

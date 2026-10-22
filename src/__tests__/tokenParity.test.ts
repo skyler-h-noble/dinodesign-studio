@@ -55,6 +55,7 @@ const BUTTON_MAP: Record<string, string> = {
   secondary: 'secondary-fixed',
   tonal: 'tonal-fixed',
   laddered: 'laddered-fixed',
+  match: 'match-fixed',
   'black-white': 'black-white',
 };
 
@@ -94,6 +95,9 @@ function buildAll(scheme: ColorScheme, sel: UserSelections, mode: 'light' | 'dar
       button: (BUTTON_MAP[sel.button as string] ?? 'primary-fixed') as never,
       cardColoring: sel.cardColoring as never,
       textColoring: sel.textColoring as never,
+      // The tone fields, as generateDesignSystem passes them.
+      buttonTone: sel.buttonTone,
+      buttonCellTones: sel.buttonCellTones as never,
     },
   );
 
@@ -195,7 +199,10 @@ describe('preview ↔ export ↔ figma parity', () => {
   it.each(SELECTION_MATRIX)('$label — Default button fill agrees between preview and export', ({ sel }) => {
     const { previewCss, json } = buildAll(SCHEME, sel, 'light');
     const preview = norm(previewToken(previewCss, /\[data-theme="Brand"\]/, 'Buttons-Default-Button'));
-    const raw = at(json, 'Modes.Light-Mode.Default-Button.Default.Medium.Button');
+    // The Default theme's own button: since utils/cellButtons.ts, the page's
+    // Default button is Themes.Default.Surfaces.Buttons.Default, from the same
+    // function as the preview. The old Default-Button table no longer drives it.
+    const raw = at(json, 'Modes.Light-Mode.Themes.Default.Surfaces.Buttons.Default.Button');
     const exported = norm(resolveRef(
       typeof raw === 'string' ? raw : raw?.value ?? '',
       at(json, 'Modes.Light-Mode'),
@@ -212,12 +219,16 @@ describe('preview ↔ export ↔ figma parity', () => {
   // the *last* declaration won and dark buttons landed on the light tone.
   it.each(SELECTION_MATRIX)('$label — dark Default button agrees between preview and export', ({ sel }) => {
     const { previewCss, json } = buildAll(SCHEME, sel, 'dark');
-    const raw = at(json, 'Modes.Dark-Mode.Default-Button.Default.Medium.Button');
+    const raw = at(json, 'Modes.Dark-Mode.Themes.Default.Surfaces.Buttons.Default.Button');
     const exported = norm(resolveRef(
       typeof raw === 'string' ? raw : raw?.value ?? '',
       at(json, 'Modes.Dark-Mode'),
     ));
-    const preview = norm(previewToken(previewCss, /\[data-theme="Brand"\]/, 'Buttons-Default-Button'));
+    /* The PAGE block only — [data-theme="Brand"], [data-theme="Brand"][data-surface="Surface"].
+       A bare /\[data-theme="Brand"\]/ also matched the Surface-Bright block
+       written after it, so the reader took THAT block's button (a different
+       tone) and reported a divergence the CSS did not have. */
+    const preview = norm(previewToken(previewCss, /\[data-theme="Brand"\],\s*\[data-theme="Brand"\]\[data-surface="Surface"\]/, 'Buttons-Default-Button'));
     console.log(`  dark Default-Button  preview=${preview ?? '—'}  export=${exported ?? '—'}`);
     expect(preview).toBeTruthy();
     expect(exported).toBeTruthy();
@@ -340,7 +351,10 @@ describe('per-theme button parity', () => {
 
   // Guards the specific collapse that hid the bug: a surface-scoped mode must
   // actually differ across surfaces, or it has silently become a fixed mode.
-  it.each(['tonal', 'laddered'])('%s resolves to a different button per surface', (buttonMode) => {
+  // Match and Laddered pick the color FROM the surface, so each themed surface
+  // gets its own. ('tonal' used to be here: it meant "the surface's color" and
+  // now means Primary at the 3:1 tone — see utils/buttonChoice.ts.)
+  it.each(['match', 'laddered'])('%s resolves to a different button per surface', (buttonMode) => {
     const sel = {
       background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: buttonMode,
     } as UserSelections;
@@ -357,8 +371,15 @@ describe('per-theme button parity', () => {
     } as UserSelections;
     const { json } = buildAll(SCHEME, sel, 'light');
     const exportCss = (generateCSSFiles(json as never) as Record<string, string>)['Light-Mode.css'] ?? '';
-    const fills = THEMED.map((t) => norm(themeToken(exportCss, t, 'Buttons-Default-Button')));
+    // Except base on base: on its OWN palette's Surface the brand tone would be
+    // the background itself, so it steps one tone lighter (buildPreviewCSS,
+    // defaultButtonFor). Every other themed surface keeps the one fill.
+    const own = buttonMode === 'primary' ? 'Primary' : 'Secondary';
+    const fills = THEMED.filter((t) => t !== own).map((t) => norm(themeToken(exportCss, t, 'Buttons-Default-Button')));
     expect(new Set(fills).size, `${buttonMode} should not vary by surface`).toBe(1);
+    const ownFill = norm(themeToken(exportCss, own, 'Buttons-Default-Button'));
+    const ownBg = norm(themeToken(exportCss, own, 'Background'));
+    expect(ownFill, `${buttonMode} on its own surface must not be the background`).not.toBe(ownBg);
   });
 });
 
@@ -554,7 +575,9 @@ describe('the accessibility floor holds across brands', () => {
     console.log(`  accessibility sweep: ${checked} checks, floor ${worst.toFixed(2)} at ${worstAt}`);
     expect(checked, 'the sweep produced no checks at all').toBeGreaterThan(1000);
     expect(failures.slice(0, 10).join('\n'), `${failures.length} checks below their threshold`).toBe('');
-  });
+    // Dozens of full exports; each now also builds the preview twice for the
+    // shared Default-button rule. Under a parallel run that outlasts 5s.
+  }, 60_000);
 });
 
 describe('Text.Surfaces stays a reference table', () => {
@@ -649,4 +672,59 @@ describe('container levels: the preview and the export agree', () => {
     const { previewCss } = buildAll(SCHEME, SELECTION_MATRIX[0].sel, 'light');
     expect(previewCss).not.toMatch(/absence is the fix/);
   });
+});
+
+/* The Advanced tone grid promises the button Figma will get. Every one of its
+   twenty cells — a theme at a surface level — must be the button the export
+   writes into that theme section, in both modes, including a picked tone and a
+   per-cell Tonal. Both sides come from defaultButtonFor (utils/cellButtons.ts);
+   this checks the wiring, the backgrounds and the per-mode values agree. */
+describe('the Advanced grid is what the export writes', () => {
+  const SECTION: Record<string, string> = {
+    'Surface-Dimmest': 'Surfaces-Dimmest', 'Surface-Dim': 'Surfaces-Dim', 'Surface': 'Surfaces',
+    'Surface-Bright': 'Surfaces-Bright', 'Surface-Brightest': 'Surfaces-Brightest',
+  };
+  for (const mode of ['light', 'dark'] as const) {
+    it(`all twenty cells, ${mode}`, () => {
+      const sel = {
+        background: 'white', cardColoring: 'tonal', textColoring: 'tonal', button: 'match',
+        buttonTone: 'fixed', buttonCellTones: { 'Tertiary/Surface-Bright': 'tonal', 'Primary/Surface-Dim': 4 },
+      } as unknown as UserSelections;
+      const { json } = buildAll(SCHEME, sel, mode);
+      const modeName = mode === 'dark' ? 'Dark-Mode' : 'Light-Mode';
+      let cells: Array<{ theme: string; level: string; vars: Record<string, string> }> = [];
+      buildPreviewCSS({ colorScheme: SCHEME, userSelections: sel, componentStyle: 'modern', mode, typographyStyles: TYPOGRAPHY,
+        onButtonGrid: (c: typeof cells) => { cells = c; } } as never);
+      const M = at(json, `Modes.${modeName}`);
+      const wrong: string[] = [];
+      for (const c of cells) {
+        const sec = at(json, `Modes.${modeName}.Themes.${c.theme}.${SECTION[c.level]}`);
+        const bg = norm(resolveRef(sec?.Background?.value ?? '', M));
+        const btn = norm(resolveRef(sec?.Buttons?.Default?.Button?.value ?? '', M));
+        const border = norm(resolveRef(sec?.Buttons?.Default?.Border?.value ?? '', M));
+        const want = [norm(c.vars['--Background']), norm(c.vars['--Buttons-Default-Button']), norm(c.vars['--Buttons-Default-Border'])];
+        if (bg !== want[0] || btn !== want[1] || border !== want[2]) {
+          wrong.push(`${c.theme}/${c.level}: export bg ${bg} btn ${btn} border ${border} · grid bg ${want[0]} btn ${want[1]} border ${want[2]}`);
+        }
+      }
+      expect(wrong.join('\n')).toBe('');
+    });
+  }
+});
+
+describe("an outline button's resting label under Black & White text", () => {
+  // The label sits on the surface, so with black/white text its resting color
+  // IS the surface's Quiet — the composited solid, which is what Figma draws
+  // (Text at the Quiet opacity). The export used to write the raw quiet TONE
+  // here (Primary-5 where --Quiet was #7a6d57), so code and Figma disagreed on
+  // every outline and ghost button at rest.
+  for (const mode of ['light', 'dark'] as const) {
+    it(`Buttons-Default-Outline-Quiet equals --Quiet on the Default surface (${mode})`, () => {
+      const sel = { background: 'primary-light', button: 'secondary', buttonTone: 'fixed', cardColoring: 'tonal', textColoring: 'black-white' } as unknown as UserSelections;
+      const { css } = exportCssFor(SCHEME, sel, mode);
+      const quiet = norm(themeToken(css, 'Default', 'Quiet'));
+      expect(quiet).not.toBeNull();
+      expect(norm(themeToken(css, 'Default', 'Buttons-Default-Outline-Quiet'))).toBe(quiet);
+    });
+  }
 });

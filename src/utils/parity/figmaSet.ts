@@ -21,7 +21,7 @@ export interface FigmaPart {
   fill: string | null;
   effects: string[];
   /** TEXT parts only. */
-  font?: { size: number; family: string; weight: number; color: string | null };
+  font?: { size: number; family: string; weight: number; color: string | null; align?: string };
 }
 
 export interface FigmaVariant {
@@ -78,15 +78,22 @@ function partOf(node: any, origin?: { x: number; y: number }): FigmaPart {
     effects,
   };
   if (node.type === 'TEXT' && node.style) {
-    part.font = { size: node.style.fontSize, family: node.style.fontFamily, weight: node.style.fontWeight, color: fill ? figmaColor(fill.color, fill.opacity ?? 1) : null };
+    part.font = { size: node.style.fontSize, family: node.style.fontFamily, weight: node.style.fontWeight, color: fill ? figmaColor(fill.color, fill.opacity ?? 1) : null, align: node.style.textAlignHorizontal };
   }
   return part;
 }
 
+/** By layer name, in document order. The first copy is `name`; later copies
+ *  of a repeated layer (the segments of a group) are `name#2`, `name#3`… */
 function indexParts(node: any, into: Record<string, FigmaPart>, origin: { x: number; y: number }) {
   for (const c of node.children || []) {
     if (c.visible === false) continue;
     if (!into[c.name]) into[c.name] = partOf(c, origin);
+    else {
+      let k = 2;
+      while (into[`${c.name}#${k}`]) k++;
+      into[`${c.name}#${k}`] = partOf(c, origin);
+    }
     indexParts(c, into, origin);
   }
 }

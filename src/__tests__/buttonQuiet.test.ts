@@ -163,7 +163,12 @@ describe('button Quiet — the exported token', () => {
               for (const [pal, e] of Object.entries<any>(section.Buttons)) {
                 if (!e?.Quiet || !e.Text) continue;
                 const t = resolve(e.Text), q = resolve(e.Quiet);
-                if (t.startsWith('#') && q.startsWith('#')
+                /* A black or white label is exempt: on a Black/White face, and
+                   under Black & White text, the resting label is the same black
+                   or white as the active one by design — a grey rest label was
+                   the dark-mode white button's illegible grey text. */
+                const bw = (h: string) => ['#ffffff', '#1a1a1a', '#000000'].includes(h.slice(0, 7).toLowerCase());
+                if (t.startsWith('#') && q.startsWith('#') && !bw(t)
                     && t.slice(0, 7).toLowerCase() === q.slice(0, 7).toLowerCase()) {
                   same.push(`${tn}/${sn}/${pal} = ${t}`);
                 }
@@ -213,9 +218,12 @@ describe('button Quiet — the emitted CSS', () => {
   // copies per scope would be the duplication invariant 2 warns about: the
   // test for redundancy is not "do the copies match" but "does anything
   // select between them", and here nothing does.
-  it('emits --Outline-Quiet once per scope, never per palette', () => {
+  /* Default is the exception: its outline label is the BUTTON's palette at
+     its quiet tone under Tonal text (utils/cellButtons.ts), so a Secondary
+     outline reads Secondary — which one shared --Outline-Quiet cannot say. */
+  it('emits --Outline-Quiet once per scope, and per palette only for Default', () => {
     expect(bundle).toContain('--Outline-Quiet:');
-    for (const pal of PALETTES) {
+    for (const pal of PALETTES.filter((p) => p !== 'Default')) {
       expect(`${pal}: ${bundle.includes(`--Buttons-${pal}-Outline-Quiet:`)}`).toBe(`${pal}: false`);
     }
   });

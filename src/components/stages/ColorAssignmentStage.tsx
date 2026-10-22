@@ -1,13 +1,18 @@
 import {
-  Button, H2, H3, Body, BodySmall, VStack, HStack, Card, ButtonGroup, Select, Link, Modal, Checkbox,
+  Button, H2, H3, Body, BodySmall, Overline, Divider, VStack, HStack, Card, ToggleButtonGroup, Select, Link, Modal, Checkbox,
 } from '@omni-design/components';
 import chroma from 'chroma-js';
+import { resolveButtonChoice, type ButtonColor, type ButtonTone } from '../../utils/buttonChoice';
+import { ButtonToneGrid } from '../ButtonToneGrid';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useState, useRef } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';
 import {
   BACKGROUND_THEMES, BAR_THEMES, SURFACE_LEVELS, parseBackground, formatBackground,
   parseBar,
   legacyName, toneFor, type BackgroundSelection,
+  barToneFor,
 } from '../../utils/backgroundSelection';
 import PhonePreview from '../PhonePreview';
 import '../../styles/assign-colors.css';
@@ -29,14 +34,20 @@ interface Props extends StageProps {
 
 /** A bar's stored value: a legacy string, or 'Theme/Surface-Level'. */
 type NavOption = string;
-type ButtonMode = 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
-
-const BUTTON_MODES: { value: ButtonMode; label: string }[] = [
+/* The Default button is a COLOR plus a TONE (utils/buttonChoice.ts). Tonal
+   used to sit in this row as a fifth color; it is a tone, and Primary,
+   Secondary and Laddered each take it. */
+const BUTTON_MODES: { value: ButtonColor; label: string }[] = [
   { value: 'primary', label: 'Primary' },
   { value: 'secondary', label: 'Secondary' },
-  { value: 'tonal', label: 'Tonal' },
+  { value: 'match', label: 'Match' },
   { value: 'laddered', label: 'Laddered' },
   { value: 'black-white', label: 'Black/White' },
+];
+
+const BUTTON_TONES: { value: ButtonTone; label: string }[] = [
+  { value: 'fixed', label: 'Fixed' },
+  { value: 'tonal', label: 'Tonal' },
 ];
 
 /** Short labels for the surface row. The stored names are long enough that
@@ -91,6 +102,7 @@ export default function ColorAssignmentStage({
   const [activeTab, setActiveTab] = useState<'preview' | 'customize'>('customize');
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
   const [showButtonInfo, setShowButtonInfo] = useState(false);
+  const [showButtonAdvanced, setShowButtonAdvanced] = useState(Boolean(userSelections.buttonCellTones && Object.keys(userSelections.buttonCellTones).length));
   const colors = colorScheme?.colors || ['#666', '#999', '#ccc'];
   const palettes = colorScheme?.tonePalettes;
   const PC = toneToColorNumber(colorScheme?.extractedTones?.primary || 60);
@@ -108,6 +120,7 @@ export default function ColorAssignmentStage({
     () => userSelections.status === userSelections.appBar && userSelections.appBar === userSelections.navBar,
   );
 
+  const buttonChoice = resolveButtonChoice(userSelections.button, userSelections.buttonTone);
   const update = (partial: Partial<UserSelections>) => {
     onSelectionsChanged({ ...userSelections, ...partial });
   };
@@ -188,7 +201,7 @@ export default function ColorAssignmentStage({
         : sel.theme === 'Neutral' ? null
           : p;
     const core = sel.theme === 'Secondary' ? SC : sel.theme === 'Tertiary' ? TC : PC;
-    const n = toneFor(sel.theme, sel.surface, core);
+    const n = barToneFor(sel.theme, sel.surface, core);
     return ramp === null ? neutral(n) : (ramp[n - 1]?.hex || '#ccc');
   };
 
@@ -238,14 +251,14 @@ export default function ColorAssignmentStage({
         {/* ─── Left: Preview ─── */}
         <div className={`assign-colors-preview ${activeTab !== 'preview' ? 'hidden' : ''}`}>
           <div className="assign-preview-toggle">
-            <ButtonGroup
+            <ToggleButtonGroup
               size="small"
               value={previewMode}
-              onChange={(val: 'light' | 'dark') => setPreviewMode(val)}
+              onChange={(val: 'light' | 'dark') => val && setPreviewMode(val)}
             >
               <Button value="light" size="small">Light</Button>
               <Button value="dark" size="small">Dark</Button>
-            </ButtonGroup>
+            </ToggleButtonGroup>
           </div>
 
           <div className="assign-preview-container">
@@ -458,52 +471,106 @@ export default function ColorAssignmentStage({
             {BUTTON_MODES.map(mode => (
               <Button
                 key={mode.value}
-                variant={userSelections.button === mode.value ? 'default' : 'outline'}
+                variant={buttonChoice.color === mode.value ? 'default' : 'outline'}
                 size="small"
-                onClick={() => update({ button: mode.value })}
+                onClick={() => update({ button: mode.value, buttonTone: buttonChoice.tone })}
                 style={{ flex: '1 1 100px', minWidth: 0 }}
               >
                 {mode.label}
               </Button>
             ))}
           </div>
+          {buttonChoice.color !== 'black-white' && (
+            <ToggleButtonGroup
+              value={buttonChoice.tone}
+              onChange={(v: ButtonTone) => v && update({ button: buttonChoice.color, buttonTone: v })}
+              size="small"
+            >
+              {BUTTON_TONES.map(tone => (
+                <Button key={tone.value} value={tone.value} size="small">{tone.label}</Button>
+              ))}
+            </ToggleButtonGroup>
+          )}
+
+          {/* Advanced: the tone on every background at every surface level,
+              shown as the real button on the real background. Color stays
+              the main choice; a cell can change only its tone. */}
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={() => setShowButtonAdvanced(!showButtonAdvanced)}
+            aria-expanded={showButtonAdvanced}
+            startIcon={showButtonAdvanced ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {showButtonAdvanced ? 'Hide advanced' : 'Advanced: tone per background'}
+          </Button>
+          {showButtonAdvanced && colorScheme && (
+            <VStack spacing={2} style={{ width: '100%' }}>
+              <BodySmall color="quiet">
+                Every background at every surface level, with the button it gets. The color comes from your choice above; change the tone in any cell where it does not look right.
+              </BodySmall>
+              <ButtonToneGrid
+                colorScheme={colorScheme}
+                userSelections={userSelections}
+                onChange={(buttonCellTones) => update({ buttonCellTones })}
+              />
+            </VStack>
+          )}
         </VStack>
       </Card>
 
       {/* Button Modes Info Modal */}
-      <Modal open={showButtonInfo} onClose={() => setShowButtonInfo(false)} title="Button Color Modes">
+      <Modal open={showButtonInfo} onClose={() => setShowButtonInfo(false)} title="Default Buttons">
         <VStack spacing={3} style={{ maxWidth: 520 }}>
+          <BodySmall color="quiet">
+            Default buttons are two choices: a color, then a tone. The color decides which palette the button uses on each background. The tone decides how the button meets the 3:1 contrast it needs against that background.
+          </BodySmall>
+          <Overline>Color</Overline>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Primary</H3>
-            <BodySmall color="quiet">
-              Buttons use your primary theme color. On primary-tinted backgrounds, the border tone is used instead to maintain contrast.
-            </BodySmall>
+            <BodySmall color="quiet">Buttons use your primary color on every background.</BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Secondary</H3>
-            <BodySmall color="quiet">
-              Buttons use your secondary theme color, creating a complementary accent against primary surfaces and navigation.
-            </BodySmall>
+            <BodySmall color="quiet">Buttons use your secondary color on every background, an accent against primary surfaces and navigation.</BodySmall>
           </VStack>
           <VStack spacing={1}>
-            <H3 style={{ fontSize: '1rem' }}>Tonal</H3>
+            <H3 style={{ fontSize: '1rem' }}>Match</H3>
             <BodySmall color="quiet">
-              Buttons use the primary border tone — a mid-range shade from your palette that has verified 3:1 contrast against the surface background.
+              The button takes the background's own color: primary buttons on primary backgrounds, secondary on secondary, tertiary on tertiary, and primary on neutral.
             </BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Laddered</H3>
             <BodySmall color="quiet">
-              Primary actions use the secondary color, secondary actions use tertiary, and so on — creating a visual hierarchy that cascades through your palette.
+              The color steps one along from the background: secondary buttons on primary backgrounds, tertiary on secondary, and primary on tertiary and neutral.
             </BodySmall>
           </VStack>
           <VStack spacing={1}>
             <H3 style={{ fontSize: '1rem' }}>Black/White</H3>
             <BodySmall color="quiet">
-              Buttons are pure black on light backgrounds and pure white on dark backgrounds. In dark mode, this automatically switches to Laddered to preserve usability.
+              Black buttons on light backgrounds and white buttons on dark ones, in both light and dark mode. There is no tone to pick.
             </BodySmall>
           </VStack>
-          <Button variant="primary-outline" size="small" onClick={() => setShowButtonInfo(false)} style={{ alignSelf: 'flex-end' }}>
+          <Divider />
+          <Overline>Tone</Overline>
+          <BodySmall color="quiet">
+            Primary, Secondary, Match and Laddered each come in Fixed or Tonal.
+          </BodySmall>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Fixed</H3>
+            <BodySmall color="quiet">
+              The button keeps your brand tone everywhere, so it looks the same on every background. Its border changes tone to keep 3:1 contrast with the background.
+            </BodySmall>
+          </VStack>
+          <VStack spacing={1}>
+            <H3 style={{ fontSize: '1rem' }}>Tonal</H3>
+            <BodySmall color="quiet">
+              The same color, but the button moves to the tone that has 3:1 contrast with the background it sits on, so the button itself stands out, not just its border. It gets lighter on dark backgrounds and darker on light ones.
+            </BodySmall>
+          </VStack>
+          <Button variant="outline" size="small" onClick={() => setShowButtonInfo(false)} style={{ alignSelf: 'flex-end' }}>
             Close
           </Button>
         </VStack>

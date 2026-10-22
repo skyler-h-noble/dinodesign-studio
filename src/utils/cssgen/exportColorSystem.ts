@@ -1,4 +1,5 @@
 // Button logic update - OB=8 when PC>=9 - 12-tone scale
+import { applyCellButtons } from '../cellButtons';
 import { blendColors } from '../colorScale';
 import type { NavSelection } from './generateCompleteThemes';
 import { nearestAvailableWeight } from '../googleFontWeights';
@@ -23,7 +24,7 @@ import { calculateDefaultThemeSettings, getSelectionName, applyUserSelections } 
 import { generateAllButtonsForMode } from './generateButtons';
 import { generateCompleteButtonSystem } from './generateButtonsSimplified';
 import { generateCompleteSimplifiedSystem } from './completeSimplifiedSystem';
-import { parseBar, parseBackground, toneFor } from '../backgroundSelection';
+import { parseBar, parseBackground, toneFor, barToneFor } from '../backgroundSelection';
 
 import { STATE_THEME_TONE } from '../themes';
 
@@ -2746,7 +2747,7 @@ function generateModesThemes(
     const parsed = parseBar(selection);
     if (selection.includes('/')) {
       const core = parsed.theme === 'Secondary' ? SC : parsed.theme === 'Tertiary' ? TC : PC;
-      return { theme: parsed.theme, n: toneFor(parsed.theme, parsed.surface, core) };
+      return { theme: parsed.theme, n: barToneFor(parsed.theme, parsed.surface, core) };
     }
     return { theme: defaultTheme, n: defaultN };
   };
@@ -3344,7 +3345,11 @@ export function exportColorSystemToJSON(
     appBar?: NavSelection;
     navBar?: NavSelection;
     status?: NavSelection;
-    button?: 'primary-adaptive' | 'primary-fixed' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed' | 'black-white';
+    button?: 'primary-adaptive' | 'primary-fixed' | 'secondary-adaptive' | 'secondary-fixed' | 'tonal-adaptive' | 'tonal-fixed' | 'laddered-adaptive' | 'laddered-fixed' | 'match-fixed' | 'black-white';
+    /** The Default button's tone and per-cell tones (utils/buttonChoice.ts),
+     *  read by applyCellButtons. */
+    buttonTone?: 'fixed' | 'tonal';
+    buttonCellTones?: Partial<Record<string, 'fixed' | 'tonal' | number>>;
     cardColoring?: 'tonal' | 'white' | 'black';
     /** Read below; declared in defaultThemeLogic.ts, which carries the legacy
      *  string form alongside the union. */
@@ -7593,6 +7598,19 @@ export function exportColorSystemToJSON(
     }
   }
   console.log(`🚦 [JSON Export] State backgrounds: ${redirectedButtons} button palettes redirected to their own state`);
+
+  /* The Default button on every theme section, from the same function the
+     preview and the Advanced tone grid use — see utils/cellButtons.ts. Last,
+     so nothing above rewrites it. */
+  const cellButtons = applyCellButtons(colorSystem, {
+    tonePalettes: tonePalettes as never,
+    darkModeTonePalettes: darkModeTonePalettes as never,
+    extractedTones,
+    userSelections: { ...(userSelections ?? {}) } as never,
+    computeHighlight,
+    computeLowlight,
+  });
+  console.log(`🔘 [JSON Export] Default buttons from the shared rule: ${cellButtons} theme sections`);
 
   console.log('✅ [JSON Export] Color system export complete!');
   return colorSystem;

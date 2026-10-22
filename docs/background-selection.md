@@ -123,3 +123,24 @@ variables is recoverable; **deleting them is not** (invariant 8), so do not
 
 - [Container logic](container-logic.md) — what sits *on* these backgrounds.
 - [Design system architecture](design-system-architecture.md).
+
+## Bars use the theme's levels, not this grid
+
+The App Bar, Nav Bar and Status Bar pickers use the same Theme × level
+vocabulary, but **not** this grid's tones. A bar's level is the theme's own
+surface level of that name — `surfaceWindow` (Dim = core − 1, Bright = core + 1,
+Dimmest / Brightest anchored) — via `barToneFor` in `backgroundSelection.ts`.
+
+Why: a bar is published to Figma as a Theme mode plus a Surface mode, and Figma
+can only show a tone some surface level actually has. On this grid Popsicles'
+"Tertiary · Bright" was tone 9, which no Tertiary level uses (3 / 5 / 6 / 7 / 11),
+so code drew a light blue no Figma setting could reproduce. Decided 2026-10-20.
+
+The page background keeps this grid; only bars changed.
+
+Neutral bars read Neutral's **locked** window — black / 9 / 10 / 11 / white
+(`neutralSurfaceWindow`) — which is what the export's Neutral theme paints. They
+briefly kept this grid's Neutral ladder, so "Neutral · Base" was a mid grey in
+the studio and a near-white in Figma. The Advanced button-tone grid uses the
+same ladders, and `tokenParity.test.ts` checks all twenty of its cells against
+the export in both modes.

@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { generateAllThemesWithSurfacesAndContainers } from '../utils/cssgen/generateCompleteThemes';
-import { toneFor } from '../utils/backgroundSelection';
+import { toneFor, barToneFor } from '../utils/backgroundSelection';
 
 /* The mapper is module-private, so this drives the real entry point and
    asserts on the themes that come out — which is the thing that was broken,
@@ -41,16 +41,18 @@ describe('the Theme/Level vocabulary resolves', () => {
     }
   });
 
-  it('paints a Theme/Level pick at the background-selection grid\'s tone, as the preview does', () => {
-    /* "Tertiary/Surface-Bright" is the grid's tone — the midpoint of the
-       theme's core and 11 (docs/background-selection.md) — not the theme's
-       own component level of that name. This used to promote the component
-       level, so Popsicles' bar exported at tone 7 while the preview, which
-       reads the grid, showed tone 9. Both now go through toneFor. */
+  it('paints a Theme/Level pick at the theme\'s own level of that name', () => {
+    /* "Tertiary/Surface-Bright" is the theme's Surface-Bright — the core + 1
+       (surfaceWindow) — not the background grid's midpoint of the core and 11.
+       A bar is published to Figma as Theme × Surface modes, and Figma can only
+       show a tone some level has: at the grid's tone 9, Popsicles' bar was a
+       light blue in code that no Figma setting could match (its Tertiary ·
+       Surface-Bright is tone 7). Decided 2026-10-20: bars use the theme levels. */
     const t = themesFor({ appBar: 'Tertiary/Surface-Bright' }) as never as
       Record<string, { Surfaces: { Background: { value: string } } }>;
     const core = Number(/Background-(\d+)/.exec(t['Tertiary'].Surfaces.Background.value)![1]);
-    const n = toneFor('Tertiary', 'Surface-Bright', core);
+    const n = barToneFor('Tertiary', 'Surface-Bright', core);
+    expect(n).toBe(core + 1);
     expect(t['App-Bar'].Surfaces.Background.value).toBe(`{Backgrounds.Tertiary.Background-${n}.Surfaces.Surface}`);
     // And it is brighter than the theme's base, as a Bright pick must be.
     expect(n).toBeGreaterThan(core);

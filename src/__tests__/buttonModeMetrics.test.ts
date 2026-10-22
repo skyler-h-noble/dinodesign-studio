@@ -141,7 +141,8 @@ describe('mode-scoped button metrics', () => {
     const d = derivedTextMetrics(HEIGHTS);
     expect(d['Button-Text']).toEqual({ medium: 16, small: 14, large: 20 });
     expect(d['Avatar-Text']).toEqual({ medium: 14, small: 12, large: 18 });
-    expect(d['Button-Icon-Only']).toEqual({ medium: 24, small: 16, large: 40 });
+    // Button-Icon-Only is retired: an icon-only button uses Button-Icon.
+    expect(d['Button-Icon-Only']).toBeUndefined();
     // The two values that deliberately differ from the design's table.
     // Button-Numbers medium: design 14, the shared text slope puts it at 12.
     // Button-Icon small:     design 20, the icon ramp puts it at 16.
@@ -165,7 +166,7 @@ describe('mode-scoped button metrics', () => {
     for (const hs of [HEIGHTS, { buttonHeight: 40, smallButtonHeight: 28, largeButtonHeight: 64 },
                       { buttonHeight: 100, smallButtonHeight: 12, largeButtonHeight: 200 }]) {
       const d = derivedTextMetrics(hs);
-      for (const name of ['Button-Icon', 'Button-Icon-Only']) {
+      for (const name of ['Button-Icon']) {
         for (const k of ['medium', 'small', 'large'] as const) {
           expect(ICON_RAMP, `${name}.${k}`).toContain(d[name][k]);
         }

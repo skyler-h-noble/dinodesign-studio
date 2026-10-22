@@ -102,7 +102,16 @@ export interface UserSelections {
   appBar: string;
   navBar: string;
   status: string;
-  button: 'primary' | 'secondary' | 'tonal' | 'laddered' | 'black-white';
+  /** The Default button's COLOR. 'tonal' is a legacy value, read as
+   *  primary + buttonTone 'tonal' (see utils/buttonChoice.ts). */
+  button: 'primary' | 'secondary' | 'match' | 'tonal' | 'laddered' | 'black-white';
+  /** Fixed keeps the brand tone; Tonal moves it to 3:1 against each surface.
+   *  Ignored for black-white. Absent on older systems, which read as fixed. */
+  buttonTone?: 'fixed' | 'tonal';
+  /** Advanced: the tone for one background at one surface level, keyed
+   *  'Theme/Surface-Level': Fixed, Tonal, or a picked tone 1–12. Only cells
+   *  that differ from buttonTone are stored. */
+  buttonCellTones?: Partial<Record<string, 'fixed' | 'tonal' | number>>;
   cardColoring: 'tonal' | 'white' | 'black';
   textColoring: 'tonal' | 'black-white';
   decorativeMode: 'surface-components' | 'only-selected';

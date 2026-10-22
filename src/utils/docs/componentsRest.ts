@@ -141,7 +141,7 @@ export const CODE_BLOCK_DOC: ComponentDoc = {
   theming: [
     { collection: 'Theme',
       inCode: 'None to set. The root declares `data-theme="Neutral"` + `data-surface="Surface-Dimmest"` itself, so the dark region follows the brand\'s own neutrals.',
-      inFigma: 'The component pins the same pair. Change the Neutral ramp, not this component, to move it.' },
+      inFigma: 'Both variant roots pin `Theme=Neutral` and `Surface=Surface-Dimmest`. That dark region is the brand\'s own neutrals, not a hardcoded color, which is why the block stays legible in light and dark. To move it, change the Neutral ramp rather than these pins.' },
   ],
   tokens: [
     surfaceToken('--Background', 'the dark code region — via Surface-Dimmest'),
@@ -279,7 +279,7 @@ export const REST_DOCS: ComponentDoc[] = [
   undesigned('Toolbar',
     'A row of actions belonging to a region or a selection.',
     [{ when: 'It is the top-level application bar', use: 'AppBar' },
-     { when: 'It is one set of exclusive choices', use: 'ButtonGroup' }],
+     { when: 'It is one set of exclusive choices', use: 'ToggleButtonGroup' }],
     [{ name: 'items', type: 'array', default: '[]' },
      { name: 'type', type: 'string', values: ['floating', 'docked'], default: 'floating' },
      { name: 'orientation', type: 'string', values: ['horizontal', 'vertical'], default: 'horizontal' },
