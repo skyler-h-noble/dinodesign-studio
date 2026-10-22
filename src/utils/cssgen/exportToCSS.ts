@@ -3751,10 +3751,10 @@ export function generateModeCSSFile(jsonData: DesignSystem, modeName: string): s
  *
  * This MIRRORS the Figma Chart collection, which is what the Charts add-on's
  * Figma build paints with, so the code and the Figma chart agree:
- *   Chart-1..4   the brand four alias the Icons on that surface —
- *                .Theme/Surface-{ground}/Icons/{Primary,Secondary,Tertiary,Neutral}
- *                in Figma, var(--Icons-*) here, which resolves per surface the
- *                same way.
+ *   Chart-1..4   the brand four at their SOLVED tones (solveChartPalette
+ *                writes all ten), the same values Figma's .Modes/Chart/{ground}
+ *                carries. They were var(--Icons-*), the solver's rejected first
+ *                approach, while 5..10 were solved around different picks.
  *   Chart-5..10  the solved palette — the SAME solveChartPalette() result the
  *                Figma payload writes to .Modes/Chart/{ground}/Color-N.
  *   Chart-Lines  Border-Variant on that surface. Gridlines are decorative, so
@@ -3779,7 +3779,16 @@ export function chartGroundCSS(jsonData: any, modeName: string): string {
     const g = grounds[level];
     if (!g) continue;
     out.push(`[data-surface="${level}"] {`);
-    BRAND_ICONS.forEach((icon, i) => out.push(`  --Chart-${i + 1}: var(--Icons-${icon});`));
+    /* Chart-1..4 are the SOLVED brand tones, like 5..10 — not the surface's
+       Icons. The solver arranges 5..10 around its own brand picks (its notes:
+       Icons "tune for icon contrast", which drives a light ground dark and
+       collapsed Primary/Tertiary to dE 1.8), so drawing the Icons here showed
+       a set nobody solved for. The Icon is the fallback only when the solver
+       left a brand series out. */
+    BRAND_ICONS.forEach((icon, i) => {
+      const hex = g[`Color-${i + 1}`]?.value;
+      out.push(`  --Chart-${i + 1}: ${hex || `var(--Icons-${icon})`};`);
+    });
     for (let n = 5; n <= 10; n++) {
       const hex = g[`Color-${n}`]?.value;
       if (hex) out.push(`  --Chart-${n}: ${hex};`);

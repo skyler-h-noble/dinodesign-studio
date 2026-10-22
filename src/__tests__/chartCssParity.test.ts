@@ -63,11 +63,17 @@ describe('chart colors: CSS mode sheets == Figma payload', () => {
         }
       });
 
-      it(`${mode} / ${level}: the brand four follow that surface's Icons, as the Figma Chart collection does`, () => {
+      /* The brand four are the SOLVED tones too, as the Figma Chart collection
+         now links them (.Modes/Chart/{ground}/Color-1..4). They were the
+         surface's Icons — the solver's rejected first approach — while 5..10
+         were solved around different brand picks, so the drawn set was one
+         nobody had solved for (Surf's Up: closest pair 2.9 drawn vs 3.8 solved). */
+      it(`${mode} / ${level}: the brand four are the payload's solved hexes`, () => {
         const decl = rule(css, level);
-        expect([1, 2, 3, 4].map((n) => decl[`--Chart-${n}`])).toEqual([
-          'var(--Icons-Primary)', 'var(--Icons-Secondary)', 'var(--Icons-Tertiary)', 'var(--Icons-Neutral)',
-        ]);
+        const payload = figma.Modes[mode].Chart[level];
+        for (const n of [1, 2, 3, 4]) {
+          expect(decl[`--Chart-${n}`], `${mode}/${level}/Chart-${n}`).toBe(payload[`Color-${n}`].value);
+        }
         expect(decl['--Chart-Lines']).toBeDefined();
         // The state four follow it too — Chart/Colors/{State} aliases Icons/{State}.
         expect(['Info', 'Success', 'Warning', 'Error'].map((st) => decl[`--Chart-${st}`])).toEqual([
