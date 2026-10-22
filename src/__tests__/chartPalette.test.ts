@@ -208,3 +208,16 @@ describe('a tone must satisfy BOTH modes ramps', () => {
       .toBeGreaterThan(0);
   });
 });
+
+/* The solver's colour difference is CIEDE2000, checked against chroma-js. */
+import { chartDeltaE } from '../utils/chartPalette';
+import chromaForDE from 'chroma-js';
+describe('chart solver colour difference is CIEDE2000', () => {
+  // 0.1: the two Lab conversions round differently (white vs blue differs by 0.053).
+  it('matches chroma-js deltaE within 0.1 on varied pairs', () => {
+    const hexes = ['#2d454c', '#2a2f38', '#b87d6e', '#475c49', '#a480a9', '#6a4f5f', '#1656b8', '#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff', '#888888', '#d4941a', '#3b82f6'];
+    for (const a of hexes) for (const b of hexes) {
+      expect(Math.abs(chartDeltaE(a, b) - chromaForDE.deltaE(a, b)), `${a} vs ${b}`).toBeLessThan(0.1);
+    }
+  });
+});

@@ -26,6 +26,8 @@ export type Ramp = Record<number, string>;
 export interface ChartSolveInput {
   /** every palette's ramp for ONE mode, e.g. { Primary: {1:'#..',...}, ... } */
   ramps: Record<string, Ramp>;
+  /** also offer the generated hues half-step tones (rampForHue's halfSteps) */
+  halfSteps?: boolean;
   /**
    * The OTHER mode's ramps. A tone is only usable if it satisfies the contrast
    * and chroma rules in BOTH, because the tone is shared across modes and each
@@ -168,13 +170,43 @@ export const hueArc = (a: number, b: number) => {
   return d > 180 ? 360 - d : d;
 };
 
-/** CIE76 is enough here: the comparisons are between saturated, well-separated
- *  colors where CIEDE2000's corrections are small, and keeping it dependency-
- *  free keeps this module unit-testable without chroma-js. */
+/** CIEDE2000, dependency-free so this module stays unit-testable without
+ *  chroma-js (chartPalette.test checks it against chroma's implementation).
+ *
+ *  It was CIE76, on the reasoning that chart colours are saturated and well
+ *  separated, where CIEDE2000's corrections are small. On a LIGHT chart ground
+ *  they are neither: 3:1 forces every series below L* ~59, so the set is dark
+ *  and muted, and that is where CIE76 overstates a difference. It rated Surf's
+ *  Up's Chart-7 / Chart-8 (#2d454c slate, #2a2f38 near-black) as distinct
+ *  enough; a red-green colour-blind reader got 5.8. */
 function deltaE(a: string, b: string): number {
-  const A = rgbToLab(a), B = rgbToLab(b);
-  return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
+  const [L1, a1, b1] = rgbToLab(a), [L2, a2, b2] = rgbToLab(b);
+  const rad = Math.PI / 180;
+  const C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2);
+  const Cb7 = ((C1 + C2) / 2) ** 7;
+  const G = 0.5 * (1 - Math.sqrt(Cb7 / (Cb7 + 25 ** 7)));
+  const a1p = (1 + G) * a1, a2p = (1 + G) * a2;
+  const C1p = Math.hypot(a1p, b1), C2p = Math.hypot(a2p, b2);
+  const hue = (x: number, y: number) => (x === 0 && y === 0 ? 0 : ((Math.atan2(y, x) / rad) + 360) % 360);
+  const h1p = hue(a1p, b1), h2p = hue(a2p, b2);
+  const dLp = L2 - L1, dCp = C2p - C1p;
+  let dhp = 0;
+  if (C1p * C2p !== 0) { dhp = h2p - h1p; if (dhp > 180) dhp -= 360; else if (dhp < -180) dhp += 360; }
+  const dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin((dhp / 2) * rad);
+  const Lbp = (L1 + L2) / 2, Cbp = (C1p + C2p) / 2;
+  let hbp = h1p + h2p;
+  if (C1p * C2p !== 0) hbp = Math.abs(h1p - h2p) <= 180 ? (h1p + h2p) / 2 : (h1p + h2p < 360 ? (h1p + h2p + 360) / 2 : (h1p + h2p - 360) / 2);
+  const T = 1 - 0.17 * Math.cos((hbp - 30) * rad) + 0.24 * Math.cos(2 * hbp * rad) + 0.32 * Math.cos((3 * hbp + 6) * rad) - 0.2 * Math.cos((4 * hbp - 63) * rad);
+  const dTheta = 30 * Math.exp(-(((hbp - 275) / 25) ** 2));
+  const Cbp7 = Cbp ** 7;
+  const Rc = 2 * Math.sqrt(Cbp7 / (Cbp7 + 25 ** 7));
+  const Sl = 1 + (0.015 * (Lbp - 50) ** 2) / Math.sqrt(20 + (Lbp - 50) ** 2);
+  const Sc = 1 + 0.045 * Cbp, Sh = 1 + 0.015 * Cbp * T;
+  const Rt = -Math.sin(2 * dTheta * rad) * Rc;
+  return Math.sqrt((dLp / Sl) ** 2 + (dCp / Sc) ** 2 + (dHp / Sh) ** 2 + Rt * (dCp / Sc) * (dHp / Sh));
 }
+/** Exposed for the test that checks it against chroma-js. */
+export const chartDeltaE = deltaE;
 
 /* Machado 2009, severity 1.0, applied in linear RGB. CVD matters for the
  * LEGEND — adjacent segments are separated by a border in --Chart-BG, which
@@ -225,13 +257,24 @@ const pairScore = (a: string, b: string) =>
   isOrdinalPair(a, b) ? Math.min(separation(a, b), ORDINAL_CAP) : separation(a, b);
 
 /** a 12-tone ramp at `hue`, borrowing `profile`'s lightness and chroma */
-export function rampForHue(hue: number, profile: Ramp): Ramp {
+export function rampForHue(hue: number, profile: Ramp, halfSteps = false): Ramp {
   const out: Ramp = {};
   for (let n = 1; n <= 12; n++) {
     const src = profile[n];
     if (!src) continue;
     const [L, C] = lch(src);
     out[n] = fromLch(L, C, hue);
+    /* Optional HALF steps, at the midpoint of a tone and the next in lightness
+       and chroma. The ladder jumps L 37 -> 58 between t5 and t6 — the band a
+       light-ground chart lives in (3:1 caps it near L 59) — so on whole tones
+       the solver could only separate generated hues by pushing them darker.
+       Offered to the solver as an alternative, never forced: see
+       solveChartPalette, which keeps them only where they measurably help. */
+    const next = halfSteps ? profile[n + 1] : undefined;
+    if (next) {
+      const [L2, C2] = lch(next);
+      out[n + 0.5] = fromLch((L + L2) / 2, (C + C2) / 2, hue);
+    }
   }
   return out;
 }
@@ -352,16 +395,17 @@ export interface GroundSolution {
  */
 export function solveGround(input: ChartSolveInput): GroundSolution {
   const { ramps, grounds, hues, profile, altRamps } = input;
+  const halfSteps = !!input.halfSteps;
   const series: Record<string, Ramp> = {};
   const altSeries: Record<string, Ramp> = {};
   if (altRamps) {
     const altProfile = altRamps.Primary || altRamps.Neutral;
     for (const n of BRAND_SERIES) if (altRamps[n]) altSeries['Chart-' + n] = altRamps[n];
-    if (altProfile) hues.forEach((h, i) => { altSeries['Chart-' + (i + 5)] = rampForHue(h, altProfile); });
+    if (altProfile) hues.forEach((h, i) => { altSeries['Chart-' + (i + 5)] = rampForHue(h, altProfile, halfSteps); });
     for (const n of STATE_SERIES) if (altRamps[n]) altSeries['Chart-State-' + n] = altRamps[n];
   }
   for (const n of BRAND_SERIES) if (ramps[n]) series['Chart-' + n] = ramps[n];
-  hues.forEach((h, i) => { series['Chart-' + (i + 5)] = rampForHue(h, profile); });
+  hues.forEach((h, i) => { series['Chart-' + (i + 5)] = rampForHue(h, profile, halfSteps); });
   for (const n of STATE_SERIES) if (ramps[n]) series['Chart-State-' + n] = ramps[n];
 
   const names = Object.keys(series);
@@ -373,7 +417,9 @@ export function solveGround(input: ChartSolveInput): GroundSolution {
   for (const n of names) {
     const passing: number[] = [];
     const vivid: number[] = [];
-    for (let t = TONE_BAND[0]; t <= TONE_BAND[1]; t++) {
+    // With halfSteps the generated hues also have t + 0.5; a brand ramp has
+    // no entry there and is skipped, as before.
+    for (let t = TONE_BAND[0]; t <= TONE_BAND[1]; t += halfSteps ? 0.5 : 1) {
       const hex = series[n][t];
       if (!hex) continue;
       if (worstContrast(hex) < MIN_CONTRAST) continue;
@@ -456,6 +502,10 @@ export function solveGround(input: ChartSolveInput): GroundSolution {
     let pair: [string, string] | null = null;
     for (let i = 0; i < live.length; i++)
       for (let j = i + 1; j < live.length; j++) {
+        /* The state four never share a chart with the categorical ten
+           (docs/chart-colors.md), so a state-vs-anything pair must not set the
+           floor the ten are judged by. */
+        if (live[i].startsWith('Chart-State-') !== live[j].startsWith('Chart-State-')) continue;
         const d = pairScore(series[live[i]][p[live[i]]], series[live[j]][p[live[j]]]);
         ds.push(d);
         if (d < w) { w = d; pair = [live[i], live[j]]; }
@@ -547,9 +597,13 @@ export function solveGround(input: ChartSolveInput): GroundSolution {
   for (const n of live) picks[n] = { tone: pick[n], hex: series[n][pick[n]] };
   const ordinalPairs: string[] = [];
   for (let i = 0; i < live.length; i++)
-    for (let j = i + 1; j < live.length; j++)
+    for (let j = i + 1; j < live.length; j++) {
+      // A state colour and a categorical one never share a chart — the same
+      // exclusion the scoring makes — so they cannot read as one sequence.
+      if (live[i].startsWith('Chart-State-') !== live[j].startsWith('Chart-State-')) continue;
       if (isOrdinalPair(picks[live[i]].hex, picks[live[j]].hex))
         ordinalPairs.push(`${live[i]}/${live[j]}`);
+    }
 
   return { picks, unsolvable, worstSeparation: cur.w, ordinalPairs, widened };
 }
@@ -651,13 +705,20 @@ export function solveChartPalette(designSystemJSON: any, modesPresent: string[] 
           console.warn(`[figma] Chart: no ${level} backgrounds for ${cfg.modes.join('+')} — skipped.`);
           continue;
         }
-        const sol = solveGround({
+        const solveInput = {
           ramps: lightRamps, grounds: [...new Set(grounds)], hues, profile,
           /* the dark ramps emit at the SAME tone, so they must clear the same
              bars — without this the light ramp was validated and the dark one
              shipped, putting a near-black #2a2e1b in the dark palette */
           altRamps: rampsFor('Dark-Mode'),
-        });
+        };
+        /* Whole tones, and again with half steps for the generated hues; the
+           half-step solution is kept only when its worst pair is MEASURABLY
+           better (> 0.5 CIEDE2000), so offering it can never make a palette
+           worse and a near-tie keeps the simpler whole-tone answer. */
+        const whole = solveGround(solveInput);
+        const half = solveGround({ ...solveInput, halfSteps: true });
+        const sol = half.worstSeparation > whole.worstSeparation + 0.5 ? half : whole;
         if (sol.unsolvable.length)
           console.warn(`[figma] Chart ${level}: no tone clears 3:1 on every ground for ` +
                        sol.unsolvable.join(', ') + ' — omitted rather than written failing.');
@@ -679,7 +740,7 @@ export function solveChartPalette(designSystemJSON: any, modesPresent: string[] 
           hues.forEach((h, i) => {
             const pick = sol.picks['Chart-' + (i + 5)];
             if (!pick) return;
-            const hex = rampForHue(h, modeProfile)[pick.tone];
+            const hex = rampForHue(h, modeProfile, true)[pick.tone];
             if (hex) group[`Color-${i + 5}`] = { value: hex, type: 'color' };
           });
           if (Object.keys(group).length) {
