@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, ButtonGroup, Icon, Radio, Ratio, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, ButtonGroup, Icon, Radio, Ratio, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -739,4 +739,46 @@ const checkboxField: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, radio, swatch, toggleButtonGroup];
+/* Chip: Chip Holder (the 1px outside border and the hover lift) around
+   Theme-Chip-Body (the fill), at Surface-Brightest unselected and
+   Surface-Dimmest selected, holding an avatar, the label and an icon — the
+   Start-Avatar / End-Icon booleans default on, Start-Icon / End-Avatar off.
+   Focus-Visible is a 2px ring 3px outside. The set resolves in .Theme=Default,
+   so the code side is variant="default", which inherits. */
+const chip: ParityComponent = {
+  key: 'chip',
+  name: 'Chip',
+  nodeId: '8927:15447',
+  libFile: 'src/components/Chip/Chip.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: 'Chip Holder', css: '.MuiChip-root', label: 'Chip', outer: true, skip: ['fill'] },
+    { figma: 'Theme-Chip-Body', css: '.MuiChip-root', label: 'Fill', skip: ['border', 'shadow', 'position', 'width', 'height', 'radius (as drawn)'] },
+    { figma: 'Focus-Visible', css: '.MuiChip-root', outline: true, outer: true, label: 'Focus ring' },
+    { figma: 'Avatar', css: '.MuiChip-label .avatar', label: 'Avatar', skip: ['fill', 'border'] },
+    { figma: 'Icon', css: '.MuiChip-label svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Component Name', css: '.MuiChip-label .chip-parity-label', label: 'Label' },
+  ],
+  render: (v, booleans) => {
+    const avatar = <Avatar alt="" />;
+    const icon = <HomeIcon />;
+    const start = (booleans['Start-Avatar'] ?? true) ? avatar : booleans['Start-Icon'] ? icon : undefined;
+    const end = (booleans['End-Icon'] ?? true) ? icon : booleans['End-Avatar'] ? avatar : undefined;
+    return (
+      <Chip
+        variant="default"
+        className={v.props.State === 'Focus-Visible' ? 'Mui-focusVisible' : undefined}
+        clickable
+        selected={v.props.Status === 'selected'}
+        disabled={v.props.State === 'Disabled'}
+        onClick={noop}
+        startDecorator={start}
+        endDecorator={end}
+        label={<span className="chip-parity-label">Button</span>}
+      />
+    );
+  },
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, radio, swatch, toggleButtonGroup];
