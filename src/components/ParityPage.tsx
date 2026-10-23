@@ -340,6 +340,12 @@ function compare(variant: string, part: string, f: FigmaPart, c: Measured | null
 
 /* ── page ──────────────────────────────────────────────────────────────── */
 
+/* The code side never takes the real pointer. A cell under the mouse is in
+   :hover, and the report measured it as the Default variant — a range-end day
+   came back with the hover fill and lift. Interaction states are forced by
+   class (pseudoStates), so nothing on this side needs a real pointer. */
+const NO_POINTER: React.CSSProperties = { pointerEvents: 'none' };
+
 export default function ParityPage() {
   const params = new URLSearchParams(window.location.search);
   /* The selected component set, by Figma node id. A set with a ParityComponent
@@ -771,7 +777,7 @@ export default function ParityPage() {
 
         {set && layout === 'variants' && (
           // Plain div for the ref: the measurement root, whatever VStack forwards.
-          <div ref={codeRef}><VStack spacing={3}>
+          <div ref={codeRef} style={NO_POINTER}><VStack spacing={3}>
             {set.variants.map((v) => {
               const label = Object.values(v.props).join(' · ');
               const own = rows.filter((r) => r.variant === label && !r.ok);
@@ -813,7 +819,7 @@ export default function ParityPage() {
           // Layout primitive: the stages side by side, wrapping when narrow.
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32, alignItems: 'flex-start' }}>
             {mode === 'side' && stage(figmaLayer, 'Figma')}
-            {mode === 'side' && stage(<div ref={codeRef}>{codeLayer}</div>, 'Code')}
+            {mode === 'side' && stage(<div ref={codeRef} style={NO_POINTER}>{codeLayer}</div>, 'Code')}
             {mode !== 'side' && stage(
               <>
                 {figmaLayer}
@@ -821,7 +827,7 @@ export default function ParityPage() {
                     it hides the Figma image completely and the slider fades
                     between the two. */}
                 <Section {...zone} style={{ position: 'absolute', inset: 0, opacity }}>
-                  <div ref={codeRef}>{codeLayer}</div>
+                  <div ref={codeRef} style={NO_POINTER}>{codeLayer}</div>
                 </Section>
               </>,
               'Code over Figma',
