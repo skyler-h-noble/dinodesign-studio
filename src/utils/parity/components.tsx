@@ -896,7 +896,9 @@ const expandableNavRailItem: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
   parts: [
-    { figma: '__root__', css: '.rail-item', label: 'Item' },
+    // The item's edge is an inset ring in code (Figma's inside stroke takes no
+    // layout space); read it as the border it draws.
+    { figma: '__root__', css: '.rail-item', label: 'Item', shadow: 'inset' },
     { figma: 'Focus-Visible', css: '.rail-item', outline: true, outer: true, label: 'Focus ring' },
     { figma: 'Icon Buttons', css: '.rail-item-icon', label: 'Icon slot', skip: ['fill', 'border', 'shadow'] },
     { figma: 'Component Name', css: '.rail-item-label', label: 'Label' },
