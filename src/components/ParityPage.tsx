@@ -394,14 +394,20 @@ export default function ParityPage() {
       .catch(() => setAllSets([]));
   }, [token]);
 
+  /* The latest request wins. Switching component while a slow fetch is in
+     flight let the OLD response land last and fill the page — a Day Cell
+     report carrying Count Step's variants under Day Cell's node id. */
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
     if (!token.trim()) return;
+    const seq = ++loadSeq.current;
     setLoading(true); setError(null);
     try {
       const [doc, img] = await Promise.all([
         fetchFigmaNode(FILE_KEY, nodeId, token.trim()),
         fetchFigmaImage(FILE_KEY, nodeId, token.trim(), 2),
       ]);
+      if (seq !== loadSeq.current) return;
       const parsed = parseFigmaSet(doc);
       setSet(parsed);
       setImage(img);
@@ -409,9 +415,9 @@ export default function ParityPage() {
       // radio is unreadable at 1×, a 700px alert is unmanageable at 2×).
       setZoom(parsed.box.w > 200 ? '1' : '2');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (seq === loadSeq.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [nodeId, token]);
 
