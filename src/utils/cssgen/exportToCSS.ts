@@ -1822,10 +1822,19 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
            Quiet opacity — rather than the raw quiet tone its reference names.
            A palette Outline-Quiet (Tonal text) is a different color and keeps
            its reference. */
-        const isSurfaceQuiet = ctx !== obj && key === 'Outline-Quiet'
+        /* Which of the section's Quiet roles this button's Outline-Quiet IS —
+           the surface Quiet (Black & White, Neutral, BlackWhite) or a palette's
+           Quiet-<Pal> (Tonal: a Secondary outline rests on Quiet-Secondary).
+           Either way it takes that role's composited solid, so the button and
+           the --Quiet-<Pal> beside it are the same color. Matched by reference
+           first, then by resolved hex. */
+        const sourceRole = ctx !== obj && key === 'Outline-Quiet'
           && value && typeof value === 'object' && 'value' in value
-          && hexForToken(value) !== null && hexForToken(value) === hexForToken(ctx['Quiet']);
-        const solid = ctx === obj ? quietSolid(obj, key) : isSurfaceQuiet ? quietSolid(ctx, 'Quiet') : null;
+          ? (['Quiet', ...QUIET_PALETTES.map((p) => `Quiet-${p}`)].find((role) =>
+              ctx[role] && (ctx[role].value === value.value
+                || (hexForToken(value) !== null && hexForToken(value) === hexForToken(ctx[role])))) ?? null)
+          : null;
+        const solid = ctx === obj ? quietSolid(obj, key) : sourceRole ? quietSolid(ctx, sourceRole) : null;
         if (solid) {
           lines.push(`  ${prefix ? `--${prefix}-${key}` : `--${key}`}: ${solid};`);
           return;

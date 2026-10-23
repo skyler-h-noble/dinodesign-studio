@@ -7516,21 +7516,26 @@ export function exportColorSystemToJSON(
 
   // ── Outline-Quiet ─────────────────────────────────────────────────────
   //
-  // The muted counterpart of Outline-Text, on the same no-fill variants.
+  // The muted counterpart of Outline-Text, on the same no-fill variants: the
+  // resting label of an outline or ghost button, and an unselected Day Cell.
   //
-  // An outline or ghost button sits ON the surface, so its quiet tone is the
-  // SURFACE's own Quiet — not the palette's, and not Quiet-on-the-fill (there
-  // is no fill). That makes it one value per section rather than one per
-  // palette, but it is still written onto every palette entry: the lib reads
-  // it as Buttons.<Pal>.Outline-Quiet, and a name nothing defines fails
-  // silently rather than falling back.
+  // It follows the BUTTON's palette, as Outline-Text does: a Secondary button
+  // rests on the section's Quiet-Secondary (Text-Secondary at the Quiet
+  // opacity, already solved for this background). That is the rule the Figma
+  // plugin writes into the Buttons collection — Quiet-<Palette> under Tonal
+  // text — and outlineFor in the preview. Under Black & White text, and for
+  // Neutral / BlackWhite, it is the section's own Quiet, which is black or
+  // white.
   //
-  // Deliberately NOT reading the palette's Quiet.<scope>.<Pal>.<tone> row the
-  // way Outline-Text reads the Text row. Text at 4.5:1 in a palette hue still
-  // reads as that palette; the same row muted is what --Quiet already is, and
-  // a per-palette muted tone on a transparent button is a distinction with no
-  // visible difference — while costing eight tokens per section that each have
-  // to stay accessible independently.
+  // Written onto EVERY palette entry in every section. A palette left
+  // undefined in a scope inherits the nearest ancestor's value — the page's
+  // tone on a card, a card's grey on a Warning Alert — and a var() fallback
+  // only fires when the name is undefined everywhere above.
+  //
+  // Default is resolved by Cell-Button on surfaces (applyCellButtons runs
+  // below and overwrites it); on containers it starts as the section's Quiet.
+  const bwOutline = (userSelections as { textColoring?: string } | undefined)?.textColoring === 'black-white';
+  const OWN_QUIET_PALETTES = new Set(['Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error']);
   let outlineQuietTokens = 0;
   for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
     const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
@@ -7539,25 +7544,19 @@ export function exportColorSystemToJSON(
       for (const section of Object.values<any>(theme ?? {})) {
         const buttons = section?.Buttons;
         if (!buttons || typeof buttons !== 'object') continue;
-        // The section's own Quiet, so the alias cannot disagree with the
-        // --Quiet a component beside the button reads.
         const surfaceQuiet = section.Quiet?.value;
         if (!surfaceQuiet) continue;
         section['Outline-Quiet'] = { value: surfaceQuiet, type: 'color' };
         outlineQuietTokens++;
-        /* AND onto the DEFAULT entry, which the lib reads first
-           (var(--Buttons-Default-Outline-Quiet, var(--Outline-Quiet))). A var()
-           fallback only fires when the name is undefined, and Default IS
-           defined — at page scope, by Cell-Button. A Container, which Cell-
-           Button does not cover, defined none of its own, so it inherited the
-           PAGE's: on a dark page with a light card, a light quiet on a light
-           card — the Chart Add-On's unselected ButtonGroup segments went
-           near-invisible. The other palettes have no per-palette Outline-Quiet
-           by design and read --Outline-Quiet. Surfaces get their Default entry
-           from Cell-Button afterwards (applyCellButtons runs below). */
-        const def = buttons.Default;
-        if (def && typeof def === 'object' && !def['Outline-Quiet']) {
-          def['Outline-Quiet'] = { value: surfaceQuiet, type: 'color' };
+        for (const [pal, entry] of Object.entries<any>(buttons)) {
+          if (!entry || typeof entry !== 'object') continue;
+          if (pal === 'Default') {
+            if (!entry['Outline-Quiet']) entry['Outline-Quiet'] = { value: surfaceQuiet, type: 'color' };
+            continue;
+          }
+          const own = !bwOutline && OWN_QUIET_PALETTES.has(pal) ? section[`Quiet-${pal}`]?.value : undefined;
+          entry['Outline-Quiet'] = { value: own ?? surfaceQuiet, type: 'color' };
+          outlineQuietTokens++;
         }
       }
     }
