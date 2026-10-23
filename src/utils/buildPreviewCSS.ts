@@ -13,7 +13,7 @@ import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevel
 // surface tone, which fails WCAG on light surfaces. These helpers return
 // design-token references (e.g. "{Colors.Primary.Color-8}") that we then
 // convert to CSS var() form below.
-import { getFixedTextToken, getFixedHeaderToken, getFixedIconToken, iconToneAt } from './cssgen/exportColorSystem';
+import { getFixedTextToken, textTableToken, getFixedHeaderToken, getFixedIconToken, iconToneAt } from './cssgen/exportColorSystem';
 import { resolveButtonChoice, buttonForSurface, type ButtonPalette, type ButtonTone, type CellTone } from './buttonChoice';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
@@ -31,7 +31,7 @@ function tokenRefToVar(ref: string): string {
 
 /** Build the eight per-palette Text-* token lines for a surface or
  *  container with the given background tone. */
-function buildTextPaletteLines(backgroundN: number, isContainer: boolean): string {
+function buildTextPaletteLines(backgroundN: number, isContainer: boolean, isDark = false): string {
   const palettes: Array<['Primary' | 'Secondary' | 'Tertiary' | 'Neutral' | 'Info' | 'Success' | 'Warning' | 'Error', string]> = [
     ['Primary',   'Text-Primary'],
     ['Secondary', 'Text-Secondary'],
@@ -43,7 +43,7 @@ function buildTextPaletteLines(backgroundN: number, isContainer: boolean): strin
     ['Error',     'Text-Error'],
   ];
   return palettes
-    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedTextToken(backgroundN, isContainer, palette))};`)
+    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(textTableToken(backgroundN, isContainer, palette, isDark))};`)
     .join('\n');
 }
 
@@ -278,7 +278,7 @@ function contrastRatio(hex1: string, hex2: string): number {
  * Starts from the lookup table suggestion, then nudges if the actual
  * palette hex values don't meet the required contrast ratio.
  */
-function findAccessibleTone(
+export function findAccessibleTone(
   bgHex: string,
   palette: Array<{ hex: string }>,
   startN: number,
@@ -1368,9 +1368,9 @@ export function buildPreviewCSS(input: BuildInput): string {
   --Border-Variant: ${borderVariantVal};
   --Hover: ${scopeHover};
   --Pressed: ${scopeActive};
-  --Hotlink: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
+  --Hotlink: ${tokenRefToVar(textTableToken(scopeN, false, 'Info', isDark))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
-  --Link: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
+  --Link: ${tokenRefToVar(textTableToken(scopeN, false, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
   --Buttons-Primary-Border: ${scopeBtnBorderPrimary};
   --Buttons-Secondary-Border: ${scopeBtnBorderSecondary};
@@ -1573,11 +1573,11 @@ ${vibrantLines()}
   /* --Hotlink and friends share the contrast-tuned Info text mapping so
      ghost-variant buttons (which inherit color from --Hotlink) read on
      any surface tone. Same getFixedTextToken lookup as --Text-Info above. */
-  --Hotlink: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
+  --Hotlink: ${tokenRefToVar(textTableToken(surfaceN, false, 'Info', isDark))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
-  --Link: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
+  --Link: ${tokenRefToVar(textTableToken(surfaceN, false, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
-${buildTextPaletteLines(surfaceN, false)}
+${buildTextPaletteLines(surfaceN, false, isDark)}
 ${buildIconPaletteLines(surfaceN, false, isDark, surfacePaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
 ${buildHeaderPaletteLines(surfaceN, false)}
 ${emitStateButtonTokens(surfaceN)}
@@ -1697,11 +1697,11 @@ ${(() => {
      Without emitting at Container scope, Ghost-variant buttons inside a
      Card inherit Hotlink from the parent Surface scope (often wrong tone)
      or from the lib's Light-Mode.css [data-surface^="Container"] default. */
-  --Hotlink: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
+  --Hotlink: ${tokenRefToVar(textTableToken(containerN, true, 'Info', isDark))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
-  --Link: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
+  --Link: ${tokenRefToVar(textTableToken(containerN, true, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
-${buildTextPaletteLines(containerN, true)}
+${buildTextPaletteLines(containerN, true, isDark)}
 ${buildIconPaletteLines(containerN, true, isDark, containerPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText, containerTones.text)}
 ${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${contDefBg};

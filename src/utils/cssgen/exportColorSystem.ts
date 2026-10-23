@@ -876,6 +876,29 @@ export function getFixedHeaderToken(backgroundNumber: number, isContainer: boole
 /**
  * Get fixed Text token reference based on background number and container type
  */
+/**
+ * The text tone for a palette on a background tone, read from the SAME curated
+ * table the export writes into Modes.<mode>.Text — so the preview's --Text-Info,
+ * --Hotlink and --Link resolve to what the published CSS and Figma do.
+ *
+ * getFixedTextToken below is an older static map. It agreed with the table for
+ * most tones and not all: on a tone-5 surface it said Info Color-2 (#0f1c2f on
+ * a dark green, 2.44:1) where the table says Color-11. The preview drew the
+ * failing one while the published CSS was fine (invariant 5). Falls back to
+ * getFixedTextToken only where the table has no cell.
+ */
+export function textTableToken(backgroundNumber: number, isContainer: boolean, paletteName: string, isDark = false): string {
+  const table: any = isDark ? darkModeTextFixed : lightModeTextFixed;
+  const scope = isContainer ? 'Containers' : 'Surfaces';
+  let ref: unknown = table?.[scope]?.[paletteName]?.[`Color-${backgroundNumber}`]?.value;
+  // A cell may point at another Text cell ({Text.Surfaces.Info.Color-9}); follow it.
+  for (let hop = 0; hop < 4 && typeof ref === 'string' && ref.startsWith('{Text.'); hop++) {
+    const [, sc, pal, cn] = ref.slice(1, -1).split('.');
+    ref = table?.[sc]?.[pal]?.[cn]?.value;
+  }
+  return typeof ref === 'string' ? ref : getFixedTextToken(backgroundNumber, isContainer, paletteName);
+}
+
 export function getFixedTextToken(backgroundNumber: number, isContainer: boolean, paletteName: string): string {
   const colorMap: { [key: string]: { surfaces: number | string; containers: number | string } } = {
     '1': { surfaces: 8, containers: 10 },

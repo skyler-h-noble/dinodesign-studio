@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import chroma from 'chroma-js';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
-import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
+import { defaultBackgroundTone, defaultSurfaceRefs, generateCSSFiles } from '../utils/cssgen/exportToCSS';
 import { generateFigmaJSON } from '../utils/generateFigmaJSON';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
@@ -212,6 +212,42 @@ describe('preview ↔ export ↔ figma parity', () => {
     expect(exported).toBeTruthy();
     expect(exported).toBe(preview);
   });
+
+  /* Hotlink and Text-Info read the curated text table in the export. The
+     preview read an older static map (getFixedTextToken), which disagreed on a
+     tone-5 surface: Info Color-2 there, Color-11 in the table — a #0f1c2f link
+     on a dark green page in the studio while the published CSS was fine. */
+  it.each(SELECTION_MATRIX.flatMap((m) => (['light', 'dark'] as const).map((mode) => ({ ...m, mode }))))(
+    '$label · $mode — Hotlink and Text-Info agree between preview and export', ({ sel, mode }) => {
+      const { previewCss, json } = buildAll(SCHEME, sel, mode);
+      const modeName = mode === 'dark' ? 'Dark-Mode' : 'Light-Mode';
+      const page = /\[data-theme="Brand"\],\s*\[data-theme="Brand"\]\[data-surface="Surface"\]/;
+      const viaRoot = (v: string | null) => {
+        const m = v?.match(/^var\(--([\w-]+)\)$/);
+        return m ? previewToken(previewCss, /:root/, m[1]) : v;
+      };
+      for (const token of ['Hotlink', 'Text-Info']) {
+        const preview = norm(viaRoot(previewToken(previewCss, page, token)));
+        const raw = at(json, `Modes.${modeName}.Themes.Default.Surfaces.${token}`);
+        // The Default theme reads its surfaces through {Default-Background.*},
+        // which only the generators expand — expand it the same way.
+        const { defPal, defN } = defaultBackgroundTone(json, at(json, `Modes.${modeName}`), modeName);
+        const refs: Record<string, string> = {
+          ...(defaultSurfaceRefs(defPal, defN) as Record<string, string>),
+          // exportToCSS's own expansion of the Default page's link.
+          'Default-Background.Hotlink': `{Text.Surfaces.Info.Color-${defN}}`,
+          // Text-Info is the same Info row at the page tone (the published
+          // CSS writes both as one --Info-Color-N).
+          'Default-Background.Text-Info': `{Text.Surfaces.Info.Color-${defN}}`,
+        };
+        let ref = String(typeof raw === 'string' ? raw : raw?.value ?? '');
+        for (let hop = 0; hop < 4 && refs[ref.slice(1, -1)]; hop++) ref = refs[ref.slice(1, -1)];
+        const exported = norm(resolveRef(ref, at(json, `Modes.${modeName}`)));
+        expect(preview, `${token} preview`).toBeTruthy();
+        expect(exported, `${token} export`).toBeTruthy();
+        expect(`${token}: ${preview}`).toBe(`${token}: ${exported}`);
+      }
+    });
 
   // Dark mode pins every button to one tone (Color-10). It has its own set of
   // divergences: the preview used to compute most button tokens from the raw
