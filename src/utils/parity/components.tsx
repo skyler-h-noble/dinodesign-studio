@@ -925,7 +925,8 @@ const fab: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
   parts: [
-    { figma: '__root__', css: '.fab', label: 'FAB', shadow: 'outer', skip: ['fill', 'border'] },
+    // Figma rounds Theme-Container, not the root, so the root's radius is not compared.
+    { figma: '__root__', css: '.fab', label: 'FAB', shadow: 'outer', skip: ['fill', 'border', 'radius (as drawn)'] },
     { figma: 'Theme-Container', css: '.fab', label: 'Fill', skip: ['shadow'] },
     { figma: 'Focus-Visible', css: '.fab', outline: true, outer: true, label: 'Focus ring' },
     { figma: 'Icon', css: '.fab svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
