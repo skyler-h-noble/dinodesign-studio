@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -914,4 +914,34 @@ const expandableNavRailItem: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, radio, swatch, toggleButtonGroup];
+/* FAB: a FAB-Width circle (Theme-Container: the fill and 1px border, in the
+   Tertiary theme the set pins) holding a FAB-Icon glyph, with the FAB /
+   FAB-Hover elevation on the root. Extended and Animate default off. */
+const fab: ParityComponent = {
+  key: 'fab',
+  name: 'FAB',
+  nodeId: '6778:17180',
+  libFile: 'src/components/Fab/Fab.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: '__root__', css: '.fab', label: 'FAB', shadow: 'outer', skip: ['fill', 'border'] },
+    { figma: 'Theme-Container', css: '.fab', label: 'Fill', skip: ['shadow'] },
+    { figma: 'Focus-Visible', css: '.fab', outline: true, outer: true, label: 'Focus ring' },
+    { figma: 'Icon', css: '.fab svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v, booleans) => (
+    <Fab
+      icon={<HomeIcon />}
+      extended={booleans.Extended ?? false}
+      label={booleans.Extended ? 'Extended' : undefined}
+      animate={false}
+      disabled={v.props.State === 'Disabled'}
+      className={v.props.State === 'Focus-Visible' ? 'Mui-focusVisible' : undefined}
+      onClick={noop}
+      ariaLabel="Add"
+    />
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, radio, swatch, toggleButtonGroup];
