@@ -143,10 +143,9 @@ describe('mode-scoped button metrics', () => {
     expect(d['Avatar-Text']).toEqual({ medium: 14, small: 12, large: 18 });
     // Button-Icon-Only is retired: an icon-only button uses Button-Icon.
     expect(d['Button-Icon-Only']).toBeUndefined();
-    // The two values that deliberately differ from the design's table.
-    // Button-Numbers medium: design 14, the shared text slope puts it at 12.
-    // Button-Icon small:     design 20, the icon ramp puts it at 16.
-    expect(d['Button-Numbers']).toEqual({ medium: 12, small: 10, large: 16 });
+    // Button-Numbers follows the design's 10 / 14 / 16 — its medium row
+    // carries its own offset off the shared slope.
+    expect(d['Button-Numbers']).toEqual({ medium: 14, small: 10, large: 16 });
     expect(d['Button-Icon']).toEqual({ medium: 20, small: 16, large: 32 });
   });
 
@@ -157,7 +156,8 @@ describe('mode-scoped button metrics', () => {
         // Only meaningful above the 10px floor, which collapses the ladder.
         if (d['Button-Numbers'][k] <= 10) continue;
         expect(d['Avatar-Text'][k]).toBe(d['Button-Text'][k] - 2);
-        expect(d['Button-Numbers'][k]).toBe(d['Button-Text'][k] - 4);
+        // Numbers sit 4px under the label, 2px at medium (the design's 14).
+        expect(d['Button-Numbers'][k]).toBe(d['Button-Text'][k] - (k === 'medium' ? 2 : 4));
       }
     }
   });

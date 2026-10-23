@@ -5,13 +5,14 @@
  * That is close but not the design: Figma's `Badge` style is 11/12, while
  * --Sm-Button-Numbers resolves to 10 (3x24/16 + 5.5) and
  * --Button-Small-Line-Height to 14. Nor is 11 reachable by picking a different
- * rung — the Button-Numbers ladder is 10 / 12 / 16 at the three button
+ * rung — the Button-Numbers ladder is 10 / 14 / 16 at the three button
  * heights, and 11 is none of them. A value no existing token can express is
  * the signal it needs its own.
  *
  * Face, weight and tracking are NOT its own: the Figma style binds those to
  * the Buttons/Small role, so only size and leading are stated here.
  */
+import { derivedTextMetrics } from '../utils/buttonSizing';
 import { describe, it, expect } from 'vitest';
 import { typographyDeclarations } from '../utils/cssgen/generateTypographyTokensCSS';
 
@@ -41,8 +42,10 @@ describe('the Badge type style', () => {
   it('is not reachable from the Button-Numbers ladder', () => {
     /* Guards the reason this style exists. If a future retune ever puts a rung
        on 11, the ladder could carry the badge and this style would be
-       duplication — but until then, reading a Button token gives 10 or 12. */
-    const rung = (h: number) => Math.max(10, Math.round((3 * h) / 16 + 5.5));
-    expect([rung(24), rung(32), rung(56)]).toEqual([10, 12, 16]);
+       duplication — but until then, reading a Button token gives 10, 14 or 16. */
+    const d = derivedTextMetrics({});
+    const ladder = [d['Button-Numbers'].small, d['Button-Numbers'].medium, d['Button-Numbers'].large];
+    expect(ladder).toEqual([10, 14, 16]);
+    expect(ladder).not.toContain(11);
   });
 });
