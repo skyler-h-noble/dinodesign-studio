@@ -86,6 +86,7 @@ for token/theme details.)
 | Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
 | Selection | `Checkbox`, `Radio`, `RadioGroup`, `SwitchInput`, `Slider`/`SliderInput`, `RangeSlider`, `Rating` |
+| Dates | `DatePicker` (single or `selectionMode="range"`), `DayCell` |
 | Layout | `VStack`, `HStack`, `Stack`, `Box`, `Grid`, `Container`, `Divider`, `Spacing` |
 | Surfaces | `Card`, `SelectableCard`, `Paper`, `Surfaced`, `ThemedZone` |
 | Navigation | `Tabs`/`Tab`/`TabList`/`TabPanel`, `Breadcrumbs`, `Pagination`, `Stepper`, `BottomNavigation`, `AppBar`, `Sidebar` |

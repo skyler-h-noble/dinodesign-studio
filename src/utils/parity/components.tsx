@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, Divider, ButtonGroup, Icon, Radio, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, ButtonGroup, Icon, Radio, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -853,4 +853,36 @@ const divider: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, divider, radio, swatch, toggleButtonGroup];
+/* Day Cell: one DatePicker day — a 36px cell, Sizing-Quarter round a
+   Button-Height circle (the frame `Day`; its number is the text `Day`, so
+   `Day#2`). The range band is Backfill (range-middle, full width) or the
+   inner half — Right-Fill on range-start, Left-Fill on range-end — the Button
+   fill at 50% layer opacity. */
+const dayCell: ParityComponent = {
+  key: 'dayCell',
+  name: 'Day Cell',
+  nodeId: '8619:3484',
+  libFile: 'src/components/DatePicker/DatePicker.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: '__root__', css: '.day-cell', label: 'Cell', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Day', css: '.day-cell-day', label: 'Day' },
+    { figma: 'Focus-Visible', css: '.day-cell-day', outline: true, outer: true, label: 'Focus ring' },
+    { figma: 'Day#2', css: '.day-cell-day', label: 'Number', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'position', 'position (centre, top)', 'width', 'height'] },
+    { figma: 'Backfill', css: '.day-cell-band', label: 'Range band', when: (v) => v.props.Selection === 'range-middle' },
+    { figma: 'Right-Fill', css: '.day-cell-band', label: 'Range band', when: (v) => v.props.Selection === 'range-start' },
+    { figma: 'Left-Fill', css: '.day-cell-band', label: 'Range band', when: (v) => v.props.Selection === 'range-end' },
+  ],
+  render: (v) => (
+    <DayCell
+      day={15}
+      selection={String(v.props.Selection)}
+      disabled={v.props.State === 'Disabled'}
+      onClick={noop}
+      aria-label="September 15, 2026"
+    />
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, radio, swatch, toggleButtonGroup];

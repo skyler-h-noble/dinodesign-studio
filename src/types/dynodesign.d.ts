@@ -224,6 +224,8 @@ declare module '@omni-design/components' {
      omitting what does exist hides a usable component. */
   export const IconBadge: FC<any>;
   export const Divider: FC<any>;
+  export const DatePicker: FC<any>;
+  export const DayCell: FC<any>;
   export const List: FC<any>;
   export const Slider: FC<any>;
   export const Table: FC<any>;
