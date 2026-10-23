@@ -739,8 +739,8 @@ const checkboxField: ParityComponent = {
   },
 };
 
-/* Chip: Chip Holder (the 1px outside border and the hover lift) around
-   Theme-Chip-Body (the fill), at Surface-Brightest unselected and
+/* Chip: Chip Holder (the hover lift) around Theme-Chip-Body (the fill and,
+   unselected, a 1px inside border), at Surface-Brightest unselected and
    Surface-Dimmest selected, holding an avatar, the label and an icon — the
    Start-Avatar / End-Icon booleans default on, Start-Icon / End-Avatar off.
    Focus-Visible is a 2px ring 3px outside. The set resolves in .Theme=Default,
@@ -753,8 +753,11 @@ const chip: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
   parts: [
-    { figma: 'Chip Holder', css: '.MuiChip-root', label: 'Chip', outer: true, skip: ['fill'] },
-    { figma: 'Theme-Chip-Body', css: '.MuiChip-root', label: 'Fill', skip: ['border', 'shadow', 'position', 'width', 'height', 'radius (as drawn)'] },
+    // The holder carries the hover lift; the body carries the fill and the
+    // 1px inside border (a frame's own stroke draws under its children, so on
+    // the holder the body's fill covered it).
+    { figma: 'Chip Holder', css: '.MuiChip-root', label: 'Chip', skip: ['fill', 'border'] },
+    { figma: 'Theme-Chip-Body', css: '.MuiChip-root', label: 'Fill', skip: ['shadow', 'position', 'width', 'height', 'radius (as drawn)'] },
     { figma: 'Focus-Visible', css: '.MuiChip-root', outline: true, outer: true, label: 'Focus ring' },
     { figma: 'Avatar', css: '.MuiChip-label .avatar', label: 'Avatar', skip: ['fill', 'border'] },
     { figma: 'Icon', css: '.MuiChip-label svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
