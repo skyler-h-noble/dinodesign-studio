@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, ButtonGroup, Icon, Radio, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, Divider, ButtonGroup, Icon, Radio, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -829,4 +829,28 @@ const countStep: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, radio, swatch, toggleButtonGroup];
+/* Divider: a 1-layer rule, Border-Variant, its thickness bound to
+   Component-Size › Other › Divider. The set's Size axis has one value
+   (small) — the weight comes from the Component-Size MODE the set resolves
+   in, so the code side takes the context size, not the axis. */
+const divider: ParityComponent = {
+  key: 'divider',
+  name: 'Divider',
+  nodeId: '6847:27685',
+  libFile: 'src/components/Divider/Divider.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '[role="separator"]', label: 'Rule' },
+  ],
+  notes: ['Figma\'s Size axis has only "small"; the thickness follows the Component-Size mode, so code renders size={context size}.'],
+  render: (v, _b, ctx) => {
+    const vertical = v.props.Orientation === 'vertical';
+    return (
+      <div style={{ width: v.box.w, height: v.box.h, display: 'flex', flexDirection: vertical ? 'row' : 'column', justifyContent: 'center' }}>
+        <Divider orientation={vertical ? 'vertical' : 'horizontal'} size={ctx.size} />
+      </div>
+    );
+  },
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, divider, radio, swatch, toggleButtonGroup];
