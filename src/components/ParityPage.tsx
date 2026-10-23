@@ -385,6 +385,40 @@ export default function ParityPage() {
   }, [dsId]);
   useEffect(() => { if (dsStatus === 'ready') localStorage.setItem(LS_DESIGN_ID, dsId); }, [dsId, dsStatus]);
   useEffect(() => { localStorage.setItem(LS_FIGMA_TOKEN, token.trim()); }, [token]);
+  /* The key is shared with the workbench and with every other open tab, and
+     each one writes its own copy back when its token changes — so a tab opened
+     before you pasted a new token could put the old one back. Follow the other
+     tabs instead of holding a stale copy. */
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LS_FIGMA_TOKEN && e.newValue != null && e.newValue !== token) setToken(e.newValue);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [token]);
+  /* Whether the saved token works, checked against Figma's /v1/me — shown in
+     Settings next to the masked token, so "saved" and "valid" are visible
+     separately. */
+  const [tokenCheck, setTokenCheck] = useState<{ state: 'checking' | 'ok' | 'bad'; detail: string } | null>(null);
+  useEffect(() => {
+    const t = token.trim();
+    if (!t) { setTokenCheck(null); return; }
+    let live = true;
+    setTokenCheck({ state: 'checking', detail: '' });
+    fetch('https://api.figma.com/v1/me', { headers: { 'X-Figma-Token': t } })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!live) return;
+        if (r.ok) setTokenCheck({ state: 'ok', detail: body.handle || body.email || 'valid' });
+        else {
+          setTokenCheck({ state: 'bad', detail: body.err || `HTTP ${r.status}` });
+          setShowSettings(true);
+        }
+      })
+      .catch(() => live && setTokenCheck({ state: 'bad', detail: 'could not reach Figma' }));
+    return () => { live = false; };
+  }, [token]);
+  const maskedToken = token.trim() ? `${token.trim().slice(0, 5)}…${token.trim().slice(-4)}` : '';
   useEffect(() => {
     if (!token.trim()) return;
     fetchFigmaComponentSets(FILE_KEY, token.trim())
@@ -698,6 +732,11 @@ export default function ParityPage() {
                   Use token
                 </Button>
               </HStack>
+              {maskedToken && (
+                tokenCheck?.state === 'bad'
+                  ? <Alert color="error">{`Saved token ${maskedToken} — ${tokenCheck.detail}. Create a new one in Figma (Settings › Security › Personal access tokens) and paste it above.`}</Alert>
+                  : <Caption color="quiet">{`Saved token ${maskedToken}${tokenCheck?.state === 'ok' ? ` — valid, signed in as ${tokenCheck.detail}` : tokenCheck?.state === 'checking' ? ' — checking…' : ''}.`}</Caption>
+              )}
             </VStack>
           </Card>
         )}

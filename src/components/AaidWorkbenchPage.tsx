@@ -236,6 +236,15 @@ export default function AaidWorkbenchPage() {
   // obvious read is that the key is wrong rather than that it has whitespace on
   // the end.
   useEffect(() => { localStorage.setItem(LS_FIGMA_TOKEN, figmaToken.trim()); }, [figmaToken]);
+  // Shared with the parity page and other tabs: follow a token saved elsewhere
+  // rather than writing a stale copy back over it.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LS_FIGMA_TOKEN && e.newValue != null && e.newValue !== figmaToken) setFigmaToken(e.newValue);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [figmaToken]);
   useEffect(() => { localStorage.setItem(LS_ANTHROPIC_KEY, anthropicKey.trim()); }, [anthropicKey]);
   useEffect(() => { localStorage.setItem(LS_DINO_ID, dinoId); }, [dinoId]);
 
