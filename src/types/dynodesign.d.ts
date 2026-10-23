@@ -188,6 +188,7 @@ declare module '@omni-design/components' {
   export const MenuButton: FC<any>;
   export const BottomNavigation: FC<any>;
   export const Stepper: FC<any>;
+  export const Step: FC<any>;
   export const SpeedDial: FC<any>;
 
   // Surfaces

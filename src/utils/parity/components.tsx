@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, ButtonGroup, Icon, Radio, Ratio, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, ButtonGroup, Icon, Radio, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -784,4 +784,47 @@ const chip: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, radio, swatch, toggleButtonGroup];
+/* Count Step: one Stepper step — a Button-Height circle (Button-Fill: fill
+   and ring; Button-Effect: the hover lift) holding its number, with a label
+   below (Bottom Label, on by default) or to the right (Right Label). Status
+   is where the step sits against activeStep: incomplete is ahead of it,
+   current is on it, complete is behind it. */
+const COUNT_STEP_ACTIVE: Record<string, number> = { incomplete: -1, current: 0, complete: 1 };
+const countStep: ParityComponent = {
+  key: 'countStep',
+  name: 'Count Step',
+  nodeId: '8379:13829',
+  libFile: 'src/components/Stepper/Stepper.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: 'Button-Fill', css: '.step-indicator', label: 'Circle', skip: ['shadow'] },
+    { figma: 'Button-Effect', css: '.step-indicator', label: 'Lift', shadow: 'outer', skip: ['fill', 'border', 'position', 'width', 'height', 'radius (as drawn)'] },
+    { figma: 'Focus-Visible', css: '.step-indicator', outline: true, outer: true, label: 'Focus ring' },
+    // The digit is a bare text node in the circle, so its box is the circle's: compare its type and color, not where it sits.
+    { figma: 'Component Name', css: '.step-indicator', label: 'Number', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'position', 'position (centre, top)', 'width', 'height'] },
+    { figma: 'Label', css: '.step .typography', label: 'Label' },
+  ],
+  render: (v, booleans) => {
+    const bottom = booleans['Bottom Label'] ?? true;
+    const right = booleans['Right Label'] ?? false;
+    return (
+      <div style={{ width: v.box.w, display: 'inline-block' }}>
+        <Stepper
+          orientation={right && !bottom ? 'vertical' : 'horizontal'}
+          activeStep={COUNT_STEP_ACTIVE[String(v.props.Status)]}
+          clickable
+          onStepClick={noop}
+        >
+          <Step
+            label={bottom || right ? 'Label' : undefined}
+            disabled={v.props.State === 'Disabled'}
+            className={v.props.State === 'Focus-Visible' ? 'Mui-focusVisible' : undefined}
+          />
+        </Stepper>
+      </div>
+    );
+  },
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, radio, swatch, toggleButtonGroup];
