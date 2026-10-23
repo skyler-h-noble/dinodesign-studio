@@ -757,7 +757,9 @@ const chip: ParityComponent = {
     // 1px inside border (a frame's own stroke draws under its children, so on
     // the holder the body's fill covered it).
     { figma: 'Chip Holder', css: '.MuiChip-root', label: 'Chip', skip: ['fill', 'border'] },
-    { figma: 'Theme-Chip-Body', css: '.chip-surface', label: 'Fill', skip: ['shadow', 'radius (as drawn)'] },
+    // Radius IS compared here: this is the element that paints. The root's
+    // radius matching proved nothing while the inner surface drew square.
+    { figma: 'Theme-Chip-Body', css: '.chip-surface', label: 'Fill', skip: ['shadow'] },
     { figma: 'Focus-Visible', css: '.MuiChip-root', outline: true, outer: true, label: 'Focus ring' },
     { figma: 'Avatar', css: '.MuiChip-label .avatar', label: 'Avatar', skip: ['fill', 'border'] },
     { figma: 'Icon', css: '.MuiChip-label svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
