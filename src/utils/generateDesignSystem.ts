@@ -2,7 +2,9 @@ import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from
 import {
   bevelCSS, bevelJSON, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
   platformBevelCSS,
+  fabBevelVars,
 } from './bevelGeometry';
+import { FAB_SIZE } from './componentSize';
 import { extractHeroImage } from './heroImage';
 import { STORAGE_BUCKET } from './firebase/client';
 import type { ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../types';
@@ -1086,6 +1088,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Bevel: ${bevelPercent};
   --Button-Bevel-Px: ${bevelPx}px;
   --Button-Bevel-Opacity: ${bevelOpacity / 100};
+${Object.entries(fabBevelVars(FAB_SIZE, bevelPercent)).map(([k, v]) => `  ${k}: ${v};`).join('\n')}
   /* Bevel geometry — the literal box-shadow numbers, same values the Figma
      Platform/Components collections carry (there as bare numbers, here as px).
      Small and large don't vary by platform, so they live here; medium's live

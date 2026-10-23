@@ -14,7 +14,8 @@ import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
 import { chartColorVisionCSS } from '../chartColorVision';
 import { compositeOver, solveQuietOpacities, QUIET_PALETTES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
-import { navMetricsCSS } from '../componentSize';
+import { navMetricsCSS, FAB_SIZE } from '../componentSize';
+import { fabBevelVars } from '../bevelGeometry';
 import { menuLevelCSS } from '../menuLevels';
 import { EYEBROW_WEB_FAMILY } from '../typographyPlatform';
 import { CSS_THEME_NAMES } from '../themes';
@@ -5447,6 +5448,8 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Button-Bevel: ${bevelPercent};`);
     lines.push(`  --Button-Bevel-Px: ${bevelPx}px;`);
     lines.push(`  --Button-Bevel-Opacity: ${bevelOpacity / 100};`);
+    // The FAB's bevel, from its own width — the values Figma's FAB-Bevel holds.
+    for (const [k, v] of Object.entries(fabBevelVars(FAB_SIZE, bevelPercent))) lines.push(`  ${k}: ${v};`);
     // Effect levels — box-shadow recipes. --Dropshadow-Color is overridden
     // per-theme in Light-Mode.css / Dark-Mode.css; the nested var() resolves
     // at the consuming element so themed values still apply even though

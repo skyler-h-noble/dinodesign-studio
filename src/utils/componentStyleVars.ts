@@ -22,7 +22,8 @@ import { buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRad
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
 import { buttonModeMetricVars } from './buttonSizing';
-import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars } from './componentSize';
+import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars, FAB_SIZE } from './componentSize';
+import { fabBevelVars } from './bevelGeometry';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -113,6 +114,7 @@ export function componentStyleVars(
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
     '--Button-Bevel-Px': `${bevelPx}px`,
+    ...fabBevelVars(FAB_SIZE, bevel),
     /* Button-Height / Sm- / Lg- now come from buttonModeMetricVars above, so
        they are not restated here — one source, matching Figma's names.
        These two remain as ALIASES: ToggleButtonGroup, Autocomplete and Input
