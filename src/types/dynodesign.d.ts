@@ -77,6 +77,7 @@ declare module '@omni-design/components' {
   export const ButtonIcon: FC<any>;
   export const Fab: FC<any>;
   export const Rail: FC<any>;
+  export const RailItem: FC<any>;
   export const Toolbar: FC<any>;
   export const ToggleButton: FC<any>;
   export const ToggleButtonGroup: FC<any>;

@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, ButtonGroup, Icon, Radio, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -885,4 +885,33 @@ const dayCell: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, radio, swatch, toggleButtonGroup];
+/* Expandable Nav Rail Item: one expanded rail row — a 32px icon slot (Rail
+   Button / Icon Buttons), 2px, then the label. The set resolves Buttons in
+   `default`, which is the selected item's palette. */
+const expandableNavRailItem: ParityComponent = {
+  key: 'expandableNavRailItem',
+  name: 'Expandable Nav Rail Item',
+  nodeId: '8239:5977',
+  libFile: 'src/components/Rail/Rail.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: '__root__', css: '.rail-item', label: 'Item' },
+    { figma: 'Focus-Visible', css: '.rail-item', outline: true, outer: true, label: 'Focus ring' },
+    { figma: 'Icon Buttons', css: '.rail-item-icon', label: 'Icon slot', skip: ['fill', 'border', 'shadow'] },
+    { figma: 'Component Name', css: '.rail-item-label', label: 'Label' },
+  ],
+  render: (v) => (
+    <div style={{ width: v.box.w }}>
+      <RailItem
+        expanded
+        variant="default"
+        selected={v.props.State === 'Selected'}
+        item={{ icon: <HomeIcon />, label: 'Label', disabled: v.props.State === 'Disabled' }}
+        onClick={noop}
+      />
+    </div>
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, radio, swatch, toggleButtonGroup];
