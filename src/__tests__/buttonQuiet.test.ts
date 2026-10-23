@@ -177,6 +177,32 @@ describe('button Quiet — the exported token', () => {
           expect(same).toEqual([]);
         });
 
+        /* The lib reads --Buttons-Default-Outline-Quiet first, so the Default
+           entry needs one IN EVERY SECTION. Containers had none and inherited
+           the page's — on a dark page with a light card, a light quiet on a
+           light card. */
+        it(`every Default button carries an Outline-Quiet that reads on its section — ${where}`, () => {
+          const resolve = makeResolver(json, mode);
+          const fails: string[] = [];
+          let checked = 0;
+          for (const [tn, theme] of Object.entries<any>(json.Modes[mode].Themes))
+            for (const [sn, section] of Object.entries<any>(theme)) {
+              if (!section?.Buttons || !section.Background) continue;
+              const bg = resolve(section.Background);
+              for (const [pal, e] of Object.entries<any>({ Default: section.Buttons.Default })) {
+                if (!e || typeof e !== 'object') continue;
+                if (!e['Outline-Quiet']) { fails.push(`${tn}/${sn}/${pal} missing`); continue; }
+                const q = resolve(e['Outline-Quiet']);
+                if (!bg.startsWith('#') || !q.startsWith('#')) continue;
+                checked++;
+                const ratio = chroma.contrast(bg.slice(0, 7), q.slice(0, 7));
+                if (ratio < 4.5) fails.push(`${tn}/${sn}/${pal} ${q} on ${bg} = ${ratio.toFixed(2)}`);
+              }
+            }
+          expect(checked).toBeGreaterThan(20);
+          expect(fails).toEqual([]);
+        });
+
         it(`Outline-Quiet is the SECTION's quiet, not the palette's — ${where}`, () => {
           const resolve = makeResolver(json, mode);
           const wrong: string[] = [];

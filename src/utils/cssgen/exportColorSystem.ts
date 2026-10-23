@@ -7545,6 +7545,20 @@ export function exportColorSystemToJSON(
         if (!surfaceQuiet) continue;
         section['Outline-Quiet'] = { value: surfaceQuiet, type: 'color' };
         outlineQuietTokens++;
+        /* AND onto the DEFAULT entry, which the lib reads first
+           (var(--Buttons-Default-Outline-Quiet, var(--Outline-Quiet))). A var()
+           fallback only fires when the name is undefined, and Default IS
+           defined — at page scope, by Cell-Button. A Container, which Cell-
+           Button does not cover, defined none of its own, so it inherited the
+           PAGE's: on a dark page with a light card, a light quiet on a light
+           card — the Chart Add-On's unselected ButtonGroup segments went
+           near-invisible. The other palettes have no per-palette Outline-Quiet
+           by design and read --Outline-Quiet. Surfaces get their Default entry
+           from Cell-Button afterwards (applyCellButtons runs below). */
+        const def = buttons.Default;
+        if (def && typeof def === 'object' && !def['Outline-Quiet']) {
+          def['Outline-Quiet'] = { value: surfaceQuiet, type: 'color' };
+        }
       }
     }
   }
