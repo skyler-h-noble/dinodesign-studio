@@ -396,20 +396,23 @@ export default function ParityPage() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [token]);
-  /* Whether the saved token works, checked against Figma's /v1/me — shown in
-     Settings next to the masked token, so "saved" and "valid" are visible
-     separately. */
+  /* Whether the saved token works — shown in Settings next to the masked
+     token, so "saved" and "valid" are visible separately. Checked by reading
+     the library file's root, which is exactly what the page needs. Not
+     /v1/me: that needs the current_user:read scope, which a token made with
+     only File / Library content access does not have, so a working token
+     reported 403. */
   const [tokenCheck, setTokenCheck] = useState<{ state: 'checking' | 'ok' | 'bad'; detail: string } | null>(null);
   useEffect(() => {
     const t = token.trim();
     if (!t) { setTokenCheck(null); return; }
     let live = true;
     setTokenCheck({ state: 'checking', detail: '' });
-    fetch('https://api.figma.com/v1/me', { headers: { 'X-Figma-Token': t } })
+    fetch(`https://api.figma.com/v1/files/${FILE_KEY}/nodes?ids=0:1&depth=1`, { headers: { 'X-Figma-Token': t } })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
         if (!live) return;
-        if (r.ok) setTokenCheck({ state: 'ok', detail: body.handle || body.email || 'valid' });
+        if (r.ok) setTokenCheck({ state: 'ok', detail: body.name ? `reads "${body.name}"` : 'reads the library file' });
         else {
           setTokenCheck({ state: 'bad', detail: body.err || `HTTP ${r.status}` });
           setShowSettings(true);
@@ -735,7 +738,7 @@ export default function ParityPage() {
               {maskedToken && (
                 tokenCheck?.state === 'bad'
                   ? <Alert color="error">{`Saved token ${maskedToken} — ${tokenCheck.detail}. Create a new one in Figma (Settings › Security › Personal access tokens) and paste it above.`}</Alert>
-                  : <Caption color="quiet">{`Saved token ${maskedToken}${tokenCheck?.state === 'ok' ? ` — valid, signed in as ${tokenCheck.detail}` : tokenCheck?.state === 'checking' ? ' — checking…' : ''}.`}</Caption>
+                  : <Caption color="quiet">{`Saved token ${maskedToken}${tokenCheck?.state === 'ok' ? ` — valid, ${tokenCheck.detail}` : tokenCheck?.state === 'checking' ? ' — checking…' : ''}.`}</Caption>
               )}
             </VStack>
           </Card>
