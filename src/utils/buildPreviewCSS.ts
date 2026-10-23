@@ -481,6 +481,15 @@ function finalizePreviewCSS(css: string): string {
 const OUTLINE_PALETTES = ['Default', 'Primary', 'Secondary', 'Tertiary'];
 
 function withOutlineQuiet(css: string): string {
+  /* A non-Default palette whose Outline-Quiet is just var(--Quiet) is not
+     written at all. The lib reads var(--Buttons-<P>-Outline-Quiet,
+     var(--Outline-Quiet)), and the fallback resolves in whatever zone the
+     button sits in. Written out, var(--Quiet) resolves on the element that
+     declares it and is INHERITED as that fixed color into every nested zone
+     the preview does not write itself — the Brand page's grey (#aaa, 2.2:1)
+     on a Warning Alert's button. Same rule as the export, which gives only
+     Default a per-palette Outline-Quiet. */
+  css = css.replace(/^[ \t]*--Buttons-(?!Default-)[A-Za-z]+-Outline-Quiet:\s*var\(--Quiet\);[ \t]*\n/gm, '');
   const withAlias = css.replace(
     /^([ \t]*)(--Quiet:[^;]+;)/gm,
     (_m, indent: string, decl: string) => `${indent}${decl}\n${indent}--Outline-Quiet: var(--Quiet);`,
@@ -495,7 +504,14 @@ function withOutlineQuiet(css: string): string {
     const missing: string[] = [];
     for (const p of OUTLINE_PALETTES) {
       if (setsText && !body.includes(`--Buttons-${p}-Outline-Text:`)) missing.push(`  --Buttons-${p}-Outline-Text: var(--Text);`);
-      if (setsQuiet && !body.includes(`--Buttons-${p}-Outline-Quiet:`)) missing.push(`  --Buttons-${p}-Outline-Quiet: var(--Quiet);`);
+      /* Quiet: Default only, as the export does. For the others the lib's own
+         fallback, var(--Outline-Quiet), already resolves per scope. Written
+         here as var(--Quiet), it resolved on THIS element and was inherited
+         as a fixed color into any nested zone the preview does not write — a
+         Warning Alert inside a Brand card got the card's grey (#777, 4.2:1 on
+         the alert), because the export's Warning scope, by design, defines no
+         per-palette Outline-Quiet to override it. */
+      if (p === 'Default' && setsQuiet && !body.includes(`--Buttons-${p}-Outline-Quiet:`)) missing.push(`  --Buttons-${p}-Outline-Quiet: var(--Quiet);`);
     }
     return missing.length ? `{${body.replace(/\s*$/, '')}\n${missing.join('\n')}\n}` : whole;
   });
