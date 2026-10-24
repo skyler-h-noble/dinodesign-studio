@@ -19,7 +19,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Body, Button, ToggleButtonGroup, Caption, Card, CodeBlock, H2, H3, HStack, Section, Select, Slider, Table, TextInput, VStack, Alert,
+  Body, Button, ToggleButtonGroup, Caption, Card, CodeBlock, H2, H3, HStack, Section, Select, Slider, Table, TextInput, VStack, Alert, ThemedZone,
 } from '@omni-design/components';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { fetchFigmaComponentSets, fetchFigmaImage, fetchFigmaNode } from '../utils/figmaApi';
@@ -841,9 +841,9 @@ export default function ParityPage() {
                     {component && windowBox(v, (
                       <>
                         {figmaCrop(v)}
-                        <Section {...zone} style={{ position: 'absolute', inset: 0, ...(play === 'fade' ? overlayFade : { opacity }) }}>
+                        <ThemedZone {...zone} style={{ position: 'absolute', inset: 0, background: 'transparent', ...(play === 'fade' ? overlayFade : { opacity }) }}>
                           {variantCell(v, { x: PAD, y: PAD }, false)}
-                        </Section>
+                        </ThemedZone>
                       </>
                     ), 'Overlay')}
                   </div>
@@ -876,9 +876,15 @@ export default function ParityPage() {
                 {/* The code layer paints its own surface, so at full opacity
                     it hides the Figma image completely and the slider fades
                     between the two. */}
-                <Section {...zone} style={{ position: 'absolute', inset: 0, ...overlayFade }}>
+                {/* ThemedZone, not Section: the code layer carries the zone's
+                    tokens but paints NO page background of its own, so where
+                    it overlaps the Figma image both show and the parity is
+                    visible. The design system paints any [data-theme]
+                    [data-surface] element, hence the explicit transparent —
+                    shell chrome for this harness, not a component. */}
+                <ThemedZone {...zone} style={{ position: 'absolute', inset: 0, background: 'transparent', ...overlayFade }}>
                   <div ref={codeRef} style={NO_POINTER}>{codeLayer}</div>
-                </Section>
+                </ThemedZone>
               </>,
               'Code over Figma',
             )}

@@ -12,6 +12,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
+import AddIcon from '@mui/icons-material/Add';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -936,7 +937,7 @@ const fab: ParityComponent = {
   ],
   render: (v, booleans) => (
     <Fab
-      icon={<HomeIcon />}
+      icon={<AddIcon />}
       extended={booleans.Extended ?? false}
       label={booleans.Extended ? 'Extended' : undefined}
       animate={false}
