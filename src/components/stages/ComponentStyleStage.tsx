@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { INPUT_RADIUS_MAX } from '../../utils/componentRadii';
 import {
-  Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
+  Button, ButtonGroup, ToggleButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
   TextInput, SearchField,
 } from '@omni-design/components';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -9,7 +9,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
-import { computeRadii, migrateLegacyRadii } from '../../utils/componentRadii';
+import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from '../../utils/componentRadii';
 import { shadowOptionsFromStyle, type ShadowOptions } from '../../utils/dropshadow';
 import '../../styles/component-style.css';
 import { CREATION_CHROME } from '../CreationNav';
@@ -39,6 +39,8 @@ export interface StyleCustomizations {
   smallButtonHeight: number;
   largeButtonHeight: number;
   minButtonWidth: number;
+  /** 1 or 2 (px) — see buttonBorderWidthPx. Absent on older systems: 1. */
+  buttonBorderWidth?: number;
   inputPadding: number;
   /* Shadow palette. Comeau's generator controls, driving every --Effect-Level
      recipe and the Figma shadow variables. Maths in utils/dropshadow.ts;
@@ -75,6 +77,7 @@ const DEFAULT_CUSTOMIZATIONS: Record<ComponentStyle, StyleCustomizations> = Obje
     smallButtonHeight: STYLE_DEFAULTS[k].smallButtonHeight,
     largeButtonHeight: STYLE_DEFAULTS[k].largeButtonHeight,
     minButtonWidth: STYLE_DEFAULTS[k].minButtonWidth,
+    buttonBorderWidth: 1,
     iconButtonRadius: STYLE_DEFAULTS[k].iconButtonRadius,
     inputRadius: STYLE_DEFAULTS[k].inputRadius,
     inputPadding: STYLE_DEFAULTS[k].inputPadding,
@@ -228,6 +231,20 @@ export default function ComponentStyleStage({
                     <Slider variant="default" label="Large Button Height" min={44} max={72} value={custom.largeButtonHeight} onChange={(_: any, v: number | number[]) => updateCustom('largeButtonHeight', v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Border Radius (px)" min={0} max={custom.largeButtonHeight} value={Math.round(custom.buttonRadius * custom.largeButtonHeight / 100)} onChange={(_: any, v: number | number[]) => setButtonRadiusPx(v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Minimum Width" min={40} max={120} value={custom.minButtonWidth} onChange={(_: any, v: number | number[]) => updateCustom('minButtonWidth', v as number)} size="small" valueLabelDisplay="auto" />
+                    {/* Border width: 1px or 2px. A selected button draws one
+                        pixel more, so selection stays heavier than rest. */}
+                    <VStack spacing={0.5} style={{ width: '100%' }}>
+                      <Label component="span">Border</Label>
+                      <ToggleButtonGroup
+                        value={String(buttonBorderWidthPx(custom.buttonBorderWidth))}
+                        onChange={(v: string) => v && updateCustom('buttonBorderWidth', Number(v))}
+                        size="small"
+                        aria-label="Button border width"
+                      >
+                        <Button value="1" size="small">1px</Button>
+                        <Button value="2" size="small">2px</Button>
+                      </ToggleButtonGroup>
+                    </VStack>
                     <Slider variant="default" label="Bevel" min={0} max={20} value={custom.bevel} onChange={(_: any, v: number | number[]) => updateCustom('bevel', v as number)} size="small" valueLabelDisplay="auto" />
                     <Slider variant="default" label="Bevel Opacity" min={0} max={100} value={custom.bevelOpacity} onChange={(_: any, v: number | number[]) => updateCustom('bevelOpacity', v as number)} size="small" valueLabelDisplay="auto" />
                   </VStack>
@@ -335,7 +352,10 @@ export default function ComponentStyleStage({
                   '--Sm-Button-Padding': 'var(--Button-Padding)',
                   '--Lg-Button-Padding': '16px',
                   '--Large-Button-Padding': 'var(--Lg-Button-Padding)',
-                  '--Button-Border-Width': '2px',
+                  // Was a hard-coded 2px while the export wrote 1px, so this
+                  // preview drew heavier buttons than the published system.
+                  '--Button-Border-Width': `${buttonBorderWidthPx(custom.buttonBorderWidth)}px`,
+                  '--Button-Selected-Border-Width': `${buttonSelectedBorderWidthPx(custom.buttonBorderWidth)}px`,
                   // Inject the user's bevel settings so the live preview matches
                   // the exported CSS exactly. Without these, the lib's Button
                   // falls back to its static --Button-Bevel (foundation.css)

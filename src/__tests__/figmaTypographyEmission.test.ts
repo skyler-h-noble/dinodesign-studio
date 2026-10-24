@@ -257,7 +257,9 @@ describe('the downloaded figma.json', () => {
   it('still writes the Button metrics that are NOT aliased', () => {
     /* The exclusion has to be exactly two names, not the whole group. */
     expect(out['Component-Size'].medium['Button/Button-Radius']).toBeDefined();
-    expect(out['Component-Size'].medium['Button/Button-Icon-Only']).toBeDefined();
+    // Retired 2026-10-20: icon-only buttons use Button-Icon (which is
+    // device-owned, so it is one of the two names excluded here).
+    expect(out['Component-Size'].medium['Button/Button-Icon-Only']).toBeUndefined();
   });
 
   it('every alias resolves to a name that is actually in the payload', () => {

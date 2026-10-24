@@ -3,6 +3,7 @@
  * Determines default theme settings based on Primary Color tone, surface style, and scheme type
  */
 import { toneToColorNumber } from '../colorScale';
+import { barPaletteAndTone } from '../backgroundSelection';
 
 /**
  * Map 12-tone Color-N to Background-N. Backgrounds are now 1:1 with Color-N
@@ -65,7 +66,7 @@ export function calculateDefaultThemeSettings(
   buttonStyle?: 'primary-adaptive' | 'primary-fixed' | 'black-white'
     | 'secondary-adaptive' | 'secondary-fixed'
     | 'tonal-adaptive' | 'tonal-fixed'
-    | 'laddered-adaptive' | 'laddered-fixed',
+    | 'laddered-adaptive' | 'laddered-fixed' | 'match-fixed',
   userSelections?: {
     defaultTheme?: 'light' | 'dark';
     background?: 'white' | 'black' | 'primary' | 'primary-light' | 'primary-medium' | 'primary-dark';
@@ -342,7 +343,18 @@ function mapNavSelectionToThemeAndN(
     case 'primary': { const pcN = toneToColorNumber(primaryColorTone); return { theme: 'Primary', n: pcN }; }
     case 'primary-bright': { const pcN = toneToColorNumber(primaryColorTone); return { theme: 'Primary', n: Math.min(pcN + 1, 12) }; }
     case 'primary-dim': { const pcN = toneToColorNumber(primaryColorTone); return { theme: 'Primary', n: Math.max(pcN - 1, 1) }; }
-    default: return mapSelectionToThemeAndN(selection, primaryColorTone);
+    default:
+      /* The current form, "Theme/Surface-Level" ("Tertiary/Surface-Bright"),
+         decoded by the shared barPaletteAndTone. It fell through to
+         mapSelectionToThemeAndN, which knows only the old names, so every
+         bar picked in the new picker was recorded as Primary — the CSS read
+         the selection itself and was right, the metadata the Figma import
+         reads was wrong, and Figma themed the bars Primary. */
+      if (selection.includes('/')) {
+        const b = barPaletteAndTone(selection, toneToColorNumber(primaryColorTone));
+        return { theme: b.theme, n: b.n };
+      }
+      return mapSelectionToThemeAndN(selection, primaryColorTone);
   }
 }
 
@@ -395,7 +407,9 @@ export function applyUserSelections(
   // Apply App Bar if selected
   if (userSelections.appBar) {
     const { theme, n } = mapNavSelectionToThemeAndN(userSelections.appBar, updated.defaultTheme, updated.defaultN, primaryColorTone, 'appBar');
-    updated.appBar = getSelectionName(theme, n);
+    // Keep the selection as picked when it is the Theme/Surface form — it is
+    // what the Figma payload decodes; getSelectionName cannot say a surface.
+    updated.appBar = userSelections.appBar.includes('/') ? userSelections.appBar : getSelectionName(theme, n);
     updated.appBarTheme = theme;
     updated.appBarN = n;
   }
@@ -403,7 +417,9 @@ export function applyUserSelections(
   // Apply Nav Bar if selected
   if (userSelections.navBar) {
     const { theme, n } = mapNavSelectionToThemeAndN(userSelections.navBar, updated.defaultTheme, updated.defaultN, primaryColorTone, 'navBar');
-    updated.navBar = getSelectionName(theme, n);
+    // Keep the selection as picked when it is the Theme/Surface form — it is
+    // what the Figma payload decodes; getSelectionName cannot say a surface.
+    updated.navBar = userSelections.navBar.includes('/') ? userSelections.navBar : getSelectionName(theme, n);
     updated.navBarTheme = theme;
     updated.navBarN = n;
   }
@@ -411,7 +427,9 @@ export function applyUserSelections(
   // Apply Status Bar if selected
   if (userSelections.status) {
     const { theme, n } = mapNavSelectionToThemeAndN(userSelections.status, updated.defaultTheme, updated.defaultN, primaryColorTone, 'status');
-    updated.status = getSelectionName(theme, n);
+    // Keep the selection as picked when it is the Theme/Surface form — it is
+    // what the Figma payload decodes; getSelectionName cannot say a surface.
+    updated.status = userSelections.status.includes('/') ? userSelections.status : getSelectionName(theme, n);
     updated.statusTheme = theme;
     updated.statusN = n;
   }

@@ -305,7 +305,7 @@ no rebuild.
 | contact layer | always `0.3px 0.5px 0.7px` with no spread, at every tier and every Resolution |
 | offset curve | **exponential**, `y = Y_MIN + (yMax − Y_MIN)(a^t − 1)/(a − 1)` with a = 12.14 |
 | blur | 1.257 × offset-y at Crispness 0.5 |
-| spread | linear, 0 at the contact layer to −2.5 at the outermost, **uncapped** |
+| spread | **0 on every layer** (see *No spread*, below) |
 
 The offset curve is the interesting one. His high tier at 9 layers and his
 medium at 5 have different envelopes and different layer counts, yet normalise
@@ -324,7 +324,7 @@ stated in a comment confidently enough to survive:
 | Level-5 distance | 74px | 50px |
 | offset curve | cubic `t^3` | exponential, a = 12.14 |
 | blur ratio | 1.35 × y at Crispness 0.5 | 1.257 |
-| spread | capped against the envelope *and* the blur | uncapped |
+| spread | capped against the envelope *and* the blur | 0 — no spread at all |
 | layer counts | 1..3 / 2..4 / 3..6 / 4..8 / 5..10 | 2..3 / 2..4 / 2..5 / 3..7 / 3..10 |
 
 The caps are worth singling out. Both only ever fired on the small levels, so
@@ -412,3 +412,21 @@ at default Resolution — `FAB/Hover` Elevated holds 6 where Level-5 at 0.75
 gives 8. The file was last written by an older run, from before the shadow
 model was corrected against the captures. A regenerate and import will change
 the Fab's shadow, which is expected and correct, not a regression.
+
+
+## No spread
+
+Comeau's tool tucks the outer layers in with negative spread (up to −5px at
+Crispy 1), and the generator used to follow it. It no longer does: every layer's
+spread is 0.
+
+Figma ignores a shadow's spread on a frame that has no fill or does not clip its
+content — which is how nearly every component carries its shadow. So the shadow
+every design was drawn against in Figma was always the spread-0 one. CSS honours
+spread, and at Crispy 1 the −5px pulled the Level 1 shadow's outer layer wholly
+under the element: the Accordion's shadow was in the computed style and
+invisible on screen.
+
+Crispy now drives the blur alone (1.707 − 0.9 × crispy, times the offset) — the
+half of it Figma has always shown. `effectLevels.test.ts` pins spread 0 on every
+layer of every level at Crispy 0, 0.5 and 1.

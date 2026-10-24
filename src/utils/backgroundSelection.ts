@@ -18,6 +18,8 @@
  * the picker offered them, and narrowing what parses would silently repaint
  * those brands white.
  */
+import { surfaceWindow, neutralSurfaceWindow, MIN_SURFACE_TONE, MAX_SURFACE_TONE } from './surfaceWindow';
+
 export const ALL_THEMES = ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const;
 export type BackgroundTheme = typeof ALL_THEMES[number];
 
@@ -124,6 +126,40 @@ export function toneFor(
   }
 }
 
+/**
+ * The tone a BAR (App Bar, Nav Bar, Status Bar) paints at a surface level.
+ *
+ * The theme's own ladder, not toneFor's. A bar is published to Figma as a
+ * Theme mode plus a Surface mode, and Figma can only show a tone some surface
+ * level actually has. toneFor puts Bright halfway between the core and the
+ * lightest tone — Popsicle's Tertiary · Bright was Color-9 — while the theme's
+ * Surface-Bright is the core + 1 (Color-7), so code drew a light blue and
+ * Figma, faithfully setting Theme=Tertiary, Surface=Surface-Bright, drew a
+ * mid blue, and no Figma setting could match code. Reading surfaceWindow
+ * makes every bar a real Theme × Surface combination.
+ *
+ * Neutral keeps toneFor's fixed tones: its bars are the white / black ends,
+ * which the theme ladder reaches only through clamping.
+ */
+export function barToneFor(
+  theme: BackgroundTheme,
+  surface: SurfaceLevel,
+  coreToneN?: number,
+): number {
+  /* Neutral reads its LOCKED window — black / 9 / 10 / 11 / white — which is
+     what the export's Neutral theme paints (generateSingleTheme), and so what
+     Figma shows for a Neutral bar at any level. It used to keep toneFor's
+     page ladder, so "Neutral · Base" was a mid grey in the studio and a
+     near-white in Figma. */
+  if (theme === 'Neutral') {
+    const step = neutralSurfaceWindow().find((s) => s.level === surface);
+    return step ? step.toneIndex : toneFor(theme, surface, coreToneN);
+  }
+  const core = Math.min(Math.max(Math.round(coreToneN ?? LEVEL_TONE.Surface), MIN_SURFACE_TONE), MAX_SURFACE_TONE);
+  const step = surfaceWindow(core).find((s) => s.level === surface);
+  return step ? step.toneIndex : core;
+}
+
 /** The four options the picker used to offer, and the tones they resolve to. */
 const LEGACY: Record<string, BackgroundSelection> = {
   'white':         { theme: 'Neutral', surface: 'Surface-Brightest' },
@@ -160,6 +196,21 @@ export function parseBackground(
     }
   }
   return { theme: 'Neutral', surface: 'Surface-Brightest' };   // white
+}
+
+/**
+ * The Default page in DARK mode: the chosen background's THEME at Color-2.
+ *
+ * docs/background-selection.md: "the theme carries over, the tone does not".
+ * The preview, the CSS export and the Figma payload each had their own copy
+ * of this, and they had drifted: all three kept the theme only for the
+ * primary strings (so a Secondary or Tertiary pick went Neutral), and the
+ * preview's copy lacked plain 'primary' entirely, painting that choice as a
+ * Neutral page at tone 3 while the export painted Primary-2.
+ */
+export const DARK_PAGE_N = 2;
+export function darkPageTheme(value: string | BackgroundSelection | null | undefined): BackgroundTheme {
+  return parseBackground(value).theme;
 }
 
 /** The serialised form stored on the design system. */
@@ -247,7 +298,7 @@ export function barPaletteAndTone(
   const sel = parseBar(value);
   return {
     palette: sel.theme,
-    n: toneFor(sel.theme, sel.surface, coreToneN),
+    n: barToneFor(sel.theme, sel.surface, coreToneN),
     theme: sel.theme,
     surface: sel.surface,
   };

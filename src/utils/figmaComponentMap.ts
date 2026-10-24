@@ -45,11 +45,15 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Avatar:            { page: 'Avatar', sets: ['Avatar'] },
   Badge:             { page: 'Badge', sets: ['Badge Counter'] },
   Box:               { page: 'Box', sets: ['Box'] },
-  Breadcrumbs:       { page: 'Breadcrumbs', sets: ['Breadcrumb-Segments', 'Breadcrumbs-separator'] },
+  Breadcrumbs:       { page: 'Breadcrumbs', sets: ['Breadcrumbs', 'Breadcrumb-Segments', 'Breadcrumbs-separator'],
+                       note: 'Breadcrumbs is the assembled trail (a component, not a set); the two parts are hidden building blocks, named .Breadcrumb-Segments and .Breadcrumbs-separator in Figma.' },
   Button:            { page: 'Button', sets: ['Button'] },
-  ButtonGroup:       { page: 'ButtonGroup',
-                       sets: ['ButtonGroup', 'Button-Group-Segments', 'Separated-Button-Segments'],
-                       note: 'Two segment sets: connected segments carry left/center/right end caps, separated ones do not.' },
+  /* Split 2026-10: ButtonGroup is a row of joined ACTIONS with no selection;
+     the old ButtonGroup set (with its segments) is now ToggleButtonGroup, the
+     selection control, on its own page. Separated-Button-Segments is gone —
+     separated segments are plain Buttons with a gap. */
+  BrandIcon:         { page: 'Brand', sets: ['Brand'] },
+  ButtonGroup:       { page: 'ButtonGroup', sets: ['ButtonGroup'] },
   Card:              { page: 'Card', sets: ['Card', 'Quote Cards', 'Card Content / Ecommerce'] },
   Charts:            { page: 'Data Visualization', sets: ['Bar-Basic'],
                        note: 'The page is named for the discipline, the export for the component.' },
@@ -95,7 +99,8 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Pagination:        { page: 'Pagination', sets: ['Pagination Number'] },
   Progress:          { page: 'Progress Indicators', sets: ['Progress Bar', 'Progress Dial'],
                        note: 'One page for what the library splits into CircularProgress, LinearProgress and Progress.' },
-  Radio:             { page: 'Radio', sets: ['Radio Group', 'Radio'] },
+  Radio:             { page: 'Radio', sets: ['Radio', 'RadioField'],
+                       note: 'RadioField is the radio with its field label and helper text; it replaced the Radio Group set.' },
   Rail:              { page: 'Rail', sets: ['Nav Rail', 'Nav Rail Item', 'Expandable Nav Rail Item', 'Drawer Title'] },
   Rating:            { page: 'Rating', sets: ['Rating', 'Star'] },
   Ratio:             { page: 'Ratio', sets: ['Ratio - Fill Horizontal', 'Ratio - Fill Vertical'] },
@@ -104,8 +109,13 @@ export const FIGMA_COMPONENT_MAP: Record<string, FigmaComponentMapping> = {
   Snackbar:          { page: 'Snackbar', sets: ['Snackbar', 'Snack'] },
   SpeedDial:         { page: 'SpeedDial', sets: ['SpeedDial'] },
   Stepper:           { page: 'Stepper', sets: ['Stepper', 'Count Step', 'No-Count Step', 'Step - Line'] },
-  Switch:            { page: 'Switch', sets: ['Switch'] },
+  Swatch:            { page: 'Swatch', sets: ['Swatch', 'SwatchField'],
+                       note: 'SwatchField is the swatch with its field label and helper text (the Forms label system).' },
+  Switch:            { page: 'Switch', sets: ['Switch', 'SwitchField'],
+                       note: 'Documented as SwitchInput. SwitchField is the switch with its field label and helper text.' },
   Table:             { page: 'Table', sets: ['Table Header Row', 'Table Body Row'] },
+  ToggleButtonGroup: { page: 'ToggleButtonGroup', sets: ['ToggleButtonGroup', 'Button-Group-Segments'],
+                       note: 'The selection control. Button-Group-Segments are its joined segments, with left/center/right end caps.' },
   Tabs:              { page: 'Tabs', sets: ['Tabs', 'Tab'],
                        note: 'Tabs is the container, Tab one row. The library also exports TabList, which Figma folds into Tabs.' },
   Tag:               { page: 'Tag', sets: ['Tag'] },
@@ -152,13 +162,12 @@ export const NO_FIGMA_PAGE = {
   /**
    * Out of scope for now.
    *
-   * ToggleButtonGroup is retired — a shim onto ButtonGroup, and it should
-   * never get a page. ToggleButton has a Figma page but no component set: it
+   * ToggleButton has a Figma page but no component set: it
    * is drawn, not built, and the design is still being settled. Documenting a
    * component whose design is in flux teaches the wrong thing, so it stays off
    * the list until the set exists.
    */
-  deferred: ['ToggleButtonGroup', 'ToggleButton'],
+  deferred: ['ToggleButton'],
 } as const;
 
 /**
@@ -172,10 +181,11 @@ export const NO_LIBRARY_COMPONENT = [
   'Status Bar', 'Text Editor',
 ] as const;
 
-/** Pages that are not components at all, and should never be matched. */
+/** Pages that are not components at all, and should never be matched.
+ *  (Brand left this list: it now holds the Brand set, which is BrandIcon.) */
 export const NON_COMPONENT_PAGES = [
   'Almost Theme! - Import your Dino Design', 'Page 13', 'Adaptive Templates',
-  'Brand', 'Forms', 'Hero', 'Shapes', 'Design to Code Test',
+  'Forms', 'Hero', 'Shapes', 'Design to Code Test',
 ] as const;
 
 /** Where a library component lives in Figma, or null if it has no page. */

@@ -86,6 +86,7 @@ for token/theme details.)
 | Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
 | Selection | `Checkbox`, `Radio`, `RadioGroup`, `SwitchInput`, `Slider`/`SliderInput`, `RangeSlider`, `Rating` |
+| Dates | `DatePicker` (single or `selectionMode="range"`), `DayCell` |
 | Layout | `VStack`, `HStack`, `Stack`, `Box`, `Grid`, `Container`, `Divider`, `Spacing` |
 | Surfaces | `Card`, `SelectableCard`, `Paper`, `Surfaced`, `ThemedZone` |
 | Navigation | `Tabs`/`Tab`/`TabList`/`TabPanel`, `Breadcrumbs`, `Pagination`, `Stepper`, `BottomNavigation`, `AppBar`, `Sidebar` |
@@ -547,13 +548,16 @@ sizes, same leading.
 ```tsx
 <Body>Normal body copy.</Body>
 <Typography variant="body-semibold">Semibold body copy.</Typography>
-<Subtitle color="standard">Bold body copy.</Subtitle>
+<Subtitle>Bold body copy.</Subtitle>
 ```
 
-Two traps: `variant="body-bold"` silently resolves to the *semibold* style (it
-is a back-compat alias, not a 700), and Subtitle defaults to `color="header"`
-while Body defaults to `color="standard"` — so pass `color="standard"` when you
-are using Subtitle purely to get weight, or the text changes colour too.
+One trap: `variant="body-bold"` silently resolves to the *semibold* style (it
+is a back-compat alias, not a 700).
+
+Subtitle defaults to `--Text`, like Body (from `@omni-design/components`
+0.14.29). It used to default to `--Header`, but Subtitle is body-sized and
+needs 4.5:1, while `--Header` only promises the 3:1 that large text gets.
+Headings (h1–h6, display) keep `--Header`.
 
 Full rationale and the `--Body-Bold-Font-Weight` caveat: the lib's CLAUDE.md,
 *Body has two weights — Subtitle is the bold one*.

@@ -224,6 +224,10 @@ export async function regenerateDesignSystem(target: DesignSystemTarget): Promis
 
   await setDoc(doc(db, 'designSystems', target.id), {
     updatedAt: serverTimestamp(),
+    /* Its own field: updatedAt also moves on a rename, so it cannot say when
+       the published files were last rebuilt — which is what someone checking
+       "did my regenerate land before I imported?" needs to know. */
+    regeneratedAt: serverTimestamp(),
     version: nextVersion,
   }, { merge: true });
 

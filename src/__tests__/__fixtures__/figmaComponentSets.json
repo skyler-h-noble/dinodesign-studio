@@ -1,6 +1,6 @@
 {
   "_comment": "Captured from the library Figma file Qv2dqF7mYoAGY77EkdrwTv on 2026-09-30. Node ids are per COPY of the template and are NOT used for matching - the plugin reports the user's own at link time. They are captured so drift in this capture is visible. Page and set NAMES are what figmaComponentMap keys on. `pages` is every page; `sets` covers component SETS plus the handful of lone COMPONENTs on pages that have no set. Pages with a set are not scanned for lone components: the Icon page holds ~600 individual glyphs, which are artwork.",
-  "capturedAt": "2026-10-01 (third capture: CodeBlock designed — page and lone COMPONENT added; it moved out of NO_FIGMA_PAGE.undesigned)",
+  "capturedAt": "2026-10-01 (third capture: CodeBlock designed — page and lone COMPONENT added; it moved out of NO_FIGMA_PAGE.undesigned); 2026-10-20: Breadcrumbs (assembled component), Swatch and SwatchField, SwitchField, Switch re-id, ButtonGroup split into ButtonGroup and a ToggleButtonGroup page; Radio Group renamed RadioField (Figma name currently has a trailing space)",
   "fileKey": "Qv2dqF7mYoAGY77EkdrwTv",
   "sets": [
     {
@@ -53,6 +53,12 @@
     },
     {
       "page": "Breadcrumbs",
+      "name": "Breadcrumbs",
+      "id": "8424:36170",
+      "variants": 1
+    },
+    {
+      "page": "Breadcrumbs",
       "name": "Breadcrumb-Segments",
       "id": "3156:5336",
       "variants": 2
@@ -70,22 +76,22 @@
       "variants": 75
     },
     {
-      "page": "ButtonGroup",
-      "name": "ButtonGroup",
+      "page": "ToggleButtonGroup",
+      "name": "ToggleButtonGroup",
       "id": "6599:138",
-      "variants": 4
+      "variants": 8
     },
     {
-      "page": "ButtonGroup",
+      "page": "ToggleButtonGroup",
       "name": "Button-Group-Segments",
       "id": "7981:9443",
-      "variants": 108
+      "variants": 300
     },
     {
       "page": "ButtonGroup",
-      "name": "Separated-Button-Segments",
-      "id": "8422:34618",
-      "variants": 12
+      "name": "ButtonGroup",
+      "id": "9350:37170",
+      "variants": 4
     },
     {
       "page": "Card",
@@ -293,9 +299,9 @@
     },
     {
       "page": "Radio",
-      "name": "Radio Group",
+      "name": "RadioField",
       "id": "6778:13979",
-      "variants": 2
+      "variants": 5
     },
     {
       "page": "Rail",
@@ -394,10 +400,28 @@
       "variants": 2
     },
     {
+      "page": "Swatch",
+      "name": "Swatch",
+      "id": "9212:6816",
+      "variants": 24
+    },
+    {
+      "page": "Swatch",
+      "name": "SwatchField",
+      "id": "9575:2390",
+      "variants": 5
+    },
+    {
       "page": "Switch",
       "name": "Switch",
-      "id": "6779:2252",
+      "id": "9212:6767",
       "variants": 10
+    },
+    {
+      "page": "Switch",
+      "name": "SwitchField",
+      "id": "9575:2434",
+      "variants": 5
     },
     {
       "page": "SpeedDial",
@@ -636,7 +660,9 @@
     "ToggleButton",
     "TreeView",
     "Typography",
-    "Design to Code Test"
+    "Design to Code Test",
+    "Swatch",
+    "ToggleButtonGroup"
   ],
   "componentSizeGroups": [
     "Accordion",

@@ -274,14 +274,17 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
    * inside an 8px corner emerges at 5px with nobody computing it. Figma cannot
    * do arithmetic on a variable, so the two values have to be stated.
    *
-   * The inset is 3, not the 1 that `inner()` applies to Input. Input's inner
-   * focus sits 1px in; the accordion's sits 3px in, matching the lib's
-   * outlineOffset: -3px. Reusing inner() here would emit 7 and put Figma's
-   * ring a step off what the CSS actually draws — the two would look
-   * concentric in neither place. */
-  const ACCORDION_FOCUS_INSET = 3;
-  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_INSET;
-  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_FOCUS_INSET);
+   * The OUTSIDE ring (a lone segment) has its outer edge 3px out — a 2px
+   * outline 1px off the segment — so its corner is radius + 3. The INSIDE
+   * ring (a connected segment) has its outer edge 2px in — a 3px outline at
+   * -5px, as Figma's frame 2px in with an INSIDE stroke — so its corner is
+   * radius - 2. That was radius - 3, from when the inner ring sat 3px in: a
+   * 16px corner gave 13 where the ring now needs 14, and Figma's inset ring
+   * ran 1px off concentric. */
+  const ACCORDION_FOCUS_OUTSET = 3;
+  const ACCORDION_INNER_FOCUS_INSET = 2;
+  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_OUTSET;
+  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_INNER_FOCUS_INSET);
 
   const CARD_RADIUS_MAX = 24;
   const cardRadius = Math.min(cardCornerBase + cardPadding, CARD_RADIUS_MAX);
@@ -651,4 +654,24 @@ export function migrateLegacyRadii<T extends Partial<RadiiInput> & { radius?: nu
     smallButtonHeight: cs.smallButtonHeight ?? 24,
     largeButtonHeight: cs.largeButtonHeight ?? 56,
   } as T & RadiiInput;
+}
+
+/**
+ * The button border width, a style choice: 1px (default) or 2px.
+ *
+ * One value for the CSS export, the Figma payload and the live preview. Only
+ * the border moves — the inner heights and swatches are measured off the
+ * OUTER button size, so a 2px border does not change a button's footprint. A
+ * SELECTED button draws one pixel more (buttonSelectedBorderWidthPx).
+ */
+export function buttonBorderWidthPx(v?: number | null): 1 | 2 {
+  return v === 2 ? 2 : 1;
+}
+
+/** A SELECTED button's border: the rest width plus 1px — 2px on a 1px brand,
+ *  3px on a 2px one — so selection always reads one pixel heavier. Its own
+ *  token because a Figma variable cannot be arithmetic: the selected stroke
+ *  binds to this the way the rest stroke binds to Button-Border-Width. */
+export function buttonSelectedBorderWidthPx(v?: number | null): 2 | 3 {
+  return (buttonBorderWidthPx(v) + 1) as 2 | 3;
 }

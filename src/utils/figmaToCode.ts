@@ -1239,7 +1239,21 @@ function attachAaidNotes(node: any): void {
   if (!node || typeof node !== 'object') return;
   const shared = node.sharedPluginData;
   if (shared && shared.dino && typeof shared.dino.aaid === 'string') {
-    try { node._aaid = JSON.parse(shared.dino.aaid); } catch { /* ignore malformed note */ }
+    try {
+      node._aaid = JSON.parse(shared.dino.aaid);
+      /* Mode keys by their bare collection name. A file that hides a collection
+         from its published library names it with a leading "." (.Theme,
+         .Elevation), and notes written before the plugin stripped it carry
+         that name — which the prompt's modes.Theme / modes.Elevation would
+         read as absent, and an absent Theme means Default. */
+      const modes = node._aaid?.modes;
+      if (modes && typeof modes === 'object') {
+        for (const k of Object.keys(modes)) {
+          const bare = k.replace(/^[._]/, '');
+          if (bare !== k) { if (!(bare in modes)) modes[bare] = modes[k]; delete modes[k]; }
+        }
+      }
+    } catch { /* ignore malformed note */ }
   }
   if (node.sharedPluginData) delete node.sharedPluginData;
   if (Array.isArray(node.children)) {

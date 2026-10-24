@@ -2,7 +2,9 @@ import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from
 import {
   bevelCSS, bevelJSON, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
   platformBevelCSS,
+  fabBevelVars,
 } from './bevelGeometry';
+import { FAB_SIZE } from './componentSize';
 import { extractHeroImage } from './heroImage';
 import { STORAGE_BUCKET } from './firebase/client';
 import type { ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../types';
@@ -58,6 +60,7 @@ function mapButtonStyle(button: string): string {
     case 'secondary': return 'secondary-fixed';
     case 'tonal': return 'tonal-fixed';
     case 'laddered': return 'laddered-fixed';
+    case 'match': return 'match-fixed';
     case 'black-white': return 'black-white';
     default: return 'primary-fixed';
   }
@@ -862,6 +865,8 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
         navBar: input.userSelections.navBar as any,
         status: input.userSelections.status as any,
         button: mapButtonStyle(input.userSelections.button) as any,
+        buttonTone: input.userSelections.buttonTone,
+        buttonCellTones: input.userSelections.buttonCellTones,
         cardColoring: input.userSelections.cardColoring,
         textColoring: input.userSelections.textColoring,
       },
@@ -1083,6 +1088,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Bevel: ${bevelPercent};
   --Button-Bevel-Px: ${bevelPx}px;
   --Button-Bevel-Opacity: ${bevelOpacity / 100};
+${Object.entries(fabBevelVars(FAB_SIZE, bevelPercent)).map(([k, v]) => `  ${k}: ${v};`).join('\n')}
   /* Bevel geometry — the literal box-shadow numbers, same values the Figma
      Platform/Components collections carry (there as bare numbers, here as px).
      Small and large don't vary by platform, so they live here; medium's live
@@ -1610,6 +1616,10 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
           version: input.version ?? 1,
           lastModified: new Date().toISOString(),
           name: input.designSystemName,
+          /* The plugin points Buttons › Outline-Text / Outline-Quiet at the
+             surface's own Text / Quiet under Black & White text, and at the
+             button's palette under Tonal — the rule outlineFor applies in CSS. */
+          textColoring: (input.userSelections as { textColoring?: string } | undefined)?.textColoring ?? 'tonal',
         };
         return JSON.stringify(figmaPayload, null, 2);
       } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; }

@@ -76,7 +76,13 @@ declare module '@omni-design/components' {
   export const ButtonGroup: FC<any>;
   export const ButtonIcon: FC<any>;
   export const Fab: FC<any>;
+  export const FieldButton: FC<any>;
+  export const FormHelper: FC<any>;
+  export const FormLabel: FC<any>;
+  export const LinkGroup: FC<any>;
+  export const ImagePlaceholder: FC<any>;
   export const Rail: FC<any>;
+  export const RailItem: FC<any>;
   export const Toolbar: FC<any>;
   export const ToggleButton: FC<any>;
   export const ToggleButtonGroup: FC<any>;
@@ -85,7 +91,10 @@ declare module '@omni-design/components' {
   // Inputs
   export const TextField: FC<any>;
   export const TextInput: FC<any>;
-  export const Input: FC<any>;
+  export const InputDecorator: FC<any>;
+  /* No `Input`: the package exports the field as TextInput only. Declaring
+     Input here let `import { Input }` typecheck and then crash the page at
+     runtime — a shim promising an export the package lacks. */
   export const Select: FC<any>;
   export const Autocomplete: FC<any>;
   export const Checkbox: FC<any>;
@@ -188,6 +197,7 @@ declare module '@omni-design/components' {
   export const MenuButton: FC<any>;
   export const BottomNavigation: FC<any>;
   export const Stepper: FC<any>;
+  export const Step: FC<any>;
   export const SpeedDial: FC<any>;
 
   // Surfaces
@@ -223,6 +233,8 @@ declare module '@omni-design/components' {
      omitting what does exist hides a usable component. */
   export const IconBadge: FC<any>;
   export const Divider: FC<any>;
+  export const DatePicker: FC<any>;
+  export const DayCell: FC<any>;
   export const List: FC<any>;
   export const Slider: FC<any>;
   export const Table: FC<any>;
@@ -267,4 +279,20 @@ declare module '@omni-design/components' {
   export const ListItem: FC<any>;
   export const EmailTextField: FC<any>;
   export const BreadcrumbItem: FC<any>;
+
+  /* Chart color-vision sets (0.14.31, Charts/colorVision.js) — verified in the
+     published bundle before being declared here. Typed, not `any`: the studio
+     generator reads them. [light ground, dark ground] per color. */
+  type ChartColorPair = readonly [string, string];
+  export const CHART_COLOR_VISION: Record<
+    'red-weak' | 'red-blind' | 'green-weak' | 'green-blind' | 'blue-weak' | 'blue-blind' | 'blue-cone',
+    {
+      figma: string;
+      label: string;
+      series: readonly ChartColorPair[];
+      states: { Error: ChartColorPair; Warning: ChartColorPair; Success: ChartColorPair; Info: ChartColorPair };
+    }
+  >;
+  export const COLOR_VISIONS: ReadonlyArray<keyof typeof CHART_COLOR_VISION>;
+  export function chartColorVisionCSS(levels?: ReadonlyArray<'Surface-Brightest' | 'Surface-Dimmest'>): string;
 }

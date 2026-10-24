@@ -50,6 +50,7 @@ import LandingPage from './components/LandingPage';
 import AddOnCatalogPage from './components/AddOnCatalogPage';
 import AccessibilityReport from './components/AccessibilityReport';
 import DesignSystemDetail from './components/DesignSystemDetail';
+import ParityPage from './components/ParityPage';
 import MyDesignsPage from './components/MyDesignsPage';
 import AdminProposals from './components/AdminProposals';
 import TypographyTestPage from './components/TypographyTestPage';
@@ -135,6 +136,7 @@ function MainApp() {
     navBar: 'primary-light',
     status: 'primary-light',
     button: 'primary',
+    buttonTone: 'fixed',
     cardColoring: 'tonal',
     textColoring: 'tonal',
     decorativeMode: 'surface-components',
@@ -1113,6 +1115,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/parity" element={<ParityPage />} />
         <Route path="/add-ons" element={<AddOnCatalogPage />} />
         <Route path="/create" element={<MainApp />} />
         <Route path="/playground" element={<Playground />} />

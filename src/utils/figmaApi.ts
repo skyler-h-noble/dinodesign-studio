@@ -98,3 +98,39 @@ export async function fetchFigmaVariables(
     return {};
   }
 }
+
+/** The file's published component sets — name, node id and page. Only sets
+ *  that have been published to the team library appear here. */
+export async function fetchFigmaComponentSets(
+  fileKey: string,
+  token: string,
+): Promise<Array<{ nodeId: string; name: string; page: string }>> {
+  const res = await fetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, {
+    headers: { 'X-Figma-Token': token },
+  });
+  if (!res.ok) throw new Error(`Figma component sets API ${res.status}`);
+  const json = await res.json();
+  const sets: Array<{ nodeId: string; name: string; page: string }> = (json.meta?.component_sets ?? []).map((s: any) => ({
+    nodeId: s.node_id,
+    name: s.name,
+    page: s.containing_frame?.pageName ?? '',
+  }));
+  /* The listing carries the name as last PUBLISHED. Ask the file for each
+     set's current name too, so a rename — like a leading "." that makes a set
+     private — counts at once rather than at the next library publish. A
+     failure here keeps the published names. */
+  try {
+    const ids = sets.map((x) => x.nodeId).join(',');
+    const nodes = await fetch(`https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(ids)}&depth=1`, {
+      headers: { 'X-Figma-Token': token },
+    });
+    if (nodes.ok) {
+      const nj = await nodes.json();
+      for (const x of sets) {
+        const doc = nj.nodes?.[x.nodeId]?.document;
+        if (doc?.name) x.name = doc.name;
+      }
+    }
+  } catch { /* keep the published names */ }
+  return sets;
+}

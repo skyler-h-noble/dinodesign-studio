@@ -35,15 +35,22 @@ import { DEVICES_COLLECTION } from '../utils/typographyPlatform';
  * having it is what happened with Components.
  */
 const FILE_COLLECTIONS = [
-  'Add-Ons', 'Alt-Display', 'Buttons', 'Charts', 'Component-Elevations',
-  'Component-Size', 'Device-Sizes', 'Devices-Type', 'Drop-Colors', 'Elevation',
-  'Icons & Avatars', 'Menu-Levels', 'Modes', 'Sizing', 'Spacing', 'Surface',
-  'Theme', 'Typography',
+  /* The names AS THE FILE HAS THEM (read 2026-10-19). A leading "." keeps a
+     collection out of the published library; the payload and the plugin name
+     it bare and the plugin's findCollection takes the dotted one first. This
+     list used to hold bare names for all of them, which is how a plugin that
+     looked up 'Modes' in a file holding '.Modes' — and created a visible
+     duplicate — passed this test. */
+  '.Alt-Display', 'Buttons', 'Chart', 'Chart-Colors', '.Component-Elevations',
+  'Component-Size', 'Device-Sizes', 'Devices-Type', '.Drop-Colors', '.Elevation',
+  'Icons', 'Icons & Avatars', '.Menu-Levels', '.Modes', 'Sizing', 'Spacing', 'State-Chart', 'Surface',
+  '.Theme', 'Typography',
   /* Created by the plugin's own importer (populatePageLayout) on the first
-     import that carries it — the one collection here the file did not start
-     with. Deliberate: it is new, so a duplicate cannot happen. */
+     import that carries it. Visible on purpose: designers pick its mode. */
   'Page-Layout',
 ] as const;
+/** A collection name as the payload and the plugin's lookup compare it. */
+const bare = (n: string) => n.replace(/^[._]/, '');
 
 /** Payload sections that ARE collections, and must name a real one. */
 const EMITS_COLLECTION = [
@@ -117,16 +124,16 @@ describe('the payload names only collections the file has', () => {
   });
 
   it('every collection-shaped section names a collection that exists', () => {
-    const file = new Set<string>(FILE_COLLECTIONS);
-    const missing = EMITS_COLLECTION.filter((c) => !file.has(c));
+    const file = new Set<string>(FILE_COLLECTIONS.map(bare));
+    const missing = EMITS_COLLECTION.filter((c) => !file.has(bare(c)));
     expect(missing,
       'The plugin CREATES a collection for a name the file lacks, rather than ' +
       'failing — so this is a silent duplicate, not an error.').toEqual([]);
   });
 
   it('no not-a-collection section shares a name with a collection', () => {
-    const file = new Set<string>(FILE_COLLECTIONS);
-    expect(NOT_A_COLLECTION.filter((k) => file.has(k))).toEqual([]);
+    const file = new Set<string>(FILE_COLLECTIONS.map(bare));
+    expect(NOT_A_COLLECTION.filter((k) => file.has(bare(k)))).toEqual([]);
   });
 
   it('does not emit Components — the section this check exists for', () => {

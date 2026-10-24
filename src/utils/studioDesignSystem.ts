@@ -102,14 +102,16 @@ function ensureFonts(urls: string[]): void {
  * defaults are already in the bundle, so the app is styled from the first
  * frame and this refines it — a network hiccup costs the brand, never the UI.
  */
-export async function applyStudioDesignSystem(id: string): Promise<void> {
+export async function applyStudioDesignSystem(id: string): Promise<boolean> {
   let combined = cache.get(id);
   if (combined === undefined) {
     const parts = await Promise.all(SHEETS.map((f) => fetchText(fileUrl(id, f))));
     combined = parts.join('\n\n');
     if (combined.trim()) cache.set(id, combined);
   }
-  if (!combined.trim()) return;
+  // True once applied; false when the id published nothing (a typo, or a
+  // system that was deleted) — the studio then stays on what it had.
+  if (!combined.trim()) return false;
 
   const fonts = new Set<string>();
   // Match the WHOLE @import — url() and all — so a css2 URL's internal
@@ -131,4 +133,5 @@ export async function applyStudioDesignSystem(id: string): Promise<void> {
   style.id = STYLE_ID;
   style.textContent = css;
   document.head.appendChild(style);
+  return true;
 }

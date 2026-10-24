@@ -163,7 +163,12 @@ describe('button Quiet — the exported token', () => {
               for (const [pal, e] of Object.entries<any>(section.Buttons)) {
                 if (!e?.Quiet || !e.Text) continue;
                 const t = resolve(e.Text), q = resolve(e.Quiet);
-                if (t.startsWith('#') && q.startsWith('#')
+                /* A black or white label is exempt: on a Black/White face, and
+                   under Black & White text, the resting label is the same black
+                   or white as the active one by design — a grey rest label was
+                   the dark-mode white button's illegible grey text. */
+                const bw = (h: string) => ['#ffffff', '#1a1a1a', '#000000'].includes(h.slice(0, 7).toLowerCase());
+                if (t.startsWith('#') && q.startsWith('#') && !bw(t)
                     && t.slice(0, 7).toLowerCase() === q.slice(0, 7).toLowerCase()) {
                   same.push(`${tn}/${sn}/${pal} = ${t}`);
                 }
@@ -172,7 +177,55 @@ describe('button Quiet — the exported token', () => {
           expect(same).toEqual([]);
         });
 
-        it(`Outline-Quiet is the SECTION's quiet, not the palette's — ${where}`, () => {
+        /* The lib reads --Buttons-Default-Outline-Quiet first, so the Default
+           entry needs one IN EVERY SECTION. Containers had none and inherited
+           the page's — on a dark page with a light card, a light quiet on a
+           light card. */
+        it(`every button carries an Outline-Quiet that reads on its section — ${where}`, () => {
+          const resolve = makeResolver(json, mode);
+          const fails: string[] = [];
+          let checked = 0;
+          for (const [tn, theme] of Object.entries<any>(json.Modes[mode].Themes))
+            for (const [sn, section] of Object.entries<any>(theme)) {
+              if (!section?.Buttons || !section.Background) continue;
+              const bg = resolve(section.Background);
+              for (const [pal, e] of Object.entries<any>(section.Buttons)) {
+                if (!e || typeof e !== 'object') continue;
+                if (!e['Outline-Quiet']) { fails.push(`${tn}/${sn}/${pal} missing`); continue; }
+                const q = resolve(e['Outline-Quiet']);
+                if (!bg.startsWith('#') || !q.startsWith('#')) continue;
+                checked++;
+                const ratio = chroma.contrast(bg.slice(0, 7), q.slice(0, 7));
+                if (ratio < 4.5) fails.push(`${tn}/${sn}/${pal} ${q} on ${bg} = ${ratio.toFixed(2)}`);
+              }
+            }
+          expect(checked).toBeGreaterThan(100);
+          expect(fails).toEqual([]);
+        });
+
+        /* The palette rule: a Secondary outline rests on Quiet-Secondary under
+           Tonal text; Neutral and BlackWhite on the surface's own Quiet. */
+        it(`Outline-Quiet follows the button's palette — ${where}`, () => {
+          const wrong: string[] = [];
+          for (const [tn, theme] of Object.entries<any>(json.Modes[mode].Themes))
+            for (const [sn, section] of Object.entries<any>(theme)) {
+              // State surfaces redirect every palette to the state's own
+              // button (see "State backgrounds only offer their own button").
+              if (!section?.Buttons || ['Info', 'Success', 'Warning', 'Error'].includes(tn)) continue;
+              for (const pal of ['Primary', 'Secondary', 'Tertiary']) {
+                const e = section.Buttons[pal];
+                if (!e?.['Outline-Quiet'] || !section[`Quiet-${pal}`]) continue;
+                if (e['Outline-Quiet'].value !== section[`Quiet-${pal}`].value) wrong.push(`${tn}/${sn}/${pal}`);
+              }
+              for (const pal of ['Neutral', 'BlackWhite']) {
+                const e = section.Buttons[pal];
+                if (e?.['Outline-Quiet'] && e['Outline-Quiet'].value !== section.Quiet?.value) wrong.push(`${tn}/${sn}/${pal}`);
+              }
+            }
+          expect(wrong).toEqual([]);
+        });
+
+        it(`the section-level Outline-Quiet is the section's Quiet — ${where}`, () => {
           const resolve = makeResolver(json, mode);
           const wrong: string[] = [];
           for (const [tn, theme] of Object.entries<any>(json.Modes[mode].Themes))
@@ -193,6 +246,27 @@ describe('button Quiet — the exported token', () => {
   }
 });
 
+describe('Outline-Quiet under Black & White text', () => {
+  const json: any = build(scheme(BRANDS[0][1]),
+    { background: 'white', cardColoring: 'tonal', textColoring: 'black-white', button: 'primary-fixed' });
+  it('every non-Default palette rests on the section\'s own Quiet', () => {
+    const wrong: string[] = [];
+    let seen = 0;
+    for (const mode of MODES)
+      for (const [tn, theme] of Object.entries<any>(json.Modes[mode].Themes))
+        for (const [sn, section] of Object.entries<any>(theme)) {
+          if (!section?.Buttons || !section.Quiet) continue;
+          for (const [pal, e] of Object.entries<any>(section.Buttons)) {
+            if (pal === 'Default' || !e?.['Outline-Quiet']) continue;
+            seen++;
+            if (e['Outline-Quiet'].value !== section.Quiet.value) wrong.push(`${mode}/${tn}/${sn}/${pal}`);
+          }
+        }
+    expect(seen).toBeGreaterThan(100);
+    expect(wrong).toEqual([]);
+  });
+});
+
 describe('button Quiet — the emitted CSS', () => {
   const json: any = build(scheme(BRANDS[0][1]), SELECTIONS[0][1]);
   const files: Record<string, string> = generateCSSFiles(json) as never;
@@ -207,16 +281,13 @@ describe('button Quiet — the emitted CSS', () => {
     });
   }
 
-  // Outline-Quiet is ONE name per scope, not one per palette. An outline or
-  // ghost button has no fill, so there is nothing palette-specific about its
-  // muted tone — it is the surface's own Quiet. Emitting eight identical
-  // copies per scope would be the duplication invariant 2 warns about: the
-  // test for redundancy is not "do the copies match" but "does anything
-  // select between them", and here nothing does.
-  it('emits --Outline-Quiet once per scope, never per palette', () => {
+  // Outline-Quiet follows the button's PALETTE (Quiet-<Pal> under Tonal
+  // text), as the Figma plugin writes it, so each palette has its own name in
+  // every scope — a palette left undefined in a scope inherits an ancestor's.
+  it('emits --Outline-Quiet per scope and --Buttons-<Pal>-Outline-Quiet per palette', () => {
     expect(bundle).toContain('--Outline-Quiet:');
     for (const pal of PALETTES) {
-      expect(`${pal}: ${bundle.includes(`--Buttons-${pal}-Outline-Quiet:`)}`).toBe(`${pal}: false`);
+      expect(`${pal}: ${bundle.includes(`--Buttons-${pal}-Outline-Quiet:`)}`).toBe(`${pal}: true`);
     }
   });
 

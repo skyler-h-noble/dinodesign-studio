@@ -111,7 +111,7 @@ export function getSimplifiedDefaultSettings(
       | 'primary-adaptive' | 'primary-fixed'
       | 'secondary-adaptive' | 'secondary-fixed'
       | 'tonal-adaptive' | 'tonal-fixed'
-      | 'laddered-adaptive' | 'laddered-fixed';
+      | 'laddered-adaptive' | 'laddered-fixed' | 'match-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
   }
@@ -733,7 +733,7 @@ export function generateCompleteSimplifiedSystem(
       | 'primary-adaptive' | 'primary-fixed'
       | 'secondary-adaptive' | 'secondary-fixed'
       | 'tonal-adaptive' | 'tonal-fixed'
-      | 'laddered-adaptive' | 'laddered-fixed';
+      | 'laddered-adaptive' | 'laddered-fixed' | 'match-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black';
   },

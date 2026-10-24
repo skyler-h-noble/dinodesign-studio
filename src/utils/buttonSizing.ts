@@ -27,12 +27,15 @@
  * across small and medium, then jumps to 32) while the text rows are.
  *
  *     Button-Icon(h)      = snap(0.625h)
- *     Button-Icon-Only(h) = snap(0.70h)
+ *
+ * One icon ramp for a decorator and for an icon-only button alike — the
+ * separate Button-Icon-Only (snap(0.70h): 16 / 24 / 40) was retired
+ * 2026-10-20, when the smaller icon was chosen for icon-only buttons too.
  *
  * Fourteen of the design's fifteen sampled values now reproduce exactly. It
  * was thirteen: Button-Icon's small was the second divergence, and the design
- * moved to the formula's 16 on 2026-09-20 — so the only one left is
- * Button-Numbers' medium, called out on its row below.
+ * moved to the formula's 16 on 2026-09-20; Button-Numbers' medium, the last,
+ * now carries its own offset on its row below — all fifteen reproduce.
  *
  * Button-Text-Padding stays tabular: it is spacing, not a glyph size, and the
  * design repeats small and medium rather than scaling them, which no function
@@ -63,18 +66,20 @@ export interface ButtonHeights {
  * evenly spaced by design: a button's number is 4px under its label, and an
  * avatar's initials sit halfway between.
  */
-const TEXT_OFFSETS: Record<string, number> = {
+const TEXT_OFFSETS: Record<string, number | ButtonModeMetric> = {
   /** Label size for a text button. */
   'Button-Text': 9.5,
   /** Initials size for an avatar sitting in a button. */
   'Avatar-Text': 7.5,
   /**
-   * Digit size for a counter or numeric button.
-   * MOVED: the design's medium is 14; the shared slope puts it at 12. Small
-   * (10) and large (16) reproduce exactly, so 14 was the outlier — it is the
-   * only one of the three text rows whose medium sits off its own line.
+   * Digit size for a counter or numeric button — Count Step, Day Cell, Badge.
+   * Follows the design's 10 / 14 / 16. Small and large sit on the shared slope
+   * (4px under the label); the design's medium is 2px larger than the slope
+   * puts it, so the medium row carries its own offset. It still moves with a
+   * brand's medium height — only the offset is the design's, not the size.
+   * (It used to stay on the slope and render 12 where Figma draws 14.)
    */
-  'Button-Numbers': 5.5,
+  'Button-Numbers': { medium: 7.5, small: 5.5, large: 5.5 },
 };
 
 /**
@@ -92,8 +97,6 @@ const ICON_RATIOS: Record<string, number> = {
    * agree and the inversion is gone.
    */
   'Button-Icon': 0.625,
-  /** Glyph for an icon-ONLY button, which owns the whole button. */
-  'Button-Icon-Only': 0.70,
 };
 
 /**
@@ -138,10 +141,11 @@ export function derivedTextMetrics(h: ButtonHeights): Record<string, ButtonModeM
   const hs = heightsOf(h);
   const out: Record<string, ButtonModeMetric> = {};
   for (const [name, offset] of Object.entries(TEXT_OFFSETS)) {
+    const o = typeof offset === 'number' ? { medium: offset, small: offset, large: offset } : offset;
     out[name] = {
-      medium: typeForHeight(hs.medium, offset),
-      small: typeForHeight(hs.small, offset),
-      large: typeForHeight(hs.large, offset),
+      medium: typeForHeight(hs.medium, o.medium),
+      small: typeForHeight(hs.small, o.small),
+      large: typeForHeight(hs.large, o.large),
     };
   }
   for (const [name, ratio] of Object.entries(ICON_RATIOS)) {

@@ -160,3 +160,22 @@
     width: 100%;
   }
 }
+
+
+/* Advanced tone grid: five levels across, wrapping on a phone. Each cell is a
+   lib Section, so it paints its own background; this only lays them out. */
+.button-tone-grid-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.button-tone-grid-cell {
+  padding: 12px 8px;
+  border-radius: var(--Card-Radius, 12px);
+  min-width: 0;
+}
+.button-tone-grid-cell.is-custom {
+  outline: 2px solid var(--Focus-Visible);
+  outline-offset: 2px;
+}

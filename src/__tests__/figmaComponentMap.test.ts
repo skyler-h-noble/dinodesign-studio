@@ -122,10 +122,12 @@ describe('components made of several sets', () => {
     expect(figmaMappingFor('Rating')!.sets[0]).toBe('Rating');
   });
 
-  it('keeps ButtonGroup both segment sets, which are different components', () => {
-    const sets = figmaMappingFor('ButtonGroup')!.sets;
-    expect(sets).toContain('Button-Group-Segments');
-    expect(sets).toContain('Separated-Button-Segments');
+  // ButtonGroup and ToggleButtonGroup are different components with different
+  // sets: actions with no selection, and the selection control with its
+  // joined segments. (The old ButtonGroup row held both segment sets.)
+  it('keeps the joined segments with ToggleButtonGroup, not ButtonGroup', () => {
+    expect(figmaMappingFor('ButtonGroup')!.sets).toEqual(['ButtonGroup']);
+    expect(figmaMappingFor('ToggleButtonGroup')!.sets).toEqual(['ToggleButtonGroup', 'Button-Group-Segments']);
   });
 
   it('allows a mapped page to hold no sets at all', () => {
