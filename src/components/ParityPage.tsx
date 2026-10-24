@@ -91,6 +91,8 @@ interface Measured extends FigmaPart {
   opacity: number;
   /** Text labels laid side by side inside the box — see textRunsAcross. */
   textRuns?: number;
+  /** Text labels BEFORE the box on its line, inside the variant — see textRunsBefore. */
+  textBefore?: number;
 }
 
 /**
@@ -115,6 +117,30 @@ function textRunsAcross(el: Element): number {
     tops.set(top, (tops.get(top) ?? 0) + 1);
   }
   return Math.max(0, ...tops.values());
+}
+
+/**
+ * How many text labels sit to the LEFT of `el` on the same line, inside the
+ * variant. Each was rounded up to a whole pixel in Figma, so everything after
+ * them is pushed right by up to that many pixels — a row of links where the
+ * third starts 3.4px later in Figma for no reason but its two labels and two
+ * separators before it.
+ */
+function textRunsBefore(el: Element, stopAt: Element): number {
+  const box = el.getBoundingClientRect();
+  const walker = document.createTreeWalker(stopAt, NodeFilter.SHOW_TEXT);
+  const seen = new Set<Element>();
+  let n = 0;
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    const host = t.parentElement;
+    if (!host || seen.has(host) || !t.textContent?.trim() || el.contains(host)) continue;
+    seen.add(host);
+    const r = host.getBoundingClientRect();
+    if (!r.width) continue;
+    const sameLine = r.bottom > box.top + 1 && r.top < box.bottom - 1;
+    if (sameLine && r.right <= box.left + 0.5) n++;
+  }
+  return n;
 }
 
 /** True when at least one shadow layer has a color that is not fully transparent. */
@@ -290,6 +316,7 @@ function measure(el: Element, stopAt: Element, scale: number): Measured {
     font: { size: parseFloat(cs.fontSize), family: cs.fontFamily.split(',')[0].replace(/['"]/g, '').trim(), weight: parseFloat(cs.fontWeight), color: cssColor(cs.color) },
     opacity: Math.round(opacity * 100) / 100,
     textRuns: textRunsAcross(el),
+    textBefore: textRunsBefore(el, stopAt),
   };
 }
 
@@ -328,7 +355,10 @@ function compare(variant: string, part: string, f: FigmaPart, c: Measured | null
   // Position inside the variant: a part the right size in the wrong place is
   // the misalignment an overlay shows and a size check cannot.
   if (f.x !== undefined && c.x !== undefined) {
-    add('position', `${f.x}, ${f.y}`, `${c.x}, ${c.y}`, Math.abs(f.x - c.x) < 0.6 && Math.abs((f.y ?? 0) - (c.y ?? 0)) < 0.6);
+    /* Figma may sit up to 1px further RIGHT per label before it on the line
+       (its text rounding, see textRunsBefore) — never further left. */
+    const xOk = Math.abs(f.x - c.x) < 0.6 || (f.x > c.x && f.x - c.x <= (c.textBefore ?? 0) + 0.01);
+    add('position', `${f.x}, ${f.y}`, `${c.x}, ${c.y}`, xOk && Math.abs((f.y ?? 0) - (c.y ?? 0)) < 0.6);
   }
   // Figma may be wider by up to 1px per label on a line (its text rounding,
   // see textRunsAcross) — never narrower.
