@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import BackspaceIcon from '@mui/icons-material/Backspace';
 import SearchIcon from '@mui/icons-material/Search';
@@ -1156,11 +1156,42 @@ const input: ParityComponent = {
           placeholder={filled || floating ? undefined : ' '}
           disabled={v.props.State === 'Disabled'}
           startAdornment={(booleans['Start Icon'] ?? true) ? <SearchIcon /> : undefined}
-          endAdornment={(booleans['End Decorator'] ?? true) ? <Button iconOnly variant="ghost" aria-label="Clear"><BackspaceIcon /></Button> : undefined}
+          endAdornment={(booleans['End Decorator'] ?? true) ? <InputDecorator aria-label="Clear"><BackspaceIcon /></InputDecorator> : undefined}
         />
       </div>
     );
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, radio, swatch, toggleButtonGroup];
+/* Input Decorator: the ghost button an Input carries at its end — Type text
+   ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
+   lib's ghost Button; Button-Container carries the hover lift, Button-Fill
+   the paint, Focus-Visible a 3px ring inside. */
+const inputDecorator: ParityComponent = {
+  key: 'inputDecorator',
+  name: 'Input Decorator',
+  nodeId: '8590:24802',
+  libFile: 'src/components/Input/InputDecorator.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: 'Button-Container', css: 'button.MuiButton-root', label: 'Elevation', skip: ['fill', 'border'], shadow: 'outer' },
+    { figma: 'Button-Fill', css: 'button.MuiButton-root', label: 'Fill', shadow: 'inset' },
+    { figma: 'Focus-Visible', css: 'button.MuiButton-root', outline: true, label: 'Focus ring' },
+    { figma: 'Typography Holder', css: '.btn-text-content', label: 'Label box', when: (v) => v.props.Type === 'text', skip: ['fill'] },
+    { figma: 'Component Name', css: '.btn-text-content .typography', label: 'Label', when: (v) => v.props.Type === 'text' },
+    { figma: 'Icon', css: '.MuiButton-endIcon', label: 'End icon', when: (v) => v.props.Type === 'text' },
+    { figma: 'Icon', css: 'button.MuiButton-root svg', label: 'Icon', when: (v) => v.props.Type === 'iconOnly', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v, b) => {
+    const common = {
+      disabled: v.props.State === 'Disabled',
+      className: v.props.State === 'Focus-Visible' ? 'Mui-focusVisible' : undefined,
+    };
+    return v.props.Type === 'iconOnly'
+      ? <InputDecorator {...common} aria-label="Clear"><BackspaceIcon /></InputDecorator>
+      : <InputDecorator {...common} startDecorator={b['start-icon'] ? <HomeIcon /> : undefined} endDecorator={(b['end-icon'] ?? true) ? <HomeIcon /> : undefined}>Button</InputDecorator>;
+  },
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, radio, swatch, toggleButtonGroup];
