@@ -346,6 +346,21 @@ function compare(variant: string, part: string, f: FigmaPart, c: Measured | null
    class (pseudoStates), so nothing on this side needs a real pointer. */
 const NO_POINTER: React.CSSProperties = { pointerEvents: 'none' };
 
+/* The Overlay fade. Reduced motion holds it at half, which is the slider's own
+   starting point, rather than blinking at someone who asked it not to. */
+const OVERLAY_FADE_CSS = `
+@keyframes parity-overlay-fade { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes parity-overlay-slide {
+  0%, 12%   { transform: translate(var(--parity-dx), var(--parity-dy)); opacity: 1; }
+  32%, 42%  { transform: translate(0, 0); opacity: 1; }
+  52%       { transform: translate(0, 0); opacity: 0; }
+  62%, 70%  { transform: translate(0, 0); opacity: 1; }
+  90%, 100% { transform: translate(var(--parity-dx), var(--parity-dy)); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="parity-overlay"] { animation: none !important; opacity: 0.5 !important; transform: none !important; }
+}`;
+
 export default function ParityPage() {
   const params = new URLSearchParams(window.location.search);
   /* The selected component set, by Figma node id. A set with a ParityComponent
@@ -375,6 +390,10 @@ export default function ParityPage() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<Mode>('side');
   const [opacity, setOpacity] = useState(0.5);
+  /* Overlay animation — see overlayFade below. */
+  type Play = 'off' | 'fade' | 'side' | 'below';
+  const [play, setPlay] = useState<Play>('off');
+
   const [zoom, setZoom] = useState('2');
   const [rows, setRows] = useState<Row[]>([]);
   const [showAll, setShowAll] = useState(false);
@@ -568,6 +587,22 @@ export default function ParityPage() {
   }, [set, component, rows, dsId]);
 
   const scale = Number(zoom);
+  /* Overlay can animate itself — for a walkthrough or a screen recording.
+       fade   the code layer breathes 0 → 100% → 0 over the Figma image
+       side   the code starts BESIDE the Figma image, slides onto it, blinks
+              out and back so Figma shows through, slides back, loops
+       below  the same from underneath */
+  const animate = play !== 'off';
+  const SLIDE_GAP = 32;
+  const overlayFade: React.CSSProperties = play === 'fade'
+    ? { animation: 'parity-overlay-fade 2.4s ease-in-out infinite' }
+    : play === 'side' || play === 'below'
+      ? ({
+          animation: `parity-overlay-slide 6s ease-in-out infinite`,
+          ['--parity-dx' as string]: play === 'side' ? `${(set?.box.w ?? 0) + SLIDE_GAP / scale}px` : '0px',
+          ['--parity-dy' as string]: play === 'below' ? `${(set?.box.h ?? 0) + SLIDE_GAP / scale}px` : '0px',
+        } as React.CSSProperties)
+      : { opacity };
   /* Every stage paints the theme and surface Figma resolves the set in, so the
      Figma image and the code sit on the same ground they sit on in the file. */
   const zone = component?.context?.theme
@@ -642,7 +677,10 @@ export default function ParityPage() {
     <VStack spacing={1}>
       <Caption color="quiet">{title}</Caption>
       {/* Layout primitive: reserves the zoomed footprint. */}
-      <div style={{ width: set.box.w * scale, height: set.box.h * scale }}>
+      <div style={{
+        width: (set.box.w + (play === 'side' && mode !== 'side' ? set.box.w + SLIDE_GAP / scale : 0)) * scale,
+        height: (set.box.h + (play === 'below' && mode !== 'side' ? set.box.h + SLIDE_GAP / scale : 0)) * scale,
+      }}>
         <Section {...zone} style={{ position: 'relative', width: set.box.w, height: set.box.h, transform: `scale(${scale})`, transformOrigin: '0 0', isolation: 'isolate' }}>
           {children}
         </Section>
@@ -652,6 +690,7 @@ export default function ParityPage() {
 
   return (
     <Section padding="32px 24px" style={{ minHeight: '100vh' }}>
+      <style>{OVERLAY_FADE_CSS}</style>
       <VStack spacing={3} style={{ maxWidth: 1200, margin: '0 auto' }}>
         <VStack spacing={1}>
           <H2>Component parity</H2>
@@ -682,9 +721,20 @@ export default function ParityPage() {
           </ToggleButtonGroup>
           {(mode === 'overlay' || layout === 'variants') && (
             <VStack spacing={0} style={{ width: 180 }}>
-              <Caption color="quiet">Code opacity {Math.round(opacity * 100)}%</Caption>
-              <Slider value={opacity} min={0} max={1} step={0.05} aria-label="Code opacity"
+              <Caption color="quiet">{animate ? 'Code opacity — fading' : `Code opacity ${Math.round(opacity * 100)}%`}</Caption>
+              <Slider value={opacity} min={0} max={1} step={0.05} aria-label="Code opacity" disabled={animate}
                 onChange={(_e: unknown, v: number) => setOpacity(v)} />
+            </VStack>
+          )}
+          {(mode === 'overlay' || layout === 'variants') && (
+            <VStack spacing={0}>
+              <Caption color="quiet">Animate</Caption>
+              <ToggleButtonGroup value={play} onChange={(v: Play) => v && setPlay(v)} size="small">
+                <Button value="off" size="small">Off</Button>
+                <Button value="fade" size="small">Fade</Button>
+                {layout !== 'variants' && <Button value="side" size="small">From side</Button>}
+                {layout !== 'variants' && <Button value="below" size="small">From below</Button>}
+              </ToggleButtonGroup>
             </VStack>
           )}
           <Button variant="default-outline" size="small" onClick={() => { load(); remeasure(); }} disabled={loading}>
@@ -791,7 +841,7 @@ export default function ParityPage() {
                     {component && windowBox(v, (
                       <>
                         {figmaCrop(v)}
-                        <Section {...zone} style={{ position: 'absolute', inset: 0, opacity }}>
+                        <Section {...zone} style={{ position: 'absolute', inset: 0, ...(play === 'fade' ? overlayFade : { opacity }) }}>
                           {variantCell(v, { x: PAD, y: PAD }, false)}
                         </Section>
                       </>
@@ -826,7 +876,7 @@ export default function ParityPage() {
                 {/* The code layer paints its own surface, so at full opacity
                     it hides the Figma image completely and the slider fades
                     between the two. */}
-                <Section {...zone} style={{ position: 'absolute', inset: 0, opacity }}>
+                <Section {...zone} style={{ position: 'absolute', inset: 0, ...overlayFade }}>
                   <div ref={codeRef} style={NO_POINTER}>{codeLayer}</div>
                 </Section>
               </>,
