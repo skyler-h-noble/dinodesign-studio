@@ -745,9 +745,15 @@ export default function ParityPage() {
   );
 
   return (
-    <Section padding="32px 24px" style={{ minHeight: '100vh' }}>
+    /* fit-content + min 100%: a set wider than the window (a 1356px Input
+       Field, a row of 21 ratios) widens the page with it, so the background is
+       painted under everything you scroll to rather than stopping at the
+       window's edge. Narrower sets keep the window width. */
+    <Section padding="32px 24px" style={{ minHeight: '100vh', width: 'fit-content', minWidth: '100%', boxSizing: 'border-box' }}>
       <style>{OVERLAY_FADE_CSS}</style>
-      <VStack spacing={3} style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* min-width beats max-width: a set wider than 1200 widens the column (and,
+          through fit-content above, the page) instead of spilling out of it. */}
+      <VStack spacing={3} style={{ maxWidth: 1200, minWidth: 'min-content', margin: '0 auto' }}>
         <VStack spacing={1}>
           <H2>Component parity</H2>
           <Body color="quiet">

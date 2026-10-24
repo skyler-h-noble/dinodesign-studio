@@ -1231,6 +1231,41 @@ const link: ParityComponent = {
   ),
 };
 
+/* Ratio: a bare box that holds its proportion — Fill Horizontal takes the
+   width and derives the height (fit="width"), Fill Vertical the reverse
+   (fit="height"). Empty, it shows the Image Placeholder. */
+const ratioOf = (v: FigmaVariant) => String(v.props.Ratio).replace('Golden ', 'Golden-');
+const ratioFillHorizontal: ParityComponent = {
+  key: 'ratioFillHorizontal',
+  name: 'Ratio - Fill Horizontal',
+  nodeId: '6241:11978',
+  libFile: 'src/components/Ratio/Ratio.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-ratio .ratio', label: 'Box', skip: ['fill', 'border', 'shadow'] },
+  ],
+  render: (v) => (
+    <div className="parity-ratio" style={{ width: v.box.w }}>
+      <Ratio ratio={ratioOf(v)} />
+    </div>
+  ),
+};
+const ratioFillVertical: ParityComponent = {
+  key: 'ratioFillVertical',
+  name: 'Ratio - Fill Vertical',
+  nodeId: '7257:3697',
+  libFile: 'src/components/Ratio/Ratio.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-ratio .ratio', label: 'Box', skip: ['fill', 'border', 'shadow'] },
+  ],
+  render: (v) => (
+    <div className="parity-ratio" style={{ height: v.box.h, display: 'flex' }}>
+      <Ratio ratio={ratioOf(v)} fit="height" />
+    </div>
+  ),
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1262,4 +1297,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, swatch, toggleButtonGroup];
