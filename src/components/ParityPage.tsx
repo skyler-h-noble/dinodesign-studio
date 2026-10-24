@@ -230,17 +230,29 @@ function ownShadows(m: Measured, kind: 'outer' | 'inset'): Measured {
   const layers = (m.effects ?? []).flatMap(shadowLayers);
   const ring = /(^|\s)0(px)? 0(px)? 0(px)? (\d+(\.\d+)?)px( inset|$)|inset\s+0(px)? 0(px)? 0(px)? (\d+(\.\d+)?)px/;
   let ringPx = 0;
+  let ringColor: string | null = null;
   const kept = layers.filter((l) => {
     const inset = /\binset\b/.test(l);
     const r = inset ? l.match(ring) : null;
-    if (r) { ringPx += parseFloat(r[5] ?? r[11] ?? '0'); return false; }
+    if (r) {
+      ringPx += parseFloat(r[5] ?? r[11] ?? '0');
+      const c = l.match(/rgba?\([^)]*\)|#[0-9a-f]{3,8}\b/i);
+      if (c && !ringColor) ringColor = cssColor(c[0]);
+      return false;
+    }
     return kind === 'inset' ? inset : !inset;
   });
   const effects = kept.length ? [kept.join(', ')] : [];
+  /* With a real border the ring THICKENS it (Card's selected 1px + 1px). With
+     none, the ring IS the border — an inside stroke drawn as an inset ring so
+     it takes no layout space (Field Button, the expanded rail item). Dropping
+     it there reported "border: none" against a Figma stroke of the same color. */
+  const withBorder = m.strokeWeight != null;
   return {
     ...m,
     effects,
-    strokeWeight: kind === 'inset' && ringPx && m.strokeWeight != null ? m.strokeWeight + ringPx : m.strokeWeight,
+    strokeWeight: kind === 'inset' && ringPx ? (withBorder ? (m.strokeWeight as number) + ringPx : ringPx) : m.strokeWeight,
+    stroke: kind === 'inset' && ringPx && !withBorder ? ringColor : m.stroke,
   };
 }
 

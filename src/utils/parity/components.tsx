@@ -10,9 +10,10 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from '@mui/icons-material/Add';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -949,4 +950,36 @@ const fab: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, radio, swatch, toggleButtonGroup];
+/* Field Button: a NumberField stepper — Button-Height tall, Sizing-6 wide,
+   the field's Input-Radius, an in-button icon. Ghost has no edge, outline a
+   1px inside Buttons border; Focus is a 3px ring inside the button. */
+const fieldButton: ParityComponent = {
+  key: 'fieldButton',
+  name: 'Field Button',
+  nodeId: '6850:28584',
+  libFile: 'src/components/NumberField/FieldButton.js',
+  // The set is pinned to Component-Size › large.
+  context: { theme: 'Default', surface: 'Surface', size: 'large' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    // The inset ring is the outline style's edge; read it as border.
+    { figma: '__root__', css: '.field-button', label: 'Button', shadow: 'outer', skip: ['border', 'radius (as drawn)'] },
+    { figma: 'Button-Contents', css: '.field-button', label: 'Contents', shadow: 'inset', skip: ['fill', 'position', 'width', 'height'] },
+    { figma: 'Focus-Visible', css: '.field-button', outline: true, label: 'Focus ring' },
+    // Figma's Icon frame carries no fill (the glyph inside does), so its color is not compared here.
+    { figma: 'Icon', css: '.field-button svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v, _b, ctx) => (
+    <FieldButton
+      size={ctx.size}
+      variant={String(v.props.Style) as 'ghost' | 'outline'}
+      disabled={v.props.State === 'Disabled'}
+      aria-label="Increase"
+      onClick={noop}
+    >
+      <KeyboardArrowUpIcon />
+    </FieldButton>
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, radio, swatch, toggleButtonGroup];
