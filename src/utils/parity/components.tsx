@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1322,6 +1322,40 @@ const selectField: ParityComponent = {
   },
 };
 
+/* Slider: Figma's Type folds the thumb count (single / double) with the fill
+   side (standard / inverted). The values here put each thumb where Figma
+   draws it, so the rail, fill and thumbs can be compared by position. */
+const SLIDER_VALUES: Record<string, number | number[]> = {
+  'single|horizontal': 38, 'single-inverted|horizontal': 62,
+  'double|horizontal': [20.4, 85.6], 'double-inverted|horizontal': [20.4, 85.6],
+  'single|vertical': 52, 'single-inverted|vertical': 70.9,
+  'double|vertical': [17.7, 68.8], 'double-inverted|vertical': [17.7, 68.8],
+};
+const slider: ParityComponent = {
+  key: 'slider',
+  name: 'Slider',
+  nodeId: '6791:14897',
+  libFile: 'src/components/Slider/Slider.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Slider Back Bar', css: '.parity-slider .MuiSlider-rail', label: 'Rail' },
+    { figma: 'Fill', css: '.parity-slider .MuiSlider-track', label: 'Fill', when: (v) => !String(v.props.Type).includes('inverted') },
+    { figma: 'Slider-thumb Horizontal', css: '.parity-slider .MuiSlider-thumb', label: 'Thumb', skip: ['fill', 'border', 'shadow'], when: (v) => v.props.Orientation === 'horizontal' },
+    { figma: 'Slider-thumb Vertical', css: '.parity-slider .MuiSlider-thumb', label: 'Thumb', skip: ['fill', 'border', 'shadow'], when: (v) => v.props.Orientation === 'vertical' },
+  ],
+  render: (v) => {
+    const type = String(v.props.Type);
+    const vertical = v.props.Orientation === 'vertical';
+    const val = SLIDER_VALUES[type + '|' + v.props.Orientation];
+    return (
+      <div className="parity-slider" style={{ width: v.box.w, height: v.box.h, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', padding: vertical ? '0 48px' : '48px 0' }}>
+        <Slider aria-label="Amount" orientation={vertical ? 'vertical' : 'horizontal'} value={val} track={type.includes('inverted') ? 'inverted' : 'standard'}
+          sx={vertical ? { height: '100%' } : { width: '100%' }} />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1353,4 +1387,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, slider, swatch, toggleButtonGroup];
