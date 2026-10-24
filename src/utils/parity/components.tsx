@@ -901,6 +901,7 @@ const expandableNavRailItem: ParityComponent = {
     { figma: '__root__', css: '.rail-item', label: 'Item', shadow: 'inset' },
     { figma: 'Focus-Visible', css: '.rail-item', outline: true, outer: true, label: 'Focus ring' },
     { figma: 'Icon Buttons', css: '.rail-item-icon', label: 'Icon slot', skip: ['fill', 'border', 'shadow'] },
+    { figma: 'Icon', css: '.rail-item-icon svg', label: 'Icon', skip: ['border', 'shadow', 'radius (as drawn)'] },
     { figma: 'Component Name', css: '.rail-item-label', label: 'Label' },
   ],
   render: (v) => (
