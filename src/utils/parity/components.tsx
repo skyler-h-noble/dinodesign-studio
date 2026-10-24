@@ -1328,7 +1328,7 @@ const selectField: ParityComponent = {
 const SLIDER_VALUES: Record<string, number | number[]> = {
   'single|horizontal': 38, 'single-inverted|horizontal': 62,
   'double|horizontal': [20.4, 85.6], 'double-inverted|horizontal': [20.4, 85.6],
-  'single|vertical': 52, 'single-inverted|vertical': 70.9,
+  'single|vertical': 79.4, 'single-inverted|vertical': 52,
   'double|vertical': [17.7, 68.8], 'double-inverted|vertical': [17.7, 68.8],
 };
 const slider: ParityComponent = {
@@ -1338,10 +1338,18 @@ const slider: ParityComponent = {
   libFile: 'src/components/Slider/Slider.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
-    { figma: 'Slider Back Bar', css: '.parity-slider .MuiSlider-rail', label: 'Rail' },
-    { figma: 'Fill', css: '.parity-slider .MuiSlider-track', label: 'Fill', when: (v) => !String(v.props.Type).includes('inverted') },
-    { figma: 'Slider-thumb Horizontal', css: '.parity-slider .MuiSlider-thumb', label: 'Thumb', skip: ['fill', 'border', 'shadow'], when: (v) => v.props.Orientation === 'horizontal' },
-    { figma: 'Slider-thumb Vertical', css: '.parity-slider .MuiSlider-thumb', label: 'Thumb', skip: ['fill', 'border', 'shadow'], when: (v) => v.props.Orientation === 'vertical' },
+    // Figma builds the bar from pieces (fill, gap, rest), each with its own
+    // paint; code is one rail with the track on top. So the rail owns the bar's
+    // box, and the paint is compared on the fill.
+    { figma: 'Slider Back Bar', css: '.parity-slider .MuiSlider-rail', label: 'Rail', skip: ['fill', 'border'] },
+    // Figma's fill stops at the thumb's EDGE, code's at its centre — under the
+    // thumb either way, so its length and start are not compared.
+    { figma: 'Fill', css: '.parity-slider .MuiSlider-track', label: 'Fill', skip: ['position', 'width', 'height', 'radius (as drawn)'],
+      when: (v) => v.props.Type === 'single' && v.props.Orientation === 'horizontal' },
+    // The touch box is measured; its circle is ::before, so no corner here.
+    { figma: 'Slider-thumb Horizontal', css: '.parity-slider .MuiSlider-thumb', label: 'Thumb', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'horizontal' },
+    // Vertical: Figma's first thumb is the TOP one, MUI's last.
+    { figma: 'Slider-thumb Vertical', css: '.parity-slider .MuiSlider-thumb:last-of-type', label: 'Thumb', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'vertical' },
   ],
   render: (v) => {
     const type = String(v.props.Type);
@@ -1351,6 +1359,77 @@ const slider: ParityComponent = {
       <div className="parity-slider" style={{ width: v.box.w, height: v.box.h, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', padding: vertical ? '0 48px' : '48px 0' }}>
         <Slider aria-label="Amount" orientation={vertical ? 'vertical' : 'horizontal'} value={val} track={type.includes('inverted') ? 'inverted' : 'standard'}
           sx={vertical ? { height: '100%' } : { width: '100%' }} />
+      </div>
+    );
+  },
+};
+
+/* Slider thumbs: the 24px handle on a stub of bar, one set per orientation.
+   Fill Direction is which side of the thumb the fill is on. The handle is the
+   thumb's ::before; hover / pressed add a 20% halo of the fill (4px / 8px). */
+const thumbParts = (vertical: boolean): ParityPart[] => vertical ? [
+  // The vertical Handle carries its own 1px --Background edge.
+  { figma: 'Handle', css: '.parity-thumb .MuiSlider-thumb', pseudo: '::before', label: 'Handle', skip: ['shadow'] },
+] : [
+  // The horizontal Handle strokes itself in its own fill (invisible); the
+  // visible 1px --Background edge is the Thumb Border layer above it.
+  { figma: 'Handle', css: '.parity-thumb .MuiSlider-thumb', pseudo: '::before', label: 'Handle', skip: ['shadow', 'border'] },
+  { figma: 'Thumb Border', css: '.parity-thumb .MuiSlider-thumb', pseudo: '::before', label: 'Edge', skip: ['shadow', 'fill', 'position'] },
+  // The hover / pressed halo is a spread shadow on ::before, which the page
+  // cannot measure on a pseudo-element yet — checked by eye.
+];
+const thumbRender = (vertical: boolean) => (v: FigmaVariant) => {
+  const dir = String(v.props['Fill Direction']).toLowerCase();
+  const inverted = vertical ? dir === 'bottom' : dir === 'right';
+  return (
+    <div className="parity-thumb" style={{ width: v.box.w, height: v.box.h, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Slider aria-label="Amount" orientation={vertical ? 'vertical' : 'horizontal'} value={50} track={inverted ? 'inverted' : 'standard'}
+        disabled={v.props.State === 'Disabled'} valueLabelDisplay="off" sx={vertical ? { height: v.box.h } : { width: v.box.w }} />
+    </div>
+  );
+};
+const sliderThumbHorizontal: ParityComponent = {
+  key: 'sliderThumbHorizontal',
+  name: 'Slider-thumb Horizontal',
+  nodeId: '6791:15142',
+  libFile: 'src/components/Slider/Slider.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: thumbParts(false),
+  render: thumbRender(false),
+};
+const sliderThumbVertical: ParityComponent = {
+  key: 'sliderThumbVertical',
+  name: 'Slider-thumb Vertical',
+  nodeId: '7514:21988',
+  libFile: 'src/components/Slider/Slider.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: thumbParts(true),
+  render: thumbRender(true),
+};
+
+/* SliderField: Form-Label above or below a double Slider (104 tall: 48px
+   either side of the bar, room for the value label), or no label. */
+const sliderField: ParityComponent = {
+  key: 'sliderField',
+  name: 'SliderField',
+  nodeId: '9492:48466',
+  libFile: 'src/components/Slider/Slider.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Form-Label', css: '.parity-slider-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'],
+      when: (v) => v.props.Label !== 'none' },
+    // Below the slider, the first "Label" layer is the thumb's value bubble; the row covers it there.
+    { figma: 'Label', css: '.parity-slider-field .form-label', label: 'Label', skip: ['width'], when: (v) => v.props.Label === 'label-top' },
+    { figma: 'Slider Back Bar', css: '.parity-slider-field .MuiSlider-rail', label: 'Rail', skip: ['fill', 'border'] },
+  ],
+  render: (v) => {
+    const pos = v.props.Label;
+    return (
+      <div className="parity-slider-field" style={{ width: v.box.w, ...(pos === 'none' ? { padding: '48px 0', boxSizing: 'border-box', height: v.box.h, display: 'flex', alignItems: 'center' } : {}) }}>
+        <Slider defaultValue={[20.4, 85.6]} label={pos === 'none' ? undefined : 'Label'} aria-label={pos === 'none' ? 'Amount' : undefined}
+          labelPosition={pos === 'label-bottom' ? 'bottom' : 'top'} valueLabelDisplay="off" sx={{ width: '100%' }} />
       </div>
     );
   },
@@ -1387,4 +1466,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, slider, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
