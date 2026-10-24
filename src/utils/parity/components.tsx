@@ -1172,6 +1172,44 @@ const input: ParityComponent = {
   },
 };
 
+/* Input Field: the Input with its Form-Label — Label top (Sizing-Half below
+   the label), left (Sizing-1 beside it, centred), floating (the Input's own
+   floating type) or none. The Input inside is the default one, so this checks
+   only where the label goes; the Input set checks the field. */
+const inputField: ParityComponent = {
+  key: 'inputField',
+  name: 'Input Field',
+  nodeId: '9457:47428',
+  libFile: 'src/components/Input/Input.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Form-Label', css: '.parity-input-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'],
+      when: (v) => v.props.Label === 'label-top' || v.props.Label === 'label-left' },
+    { figma: 'Label', css: '.parity-input-field .form-label', label: 'Label', skip: ['width'],
+      when: (v) => v.props.Label === 'label-top' || v.props.Label === 'label-left' },
+    // The instance's own frame is square; its Inner Frame carries the corner, which the Input set checks.
+    { figma: 'Input', css: '.parity-input-field .inp-shell', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const pos = v.props.Label;
+    const floating = pos === 'floating';
+    const labelled = pos !== 'none';
+    return (
+      <div className="parity-input-field" style={{ width: v.box.w }}>
+        <TextInput
+          fullWidth
+          labelPosition={floating ? 'floating' : pos === 'label-left' ? 'left' : 'standard'}
+          label={labelled ? (floating ? 'Email address' : 'Label') : undefined}
+          aria-label={labelled ? undefined : 'Email address'}
+          placeholder={floating ? undefined : ' '}
+          startAdornment={<MailIcon />}
+          endAdornment={<span className={OWN_STATE_CLASS} style={{ display: 'contents' }}><InputDecorator aria-label="Clear"><BackspaceIcon /></InputDecorator></span>}
+        />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1203,4 +1241,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, radio, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, radio, swatch, toggleButtonGroup];
