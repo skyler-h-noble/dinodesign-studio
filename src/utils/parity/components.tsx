@@ -1210,6 +1210,27 @@ const inputField: ParityComponent = {
   },
 };
 
+/* Link: Body text in --Hotlink, underlined at rest. Focus-Visible is a 2px
+   ring (a frame 2px out, 2px inside stroke); Disabled is 38%. */
+const link: ParityComponent = {
+  key: 'link',
+  name: 'Link',
+  nodeId: '3156:5476',
+  libFile: 'src/components/Link/Link.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: '__root__', css: '.parity-link a', label: 'Link', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Hotlink', css: '.parity-link a', label: 'Text' },
+    { figma: 'Focus-Visible', css: '.parity-link a', outline: true, outer: true, label: 'Focus ring' },
+  ],
+  render: (v) => (
+    <div className="parity-link">
+      <Link href="#parity" onClick={(e: { preventDefault: () => void }) => e.preventDefault()} disabled={v.props.State === 'Disabled'}>Hotlink</Link>
+    </div>
+  ),
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1241,4 +1262,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, radio, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, swatch, toggleButtonGroup];

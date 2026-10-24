@@ -340,7 +340,8 @@ item's hover highlight. Pixels, not a percent: a dropdown's height is
 content-driven, so a percent would make a long menu absurdly round.
 
 **Links do not change colour on hover.** The design system emits no hover tone
-for links; the underline thickens instead. Do not add one — any value would be
+for links; the underline goes away instead (hover and pressed; focus keeps it —
+Figma's Link set). Do not add one — any value would be
 invented rather than derived, on text carrying a 4.5:1 requirement. The lib's
 `Link` reads `--Link` / `--Link-Visited`, which nothing defines; it falls back
 to `--Hotlink` / `--Hotlink-Visited`, which is what the generator actually

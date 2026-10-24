@@ -213,6 +213,17 @@ function measureHalo(el: Element, scale: number): Measured | null {
   };
 }
 
+/* An outline's corner is the box's corner grown by the offset and width — but
+   only where there IS a corner: round a square box the browser draws it square
+   (it reported a 3px corner on a square link ring). */
+function ringRadius(cs: CSSStyleDeclaration, w: number, grow: number): number {
+  const r = cs.borderTopLeftRadius.endsWith('%') ? (parseFloat(cs.borderTopLeftRadius) / 100) * w : parseFloat(cs.borderTopLeftRadius);
+  if (!(r > 0)) return 0;
+  // A corner cannot be smaller than square: an inset outline on a square
+  // segment would otherwise report a negative radius.
+  return Math.max(0, r + grow);
+}
+
 /** A CSS outline as a ring: its outer box, width and color; null when none. */
 function measureOutline(el: Element, scale: number): Measured | null {
   const cs = getComputedStyle(el);
@@ -223,11 +234,11 @@ function measureOutline(el: Element, scale: number): Measured | null {
   const w = rect.width / scale + grow * 2, h = rect.height / scale + grow * 2;
   return {
     w: Math.round(w * 100) / 100, h: Math.round(h * 100) / 100,
-    // A corner cannot be smaller than square: an inset outline on a square
-    // segment would otherwise report a negative radius.
-    radius: Math.max(0, (cs.borderTopLeftRadius.endsWith('%') ? (parseFloat(cs.borderTopLeftRadius) / 100) * (rect.width / scale) : parseFloat(cs.borderTopLeftRadius)) + grow),
+    radius: ringRadius(cs, rect.width / scale, grow),
     strokeWeight: ow, stroke: cssColor(cs.outlineColor),
     fill: null, effects: [], opacity: 1,
+    // A ring round a text box is as wide as the text, so it takes the text's rounding too.
+    textRuns: textRunsAcross(el),
   };
 }
 
