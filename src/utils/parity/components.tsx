@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -1022,4 +1022,32 @@ const formHelper: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, radio, swatch, toggleButtonGroup];
+/* Form-Label: the label (Dynamic-Label, Text) and, by Type, its marker —
+   " * Required" or "Optional" — as a second text after a gap. More Info (off
+   by default) adds an info icon and a link beside it. In code the marker is a
+   span inside the label, so the label part is compared on its type and the
+   marker on its own position. */
+const formLabel: ParityComponent = {
+  key: 'formLabel',
+  name: 'Form-Label',
+  nodeId: '8702:11037',
+  libFile: 'src/components/FormLabel/FormLabel.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.form-label-row', label: 'Row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Label', css: '.form-label', label: 'Label', skip: ['width'] },
+    { figma: '* Required', css: '.form-label-marker', label: 'Marker', when: (v) => v.props.Type === 'required' },
+    { figma: 'Optional', css: '.form-label-marker', label: 'Marker', when: (v) => v.props.Type === 'optional' },
+  ],
+  render: (v, booleans) => (
+    <FormLabel
+      htmlFor="parity-field"
+      type={String(v.props.Type)}
+      moreInfo={booleans['More Info'] ? { label: 'More about this field', text: 'More Info', href: '#' } : undefined}
+    >
+      Label
+    </FormLabel>
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, radio, swatch, toggleButtonGroup];
