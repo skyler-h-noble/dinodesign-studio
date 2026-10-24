@@ -1296,6 +1296,32 @@ const select: ParityComponent = {
   ),
 };
 
+/* SelectField: the Select with its Form-Label — top, left or none, as Input
+   Field. Only where the label goes is checked; Select checks the field. */
+const selectField: ParityComponent = {
+  key: 'selectField',
+  name: 'SelectField',
+  nodeId: '9499:50500',
+  libFile: 'src/components/Select/Select.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Form-Label', css: '.parity-select-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'],
+      when: (v) => v.props.Label !== 'none' },
+    { figma: 'Label', css: '.parity-select-field .form-label', label: 'Label', skip: ['width'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Select', css: '.parity-select-field .select-shell', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const pos = v.props.Label;
+    return (
+      <div className="parity-select-field" style={{ width: v.box.w }}>
+        <Select fullWidth placeholder=" " options={['One', 'Two', 'Three']}
+          label={pos === 'none' ? undefined : 'Label'} aria-label={pos === 'none' ? 'Choose' : undefined}
+          labelPosition={pos === 'label-left' ? 'left' : pos === 'label-top' ? 'top' : 'none'} />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1327,4 +1353,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, swatch, toggleButtonGroup];
