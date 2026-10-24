@@ -321,6 +321,60 @@ export const LINE_METRICS = {
   'No Count Step': { medium: 12, small: 8,   large: 16 },
 } as const;
 
+/* ── Field Button and NumberField ─────────────────────────────────────────
+ *
+ * Figma: Component-Size › Button/FieldButton-Width, Button/FieldButton-Height
+ * and Input/Numberfield (added 2026-10-24).
+ *
+ *   FieldButton-Width   40 / 48 / 64 — a shape, stated: the icon plus even
+ *                       padding at each size, so the stepper scales with its
+ *                       height instead of staying 48 everywhere
+ *   FieldButton-Height  the button height. Not written by the payload: in the
+ *                       file it should ALIAS Button/Button-Height (which follows
+ *                       the device), and a literal written over an alias
+ *                       detaches it. CSS points it at --Button-Height.
+ *   Numberfield         the field's height: two stacked steppers, the column's
+ *                       1px border top and bottom, and the divider between —
+ *                       2 x Button-Height + 2 + Divider. 50.5 / 67 / 116 at the
+ *                       studio heights, exactly the file's numbers. Derived, so
+ *                       it follows a brand that picks other button heights.
+ */
+export const FIELD_BUTTON_WIDTH = { small: 40, medium: 48, large: 64 } as const;
+
+export function numberfieldHeight(buttonHeight: number, size: SizeMode): number {
+  return 2 * buttonHeight + 2 + LINE_METRICS.Divider[size];
+}
+
+/** Button group: FieldButton-Width, in the Name / Sm- / Lg- shape. */
+export function fieldButtonFlat(): Record<string, number> {
+  return {
+    'FieldButton-Width': FIELD_BUTTON_WIDTH.medium,
+    'Sm-FieldButton-Width': FIELD_BUTTON_WIDTH.small,
+    'Lg-FieldButton-Width': FIELD_BUTTON_WIDTH.large,
+  };
+}
+
+/** Input group: Numberfield, from the brand's three button heights. */
+export function numberfieldFlat(h: { small: number; medium: number; large: number }): Record<string, number> {
+  return {
+    'Numberfield': numberfieldHeight(h.medium, 'medium'),
+    'Sm-Numberfield': numberfieldHeight(h.small, 'small'),
+    'Lg-Numberfield': numberfieldHeight(h.large, 'large'),
+  };
+}
+
+/** The same as CSS. Height and the field are calc()s of the live tokens, so
+ *  they cannot drift from the button height or the divider they derive from. */
+export function fieldMetricsVars(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [p, size, h] of [['', 'medium', 'Button-Height'], ['Sm-', 'small', 'Sm-Button-Height'], ['Lg-', 'large', 'Lg-Button-Height']] as const) {
+    out[`--${p}FieldButton-Width`] = `${FIELD_BUTTON_WIDTH[size]}px`;
+    out[`--${p}FieldButton-Height`] = `var(--${h})`;
+    out[`--${p}Numberfield`] = `calc(2 * var(--${h}) + 2px + var(--${p}Divider, ${LINE_METRICS.Divider[size]}px))`;
+  }
+  return out;
+}
+
 /* ── Switch ───────────────────────────────────────────────────────────────
  *
  * Static, like NAV_METRICS and LINE_METRICS. A switch is 42x24 at medium in

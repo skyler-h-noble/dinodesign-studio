@@ -22,7 +22,7 @@ import { buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRad
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
 import { buttonModeMetricVars } from './buttonSizing';
-import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars, FAB_SIZE } from './componentSize';
+import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars, fieldMetricsVars, FAB_SIZE } from './componentSize';
 import { fabBevelVars } from './bevelGeometry';
 export type { ComponentStyle };
 
@@ -136,6 +136,7 @@ export function componentStyleVars(
     ...lineMetricsVars(),
     /* Radio / Checkbox box, dot, check, gap and the shared touch target. */
     ...selectionMetricsVars(),
+    ...fieldMetricsVars(),
     ...tooltipMetricsVars(),
     /* Rail-Width / App-Bar-Height / Nav-Bar-Height. The record form of the
        same table navMetricsCSS() writes into the exported stylesheet and into

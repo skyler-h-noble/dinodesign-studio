@@ -16,7 +16,7 @@ import { inputMetrics, floatingLabelLeading, FLOATING_LABEL_SIZES } from './inpu
 import { overlayOffsets, type DeviceMode } from './deviceChrome';
 import { SYSTEM_FAMILY_OF, systemLineHeight } from './systemTypography';
 import { platformButtonMetrics } from './platformMetrics';
-import { FAB_SIZE } from './componentSize';
+import { FAB_SIZE, fieldButtonFlat, numberfieldFlat } from './componentSize';
 import { THEME_MODES, CSS_ONLY_THEMES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
@@ -2500,10 +2500,12 @@ const FIGMA_LG_BUTTON_PADDING = 16;
     };
     const inputExtras: Record<string, number> = {
       'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
+      // The NumberField's height, from the brand's button heights.
+      ...numberfieldFlat({ small: cs.smallButtonHeight, medium: cs.buttonHeight, large: cs.largeButtonHeight }),
     };
 
     figma['Component-Size'] = componentSizePayload(
-      r as never, { ...buttonFigmaMetrics, ...buttonExtras }, inputExtras);
+      r as never, { ...buttonFigmaMetrics, ...buttonExtras, ...fieldButtonFlat() }, inputExtras);
 
     /* Every column of the Devices-Type button variables that
        Component-Size/Button/Button-Height and -Icon alias into.

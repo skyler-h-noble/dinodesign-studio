@@ -958,8 +958,7 @@ const fieldButton: ParityComponent = {
   name: 'Field Button',
   nodeId: '6850:28584',
   libFile: 'src/components/NumberField/FieldButton.js',
-  // The set is pinned to Component-Size › large.
-  context: { theme: 'Default', surface: 'Surface', size: 'large' },
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
   parts: [
     // The inset ring is the outline style's edge; read it as border.
