@@ -31,6 +31,17 @@ export const forcedStateClass = (s: ForcedState) => `pseudo-${s}-all`;
 
 const STYLE_ID = 'parity-pseudo-states';
 
+/* A control nested in the one being forced keeps its OWN states: the Input's
+   end decorator is a button, and an Input drawn as Hover is not hovering its
+   decorator. Wrapping that control in `.pseudo-own-state` keeps every forced
+   copy off it — the guard goes on the subject, ahead of any pseudo-element. */
+export const OWN_STATE_CLASS = 'pseudo-own-state';
+function ownStateGuard(sel: string): string {
+  const guard = `:not(.${OWN_STATE_CLASS}, .${OWN_STATE_CLASS} *)`;
+  const m = sel.match(/::?(before|after|placeholder|marker|selection)$/);
+  return m ? sel.slice(0, m.index) + guard + m[0] : sel + guard;
+}
+
 function rewrite(selectorText: string): string[] {
   const out: string[] = [];
   for (const { pseudo, cls } of STATES) {
@@ -38,7 +49,7 @@ function rewrite(selectorText: string): string[] {
     const parts = selectorText
       .split(',')
       .filter((p) => p.includes(pseudo))
-      .map((p) => `.${cls} ${p.trim().split(pseudo).join('')}`);
+      .map((p) => `.${cls} ${ownStateGuard(p.trim().split(pseudo).join(''))}`);
     if (parts.length) out.push(parts.join(', '));
   }
   return out;

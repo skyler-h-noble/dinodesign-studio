@@ -13,7 +13,6 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import BackspaceIcon from '@mui/icons-material/Backspace';
-import SearchIcon from '@mui/icons-material/Search';
 import HomeSharpIcon from '@mui/icons-material/HomeSharp';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import AddIcon from '@mui/icons-material/Add';
@@ -25,6 +24,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import CloseIcon from '@mui/icons-material/Close';
 import type { FigmaVariant } from './figmaSet';
 import type { ForcedState } from './pseudoStates';
+import { OWN_STATE_CLASS } from './pseudoStates';
 
 export interface ParityPart {
   figma: string;
@@ -1138,7 +1138,11 @@ const input: ParityComponent = {
     { figma: 'Focus-Visible', css: '.parity-input .inp-shell', outline: true, outer: true, label: 'Focus ring' },
     { figma: 'Icon', css: '.parity-input .MuiInputAdornment-positionStart svg', label: 'Start icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     // The <input> spans the row; Figma's text box is the 24px line inside it — type and colour, not the box.
-    { figma: 'Component Name', css: '.parity-input .MuiOutlinedInput-input', label: 'Text', skip: ['width', 'position', 'position (left, top)', 'height'] },
+    { figma: 'Component Name', css: '.parity-input .MuiOutlinedInput-input', label: 'Text', skip: ['width', 'position', 'position (left, top)', 'height'],
+      when: (v) => !(v.props.Type === 'Floating Label' && v.props.Content === 'placeholder') },
+    // An empty floating field draws no placeholder: its "Name" is the resting label.
+    { figma: 'Component Name', css: '.parity-input .MuiInputLabel-root', label: 'Resting label', skip: ['width', 'height'],
+      when: (v) => v.props.Type === 'Floating Label' && v.props.Content === 'placeholder' && ['Default', 'Disabled'].includes(v.props.State) },
     { figma: 'Input Decorator', css: '.parity-input .MuiInputAdornment-positionEnd', label: 'End decorator', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
   ],
   render: (v, booleans) => {
@@ -1155,8 +1159,9 @@ const input: ParityComponent = {
           // Figma's placeholder variant is an empty " " in Quiet — a placeholder, so the field shows its placeholder colour.
           placeholder={filled || floating ? undefined : ' '}
           disabled={v.props.State === 'Disabled'}
-          startAdornment={(booleans['Start Icon'] ?? true) ? <SearchIcon /> : undefined}
-          endAdornment={(booleans['End Decorator'] ?? true) ? <InputDecorator aria-label="Clear"><BackspaceIcon /></InputDecorator> : undefined}
+          startAdornment={(booleans['Start Icon'] ?? true) ? <HomeIcon /> : undefined}
+          // The decorator is a button with its own states; the field's state is not forced onto it.
+          endAdornment={(booleans['End Decorator'] ?? true) ? <span className={OWN_STATE_CLASS} style={{ display: 'contents' }}><InputDecorator aria-label="Clear"><BackspaceIcon /></InputDecorator></span> : undefined}
         />
       </div>
     );
