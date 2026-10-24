@@ -12,6 +12,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
+import HomeSharpIcon from '@mui/icons-material/HomeSharp';
+import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import InfoIcon from '@mui/icons-material/Info';
@@ -1072,4 +1074,26 @@ const hotlinkGroup: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, radio, swatch, toggleButtonGroup];
+/* Icon: one Material glyph at Icons & Avatars › Icon-Size (24 in `small`),
+   colored Icons › Icon. Style picks the glyph set — Default (filled), Round,
+   Sharp — which in code is the matching @mui/icons-material export. */
+const ICON_STYLE: Record<string, ReactNode> = { Default: <HomeIcon />, Round: <HomeRoundedIcon />, Sharp: <HomeSharpIcon /> };
+const icon: ParityComponent = {
+  key: 'icon',
+  name: 'Icon',
+  nodeId: '9155:25617',
+  libFile: 'src/components/Icon/Icon.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-icon > *', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // Figma draws the glyph with the Material Icons FONT, code with the same glyph as SVG — so the font family is not a comparison.
+    { figma: 'home', css: '.parity-icon svg', label: 'Glyph', skip: ['border', 'shadow', 'radius (as drawn)', 'font family'] },
+  ],
+  render: (v) => (
+    <span className="parity-icon" style={{ display: 'inline-flex' }}>
+      <Icon size="small">{ICON_STYLE[String(v.props.Style)] ?? <HomeIcon />}</Icon>
+    </span>
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, radio, swatch, toggleButtonGroup];
