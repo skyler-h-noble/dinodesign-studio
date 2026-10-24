@@ -10,8 +10,10 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
+import BackspaceIcon from '@mui/icons-material/Backspace';
+import SearchIcon from '@mui/icons-material/Search';
 import HomeSharpIcon from '@mui/icons-material/HomeSharp';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import AddIcon from '@mui/icons-material/Add';
@@ -1116,4 +1118,49 @@ const imagePlaceholder: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, radio, swatch, toggleButtonGroup];
+/* Input: a 32px field (Floating Label: 56) — Inner Frame carries the Hover
+   fill, a 1px Border edge and the Input-Radius corner; a 20px start icon, the
+   text in Dynamic Body, and an end decorator (a ghost icon-only button, 32px,
+   "backspace"). Focus-Visible is a 2px ring 1px outside the field. */
+const input: ParityComponent = {
+  key: 'input',
+  name: 'Input',
+  nodeId: '8574:19742',
+  libFile: 'src/components/Input/Input.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    // The shell carries the size, corner and focus ring; its ::after draws the
+    // edge (Figma's inside stroke, as an overlay); the MUI root draws the fill.
+    { figma: 'Inner Frame', css: '.parity-input .inp-shell', label: 'Field', skip: ['fill', 'border'] },
+    { figma: 'Inner Frame', css: '.parity-input .inp-shell', pseudo: '::after', label: 'Field edge', skip: ['fill', 'position', 'width', 'height', 'shadow', 'opacity'] },
+    { figma: 'Inner Frame', css: '.parity-input .MuiOutlinedInput-root', label: 'Field fill', skip: ['border', 'radius (as drawn)', 'position', 'width', 'height', 'shadow'] },
+    { figma: 'Focus-Visible', css: '.parity-input .inp-shell', outline: true, outer: true, label: 'Focus ring' },
+    { figma: 'Icon', css: '.parity-input .MuiInputAdornment-positionStart svg', label: 'Start icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // The <input> spans the row; Figma's text box is the 24px line inside it — type and colour, not the box.
+    { figma: 'Component Name', css: '.parity-input .MuiOutlinedInput-input', label: 'Text', skip: ['width', 'position', 'position (left, top)', 'height'] },
+    { figma: 'Input Decorator', css: '.parity-input .MuiInputAdornment-positionEnd', label: 'End decorator', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v, booleans) => {
+    const floating = v.props.Type === 'Floating Label';
+    const filled = v.props.Content === 'value';
+    return (
+      <div className="parity-input" style={{ width: v.box.w }}>
+        <TextInput
+          fullWidth
+          labelPosition={floating ? 'floating' : 'standard'}
+          label={floating ? 'Name' : undefined}
+          aria-label={floating ? undefined : 'Name'}
+          defaultValue={filled ? 'Jane Doe' : undefined}
+          // Figma's placeholder variant is an empty " " in Quiet — a placeholder, so the field shows its placeholder colour.
+          placeholder={filled || floating ? undefined : ' '}
+          disabled={v.props.State === 'Disabled'}
+          startAdornment={(booleans['Start Icon'] ?? true) ? <SearchIcon /> : undefined}
+          endAdornment={(booleans['End Decorator'] ?? true) ? <Button iconOnly variant="ghost" aria-label="Clear"><BackspaceIcon /></Button> : undefined}
+        />
+      </div>
+    );
+  },
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, radio, swatch, toggleButtonGroup];

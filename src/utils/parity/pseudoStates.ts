@@ -21,6 +21,9 @@ const STATES = [
   { pseudo: ':hover', cls: 'pseudo-hover-all' },
   { pseudo: ':active', cls: 'pseudo-active-all' },
   { pseudo: ':focus-visible', cls: 'pseudo-focus-visible-all' },
+  /* A field shows focus on its SHELL with :focus-within (the <input> inside is
+     what takes focus), so Focus-Visible forces that too. */
+  { pseudo: ':focus-within', cls: 'pseudo-focus-visible-all' },
 ] as const;
 
 export type ForcedState = 'hover' | 'active' | 'focus-visible';

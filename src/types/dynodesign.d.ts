@@ -91,7 +91,9 @@ declare module '@omni-design/components' {
   // Inputs
   export const TextField: FC<any>;
   export const TextInput: FC<any>;
-  export const Input: FC<any>;
+  /* No `Input`: the package exports the field as TextInput only. Declaring
+     Input here let `import { Input }` typecheck and then crash the page at
+     runtime — a shim promising an export the package lacks. */
   export const Select: FC<any>;
   export const Autocomplete: FC<any>;
   export const Checkbox: FC<any>;
