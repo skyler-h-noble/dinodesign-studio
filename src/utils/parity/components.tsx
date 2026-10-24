@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -981,4 +981,45 @@ const fieldButton: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, radio, swatch, toggleButtonGroup];
+/* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
+   message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
+   Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
+   carry the state (and Figma spells the info text "Info  message", two
+   spaces), so the message parts are listed per validation. */
+const FORM_HELPER_STATES = [
+  ['warning', 'Theme-Warning', 'Warning message'],
+  ['info', 'Theme-Info', 'Info  message'],
+  ['success', 'Theme-Success', 'Success message'],
+  ['error', 'Theme-Error', 'Error message'],
+] as const;
+const formHelper: ParityComponent = {
+  key: 'formHelper',
+  name: 'Form-Helper',
+  nodeId: '8580:22922',
+  libFile: 'src/components/FormHelper/FormHelper.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    // Figma's frame is a fixed 113 wide rather than hugging its text, so its width is not compared.
+    { figma: '__root__', css: '.form-helper', label: 'Helper', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'] },
+    { figma: 'Input Help Text', css: '.form-helper-text', label: 'Helper text' },
+    ...FORM_HELPER_STATES.flatMap(([state, pill, text]) => [
+      { figma: pill, css: '.input-message', label: 'Message', when: (v: FigmaVariant) => v.props.Validation === state },
+      { figma: 'Message Icons', css: '.input-message svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v: FigmaVariant) => v.props.Validation === state },
+      { figma: text, css: '.input-message-text', label: 'Message text', when: (v: FigmaVariant) => v.props.Validation === state },
+    ]),
+  ],
+  render: (v, booleans) => {
+    const state = String(v.props.Validation);
+    const label = { warning: 'Warning message', info: 'Info message', success: 'Success message', error: 'Error message' }[state];
+    return (
+      <FormHelper
+        helperText="Input Help Text"
+        showHelper={booleans['Show Helper'] ?? true}
+        validation={state}
+        validationMessage={label}
+      />
+    );
+  },
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, radio, swatch, toggleButtonGroup];
