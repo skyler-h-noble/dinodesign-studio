@@ -349,13 +349,12 @@ const NO_POINTER: React.CSSProperties = { pointerEvents: 'none' };
 /* The Overlay fade. Reduced motion holds it at half, which is the slider's own
    starting point, rather than blinking at someone who asked it not to. */
 const OVERLAY_FADE_CSS = `
-@keyframes parity-overlay-fade { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes parity-overlay-fade { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 @keyframes parity-overlay-slide {
-  0%, 12%   { transform: translate(var(--parity-dx), var(--parity-dy)); opacity: 1; }
-  32%, 42%  { transform: translate(0, 0); opacity: 1; }
-  52%       { transform: translate(0, 0); opacity: 0; }
-  62%, 70%  { transform: translate(0, 0); opacity: 1; }
-  90%, 100% { transform: translate(var(--parity-dx), var(--parity-dy)); opacity: 1; }
+  0%, 15%   { transform: translate(var(--parity-dx), var(--parity-dy)); opacity: 1; }
+  50%, 62%  { transform: translate(0, 0); opacity: 1; }
+  76%       { transform: translate(0, 0); opacity: 0; }
+  90%, 100% { transform: translate(0, 0); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   [style*="parity-overlay"] { animation: none !important; opacity: 0.5 !important; transform: none !important; }
@@ -393,6 +392,7 @@ export default function ParityPage() {
   /* Overlay animation — see overlayFade below. */
   type Play = 'off' | 'fade' | 'side' | 'below';
   const [play, setPlay] = useState<Play>('off');
+  const [runKey, setRunKey] = useState(0);
 
   const [zoom, setZoom] = useState('2');
   const [rows, setRows] = useState<Row[]>([]);
@@ -594,11 +594,14 @@ export default function ParityPage() {
        below  the same from underneath */
   const animate = play !== 'off';
   const SLIDE_GAP = 32;
+  /* Runs ONCE and holds the last frame — the slides end overlaid — so a
+     recording has a clean start and finish. Replay bumps runKey, which
+     remounts the layer and restarts the animation. */
   const overlayFade: React.CSSProperties = play === 'fade'
-    ? { animation: 'parity-overlay-fade 2.4s ease-in-out infinite' }
+    ? { animation: 'parity-overlay-fade 2.4s ease-in-out 1 both' }
     : play === 'side' || play === 'below'
       ? ({
-          animation: `parity-overlay-slide 6s ease-in-out infinite`,
+          animation: `parity-overlay-slide 4s ease-in-out 1 both`,
           ['--parity-dx' as string]: play === 'side' ? `${(set?.box.w ?? 0) + SLIDE_GAP / scale}px` : '0px',
           ['--parity-dy' as string]: play === 'below' ? `${(set?.box.h ?? 0) + SLIDE_GAP / scale}px` : '0px',
         } as React.CSSProperties)
@@ -729,13 +732,16 @@ export default function ParityPage() {
           {(mode === 'overlay' || layout === 'variants') && (
             <VStack spacing={0}>
               <Caption color="quiet">Animate</Caption>
-              <ToggleButtonGroup value={play} onChange={(v: Play) => v && setPlay(v)} size="small">
+              <ToggleButtonGroup value={play} onChange={(v: Play) => { if (v) { setPlay(v); setRunKey((k) => k + 1); } }} size="small">
                 <Button value="off" size="small">Off</Button>
                 <Button value="fade" size="small">Fade</Button>
                 {layout !== 'variants' && <Button value="side" size="small">From side</Button>}
                 {layout !== 'variants' && <Button value="below" size="small">From below</Button>}
               </ToggleButtonGroup>
             </VStack>
+          )}
+          {(mode === 'overlay' || layout === 'variants') && play !== 'off' && (
+            <Button variant="default-outline" size="small" onClick={() => setRunKey((k) => k + 1)}>Replay</Button>
           )}
           <Button variant="default-outline" size="small" onClick={() => { load(); remeasure(); }} disabled={loading}>
             {loading ? 'Loading…' : 'Reload Figma'}
@@ -841,7 +847,7 @@ export default function ParityPage() {
                     {component && windowBox(v, (
                       <>
                         {figmaCrop(v)}
-                        <ThemedZone {...zone} style={{ position: 'absolute', inset: 0, background: 'transparent', ...(play === 'fade' ? overlayFade : { opacity }) }}>
+                        <ThemedZone key={runKey} {...zone} style={{ position: 'absolute', inset: 0, background: 'transparent', ...(play === 'fade' ? overlayFade : { opacity }) }}>
                           {variantCell(v, { x: PAD, y: PAD }, false)}
                         </ThemedZone>
                       </>
@@ -882,7 +888,7 @@ export default function ParityPage() {
                     visible. The design system paints any [data-theme]
                     [data-surface] element, hence the explicit transparent —
                     shell chrome for this harness, not a component. */}
-                <ThemedZone {...zone} style={{ position: 'absolute', inset: 0, background: 'transparent', ...overlayFade }}>
+                <ThemedZone key={runKey} {...zone} style={{ position: 'absolute', inset: 0, background: 'transparent', ...overlayFade }}>
                   <div ref={codeRef} style={NO_POINTER}>{codeLayer}</div>
                 </ThemedZone>
               </>,
