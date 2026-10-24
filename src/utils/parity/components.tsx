@@ -12,6 +12,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
+import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
 import HomeSharpIcon from '@mui/icons-material/HomeSharp';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
@@ -1153,13 +1154,13 @@ const input: ParityComponent = {
         <TextInput
           fullWidth
           labelPosition={floating ? 'floating' : 'standard'}
-          label={floating ? 'Name' : undefined}
-          aria-label={floating ? undefined : 'Name'}
-          defaultValue={filled ? 'Jane Doe' : undefined}
+          label={floating ? 'Email address' : undefined}
+          aria-label={floating ? undefined : 'Email address'}
+          defaultValue={filled ? 'Jane.Doe@gmail.com' : undefined}
           // Figma's placeholder variant is an empty " " in Quiet — a placeholder, so the field shows its placeholder colour.
           placeholder={filled || floating ? undefined : ' '}
           disabled={v.props.State === 'Disabled'}
-          startAdornment={(booleans['Start Icon'] ?? true) ? <HomeIcon /> : undefined}
+          startAdornment={(booleans['Start Icon'] ?? true) ? <MailIcon /> : undefined}
           // The decorator is a button with its own states; the field's state is not forced onto it.
           endAdornment={(booleans['End Decorator'] ?? true) ? <span className={OWN_STATE_CLASS} style={{ display: 'contents' }}><InputDecorator aria-label="Clear"><BackspaceIcon /></InputDecorator></span> : undefined}
         />
