@@ -97,8 +97,8 @@ DATA:
     renders the built-in photo-icon placeholder itself (no <img>, no broken
     src). Likewise emit <Ratio placeholder /> for any image slot whose source
     isn't a usable URL (e.g. a Figma imageRef hash). Only pass an <img> child
-    when you have a REAL image URL. A plain <Ratio ratio="1:1" /> with the
-    boolean false is just a blank tile.
+    when you have a REAL image URL. A plain <Ratio ratio="1:1" /> is an empty
+    Surface-Dim tile — the component's default, as in Figma.
   - <ListItem
        startDecorator={<Avatar/Ratio/Icon />}
        endDecorator={<Checkbox/Button/Icon />}

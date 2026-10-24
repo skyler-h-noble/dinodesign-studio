@@ -1243,6 +1243,8 @@ const ratioFillHorizontal: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: '__root__', css: '.parity-ratio .ratio', label: 'Box', skip: ['fill', 'border', 'shadow'] },
+    // The paint is the inner layer's: the Surface-Dim level Figma pins on the Ratio.
+    { figma: '__root__', css: '.parity-ratio .ratio > [data-surface]', label: 'Fill', skip: ['border', 'shadow', 'width', 'height', 'position', 'radius (as drawn)'] },
   ],
   render: (v) => (
     <div className="parity-ratio" style={{ width: v.box.w }}>
@@ -1258,6 +1260,8 @@ const ratioFillVertical: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: '__root__', css: '.parity-ratio .ratio', label: 'Box', skip: ['fill', 'border', 'shadow'] },
+    // The paint is the inner layer's: the Surface-Dim level Figma pins on the Ratio.
+    { figma: '__root__', css: '.parity-ratio .ratio > [data-surface]', label: 'Fill', skip: ['border', 'shadow', 'width', 'height', 'position', 'radius (as drawn)'] },
   ],
   render: (v) => (
     <div className="parity-ratio" style={{ height: v.box.h, display: 'flex' }}>
