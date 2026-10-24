@@ -1144,6 +1144,9 @@ const input: ParityComponent = {
     // An empty floating field draws no placeholder: its "Name" is the resting label.
     { figma: 'Component Name', css: '.parity-input .MuiInputLabel-root', label: 'Resting label', skip: ['width', 'height'],
       when: (v) => v.props.Type === 'Floating Label' && v.props.Content === 'placeholder' && ['Default', 'Disabled'].includes(v.props.State) },
+    // The raised label: content, or an empty field under hover / press / focus.
+    { figma: 'Email address', css: '.parity-input .MuiInputLabel-root', label: 'Raised label', skip: ['width', 'height'],
+      when: (v) => v.props.Type === 'Floating Label' && (v.props.Content === 'value' || ['Hover', 'Pressed', 'Focus-Visible'].includes(v.props.State)) },
     { figma: 'Input Decorator', css: '.parity-input .MuiInputAdornment-positionEnd', label: 'End decorator', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
   ],
   render: (v, booleans) => {
