@@ -208,6 +208,7 @@ declare module '@omni-design/components' {
   export const Dialog: FC<any>;
   export const Modal: FC<any>;
   export const Drawer: FC<any>;
+  export const Sheet: FC<any>;
 
   // Feedback
   export const Alert: FC<any>;
