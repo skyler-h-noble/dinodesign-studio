@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ButtonGroup, Icon, Radio, RailItem, Ratio, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -1050,4 +1050,26 @@ const formLabel: ParityComponent = {
   ),
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, radio, swatch, toggleButtonGroup];
+/* Hotlink Group: Hotlinks in a row with a Border-Variant bar between each.
+   "Four" holds three links and two bars (one pair sits in the Link Slot). */
+const hotlinkGroup: ParityComponent = {
+  key: 'hotlinkGroup',
+  name: 'Hotlink Group',
+  nodeId: '3156:5504',
+  libFile: 'src/components/LinkGroup/LinkGroup.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.link-group', label: 'Group', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Link', css: '.link-group-item', label: 'Link', all: true, skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: '.Breadcrumbs-separator', css: '.link-group-separator', label: 'Separator', all: true, skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: () => (
+    <LinkGroup>
+      <Link href="#">Hotlink</Link>
+      <Link href="#">Hotlink</Link>
+      <Link href="#">Hotlink</Link>
+    </LinkGroup>
+  ),
+};
+
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, radio, swatch, toggleButtonGroup];

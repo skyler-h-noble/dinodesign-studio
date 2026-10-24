@@ -79,6 +79,7 @@ declare module '@omni-design/components' {
   export const FieldButton: FC<any>;
   export const FormHelper: FC<any>;
   export const FormLabel: FC<any>;
+  export const LinkGroup: FC<any>;
   export const Rail: FC<any>;
   export const RailItem: FC<any>;
   export const Toolbar: FC<any>;
