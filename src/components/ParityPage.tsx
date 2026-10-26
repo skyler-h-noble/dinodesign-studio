@@ -420,7 +420,11 @@ function compare(variant: string, part: string, f: FigmaPart, c: Measured | null
   // it draws over the cell's Background, when code's fill is opaque — as text
   // and borders already are.
   const seenFill = c.fill && rgbaOf(c.fill)?.[3] === 255 && f.fill && (rgbaOf(f.fill)?.[3] ?? 255) < 255 ? compositeOn(f.fill, ground) : null;
-  add('fill', seenFill ? `${f.fill} (= ${seenFill} on Background)` : f.fill, c.fill, colorsMatch(seenFill ?? f.fill, c.fill));
+  // No code fill shows the cell's Background — the same pixels as a Figma fill
+  // OF that Background (an unselected segment painted the surface it sits on).
+  const transparentOnGround = !c.fill && !!f.fill && !!ground && colorsMatch(f.fill, ground);
+  add('fill', seenFill ? `${f.fill} (= ${seenFill} on Background)` : transparentOnGround ? `${f.fill} (= Background)` : f.fill, c.fill,
+    transparentOnGround || colorsMatch(seenFill ?? f.fill, c.fill));
   add('shadow', f.effects.join(', ') || 'none', c.effects.join(', ') || 'none', (f.effects.length === 0) === (c.effects.length === 0));
   add('opacity', +figmaOpacity.toFixed(2), c.opacity, Math.abs(figmaOpacity - c.opacity) < 0.02);
   return rows;
