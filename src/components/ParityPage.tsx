@@ -565,6 +565,8 @@ export default function ParityPage() {
      report carrying Count Step's variants under Day Cell's node id. */
   const loadSeq = useRef(0);
   const sweepDocs = useRef<Record<string, any>>({});
+  // Bumped by the sweep so re-selecting the component already open still loads.
+  const [reloadTick, setReloadTick] = useState(0);
   const load = useCallback(async () => {
     if (!token.trim()) return;
     const seq = ++loadSeq.current;
@@ -591,7 +593,7 @@ export default function ParityPage() {
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [nodeId, token]);
+  }, [nodeId, token, reloadTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 
@@ -684,6 +686,7 @@ export default function ParityPage() {
         // component renders once against the old component's variants.
         setSet(null); setImage(null); setRows([]);
         setNodeId(c.nodeId);
+        setReloadTick((t) => t + 1);
         // Wait for this component's SECOND measurement (the 2s one) to land.
         const start = Date.now();
         let first = 0;

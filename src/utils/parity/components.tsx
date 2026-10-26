@@ -186,7 +186,10 @@ const alert: ParityComponent = {
     { figma: 'Icon', css: '.alert-start-decorator .icon', label: 'Icon' },
     { figma: 'Alert Title', css: '.alert-title .typography, .alert-title p, .alert-title span', label: 'Title' },
     // The button's visible shape is its inner Theme-Button frame; the instance root is a bare box.
-    { figma: 'Theme-Button', css: '.alert-end-decorator button', label: 'Close button' },
+    // A ghost close button: transparent in code over the alert's own (75%)
+    // surface, which Figma paints into the button — the same pixels, so its
+    // fill is not compared (as on Button's resting ghost).
+    { figma: 'Theme-Button', css: '.alert-end-decorator button', label: 'Close button', skip: ['fill'] },
     { figma: 'Alert body', css: '.alert-message .typography, .alert-message p, .alert-message span', label: 'Body' },
   ],
   render: (v, _b, ctx) => {
@@ -403,7 +406,10 @@ const badgeCounter: ParityComponent = {
     { figma: '__root__', css: '.MuiBadge-badge', label: 'Badge' },
     // The digit is centred in the pill; its box is the text's, so only the
     // type and the centre are compared.
-    { figma: '1', css: '.MuiBadge-badge', label: 'Count', when: (v) => v.props.Type === 'standard', skip: ['width', 'height', 'radius (as drawn)', 'fill', 'border', 'shadow'] },
+    // Code's count is the text of the 16px badge itself; Figma's is a
+    // cap-height-trimmed 12px text box centred in it — the glyph sits in the
+    // same place, but the boxes' tops differ, so that edge is not compared.
+    { figma: '1', css: '.MuiBadge-badge', label: 'Count', when: (v) => v.props.Type === 'standard', skip: ['width', 'height', 'radius (as drawn)', 'fill', 'border', 'shadow', 'position (centre, top)'] },
   ],
   /* Pinned from OUTSIDE. Passing sx={{ '& .MuiBadge-badge': … }} replaced the
      lib's own '& .MuiBadge-badge' block (same key, spread last), so the badge
@@ -436,15 +442,18 @@ const box: ParityComponent = {
   parts: [
     { figma: '__root__', css: '.omni-box', label: 'Box', skip: ['fill'] },
     { figma: 'Content Slot', css: '.omni-box', label: 'Content slot', when: (v) => v.props.Fit === 'No Ratio' },
-    { figma: 'Ratio - Fill Horizontal', css: '.ratio', label: 'Ratio', when: (v) => v.props.Fit === 'Ratio' },
+    { figma: 'Ratio - Fill Horizontal', css: '.ratio', label: 'Ratio', skip: ['fill'], when: (v) => v.props.Fit === 'Ratio' },
+    // The Ratio paints on its inner zone element (Surface-Dim), not its wrapper.
+    { figma: 'Ratio - Fill Horizontal', css: '.ratio > [data-surface]', label: 'Ratio fill', skip: ['border', 'shadow', 'width', 'height', 'position', 'radius (as drawn)'], when: (v) => v.props.Fit === 'Ratio' },
   ],
+  // Figma's Content Slot is a Surface-Dim example — Box itself sets no surface.
   render: (v) => v.props.Fit === 'Ratio'
     ? (
       <Box style={{ width: v.box.w }}>
         <Ratio ratio="1:1" placeholder={false} />
       </Box>
     )
-    : <Box style={{ width: v.box.w, height: v.box.h }} />,
+    : <Box surface="Surface-Dim" style={{ width: v.box.w, height: v.box.h }} />,
 };
 
 /* The assembled trail: six link crumbs and the current one, with slanted
@@ -915,8 +924,13 @@ const expandableNavRailItem: ParityComponent = {
     // layout space); read it as the border it draws.
     { figma: '__root__', css: '.rail-item', label: 'Item', shadow: 'inset' },
     { figma: 'Focus-Visible', css: '.rail-item', outline: true, outer: true, label: 'Focus ring' },
-    { figma: 'Icon Buttons', css: '.rail-item-icon', label: 'Icon slot', skip: ['fill', 'border', 'shadow'] },
-    { figma: 'Icon', css: '.rail-item-icon svg', label: 'Icon', skip: ['border', 'shadow', 'radius (as drawn)'] },
+    // Figma's holder hugs the 20px icon with Sizing-Half above and below (28),
+    // code's is the 32 row — an invisible box either way; the icon inside lands
+    // at the same place, and that is what is compared.
+    { figma: 'Icon Buttons', css: '.rail-item-icon', label: 'Icon slot', skip: ['fill', 'border', 'shadow', 'height', 'position'] },
+    { figma: 'Icon', css: '.rail-item-icon svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // The color is on the glyph (Material ligature "home"), not the Icon frame.
+    { figma: 'home', css: '.rail-item-icon svg', label: 'Glyph', skip: ['border', 'shadow', 'radius (as drawn)', 'font family', 'font size', 'font weight', 'position', 'position (left, top)', 'width', 'height'] },
     { figma: 'Component Name', css: '.rail-item-label', label: 'Label' },
   ],
   render: (v) => (
@@ -1754,7 +1768,7 @@ const formHelper: ParityComponent = {
 };
 
 /* Form-Label: the label (Dynamic-Label, Text) and, by Type, its marker —
-   " * Required" or "Optional" — as a second text after a gap. More Info (off
+   "* Required" or "Optional" — as a second text after a gap. More Info (off
    by default) adds an info icon and a link beside it. In code the marker is a
    span inside the label, so the label part is compared on its type and the
    marker on its own position. */
