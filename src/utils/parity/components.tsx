@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -53,7 +53,7 @@ export interface ParityPart {
    *  another — where CSS stacks them all on one element. 'outer' keeps the
    *  drop shadows, 'inset' the inset ones. An `inset 0 0 0 Npx` ring is read
    *  as N more pixels of border, which is what it draws. */
-  shadow?: 'outer' | 'inset';
+  shadow?: 'outer' | 'inset' | 'ring';
   /** A child (selector, inside the matched node) whose inset ring is MORE of
    *  this node's border — Card draws its selected ring as a 1px border plus a
    *  1px inset ring on its inner surface, where Figma draws one 2px stroke. */
@@ -141,8 +141,9 @@ const radio: ParityComponent = {
     { figma: 'Focus-Visible', css: '.radio-circle-icon', outline: true, outer: true, label: 'Focus ring' },
   ],
   forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
-  // The Radio page resolves the set in .Theme=Primary and Component-Size=large.
-  context: { theme: 'Primary', surface: 'Surface', size: 'large' },
+  // The set resolves in .Theme=Primary (on each variant) and Component-Size
+  // medium — the page used to pin large; that override is gone.
+  context: { theme: 'Primary', surface: 'Surface', size: 'medium' },
   // No `color`: the comparison is against what the lib does BY DEFAULT, which
   // is what every caller that passes nothing gets — Swatch's radio included.
   render: (v, _b, ctx) => (
@@ -1035,6 +1036,40 @@ const paginationNumber: ParityComponent = {
   },
 };
 
+/* Progress Bar: the track is an outline (1px Border OUTSIDE, no fill), the
+   indicator Buttons-Border with a 1px Background ring inside. Figma's bar is
+   192 wide with a 100px indicator, so code renders 100/192 of the way. */
+const progressBar: ParityComponent = {
+  key: 'progressBar',
+  name: 'Progress Bar',
+  nodeId: '8379:11531',
+  libFile: 'src/components/LinearProgress/LinearProgress.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.linear-progress', label: 'Track', shadow: 'ring' },
+    { figma: 'Progress Indicator', css: '.linear-progress-bar', label: 'Indicator', shadow: 'inset' },
+  ],
+  render: () => <LinearProgress value={100 / 1.92} size="large" />,
+};
+
+/* Progress Dial: a ring an eighth of the diameter thick — Background with a
+   1px Border on both edges — and a Buttons-Border arc inset 1px, clockwise
+   from twelve. Figma's arc ends at 36.87deg past three o'clock: 35.24%. The
+   ring and arc are SVG strokes, which the box measurements cannot read, so
+   only the dial's box is compared; use Overlay for the drawing. */
+const progressDial: ParityComponent = {
+  key: 'progressDial',
+  name: 'Progress Dial',
+  nodeId: '8379:11570',
+  libFile: 'src/components/CircularProgress/CircularProgress.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: ['The ring and arc are SVG strokes; only the dial box is measured — check the drawing with Overlay.'],
+  parts: [
+    { figma: 'Container', css: '.circular-progress', label: 'Dial', skip: ['fill', 'border', 'shadow'] },
+  ],
+  render: () => <CircularProgress value={35.24} size="large" />,
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -1831,4 +1866,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];

@@ -287,14 +287,16 @@ function svgFill(el: Element): string | null {
 
 /* Keep the box-shadow layers a part owns (see ParityPart.shadow). A ring,
    `inset 0 0 0 Npx`, is folded into the border it visually thickens. */
-function ownShadows(m: Measured, kind: 'outer' | 'inset'): Measured {
+function ownShadows(m: Measured, kind: 'outer' | 'inset' | 'ring'): Measured {
   const layers = (m.effects ?? []).flatMap(shadowLayers);
   const ring = /(^|\s)0(px)? 0(px)? 0(px)? (\d+(\.\d+)?)px( inset|$)|inset\s+0(px)? 0(px)? 0(px)? (\d+(\.\d+)?)px/;
   let ringPx = 0;
   let ringColor: string | null = null;
   const kept = layers.filter((l) => {
     const inset = /\binset\b/.test(l);
-    const r = inset ? l.match(ring) : null;
+    /* 'ring': an OUTSIDE stroke drawn as a 0-offset spread shadow (it takes no
+       layout space, as Figma's outside stroke does) is the border. */
+    const r = inset || kind === 'ring' ? l.match(ring) : null;
     if (r) {
       ringPx += parseFloat(r[5] ?? r[11] ?? '0');
       const c = l.match(/rgba?\([^)]*\)|#[0-9a-f]{3,8}\b/i);
@@ -303,6 +305,7 @@ function ownShadows(m: Measured, kind: 'outer' | 'inset'): Measured {
     }
     return kind === 'inset' ? inset : !inset;
   });
+  const asBorder = kind === 'inset' || kind === 'ring';
   const effects = kept.length ? [kept.join(', ')] : [];
   /* With a real border the ring THICKENS it (Card's selected 1px + 1px). With
      none, the ring IS the border — an inside stroke drawn as an inset ring so
@@ -312,8 +315,8 @@ function ownShadows(m: Measured, kind: 'outer' | 'inset'): Measured {
   return {
     ...m,
     effects,
-    strokeWeight: kind === 'inset' && ringPx ? (withBorder ? (m.strokeWeight as number) + ringPx : ringPx) : m.strokeWeight,
-    stroke: kind === 'inset' && ringPx && !withBorder ? ringColor : m.stroke,
+    strokeWeight: asBorder && ringPx ? (withBorder ? (m.strokeWeight as number) + ringPx : ringPx) : m.strokeWeight,
+    stroke: asBorder && ringPx && !withBorder ? ringColor : m.stroke,
   };
 }
 
