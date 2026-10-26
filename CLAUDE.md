@@ -90,7 +90,7 @@ for token/theme details.)
 | Layout | `VStack`, `HStack`, `Stack`, `Box`, `Grid`, `Container`, `Divider`, `Spacing` |
 | Surfaces | `Card`, `SelectableCard`, `Paper`, `Surfaced`, `ThemedZone` |
 | Navigation | `Tabs`/`Tab`/`TabList`/`TabPanel`, `Breadcrumbs`, `Pagination`, `Stepper`, `BottomNavigation`, `AppBar`, `Sidebar` |
-| Disclosure | `Accordion`, `Drawer`, `Modal`, `Dialog`, `Tooltip`, `Popover` (via `Dropdown` — see below) |
+| Disclosure | `Accordion`, `Drawer`, `Modal`, `Dialog`, `Tooltip` (one solid style), `Popover` (portal panel; also see `Dropdown` below) |
 | Feedback | `Alert`, `Snackbar`, `CircularProgress`, `LinearProgress`, `Badge` |
 | Data | `Chip`, `Avatar`, `AvatarGroup`, `Table`, `List`, `Skeleton` |
 | Code | `CodeBlock`, `CopyButton` — see [Code blocks](#code-blocks) |
@@ -155,9 +155,12 @@ The portal pattern is in `MyDesignsPage.tsx` (ellipsis menu) and
 (account dropdown). Both anchor a panel via `getBoundingClientRect`, render
 through `createPortal(document.body)`, and close on outside-click + Escape.
 
-If you need that in a new file, tag it `MISSING-LIB-COMPONENT: Popover` — the
-lib still has no portal-based popover, and that gap is real even though `Menu`
-is not broken.
+For anything else that floats, use the lib's **`Popover`**: it portals,
+places itself (`placement`, flips at the viewport edge), draws an optional
+`arrow`, closes on outside-click / Escape / Tab-out, and moves focus in and
+back to the anchor. `role="tooltip"` + `autoFocus={false}` makes it a hover
+card (AvatarGroup's details card is one). It is the menu panel's frame, so
+every floating thing is one shape. The two hand-rolled panels above predate it.
 
 Its 18 failing ARIA tests are **test** bugs, not component bugs: they assert on
 `getByText('Actions')`, which returns the inner Typography `<p>`, while
