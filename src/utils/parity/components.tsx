@@ -1584,17 +1584,18 @@ const navItem: ParityComponent = {
   libFile: 'src/components/BottomNavigation/BottomNavigation.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
-    // Colours are the BAR's: an item only ever sits in a Nav-Bar zone, which
-    // re-themes it, while Figma draws the lone item on plain Surface. So the
-    // item is compared by geometry; the bar set checks the paint in context.
     { figma: '__root__', css: '.parity-nav .bottom-nav-item', label: 'Item', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Icon-Holder', css: '.parity-nav .bottom-nav-item > :first-child', label: 'Icon holder', skip: ['fill'] },
+    { figma: 'Icon-Holder', css: '.parity-nav .bottom-nav-item > :first-child', label: 'Icon holder' },
+    // Figma's Icon frame has no fill — its colour is on the glyph inside — so only its box is compared.
     { figma: 'Icon', css: '.parity-nav .bottom-nav-item svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Component Name', css: '.parity-nav .bottom-nav-label', label: 'Label', skip: ['text color'] },
+    { figma: 'Component Name', css: '.parity-nav .bottom-nav-label', label: 'Label' },
   ],
   render: (v) => (
     <div className="parity-nav" style={{ width: v.box.w, height: v.box.h }}>
+      {/* In Figma's zone (Default / Surface): the bar would otherwise put the
+          item in its own Nav-Bar theme, which Figma's lone item is not in. */}
       <BottomNavigation fixed={false} items={[{ label: 'Home', icon: <HomeIcon /> }]}
+        data-theme="Default" data-surface="Surface"
         value={v.props.State === 'Selected' ? 0 : -1} aria-label="Navigation"
         sx={{ p: 0, m: 0, width: 'auto', minHeight: 0, display: 'inline-flex', background: 'transparent', boxShadow: 'none', border: 'none' }} />
     </div>
