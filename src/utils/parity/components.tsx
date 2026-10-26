@@ -1595,6 +1595,53 @@ const tooltip: ParityComponent = {
   },
 };
 
+/* TreeView: a Background panel, 8px padding, 4px corners, holding Menu Item
+   rows at levels 0-4 (the first selected). Code nests one row in the next and
+   expands them all so the five levels show; Figma draws every row closed, so
+   the chevrons are not compared. */
+const treeView: ParityComponent = {
+  key: 'treeView',
+  name: 'TreeView',
+  nodeId: '6911:36658',
+  libFile: 'src/components/TreeView/TreeView.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-tree > *', label: 'Panel', skip: ['border', 'shadow'] },
+    // No 'Tree List' part: code's list carries the panel padding itself, so its
+    // box is the panel's; the rows' positions check the padding instead.
+    { figma: 'Parent', css: '.parity-tree .omni-tree-content', all: true, label: 'Row', skip: ['border', 'shadow', 'opacity'] },
+  ],
+  render: (v) => {
+    const row = (id: string, child?: object) => ({ id, label: 'Menu Item', icon: <HomeIcon />, swatch: 'var(--Buttons-Primary-Button)', ...(child ? { children: [child] } : {}) });
+    const items = [row('a', row('b', row('c', row('d', row('e')))))];
+    return (
+      <div className="parity-tree" style={{ width: v.box.w }}>
+        <OmniTreeView items={items} variant="default" surface="Surface" animation="none"
+          defaultExpandedItems={['a', 'b', 'c', 'd']} selectedItems="a" onSelectedItemsChange={noop} aria-label="Tree" />
+      </div>
+    );
+  },
+};
+
+/* Validation Frame: the 2px inside stroke a field takes in a validation
+   state — Buttons Border in the error / warning / success / info Buttons
+   mode, Input-Radius corners. Code draws it as the field's edge. */
+const validationFrame: ParityComponent = {
+  key: 'validationFrame',
+  name: 'Validation Frame',
+  nodeId: '9518:53481',
+  libFile: 'src/components/Input/Input.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-vf .inp-shell', pseudo: '::after', label: 'Edge', skip: ['fill', 'position', 'width', 'height', 'shadow', 'opacity'] },
+  ],
+  render: (v) => (
+    <div className="parity-vf" style={{ width: v.box.w }}>
+      <TextArea aria-label="Field" rows={3} validation={String(v.props['Validation-State']).toLowerCase()} onChange={noop} value="" />
+    </div>
+  ),
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2396,4 +2443,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
