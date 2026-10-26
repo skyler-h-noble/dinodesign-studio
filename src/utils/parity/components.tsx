@@ -1558,9 +1558,8 @@ const textAreaField: ParityComponent = {
     };
     return (
       <div className="parity-textarea-field" style={{ width: v.box.w }}>
-        {v.props.Label === 'none'
-          ? <TextArea aria-label="About you" placeholder="Tell us about yourself" rows={1} onChange={noop} {...deco} />
-          : <TextAreaField label="Label" placeholder="Tell us about yourself" rows={1} onChange={noop} {...deco} />}
+        <TextAreaField label="Label" placeholder="Tell us about yourself" rows={1} onChange={noop} {...deco}
+          labelPosition={v.props.Label === 'none' ? 'none' : v.props.Label === 'label-left' ? 'left' : 'top'} />
       </div>
     );
   },
