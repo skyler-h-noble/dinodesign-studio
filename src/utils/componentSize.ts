@@ -390,6 +390,7 @@ export function fieldMetricsVars(): Record<string, string> {
  *   Rating, Rating-Icon    a star's box and glyph           24 / 24 / 32
  *   Floating-Label-*       Dynamic-Floating-Label: 12 / 11 / 14 at 500,
  *                          0.5 tracking, 16.8 / 14.4 / 19.2 leading
+ *   ToolBar, ToolBarShort  the nav bar's height: 80, and 64 for the FAB styles
  *   Sheet                  a sheet's height: Sheet Half (540) at medium,
  *                          Sheet Third at small, the device height at large
  */
@@ -397,6 +398,10 @@ export const OTHER_METRICS = {
   'Progress-Bar-Width':   { medium: 8,  small: 4,  large: 16 },
   'Text-Area-Min-Height': { medium: 88, small: 74, large: 102 },
   'Rating':               { medium: 24, small: 24, large: 32 },
+  // Nav-Bar heights (Other/ToolBar, Other/ToolBarShort): the fixed and floating
+  // bar, and the shorter pill of the two FAB styles. Equal across sizes in Figma.
+  'ToolBar':              { medium: 80, small: 80, large: 80 },
+  'ToolBarShort':         { medium: 64, small: 64, large: 64 },
   'Rating-Icon':          { medium: 24, small: 24, large: 32 },
 } as const;
 

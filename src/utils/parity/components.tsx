@@ -15,6 +15,9 @@ import HomeIcon from '@mui/icons-material/Home';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
 import FlightIcon from '@mui/icons-material/Flight';
+import HotelIcon from '@mui/icons-material/Hotel';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import CarRentalIcon from '@mui/icons-material/CarRental';
 import MapIcon from '@mui/icons-material/Map';
 import MicIcon from '@mui/icons-material/Mic';
 import MailIcon from '@mui/icons-material/Mail';
@@ -2356,6 +2359,59 @@ const navItem: ParityComponent = {
   ),
 };
 
+/* Nav-Bar: the ToolBar page's one set for the bottom nav AND the toolbar.
+   Seven variants — Fixed (labels / none), Floating, Floating +Raised FAB,
+   Right FAB, and the vertical floating bar (labels / none). The bar is pinned
+   in Figma to Primary · Surface-Bright, so it renders there rather than in the
+   published Nav-Bar theme (the user's pick, which the import sets). */
+const NAV_BAR_ITEMS_5 = [
+  { label: 'Home', icon: <HomeIcon /> }, { label: 'Travel', icon: <FlightIcon /> },
+  { label: 'Hotel', icon: <HotelIcon /> }, { label: 'Food', icon: <RestaurantIcon /> },
+  { label: 'Rentals', icon: <CarRentalIcon /> },
+];
+const NAV_BAR_ITEMS_4 = [NAV_BAR_ITEMS_5[0], NAV_BAR_ITEMS_5[1], NAV_BAR_ITEMS_5[3], NAV_BAR_ITEMS_5[4]];
+const navBar: ParityComponent = {
+  key: 'navBar',
+  name: 'Nav-Bar',
+  nodeId: '7442:31297',
+  libFile: 'src/components/BottomNavigation/BottomNavigation.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Theme-Container', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => /Fixed|Floating/.test(String(v.props.Style)) && v.props.Orientation === 'Horizontal' },
+    { figma: 'Theme-Toolbar', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => v.props.Style === 'Right FAB' },
+    { figma: 'Theme-ToolBar', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => v.props.Orientation === 'Vertical' },
+    { figma: 'Nav Item', css: '.parity-navbar .bottom-nav-item', all: true, label: 'Item', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'FAB', css: '.parity-navbar .bottom-nav-fab .fab', label: 'FAB', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => /FAB/.test(String(v.props.Style)) },
+    { figma: 'Frame 1', css: '.parity-navbar .bottom-nav-fab-raised', label: 'FAB halo', skip: ['shadow'], when: (v) => String(v.props.Style).includes('Raised') },
+  ],
+  render: (v) => {
+    const style = String(v.props.Style);
+    const vertical = v.props.Orientation === 'Vertical';
+    const labels = v.props.Labels === 'Default';
+    const raised = style.includes('Raised');
+    const right = style === 'Right FAB';
+    const fab = raised || right;
+    // The variant root's own padding, so the bar lands where Figma's does.
+    const pad = vertical ? '16px' : raised ? '24px 16px 0' : right ? '16px' : style === 'Floating' ? '0 16px' : 0;
+    return (
+      <div className="parity-navbar" style={{ width: v.box.w, height: v.box.h, padding: pad, boxSizing: 'border-box' }}>
+        <BottomNavigation
+          fixed={false}
+          barColor="primary" surface="Surface-Bright"
+          items={fab ? NAV_BAR_ITEMS_4 : NAV_BAR_ITEMS_5}
+          defaultValue={0}
+          showLabels={labels}
+          orientation={vertical ? 'vertical' : 'horizontal'}
+          variant={style === 'Fixed' ? 'fixed' : 'floating'}
+          {...(fab ? { fabAction: { label: 'Create' }, fabPosition: raised ? 'center' : 'end' } : {})}
+          // The raised wrapper reserves the FAB's rise above the bar; Figma lets it overhang.
+          {...(raised ? { sx: { mt: '-28px' } } : {})}
+        />
+      </div>
+    );
+  },
+};
+
 /* Nav Rail: Default (labelled items in two groups split by a divider),
    Closed-Expandable (the menu toggle over icon rows) and Open-Expandable (the
    toggle over full rows). The second item is selected in each. */
@@ -2536,4 +2592,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, checkbox, checkboxField, chip, countStep, dayCell, divider, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, checkbox, checkboxField, chip, countStep, dayCell, divider, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];

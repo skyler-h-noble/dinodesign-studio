@@ -17,6 +17,8 @@ describe('Other component-size metrics', () => {
     expect(v['--Text-Area-Min-Height']).toBe('88px');
     expect(v['--Rating']).toBe('24px');
     expect(v['--Lg-Rating']).toBe('32px');
+    expect(v['--ToolBar']).toBe('80px');
+    expect(v['--ToolBarShort']).toBe('64px');
     expect(v['--Progress-Dial-Radius']).toBe('var(--Sizing-10, 80px)');
     expect(v['--Floating-Label-Medium-Font-Size']).toBe('12px');
     expect(v['--Floating-Label-Font-Weight']).toBe('500');
