@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1163,6 +1163,35 @@ const ratingField: ParityComponent = {
   },
 };
 
+/* Snackbar: the placement frame — device Margin left/right, SnackBar-Top /
+   SnackBar-Bottom from its edge — holding a 520px Snack, right or middle.
+   The Snack: the theme's Surface with a 1px Border inside, Dropdown-Frame-
+   Radius corners, the FAB / Snackbar elevation, an Icons-Match icon, the
+   message in Text-Match and a ghost close button. Code is position: fixed,
+   so it is pinned into a box the frame's size to be measured. */
+const snackbar: ParityComponent = {
+  key: 'snackbar',
+  name: 'Snackbar',
+  nodeId: '8839:28556',
+  libFile: 'src/components/Snackbar/Snackbar.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Snack', css: '.snackbar', label: 'Snack', skip: ['fill', 'border'], shadow: 'outer' },
+    { figma: 'Theme-Container', css: '.snackbar-inner', label: 'Container' },
+    { figma: 'Icon', css: '.snackbar-icon', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Snackbar', css: '.snackbar-message .typography', label: 'Message' },
+    { figma: 'Button', css: '.snackbar-close', label: 'Close', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => (
+    <div style={{ position: 'relative', width: v.box.w, height: v.box.h }}>
+      <Snackbar open anchor={String(v.props.Anchor).toLowerCase()} onClose={noop} startDecorator={<HomeIcon />}
+        sx={{ position: 'absolute', animation: 'none' }}>
+        Snackbar
+      </Snackbar>
+    </div>
+  ),
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -1964,4 +1993,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, star, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, star, swatch, toggleButtonGroup];
