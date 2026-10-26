@@ -1096,12 +1096,11 @@ const radioField: ParityComponent = {
   },
 };
 
-/* Star: one Rating star — a Material glyph (star_purple500 / star_border_
-   purple500 / star_half) at the in-button Icon-Size, 20 in a Sizing-3 box,
+/* Star: one Rating star — a Material glyph (star / star_border / star_half) at the in-button Icon-Size, 20 in a Sizing-3 box,
    colored Icons › Icon (the Icons mode; Default here is the surface's Text).
    Hover on an unselected star turns it Text. Focus is a 3px ring 1px inside.
    The set pins .Theme=Primary. Code draws one star with Rating max={1}. */
-const STAR_GLYPH: Record<string, string> = { selected: 'star_purple500', unselected: 'star_border_purple500', isHalfFilled: 'star_half' };
+const STAR_GLYPH: Record<string, string> = { selected: 'star', unselected: 'star_border', isHalfFilled: 'star_half' };
 const starParts = (): ParityPart[] => [
   { figma: '__root__', css: '.rating-star', label: 'Star', skip: ['fill', 'border', 'radius (as drawn)'] },
   { figma: 'Icon', css: '.rating-star svg', label: 'Icon box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
@@ -1240,6 +1239,73 @@ const speedDial: ParityComponent = {
     return (
       <SpeedDial size={ctx.size} direction={String(v.props.Direction)} open={open} onOpen={noop} onClose={noop}
         disabled={v.props.State === 'Disabled'} actions={actions} showTooltips={false} ariaLabel="Add" />
+    );
+  },
+};
+
+/* Stepper: three steps — complete, current, incomplete — joined by
+   Step-Lines, horizontal (labels under the steps) or vertical (labels right,
+   a Sizing-3 line between steps),
+   count or noCount. The line is a stroked LINE in Figma and a filled bar in
+   code, so its geometry is compared here and its color by Overlay. */
+const stepperParts = (): ParityPart[] => [
+  { figma: '__root__', css: '.stepper', label: 'Stepper', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'horizontal' },
+  { figma: '__root__', css: '.stepper', label: 'Stepper', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'], when: (v) => v.props.Orientation === 'vertical' },
+  // The step's own column (indicator + label); code's .step also holds the line after it.
+  // Vertical: Figma's step box is the indicator's width with the label
+  // overflowing it, code's column holds the label — so no width there.
+  { figma: 'Count Step', css: '.step > :first-child', all: true, label: 'Step', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Style === 'count' && v.props.Orientation === 'horizontal' },
+  { figma: 'Count Step', css: '.step > :first-child', all: true, label: 'Step', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'], when: (v) => v.props.Style === 'count' && v.props.Orientation === 'vertical' },
+  { figma: 'No-Count Step', css: '.step > :first-child', all: true, label: 'Step', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Style === 'noCount' && v.props.Orientation === 'horizontal' },
+  { figma: 'No-Count Step', css: '.step > :first-child', all: true, label: 'Step', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'], when: (v) => v.props.Style === 'noCount' && v.props.Orientation === 'vertical' },
+  { figma: 'Line', css: '.step-connector', all: true, label: 'Line', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'horizontal' },
+  // 'Step-Line' names the instance AND the frame inside it: every other one.
+  { figma: 'Step-Line', css: '.step-connector', all: true, figmaEvery: 2, label: 'Line', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'vertical' },
+];
+const stepper: ParityComponent = {
+  key: 'stepper',
+  name: 'Stepper',
+  nodeId: '8379:13867',
+  libFile: 'src/components/Stepper/Stepper.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: ['The Step-Line color is a stroke in Figma and a fill in code — check it with Overlay.'],
+  parts: stepperParts(),
+  render: (v) => {
+    const horizontal = v.props.Orientation === 'horizontal';
+    const label = 'Label';
+    return (
+      <div style={{ width: horizontal ? v.box.w : undefined, display: 'inline-block' }}>
+        <Stepper orientation={horizontal ? 'horizontal' : 'vertical'} variant={v.props.Style === 'noCount' ? 'noCount' : undefined} activeStep={1}>
+          <Step label={label} /><Step label={label} /><Step label={label} />
+        </Stepper>
+      </div>
+    );
+  },
+};
+
+/* Step-Line: the 2px rule between two steps, centred in a Button-Height band
+   — Buttons-Border complete, Quiet incomplete, dashed Quiet for
+   incomplete-dashed (2/2 across, 4/4 down). Code draws it inside a two-step
+   Stepper; only the rule's thickness and band position are compared. */
+const STEP_LINE_ACTIVE: Record<string, number> = { complete: 1, incomplete: 0, 'incomplete-dashed': 0 };
+const stepLine: ParityComponent = {
+  key: 'stepLine',
+  name: 'Step-Line',
+  nodeId: '9383:42912',
+  libFile: 'src/components/Stepper/Stepper.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: ['Only the rule is compared: its color is a stroke in Figma and a fill in code (check with Overlay), and its length is whatever sits between two steps.'],
+  parts: [
+    { figma: 'Line', css: '.step-connector', label: 'Rule', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'position', 'width'], when: (v) => v.props.Orientation === 'horizontal' },
+    { figma: 'Step-Line', css: '.step-connector', label: 'Rule', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'position', 'height'], when: (v) => v.props.Orientation === 'vertical' },
+  ],
+  render: (v) => {
+    const horizontal = v.props.Orientation === 'horizontal';
+    return (
+      <Stepper orientation={horizontal ? 'horizontal' : 'vertical'} activeStep={STEP_LINE_ACTIVE[String(v.props.Status)]}
+        dashedIncomplete={v.props.Status === 'incomplete-dashed'}>
+        <Step /><Step />
+      </Stepper>
     );
   },
 };
@@ -2045,4 +2111,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, swatch, toggleButtonGroup];
