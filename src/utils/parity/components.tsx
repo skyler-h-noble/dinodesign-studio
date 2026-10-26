@@ -1527,6 +1527,10 @@ const slider: ParityComponent = {
     { figma: 'Slider-thumb Horizontal', css: '.parity-slider .MuiSlider-thumb', label: 'Thumb', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'horizontal' },
     // Vertical: Figma's first thumb is the TOP one, MUI's last.
     { figma: 'Slider-thumb Vertical', css: '.parity-slider .MuiSlider-thumb:last-of-type', label: 'Thumb', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'vertical' },
+    // The thumbs' Always Show Label defaults on, so the bubble is drawn at
+    // rest. Figma's placeholder text is "Label" (horizontal) / "36" (vertical).
+    { figma: 'Label', css: '.parity-slider .MuiSlider-valueLabel', label: 'Value label', skip: ['shadow'], when: (v) => v.props.Orientation === 'horizontal' },
+    { figma: 'Text', css: '.parity-slider .MuiSlider-thumb:last-of-type .MuiSlider-valueLabel', label: 'Value label', skip: ['shadow'], when: (v) => v.props.Orientation === 'vertical' },
   ],
   render: (v) => {
     const type = String(v.props.Type);
@@ -1535,6 +1539,7 @@ const slider: ParityComponent = {
     return (
       <div className="parity-slider" style={{ width: v.box.w, height: v.box.h, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', padding: vertical ? '0 48px' : '48px 0' }}>
         <Slider aria-label="Amount" orientation={vertical ? 'vertical' : 'horizontal'} value={val} track={type.includes('inverted') ? 'inverted' : 'standard'}
+          valueLabelDisplay="on" valueLabelFormat={() => (vertical ? '36' : 'Label')}
           sx={vertical ? { height: '100%' } : { width: '100%' }} />
       </div>
     );
