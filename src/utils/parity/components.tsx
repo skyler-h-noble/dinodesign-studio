@@ -10,8 +10,9 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
 import FlightIcon from '@mui/icons-material/Flight';
 import MapIcon from '@mui/icons-material/Map';
@@ -1544,6 +1545,56 @@ const player: ParityComponent = {
   ),
 };
 
+/* Tooltip: a black-white Buttons bubble (Buttons Button / Text), Tooltip-
+   Radius, Tooltip-Padding, Tooltip-Gap between an icon and the label, with
+   a 16x8 arrow 6px of which shows; the tip touches the anchor. Code is MUI's
+   tooltip, so it is rendered OPEN, without a portal, against a zero-size
+   anchor where Figma's arrow tip is. */
+const tooltip: ParityComponent = {
+  key: 'tooltip',
+  name: 'Tooltip',
+  nodeId: '8829:27295',
+  libFile: 'src/components/Tooltip/Tooltip.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Tooltip container', css: '.tooltip-content', label: 'Bubble', skip: ['shadow'] },
+    { figma: 'Icon', css: '.tooltip-content svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Component Name', css: '.tooltip-content .tooltip-label', label: 'Label', skip: ['width', 'position', 'position (left, top)'] },
+    // 'Text' in Bottom; the others call the same frame 'Frame 1'.
+    { figma: 'Text', css: '.tooltip-content .tooltip-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Location === 'Bottom' },
+    { figma: 'Frame 1', css: '.tooltip-content .tooltip-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Location !== 'Bottom' },
+    // Figma's Polygon is the whole arrow (2px tucks under the bubble); code's
+    // box is the part that shows — Figma's Arrow Holder. The holder runs the
+    // bubble's length, so only its thickness (and that side's edge) compare.
+    { figma: 'Arrow Holder', css: '.MuiTooltip-arrow', label: 'Arrow', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width', 'position'],
+      when: (v) => ['Bottom', 'Top'].includes(String(v.props.Location)) },
+    { figma: 'Arrow Holder', css: '.MuiTooltip-arrow', label: 'Arrow', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'height', 'position'],
+      when: (v) => ['Left', 'Right'].includes(String(v.props.Location)) },
+  ],
+  /* The popper is pinned to the cell's corner and the arrow centred on its
+     edge: positioning is MUI's job, and its maths does not survive the
+     parity stage. What is compared is the tooltip's own drawing — bubble,
+     stand-off, arrow, content. */
+  render: (v) => {
+    const loc = String(v.props.Location);
+    const sideways = loc === 'Left' || loc === 'Right';
+    return (
+      <div className="parity-tooltip" style={{ position: 'relative', width: v.box.w, height: v.box.h }}>
+        <style>{'.parity-tooltip .MuiTooltip-popper { position: absolute !important; inset: 0 auto auto 0 !important; transform: none !important; } '
+          + '.parity-tooltip .MuiTooltip-arrow { ' + ({
+            Bottom: 'top: 0 !important; bottom: auto !important; left: 50% !important; transform: translateX(-50%) !important;',
+            Top: 'top: auto !important; bottom: 0 !important; left: 50% !important; transform: translateX(-50%) !important;',
+            Left: 'left: auto !important; right: 0 !important; top: 50% !important; transform: translateY(-50%) !important;',
+            Right: 'left: 0 !important; right: auto !important; top: 50% !important; transform: translateY(-50%) !important;',
+          } as Record<string, string>)[loc] + ' }'}</style>
+        <Tooltip open placement={loc.toLowerCase()} PopperProps={{ disablePortal: true }} title="Tooltip" icon={<InfoOutlinedIcon />}>
+          <span style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }} />
+        </Tooltip>
+      </div>
+    );
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2345,4 +2396,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip];
