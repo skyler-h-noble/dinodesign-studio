@@ -416,7 +416,11 @@ function compare(variant: string, part: string, f: FigmaPart, c: Measured | null
     // Width within half a pixel: the browser snaps a 1px border to whole DEVICE
     // pixels, so at a fractional zoom it reports 0.56px for the same line.
     (!f.stroke && !c.stroke) || (!!f.stroke && !!c.stroke && Math.abs((f.strokeWeight ?? 0) - (c.strokeWeight ?? 0)) <= 0.5 && colorsMatch(seenStroke ?? f.stroke, c.stroke)));
-  add('fill', f.fill, c.fill, colorsMatch(f.fill, c.fill));
+  // A translucent Figma fill (Quiet is Text at an opacity) is compared as what
+  // it draws over the cell's Background, when code's fill is opaque — as text
+  // and borders already are.
+  const seenFill = c.fill && rgbaOf(c.fill)?.[3] === 255 && f.fill && (rgbaOf(f.fill)?.[3] ?? 255) < 255 ? compositeOn(f.fill, ground) : null;
+  add('fill', seenFill ? `${f.fill} (= ${seenFill} on Background)` : f.fill, c.fill, colorsMatch(seenFill ?? f.fill, c.fill));
   add('shadow', f.effects.join(', ') || 'none', c.effects.join(', ') || 'none', (f.effects.length === 0) === (c.effects.length === 0));
   add('opacity', +figmaOpacity.toFixed(2), c.opacity, Math.abs(figmaOpacity - c.opacity) < 0.02);
   return rows;

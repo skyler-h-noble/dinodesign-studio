@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import PlaceIcon from '@mui/icons-material/Place';
 import FlightIcon from '@mui/icons-material/Flight';
@@ -1322,6 +1322,55 @@ const stepLine: ParityComponent = {
   },
 };
 
+/* Switch: a 42x24 pill (Switch-Width x -Height), 2px padding, a 20px handle.
+   Off: a 1px Quiet edge, no fill, Quiet handle. On: fill and edge
+   Icons › Icon, handle Icons › On-Icon. Focus: a 2px ring 1px outside.
+   Disabled 38%. The set pins .Theme=Primary. Code draws focus from MUI's
+   Mui-focusVisible on the switch base, which a forced :focus-visible does not
+   set, so the render adds it. */
+const switchParity: ParityComponent = {
+  key: 'switch',
+  name: 'Switch',
+  nodeId: '9212:6767',
+  libFile: 'src/components/Switch/Switch.js',
+  context: { theme: 'Primary', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: '__root__', css: '.MuiSwitch-root', label: 'Switch', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Switch-Body', css: '.MuiSwitch-track', label: 'Track', shadow: 'outer' },
+    { figma: 'Dot', css: '.MuiSwitch-thumb', label: 'Handle', skip: ['shadow'] },
+    { figma: 'Focus-Visible', css: '.MuiSwitch-track', outline: true, outer: true, label: 'Focus ring' },
+  ],
+  render: (v) => (
+    <div ref={(el) => { if (el && v.props.State === 'Focus-Visible') el.querySelector('.MuiSwitch-switchBase')?.classList.add('Mui-focusVisible'); }}>
+      <SwitchInput checked={v.props.Status === 'On'} disabled={v.props.State === 'Disabled'} onChange={noop} aria-label="Switch" />
+    </div>
+  ),
+};
+
+/* SwitchField: Switch + Form-Label, Label-Gap apart, in the five placements
+   CheckboxField uses. Top / bottom / none hold the switch in a "Frame 1";
+   left / right place it directly. Colors are the Switch set's to check. */
+const switchField: ParityComponent = {
+  key: 'switchField',
+  name: 'SwitchField',
+  nodeId: '9575:2434',
+  libFile: 'src/components/Switch/Switch.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.MuiFormControlLabel-root', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Switch', css: '.MuiSwitch-root', label: 'Switch', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => ['label-left', 'label-right'].includes(String(v.props.Label)) },
+    { figma: 'Frame 1', css: '.MuiSwitch-root', label: 'Switch', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => !['label-left', 'label-right'].includes(String(v.props.Label)) },
+    { figma: 'Label', css: '.MuiFormControlLabel-label .typography', label: 'Label' },
+  ],
+  render: (v) => {
+    const placement = CHECKBOX_FIELD_PLACEMENT[String(v.props.Label)];
+    return placement
+      ? <SwitchInput label="Label" labelPlacement={placement} onChange={noop} />
+      : <SwitchInput onChange={noop} aria-label="Switch" />;
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2123,4 +2172,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, swatch, toggleButtonGroup];
