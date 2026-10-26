@@ -56,7 +56,7 @@ export function figmaColor(c: { r: number; g: number; b: number; a?: number } | 
 const visiblePaint = (paints: any[] | undefined) =>
   (paints || []).find((p) => p.visible !== false && p.type === 'SOLID');
 
-function partOf(node: any, origin?: { x: number; y: number }): FigmaPart {
+function partOf(node: any, origin?: { x: number; y: number }, isRoot = false): FigmaPart {
   const fill = visiblePaint(node.fills);
   const stroke = visiblePaint(node.strokes);
   const b = node.absoluteBoundingBox || { width: 0, height: 0 };
@@ -64,8 +64,10 @@ function partOf(node: any, origin?: { x: number; y: number }): FigmaPart {
     .filter((e: any) => e.visible !== false && (e.color?.a ?? 1) > 0.001)
     .map((e: any) => `${e.type === 'INNER_SHADOW' ? 'inset ' : ''}${e.offset?.x ?? 0}px ${e.offset?.y ?? 0}px ${e.radius ?? 0}px ${e.spread ?? 0}px ${figmaColor(e.color)}`);
   // A layer's own opacity tints its paints — the radio halo is the button
-  // Border on a layer at 10%, and that 10% is part of its color.
-  const layerOpacity = node.opacity ?? 1;
+  // Border on a layer at 10%, and that 10% is part of its color. Not the
+  // variant's own: that is compared as the variant's opacity (code sets it on
+  // the element, whose fill stays opaque), and folding it in counts it twice.
+  const layerOpacity = isRoot ? 1 : node.opacity ?? 1;
   const part: FigmaPart = {
     ...(origin && b.x !== undefined ? { x: Math.round((b.x - origin.x) * 100) / 100, y: Math.round((b.y - origin.y) * 100) / 100 } : {}),
     w: Math.round(b.width * 100) / 100,
@@ -120,7 +122,7 @@ export function parseFigmaSet(doc: any): FigmaSet {
       const b = c.absoluteBoundingBox;
       // `__root__` is the variant itself — where a component-level effect,
       // like the Alert's Level 1 shadow, lives.
-      const parts: Record<string, FigmaPart> = { __root__: partOf(c, { x: b.x, y: b.y }) };
+      const parts: Record<string, FigmaPart> = { __root__: partOf(c, { x: b.x, y: b.y }, true) };
       indexParts(c, parts, { x: b.x, y: b.y });
       return {
         id: c.id,
