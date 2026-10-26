@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1536,7 +1536,8 @@ const menuItem: ParityComponent = {
   ],
   render: (v) => {
     const open = v.props.Type === 'open';
-    const child = { id: 'c', label: 'Menu Item', icon: <HomeIcon />, swatch: 'var(--Buttons-Primary-Button)', children: [{ id: 'g', label: 'Menu Item' }] };
+    // The child row keeps its own state: Figma draws Hover / Pressed / Focus on the parent row only.
+    const child = { id: 'c', label: 'Menu Item', icon: <HomeIcon />, swatch: 'var(--Buttons-Primary-Button)', className: OWN_STATE_CLASS, children: [{ id: 'g', label: 'Menu Item' }] };
     const items = [{ id: 'p', label: 'Menu Item', icon: <HomeIcon />, swatch: 'var(--Buttons-Primary-Button)', disabled: v.props.State === 'Disabled', children: [child] }];
     return (
       <div className="parity-menu-item" style={{ width: v.box.w }}>
@@ -1544,6 +1545,30 @@ const menuItem: ParityComponent = {
         <OmniTreeView items={items} variant="default" surface="Surface" animation="none" disableSelection
           defaultExpandedItems={open ? ['p'] : []} aria-label="Menu"
           sx={{ borderRadius: 0, '& [role="tree"]': { padding: 0 } }} />
+      </div>
+    );
+  },
+};
+
+/* Message Icons: the 16px glyph an InputMessage leads with — one per
+   notification, in that notification's Icons colour (Icons mode → --Icons-*).
+   Drawn with the lib's own MESSAGE_ICONS map and Icon at xxs, which is
+   exactly what InputMessage renders. */
+const messageIcons: ParityComponent = {
+  key: 'messageIcons',
+  name: 'Message Icons',
+  nodeId: '8580:22896',
+  libFile: 'src/components/InputMessage/InputMessage.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-message-icon > *', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const type = String(v.props.Notification);
+    const Glyph = MESSAGE_ICONS[type];
+    return (
+      <div className="parity-message-icon" style={{ width: v.box.w, height: v.box.h, display: 'flex' }}>
+        <Icon size="xxs" color={type}><Glyph /></Icon>
       </div>
     );
   },
@@ -1580,4 +1605,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
