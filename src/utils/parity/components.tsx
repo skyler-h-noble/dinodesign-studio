@@ -1673,6 +1673,33 @@ const navRailItem: ParityComponent = {
   ),
 };
 
+/* No-Count Step: the stepper's plain dot (No-Count-Step, 12 at medium) with
+   its label. Figma's Orientation names where the LABEL goes — horizontal is
+   beside the dot, which is a vertical stepper's step in code; vertical is
+   below it, a horizontal stepper's. */
+const noCountStep: ParityComponent = {
+  key: 'noCountStep',
+  name: 'No-Count Step',
+  nodeId: '8425:36435',
+  libFile: 'src/components/Stepper/Stepper.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Ellipse 1', css: '.step-indicator', label: 'Dot', skip: ['shadow', 'radius (as drawn)'] },
+    { figma: 'Label', css: '.step .typography', label: 'Label' },
+  ],
+  render: (v, booleans) => {
+    const labelled = booleans['Label'] ?? true;
+    return (
+      <div style={{ width: v.box.w, display: 'inline-block' }}>
+        <Stepper variant="noCount" orientation={v.props.Orientation === 'horizontal' ? 'vertical' : 'horizontal'}
+          activeStep={COUNT_STEP_ACTIVE[String(v.props.Status)]}>
+          <Step label={labelled ? 'Label' : undefined} />
+        </Stepper>
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1704,4 +1731,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
