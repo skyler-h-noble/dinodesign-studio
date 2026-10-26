@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1602,6 +1602,36 @@ const navItem: ParityComponent = {
   ),
 };
 
+/* Nav Rail: Default (labelled items in two groups split by a divider),
+   Closed-Expandable (the menu toggle over icon rows) and Open-Expandable (the
+   toggle over full rows). The second item is selected in each. */
+const RAIL_ITEMS = [0, 1, 2, 3].map(() => ({ icon: <HomeIcon />, label: 'Label' }));
+const navRail: ParityComponent = {
+  key: 'navRail',
+  name: 'Nav Rail',
+  nodeId: '8224:5229',
+  libFile: 'src/components/Rail/Rail.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-rail .rail', label: 'Rail', skip: ['shadow', 'height'] },
+    { figma: 'Expandable Rail Slot', css: '.parity-rail .rail [role="tablist"]', label: 'Slot', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'height'] },
+    { figma: 'Nav Rail Item', css: '.parity-rail .rail-item', all: true, label: 'Item', skip: ['shadow'], when: (v) => v.props.Type === 'Default' },
+    { figma: 'Expandable Nav Rail Item', css: '.parity-rail .rail-item', all: true, label: 'Item', skip: ['shadow'], when: (v) => v.props.Type !== 'Default' },
+    { figma: 'Expand-Collapse', css: '.parity-rail .rail > :first-child', label: 'Toggle row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
+  ],
+  render: (v) => {
+    const type = String(v.props.Type);
+    const expandable = type !== 'Default';
+    return (
+      <div className="parity-rail" style={{ width: v.box.w, height: v.box.h }}>
+        <Rail value={1} aria-label="Navigation"
+          expandable={expandable} defaultExpanded={type === 'Open-Expandable'}
+          {...(expandable ? { items: RAIL_ITEMS } : { sections: [{ items: RAIL_ITEMS.slice(0, 2) }, { items: RAIL_ITEMS.slice(2) }] })} />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1633,4 +1663,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
