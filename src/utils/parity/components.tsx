@@ -2379,10 +2379,17 @@ const navBar: ParityComponent = {
   parts: [
     { figma: 'Theme-Container', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => /Fixed|Floating/.test(String(v.props.Style)) && v.props.Orientation === 'Horizontal' },
     { figma: 'Theme-Toolbar', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => v.props.Style === 'Right FAB' },
-    { figma: 'Theme-ToolBar', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => v.props.Orientation === 'Vertical' },
+    /* Not the labelled vertical bar's height: Figma's label line is 16.5, as
+       code's, but Figma rounds the text box to 17, so five labels come out
+       2.5px taller there. */
+    { figma: 'Theme-ToolBar', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow'], when: (v) => v.props.Orientation === 'Vertical' && v.props.Labels !== 'Default' },
+    { figma: 'Theme-ToolBar', css: '.parity-navbar .bottom-nav', label: 'Bar', skip: ['shadow', 'height'], when: (v) => v.props.Orientation === 'Vertical' && v.props.Labels === 'Default' },
     { figma: 'Nav Item', css: '.parity-navbar .bottom-nav-item', all: true, label: 'Item', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: 'FAB', css: '.parity-navbar .bottom-nav-fab .fab', label: 'FAB', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => /FAB/.test(String(v.props.Style)) },
-    { figma: 'Frame 1', css: '.parity-navbar .bottom-nav-fab-raised', label: 'FAB halo', skip: ['shadow'], when: (v) => String(v.props.Style).includes('Raised') },
+    /* Not the halo's fill: it is the PAGE's Background, and the Nav-Bar set
+       is pinned to Primary in the file, so on the component page it reads
+       Primary's. A placed instance takes the page's, as code does. */
+    { figma: 'Frame 1', css: '.parity-navbar .bottom-nav-fab-raised', label: 'FAB halo', skip: ['shadow', 'fill'], when: (v) => String(v.props.Style).includes('Raised') },
   ],
   render: (v) => {
     const style = String(v.props.Style);
