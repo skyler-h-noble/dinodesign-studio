@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1574,6 +1574,33 @@ const messageIcons: ParityComponent = {
   },
 };
 
+/* Nav Item: one bottom-navigation item — a 40px circular icon holder over a
+   Mobile-Nav-Label. Selected fills the holder with --Text and reverses the
+   icon out of it. Rendered as a one-item bar with the bar's own chrome off. */
+const navItem: ParityComponent = {
+  key: 'navItem',
+  name: 'Nav Item',
+  nodeId: '5670:49999',
+  libFile: 'src/components/BottomNavigation/BottomNavigation.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    // Colours are the BAR's: an item only ever sits in a Nav-Bar zone, which
+    // re-themes it, while Figma draws the lone item on plain Surface. So the
+    // item is compared by geometry; the bar set checks the paint in context.
+    { figma: '__root__', css: '.parity-nav .bottom-nav-item', label: 'Item', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Icon-Holder', css: '.parity-nav .bottom-nav-item > :first-child', label: 'Icon holder', skip: ['fill'] },
+    { figma: 'Icon', css: '.parity-nav .bottom-nav-item svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Component Name', css: '.parity-nav .bottom-nav-label', label: 'Label', skip: ['text color'] },
+  ],
+  render: (v) => (
+    <div className="parity-nav" style={{ width: v.box.w, height: v.box.h }}>
+      <BottomNavigation fixed={false} items={[{ label: 'Home', icon: <HomeIcon /> }]}
+        value={v.props.State === 'Selected' ? 0 : -1} aria-label="Navigation"
+        sx={{ p: 0, m: 0, width: 'auto', minHeight: 0, display: 'inline-flex', background: 'transparent', boxShadow: 'none', border: 'none' }} />
+    </div>
+  ),
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1605,4 +1632,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
