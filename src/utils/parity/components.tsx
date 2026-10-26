@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1093,6 +1093,76 @@ const radioField: ParityComponent = {
   },
 };
 
+/* Star: one Rating star — a Material glyph (star_purple500 / star_border_
+   purple500 / star_half) at the in-button Icon-Size, 20 in a Sizing-3 box,
+   colored Icons › Icon (the Icons mode; Default here is the surface's Text).
+   Hover on an unselected star turns it Text. Focus is a 3px ring 1px inside.
+   The set pins .Theme=Primary. Code draws one star with Rating max={1}. */
+const STAR_GLYPH: Record<string, string> = { selected: 'star_purple500', unselected: 'star_border_purple500', isHalfFilled: 'star_half' };
+const starParts = (): ParityPart[] => [
+  { figma: '__root__', css: '.rating-star', label: 'Star', skip: ['fill', 'border', 'radius (as drawn)'] },
+  { figma: 'Icon', css: '.rating-star svg', label: 'Icon box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ...Object.entries(STAR_GLYPH).map(([status, glyph]): ParityPart => ({
+    figma: glyph, css: '.rating-star svg', label: 'Glyph',
+    when: (v) => v.props.Status === status,
+    skip: ['border', 'shadow', 'radius (as drawn)', 'font family'],
+  })),
+  { figma: 'Focus-Visible', css: '.rating-star', outline: true, label: 'Focus ring' },
+];
+const star: ParityComponent = {
+  key: 'star',
+  name: 'Star',
+  nodeId: '6780:12460',
+  libFile: 'src/components/Rating/Rating.js',
+  context: { theme: 'Primary', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: starParts(),
+  render: (v) => {
+    const st = String(v.props.Status);
+    return (
+      <Rating max={1} emptyLabel="" precision={st === 'isHalfFilled' ? 0.5 : 1}
+        value={st === 'selected' ? 1 : st === 'isHalfFilled' ? 0.5 : null}
+        disabled={v.props.State === 'Disabled'} onChange={noop} />
+    );
+  },
+};
+
+/* Rating: five Stars, no gap — four selected, one unselected. */
+const rating: ParityComponent = {
+  key: 'rating',
+  name: 'Rating',
+  nodeId: '6780:12693',
+  libFile: 'src/components/Rating/Rating.js',
+  context: { theme: 'Primary', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.rating', label: 'Rating', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Star', css: '.rating-star', all: true, label: 'Star', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: () => <Rating value={4} onChange={noop} />,
+};
+
+/* RatingField: a Form-Label above or below the Rating, Sizing-Half apart.
+   The field is on .Theme=Default; only its stars pin Primary. */
+const ratingField: ParityComponent = {
+  key: 'ratingField',
+  name: 'RatingField',
+  nodeId: '9574:3354',
+  libFile: 'src/components/Rating/Rating.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.rating-field', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Rating', css: '.rating', label: 'Rating', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Form-Label', css: '.rating-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Label', css: '.rating-field .form-label', label: 'Label', skip: ['width'] },
+  ],
+  render: (v) => {
+    const pos = String(v.props.Label);
+    return pos === 'none'
+      ? <Rating value={4} onChange={noop} />
+      : <Rating value={4} onChange={noop} label="Label" labelPosition={pos === 'label-bottom' ? 'bottom' : 'top'} />;
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -1889,4 +1959,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, star, swatch, toggleButtonGroup];
