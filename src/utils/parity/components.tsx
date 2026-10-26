@@ -1286,7 +1286,8 @@ const stepper: ParityComponent = {
 /* Step-Line: the 2px rule between two steps, centred in a Button-Height band
    — Buttons-Border complete, Quiet incomplete, dashed Quiet for
    incomplete-dashed (2/2 across, 4/4 down). Code draws it inside a two-step
-   Stepper; only the rule's thickness and band position are compared. */
+   Stepper with the steps hidden; only the rule's thickness and band position
+   are compared. */
 const STEP_LINE_ACTIVE: Record<string, number> = { complete: 1, incomplete: 0, 'incomplete-dashed': 0 };
 const stepLine: ParityComponent = {
   key: 'stepLine',
@@ -1294,18 +1295,29 @@ const stepLine: ParityComponent = {
   nodeId: '9383:42912',
   libFile: 'src/components/Stepper/Stepper.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
-  notes: ['Only the rule is compared: its color is a stroke in Figma and a fill in code (check with Overlay), and its length is whatever sits between two steps.'],
+  notes: ['Only the rule is drawn and compared. Its color is a stroke in Figma and a fill in code — check with Overlay.'],
   parts: [
-    { figma: 'Line', css: '.step-connector', label: 'Rule', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'position', 'width'], when: (v) => v.props.Orientation === 'horizontal' },
-    { figma: 'Step-Line', css: '.step-connector', label: 'Rule', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'position', 'height'], when: (v) => v.props.Orientation === 'vertical' },
+    { figma: 'Line', css: '.step-connector', label: 'Rule', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Orientation === 'horizontal' },
+    // A vertical variant's length is whatever its fill gives it in the set (9.7).
+    { figma: 'Step-Line', css: '.step-connector', label: 'Rule', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'height'], when: (v) => v.props.Orientation === 'vertical' },
   ],
+  // Just the rule, as Figma's set shows it: the two steps that bound it are
+  // hidden, and the stepper is shifted so its connector sits where Figma's
+  // line does — the 32px step band before it pushed out of the clipped frame.
   render: (v) => {
     const horizontal = v.props.Orientation === 'horizontal';
     return (
-      <Stepper orientation={horizontal ? 'horizontal' : 'vertical'} activeStep={STEP_LINE_ACTIVE[String(v.props.Status)]}
-        dashedIncomplete={v.props.Status === 'incomplete-dashed'}>
-        <Step /><Step />
-      </Stepper>
+      <div className="parity-step-line" style={{ position: 'relative', width: v.box.w, height: v.box.h, overflow: 'hidden' }}>
+        <style>{'.parity-step-line .step > :first-child { visibility: hidden; }'}</style>
+        <div style={horizontal
+          ? { position: 'absolute', left: -32, top: 0, width: v.box.w + 64 }
+          : { position: 'absolute', left: -15, top: -32 }}>
+          <Stepper orientation={horizontal ? 'horizontal' : 'vertical'} activeStep={STEP_LINE_ACTIVE[String(v.props.Status)]}
+            dashedIncomplete={v.props.Status === 'incomplete-dashed'}>
+            <Step /><Step />
+          </Stepper>
+        </div>
+      </div>
     );
   },
 };

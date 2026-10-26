@@ -444,6 +444,10 @@ const OVERLAY_FADE_CSS = `
   [style*="parity-overlay"] { animation: none !important; opacity: 0.5 !important; transform: none !important; }
 }`;
 
+/* Pages whose components exist for Figma mockups only — device chrome with no
+   lib counterpart — so they are left out of the component list. */
+const FIGMA_ONLY_PAGES = ['Status Bar'];
+
 export default function ParityPage() {
   const params = new URLSearchParams(window.location.search);
   /* The selected component set, by Figma node id. A set with a ParityComponent
@@ -536,7 +540,10 @@ export default function ParityPage() {
     fetchFigmaComponentSets(FILE_KEY, token.trim())
       // Building blocks named with a leading "." or "_" are Figma's private
       // components — parts of another component, not ones to compare alone.
-      .then((list) => setAllSets(list.filter((x) => !/^[._]/.test(x.name)).sort((a, b) => a.name.localeCompare(b.name))))
+      // Figma-only pages (device chrome like the status bar) have no code side.
+      .then((list) => setAllSets(list
+        .filter((x) => !/^[._]/.test(x.name) && !FIGMA_ONLY_PAGES.includes(x.page))
+        .sort((a, b) => a.name.localeCompare(b.name))))
       .catch(() => setAllSets([]));
   }, [token]);
 
