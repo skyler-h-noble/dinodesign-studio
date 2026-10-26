@@ -22,7 +22,7 @@ import {
   Body, Button, ToggleButtonGroup, Caption, Card, CodeBlock, H2, H3, HStack, Section, Select, Slider, Table, TextInput, VStack, Alert, ThemedZone,
 } from '@omni-design/components';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { fetchFigmaComponentSets, fetchFigmaImage, fetchFigmaNode } from '../utils/figmaApi';
+import { fetchFigmaComponentSets, fetchFigmaImage, fetchFigmaNode, fetchFigmaNodes } from '../utils/figmaApi';
 import { applyStudioDesignSystem, STUDIO_THEMES } from '../utils/studioDesignSystem';
 import { parseFigmaSet, type FigmaPart, type FigmaSet } from '../utils/parity/figmaSet';
 import { PARITY_COMPONENTS } from '../utils/parity/components';
@@ -564,15 +564,21 @@ export default function ParityPage() {
      flight let the OLD response land last and fill the page — a Day Cell
      report carrying Count Step's variants under Day Cell's node id. */
   const loadSeq = useRef(0);
+  const sweepDocs = useRef<Record<string, any>>({});
   const load = useCallback(async () => {
     if (!token.trim()) return;
     const seq = ++loadSeq.current;
     setLoading(true); setError(null);
     try {
-      const [doc, img] = await Promise.all([
-        fetchFigmaNode(FILE_KEY, nodeId, token.trim()),
-        fetchFigmaImage(FILE_KEY, nodeId, token.trim(), 2),
-      ]);
+      /* The sweep prefetches every set in a few batched calls and skips the
+         images — measuring needs neither a per-set request nor a render. */
+      const cached = sweepDocs.current[nodeId];
+      const [doc, img] = cached
+        ? [cached, null]
+        : await Promise.all([
+            fetchFigmaNode(FILE_KEY, nodeId, token.trim()),
+            fetchFigmaImage(FILE_KEY, nodeId, token.trim(), 2),
+          ]);
       if (seq !== loadSeq.current) return;
       const parsed = parseFigmaSet(doc);
       setSet(parsed);
@@ -649,8 +655,63 @@ export default function ParityPage() {
         }
       }
       setRows(out);
+      measured.current = { key: component.key, at: Date.now(), rows: out };
     });
   }, [set, component, zoom]);
+  const measured = useRef<{ key: string; at: number; rows: Row[] } | null>(null);
+
+  /* SWEEP (?sweep=1): every mapped component in turn, from one batched fetch,
+     then a table of results — "is everything at zero?" in one run. */
+  const sweepMode = params.get('sweep') === '1';
+  const [sweep, setSweep] = useState<{ running: boolean; done: Array<{ name: string; key: string; diff: number; total: number; error?: string }>; error?: string }>({ running: false, done: [] });
+  useEffect(() => {
+    if (!sweepMode || !token.trim() || dsStatus !== 'ready' || sweep.running || sweep.done.length) return;
+    let live = true;
+    (async () => {
+      setSweep({ running: true, done: [] });
+      try {
+        sweepDocs.current = await fetchFigmaNodes(FILE_KEY, PARITY_COMPONENTS.map((c) => c.nodeId), token.trim());
+      } catch (e) {
+        if (live) setSweep({ running: false, done: [], error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      const done: Array<{ name: string; key: string; diff: number; total: number; error?: string }> = [];
+      for (const c of PARITY_COMPONENTS) {
+        if (!live) return;
+        if (!sweepDocs.current[c.nodeId]) { done.push({ name: c.name, key: c.key, diff: -1, total: 0, error: 'not in Figma' }); continue; }
+        measured.current = null;
+        // Clear the previous set first, as the picker does — otherwise the new
+        // component renders once against the old component's variants.
+        setSet(null); setImage(null); setRows([]);
+        setNodeId(c.nodeId);
+        // Wait for this component's SECOND measurement (the 2s one) to land.
+        const start = Date.now();
+        let first = 0;
+        while (live && Date.now() - start < 12000) {
+          await new Promise((r) => setTimeout(r, 250));
+          const m = measured.current as { key: string; at: number; rows: Row[] } | null;
+          if (m && m.key === c.key) { if (!first) first = m.at; else if (m.at > first) break; }
+        }
+        const m = measured.current as { key: string; at: number; rows: Row[] } | null;
+        done.push(m && m.key === c.key
+          ? { name: c.name, key: c.key, diff: m.rows.filter((r) => !r.ok).length, total: m.rows.length }
+          : { name: c.name, key: c.key, diff: -1, total: 0, error: 'no measurement' });
+        if (live) setSweep({ running: true, done: [...done] });
+      }
+      if (live) setSweep({ running: false, done });
+    })();
+    return () => { live = false; };
+  }, [sweepMode, token, dsStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sweepSummary = useMemo(() => {
+    if (!sweep.done.length && !sweep.error) return '';
+    const bad = sweep.done.filter((d) => d.diff !== 0);
+    return [
+      `SWEEP — ${sweep.done.length} of ${PARITY_COMPONENTS.length} components${sweep.running ? ' (running)' : ''}`,
+      sweep.error ? `ERROR: ${sweep.error}` : '',
+      `${sweep.done.filter((d) => d.diff === 0).length} at zero, ${bad.length} not:`,
+      ...bad.map((d) => `  ${d.name} (${d.key}): ${d.error ?? `${d.diff} of ${d.total} differ`}`),
+    ].filter(Boolean).join('\n');
+  }, [sweep]);
 
   useEffect(() => {
     // Twice: emotion inserts some rules after first paint, and the forced
@@ -813,6 +874,9 @@ export default function ParityPage() {
           </Body>
         </VStack>
 
+        {sweepMode && (
+          <CodeBlock code={sweepSummary || 'Sweep starting — fetching every set in a few batched calls…'} language="Sweep" wrap />
+        )}
         {/* Layout primitive: the controls, wrapping on narrow screens. */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
           <Select label="Component" size="small" value={nodeId} minWidth={200}

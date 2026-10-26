@@ -460,8 +460,9 @@ const breadcrumbs: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: 'Desktop', css: '.breadcrumbs-list', label: 'Trail' },
-    { figma: 'Breadcrumb-Segments', css: '.breadcrumb-item', label: 'Crumb', all: true },
-    { figma: 'Breadcrumbs-separator', css: '.breadcrumb-separator', label: 'Separator', all: true },
+    // The building blocks are private now: a leading "." on both names.
+    { figma: '.Breadcrumb-Segments', css: '.breadcrumb-item', label: 'Crumb', all: true },
+    { figma: '.Breadcrumbs-separator', css: '.breadcrumb-separator', label: 'Separator', all: true },
   ],
   notes: ['The hidden Mobile layout is backOnlyMobile in the lib and is not compared.'],
   render: () => (

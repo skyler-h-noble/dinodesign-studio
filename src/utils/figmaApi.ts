@@ -50,6 +50,34 @@ export async function fetchFigmaNode(
   return node.document;
 }
 
+/** Many nodes in as few requests as possible — the parity sweep's whole set
+ *  list in a handful of calls rather than one (plus an image) per component,
+ *  which is what kept running the token into Figma's rate limit. */
+export async function fetchFigmaNodes(
+  fileKey: string,
+  nodeIds: string[],
+  token: string,
+  chunk = 25,
+): Promise<Record<string, any>> {
+  const out: Record<string, any> = {};
+  for (let i = 0; i < nodeIds.length; i += chunk) {
+    const ids = nodeIds.slice(i, i + chunk);
+    const url = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(ids.join(','))}&plugin_data=shared`;
+    // A 429 is waited out (Retry-After, else a growing pause), not failed on.
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      res = await fetch(url, { headers: { 'X-Figma-Token': token } });
+      if (res.status !== 429) break;
+      const wait = Number(res.headers.get('Retry-After')) || 15 * (attempt + 1);
+      await new Promise((r) => setTimeout(r, Math.min(wait, 90) * 1000));
+    }
+    if (!res || !res.ok) throw new Error(`Figma API ${res?.status}: ${await res?.text().catch(() => 'unknown')}`);
+    const json = await res.json();
+    for (const id of ids) if (json.nodes?.[id]?.document) out[id] = json.nodes[id].document;
+  }
+  return out;
+}
+
 /** Fetch a rendered PNG of the frame at the given scale. */
 export async function fetchFigmaImage(
   fileKey: string,
