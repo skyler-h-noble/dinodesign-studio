@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1493,6 +1493,27 @@ const list: ParityComponent = {
   },
 };
 
+/* Loader: the 32px ring (Other/Loader at medium), drawn as a conic sweep from
+   the Primary button border into the Background. Position 1–4 are its quarter
+   turns; code is one spinning ring, rendered here paused at each turn. */
+const loader: ParityComponent = {
+  key: 'loader',
+  name: 'Loader',
+  nodeId: '5859:1629',
+  libFile: 'src/components/Loader/Loader.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-loader .loader-ring', label: 'Ring', skip: ['fill', 'border', 'radius (as drawn)'] },
+  ],
+  render: (v) => (
+    <div className="parity-loader" style={{ width: v.box.w, height: v.box.h }}>
+      <Loader message="" sx={{ py: 0 }}
+        style={{ ['--_turn' as string]: (Number(v.props.Position) - 1) * 90 + 'deg' }} />
+      <style>{`.parity-loader .loader-ring{animation:none!important;transform:rotate(var(--_turn))}`}</style>
+    </div>
+  ),
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1524,4 +1545,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
