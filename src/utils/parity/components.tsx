@@ -1390,6 +1390,10 @@ const tab: ParityComponent = {
   libFile: 'src/components/Tabs/Tabs.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  // Code's tab is transparent over the list's Background (so the baseline can
+  // run under it); Figma fills Button-Contents with Background — same pixels.
+  intended: (_v, prop) => prop === 'fill',
+  notes: ['A tab is transparent in code, over its list\'s Background, so the baseline shows through it; Figma fills it Background. Fill is not compared.'],
   parts: tabParts(),
   render: (v, b) => (
     <Tabs orientation={TAB_ORIENTATION[String(v.props.Selector)]} value={b.Selected ? 0 : -1} onChange={noop} baseline={false}>
