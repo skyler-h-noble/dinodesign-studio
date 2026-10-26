@@ -1371,6 +1371,65 @@ const switchField: ParityComponent = {
   },
 };
 
+/* Tab: a Button-Height row on Background — start avatar, the label in
+   Dynamic Button (Quiet, Text when engaged), end icon. Hover previews the
+   2px selector at 50%; Selected (a boolean, off by default) draws it full;
+   Focus-Visible is a 3px ring 1px inside. Selector is the edge the bar sits
+   on — Bottom (horizontal), Left, Right. */
+const TAB_ORIENTATION: Record<string, string> = { Bottom: 'horizontal', Left: 'vertical-left', Right: 'vertical-right' };
+const tabParts = (): ParityPart[] => [
+  { figma: '__root__', css: '.tab', label: 'Tab', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  { figma: 'Button-Contents', css: '.tab', label: 'Contents', skip: ['border', 'shadow', 'radius (as drawn)'] },
+  { figma: 'Component Name', css: '.tab .typography', label: 'Label' },
+  { figma: 'Focus-Visible', css: '.tab', outline: true, label: 'Focus ring' },
+];
+const tab: ParityComponent = {
+  key: 'tab',
+  name: 'Tab',
+  nodeId: '8212:9219',
+  libFile: 'src/components/Tabs/Tabs.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: tabParts(),
+  render: (v, b) => (
+    <Tabs orientation={TAB_ORIENTATION[String(v.props.Selector)]} value={b.Selected ? 0 : -1} onChange={noop} baseline={false}>
+      <TabList aria-label="Tab">
+        <Tab value={0} disabled={v.props.State === 'Disabled'}
+          startDecorator={b['Start Avatar'] ?? true ? <Avatar alt="" size="small" /> : undefined}
+          endDecorator={b['End Icon'] ?? true ? <HomeIcon /> : undefined}>
+          Button
+        </Tab>
+      </TabList>
+    </Tabs>
+  ),
+};
+
+/* Tabs: three Tabs on Background over a 1px Border-Variant baseline (the
+   Baseline boolean, on by default) on the selector's edge. */
+const tabs: ParityComponent = {
+  key: 'tabs',
+  name: 'Tabs',
+  nodeId: '8216:9719',
+  libFile: 'src/components/Tabs/Tabs.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.tab-list', label: 'Tabs', skip: ['border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Tab', css: '.tab', all: true, label: 'Tab', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const o = String(v.props.Orientation).toLowerCase();
+    return (
+      <Tabs orientation={o} value={-1} onChange={noop}>
+        <TabList aria-label="Tabs">
+          {[0, 1, 2].map((i) => (
+            <Tab key={i} value={i} startDecorator={<Avatar alt="" size="small" />} endDecorator={<HomeIcon />}>Button</Tab>
+          ))}
+        </TabList>
+      </Tabs>
+    );
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2172,4 +2231,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, swatch, toggleButtonGroup];
