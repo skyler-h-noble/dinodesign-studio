@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1455,6 +1455,44 @@ const sheet: ParityComponent = {
   ),
 };
 
+/* List: two List Items in a column or a row. Non-clickable rows sit flush,
+   separated by a hairline under each (vertical); clickable rows are cards
+   (inset Border edge, List-Item-Radius) 8px apart, here selected (ring). Each
+   item: a 1:1 image at List-Item-Default-Image-Width, Eyebrow / Subtitle /
+   Body, and a checkbox at the end. */
+const LIST_BODY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+const list: ParityComponent = {
+  key: 'list',
+  name: 'List',
+  nodeId: '7022:51249',
+  libFile: 'src/components/List/List.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    // The clickable card's edge is an inset ring (an inside stroke that takes no space).
+    { figma: 'List Item', css: '.parity-list .list-item', all: true, shadow: 'inset', label: 'Item', skip: ['fill', 'shadow'] },
+    { figma: 'Ratio - Fill Horizontal', css: '.parity-list .list-item .ratio', label: 'Image', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // The eyebrow FACE is the design system's (Surf's Up sets Inter; the Figma file's own is Public Sans).
+    { figma: 'Component Name', css: '.parity-list .list-item .typography', label: 'Eyebrow', skip: ['width', 'height', 'font family'] },
+    { figma: 'End Decorator', css: '.parity-list .list-item .list-item-decorator:last-child', label: 'End decorator', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const clickable = v.props.Type === 'Clickable';
+    const horizontal = v.props.Orientation === 'horizontal';
+    const item = () => ({
+      eyebrow: 'Eyebrow', label: 'Subtitle', secondary: LIST_BODY,
+      startDecorator: <div style={{ width: 'var(--List-Item-Default-Image-Width, 64px)' }}><Ratio ratio="1:1" /></div>,
+      endDecorator: <Checkbox aria-label="Choose" />,
+      bottomBorder: !clickable && !horizontal,
+      selected: clickable,
+    });
+    return (
+      <div className="parity-list" style={{ width: v.box.w }}>
+        <List orientation={horizontal ? 'horizontal' : 'vertical'} clickable={clickable} items={[item(), item()]} />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1486,4 +1524,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
