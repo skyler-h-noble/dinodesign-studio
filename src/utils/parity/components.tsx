@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import PlaceIcon from '@mui/icons-material/Place';
 import FlightIcon from '@mui/icons-material/Flight';
@@ -1516,6 +1516,34 @@ const textAreaField: ParityComponent = {
   },
 };
 
+/* Player: a small Slider over the elapsed time and the time remaining
+   (Mobile Nav Label, Quiet), then the controls — previous, back 10, play
+   (the one solid button), forward 10, next — sharing the row. Sizing-1
+   padding, Sizing-3 between. A single component, not a set. Figma lays the
+   controls out in a ToggleButtonGroup; code uses a plain row (they are
+   actions, not toggles), so the group frame is compared as the row. */
+const player: ParityComponent = {
+  key: 'player',
+  name: 'Player',
+  nodeId: '10327:5421',
+  libFile: 'src/components/Player/Player.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.player', label: 'Player', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Slider and Text', css: '.player-scrubber', label: 'Scrubber', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: '1:54', css: '.player-elapsed', label: 'Elapsed' },
+    { figma: '-1:23', css: '.player-remaining', label: 'Remaining' },
+    { figma: 'ToggleButtonGroup', css: '.player-controls', label: 'Controls', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Button', css: '.player-control', all: true, label: 'Control', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => (
+    <div style={{ width: v.box.w }}>
+      <Player duration={197} defaultPosition={114} onSeek={noop} onPlayPause={noop}
+        onPrevious={noop} onNext={noop} onSkip={noop} />
+    </div>
+  ),
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2317,4 +2345,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup];

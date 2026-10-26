@@ -811,7 +811,12 @@ export default function ParityPage() {
         {/* Layout primitive: the controls, wrapping on narrow screens. */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
           <Select label="Component" size="small" value={nodeId} minWidth={200}
-            options={(allSets.length ? allSets : PARITY_COMPONENTS.map((c) => ({ nodeId: c.nodeId, name: c.name, page: '' })))
+            options={(allSets.length
+              // Plus any mapped component Figma does not list as a SET (a lone
+              // component, like Player).
+              ? [...allSets, ...PARITY_COMPONENTS.filter((c) => !allSets.some((x) => x.nodeId === c.nodeId)).map((c) => ({ nodeId: c.nodeId, name: c.name, page: '' }))]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+              : PARITY_COMPONENTS.map((c) => ({ nodeId: c.nodeId, name: c.name, page: '' })))
               .map((x) => ({ label: `${x.name}${PARITY_COMPONENTS.some((c) => c.nodeId === x.nodeId) ? ' · code' : ''}`, value: x.nodeId }))}
             onChange={(v: string) => { setSet(null); setImage(null); setRows([]); setNodeId(v); }} />
           <ToggleButtonGroup value={layout} onChange={(v: Layout) => v && setLayout(v)} size="small">

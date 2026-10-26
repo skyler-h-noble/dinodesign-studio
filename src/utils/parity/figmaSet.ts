@@ -116,8 +116,9 @@ export function parseFigmaSet(doc: any): FigmaSet {
   for (const [k, d] of Object.entries<any>(doc.componentPropertyDefinitions || {})) {
     if (d.type === 'BOOLEAN') booleanDefaults[k.split('#')[0]] = Boolean(d.defaultValue);
   }
-  const variants: FigmaVariant[] = (doc.children || [])
-    .filter((c: any) => c.type === 'COMPONENT')
+  // A lone COMPONENT (no set — e.g. Player) is its own single variant.
+  const variantNodes = doc.type === 'COMPONENT' ? [doc] : (doc.children || []).filter((c: any) => c.type === 'COMPONENT');
+  const variants: FigmaVariant[] = variantNodes
     .map((c: any) => {
       const b = c.absoluteBoundingBox;
       // `__root__` is the variant itself — where a component-level effect,
@@ -126,7 +127,7 @@ export function parseFigmaSet(doc: any): FigmaSet {
       indexParts(c, parts, { x: b.x, y: b.y });
       return {
         id: c.id,
-        props: parseVariantName(c.name),
+        props: c === doc ? {} : parseVariantName(c.name),
         box: { x: b.x - sb.x, y: b.y - sb.y, w: b.width, h: b.height },
         opacity: c.opacity ?? 1,
         parts,
