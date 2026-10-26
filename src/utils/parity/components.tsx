@@ -195,18 +195,21 @@ const alert: ParityComponent = {
     { figma: 'Theme-Button', css: '.alert-end-decorator button', label: 'Close button', skip: ['fill'] },
     { figma: 'Alert body', css: '.alert-message .typography, .alert-message p, .alert-message span', label: 'Body' },
   ],
-  render: (v, _b, ctx) => {
+  render: (v, b, ctx) => {
     const state = v.props['State-Theme'] as keyof typeof ALERT_ICONS;
-    const Glyph = ALERT_ICONS[state] ?? InfoIcon;
+    // Title (true / false) is the layout: two rows, or one. Start Decorator
+    // is the state icon — the lib's default, so it is not passed — and End
+    // Decorator the close button in the End Slot.
+    const withTitle = v.props.Title !== 'false';
     return (
       <Alert
         color={state.toLowerCase()}
         variant="light"
         size={ctx.size}
         style={{ width: v.box.w, boxSizing: 'border-box' }}
-        title="Alert Title"
-        startDecorator={<Icon size="small"><Glyph /></Icon>}
-        endDecorator={<Button iconOnly variant="ghost" size="medium" aria-label="Close alert"><CloseIcon /></Button>}
+        title={withTitle ? 'Alert Title' : undefined}
+        startDecorator={b['Start Decorator'] === false ? false : undefined}
+        endDecorator={b['End Decorator'] === false ? undefined : <Button iconOnly variant="ghost" size="medium" aria-label="Close alert"><CloseIcon /></Button>}
       >
         Alert body
       </Alert>
