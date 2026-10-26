@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -1642,6 +1642,53 @@ const validationFrame: ParityComponent = {
   ),
 };
 
+/* Drawer Title: a rail section's heading — Eyebrow in Quiet when the rail
+   is open; closed, a Border-Variant divider Sizing-2 in from either side. */
+const drawerTitle: ParityComponent = {
+  key: 'drawerTitle',
+  name: 'Drawer Title',
+  nodeId: '8239:5911',
+  libFile: 'src/components/Rail/Rail.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.rail-section-title', label: 'Title row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Title', css: '.rail-section-title .typography', label: 'Title', when: (v) => v.props['Drawer Open'] === 'Open' },
+    { figma: 'Divider', css: '.rail-section-title-closed > div', label: 'Divider', skip: ['border', 'shadow', 'radius (as drawn)'], when: (v) => v.props['Drawer Open'] === 'Closed' },
+  ],
+  render: (v) => (
+    <div style={{ width: v.box.w }}>
+      <RailSectionTitle title="Title" expanded={v.props['Drawer Open'] === 'Open'} />
+    </div>
+  ),
+};
+
+/* SwatchField: a Swatch with its field label — stacked Sizing-Half apart
+   (top / bottom) or side by side Sizing-1 apart (left / right), the swatch
+   filling the rest. Figma's swatch is the selected, labelled, fill one. */
+const SWATCH_FIELD_POS: Record<string, string> = { 'label-top': 'top', 'label-bottom': 'bottom', 'label-left': 'left', 'label-right': 'right' };
+const swatchField: ParityComponent = {
+  key: 'swatchField',
+  name: 'SwatchField',
+  nodeId: '9575:2390',
+  libFile: 'src/components/SwatchField/SwatchField.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.parity-swatch-field > *', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Form-Label', css: '.parity-swatch-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Label', css: '.parity-swatch-field .form-label', label: 'Label', skip: ['width'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Swatch', css: '.parity-swatch-field .swatch', label: 'Swatch', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const pos = SWATCH_FIELD_POS[String(v.props.Label)];
+    return (
+      <div className="parity-swatch-field" style={{ width: v.box.w }}>
+        <SwatchField label={pos ? 'Label' : undefined} labelPosition={pos} color="#e79999" fit="fill" swatchLabel="color"
+          selected aria-label={pos ? undefined : 'Swatch'} />
+      </div>
+    );
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2443,4 +2490,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];

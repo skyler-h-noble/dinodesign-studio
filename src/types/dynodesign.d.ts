@@ -280,6 +280,8 @@ declare module '@omni-design/components' {
   export const AccordionDetails: FC<any>;
   export const TextArea: FC<any>;
   export const TextAreaField: FC<any>;
+  export const SwatchField: FC<any>;
+  export const RailSectionTitle: FC<any>;
   export const Player: FC<any>;
   export const OverlineSmall: FC<any>;
   export const ListItem: FC<any>;

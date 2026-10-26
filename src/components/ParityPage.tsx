@@ -455,6 +455,11 @@ const OVERLAY_FADE_CSS = `
 /* Pages whose components exist for Figma mockups only — device chrome with no
    lib counterpart — so they are left out of the component list. */
 const FIGMA_ONLY_PAGES = ['Status Bar'];
+/* Sets with no lib component to compare, by name: Brand is a stand-in for the
+   user's own logo (its placement is the Rail's to check); bar and Column are
+   pieces of the chart / table add-ons, which generate one-off output rather
+   than being lib components. */
+const NOT_LIB_SETS = ['Brand', 'bar', 'Column'];
 
 export default function ParityPage() {
   const params = new URLSearchParams(window.location.search);
@@ -550,7 +555,7 @@ export default function ParityPage() {
       // components — parts of another component, not ones to compare alone.
       // Figma-only pages (device chrome like the status bar) have no code side.
       .then((list) => setAllSets(list
-        .filter((x) => !/^[._]/.test(x.name) && !FIGMA_ONLY_PAGES.includes(x.page))
+        .filter((x) => !/^[._]/.test(x.name) && !FIGMA_ONLY_PAGES.includes(x.page) && !NOT_LIB_SETS.includes(x.name.trim()))
         .sort((a, b) => a.name.localeCompare(b.name))))
       .catch(() => setAllSets([]));
   }, [token]);
