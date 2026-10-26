@@ -10,8 +10,11 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
+import PlaceIcon from '@mui/icons-material/Place';
+import FlightIcon from '@mui/icons-material/Flight';
+import MapIcon from '@mui/icons-material/Map';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
 import HomeSharpIcon from '@mui/icons-material/HomeSharp';
@@ -1192,6 +1195,55 @@ const snackbar: ParityComponent = {
   ),
 };
 
+/* SpeedDial: a 56px FAB (the page resolves Component-Size large) whose fan —
+   three FABs, the first Sizing-1-and-Half from the dial and the rest
+   SpeedDial-Gap apart — shows on Hover / Pressed / Focus-Visible (open) and
+   is hidden at Default / Disabled. Open, the + turns 45deg into an x. Code
+   opens on pointer events a forced :hover cannot fire, so the open states are
+   rendered open; the action FABs keep their own (rest) state. */
+const SPEED_DIAL_OPEN = ['Hover', 'Pressed', 'Focus-Visible'];
+const speedDial: ParityComponent = {
+  key: 'speedDial',
+  name: 'SpeedDial',
+  nodeId: '6843:25091',
+  libFile: 'src/components/SpeedDial/SpeedDial.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'large' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  // Disabled: Figma fades the whole dial, code the dial FAB (Fab's own
+  // disabled look) — with the fan shut, the same pixels.
+  intended: (v, prop) => v.props.State === 'Disabled' && prop === 'opacity',
+  parts: [
+    { figma: '__root__', css: '.speed-dial', label: 'Dial box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // The dial: its holder, since Figma turns the FAB itself 45deg when open
+    // (a circle — the same pixels, but a rotated box measures 79 wide).
+    { figma: 'FAB Holder', css: '.speed-dial > .fab', label: 'Dial', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // The fan, open only. Figma lists up / left fans farthest-first, code
+    // nearest-first.
+    ...[2, 3, 4].map((k): ParityPart => ({
+      figma: 'FAB#' + k, label: 'Action ' + (k - 1), skip: ['fill', 'border', 'radius (as drawn)'], shadow: 'outer',
+      css: '.speed-dial [role=menu] > .fab:nth-child(' + (k - 1) + ')',
+      when: (v) => SPEED_DIAL_OPEN.includes(String(v.props.State)) && !['up', 'left'].includes(String(v.props.Direction)),
+    })),
+    ...[2, 3, 4].map((k): ParityPart => ({
+      figma: 'FAB#' + k, label: 'Action ' + (5 - k), skip: ['fill', 'border', 'radius (as drawn)'], shadow: 'outer',
+      css: '.speed-dial [role=menu] > .fab:nth-child(' + (5 - k) + ')',
+      when: (v) => SPEED_DIAL_OPEN.includes(String(v.props.State)) && ['up', 'left'].includes(String(v.props.Direction)),
+    })),
+  ],
+  render: (v, _b, ctx) => {
+    const open = SPEED_DIAL_OPEN.includes(String(v.props.State));
+    const actions = [
+      { name: 'Place', icon: <PlaceIcon />, className: OWN_STATE_CLASS },
+      { name: 'Flight', icon: <FlightIcon />, className: OWN_STATE_CLASS },
+      { name: 'Map', icon: <MapIcon />, className: OWN_STATE_CLASS },
+    ];
+    return (
+      <SpeedDial size={ctx.size} direction={String(v.props.Direction)} open={open} onOpen={noop} onClose={noop}
+        disabled={v.props.State === 'Disabled'} actions={actions} showTooltips={false} ariaLabel="Add" />
+    );
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -1993,4 +2045,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, star, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatch, toggleButtonGroup];
