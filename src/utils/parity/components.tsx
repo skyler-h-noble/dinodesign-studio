@@ -1462,6 +1462,11 @@ const textArea: ParityComponent = {
   libFile: 'src/components/Input/Input.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   forcedState: (v) => ({ Hover: 'hover', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  // Focused and empty, the textarea's own color turns Text, but what shows is
+  // its ::placeholder, which stays Quiet — Figma's color. The page reads the
+  // element, not the pseudo-element.
+  intended: (v, prop) => v.props.State === 'Focus-Visible' && v.props.Content === 'placeholder' && prop === 'text color',
+  notes: ['Focused and empty: the visible placeholder is Quiet (as Figma); the textarea element itself is Text, which is what the page reads — not compared.'],
   parts: [
     { figma: 'Inner Frame', css: '.parity-textarea .inp-shell', label: 'Field', skip: ['fill', 'border'] },
     { figma: 'Inner Frame', css: '.parity-textarea .inp-shell', pseudo: '::after', label: 'Field edge', skip: ['fill', 'position', 'width', 'height', 'shadow', 'opacity'] },
