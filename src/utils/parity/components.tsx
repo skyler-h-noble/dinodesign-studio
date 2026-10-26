@@ -10,11 +10,12 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import PlaceIcon from '@mui/icons-material/Place';
 import FlightIcon from '@mui/icons-material/Flight';
 import MapIcon from '@mui/icons-material/Map';
+import MicIcon from '@mui/icons-material/Mic';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
 import HomeSharpIcon from '@mui/icons-material/HomeSharp';
@@ -1449,6 +1450,67 @@ const tag: ParityComponent = {
   render: (v) => <Tag color={String(v.props.Theme).toLowerCase()}>NEW</Tag>,
 };
 
+/* TextArea: Input's frame (Hover fill, 1px Border inside, Input-Radius,
+   Text-Area-Min-Height) holding the text (Dynamic Body, Input-Padding above
+   and below, Sizing-1 either side) over an Actions row — the start decorator
+   at the left, the end at the right (Figma's defaults: + and a mic). Hover
+   fills Pressed; Focus-Visible is a 2px ring 1px outside. */
+const textArea: ParityComponent = {
+  key: 'textArea',
+  name: 'TextArea',
+  nodeId: '9457:46628',
+  libFile: 'src/components/Input/Input.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: 'Inner Frame', css: '.parity-textarea .inp-shell', label: 'Field', skip: ['fill', 'border'] },
+    { figma: 'Inner Frame', css: '.parity-textarea .inp-shell', pseudo: '::after', label: 'Field edge', skip: ['fill', 'position', 'width', 'height', 'shadow', 'opacity'] },
+    { figma: 'Inner Frame', css: '.parity-textarea .MuiOutlinedInput-root', label: 'Field fill', skip: ['border', 'radius (as drawn)', 'position', 'width', 'height', 'shadow'] },
+    { figma: 'Focus-Visible', css: '.parity-textarea .inp-shell', outline: true, outer: true, label: 'Focus ring' },
+    // The text box is the textarea, padding and all; Figma's is the line alone.
+    { figma: 'Component Name', css: '.parity-textarea textarea', label: 'Text', skip: ['width', 'height', 'position', 'position (left, top)'] },
+    { figma: 'Input Buttons', css: '.parity-textarea .MuiInputAdornment-root', all: true, label: 'Action', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => (
+    <div className="parity-textarea" style={{ width: v.box.w }}>
+      <TextArea aria-label="About you" placeholder="Tell us about yourself" rows={1}
+        value={v.props.Content === 'value' ? 'My thoughts...' : ''} onChange={noop}
+        disabled={v.props.State === 'Disabled'}
+        className={v.props.State === 'Focus-Visible' ? 'Mui-focused' : undefined}
+        startAdornment={<span className={OWN_STATE_CLASS} style={{ display: 'contents' }}><InputDecorator aria-label="Add"><AddIcon /></InputDecorator></span>}
+        endAdornment={<span className={OWN_STATE_CLASS} style={{ display: 'contents' }}><InputDecorator aria-label="Dictate"><MicIcon /></InputDecorator></span>} />
+    </div>
+  ),
+};
+
+/* TextAreaField: a Form-Label over the TextArea, Sizing-Half apart; `none`
+   is the TextArea alone. */
+const textAreaField: ParityComponent = {
+  key: 'textAreaField',
+  name: 'TextAreaField',
+  nodeId: '9575:4342',
+  libFile: 'src/components/TextAreaField/TextAreaField.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Form-Label', css: '.parity-textarea-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Label', css: '.parity-textarea-field .form-label', label: 'Label', skip: ['width'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'TextArea', css: '.parity-textarea-field .inp-shell', label: 'TextArea', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const deco = {
+      startAdornment: <InputDecorator aria-label="Add"><AddIcon /></InputDecorator>,
+      endAdornment: <InputDecorator aria-label="Dictate"><MicIcon /></InputDecorator>,
+    };
+    return (
+      <div className="parity-textarea-field" style={{ width: v.box.w }}>
+        {v.props.Label === 'none'
+          ? <TextArea aria-label="About you" placeholder="Tell us about yourself" rows={1} onChange={noop} {...deco} />
+          : <TextAreaField label="Label" placeholder="Tell us about yourself" rows={1} onChange={noop} {...deco} />}
+      </div>
+    );
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -2250,4 +2312,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup];

@@ -279,6 +279,7 @@ declare module '@omni-design/components' {
   export const AccordionSummary: FC<any>;
   export const AccordionDetails: FC<any>;
   export const TextArea: FC<any>;
+  export const TextAreaField: FC<any>;
   export const OverlineSmall: FC<any>;
   export const ListItem: FC<any>;
   export const EmailTextField: FC<any>;
