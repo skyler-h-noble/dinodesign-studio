@@ -507,6 +507,7 @@ const button: ParityComponent = {
     // The ring is on the avatar's Photo frame, not on the instance around it.
     { figma: 'Photo', css: '.MuiButton-startIcon .avatar', label: 'Start avatar', when: (v) => v.props.Type === 'text' },
     { figma: 'Icon', css: '.MuiButton-endIcon', label: 'End icon', when: (v) => v.props.Type === 'text' },
+    { figma: 'Focus-Visible', css: 'button.MuiButton-root', outline: true, outer: true, label: 'Focus ring' },
   ],
   render: (v, b, ctx) => {
     const common = {
@@ -984,6 +985,54 @@ const fieldButton: ParityComponent = {
       <KeyboardArrowUpIcon />
     </FieldButton>
   ),
+};
+
+/* Pagination Number: one page in a Pagination — a letterNumber Button.
+   Unselected pages are ghost (Outline-Quiet at rest, Outline-Text engaged);
+   the current page is the selected outline button. Rendered with the props
+   Pagination.js gives a page button. */
+const paginationNumber: ParityComponent = {
+  key: 'paginationNumber',
+  name: 'Pagination Number',
+  nodeId: '8400:33345',
+  libFile: 'src/components/Pagination/Pagination.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  // As Button: an unselected button rises 1px on hover, and a resting ghost is
+  // transparent in code over the Background Figma paints — the same pixels.
+  intended: (v, prop) =>
+    (v.props.State === 'Hover' && prop.startsWith('position'))
+    || (['Default', 'Focus-Visible', 'Disabled'].includes(String(v.props.State)) && prop === 'fill'),
+  notes: [
+    'Hover lifts the button 1px — intended (see Button); Hover positions are not compared.',
+    'A resting ghost is transparent in code and Background in Figma — the same pixels, so its fill is not compared.',
+  ],
+  parts: [
+    { figma: 'Button', css: 'button.MuiButton-root', label: 'Button', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Button-Effect', css: 'button.MuiButton-root', label: 'Elevation', skip: ['fill', 'border'], shadow: 'outer' },
+    { figma: 'Theme-Button', css: 'button.MuiButton-root', label: 'Ghost fill', when: (v) => v.props.State !== 'Selected', skip: ['border', 'shadow', 'radius (as drawn)', 'opacity'] },
+    { figma: 'Button-Fill', css: 'button.MuiButton-root', label: 'Fill', when: (v) => v.props.State === 'Selected', shadow: 'inset' },
+    { figma: 'Focus-Visible', css: 'button.MuiButton-root', outline: true, outer: true, label: 'Focus ring' },
+    { figma: 'Component Name', css: 'button.MuiButton-root > .typography', label: 'Number' },
+  ],
+  render: (v, _b, ctx) => {
+    const selected = v.props.State === 'Selected';
+    return (
+      <Button
+        variant={selected ? 'default-outline' : 'ghost'}
+        selected={selected}
+        size={ctx.size}
+        disabled={v.props.State === 'Disabled'}
+        className={v.props.State === 'Focus-Visible' ? 'Mui-focusVisible' : undefined}
+        contentType="letterNumber"
+        aria-label="Page 1"
+        aria-current={selected ? 'page' : undefined}
+        onClick={noop}
+      >
+        1
+      </Button>
+    );
+  },
 };
 
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
@@ -1782,4 +1831,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
