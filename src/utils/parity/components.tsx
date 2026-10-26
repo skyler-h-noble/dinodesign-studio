@@ -1617,7 +1617,10 @@ const navRail: ParityComponent = {
     { figma: 'Expandable Rail Slot', css: '.parity-rail .rail [role="tablist"]', label: 'Slot', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'height'] },
     { figma: 'Nav Rail Item', css: '.parity-rail .rail-item', all: true, label: 'Item', skip: ['shadow'], when: (v) => v.props.Type === 'Default' },
     { figma: 'Expandable Nav Rail Item', css: '.parity-rail .rail-item', all: true, label: 'Item', skip: ['shadow'], when: (v) => v.props.Type !== 'Default' },
-    { figma: 'Expand-Collapse', css: '.parity-rail .rail > :first-child', label: 'Toggle row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
+    { figma: 'Expand-Collapse', css: '.parity-rail .rail-toggle', label: 'Toggle row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
+    { figma: 'Button', css: '.parity-rail .rail-toggle button', label: 'Toggle', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
+    { figma: 'Drawer Title', css: '.parity-rail .rail-section-title', label: 'Title', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
+    { figma: 'Top', css: '.parity-rail .rail-brand', label: 'Brand row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type === 'Default' },
   ],
   render: (v) => {
     const type = String(v.props.Type);
@@ -1626,7 +1629,8 @@ const navRail: ParityComponent = {
       <div className="parity-rail" style={{ width: v.box.w, height: v.box.h }}>
         <Rail value={1} aria-label="Navigation"
           expandable={expandable} defaultExpanded={type === 'Open-Expandable'}
-          {...(expandable ? { items: RAIL_ITEMS } : { sections: [{ items: RAIL_ITEMS.slice(0, 2) }, { items: RAIL_ITEMS.slice(2) }] })} />
+          brand={expandable ? undefined : <div style={{ width: 'var(--Button-Height, 32px)', height: 'var(--Button-Height, 32px)', background: 'var(--Background)' }} />}
+          sections={expandable ? [{ title: 'Title', items: RAIL_ITEMS }] : [{ items: RAIL_ITEMS.slice(0, 2) }, { items: RAIL_ITEMS.slice(2) }]} />
       </div>
     );
   },
