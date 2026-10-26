@@ -1070,6 +1070,29 @@ const progressDial: ParityComponent = {
   render: () => <CircularProgress value={35.24} size="large" />,
 };
 
+/* RadioField: Radio + Form-Label, Label-Gap apart, in the five placements
+   CheckboxField uses. (Figma's set name carries a trailing space.) The radio
+   inside is pinned to .Theme=Primary; colors are the Radio set's to check,
+   so here only the layout is compared. */
+const radioField: ParityComponent = {
+  key: 'radioField',
+  name: 'RadioField',
+  nodeId: '6778:13979',
+  libFile: 'src/components/Radio/Radio.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.MuiFormControlLabel-root', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Label !== 'none' },
+    { figma: 'Radio', css: '.MuiRadio-root', label: 'Radio', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Label', css: '.MuiFormControlLabel-label .typography', label: 'Label' },
+  ],
+  render: (v) => {
+    const placement = CHECKBOX_FIELD_PLACEMENT[String(v.props.Label)];
+    return placement
+      ? <Radio label="Label" labelPlacement={placement} onChange={noop} />
+      : <Radio onChange={noop} aria-label="Radio" />;
+  },
+};
+
 /* Form-Helper: the helper line (Legal, Quiet) and, with a validation, the
    message under it — a Theme-<State> / Surface-Brightest pill holding a 16px
    Message Icon and the message in Legal-Semibold, Text-<State>. Layer names
@@ -1866,4 +1889,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, progressBar, progressDial, radio, radioField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
