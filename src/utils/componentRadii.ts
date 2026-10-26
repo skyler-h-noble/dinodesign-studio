@@ -253,19 +253,6 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   //
   // Capping the total fixes both — above the cap the curve is flat, so the
   // cliff has nothing to fall off.
-  /* Accordion corner — follows the button radius, capped at half the summary's
-   * height so it cannot saturate into a stadium.
-   *
-   * An accordion summary is about one button tall, so a pill-able
-   * --Button-Radius rounds it into a lozenge; buttons are deliberately
-   * pill-able, accordions are not. Half the height is the point at which a
-   * corner stops being a corner, which makes it the right maximum.
-   *
-   * This lived inline in buildPreviewCSS, so --Accordion-Radius reached the
-   * studio preview and nothing else — not the CSS export, not Figma. The lib
-   * therefore fell back to --Button-Radius everywhere real, which is the pill
-   * the token exists to prevent. */
-  const accordionRadius = Math.min(buttonRadius, Math.floor(cs.buttonHeight / 2));
 
   /* The accordion's focus ring, for FIGMA's benefit only.
    *
@@ -283,11 +270,25 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
    * ran 1px off concentric. */
   const ACCORDION_FOCUS_OUTSET = 3;
   const ACCORDION_INNER_FOCUS_INSET = 2;
-  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_OUTSET;
-  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_INNER_FOCUS_INSET);
 
   const CARD_RADIUS_MAX = 24;
   const cardRadius = Math.min(cardCornerBase + cardPadding, CARD_RADIUS_MAX);
+
+  /* Accordion corner — the dropdown frame's rule: min(Button-Radius,
+   * Card-Radius, 16px).
+   *
+   * It follows the button so a square brand stays square, but an accordion is
+   * a SURFACE that opens into a card, so it is never rounder than the brand's
+   * cards and never past 16px. It was min(button, height / 2), which on a pill
+   * brand made a closed 40px segment a full stadium and an open one a card
+   * with 20px corners, so the shape changed as it opened.
+   *
+   * (This lived inline in buildPreviewCSS once, so --Accordion-Radius reached
+   * the preview and nothing else; it is computed here for all three outputs.) */
+  const ACCORDION_RADIUS_MAX = 16;
+  const accordionRadius = Math.min(buttonRadius, cardRadius, ACCORDION_RADIUS_MAX);
+  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_OUTSET;
+  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_INNER_FOCUS_INSET);
 
   /* Small and large cards, scaled PROPORTIONALLY off the resolved medium.
    *

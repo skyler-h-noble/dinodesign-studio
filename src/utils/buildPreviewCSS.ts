@@ -2069,12 +2069,7 @@ ${(() => {
   const cappedStyleRadius = Math.min(r.buttonRadius, buttonHeight);
   const cappedCardRadius = Math.min(r.cardRadius, buttonHeight);
   const cappedModalRadius = Math.min(r.modalRadius, buttonHeight);
-  // Accordion-specific cap. The Accordion summary is ~buttonHeight tall, so
-  // using --Style-Border-Radius at full cap (= buttonHeight) saturates into
-  // a stadium shape (radius ≥ height/2). Buttons are intentionally pill-able,
-  // accordions aren't. We can't lower --Style-Border-Radius without also
-  // de-pilling buttons, so emit a dedicated --Accordion-Radius capped at
-  // half the button height and override the lib's Accordion rule below.
+  // Accordion corner: min(button, card, 16) — see componentRadii.ts.
   const cappedAccordionRadius = r.accordionRadius;
   // Button radius caps at the LARGE button height — beyond that CSS clamps a
   // pill anyway, and uncapped values (e.g. 100) over-round anything that reads
