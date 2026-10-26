@@ -1632,6 +1632,42 @@ const navRail: ParityComponent = {
   },
 };
 
+/* Nav Rail Item: the collapsed rail's item — Label Contained (the state fills
+   the whole 64x47 item) or Label Outside (only the 32px circle round the icon).
+   Selected is the Buttons palette. */
+const navRailItem: ParityComponent = {
+  key: 'navRailItem',
+  name: 'Nav Rail Item',
+  nodeId: '8224:5192',
+  libFile: 'src/components/Rail/Rail.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    // The item's corner only shows where the item paints (Contained: hover, pressed, selected).
+    { figma: '__root__', css: '.parity-rail-item .rail-item', shadow: 'inset', label: 'Item', skip: ['shadow'],
+      when: (v) => v.props.Style === 'Label Contained' && ['Hover', 'Pressed', 'Selected'].includes(String(v.props.State)) },
+    { figma: '__root__', css: '.parity-rail-item .rail-item', shadow: 'inset', label: 'Item', skip: ['shadow', 'radius (as drawn)'],
+      when: (v) => !(v.props.Style === 'Label Contained' && ['Hover', 'Pressed', 'Selected'].includes(String(v.props.State))) },
+    // Figma names shift between the Styles: Contained's padded row is "Icon Buttons";
+    // Outside's 32px circle is "Rail Button" (its "Icon Buttons" is the bare 20px glyph).
+    { figma: 'Icon Buttons', css: '.parity-rail-item .rail-item > :first-child', shadow: 'inset', label: 'Rail button', skip: ['shadow'],
+      when: (v) => v.props.Style === 'Label Contained' },
+    { figma: 'Rail Button', css: '.parity-rail-item .rail-item > :first-child', shadow: 'inset', label: 'Circle', skip: ['shadow'],
+      when: (v) => v.props.Style === 'Label Outside' },
+    { figma: 'Component Name', css: '.parity-rail-item .rail-item-label', label: 'Label' },
+    { figma: 'Focus-Visible', css: '.parity-rail-item .rail-item', outline: true, outer: true, label: 'Focus ring',
+      when: (v) => v.props.State === 'Focus-Visible' && v.props.Style === 'Label Contained' },
+    { figma: 'Focus-Visible', css: '.parity-rail-item .rail-item > :first-child', outline: true, outer: true, label: 'Focus ring',
+      when: (v) => v.props.State === 'Focus-Visible' && v.props.Style === 'Label Outside' },
+  ],
+  render: (v) => (
+    <div className="parity-rail-item" style={{ width: v.box.w }}>
+      <RailItem item={{ icon: <HomeIcon />, label: 'Label', disabled: v.props.State === 'Disabled' }}
+        selected={v.props.State === 'Selected'} labelStyle={v.props.Style === 'Label Outside' ? 'outside' : 'contained'} />
+    </div>
+  ),
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1663,4 +1699,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
