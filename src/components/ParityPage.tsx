@@ -93,6 +93,8 @@ interface Measured extends FigmaPart {
   textRuns?: number;
   /** Text labels BEFORE the box on its line, inside the variant — see textRunsBefore. */
   textBefore?: number;
+  /** Text lines ABOVE the box in its column, inside the variant — see textRowsAbove. */
+  textAbove?: number;
 }
 
 /**
@@ -126,6 +128,28 @@ function textRunsAcross(el: Element): number {
  * third starts 3.4px later in Figma for no reason but its two labels and two
  * separators before it.
  */
+/**
+ * How many text lines sit ABOVE `el` in its column, inside the variant. Figma
+ * rounds a text box's HEIGHT up as well (a 16.5px line is drawn 17), so a
+ * stack of labelled items lands half a pixel lower in Figma per label above.
+ */
+function textRowsAbove(el: Element, stopAt: Element): number {
+  const box = el.getBoundingClientRect();
+  const walker = document.createTreeWalker(stopAt, NodeFilter.SHOW_TEXT);
+  const seen = new Set<Element>();
+  let n = 0;
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    const host = t.parentElement;
+    if (!host || seen.has(host) || !t.textContent?.trim() || el.contains(host)) continue;
+    seen.add(host);
+    const r = host.getBoundingClientRect();
+    if (!r.width) continue;
+    const sameColumn = r.right > box.left + 1 && r.left < box.right - 1;
+    if (sameColumn && r.bottom <= box.top + 0.5) n++;
+  }
+  return n;
+}
+
 function textRunsBefore(el: Element, stopAt: Element): number {
   const box = el.getBoundingClientRect();
   const walker = document.createTreeWalker(stopAt, NodeFilter.SHOW_TEXT);
@@ -328,6 +352,7 @@ function measure(el: Element, stopAt: Element, scale: number): Measured {
     opacity: Math.round(opacity * 100) / 100,
     textRuns: textRunsAcross(el),
     textBefore: textRunsBefore(el, stopAt),
+    textAbove: textRowsAbove(el, stopAt),
   };
 }
 
@@ -369,7 +394,10 @@ function compare(variant: string, part: string, f: FigmaPart, c: Measured | null
     /* Figma may sit up to 1px further RIGHT per label before it on the line
        (its text rounding, see textRunsBefore) — never further left. */
     const xOk = Math.abs(f.x - c.x) < 0.6 || (f.x > c.x && f.x - c.x <= (c.textBefore ?? 0) + 0.01);
-    add('position', `${f.x}, ${f.y}`, `${c.x}, ${c.y}`, xOk && Math.abs((f.y ?? 0) - (c.y ?? 0)) < 0.6);
+    /* Figma may sit up to 1px LOWER per text line above (its height rounding,
+       see textRowsAbove) — never higher. */
+    const yOk = Math.abs((f.y ?? 0) - (c.y ?? 0)) < 0.6 || ((f.y ?? 0) > (c.y ?? 0) && (f.y ?? 0) - (c.y ?? 0) <= (c.textAbove ?? 0) + 0.01);
+    add('position', `${f.x}, ${f.y}`, `${c.x}, ${c.y}`, xOk && yOk);
   }
   // Figma may be wider by up to 1px per label on a line (its text rounding,
   // see textRunsAcross) — never narrower.

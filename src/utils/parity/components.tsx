@@ -1615,8 +1615,9 @@ const navRail: ParityComponent = {
   parts: [
     { figma: '__root__', css: '.parity-rail .rail', label: 'Rail', skip: ['shadow', 'height'] },
     { figma: 'Expandable Rail Slot', css: '.parity-rail .rail [role="tablist"]', label: 'Slot', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'height'] },
-    { figma: 'Nav Rail Item', css: '.parity-rail .rail-item', all: true, label: 'Item', skip: ['shadow'], when: (v) => v.props.Type === 'Default' },
-    { figma: 'Expandable Nav Rail Item', css: '.parity-rail .rail-item', all: true, label: 'Item', skip: ['shadow'], when: (v) => v.props.Type !== 'Default' },
+    // Item edges are inset rings; an unselected collapsed item paints nothing, so its corner is not compared.
+    { figma: 'Nav Rail Item', css: '.parity-rail .rail-item', all: true, shadow: 'inset', label: 'Item', skip: ['shadow', 'radius (as drawn)'], when: (v) => v.props.Type === 'Default' },
+    { figma: 'Expandable Nav Rail Item', css: '.parity-rail .rail-item', all: true, shadow: 'inset', label: 'Item', skip: ['shadow'], when: (v) => v.props.Type !== 'Default' },
     { figma: 'Expand-Collapse', css: '.parity-rail .rail-toggle', label: 'Toggle row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
     { figma: 'Button', css: '.parity-rail .rail-toggle button', label: 'Toggle', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
     { figma: 'Drawer Title', css: '.parity-rail .rail-section-title', label: 'Title', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Type !== 'Default' },
