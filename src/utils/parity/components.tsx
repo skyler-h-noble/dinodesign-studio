@@ -398,9 +398,9 @@ const avatar: ParityComponent = {
     const AVATAR_SIZE: Record<number, string> = { 16: 'xxs', 20: 'xs', 24: 'small', 32: 'medium', 40: 'large', 56: 'xl', 72: 'xxl' };
     const size = AVATAR_SIZE[Math.round(v.box.w)] ?? 'medium';
     if (style === 'Initials') return <Avatar size={size} initials="LN" alt="LN" />;
-    // Default is the person glyph: the brand fallback, not the built-in photo.
-    if (style === 'Default') return <Avatar size={size} defaultPhoto={false} alt="User" />;
-    return <Avatar size={size} alt="User photo" />;
+    // Default is the person glyph — a bare Avatar. Photo is the sample photo.
+    if (style === 'Default') return <Avatar size={size} alt="User" />;
+    return <Avatar size={size} defaultPhoto alt="User photo" />;
   },
 };
 
