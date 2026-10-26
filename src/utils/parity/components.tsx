@@ -1690,7 +1690,10 @@ const swatchField: ParityComponent = {
   parts: [
     { figma: '__root__', css: '.parity-swatch-field > *', label: 'Field', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: 'Form-Label', css: '.parity-swatch-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'], when: (v) => v.props.Label !== 'none' },
-    { figma: 'Label', css: '.parity-swatch-field .form-label', label: 'Label', skip: ['width'], when: (v) => v.props.Label !== 'none' },
+    // The swatch's own color label is ALSO called "Label"; where the swatch
+    // comes first (bottom / right) the field label is the second one.
+    { figma: 'Label', css: '.parity-swatch-field .form-label', label: 'Label', skip: ['width'], when: (v) => ['label-top', 'label-left'].includes(String(v.props.Label)) },
+    { figma: 'Label#2', css: '.parity-swatch-field .form-label', label: 'Label', skip: ['width'], when: (v) => ['label-bottom', 'label-right'].includes(String(v.props.Label)) },
     { figma: 'Swatch', css: '.parity-swatch-field .swatch', label: 'Swatch', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
   ],
   render: (v) => {

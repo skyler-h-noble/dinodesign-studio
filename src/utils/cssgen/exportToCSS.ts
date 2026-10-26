@@ -36,7 +36,7 @@ import {
   generateChartsVariables
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
-import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars, fieldMetricsVars } from '../componentSize';
+import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars, fieldMetricsVars, otherMetricsVars } from '../componentSize';
 import { altDisplayWeight } from '../altDisplay';
 import { weightsFor } from '../googleFontWeights';
 
@@ -5323,6 +5323,10 @@ export function generateBaseCSS(jsonData: any): string {
     }
     // Field Button and NumberField — see fieldMetricsVars in componentSize.ts.
     for (const [name, value] of Object.entries(fieldMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
+    // Progress, TextArea, Rating, the floating label and Sheet — otherMetricsVars.
+    for (const [name, value] of Object.entries(otherMetricsVars())) {
       lines.push(`  ${name}: ${value};`);
     }
     for (const [name, value] of Object.entries(lineMetricsVars())) {

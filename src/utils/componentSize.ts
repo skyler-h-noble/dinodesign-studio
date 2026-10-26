@@ -375,6 +375,58 @@ export function fieldMetricsVars(): Record<string, string> {
   return out;
 }
 
+/* ── Component sizes the lib reads but the stylesheet did not carry ──────
+ *
+ * Each lives in Figma's Component-Size collection and each is read by name in
+ * the lib with Figma's number as its fallback — so it painted right, but a
+ * brand that moved the value in Figma never reached code. Values are Figma's
+ * (2026-10-26). Where Figma's value varies by DEVICE (Sheet, the floating
+ * label's line height and tracking), this is the Desktop column — the one a
+ * consumer that never sets data-device gets, as the overlay offsets do.
+ *
+ *   Progress-Bar-Width     the bar's thickness              8 / 4 / 16
+ *   Progress-Dial-Radius   the dial's size: Sizing-10 / -6 / -15 (80 / 48 / 120)
+ *   Text-Area-Min-Height   the shortest TextArea            88 / 74 / 102
+ *   Rating, Rating-Icon    a star's box and glyph           24 / 24 / 32
+ *   Floating-Label-*       Dynamic-Floating-Label: 12 / 11 / 14 at 500,
+ *                          0.5 tracking, 16.8 / 14.4 / 19.2 leading
+ *   Sheet                  a sheet's height: Sheet Half (540) at medium,
+ *                          Sheet Third at small, the device height at large
+ */
+export const OTHER_METRICS = {
+  'Progress-Bar-Width':   { medium: 8,  small: 4,  large: 16 },
+  'Text-Area-Min-Height': { medium: 88, small: 74, large: 102 },
+  'Rating':               { medium: 24, small: 24, large: 32 },
+  'Rating-Icon':          { medium: 24, small: 24, large: 32 },
+} as const;
+
+export function otherMetricsVars(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, byMode] of Object.entries(OTHER_METRICS)) {
+    out[`--${name}`] = `${byMode.medium}px`;
+    out[`--Sm-${name}`] = `${byMode.small}px`;
+    out[`--Lg-${name}`] = `${byMode.large}px`;
+  }
+  // Aliases of the Sizing scale in Figma, so aliases here too.
+  out['--Progress-Dial-Radius'] = 'var(--Sizing-10, 80px)';
+  out['--Sm-Progress-Dial-Radius'] = 'var(--Sizing-6, 48px)';
+  out['--Lg-Progress-Dial-Radius'] = 'var(--Sizing-15, 120px)';
+  // The floating label — the raised label inside a Floating input.
+  out['--Floating-Label-Small-Font-Size'] = '11px';
+  out['--Floating-Label-Medium-Font-Size'] = '12px';
+  out['--Floating-Label-Large-Font-Size'] = '14px';
+  out['--Floating-Label-Small-Line-Height'] = '14.4px';
+  out['--Floating-Label-Medium-Line-Height'] = '16.8px';
+  out['--Floating-Label-Large-Line-Height'] = '19.2px';
+  out['--Floating-Label-Font-Weight'] = '500';
+  out['--Floating-Label-Letter-Spacing'] = '0.5px';
+  // Sheet heights (Desktop column).
+  out['--Sheet'] = '540px';
+  out['--Sm-Sheet'] = '540px';
+  out['--Lg-Sheet'] = '100dvh';
+  return out;
+}
+
 /* ── Switch ───────────────────────────────────────────────────────────────
  *
  * Static, like NAV_METRICS and LINE_METRICS. A switch is 42x24 at medium in
