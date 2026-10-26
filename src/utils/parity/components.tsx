@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1514,6 +1514,41 @@ const loader: ParityComponent = {
   ),
 };
 
+/* Menu Item: the tree row (OmniTreeView's). Toggle chevron, a starting icon,
+   a MiniSwatch and the label, a Border-Variant line under it; open shows one
+   child row indented to the next Menu-Level. */
+const menuItem: ParityComponent = {
+  key: 'menuItem',
+  name: 'Menu Item',
+  nodeId: '8007:25355',
+  libFile: 'src/components/TreeView/TreeView.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', Pressed: 'active', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  parts: [
+    { figma: 'Parent', css: '.parity-menu-item .omni-tree-content', label: 'Row', skip: ['border', 'shadow', 'opacity'] },
+    { figma: 'Toggle', css: '.parity-menu-item .omni-tree-twisty', label: 'Toggle', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'MiniSwatch', css: '.parity-menu-item .mini-swatch', shadow: 'inset', label: 'Swatch', skip: ['fill', 'shadow'] },
+    { figma: 'Menu Slot', css: '.parity-menu-item .omni-tree-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'width', 'radius (as drawn)'] },
+    { figma: 'Component Name', css: '.parity-menu-item .omni-tree-label .typography', label: 'Label', skip: ['width', 'height', 'position', 'fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Focus-Visible', css: '.parity-menu-item .omni-tree-content', outline: true, label: 'Focus ring', when: (v) => v.props.State === 'Focus-Visible' },
+    // Disabled dims the row, not the branch under it: a child is its own item.
+    { figma: 'Children Slot', css: '.parity-menu-item ul[role="group"]', label: 'Children', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'opacity'], when: (v) => v.props.Type === 'open' },
+  ],
+  render: (v) => {
+    const open = v.props.Type === 'open';
+    const child = { id: 'c', label: 'Menu Item', icon: <HomeIcon />, swatch: 'var(--Buttons-Primary-Button)', children: [{ id: 'g', label: 'Menu Item' }] };
+    const items = [{ id: 'p', label: 'Menu Item', icon: <HomeIcon />, swatch: 'var(--Buttons-Primary-Button)', disabled: v.props.State === 'Disabled', children: [child] }];
+    return (
+      <div className="parity-menu-item" style={{ width: v.box.w }}>
+        {/* Just the rows: on Surface, with the tree's own panel padding and corner off. */}
+        <OmniTreeView items={items} variant="default" surface="Surface" animation="none" disableSelection
+          defaultExpandedItems={open ? ['p'] : []} aria-label="Menu"
+          sx={{ borderRadius: 0, '& [role="tree"]': { padding: 0 } }} />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1545,4 +1580,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];

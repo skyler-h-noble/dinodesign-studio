@@ -238,6 +238,7 @@ declare module '@omni-design/components' {
   export const DayCell: FC<any>;
   export const List: FC<any>;
   export const Loader: FC<any>;
+  export const OmniTreeView: FC<any>;
   export const Slider: FC<any>;
   export const Table: FC<any>;
   export const Tooltip: FC<any>;
