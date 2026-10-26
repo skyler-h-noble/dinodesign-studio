@@ -404,31 +404,26 @@ const avatar: ParityComponent = {
   },
 };
 
-/* Avatar Group: three photo avatars overlapping by Avatar-Group-Gap (a
-   quarter of the avatar) and a Neutral "+2". A lone component, so its size is
-   read off the drawn height (the Icons & Avatars mode it resolves). */
+/* Avatar Group: three avatar Buttons overlapping by Avatar-Group-Gap (a
+   quarter of the button height, capped so each shows 24px) and a Neutral
+   "+2" letter/number Button. Sized by Component-Size, as Button is. */
+const AVATAR_GROUP_PEOPLE = ['Ada Lovelace', 'Grace Hopper', 'Katherine Johnson', 'Mary Jackson', 'Dorothy Vaughan']
+  .map((name) => ({ name, detail: 'Detail', onClick: () => {} }));
 const avatarGroup: ParityComponent = {
   key: 'avatarGroup',
   name: 'Avatar Group',
   nodeId: '10424:3',
-  libFile: 'src/components/Avatar/Avatar.js',
+  libFile: 'src/components/AvatarGroup/AvatarGroup.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: '__root__', css: '.avatar-group', label: 'Group', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    // The ring is a 2px outside stroke in Figma and a box-shadow in code.
-    { figma: 'Avatar', css: '.avatar-group > .avatar:not(:last-child)', all: true, label: 'Avatar', skip: ['border', 'shadow'] },
-    // The +N's fill is on its inner Button-Theme-Initials frame, not the instance.
-    { figma: 'Button-Theme-Initials', css: '.avatar-group > .avatar:last-child', label: 'Overflow', skip: ['border', 'shadow'] },
+    // The ring is a wrapper box-shadow in code; Figma's avatars carry none.
+    { figma: 'Button', css: '.avatar-group > .avatar-group-item:not(.avatar-group-overflow) button', all: true, label: 'Avatar button', skip: ['shadow', 'radius (as drawn)'] },
+    // Its fill and edge are on the Button's inner Theme-Button frame, and
+    // Button's own parity covers them — here only its box and corner.
+    { figma: 'Overflow', css: '.avatar-group-overflow button', label: '+N button', skip: ['shadow', 'fill', 'border'] },
   ],
-  render: (v) => {
-    const AVATAR_SIZE: Record<number, string> = { 16: 'xxs', 20: 'xs', 24: 'small', 32: 'medium', 40: 'large', 56: 'xl', 72: 'xxl' };
-    const size = AVATAR_SIZE[Math.round(v.box.h)] ?? 'medium';
-    return (
-      <AvatarGroup size={size} max={3}>
-        {[1, 2, 3, 4, 5].map((i) => <Avatar key={i} alt="User photo" />)}
-      </AvatarGroup>
-    );
-  },
+  render: (_v, _b, ctx) => <AvatarGroup people={AVATAR_GROUP_PEOPLE} max={3} size={ctx.size} />,
 };
 
 /* Two types: a 16px counter carrying "1" and an 8px status dot. The set
@@ -1604,6 +1599,14 @@ const player: ParityComponent = {
    a 16x8 arrow 6px of which shows; the tip touches the anchor. Code is MUI's
    tooltip, so it is rendered OPEN, without a portal, against a zero-size
    anchor where Figma's arrow tip is. */
+/* Tooltip: twelve Locations (Figma's Top-Middle = MUI 'top', Top-Left =
+   'top-start', Left-Bottom = 'left-end' …), a Leading Icon (on) and a
+   Trailing Icon (off). The arrow stays on every one. */
+const TOOLTIP_PLACEMENT = (loc: string) => {
+  const [side, along] = loc.toLowerCase().split('-');
+  const edge = along === 'left' || along === 'top' ? '-start' : along === 'right' || along === 'bottom' ? '-end' : '';
+  return { side, placement: side + edge, along: edge ? edge.slice(1) : 'center' };
+};
 const tooltip: ParityComponent = {
   key: 'tooltip',
   name: 'Tooltip',
@@ -1612,36 +1615,36 @@ const tooltip: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: 'Tooltip container', css: '.tooltip-content', label: 'Bubble', skip: ['shadow'] },
-    { figma: 'Icon', css: '.tooltip-content svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Icon', css: '.tooltip-content .tooltip-icon svg', all: true, label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: 'Component Name', css: '.tooltip-content .tooltip-label', label: 'Label', skip: ['width', 'position', 'position (left, top)'] },
-    // 'Text' in Bottom; the others call the same frame 'Frame 1'.
-    { figma: 'Text', css: '.tooltip-content .tooltip-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Location === 'Bottom' },
-    { figma: 'Frame 1', css: '.tooltip-content .tooltip-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Location !== 'Bottom' },
-    // Figma's Polygon is the whole arrow (2px tucks under the bubble); code's
-    // box is the part that shows — Figma's Arrow Holder. The holder runs the
-    // bubble's length, so only its thickness (and that side's edge) compare.
+    // 'Text' on the Bottom row; the others call the same frame 'Frame 1'.
+    { figma: 'Text', css: '.tooltip-content .tooltip-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => String(v.props.Location).startsWith('Bottom') },
+    { figma: 'Frame 1', css: '.tooltip-content .tooltip-label', label: 'Label box', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'], when: (v) => !String(v.props.Location).startsWith('Bottom') },
+    // The holder runs the bubble's length, so only its thickness compares.
     { figma: 'Arrow Holder', css: '.MuiTooltip-arrow', label: 'Arrow', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width', 'position'],
-      when: (v) => ['Bottom', 'Top'].includes(String(v.props.Location)) },
+      when: (v) => /^(Bottom|Top)/.test(String(v.props.Location)) },
     { figma: 'Arrow Holder', css: '.MuiTooltip-arrow', label: 'Arrow', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'height', 'position'],
-      when: (v) => ['Left', 'Right'].includes(String(v.props.Location)) },
+      when: (v) => /^(Left|Right)/.test(String(v.props.Location)) },
   ],
-  /* The popper is pinned to the cell's corner and the arrow centred on its
-     edge: positioning is MUI's job, and its maths does not survive the
-     parity stage. What is compared is the tooltip's own drawing — bubble,
-     stand-off, arrow, content. */
-  render: (v) => {
-    const loc = String(v.props.Location);
-    const sideways = loc === 'Left' || loc === 'Right';
+  /* The popper is pinned to the cell's corner and the arrow to its edge:
+     positioning is MUI's job, and its maths does not survive the parity
+     stage. What is compared is the tooltip's own drawing. */
+  render: (v, b) => {
+    const { side, placement, along } = TOOLTIP_PLACEMENT(String(v.props.Location));
+    const at = along === 'start' ? '12px' : along === 'end' ? 'calc(100% - 12px)' : '50%';
+    const arrowCss = ({
+      bottom: 'top: 0 !important; bottom: auto !important; left: ' + at + ' !important; transform: translateX(-50%) !important;',
+      top: 'top: auto !important; bottom: 0 !important; left: ' + at + ' !important; transform: translateX(-50%) !important;',
+      left: 'left: auto !important; right: 0 !important; top: ' + at + ' !important; transform: translateY(-50%) !important;',
+      right: 'left: 0 !important; right: auto !important; top: ' + at + ' !important; transform: translateY(-50%) !important;',
+    } as Record<string, string>)[side];
     return (
       <div className="parity-tooltip" style={{ position: 'relative', width: v.box.w, height: v.box.h }}>
         <style>{'.parity-tooltip .MuiTooltip-popper { position: absolute !important; inset: 0 auto auto 0 !important; transform: none !important; } '
-          + '.parity-tooltip .MuiTooltip-arrow { ' + ({
-            Bottom: 'top: 0 !important; bottom: auto !important; left: 50% !important; transform: translateX(-50%) !important;',
-            Top: 'top: auto !important; bottom: 0 !important; left: 50% !important; transform: translateX(-50%) !important;',
-            Left: 'left: auto !important; right: 0 !important; top: 50% !important; transform: translateY(-50%) !important;',
-            Right: 'left: 0 !important; right: auto !important; top: 50% !important; transform: translateY(-50%) !important;',
-          } as Record<string, string>)[loc] + ' }'}</style>
-        <Tooltip open placement={loc.toLowerCase()} PopperProps={{ disablePortal: true }} title="Tooltip" icon={<InfoOutlinedIcon />}>
+          + '.parity-tooltip .MuiTooltip-arrow { ' + arrowCss + ' }'}</style>
+        <Tooltip open placement={placement} PopperProps={{ disablePortal: true }} title="Tooltip"
+          icon={b['Leading Icon'] === false ? undefined : <InfoOutlinedIcon />}
+          trailingIcon={b['Trailing Icon'] ? <InfoOutlinedIcon /> : undefined}>
           <span style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }} />
         </Tooltip>
       </div>
