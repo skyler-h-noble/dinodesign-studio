@@ -10,7 +10,7 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, Checkbox, Chip, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, Ratio, Select, Sheet, Slider, Step, Stepper, Subtitle, Swatch, Tab, TabList, Tabs, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import MailIcon from '@mui/icons-material/Mail';
 import BackspaceIcon from '@mui/icons-material/Backspace';
@@ -1700,6 +1700,57 @@ const noCountStep: ParityComponent = {
   },
 };
 
+/* Number: the field with steppers — Outline (a stacked column of two ghost
+   Field Buttons on the trailing edge, 67 at medium) or Spinner (outline Field
+   Buttons either side), each also with a floating label. */
+const number: ParityComponent = {
+  key: 'number',
+  name: 'Number',
+  nodeId: '9518:52318',
+  libFile: 'src/components/NumberField/NumberField.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Input', css: '.parity-number .inp-shell', label: 'Field', skip: ['fill', 'border', 'radius (as drawn)'] },
+    { figma: 'Increments', css: '.parity-number .numberfield-steppers', label: 'Stepper column', skip: ['fill', 'border', 'shadow'],
+      when: (v) => /outline/i.test(String(v.props.Type)) },
+    { figma: 'Field Button', css: '.parity-number button.field-button', all: true, label: 'Stepper', skip: ['fill', 'shadow'] },
+    { figma: 'Divider', css: '.parity-number .numberfield-steppers > div', label: 'Divider', skip: ['border', 'shadow', 'radius (as drawn)'],
+      when: (v) => /outline/i.test(String(v.props.Type)) },
+  ],
+  render: (v) => {
+    const type = String(v.props.Type);
+    return (
+      <div className="parity-number" style={{ width: v.box.w }}>
+        <NumberField variant={/Spinner/.test(type) ? "spinner" : "outlined"} defaultValue={1} fullWidth
+          label="Email address" labelPosition={/Floating/.test(type) ? 'floating' : 'none'} aria-label="Quantity" />
+      </div>
+    );
+  },
+};
+
+/* NumberField: the Number with its Form-Label — top, left, floating or none. */
+const numberField: ParityComponent = {
+  key: 'numberField',
+  name: 'NumberField',
+  nodeId: '9518:52593',
+  libFile: 'src/components/NumberField/NumberField.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Form-Label', css: '.parity-number-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'],
+      when: (v) => v.props.Label === 'label-top' || v.props.Label === 'label-left' },
+    { figma: 'Number', css: '.parity-number-field .numberfield-row', label: 'Number', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v) => {
+    const pos = String(v.props.Label);
+    return (
+      <div className="parity-number-field" style={{ width: v.box.w }}>
+        <NumberField defaultValue={1} fullWidth label="Label" aria-label="Quantity"
+          labelPosition={pos === 'label-top' ? 'top' : pos === 'label-left' ? 'left' : pos === 'floating' ? 'floating' : 'none'} />
+      </div>
+    );
+  },
+};
+
 /* Input Decorator: the ghost button an Input carries at its end — Type text
    ("Button" + a 20px end icon) or iconOnly (32px, "backspace"). It is the
    lib's ghost Button; Button-Container carries the hover lift, Button-Fill
@@ -1731,4 +1782,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, badgeCounter, box, breadcrumbs, button, buttonGroup, card, checkbox, checkboxField, chip, countStep, dayCell, divider, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navItem, navRail, navRailItem, noCountStep, number, numberField, radio, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, swatch, toggleButtonGroup];
