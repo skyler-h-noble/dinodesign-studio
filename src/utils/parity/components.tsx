@@ -287,7 +287,13 @@ const accordionSegment: ParityComponent = {
     const open = booleans.Open ?? true;
     const seg = (target: boolean, key?: number) => (
       <Accordion key={key} defaultExpanded={open} disabled={target && disabled} className={target ? 'parity-target' : undefined}>
-        <AccordionSummary>Accordion body</AccordionSummary>
+        {/* Eyebrow / Secondary / Show End Slot (off by default). The empty
+            End Slot holds its 24px place, as Figma's does. */}
+        <AccordionSummary
+          eyebrow={booleans.Eyebrow ? 'Eyebrow' : undefined}
+          secondary={booleans.Secondary ? 'Secondary text' : undefined}
+          endDecorator={booleans['Show End Slot'] ? <span style={{ display: 'block', width: 24, height: 24 }} /> : undefined}
+        >Accordion body</AccordionSummary>
         <AccordionDetails>Accordion body</AccordionDetails>
       </Accordion>
     );
