@@ -1623,23 +1623,30 @@ const textAreaField: ParityComponent = {
 const player: ParityComponent = {
   key: 'player',
   name: 'Player',
-  nodeId: '10327:5421',
+  nodeId: '10483:681',
   libFile: 'src/components/Player/Player.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: ['Controls = 5 / 3 / 1 is which handlers code gets: onPrevious + onNext at 5, onSkip at 3 and up. Figma\'s Disabled dims the slider thumb only (the Slider set has no disabled track); code disables the whole slider.'],
   parts: [
     { figma: '__root__', css: '.player', label: 'Player', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: 'Slider and Text', css: '.player-scrubber', label: 'Scrubber', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: '1:54', css: '.player-elapsed', label: 'Elapsed' },
     { figma: '-1:23', css: '.player-remaining', label: 'Remaining' },
-    { figma: 'ToggleButtonGroup', css: '.player-controls', label: 'Controls', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Button', css: '.player-control', all: true, label: 'Control', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Controls', css: '.player-controls', label: 'Controls', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // Figma's Play/Pause is a wrapper round the Button, so its disabled 38% sits one layer in.
+    { figma: 'Play/Pause', css: '.player-play', label: 'Play / Pause', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'opacity'] },
   ],
-  render: (v) => (
-    <div style={{ width: v.box.w }}>
-      <Player duration={197} defaultPosition={114} onSeek={noop} onPlayPause={noop}
-        onPrevious={noop} onNext={noop} onSkip={noop} />
-    </div>
-  ),
+  render: (v, booleans) => {
+    const n = Number(v.props.Controls);
+    return (
+      <div style={{ width: v.box.w }}>
+        <Player duration={197} defaultPosition={114} onSeek={noop} onPlayPause={noop}
+          onPrevious={n >= 5 ? noop : undefined} onNext={n >= 5 ? noop : undefined} onSkip={n >= 3 ? noop : undefined}
+          disabled={v.props.State === 'Disabled'} showTime={booleans['Show Time'] ?? true}
+          {...(booleans['Now Playing'] ? { title: 'Track title', subtitle: 'Artist', avatarInitials: 'TT' } : {})} />
+      </div>
+    );
+  },
 };
 
 /* Tooltip: a black-white Buttons bubble (Buttons Button / Text), Tooltip-
