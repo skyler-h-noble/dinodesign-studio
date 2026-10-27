@@ -1512,6 +1512,10 @@ const tag: ParityComponent = {
    and below, Sizing-1 either side) over an Actions row — the start decorator
    at the left, the end at the right (Figma's defaults: + and a mic). Hover
    fills Pressed; Focus-Visible is a 2px ring 1px outside. */
+/* Floating and empty, the label rests on the first line — except on hover
+   and focus, which raise it. */
+const taLabelRests = (v: FigmaVariant) => v.props.Style === 'Floating' && v.props.Content === 'placeholder'
+  && (v.props.State === 'Default' || v.props.State === 'Disabled');
 const textArea: ParityComponent = {
   key: 'textArea',
   name: 'TextArea',
@@ -1522,20 +1526,30 @@ const textArea: ParityComponent = {
   // Focused and empty, the textarea's own color turns Text, but what shows is
   // its ::placeholder, which stays Quiet — Figma's color. The page reads the
   // element, not the pseudo-element.
-  intended: (v, prop) => v.props.State === 'Focus-Visible' && v.props.Content === 'placeholder' && prop === 'text color',
-  notes: ['Focused and empty: the visible placeholder is Quiet (as Figma); the textarea element itself is Text, which is what the page reads — not compared.'],
+  intended: (v, prop) => (v.props.State === 'Focus-Visible' || v.props.State === 'Hover') && v.props.Content === 'placeholder' && prop === 'text color',
+  notes: [
+    'Hovered or focused and empty: the visible placeholder is Quiet (as Figma); the textarea element itself is Text, which is what the page reads — not compared.',
+    'Floating and empty there is no placeholder — Figma hides the text line once the label rises, and the code textarea is simply empty — so the text line is not compared there.',
+  ],
   parts: [
     { figma: 'Inner Frame', css: '.parity-textarea .inp-shell', label: 'Field', skip: ['fill', 'border'] },
     { figma: 'Inner Frame', css: '.parity-textarea .inp-shell', pseudo: '::after', label: 'Field edge', skip: ['fill', 'position', 'width', 'height', 'shadow', 'opacity'] },
     { figma: 'Inner Frame', css: '.parity-textarea .MuiOutlinedInput-root', label: 'Field fill', skip: ['border', 'radius (as drawn)', 'position', 'width', 'height', 'shadow'] },
     { figma: 'Focus-Visible', css: '.parity-textarea .inp-shell', outline: true, outer: true, label: 'Focus ring' },
     // The text box is the textarea, padding and all; Figma's is the line alone.
-    { figma: 'Component Name', css: '.parity-textarea textarea', label: 'Text', skip: ['width', 'height', 'position', 'position (left, top)'] },
+    { figma: 'Component Name', css: '.parity-textarea textarea', label: 'Text', skip: ['width', 'height', 'position', 'position (left, top)'], when: (v) => !(v.props.Style === 'Floating' && v.props.Content === 'placeholder') },
+    // Floating and empty, Figma's text line IS the label, resting where the placeholder would be.
+    { figma: 'Component Name', css: '.parity-textarea .MuiInputLabel-root', label: 'Label at rest', skip: ['width', 'height'], when: taLabelRests },
+    // Raised by a value, by focus, or by hover (as the floating Input).
+    { figma: 'Tell us about yourself', css: '.parity-textarea .MuiInputLabel-root', label: 'Label raised', skip: ['width', 'height'], when: (v) => v.props.Style === 'Floating' && !taLabelRests(v) },
     { figma: 'Input Buttons', css: '.parity-textarea .MuiInputAdornment-root', all: true, label: 'Action', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
   ],
   render: (v) => (
     <div className="parity-textarea" style={{ width: v.box.w }}>
-      <TextArea aria-label="About you" placeholder="Tell us about yourself" rows={1}
+      <TextArea rows={1}
+        {...(v.props.Style === 'Floating'
+          ? { label: 'Tell us about yourself', labelPosition: 'floating' }
+          : { 'aria-label': 'About you', placeholder: 'Tell us about yourself' })}
         value={v.props.Content === 'value' ? 'My thoughts...' : ''} onChange={noop}
         disabled={v.props.State === 'Disabled'}
         className={v.props.State === 'Focus-Visible' ? 'Mui-focused' : undefined}
@@ -1566,7 +1580,7 @@ const textAreaField: ParityComponent = {
     return (
       <div className="parity-textarea-field" style={{ width: v.box.w }}>
         <TextAreaField label="Label" placeholder="Tell us about yourself" rows={1} onChange={noop} {...deco}
-          labelPosition={v.props.Label === 'none' ? 'none' : v.props.Label === 'label-left' ? 'left' : 'top'} />
+          labelPosition={({ none: 'none', 'label-left': 'left', floating: 'floating' } as Record<string, string>)[String(v.props.Label)] ?? 'top'} />
       </div>
     );
   },
