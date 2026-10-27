@@ -70,7 +70,7 @@ export const RAIL_DOC: ComponentDoc = {
     { name: 'sections', type: 'array', default: 'undefined' },
     { name: 'defaultValue', type: 'number', default: '0' },
     { name: 'expandable', type: 'boolean', default: 'false' },
-    { name: 'expandedWidth', type: 'string', values: ['partial', 'full'], default: 'partial' },
+    { name: 'expandedWidth', type: 'number | string', default: '240', note: 'One open width, 240 by default; pass any number (px) or CSS length. partial / full still render (240 / 320) and warn.' },
     { name: 'labelStyle', type: 'string', values: ['contained', 'outside'], default: 'contained',
       note: 'Whether the label sits inside the item’s target or beneath it. It changes the hit area, not just the look.' },
     { name: 'fabAction', type: 'object', default: 'undefined' },
