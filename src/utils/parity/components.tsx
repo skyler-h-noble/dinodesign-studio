@@ -1208,11 +1208,22 @@ const progressBar: ParityComponent = {
   nodeId: '8379:11531',
   libFile: 'src/components/LinearProgress/LinearProgress.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: ['Indeterminate slides, so its indicator\'s position and width are not compared — only its look.'],
   parts: [
-    { figma: '__root__', css: '.linear-progress', label: 'Track', shadow: 'ring' },
-    { figma: 'Progress Indicator', css: '.linear-progress-bar', label: 'Indicator', shadow: 'inset' },
+    // Progress: the track is its own frame with the percentage under it; Indeterminate: the root is the track.
+    { figma: 'ProgressBar', css: '.linear-progress', label: 'Track', shadow: 'ring', when: (v) => v.props.Type === 'Progress' },
+    { figma: '__root__', css: '.linear-progress', label: 'Track', shadow: 'ring', when: (v) => v.props.Type === 'Indeterminate' },
+    { figma: 'Progress Indicator', css: '.linear-progress-bar', label: 'Indicator', shadow: 'inset', when: (v) => v.props.Type === 'Progress' },
+    { figma: 'Progress Indicator', css: '.linear-progress-bar', label: 'Indicator', shadow: 'inset', skip: ['position', 'width'], when: (v) => v.props.Type === 'Indeterminate' },
+    { figma: '48%', css: '.linear-progress-value', label: 'Value', when: (v) => v.props.Type === 'Progress' },
   ],
-  render: () => <LinearProgress value={100 / 1.92} size="large" />,
+  render: (v, booleans) => (
+    <div style={{ width: v.box.w }}>
+      {v.props.Type === 'Indeterminate'
+        ? <LinearProgress size="large" />
+        : <LinearProgress value={48} size="large" showValue={booleans['Progress Text'] ?? true} />}
+    </div>
+  ),
 };
 
 /* Progress Dial: a ring an eighth of the diameter thick — Background with a
