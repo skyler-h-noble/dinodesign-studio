@@ -10,7 +10,8 @@
  * component; text layers are compared on font as well.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
+import { useEffect } from 'react';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -940,6 +941,72 @@ const dividerPill: ParityComponent = {
       </div>
     );
   },
+};
+
+/* An overlay drawn in place. Modal and Dialog are position: fixed over the
+   whole screen; a transformed parent makes fixed children position against
+   IT, so each is centred in its Figma frame instead of the viewport, its
+   backdrop filling only that frame. */
+const OVERLAY_BOX = (w: number, h: number): CSSProperties => ({ width: w, height: h, position: 'relative', transform: 'translateZ(0)' });
+/* Modal locks body scroll while open — undone here so the parity page still scrolls. */
+function UnlockBody() {
+  useEffect(() => { const t = setTimeout(() => { document.body.style.overflow = ''; }, 0); return () => clearTimeout(t); });
+  return null;
+}
+
+/* Modal: Modal-Max wide, Modal-Radius corners with a 1px Background edge,
+   the Dialog & Modal shadow (Level 5, neutral over the scrim), Content at
+   Container-Highest. Header (Modal-Padding all round) holds the title slot and
+   a ghost close Button; the body slot is Sizing-2 x Modal-Padding; the footer
+   slot holds a ButtonGroup. */
+const modal: ParityComponent = {
+  key: 'modal',
+  name: 'Modal',
+  nodeId: '8122:6781',
+  libFile: 'src/components/Modal/Modal.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.modal', label: 'Modal', skip: ['fill', 'border', 'radius (as drawn)'] },
+    { figma: 'Modal Container', css: '.modal', label: 'Frame', skip: ['fill', 'shadow'] },
+    { figma: 'Modal Content', css: '.modal', label: 'Fill', skip: ['border', 'shadow', 'radius (as drawn)', 'position', 'width', 'height'] },
+    { figma: 'Modal Header Content', css: '.modal > :first-child', label: 'Header', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Button', css: '.modal button[aria-label="Close modal"]', label: 'Close', skip: ['fill', 'border', 'shadow'] },
+  ],
+  render: (v, booleans) => (
+    <div style={OVERLAY_BOX(v.box.w, v.box.h)}>
+      <UnlockBody />
+      <Modal open onClose={noop} title="Title" transition="none" showCloseButton={booleans['Close Button'] ?? true}>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+      </Modal>
+    </div>
+  ),
+};
+
+/* Dialog: Dialog-Width wide, Card-Radius corners with a 1px Background edge,
+   the Dialog & Modal shadow, Container-Highest round Container content; one
+   slot padded Card-Padding with the title (Dynamic Subtitle) over the body
+   (Dynamic Body), Sizing-Half apart. */
+const dialog: ParityComponent = {
+  key: 'dialog',
+  name: 'Dialog',
+  nodeId: '8122:6780',
+  libFile: 'src/components/Dialog/Dialog.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: ['The Paper\'s 32px margin is MUI\'s gutter from the viewport, not part of the panel, so the parity render sets it to 0.'],
+  parts: [
+    { figma: '__root__', css: '.MuiDialog-paper', label: 'Dialog', skip: ['fill', 'border', 'radius (as drawn)'] },
+    { figma: 'Theme-Dialog Container', css: '.MuiDialog-paper', label: 'Frame', skip: ['fill', 'shadow'] },
+    { figma: 'Dialog Content', css: '.MuiDialog-paper', label: 'Fill', skip: ['border', 'shadow', 'radius (as drawn)', 'position', 'width', 'height'] },
+    { figma: 'Dialog title', css: '.MuiDialogTitle-root', label: 'Title', skip: ['width', 'height', 'position'] },
+    { figma: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', css: '.MuiDialogContent-root > div', label: 'Body', skip: ['width', 'height', 'position'] },
+  ],
+  render: (v) => (
+    <div style={OVERLAY_BOX(v.box.w, v.box.h)}>
+      <Dialog open title="Dialog title" disablePortal disableScrollLock disableAutoFocus disableEnforceFocus PaperProps={{ sx: { m: 0 } }}>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+      </Dialog>
+    </div>
+  ),
 };
 
 /* Day Cell: one DatePicker day — a 36px cell, Sizing-Quarter round a
@@ -2706,4 +2773,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
