@@ -87,7 +87,7 @@ export const COMPONENT_ELEVATIONS: ComponentElevation[] = [
    * Both then read an existing row rather than getting one of their own, which
    * is the convention already in the file: a ROW is named for its primary
    * component and a STYLE lists every consumer. Hence `Handle, Accordion` the
-   * row against `Accordion, Handle, Alert, Bottom-Sheet` the style, and `FAB`
+   * row against the `Elevations/Level-1` style (Accordion, Handle, Alert, Bottom-Sheet), and `FAB`
    * against `FAB, Snackbar`. Tooltip joins the same way, on the
    * `AppBar, Toolbars, Menus` row.
    *

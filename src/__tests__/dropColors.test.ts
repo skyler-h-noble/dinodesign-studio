@@ -241,7 +241,7 @@ describe('Alert, Snackbar and Speed Dial have no row of their own', () => {
    * their Figma styles bind `Handle, Accordion/Default` and `FAB/Default`.
    * The convention is that a ROW is named for its primary component and a
    * STYLE lists every consumer, which is why the file has `Handle, Accordion`
-   * the row against `Accordion, Handle, Alert, Bottom-Sheet` the style.
+   * the row against the `Elevations/Level-1` style (Accordion, Handle, Alert, Bottom-Sheet).
    *
    * Asserted because the alternative was tried: all three briefly had rows,
    * which would have emitted 60 variables nothing reads. */

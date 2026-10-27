@@ -959,7 +959,7 @@ function UnlockBody() {
 }
 
 /* Modal: Modal-Max wide, Modal-Radius corners with a 1px Background edge,
-   the Dialog & Modal shadow (Level 5, neutral over the scrim), Content at
+   the Elevations/Level-5 shadow (Dialog & Modal) (Level 5, neutral over the scrim), Content at
    Container-Highest. Header (Modal-Padding all round) holds the title slot and
    a ghost close Button; the body slot is Sizing-2 x Modal-Padding; the footer
    slot holds a ButtonGroup. */
@@ -994,7 +994,7 @@ const modal: ParityComponent = {
 };
 
 /* Dialog: Dialog-Width wide, Card-Radius corners with a 1px Background edge,
-   the Dialog & Modal shadow, Container-Highest round Container content; one
+   the Elevations/Level-5 shadow (Dialog & Modal), Container-Highest round Container content; one
    slot padded Card-Padding with the title (Dynamic Subtitle) over the body
    (Dynamic Body), Sizing-Half apart. */
 const dialog: ParityComponent = {
