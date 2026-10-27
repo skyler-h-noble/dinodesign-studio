@@ -903,12 +903,15 @@ const divider: ParityComponent = {
   parts: [
     { figma: '__root__', css: '[role="separator"]', label: 'Rule' },
   ],
-  notes: ['Figma\'s Size axis has only "small"; the thickness follows the Component-Size mode, so code renders size={context size}.'],
+  notes: [
+    'Figma\'s Size axis has only "small"; the thickness follows the Component-Size mode, so code renders size={context size}.',
+    'Color: Default is Border-Variant; Colored is Buttons › Border in the resolved Buttons mode (code: colored + color).',
+  ],
   render: (v, _b, ctx) => {
     const vertical = v.props.Orientation === 'vertical';
     return (
       <div style={{ width: v.box.w, height: v.box.h, display: 'flex', flexDirection: vertical ? 'row' : 'column', justifyContent: 'center' }}>
-        <Divider orientation={vertical ? 'vertical' : 'horizontal'} size={ctx.size} />
+        <Divider orientation={vertical ? 'vertical' : 'horizontal'} size={ctx.size} colored={v.props.Color === 'Colored'} />
       </div>
     );
   },
