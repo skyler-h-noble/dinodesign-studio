@@ -1299,8 +1299,9 @@ const rating: ParityComponent = {
   parts: [
     { figma: '__root__', css: '.rating', label: 'Rating', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: 'Star', css: '.rating-star', all: true, label: 'Star', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'No rating', css: '.rating-empty-label', label: 'No rating', when: (v) => v.props.Value === 'Empty' },
   ],
-  render: () => <Rating value={4} onChange={noop} />,
+  render: (v) => <Rating value={v.props.Value === 'Empty' ? null : 4} onChange={noop} />,
 };
 
 /* RatingField: a Form-Label above or below the Rating, Sizing-Half apart.
