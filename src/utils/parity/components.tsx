@@ -2541,6 +2541,32 @@ const loader: ParityComponent = {
   ),
 };
 
+/* Loader Styles (10553:82): Spinner, Orbit, Bounce, Ripple, Dual Ring, Bars —
+   Multicolor / Single, Position 1–4 the Smart Animate poses. Code animates
+   continuously, so the pieces are never at a pose: the graphic's box and the
+   message are compared, the moving pieces are watched. */
+const LOADER_TYPE: Record<string, string> = { Spinner: 'spinner', Orbit: 'orbit', Bounce: 'bounce', Ripple: 'ripple', 'Dual Ring': 'dual-ring', Bars: 'bars' };
+const loaderStyles: ParityComponent = {
+  key: 'loaderStyles',
+  name: 'Loader Styles',
+  nodeId: '10553:82',
+  libFile: 'src/components/Loader/Loader.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Loader Graphic', css: '.parity-loader-styles .loader-graphic, .parity-loader-styles .loader-ring', label: 'Graphic', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Message', css: '.parity-loader-styles .typography, .parity-loader-styles p', label: 'Message' },
+  ],
+  notes: ['The pieces move continuously in code; Figma draws four poses. Only the graphic\'s box and the message are measured.'],
+  render: (v, b) => (
+    <div className="parity-loader-styles" style={{ width: v.box.w, height: v.box.h }}>
+      <Loader type={LOADER_TYPE[String(v.props.Style)] || 'spinner'} multicolor={v.props.Color === 'Multicolor'}
+        color="default" message={b.Message === false ? '' : 'Loading...'} sx={{ py: 0 }} />
+      {/* A turning box measures larger mid-turn: hold the spinner still to measure it. */}
+      <style>{'.parity-loader-styles .loader-ring{animation:none!important}'}</style>
+    </div>
+  ),
+};
+
 /* Menu Item: the tree row (OmniTreeView's). Toggle chevron, a starting icon,
    a MiniSwatch and the label, a Border-Variant line under it; open shows one
    child row indented to the next Menu-Level. */
@@ -2879,4 +2905,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, popover, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, loaderStyles, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, popover, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
