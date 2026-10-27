@@ -874,7 +874,7 @@ const countStep: ParityComponent = {
     return (
       <div style={{ width: v.box.w, display: 'inline-block' }}>
         <Stepper
-          orientation={right && !bottom ? 'vertical' : 'horizontal'}
+          labelPosition={right && !bottom ? 'right' : 'bottom'}
           activeStep={COUNT_STEP_ACTIVE[String(v.props.Status)]}
           clickable
           onStepClick={noop}
