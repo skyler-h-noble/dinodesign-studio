@@ -965,17 +965,24 @@ const modal: ParityComponent = {
   nodeId: '8122:6781',
   libFile: 'src/components/Modal/Modal.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  notes: [
+    'Code keeps the modal 16px in from the viewport (width: calc(100% - 32px)); that gutter is not part of the panel, so the parity render sets width 100%.',
+    'Figma\'s Modal root carries 1px of padding above and below the frame, so the root\'s height and position are not compared — the Frame\'s are.',
+  ],
   parts: [
-    { figma: '__root__', css: '.modal', label: 'Modal', skip: ['fill', 'border', 'radius (as drawn)'] },
+    { figma: '__root__', css: '.modal', label: 'Modal', skip: ['fill', 'border', 'radius (as drawn)', 'height', 'position'] },
     { figma: 'Modal Container', css: '.modal', label: 'Frame', skip: ['fill', 'shadow'] },
-    { figma: 'Modal Content', css: '.modal', label: 'Fill', skip: ['border', 'shadow', 'radius (as drawn)', 'position', 'width', 'height'] },
-    { figma: 'Modal Header Content', css: '.modal > :first-child', label: 'Header', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Button', css: '.modal button[aria-label="Close modal"]', label: 'Close', skip: ['fill', 'border', 'shadow'] },
+    { figma: 'Modal Content', css: '.modal .modal-content', label: 'Fill', skip: ['border', 'shadow', 'radius (as drawn)', 'position', 'width', 'height'] },
+    { figma: 'Modal Header Content', css: '.modal .modal-header', label: 'Header', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Button', css: '.modal .modal-close', label: 'Close', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Modal Body Content', css: '.modal .modal-body', label: 'Body', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Modal Footer', css: '.modal .modal-footer', label: 'Footer', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
   ],
   render: (v, booleans) => (
     <div style={OVERLAY_BOX(v.box.w, v.box.h)}>
       <UnlockBody />
-      <Modal open onClose={noop} title="Title" transition="none" showCloseButton={booleans['Close Button'] ?? true}>
+      <Modal open onClose={noop} eyebrow="Card title" title="Card title" transition="none" sx={{ width: '100%' }} showCloseButton={booleans['Close Button'] ?? true}
+        actions={<ButtonGroup><Button variant="default">Button</Button><Button variant="default-outline">Button</Button></ButtonGroup>}>
         Lorem ipsum dolor sit amet, consectetur adipiscing elit.
       </Modal>
     </div>
@@ -992,17 +999,21 @@ const dialog: ParityComponent = {
   nodeId: '8122:6780',
   libFile: 'src/components/Dialog/Dialog.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
-  notes: ['The Paper\'s 32px margin is MUI\'s gutter from the viewport, not part of the panel, so the parity render sets it to 0.'],
+  notes: [
+    'The Paper\'s 32px margin and its calc(100% - 64px) width are MUI\'s gutter from the viewport, not part of the panel, so the parity render sets margin 0, width 100% and no max-height. It uses scroll="paper", which centres the panel vertically as Figma\'s frame does (scroll="body" top-aligns it).',
+    'Figma\'s Dialog root carries 1px of padding above and below the frame, so the root\'s height and position are not compared — the Frame\'s are.',
+  ],
   parts: [
-    { figma: '__root__', css: '.MuiDialog-paper', label: 'Dialog', skip: ['fill', 'border', 'radius (as drawn)'] },
+    { figma: '__root__', css: '.MuiDialog-paper', label: 'Dialog', skip: ['fill', 'border', 'radius (as drawn)', 'height', 'position'] },
     { figma: 'Theme-Dialog Container', css: '.MuiDialog-paper', label: 'Frame', skip: ['fill', 'shadow'] },
     { figma: 'Dialog Content', css: '.MuiDialog-paper', label: 'Fill', skip: ['border', 'shadow', 'radius (as drawn)', 'position', 'width', 'height'] },
-    { figma: 'Dialog title', css: '.MuiDialogTitle-root', label: 'Title', skip: ['width', 'height', 'position'] },
-    { figma: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', css: '.MuiDialogContent-root > div', label: 'Body', skip: ['width', 'height', 'position'] },
+    { figma: 'Padded Content', css: '.dialog-content', label: 'Content', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Dialog title', css: '.dialog-title h2', label: 'Title' },
+    { figma: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', css: '.dialog-body .typography, .dialog-body p', label: 'Body' },
   ],
   render: (v) => (
     <div style={OVERLAY_BOX(v.box.w, v.box.h)}>
-      <Dialog open title="Dialog title" disablePortal disableScrollLock disableAutoFocus disableEnforceFocus PaperProps={{ sx: { m: 0 } }}>
+      <Dialog open title="Dialog title" scroll="paper" disablePortal disableScrollLock disableAutoFocus disableEnforceFocus PaperProps={{ sx: { m: 0, width: '100%', maxHeight: 'none' } }}>
         Lorem ipsum dolor sit amet, consectetur adipiscing elit.
       </Dialog>
     </div>
