@@ -510,7 +510,11 @@ const breadcrumbs: ParityComponent = {
     // Condensed: the "…" is a ghost icon Button.
     { figma: 'More', css: '.breadcrumb-ellipsis', label: '… button', skip: ['fill', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Layout === 'Condensed' },
   ],
-  notes: ['Desktop / Mobile follow the Device Type mode; the Mobile layout is backOnlyMobile in the lib and is not compared.'],
+  notes: [
+    'Desktop / Mobile follow the Device Type mode; the Mobile layout is backOnlyMobile in the lib and is not compared.',
+    /* Measured 2026-10-27: Figma 55 / 6 / step 77, browser 54.09 / 5.62 / step 75.71. */
+    'The overlay drifts ~1.3px per crumb (~6.5px by the last): Figma rounds hug-width text UP to whole pixels — "Hotlink" 55 vs 54.09, "/" 6 vs 5.62 in the browser. Each part is within 1px, so it is not reported; it is Figma\'s text rounding, not a code spacing bug.',
+  ],
   render: (v) => (
     <Breadcrumbs size="medium" separator="/" condense={v.props.Layout === 'Condensed'} maxItems={3}>
       {Array.from({ length: 6 }, (_, i) => <BreadcrumbItem key={i} href="#">Hotlink</BreadcrumbItem>)}
