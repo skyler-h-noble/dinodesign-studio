@@ -57,6 +57,44 @@ export const DEVICE_MARGIN: Record<DeviceMode, number> = {
 };
 
 /**
+ * Overlay widths — the file's `Devices-Type::{Default}/Modal Max` and
+ * `Dialog-Small / -Medium / -Large` (Device-Sizes = Default). A modal is 960
+ * on desktop and the screen less its margins on a phone; a dialog is 400 /
+ * 560 / 720 by Component-Size, capped the same way on phones. They reach CSS
+ * as --Modal-Max and --Sm- / -- / --Lg-Dialog-Width (Component-Size › Other ›
+ * Dialog-Width aliases the three sizes), which Modal.js and Dialog.js read.
+ */
+export const DEVICE_MODAL_MAX: Record<DeviceMode, number> = {
+  'Desktop': 960,
+  'IOS-Tablet-Vertical': 720,
+  'IOS-Tablet-Horizontal': 960,
+  'Android-Tablet-Vertical': 720,
+  'Android-Tablet-Horizontal': 960,
+  'IOS-Mobile': 361,
+  'Android-Mobile': 328,
+};
+export const DEVICE_DIALOG_WIDTH: Record<DeviceMode, { small: number; medium: number; large: number }> = {
+  'Desktop':                   { small: 400, medium: 560, large: 720 },
+  'IOS-Tablet-Vertical':       { small: 400, medium: 560, large: 720 },
+  'IOS-Tablet-Horizontal':     { small: 400, medium: 560, large: 720 },
+  'Android-Tablet-Vertical':   { small: 400, medium: 560, large: 720 },
+  'Android-Tablet-Horizontal': { small: 400, medium: 560, large: 720 },
+  'IOS-Mobile':                { small: 361, medium: 361, large: 361 },
+  'Android-Mobile':            { small: 328, medium: 328, large: 328 },
+};
+
+/** The four overlay-width declarations for one device, for foundation.css. */
+export function overlayWidthCSS(device: DeviceMode, indent = '  '): string[] {
+  const d = DEVICE_DIALOG_WIDTH[device];
+  return [
+    `${indent}--Modal-Max: ${DEVICE_MODAL_MAX[device]}px;`,
+    `${indent}--Sm-Dialog-Width: ${d.small}px;`,
+    `${indent}--Dialog-Width: ${d.medium}px;`,
+    `${indent}--Lg-Dialog-Width: ${d.large}px;`,
+  ];
+}
+
+/**
  * Top chrome — status bar plus app bar, as the file already holds it in
  * `Devices-Type::App and Status`.
  *

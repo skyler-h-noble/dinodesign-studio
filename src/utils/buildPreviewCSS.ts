@@ -1,3 +1,4 @@
+import { overlayWidthCSS } from './deviceChrome';
 import chroma from 'chroma-js';
 import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
@@ -2110,6 +2111,7 @@ ${(() => {
   --Sm-Card-Padding: ${r.smCardPadding}px;
   --Lg-Card-Padding: ${r.lgCardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
+${overlayWidthCSS('Desktop').join('\n')}
   --Sm-Modal-Padding: ${r.smModalPadding}px;
   --Lg-Modal-Padding: ${r.lgModalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;

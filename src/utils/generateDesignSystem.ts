@@ -16,7 +16,7 @@ import { generateFigmaJSON } from './generateFigmaJSON';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { typographyDeclarations } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles, SYSTEM_UI_STACK } from './typeScale';
-import { overlayOffsetCSS, DEVICE_MARGIN } from './deviceChrome';
+import { overlayOffsetCSS, overlayWidthCSS, DEVICE_MARGIN } from './deviceChrome';
 import { DEVICE_COLUMNS, DEVICE_GUTTER, gridCSS } from './layoutGrid';
 
 /**
@@ -1273,6 +1273,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
 /* Desktop Defaults */
 :root {
   --Margin: ${DEVICE_MARGIN['Desktop']}px;
+${overlayWidthCSS('Desktop').join('\n')}
   --Columns: ${DEVICE_COLUMNS['Desktop']};
   --Gutter: ${DEVICE_GUTTER['Desktop']}px;
 ${gridCSS('  ').join('\n')}
@@ -1333,6 +1334,7 @@ ${overlayOffsetCSS('Desktop').slice(1).join('\n')}
 /* iOS Mobile */
 [data-device="IOS-Mobile"] {
   --Margin: ${DEVICE_MARGIN['IOS-Mobile']}px;
+${overlayWidthCSS('IOS-Mobile').join('\n')}
   --Columns: ${DEVICE_COLUMNS['IOS-Mobile']};
   --Gutter: ${DEVICE_GUTTER['IOS-Mobile']}px;
   --Container-Padding: var(--Sizing-2);
@@ -1382,6 +1384,7 @@ ${overlayOffsetCSS('IOS-Mobile').join('\n')}
 /* iOS Tablet */
 [data-device="IOS-Tablet"] {
   --Margin: ${DEVICE_MARGIN['IOS-Tablet-Vertical']}px;
+${overlayWidthCSS('IOS-Tablet-Vertical').join('\n')}
   --Columns: ${DEVICE_COLUMNS['IOS-Tablet-Vertical']};
   --Gutter: ${DEVICE_GUTTER['IOS-Tablet-Vertical']}px;
   --Container-Padding: var(--Sizing-3);
@@ -1438,6 +1441,7 @@ ${overlayOffsetCSS('IOS-Tablet').join('\n')}
 /* Android tablet */
 [data-device="Android-Tablet"] {
   --Margin: ${DEVICE_MARGIN['Android-Tablet-Vertical']}px;
+${overlayWidthCSS('Android-Tablet-Vertical').join('\n')}
   --Columns: ${DEVICE_COLUMNS['Android-Tablet-Vertical']};
   --Gutter: ${DEVICE_GUTTER['Android-Tablet-Vertical']}px;
   --Container-Padding: var(--Sizing-2);
@@ -1487,6 +1491,7 @@ ${overlayOffsetCSS('Android-Tablet').join('\n')}
 /* Android phone */
 [data-device="Android-Mobile"] {
   --Margin: ${DEVICE_MARGIN['Android-Mobile']}px;
+${overlayWidthCSS('Android-Mobile').join('\n')}
   --Columns: ${DEVICE_COLUMNS['Android-Mobile']};
   --Gutter: ${DEVICE_GUTTER['Android-Mobile']}px;
   --Container-Padding: var(--Sizing-2);
