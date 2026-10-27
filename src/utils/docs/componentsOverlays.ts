@@ -257,7 +257,7 @@ export const LIST_DOC: ComponentDoc = {
     surfaceToken('--Background', 'the row fill'),
     { name: '--List-Item-Radius', sets: 'row corner', variesWith: 'size mode', figma: 'List-item/List-Item-Radius' },
     { name: '--List-Item-Padding', sets: 'inner padding', variesWith: 'size mode', figma: 'List-item/List-Item-Padding' },
-    { name: '--List-Item-Gap', sets: 'the gap between rows', variesWith: 'size mode', figma: 'List-item/List-Item-Gap' },
+    { name: '--List-Item-Gap', sets: 'the gap inside a row (image, text, decorators)', variesWith: 'size mode', figma: 'List-item/List-Item-Gap' },
     { name: '--List-Item-Focus-Radius', sets: 'the inset focus ring', variesWith: 'size mode', figma: 'List-item/List-Item-Focus-Radius' },
     { name: '--List-Item-Default-Image-Width', sets: 'the thumbnail', variesWith: 'size mode', figma: 'List-item/List-Item-Default-Image-Width' },
   ],
@@ -269,7 +269,7 @@ export const LIST_DOC: ComponentDoc = {
     'Selection announces itself; do not add your own `aria-selected`.',
   ],
   gotchas: [
-    'The row gap is the row padding, by rule: `listItemGap = listItemPadding`. They were both bound to `Sizing-1` in Figma, so they tracked each other by coincidence until the relationship was stated.',
+    '`--List-Item-Gap` is the gap INSIDE a row, 4 / 8 / 12 — not between rows (that is Sizing-1 on a clickable List, 0 on a joined one). It is fixed: the padding follows the corner, the gap does not, or a pill brand spreads a row\'s image and title 30px apart.',
     'The focus ring is inset 2, not 1, because the row draws its own 1px border. Measured from the drawn edge it is the same 1px clear gap every inner ring has.',
   ],
 };

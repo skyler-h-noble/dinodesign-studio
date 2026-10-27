@@ -152,14 +152,14 @@ describe('the Figma payload', () => {
     expect(byMode.large[G + name]).toBe(v);
   });
 
-  it.each(['List-Item-Padding', 'List-Item-Gap'])('%s spreads across the modes', (name) => {
-    /* Figma holds 8 / 12 / 16 here. The studio emitted ONE constant, which
-       componentSizeGroup repeats into all three modes — a legal write that
-       would have flattened the ladder to 8/8/8 and left no trace. */
+  it.each([['List-Item-Padding', [8, 12, 16]], ['List-Item-Gap', [4, 8, 12]]] as const)('%s spreads across the modes', (name, ladder) => {
+    /* The studio once emitted ONE constant, which componentSizeGroup repeats
+       into all three modes — a legal write that flattens the ladder and
+       leaves no trace. */
     const r2 = radiiFor(INPUTS[0]); // square brand: the floor, undisturbed
     const flat = componentSizePayload(r2 as never, {}, {} as never);
     expect([flat.small[G + name], flat.medium[G + name], flat.large[G + name]])
-      .toEqual([8, 12, 16]);
+      .toEqual([...ladder]);
   });
 
   it('spreads the image width across the modes, because it HAS siblings', () => {
@@ -209,29 +209,26 @@ describe('the thumbnail', () => {
   });
 });
 
-describe('the gap between rows', () => {
-  it('equals the padding inside one, by rule and not by coincidence', () => {
-    /* Both were Sizing-1 in Figma, so they moved together — until someone
-       pointed one at another rung. Stated here, the padding is the hinge. */
+describe('the gap inside a row', () => {
+  it('is a fixed 4 / 8 / 12 on every brand — the corner does not move it', () => {
+    /* It used to equal the padding, which follows the corner: a pill brand put
+       30px between a row's image and its title. */
     for (const i of INPUTS) {
       const r = radiiFor(i);
-      expect(r.listItemGap).toBe(r.listItemPadding);
-      expect(r.smListItemGap).toBe(r.smListItemPadding);
-      expect(r.lgListItemGap).toBe(r.lgListItemPadding);
+      expect([r.smListItemGap, r.listItemGap, r.lgListItemGap]).toEqual([4, 8, 12]);
     }
   });
 
-  it('is the SEPARATED value — a joined list is 0, which is not derived', () => {
-    /* `gap: clickable ? var(--Sizing-1) : 0` in the library, and
-       `Type=non-clickable|clickable` in Figma. Zero is the absence of a gap,
-       not a smaller one; deriving it would invent a spacing nobody asked for. */
-    expect(radiiFor(INPUTS[2]).listItemGap).toBeGreaterThan(0);
+  it('stays below the padding on a round brand (the padding still clears the curve)', () => {
+    const r = radiiFor(INPUTS[INPUTS.length - 1]);
+    expect(r.listItemPadding).toBeGreaterThanOrEqual(r.listItemRadius);
+    expect(r.listItemGap).toBeLessThan(r.listItemPadding);
   });
 
   it('reaches Figma under the name the file has', () => {
     const byMode = componentSizePayload(radiiFor(INPUTS[2]) as never, {}, {} as never);
-    expect(byMode.medium).toHaveProperty('List-item/List-Item-Gap');
-    expect(byMode.medium['List-item/List-Item-Gap'])
-      .toBe(byMode.medium['List-item/List-Item-Padding']);
+    expect(byMode.small['List-item/List-Item-Gap']).toBe(4);
+    expect(byMode.medium['List-item/List-Item-Gap']).toBe(8);
+    expect(byMode.large['List-item/List-Item-Gap']).toBe(12);
   });
 });

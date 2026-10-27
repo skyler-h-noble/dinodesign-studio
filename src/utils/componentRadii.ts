@@ -467,28 +467,21 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   const LIST_ITEM_PADDING_FLOOR = { small: 8, medium: 12, large: 16 };
   const padFor = (floor: number, radius: number) => Math.max(floor, radius);
 
-  /* The gap BETWEEN rows equals the padding INSIDE one.
-   *
-   * A clickable list separates its rows so each reads as its own tappable
-   * surface; a non-clickable one keeps them at 0 and joins them with hairlines.
-   * The library already draws exactly that — `gap: clickable ? var(--Sizing-1)
-   * : 0` — and Figma's List has the matching `Type=non-clickable|clickable`.
-   *
-   * Equal, not merely both-8. Today they are both Sizing-1 and so move
-   * together, but only by coincidence: point either at another rung and the
-   * relationship breaks with nothing to catch it. Stated here, the padding is
-   * the hinge and the gap follows by construction.
-   *
-   * The gap is the SEPARATED value. A non-clickable list is 0 and does not read
-   * this — zero is the absence of a gap, not a smaller one, so deriving it
-   * would invent a spacing nobody asked for. */
   const listItemPadding = padFor(LIST_ITEM_PADDING_FLOOR.medium, listItemRadius);
   const smListItemPadding = padFor(LIST_ITEM_PADDING_FLOOR.small, smListItemRadius);
   const lgListItemPadding = padFor(LIST_ITEM_PADDING_FLOOR.large, lgListItemRadius);
 
-  const listItemGap = listItemPadding;
-  const smListItemGap = smListItemPadding;
-  const lgListItemGap = lgListItemPadding;
+  /* The gap INSIDE a row — between the image, the text and the decorators
+   * (Figma's Content frame itemSpacing; ListItem's `gap`). NOT between rows:
+   * that is the List's own Sizing-1 when clickable, 0 when joined.
+   *
+   * A fixed density step, 4 / 8 / 12. It used to equal the padding, which
+   * follows the corner — so a pill brand put 30px between a row's image and
+   * its title. The padding clears the curve; the gap sits mid-row, nowhere
+   * near a corner, so the radius has nothing to say about it. */
+  const listItemGap = 8;
+  const smListItemGap = 4;
+  const lgListItemGap = 12;
 
   /* The ring is inset 2: 1px clear of the drawn edge, plus the row's own 1px
      border. Concentric means the ring's radius drops by the same 2 — the
