@@ -1705,7 +1705,7 @@ const player: ParityComponent = {
   nodeId: '10483:681',
   libFile: 'src/components/Player/Player.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
-  notes: ['Controls = 5 / 3 / 1 is which handlers code gets: onPrevious + onNext at 5, onSkip at 3 and up. Figma\'s Disabled dims the slider thumb only (the Slider set has no disabled track); code disables the whole slider.'],
+  notes: ['Controls = 5 / 3 / 1 is which handlers code gets: onPrevious + onNext at 5, onSkip at 3 and up. Disabled dims the whole slider — track and thumb — to 38% on both sides.'],
   parts: [
     { figma: '__root__', css: '.player', label: 'Player', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
     { figma: 'Slider and Text', css: '.player-scrubber', label: 'Scrubber', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
@@ -2159,7 +2159,7 @@ const link: ParityComponent = {
   ],
   render: (v) => (
     <div className="parity-link">
-      <Link href="#parity" onClick={(e: { preventDefault: () => void }) => e.preventDefault()} disabled={v.props.State === 'Disabled'}>Hotlink</Link>
+      <Link href="#parity" onClick={(e: { preventDefault: () => void }) => e.preventDefault()} disabled={v.props.State === 'Disabled'} visited={v.props.Status === 'Visited'}>Hotlink</Link>
     </div>
   ),
 };
