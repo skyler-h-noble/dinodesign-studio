@@ -917,6 +917,30 @@ const divider: ParityComponent = {
   },
 };
 
+/* Divider-Pill: the text on a Divider (its Pill boolean) — one style,
+   Background fill, an edge in the line's color, Text in Mobile Nav Label
+   Semibold. Alignment is code's textAlign; start / end sit flush. */
+const dividerPill: ParityComponent = {
+  key: 'dividerPill',
+  name: 'Divider-Pill',
+  nodeId: '10472:11709',
+  libFile: 'src/components/Divider/Divider.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Pill', css: '.divider-pill', label: 'Pill' },
+  ],
+  render: (v, _b, ctx) => {
+    const vertical = v.props.Orientation === 'Vertical';
+    const align = ({ Start: 'start', Middle: 'center', End: 'end' } as Record<string, string>)[String(v.props.Alignment)];
+    return (
+      <div style={{ width: v.box.w, height: v.box.h, display: 'flex', flexDirection: vertical ? 'row' : 'column', justifyContent: 'center', alignItems: vertical ? 'center' : undefined }}>
+        <Divider orientation={vertical ? 'vertical' : 'horizontal'} size={ctx.size} indicatorText="Pill" textAlign={align}
+          colored={v.props.Color === 'Colored'} sx={vertical ? { height: v.box.h } : undefined} />
+      </div>
+    );
+  },
+};
+
 /* Day Cell: one DatePicker day — a 36px cell, Sizing-Quarter round a
    Button-Height circle (the frame `Day`; its number is the text `Day`, so
    `Day#2`). The range band is Backfill (range-middle, full width) or the
@@ -2672,4 +2696,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, divider, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
