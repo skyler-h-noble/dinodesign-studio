@@ -762,9 +762,10 @@ const checkbox: ParityComponent = {
     { figma: 'Focus-Visible', css: '.chk-box-icon', outline: true, outer: true, label: 'Focus ring' },
   ],
   // No `variant`: compared against what the lib draws for a caller who passes none.
-  render: (v) => (
+  render: (v, b) => (
     <Checkbox
       className={v.props.State === 'Focus-Visible' ? 'Mui-focusVisible' : undefined}
+      error={!!b.Validation}
       checked={v.props.Checked === 'checked'}
       indeterminate={v.props.Checked === 'indeterminate'}
       disabled={v.props.State === 'Disabled'}
@@ -2312,11 +2313,14 @@ const loader: ParityComponent = {
   libFile: 'src/components/Loader/Loader.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
-    { figma: '__root__', css: '.parity-loader .loader-ring', label: 'Ring', skip: ['fill', 'border', 'radius (as drawn)'] },
+    // The root is the stack now: the ring, then the Message line Sizing-2 under it.
+    { figma: '__root__', css: '.parity-loader > div', label: 'Loader', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Ellipse 1', css: '.parity-loader .loader-ring', label: 'Ring', skip: ['fill', 'border', 'radius (as drawn)'] },
+    { figma: 'Message', css: '.parity-loader .typography, .parity-loader p', label: 'Message' },
   ],
-  render: (v) => (
+  render: (v, b) => (
     <div className="parity-loader" style={{ width: v.box.w, height: v.box.h }}>
-      <Loader message="" sx={{ py: 0 }}
+      <Loader message={b.Message === false ? '' : 'Loading...'} sx={{ py: 0 }}
         style={{ ['--_turn' as string]: (Number(v.props.Position) - 1) * 90 + 'deg' }} />
       <style>{`.parity-loader .loader-ring{animation:none!important;transform:rotate(var(--_turn))}`}</style>
     </div>
