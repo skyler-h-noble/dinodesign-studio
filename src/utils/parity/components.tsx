@@ -2524,21 +2524,29 @@ const navItem: ParityComponent = {
   nodeId: '5670:49999',
   libFile: 'src/components/BottomNavigation/BottomNavigation.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  forcedState: (v) => ({ Hover: 'hover', 'Focus-Visible': 'focus-visible' } as const)[v.props.State as 'Hover'],
+  // Figma's Focus-Visible also fills the circle as Selected does; code keeps the
+  // circle at rest and adds only the ring (see the checklist note), so the
+  // holder's fill is not compared in that state.
   parts: [
     { figma: '__root__', css: '.parity-nav .bottom-nav-item', label: 'Item', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Icon-Holder', css: '.parity-nav .bottom-nav-item > :first-child', label: 'Icon holder' },
+    { figma: 'Icon-Holder', css: '.parity-nav .bottom-nav-item > :first-child', label: 'Icon holder', when: (v) => v.props.State !== 'Focus-Visible' },
+    { figma: 'Icon-Holder', css: '.parity-nav .bottom-nav-item > :first-child', label: 'Icon holder', skip: ['fill'], when: (v) => v.props.State === 'Focus-Visible' },
+    { figma: 'Focus-Visible', css: '.parity-nav .bottom-nav-item > :first-child', outline: true, outer: true, label: 'Focus ring' },
     // Figma's Icon frame has no fill — its colour is on the glyph inside — so only its box is compared.
     { figma: 'Icon', css: '.parity-nav .bottom-nav-item svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Component Name', css: '.parity-nav .bottom-nav-label', label: 'Label' },
+    { figma: 'Component Name', css: '.parity-nav .bottom-nav-label', label: 'Label', when: (v) => v.props.State !== 'Focus-Visible' },
+    { figma: 'Component Name', css: '.parity-nav .bottom-nav-label', label: 'Label', skip: ['text color'], when: (v) => v.props.State === 'Focus-Visible' },
   ],
-  render: (v) => (
+  render: (v, booleans) => (
     <div className="parity-nav" style={{ width: v.box.w, height: v.box.h }}>
       {/* In Figma's zone (Default / Surface): the bar would otherwise put the
           item in its own Nav-Bar theme, which Figma's lone item is not in. */}
-      <BottomNavigation fixed={false} items={[{ label: 'Home', icon: <HomeIcon /> }]}
+      <BottomNavigation fixed={false} items={[{ label: 'Home', icon: <HomeIcon />, disabled: v.props.State === 'Disabled' }]}
+        showLabels={booleans['Show Labels'] ?? true}
         data-theme="Default" data-surface="Surface"
         value={v.props.State === 'Selected' ? 0 : -1} aria-label="Navigation"
-        sx={{ p: 0, m: 0, width: 'auto', minHeight: 0, display: 'inline-flex', background: 'transparent', boxShadow: 'none', border: 'none' }} />
+        sx={{ p: 0, m: 0, width: 'auto', minHeight: 0, height: 'auto', display: 'inline-flex', background: 'transparent', boxShadow: 'none', border: 'none' }} />
     </div>
   ),
 };
