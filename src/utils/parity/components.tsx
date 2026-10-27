@@ -827,7 +827,7 @@ const chip: ParityComponent = {
     { figma: 'Component Name', css: '.MuiChip-label .chip-parity-label', label: 'Label' },
   ],
   render: (v, booleans) => {
-    const avatar = <Avatar alt="" />;
+    const avatar = <Avatar alt="" defaultPhoto />;  // Figma's chip avatar is Style=Photo; a bare Avatar is the glyph (an svg the Icon part would match)
     const icon = <HomeIcon />;
     const start = (booleans['Start-Avatar'] ?? true) ? avatar : booleans['Start-Icon'] ? icon : undefined;
     const end = (booleans['End-Icon'] ?? true) ? icon : booleans['End-Avatar'] ? avatar : undefined;
@@ -841,6 +841,7 @@ const chip: ParityComponent = {
         onClick={noop}
         startDecorator={start}
         endDecorator={end}
+        onDelete={booleans['Deletable'] ? noop : undefined}
         label={<span className="chip-parity-label">Button</span>}
       />
     );
