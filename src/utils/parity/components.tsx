@@ -498,18 +498,20 @@ const box: ParityComponent = {
 const breadcrumbs: ParityComponent = {
   key: 'breadcrumbs',
   name: 'Breadcrumbs',
-  nodeId: '8424:36170',
+  nodeId: '10464:87',
   libFile: 'src/components/Breadcrumbs/Breadcrumbs.js',
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: 'Desktop', css: '.breadcrumbs-list', label: 'Trail' },
     // The building blocks are private now: a leading "." on both names.
-    { figma: '.Breadcrumb-Segments', css: '.breadcrumb-item', label: 'Crumb', all: true },
+    { figma: '.Breadcrumb-Segments', css: '.breadcrumb-item:not(:has(.breadcrumb-ellipsis))', label: 'Crumb', all: true },
     { figma: '.Breadcrumbs-separator', css: '.breadcrumb-separator', label: 'Separator', all: true },
+    // Condensed: the "…" is a ghost icon Button.
+    { figma: 'More', css: '.breadcrumb-ellipsis', label: '… button', skip: ['fill', 'shadow', 'radius (as drawn)'], when: (v) => v.props.Layout === 'Condensed' },
   ],
-  notes: ['The hidden Mobile layout is backOnlyMobile in the lib and is not compared.'],
-  render: () => (
-    <Breadcrumbs size="medium" separator="/">
+  notes: ['Desktop / Mobile follow the Device Type mode; the Mobile layout is backOnlyMobile in the lib and is not compared.'],
+  render: (v) => (
+    <Breadcrumbs size="medium" separator="/" condense={v.props.Layout === 'Condensed'} maxItems={3}>
       {Array.from({ length: 6 }, (_, i) => <BreadcrumbItem key={i} href="#">Hotlink</BreadcrumbItem>)}
       <BreadcrumbItem>Hotlink</BreadcrumbItem>
     </Breadcrumbs>
