@@ -11,7 +11,7 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, Pagination, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -1155,6 +1155,34 @@ const fieldButton: ParityComponent = {
    Unselected pages are ghost (Outline-Quiet at rest, Outline-Text engaged);
    the current page is the selected outline button. Rendered with the props
    Pagination.js gives a page button. */
+/* Pagination Strip: the full pagination for 10 pages (one sibling, one
+   boundary) — Ellipsis = None (7 pages), End (on page 1), Both (on 5), Start
+   (on 10), as code lays it out. First and Last shows the double arrows. Every
+   arrow and unselected page is a ghost; the gap is the Pagination Ellipsis
+   cell. */
+const PAGINATION_LAYOUT: Record<string, { count: number; page: number }> = {
+  None: { count: 7, page: 1 }, End: { count: 10, page: 1 }, Both: { count: 10, page: 5 }, Start: { count: 10, page: 10 },
+};
+const paginationStrip: ParityComponent = {
+  key: 'paginationStrip',
+  name: 'Pagination Strip',
+  nodeId: '10506:453',
+  libFile: 'src/components/Pagination/Pagination.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: '__root__', css: '.pagination ul', label: 'Strip', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // A disabled Button dims a layer INSIDE its instance, so the instance's own opacity reads 1.
+    { figma: 'Previous', css: '.pagination button[aria-label="Go to previous page"]', label: 'Previous', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'opacity'] },
+    { figma: 'Next', css: '.pagination button[aria-label="Go to next page"]', label: 'Next', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'opacity'] },
+    { figma: 'Ellipsis', css: '.pagination .pagination-ellipsis', all: true, label: 'Ellipsis', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  render: (v, booleans) => {
+    const l = PAGINATION_LAYOUT[String(v.props.Ellipsis)] || PAGINATION_LAYOUT.End;
+    const fl = booleans['First and Last'] ?? true;
+    return <Pagination count={l.count} page={l.page} onChange={noop} showFirstButton={fl} showLastButton={fl} />;
+  },
+};
+
 const paginationNumber: ParityComponent = {
   key: 'paginationNumber',
   name: 'Pagination Number',
@@ -2804,4 +2832,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
