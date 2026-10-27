@@ -243,6 +243,7 @@ declare module '@omni-design/components' {
   export const Slider: FC<any>;
   export const Table: FC<any>;
   export const Tooltip: FC<any>;
+  export const Popover: FC<any>;
 
   // App Structure
   export const AppBar: FC<any>;

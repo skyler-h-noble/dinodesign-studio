@@ -11,7 +11,7 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, Pagination, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, Pagination, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup, Popover } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -1825,6 +1825,41 @@ const tooltip: ParityComponent = {
   },
 };
 
+/* Popover: the floating panel (Figma 10430:9244) — a Background panel with a
+   1px Border edge at Dropdown-Frame-Radius, an arrow holder above or below,
+   and a Content slot. Rendered in place (disablePortal): the portal and the
+   anchor maths are positioning, which is not what this compares. The panel
+   sits where Figma puts it — 7px down under a bottom arrow, at the top above
+   a top one. */
+const popover: ParityComponent = {
+  key: 'popover',
+  name: 'Popover',
+  nodeId: '10430:9244',
+  libFile: 'src/components/Popover/Popover.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'medium' },
+  parts: [
+    { figma: 'Panel', css: '.popover', label: 'Panel', skip: ['shadow'] },
+    { figma: 'Content', css: '.popover .popover-body', label: 'Content', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Arrow', css: '.popover .popover-arrow', label: 'Arrow', skip: ['shadow', 'radius (as drawn)'] },
+  ],
+  /* The arrow draws only its two outward edges; the other two sit inside the
+     panel. On a top arrow the edge the report reads (border-top) is one of the
+     hidden pair, so it reads none where Figma strokes the whole square. */
+  intended: (v, prop) => String(v.props.Placement).startsWith('Top') && prop === 'border',
+  notes: ['A top arrow\'s border reads none: its top and left edges are hidden inside the panel by design.'],
+  render: (v) => {
+    const placement = String(v.props.Placement).toLowerCase().replace('-center', '');
+    const top = placement.startsWith('top');
+    return (
+      <div style={{ position: 'relative', width: v.box.w, height: v.box.h, paddingTop: top ? 0 : 7, boxSizing: 'border-box' }}>
+        <Popover open disablePortal arrow placement={placement} width={v.box.w} aria-label="Popover">
+          <div style={{ height: 64 }} />
+        </Popover>
+      </div>
+    );
+  },
+};
+
 /* TreeView: a Background panel, 8px padding, 4px corners, holding Menu Item
    rows at levels 0-4 (the first selected). Code nests one row in the next and
    expands them all so the five levels show; Figma draws every row closed, so
@@ -2832,4 +2867,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loader, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, popover, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
