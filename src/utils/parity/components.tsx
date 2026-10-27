@@ -1391,10 +1391,14 @@ const switchParity: ParityComponent = {
     { figma: 'Switch-Body', css: '.MuiSwitch-track', label: 'Track', shadow: 'outer' },
     { figma: 'Dot', css: '.MuiSwitch-thumb', label: 'Handle', skip: ['shadow'] },
     { figma: 'Focus-Visible', css: '.MuiSwitch-track', outline: true, outer: true, label: 'Focus ring' },
+    // Figma's Icon boolean (on): check when On, close when Off, in the dot.
+    // Its color is on the glyph inside the instance, so only the box compares.
+    { figma: 'Icon', css: '.MuiSwitch-thumb svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
   ],
-  render: (v) => (
+  render: (v, b) => (
     <div ref={(el) => { if (el && v.props.State === 'Focus-Visible') el.querySelector('.MuiSwitch-switchBase')?.classList.add('Mui-focusVisible'); }}>
-      <SwitchInput checked={v.props.Status === 'On'} disabled={v.props.State === 'Disabled'} onChange={noop} aria-label="Switch" />
+      <SwitchInput checked={v.props.Status === 'On'} disabled={v.props.State === 'Disabled'} onChange={noop} aria-label="Switch"
+        icon={b.Icon === false ? false : undefined} />
     </div>
   ),
 };
