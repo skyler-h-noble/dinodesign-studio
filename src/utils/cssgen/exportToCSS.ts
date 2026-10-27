@@ -13,6 +13,7 @@ import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
 import { chartColorVisionCSS } from '../chartColorVision';
 import { compositeOver, solveQuietOpacities, QUIET_PALETTES } from '../quietOpacity';
+import { withButtonsMatchCSS } from '../buttonsMatch';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS, FAB_SIZE } from '../componentSize';
 import { fabBevelVars } from '../bevelGeometry';
@@ -2065,7 +2066,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   ].join('\n'));
 
   console.log(`  └─ Total theme sections generated: ${sections.length}`);
-  const result = sections.join('\n');
+  // Buttons › Match: each block aliases its own theme's palette (buttonsMatch.ts).
+  const result = withButtonsMatchCSS(sections.join('\n'));
   console.log(`      Result length: ${result.length} characters`);
   
   return result;

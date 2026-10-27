@@ -97,6 +97,7 @@ const THEMES: string[] = [...THEME_MODES];
  */
 import { solveChartPalette } from './chartPalette';
 import { solveQuietOpacities } from './quietOpacity';
+import { addButtonsMatchToThemes } from './buttonsMatch';
 
 export function themeOrder(defaultTheme?: string): string[] {
   const rest = THEMES.filter((t) => t !== 'Default');
@@ -689,7 +690,11 @@ export function generateFigmaJSON(
     if (!modeData) continue;
 
     const colors = modeData.Colors;
-    const themes = modeData.Themes;
+    /* A COPY, with Buttons/Match added (the theme's own palette per level —
+       see buttonsMatch.ts). Copied so the shared designSystemJSON the CSS
+       export also reads is not mutated under it. */
+    const themes = modeData.Themes ? JSON.parse(JSON.stringify(modeData.Themes)) : modeData.Themes;
+    addButtonsMatchToThemes(themes);
     const lookup = buildTokenLookup(modeData);
 
     // ── Modes section — export ALL computed groups ──

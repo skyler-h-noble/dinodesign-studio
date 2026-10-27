@@ -1,4 +1,5 @@
 import { overlayWidthCSS } from './deviceChrome';
+import { withButtonsMatchCSS } from './buttonsMatch';
 import chroma from 'chroma-js';
 import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
@@ -464,7 +465,8 @@ function finalizePreviewCSS(css: string): string {
   /* Appended at the single exit point both return paths funnel through, and
      emitted by exportToCSS from the same helper, so the studio and the
      published bundle cannot disagree (invariant 5). */
-  return `${withOutlineQuiet(css)}\n\n${libRadiusOverrideCSS()}\n`;
+  // Buttons › Match, by the same helper as the export (buttonsMatch.ts).
+  return `${withButtonsMatchCSS(withOutlineQuiet(css))}\n\n${libRadiusOverrideCSS()}\n`;
 }
 
 /* The outline / ghost button label pair, for every palette, in every scope
