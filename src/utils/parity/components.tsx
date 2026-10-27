@@ -2661,12 +2661,14 @@ const numberField: ParityComponent = {
     { figma: 'Form-Label', css: '.parity-number-field .form-label-row', label: 'Label row', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'width'],
       when: (v) => v.props.Label === 'label-top' || v.props.Label === 'label-left' },
     { figma: 'Number', css: '.parity-number-field .numberfield-row', label: 'Number', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Input Help Text', css: '.parity-number-field .form-helper-text, .parity-number-field .MuiFormHelperText-root', label: 'Helper text' },
   ],
-  render: (v) => {
+  render: (v, booleans) => {
     const pos = String(v.props.Label);
     return (
       <div className="parity-number-field" style={{ width: v.box.w }}>
         <NumberField defaultValue={1} fullWidth label="Label" aria-label="Quantity"
+          helperText={(booleans['Helper Text'] ?? true) ? 'Input Help Text' : undefined}
           labelPosition={pos === 'label-top' ? 'top' : pos === 'label-left' ? 'left' : pos === 'floating' ? 'floating' : 'none'} />
       </div>
     );
