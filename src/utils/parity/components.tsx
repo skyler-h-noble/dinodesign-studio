@@ -1626,18 +1626,26 @@ const tabs: ParityComponent = {
   context: { theme: 'Default', surface: 'Surface', size: 'medium' },
   parts: [
     { figma: '__root__', css: '.tab-list', label: 'Tabs', skip: ['border', 'shadow', 'radius (as drawn)'] },
-    { figma: 'Tab', css: '.tab', all: true, label: 'Tab', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    { figma: 'Tab', css: '.tab:not(.tab-overflowed)', all: true, label: 'Tab', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+    // Overflow: the scroll arrows and the … are ghost icon-only Buttons. A
+    // scroll-back arrow at the start is disabled in code (nowhere to go).
+    { figma: 'Button', css: '.tab-list-scroll-btn, .tab-list-more-btn', all: true, label: 'Arrow / More', skip: ['fill', 'border', 'shadow', 'radius (as drawn)', 'opacity'] },
   ],
   render: (v) => {
     const o = String(v.props.Orientation).toLowerCase();
+    const overflow = String(v.props.Overflow ?? v.props.overflow ?? 'none').toLowerCase();
+    // More needs something to fold: a fourth tab that does not fit beside the three.
+    const count = overflow === 'more' ? 4 : 3;
     return (
-      <Tabs orientation={o} value={-1} onChange={noop}>
-        <TabList aria-label="Tabs">
-          {[0, 1, 2].map((i) => (
-            <Tab key={i} value={i} startDecorator={<Avatar alt="" size="small" />} endDecorator={<HomeIcon />}>Button</Tab>
-          ))}
-        </TabList>
-      </Tabs>
+      <div style={{ width: v.box.w, height: v.box.h }}>
+        <Tabs orientation={o} value={-1} onChange={noop} overflow={overflow}>
+          <TabList aria-label="Tabs" sx={o === 'horizontal' ? {} : { height: v.box.h }}>
+            {Array.from({ length: count }, (_, i) => (
+              <Tab key={i} value={i} startDecorator={<Avatar alt="" size="small" />} endDecorator={<HomeIcon />}>Button</Tab>
+            ))}
+          </TabList>
+        </Tabs>
+      </div>
     );
   },
 };
