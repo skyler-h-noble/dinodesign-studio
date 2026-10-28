@@ -96,6 +96,13 @@ declare module '@omni-design/components' {
      Input here let `import { Input }` typecheck and then crash the page at
      runtime — a shim promising an export the package lacks. */
   export const Select: FC<any>;
+  export const Shape: FC<any>;
+  export const ShapeButton: FC<any>;
+  export const Quote: FC<any>;
+  export function shapeOptions(names: string[], opts?: { extra?: Array<{ value: string; label: string }>; size?: number; color?: string }): any[];
+  export const SHAPE_NAMES: string[];
+  export const MORPHABLE_SHAPES: string[];
+  export const ICON_SHAPES: string[];
   export const Autocomplete: FC<any>;
   export const Checkbox: FC<any>;
   export const CheckboxGroup: FC<any>;

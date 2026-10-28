@@ -52,6 +52,9 @@ export const ADD_ONS: AddOn[] = [
   // menu button, rail, bottom bar, account menu — as one component whose parts
   // switch per breakpoint (see /add-ons/nav).
   { slug: 'adaptive-nav',      title: 'Adaptive Nav',                 description: 'Your app\u2019s navigation at every width — app bar, tabs or menu button, rail, bottom bar and account menu, switching per breakpoint in your brand.', priceUsdCents: 500, available: false },
+  // Generator: a ShapeButton's two shapes and when it morphs, as code and the
+  // Figma steps (see /add-ons/morph-button).
+  { slug: 'morph-button',      title: 'Morph Button',                 description: 'A button on one of your shapes that turns into another on hover, on press or while it is on — as code, and set up in Figma with Smart Animate.', priceUsdCents: 500, available: false },
   { slug: 'charts',            title: 'Charts',                       description: 'Bar, 3D bar and line charts in your brand — copy the code, or build the same chart in Figma from your components.', priceUsdCents: 500, available: false },
 ];
 

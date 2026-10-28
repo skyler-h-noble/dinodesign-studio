@@ -60,6 +60,7 @@ import ChartsAddOnPage from './components/ChartsAddOnPage';
 import HeroAddOnPage from './components/HeroAddOnPage';
 import BrandAddOnPage from './components/BrandAddOnPage';
 import BentoAddOnPage from './components/BentoAddOnPage';
+import MorphButtonAddOnPage from './components/MorphButtonAddOnPage';
 
 /**
  * Re-map a scheme's tone palettes onto a new role order.
@@ -1149,6 +1150,8 @@ function App() {
         <Route path="/add-ons/share" element={<HeroAddOnPage variant="share" key="share" />} />
         <Route path="/add-ons/share/:uuid" element={<HeroAddOnPage variant="share" key="share" />} />
         <Route path="/add-ons/bento" element={<BentoAddOnPage />} />
+        <Route path="/add-ons/morph-button" element={<MorphButtonAddOnPage />} />
+        <Route path="/add-ons/morph-button/:uuid" element={<MorphButtonAddOnPage />} />
         <Route path="/add-ons/bento/:uuid" element={<BentoAddOnPage />} />
       </Routes>
     </BrowserRouter>
