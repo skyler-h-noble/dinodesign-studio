@@ -1798,8 +1798,8 @@ export default function NavDesignerPage() {
                   <Body>
                     In Figma, open the Omni Design plugin, open the Add-ons tab, choose
                     Adaptive Nav and paste this spec. It builds the nav as one component and
-                    creates its conditions as variables with a mode per breakpoint — so
-                    switching the mode shows the nav at that width.
+                    writes which parts show on each device into Devices-Type — so the nav
+                    switches with the frame's device, the same way a Bento reflows.
                   </Body>
                   <Body color="quiet">
                     Every value is a variable NAME, so it binds to each design system rather
