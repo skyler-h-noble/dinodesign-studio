@@ -11,7 +11,7 @@ import { useParams } from 'react-router';
 import {
   Body, BodySmall, Caption, H3, VStack, HStack, Card, Alert, Button, Tabs, TabList, Tab, TabPanel,
   CodeBlock, TextArea, TextField, Select, ToggleButtonGroup, Link, ShapeButton, shapeOptions,
-  MORPHABLE_SHAPES, AVATAR_SHAPES, OmniDesignProvider,
+  MORPHABLE_SHAPES, AVATAR_SHAPES, MORPH_TARGET_SHAPES, OmniDesignProvider,
 } from '@omni-design/components';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import StarIcon from '@mui/icons-material/Star';
@@ -107,9 +107,9 @@ export default function MorphButtonAddOnPage() {
               <Card padding="medium">
                 <VStack spacing={2.5}>
                   <Select label="Shape" fullWidth value={st.shape} onChange={(v: string) => set('shape', v)} options={shapeOptions(MORPH_PAIR_SHAPES)} />
-                  <Select label="Morphs to" fullWidth value={st.morphTo} onChange={(v: string) => set('morphTo', v)} options={shapeOptions(MORPH_PAIR_SHAPES)} />
+                  <Select label="Morphs to" fullWidth value={st.morphTo} onChange={(v: string) => set('morphTo', v)} options={shapeOptions(MORPH_TARGET_SHAPES)} />
                   <Caption color="quiet">
-                    The button shapes that share an outline — circle, the cookies, flower and puffy — so one turns into the other smoothly, in code and with Smart Animate in Figma.
+                    It rests as a calm shape and can morph into a livelier one — a sunny, a clover, a soft burst. Every pair here shares an outline, so it turns smoothly, in code and with Smart Animate in Figma.
                   </Caption>
                   <VStack spacing={1}>
                     <BodySmall>When it morphs</BodySmall>
