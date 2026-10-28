@@ -20,6 +20,7 @@ import AddOnTopNav from './addOns/AddOnTopNav';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
 import { encodeNavState, readNavState, NAV_SHARE_VERSION } from '../utils/addOns/navShare';
+import { adaptiveNavDefinition, arrangementRows, ARRANGEMENT_CONDITIONS } from '../utils/addOns/adaptiveNav';
 import {
   Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
@@ -268,6 +269,12 @@ export default function NavDesignerPage() {
        variable imports unbound and silently looks like a design decision. */
     return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
   }, [options, mobile, onMobile]);
+
+  /* The nav across EVERY width: both arrangements under one root, switched by
+     Adaptive-Nav/Desktop and /Mobile per breakpoint. This is what is
+     published, matrixed and previewed; `definition` above stays the
+     arrangement being edited at this breakpoint, for the controls. */
+  const combined = useMemo(() => adaptiveNavDefinition(options, mobile), [options, mobile]);
 
   /* What the nav occupies, so the page can keep clear of it. Derived from the
      definition rather than measured, so it follows the arrangement and the
@@ -794,7 +801,7 @@ export default function NavDesignerPage() {
     /* Only what THIS arrangement gates on. Completing over every declared
        condition put a Show-Rail switch on a layout with no rail — and worse,
        switched ON, saying a part exists when it does not. */
-    const names = conditionsUsedBy(definition);
+    const names = conditionsUsedBy(combined);
     /* Seeded from the bar's own CONTENT, not from the width alone. Four long
        labels beside a search field and two actions overlap at 900 where four
        short ones fit comfortably — same breakpoint, different answer — so the
@@ -811,9 +818,12 @@ export default function NavDesignerPage() {
         size: componentSize,
       }, available);
     });
-    return completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true);
-  }, [definition, matrix, sorted, tabs, actions, options.actions, options.search,
-      options.avatar, options.layout, componentSize]);
+    /* Desktop / Mobile come from the arrangement chosen per breakpoint (forced
+       below 600), never from the matrix — they are written over it. */
+    return { ...completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true),
+      ...arrangementRows(sorted, bottomBarAt) };
+  }, [combined, matrix, sorted, tabs, actions, options.actions, options.search,
+      options.avatar, options.layout, componentSize, bottomBarAt]);
 
   const matrixActive = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
 
@@ -849,8 +859,8 @@ export default function NavDesignerPage() {
      about what that variable holds at each width leaves every decision made
      here unrecorded, while looking correct because the binding is present. */
   const fullSpec = useMemo(
-    () => toAddonSpec(definition, { breakpoints: sorted, matrix: full }),
-    [definition, sorted, full],
+    () => toAddonSpec(combined, { breakpoints: sorted, matrix: full }),
+    [combined, sorted, full],
   );
   /* Writes one cell, at this breakpoint, honouring exclusivity.
      
@@ -950,8 +960,9 @@ export default function NavDesignerPage() {
           <VStack gap="var(--Sizing-1)">
             <H1>Adaptive Nav</H1>
             <Body color="quiet">
-              One component, one variant per layout. Which parts appear at which
-              width is a mode, not a variant — so this is three specs, not nine.
+              One component for every width. The desktop and phone arrangements sit in
+              the same spec, and which one shows — and which parts of it — is decided
+              per breakpoint, not by a variant.
             </Body>
           </VStack>
 
@@ -1629,6 +1640,8 @@ export default function NavDesignerPage() {
                      Scrolled have their own one-value controls under the sizes;
                      the account menu opens from the avatar. */
                   .filter((n) => definition.conditions?.[n]?.trigger === 'device')
+                  // The arrangement is chosen with the layout cards, not a switch.
+                  .filter((n) => !(n in ARRANGEMENT_CONDITIONS))
                   .map((name) => (
                     <SwitchInput
                       key={name}
@@ -1838,7 +1851,7 @@ export default function NavDesignerPage() {
                       page either side of a floating colored strip; passed in,
                       each band paints edge to edge and only its content caps. */}
                   <DefinitionRenderer
-                    definition={definition}
+                    definition={combined}
                     conditions={active}
                     slots={slotContent}
                     contentMaxWidth={current?.maxWidth}
