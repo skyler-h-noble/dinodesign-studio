@@ -2505,7 +2505,9 @@ const FIGMA_LG_BUTTON_PADDING = 16;
     };
 
     figma['Component-Size'] = componentSizePayload(
-      r as never, { ...buttonFigmaMetrics, ...buttonExtras, ...fieldButtonFlat() }, inputExtras);
+      r as never, { ...buttonFigmaMetrics, ...buttonExtras, ...fieldButtonFlat() }, inputExtras,
+      // App-Bar-Height = each size's button height + 2 × Sizing-2.
+      { small: cs.smallButtonHeight, medium: cs.buttonHeight, large: cs.largeButtonHeight },);
 
     /* Every column of the Devices-Type button variables that
        Component-Size/Button/Button-Height and -Icon alias into.

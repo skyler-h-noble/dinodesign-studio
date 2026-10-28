@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  NAV_METRICS, navMetricsFlat, navMetricsCSS,
+  NAV_METRICS, navMetricsFlat, navMetricsCSS, appBarHeight,
   componentSizeGroup, componentSizeNames, DISABLED_OPACITY,
 } from '../utils/componentSize';
 
@@ -45,8 +45,8 @@ describe('one table, three targets', () => {
 
   it('hyphenates the space for CSS, because a property cannot hold one', () => {
     const css = navMetricsCSS('').join('\n');
-    expect(css).toContain('--App-Bar-Height: 64px;');
-    expect(css).not.toContain('--App-Bar Height');
+    expect(css).toContain('--Nav-Bar-Height: 83px;');
+    expect(css).not.toContain('--Nav-Bar Height');
   });
 
   it('the CSS and the Figma payload carry the same numbers', () => {
@@ -56,6 +56,7 @@ describe('one table, three targets', () => {
     const payload = componentSizeGroup('Other', navMetricsFlat());
     const css = navMetricsCSS('').join('\n');
     for (const [name, byMode] of Object.entries(NAV_METRICS)) {
+      if (name === 'App-Bar-Height') continue; // derived — its own block below
       const prop = name.replace(/ /g, '-');
       expect(payload.medium[`Other/${name}`], name).toBe(byMode.medium);
       expect(payload.small[`Other/${name}`], name).toBe(byMode.small);
@@ -109,5 +110,26 @@ describe('one disabled opacity, not ten', () => {
     // not readable; 0.6 does not read as disabled.
     expect(DISABLED_OPACITY).toBeGreaterThanOrEqual(0.3);
     expect(DISABLED_OPACITY).toBeLessThanOrEqual(0.5);
+  });
+});
+
+describe('the app bar holds its size\'s buttons and tabs', () => {
+  /* App-Bar-Height = that size's Button-Height + 16 above and below. Large was
+     a typed 72, which left a 56px button 8px each side and could not hold a
+     brand's taller one at all. */
+  it('Figma: each size is its button height + 32, from the brand\'s heights', () => {
+    const payload = componentSizeGroup('Other', navMetricsFlat({ small: 24, medium: 32, large: 56 }));
+    expect([payload.small['Other/App-Bar-Height'], payload.medium['Other/App-Bar-Height'], payload.large['Other/App-Bar-Height']]).toEqual([56, 64, 88]);
+    const tall = componentSizeGroup('Other', navMetricsFlat({ small: 32, medium: 40, large: 64 }));
+    expect(tall.large['Other/App-Bar-Height']).toBe(96);
+  });
+  it('CSS: a calc() of the live button height, so the device can move it', () => {
+    const css = navMetricsCSS('').join('\n');
+    expect(css).toContain('--App-Bar-Height: calc(var(--Button-Height) + 2 * var(--Sizing-2, 16px));');
+    expect(css).toContain('--Sm-App-Bar-Height: calc(var(--Sm-Button-Height) + 2 * var(--Sizing-2, 16px));');
+    expect(css).toContain('--Lg-App-Bar-Height: calc(var(--Lg-Button-Height) + 2 * var(--Sizing-2, 16px));');
+  });
+  it('the defaults agree with the rule at the default buttons', () => {
+    expect(NAV_METRICS['App-Bar-Height']).toEqual({ small: appBarHeight(24), medium: appBarHeight(32), large: appBarHeight(56) });
   });
 });

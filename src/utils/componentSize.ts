@@ -285,7 +285,12 @@ export const NAV_METRICS = {
      All three modes stay, so layers bound at small or large keep their
      binding — they just read 80 now. */
   'Rail-Width': { medium: 80, small: 80, large: 80 },
-  'App-Bar-Height': { medium: 64, small: 56, large: 72 },
+  /* App-Bar-Height is DERIVED: the size's Button-Height + 16 above and below
+     (Sizing-2), so a bar always holds that size's buttons and tabs (a tab is a
+     button's height). These are the values at the default buttons (24 / 32 /
+     56); the brand's own heights replace them — see appBarHeight(). Large was
+     a typed 72, which left a 56px button 8px each side. */
+  'App-Bar-Height': { medium: 64, small: 56, large: 88 },
   /* The bottom bar. 83 at medium is the design's own figure (Nav-Bar
      7442:31305, 398x83); the other two follow App-Bar-Height's proportions
      rather than being measured, because the design has no small or large
@@ -686,8 +691,16 @@ function flattenByMode(
   return out;
 }
 
-export function navMetricsFlat(): Record<string, number> {
-  return flattenByMode(NAV_METRICS as never);
+/** Space above and below a control in the app bar: Sizing-2. */
+export const APP_BAR_PAD = 16;
+export const appBarHeight = (buttonHeight: number) => buttonHeight + 2 * APP_BAR_PAD;
+
+/** Figma's Other group. Given the brand's three button heights, App-Bar-Height
+ *  follows them; without, the defaults in NAV_METRICS. */
+export function navMetricsFlat(h?: { small: number; medium: number; large: number }): Record<string, number> {
+  const table: any = { ...NAV_METRICS };
+  if (h) table['App-Bar-Height'] = { small: appBarHeight(h.small), medium: appBarHeight(h.medium), large: appBarHeight(h.large) };
+  return flattenByMode(table as never);
 }
 
 export function lineMetricsFlat(): Record<string, number> {
@@ -790,7 +803,14 @@ export function lineMetricsVars(): Record<string, string> {
 
 /** The nav chrome as a record — the form App.tsx spreads into inline style. */
 export function navMetricsVars(): Record<string, string> {
-  return metricsVars(NAV_METRICS as never, NAV_METRIC_CSS);
+  const out = metricsVars(NAV_METRICS as never, NAV_METRIC_CSS);
+  /* App-Bar-Height is a calc() of the live button height, so it follows the
+     brand AND the device (iOS / Android buttons are taller) — the same move
+     the NumberField's height makes. Figma gets the number. */
+  for (const [p, h] of [['', 'Button-Height'], ['Sm-', 'Sm-Button-Height'], ['Lg-', 'Lg-Button-Height']] as const) {
+    out[`--${p}App-Bar-Height`] = `calc(var(--${h}) + 2 * var(--Sizing-2, ${APP_BAR_PAD}px))`;
+  }
+  return out;
 }
 
 /** Radio and Checkbox as CSS custom properties.
@@ -961,6 +981,8 @@ export function componentSizePayload(
    * Lg-Name bag; Input has no such bag, hence this parameter.
    */
   inputExtras: Record<string, number> = {},
+  /** The brand's three button heights — App-Bar-Height derives from them. */
+  buttonHeights?: { small: number; medium: number; large: number },
 ): ComponentSizePayload {
   return componentSizeFigma({
     Button: {
@@ -1153,7 +1175,7 @@ export function componentSizePayload(
          update-only, so these land on the variables already in the file —
          which is the point: the number then has one home instead of living
          in Figma and being re-typed in CSS. */
-      ...navMetricsFlat(),
+      ...navMetricsFlat(buttonHeights),
       /* Divider / Step bar / No Count Step — see LINE_METRICS. Same reason as
          the nav metrics: the lib holds these as literals too, so writing them
          keeps one number in one place. */
