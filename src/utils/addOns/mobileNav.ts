@@ -99,11 +99,26 @@ export function maxItemsWithFab(fab: boolean): number {
   return fab ? MAX_BOTTOM_ITEMS - 1 : MAX_BOTTOM_ITEMS;
 }
 
-/** The counts the bar can hold: two up to the ceiling. */
-export function bottomItemCounts(fab: boolean): number[] {
+/** The counts the bar can hold: two up to the ceiling — and with a CENTRED
+ *  FAB, only even counts. The items pair up either side of it; with three,
+ *  one side holds two and the other one, and the bar reads lopsided round
+ *  the thing it is built around. A FAB at the end has no sides to balance,
+ *  so any count fits beside it. */
+export function bottomItemCounts(fab: boolean, centred = false): number[] {
   const out: number[] = [];
-  for (let n = MIN_BOTTOM_ITEMS; n <= maxItemsWithFab(fab); n++) out.push(n);
+  for (let n = MIN_BOTTOM_ITEMS; n <= maxItemsWithFab(fab); n++) {
+    if (!(fab && centred) || n % 2 === 0) out.push(n);
+  }
   return out;
+}
+
+/** The count to keep when the FAB is switched: the current one if the bar
+ *  can still hold it, else the nearest it can — up, so an odd count gains an
+ *  item rather than losing one the user chose. */
+export function fitItemCount(n: number, fab: boolean, centred = false): number {
+  const ok = bottomItemCounts(fab, centred);
+  if (ok.includes(n)) return n;
+  return ok.find((c) => c > n) ?? ok[ok.length - 1];
 }
 
 /** Which of the nav's items the bar shows, at the count asked for.

@@ -42,7 +42,7 @@ import {
 } from '../utils/addOns/breakpoints';
 import ScaledPreview from './ScaledPreview';
 import {
-  mobileNavDefinition, MOBILE_LAYOUTS, maxItemsWithFab, bottomItemCounts, bottomBarItems,
+  mobileNavDefinition, MOBILE_LAYOUTS, bottomItemCounts, fitItemCount, bottomBarItems,
   type MobileLayout, type MobileOptions,
 } from '../utils/addOns/mobileNav';
 import TuneIcon from '@mui/icons-material/Tune';
@@ -1385,7 +1385,7 @@ export default function NavDesignerPage() {
                     <Divider />
                     <Label>{mobile.layout === 'toolbar' ? 'Toolbar items' : 'Navigation items'}</Label>
                     <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                      {bottomItemCounts(!!mobile.fab).map((n) => (
+                      {bottomItemCounts(!!mobile.fab, (mobile.fabPosition ?? 'center') === 'center').map((n) => (
                         <Button
                           key={n}
                           size="small"
@@ -1400,7 +1400,9 @@ export default function NavDesignerPage() {
                       Two to five. Five is a reach limit rather than a taste one: below
                       about 64px a target stops being reliably hittable with a thumb, and
                       five items is where a 360px phone reaches that. A FAB takes one of
-                      the five, because it sits in the same row. One is not navigation.
+                      the five, because it sits in the same row — and with a centred one
+                      the count is 2 or 4, so the items pair up either side of it. One
+                      is not navigation.
                     </Caption>
 
                     <SwitchInput
@@ -1417,9 +1419,10 @@ export default function NavDesignerPage() {
                         setMobile((m) => ({
                           ...m,
                           fab: on,
-                          // Adding a FAB shrinks the ceiling, so a count that
-                          // was legal a moment ago has to come down with it.
-                          itemCount: Math.min(m.itemCount ?? 4, maxItemsWithFab(on)),
+                          // A FAB lowers the ceiling and takes only even counts,
+                          // so a count that was legal a moment ago moves to the
+                          // nearest one that still is.
+                          itemCount: fitItemCount(m.itemCount ?? 4, on, (m.fabPosition ?? 'center') === 'center'),
                         }));
                       }}
                       label="FAB"
@@ -1430,7 +1433,11 @@ export default function NavDesignerPage() {
                           {([['center', 'Centred'], ['end', 'At the end']] as const).map(([id, l]) => (
                             <Button key={id} size="small"
                               variant={(mobile.fabPosition ?? 'center') === id ? 'default' : 'default-outline'}
-                              onClick={() => setMobileOpt('fabPosition', id)}>{l}</Button>
+                              onClick={() => setMobile((m) => ({
+                                ...m, fabPosition: id,
+                                // Centring it allows only even counts; 3 becomes 4.
+                                itemCount: fitItemCount(m.itemCount ?? 4, true, id === 'center'),
+                              }))}>{l}</Button>
                           ))}
                         </HStack>
                         <Caption color="quiet">
