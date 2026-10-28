@@ -151,8 +151,13 @@ describe('the responsive axis is bound, never baked', () => {
   it('every condition used is declared', () => {
     // A breakpoint invented by a typo is a layer that never shows and never
     // errors.
-    for (const l of ALL) {
-      const spec: any = toAddonSpec(full(l));
+    /* Plus the condensed hero: its scroll-gated parts only exist with
+       condensed on, and without walking them Hide-When-Condensed was bound but
+       never checked — which is how it went undeclared. */
+    const defs = [...ALL.map((l) => [l, full(l)] as const),
+      ['hero condensed', navDefinition({ layout: 'hero', search: true, actions: true, avatar: true, condensed: true })] as const];
+    for (const [l, d] of defs) {
+      const spec: any = toAddonSpec(d);
       const conds: string[] = [];
       const walk = (n: any) => { if (n.visibleWhen) conds.push(n.visibleWhen); (n.children || []).forEach(walk); };
       walk(spec.root);
@@ -296,6 +301,7 @@ describe('the condensed state is scroll-driven, not width-driven', () => {
        waved through by the person adding it. */
     const notWidthDriven = new Set([
       'Adaptive-Nav/Show-Condensed',
+      'Adaptive-Nav/Hide-When-Condensed',
       'Adaptive-Nav/Show-Account-Menu',
       /* Session, not width, and a PAIR — Figma binds `visible` to a boolean
          and cannot invert one, so "signed out" needs its own name rather than
@@ -530,6 +536,17 @@ describe('the responsive table travels with the spec', () => {
     });
     const condensed = spec.responsive.matrix['Adaptive-Nav/Show-Condensed'];
     expect(condensed).toEqual({ xs: false, md: false });
+  });
+
+  it('Hide-When-Condensed is declared, a scroll condition, and ON at rest', () => {
+    expect(NAV_CONDITIONS['Adaptive-Nav/Hide-When-Condensed']?.trigger).toBe('scroll');
+    const hero = navDefinition({ layout: 'hero', avatar: true, actions: true, condensed: true });
+    const spec: any = toAddonSpec(hero, {
+      breakpoints: BPS,
+      matrix: defaultNavMatrix(Object.keys(NAV_CONDITIONS), BPS),
+    });
+    // The hero's own actions show until the scroll — their opposite is off.
+    expect(spec.responsive.matrix['Adaptive-Nav/Hide-When-Condensed']).toEqual({ xs: true, md: true });
   });
 });
 

@@ -6,16 +6,18 @@
  * reaches the Figma component and the React one as the same decision rather
  * than as two things that have to be kept in step.
  *
- * The preview is a SCHEMATIC, deliberately. Rendering the real component would
- * mean a second implementation of the layout in this page, and the two would
- * disagree the moment either changed — the exact failure this architecture
- * exists to avoid. Boxes showing which slot sits where is the honest amount to
- * promise from a definition that has no behaviour in it yet.
+ * The preview is the definition rendered by DefinitionRenderer, with each slot
+ * filled by the real library component (Tabs, Rail, BottomNavigation,
+ * SearchField…) at the breakpoint's own width — the layout comes from the
+ * definition, the parts from the lib, so neither is a second implementation.
+ *
+ * MISSING-LIB-COMPONENT tags in this file:
+ *   FileInput — choosing a brand mark from disk (hidden input behind a Button)
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
-  VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
+  VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
   Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
 } from '@omni-design/components';
@@ -43,7 +45,7 @@ import {
   type NavItem, type NavButtonItem, type Session,
 } from '../utils/addOns/navContent';
 import {
-  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, type AccountMenuItem,
+  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, SIGNED_OUT_CONDITION, type AccountMenuItem,
 } from '../utils/addOns/accountMenu';
 import NavItemEditor from './NavItemEditor';
 import AccountMenuEditor from './AccountMenuEditor';
@@ -174,6 +176,9 @@ export default function NavDesignerPage() {
      one value for the whole nav — and true is the state a product is in
      most of the time, so it is the one to design in. */
   const [signedIn, setSignedIn] = useState(true);
+  /* Scrolled past the hero, for the preview — the condensed state. A scroll
+     position, so one value for the whole nav, like Signed in. */
+  const [scrolled, setScrolled] = useState(false);
 
   const editingItem = editing
     ? (editing.kind === 'tab' ? tabs : actions).find((i) => i.id === editing.id) ?? null
@@ -579,17 +584,10 @@ export default function NavDesignerPage() {
        come from the definition, so they follow the arrangement and the size
        mode instead of being copied out of devtools. */
     const page = (
-      <div
-        data-theme="Default"
-        data-surface="Surface"
-        style={{
-          flex: 1,
-          minHeight: 120,
-          width: '100%',
-          background: 'var(--Background)',
-          boxSizing: 'border-box',
-        }}
-      >
+      /* The lib's Section paints the region (theme + surface + Background),
+         rather than a div setting data-surface and painting it by hand. */
+      <Section as="div" theme="Default" surface="Surface" padding="0"
+        style={{ flex: 1, minHeight: 120, width: '100%', boxSizing: 'border-box' }}>
         <div style={{
           height: '100%',
           border: '1px dashed var(--Border-Variant)',
@@ -598,7 +596,7 @@ export default function NavDesignerPage() {
         }}>
           <Caption color="quiet">Content</Caption>
         </div>
-      </div>
+      </Section>
     );
 
     /* The library's Rail and BottomNavigation, not shapes drawn here.
@@ -706,20 +704,19 @@ export default function NavDesignerPage() {
       'Nav-Item-Slot': bottomNav,
       'Menu-Button': menuButton,
       Search: search,
-      /* The bottom bar's items, one slot each.
-         
-         The definition builds Nav-Item-N stacks holding Nav-Icon-N and
-         Nav-Label-N, because a designer needs those frames in Figma. The
-         preview was filling `Nav-Item-Slot` — which is a STACK, not a slot, so
-         nothing landed and every item rendered as two dashed boxes. Filling
-         the leaves puts real content in the definition's own structure rather
-         than replacing it with a component that would not match. */
-      ...Object.fromEntries(
-        tabs.flatMap((t, i) => [
-          [`Nav-Icon-${i + 1}`, <NavIconGlyph key={`ni${i}`} name={t.startIconName || t.endIconName || 'Home'} />],
-          [`Nav-Label-${i + 1}`, <LabelExtraSmall key={`nl${i}`}>{t.label}</LabelExtraSmall>],
-        ]),
-      ),
+      /* The mobile top bar's action slots: the actions as icon buttons, the
+         phone's form of them. They rendered as empty dashed boxes. */
+      ...Object.fromEntries([0, 1, 2].map((k) => {
+        const list = [...groupFor('always'), ...groupFor(signedIn ? 'signed-in' : 'signed-out')];
+        const a = list[k];
+        const fallback = [['Search', 'Search'], ['Notifications', 'Notifications'], ['MoreVert', 'More']][k];
+        const icon = a ? (a.startIconName || a.endIconName || fallback[0]) : fallback[0];
+        return [`Action-${k + 1}`, (
+          <Button key={`ma${k}`} iconOnly variant="ghost" size={componentSize} aria-label={a ? a.label : fallback[1]}>
+            <NavIconGlyph name={icon} />
+          </Button>
+        )];
+      })),
       Title: title,
       Brand: brandPlaceholder,
       'Condensed-Brand': brandPlaceholder,
@@ -730,7 +727,7 @@ export default function NavDesignerPage() {
     return out;
   }, [brand, savedBrand, tabs, actions, mobile.showLabels, mobile.barStyle, mobile.toolbarOrientation, mobile.fab, mobile.fabPosition, mobile.fabSpeedDial, dialItems, mobile.itemCount,
       avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap,
-      options.railExpandable]);
+      options.railExpandable, signedIn]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
@@ -784,8 +781,16 @@ export default function NavDesignerPage() {
      panel would be shut at every breakpoint with no way to look at it. */
   const menuShown = menuOpen && avatarOpensMenu && avatarPresent && signedIn;
   const active = useMemo<Record<string, boolean>>(
-    () => ({ ...matrixActive, [ACCOUNT_MENU_CONDITION]: menuShown, [SIGNED_IN_CONDITION]: signedIn }),
-    [matrixActive, menuShown, signedIn],
+    () => ({
+      ...matrixActive,
+      [ACCOUNT_MENU_CONDITION]: menuShown,
+      [SIGNED_IN_CONDITION]: signedIn,
+      /* Signed-out was never set, so a visitor's actions never showed. */
+      [SIGNED_OUT_CONDITION]: !signedIn,
+      'Adaptive-Nav/Show-Condensed': scrolled,
+      'Adaptive-Nav/Hide-When-Condensed': !scrolled,
+    }),
+    [matrixActive, menuShown, signedIn, scrolled],
   );
 
   /* The spec, WITH the responsive table. Derived after the matrix because it
@@ -997,34 +1002,23 @@ export default function NavDesignerPage() {
                 {NAV_LAYOUTS.map((l) => {
                   const selected = options.layout === l.id;
                   return (
-                    <div
+                    <SelectableCard
                       key={l.id}
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={selected}
+                      selected={selected}
                       aria-label={l.label}
+                      /* The lib's selectable card: role, Enter / Space, the
+                         selected ring and the states, instead of a div styled
+                         to look like one. */
                       onClick={() => {
                         set('layout', l.id as NavLayout);
                         setBottomBarAt((m) => ({ ...m, [selectedBp]: false }));
                       }}
-                      onKeyDown={(e) => {
-                        // A div taking a click has to take Enter and Space too,
-                        // or the picker is unreachable from the keyboard.
-                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); set('layout', l.id as NavLayout); }
-                      }}
-                      style={{
-                        cursor: 'pointer',
-                        padding: 'var(--Sizing-1, 4px)',
-                        borderRadius: 'var(--Card-Radius, 8px)',
-                        border: '2px solid ' + (selected ? 'var(--Buttons-Primary-Border)' : 'var(--Border-Variant)'),
-                        outlineOffset: 2,
-                      }}
                     >
-                      <NavLayoutPreview layout={l.id as NavLayout} options={options} />
-                      <div style={{ padding: 'var(--Sizing-1, 4px) var(--Sizing-2, 8px)' }}>
+                      <VStack gap="var(--Sizing-1)">
+                        <NavLayoutPreview layout={l.id as NavLayout} options={options} />
                         <Label>{l.label}</Label>
-                      </div>
-                    </div>
+                      </VStack>
+                    </SelectableCard>
                   );
                 })}
               </div>
@@ -1406,13 +1400,9 @@ export default function NavDesignerPage() {
 
               <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                 {brand && (
-                  <div style={{
-                    border: '1px solid var(--Border)',
-                    borderRadius: 'var(--Card-Radius, 8px)',
-                    padding: 'var(--Sizing-2, 8px)',
-                  }}>
+                  <Card padding="small">
                     <img src={brand.url} alt="" style={{ height: 32, width: 'auto', display: 'block' }} />
-                  </div>
+                  </Card>
                 )}
                 <Button variant="default-outline" onClick={() => brandInput.current?.click()}>
                   {brand ? 'Replace' : 'Upload a mark'}
@@ -1479,9 +1469,12 @@ export default function NavDesignerPage() {
                 ))}
               </HStack>
               <Caption color="quiet">
-                Rail-Width {componentSize === 'small' ? 72 : componentSize === 'large' ? 96 : 80}px
-                {' · '}App-Bar Height {componentSize === 'small' ? 56 : componentSize === 'large' ? 72 : 64}px
-                {' · '}Nav-Bar Height {componentSize === 'small' ? 73 : componentSize === 'large' ? 93 : 83}px
+                {/* From NAV_METRICS, the table the CSS and Figma read — it was
+                    three hard-coded ternaries that had drifted (Rail 72 / 96,
+                    App-Bar 72). App-Bar is the size's button height + 32. */}
+                Rail-Width {NAV_METRICS['Rail-Width'][componentSize]}px
+                {' · '}App-Bar-Height {NAV_METRICS['App-Bar-Height'][componentSize]}px
+                {' · '}Nav-Bar Height {NAV_METRICS['Nav-Bar Height'][componentSize]}px
               </Caption>
 
               <Divider />
@@ -1498,6 +1491,24 @@ export default function NavDesignerPage() {
                 as its own variable so a design can differ for a visitor. Here it
                 gates the account — off shows the bar with no avatar.
               </Caption>
+              {usedConditions.includes('Adaptive-Nav/Show-Condensed') && (
+                <>
+                  <Divider />
+                  <Label>Scrolled past the hero</Label>
+                  <HStack gap="var(--Sizing-2)">
+                    {([[false, 'At top'], [true, 'Scrolled']] as const).map(([v, l]) => (
+                      <Button key={l} size="small"
+                        variant={scrolled === v ? 'default' : 'default-outline'}
+                        onClick={() => setScrolled(v)}>{l}</Button>
+                    ))}
+                  </HStack>
+                  <Caption color="quiet">
+                    A scroll position, not a width: the brand and actions move into the
+                    sticky strip once the hero has gone. Published as Show-Condensed and its
+                    opposite, Hide-When-Condensed.
+                  </Caption>
+                </>
+              )}
             </VStack>
           </Card>
 
@@ -1560,10 +1571,13 @@ export default function NavDesignerPage() {
                     layout with no rail and nothing to turn it back on. */}
                 {otherConditions
                   .filter((n) => !['Adaptive-Nav/Show-Brand', 'Adaptive-Nav/Show-Search',
-                                   'Adaptive-Nav/Show-Actions', 'Adaptive-Nav/Show-Avatar',
-                                   /* Its own control, under the sizes: one value, not
-                                      one per width. */
-                                   SIGNED_IN_CONDITION].includes(n))
+                                   'Adaptive-Nav/Show-Actions', 'Adaptive-Nav/Show-Avatar'].includes(n))
+                  /* Width conditions only. Scroll, session and interaction
+                     conditions are not per-breakpoint — they had switches here,
+                     and flipping one wrote the published matrix. Signed in and
+                     Scrolled have their own one-value controls under the sizes;
+                     the account menu opens from the avatar. */
+                  .filter((n) => definition.conditions?.[n]?.trigger === 'device')
                   .map((name) => (
                     <SwitchInput
                       key={name}

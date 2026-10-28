@@ -249,6 +249,9 @@ function topBar(o: MobileOptions): NodeDef {
   const centred = o.brandAlign === 'center';
   return {
     name: 'Bar',
+    /* Declared and published, and it was bound to nothing — so switching it
+       off at a breakpoint changed the matrix and nothing in the nav. */
+    presence: { when: 'Adaptive-Nav/Show-Top-Bar' },
     kind: 'stack',
     direction: 'row',
     justify: 'between',

@@ -211,6 +211,8 @@ export function tokensUsed(def: ComponentDefinition): string[] {
     if (n.gap) out.add(n.gap.token);
     if (n.radius) out.add(n.radius.token);
     if (n.border) out.add(n.border.token);
+    // A one-side rule (the rail brand block's Border-Variant) is a token too.
+    if (n.borderBottom) out.add(n.borderBottom.token);
     for (const k of ['top', 'right', 'bottom', 'left'] as const) {
       const p = n.padding && n.padding[k];
       if (p) out.add(p.token);

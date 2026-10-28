@@ -163,7 +163,21 @@ export const NAV_CONDITIONS: Record<string, ConditionDef> = {
       + 'Driven by scroll position, not viewport width.',
     trigger: 'scroll',
   },
+  /* Show-Condensed's opposite: TRUE until the hero scrolls past. Figma binds
+     `visible` to a boolean and cannot invert one, so the hero's own actions —
+     which give way to the sticky strip's — need a variable that is on at rest.
+     It was bound without being declared, so it was seeded as a width condition
+     and appeared as a per-breakpoint switch. */
+  'Adaptive-Nav/Hide-When-Condensed': {
+    description:
+      'The hero\u2019s own actions: on until the hero has scrolled past, then off '
+      + '(their copies show in the sticky strip). The opposite of Show-Condensed.',
+    trigger: 'scroll',
+  },
 };
+
+/** Scroll conditions that are ON at rest — the inverse of one that is off. */
+export const ON_AT_REST = new Set(['Adaptive-Nav/Hide-When-Condensed']);
 
 /**
  * Conditions where exactly one of the set is true.
@@ -633,7 +647,7 @@ function railNode(fullHeight: boolean): NodeDef {
        fills what is left, which is the same instruction from the row's point
        of view — but expressed on the wrong axis it would stretch the rail
        across the page instead. */
-    height: fullHeight ? 'fill' : 'fill',
+    height: 'fill',
     /* One step dimmer than the bar, so the rail reads as a distinct region
        without naming a second color. Relative to whatever the nav is set to,
        which is why it is a level rather than a fixed surface. */
@@ -809,7 +823,10 @@ export function defaultNavMatrix(
            'scroll' by name seeded every trigger added afterwards as true,
            which would have opened the account menu at every breakpoint the
            moment it existed. */
-        def && def.trigger !== 'device' ? false
+        /* At rest, a scroll condition is off — except an inverse, which is on
+           until the scroll happens. */
+        ON_AT_REST.has(name) ? true
+        : def && def.trigger !== 'device' ? false
         /* By WIDTH, not by position in the list.
            
            This was "the narrowest breakpoint gets the menu button", so sm

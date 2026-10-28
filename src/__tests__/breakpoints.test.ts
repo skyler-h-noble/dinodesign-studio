@@ -131,7 +131,7 @@ describe('reading one breakpoint back out', () => {
 });
 
 // ─── The nav's own starting table ────────────────────────────────────────────
-import { defaultNavMatrix, NAV_CONDITIONS, TABS_MIN_WIDTH } from '../utils/addOns/navDefinition';
+import { defaultNavMatrix, NAV_CONDITIONS, TABS_MIN_WIDTH, ON_AT_REST } from '../utils/addOns/navDefinition';
 
 describe('the default matrix encodes design intent, not blanket true', () => {
   const names = Object.keys(NAV_CONDITIONS);
@@ -173,7 +173,9 @@ describe('the default matrix encodes design intent, not blanket true', () => {
        condensed state that only exists after scrolling. */
     for (const [name, def] of Object.entries(NAV_CONDITIONS)) {
       if (def.trigger !== 'scroll') continue;
-      for (const bp of DEFAULT_BREAKPOINTS) expect([name, bp.id, m[name][bp.id]]).toEqual([name, bp.id, false]);
+      // An inverse (Hide-When-Condensed) is ON at rest: its opposite is off.
+      const rest = ON_AT_REST.has(name);
+      for (const bp of DEFAULT_BREAKPOINTS) expect([name, bp.id, m[name][bp.id]]).toEqual([name, bp.id, rest]);
     }
   });
 
