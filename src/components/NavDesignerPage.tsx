@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import AddOnTopNav from './addOns/AddOnTopNav';
 import { systemExists } from '../utils/docs/systemCss';
+import { libraryPageUrl } from '../utils/docs/docsLink';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
 import { encodeNavState, readNavState, NAV_SHARE_VERSION } from '../utils/addOns/navShare';
 import { adaptiveNavDefinition, arrangementRows, ARRANGEMENT_CONDITIONS } from '../utils/addOns/adaptiveNav';
@@ -27,7 +28,7 @@ import {
   VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TabPanel, TextArea, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
   Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
-  OmniDesignProvider,
+  OmniDesignProvider, Link,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -977,6 +978,9 @@ export default function NavDesignerPage() {
               the same spec, and which one shows — and which parts of it — is decided
               per breakpoint, not by a variant.
             </Body>
+            <Link href={libraryPageUrl('adaptive-nav', uuid)} target="_blank" rel="noopener">
+              About the Adaptive Nav in the component library
+            </Link>
           </VStack>
 
           {/* Breakpoint first, because everything below is scoped to it — the
