@@ -58,11 +58,15 @@ export interface ScaledPreviewProps {
    *  of the screen, so the bottom bar, the part a phone layout is about, is the
    *  part that is not visible. */
   fitHeight?: boolean;
+  /** The design system's data-device for the simulated screen — IOS-Mobile,
+   *  Android-Tablet… Type switches on it, not on width, so without it a phone
+   *  preview draws Desktop's type (an 11px nav label where iOS has 10). */
+  device?: string | null;
 }
 
 export default function ScaledPreview(
   { width, height: deviceHeight, children, maxScale = 1, onScale, frame, clip = true,
-    style, fitHeight = false }: ScaledPreviewProps,
+    style, fitHeight = false, device }: ScaledPreviewProps,
 ) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -138,6 +142,7 @@ export default function ScaledPreview(
       }}>
         <div
           ref={inner}
+          data-device={device || undefined}
           style={{
             width,
             /* The device's full height, so the nav sits at the TOP of a

@@ -64,14 +64,15 @@ describe('the parse', () => {
        phone, which is the same trap Alt-Display fell into above. */
     /* 39 since Mobile-Nav-Label was added. It is the one style in this file
        whose values genuinely differ per platform rather than being restated:
-       Apple's tab-bar label is 10/10 untracked, Material's navigation label is
-       12/16 at 0.5, and Desktop keeps 11/16.5/0.5. So it MUST be declared in
+       Apple's tab-bar label is 10pt Medium (12 leading, untracked), Material's
+       navigation label is 12/16 Medium at 0.5, and Desktop keeps 11/16.5/0.5
+       at 600. So it MUST be declared in
        every block — leaving it to the device-floor merge would put Desktop's
        11px on both phones and erase the reason the style exists. */
     expect(Object.keys(styles).length).toBe(39);
     expect(styles['Mobile-Nav-Label']).toEqual({
-      'Font-Size': '10px', 'Font-Weight': '600',
-      'Line-Height': '10px', 'Letter-Spacing': '0px',
+      'Font-Size': '10px', 'Font-Weight': '500',
+      'Line-Height': '12px', 'Letter-Spacing': '0px',
     });
     expect(styles['H1']).toEqual({
       'Font-Size': '28px', 'Font-Weight': '600',

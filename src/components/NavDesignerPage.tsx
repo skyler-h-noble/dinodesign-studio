@@ -801,6 +801,7 @@ export default function NavDesignerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [tab, setTab] = useState<'build' | 'code' | 'export' | 'import'>('build');
+  const [platform, setPlatform] = useState<'ios' | 'android'>('ios');
   /* Where the Build grid starts on the page, so its columns can fill the rest
      of the window exactly. */
   const gridRef = useRef<HTMLDivElement>(null);
@@ -955,6 +956,15 @@ export default function NavDesignerPage() {
      exists for: how much empty space sits either side, and whether the nav
      still relates to the page under it. */
   const previewWidth = current?.deviceWidth ?? Math.max(range?.from ?? 0, 320);
+  /* Which platform's type a tablet or phone draws in. Omni switches type on
+     data-device, not width — iOS's nav label is 10px, Android's 12, Desktop's
+     11 — so the preview has to say which device it is. Desktop is the :root
+     default and sets none. */
+  const previewDevice = !current || current.id === 'desktop' || current.minWidth >= 1280
+    ? null
+    : current.minWidth < 600
+      ? (platform === 'ios' ? 'IOS-Mobile' : 'Android-Mobile')
+      : (platform === 'ios' ? 'IOS-Tablet' : 'Android-Tablet');
 
   /* How wide the preview may shrink to, and how far it takes to get there.
      
@@ -1026,6 +1036,11 @@ export default function NavDesignerPage() {
                 ))}
               </ToggleButtonGroup>
             </div>
+            {/* Tablets and phones draw in their platform's type. */}
+            <ToggleButtonGroup value={platform} onChange={(v: 'ios' | 'android') => v && setPlatform(v)} size="small" aria-label="Platform">
+              <Button value="ios" size="small">iOS</Button>
+              <Button value="android" size="small">Android</Button>
+            </ToggleButtonGroup>
             {/* The button owns the name; the icon carries none, or a screen
                 reader announces the control twice. */}
             <Button
@@ -1804,6 +1819,7 @@ export default function NavDesignerPage() {
                   onScale={setScale}
                   frame
                   fitHeight={twoCol}
+                  device={previewDevice}
                   clip={!menuShown}
                 >
                   {/* The cap goes THROUGH the renderer rather than around it.

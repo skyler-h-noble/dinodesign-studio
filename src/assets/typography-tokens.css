@@ -347,9 +347,11 @@
 
   /* Mobile Nav Label — Apple's tab-bar label: 10pt, untracked. */
   --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  /* Apple's tab bar label: SF 10pt Medium. Line height 12, not 10 — a 10px
+     line box clipped descenders on a two-word label. */
   --Mobile-Nav-Label-Font-Size:     10px;
-  --Mobile-Nav-Label-Font-Weight:   600;
-  --Mobile-Nav-Label-Line-Height:   10px;
+  --Mobile-Nav-Label-Font-Weight:   500;
+  --Mobile-Nav-Label-Line-Height:   12px;
   --Mobile-Nav-Label-Letter-Spacing: 0px;
 
   /* Legal */
@@ -584,9 +586,11 @@
 
   /* Mobile Nav Label — same as iPhone; the tab bar does not resize. */
   --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  /* Apple's tab bar label: SF 10pt Medium. Line height 12, not 10 — a 10px
+     line box clipped descenders on a two-word label. */
   --Mobile-Nav-Label-Font-Size:     10px;
-  --Mobile-Nav-Label-Font-Weight:   600;
-  --Mobile-Nav-Label-Line-Height:   10px;
+  --Mobile-Nav-Label-Font-Weight:   500;
+  --Mobile-Nav-Label-Line-Height:   12px;
   --Mobile-Nav-Label-Letter-Spacing: 0px;
 
   /* Legal */
@@ -821,8 +825,9 @@
 
   /* Mobile Nav Label — Material's navigation label: 12sp on 16, 0.5 tracking. */
   --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  /* Material's navigation bar label: Label Medium, 12sp at 500. */
   --Mobile-Nav-Label-Font-Size:     12px;
-  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Font-Weight:   500;
   --Mobile-Nav-Label-Line-Height:   16px;
   --Mobile-Nav-Label-Letter-Spacing: 0.5px;
 
@@ -1059,8 +1064,9 @@
 
   /* Mobile Nav Label — Material's navigation label: 12sp on 16, 0.5 tracking. */
   --Font-Family-Mobile-Nav-Label: var(--Platform-Font-Families-Body, var(--Set-Font-Family-Body));
+  /* Material's navigation bar label: Label Medium, 12sp at 500. */
   --Mobile-Nav-Label-Font-Size:     12px;
-  --Mobile-Nav-Label-Font-Weight:   600;
+  --Mobile-Nav-Label-Font-Weight:   500;
   --Mobile-Nav-Label-Line-Height:   16px;
   --Mobile-Nav-Label-Letter-Spacing: 0.5px;
 
