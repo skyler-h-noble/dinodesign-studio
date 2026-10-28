@@ -11,8 +11,8 @@
  *                         off at a breakpoint is display:none in that range
  *   scroll (condensed)    a scroll listener sets data-condensed on the root
  *   session (signed in)   the `signedIn` prop sets data-signed-in
- *   interaction (menu)    the avatar toggles data-menu-open; Escape and an
- *                         outside click close it
+ *   interaction (menu)    the avatar opens the library's Popover, which
+ *                         closes itself on Escape and an outside click
  *
  * Slots are filled with the library components the preview uses — Tabs,
  * Button, Avatar, Rail, BottomNavigation, SearchField, MenuItem — and the menu
@@ -24,7 +24,7 @@ import type { Breakpoint, ConditionMatrix } from './breakpoints';
 import type { NavItem, NavButtonItem, Session } from './navContent';
 import { buttonVariant, sessionOf } from './navContent';
 import type { AccountMenuItem } from './accountMenu';
-import { ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, SIGNED_OUT_CONDITION } from './accountMenu';
+import { SIGNED_IN_CONDITION, SIGNED_OUT_CONDITION } from './accountMenu';
 import type { SpeedDialItem } from './speedDial';
 import type { NavOptions } from './navDefinition';
 import type { MobileOptions } from './mobileNav';
@@ -111,8 +111,8 @@ function responsiveCSS(input: NavCodeInput, conditions: Set<string>): string {
   if (conditions.has('Adaptive-Nav/Hide-When-Condensed')) state.push(`.an-root[data-condensed] .${slug('Adaptive-Nav/Hide-When-Condensed')} { display: none !important; }`);
   if (conditions.has(SIGNED_IN_CONDITION)) state.push(`.an-root:not([data-signed-in]) .${slug(SIGNED_IN_CONDITION)} { display: none !important; }`);
   if (conditions.has(SIGNED_OUT_CONDITION)) state.push(`.an-root[data-signed-in] .${slug(SIGNED_OUT_CONDITION)} { display: none !important; }`);
-  if (conditions.has(ACCOUNT_MENU_CONDITION)) state.push(`.an-root:not([data-menu-open]) .${slug(ACCOUNT_MENU_CONDITION)} { display: none !important; }`);
-  if (state.length) out.push('/* Scroll, session and the account menu: state on the root. */', ...state);
+  // The account menu is a Popover: its own open prop, no CSS needed.
+  if (state.length) out.push('/* Scroll and session: state on the root. */', ...state);
 
   // The page clears whatever the nav pins, per arrangement.
   const kids = definition.root.children || [];
@@ -212,7 +212,7 @@ function slotCode(node: NodeDef, ctx: Ctx): string | null {
       const face = `<Avatar size="custom" customSize={${px}} alt="" src={user?.avatarUrl} />`;
       if (!menuOn) return face;
       ctx.uses.add('Button');
-      return `<Button avatar variant="ghost" size=${size} aria-label="Your account" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>${face}</Button>`;
+      return `<Button ref={avatarRef} avatar variant="ghost" size=${size} aria-label="Your account" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>${face}</Button>`;
     }
     case 'Account-Menu': {
       ctx.uses.add('MenuItem');
@@ -241,7 +241,7 @@ function slotCode(node: NodeDef, ctx: Ctx): string | null {
           : ', onClick: () => onAction?.("create")';
         fab = `{ icon: <AddIcon />, label: "Create"${dial} }`;
       }
-      return `<BottomNavigation items={BAR_ITEMS.map(toNavItem)} value={Math.max(0, BAR_ITEMS.findIndex((t) => t.id === current))} onChange={(i) => go(BAR_ITEMS[i].id)} showLabels={${m.showLabels !== false}} variant=${q(m.barStyle === 'floating' ? 'floating' : 'fixed')} orientation=${q(m.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal')} fabAction={${fab}} fabPosition=${q(m.fabPosition ?? 'center')} fixed={false} />`;
+      return `<BottomNavigation items={BAR_ITEMS.map(toNavItem)} value={Math.max(0, BAR_ITEMS.findIndex((t) => t.id === current))} onChange={(i) => go(BAR_ITEMS[i].id)} showLabels={${m.showLabels !== false}} variant=${q(m.barStyle === 'floating' ? 'floating' : 'fixed')} orientation=${q(m.layout === 'toolbar' && m.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal')} fabAction={${fab}} fabPosition=${q(m.fabPosition ?? 'center')} fixed={false} />`;
     }
   }
   const action = node.name.match(/^Action-(\d)$/);
@@ -275,6 +275,24 @@ function nodeCode(node: NodeDef, ctx: Ctx, parentDirection: 'row' | 'column', co
 
   if (node.kind === 'text') return `${open(style)}${node.text ?? ''}</div>`;
 
+  /* The account menu is the library's Popover, not a panel drawn here. It
+     portals, so a bar that clips or a sticky ancestor cannot cut it off; it
+     places itself under the avatar and flips at the viewport edge; and it
+     brings Escape, outside-click and focus in-and-back for free. Its frame —
+     Dropdown-Frame-Radius, the edge, the Level 2 shadow — is every other
+     floating panel's in the system. */
+  if (node.name === 'Account-Menu') {
+    if (node.presence && node.presence !== 'always') conditions.add(node.presence.when);
+    const content = slotCode(node, ctx);
+    if (!content) return '';
+    ctx.uses.add('Popover');
+    return [
+      '<Popover open={menuOpen} onClose={() => setMenuOpen(false)} anchorRef={avatarRef} placement="bottom-end" width="auto" aria-label="Your account">',
+      indent(content, 2),
+      '</Popover>',
+    ].join('\n');
+  }
+
   if (node.kind === 'slot') {
     const content = slotCode(node, ctx);
     if (!content) return `${open(style)}</div>`;
@@ -305,7 +323,6 @@ export function navCode(input: NavCodeInput): string {
   const css = responsiveCSS(input, conditions);
 
   const usesMenuButton = tree.includes('setDrawerOpen');
-  const usesMenu = conditions.has(ACCOUNT_MENU_CONDITION);
   const usesCondensed = conditions.has('Adaptive-Nav/Show-Condensed') || conditions.has('Adaptive-Nav/Hide-When-Condensed');
   if (usesMenuButton) { ctx.uses.add('Drawer'); tabsCode(ctx, 'vertical-left'); }
 
@@ -372,6 +389,7 @@ export default function AdaptiveNav({
   const [condensed, setCondensed] = useState(false);
   const heroRef = useRef(null);
   const rootRef = useRef(null);
+  const avatarRef = useRef(null);
 ${usesCondensed ? `
   /* Condensed once the hero has scrolled past: brand and actions move into
      the sticky strip. A scroll position — no media query can see it. */
@@ -384,17 +402,7 @@ ${usesCondensed ? `
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-` : ''}${usesMenu ? `
-  /* The account menu closes on Escape and on a click outside it. */
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
-    const onDown = (e) => { if (rootRef.current && !rootRef.current.querySelector('[aria-haspopup="menu"]')?.contains(e.target) && !e.target.closest?.('[role="menu"]')) setMenuOpen(false); };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onDown);
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('pointerdown', onDown); };
-  }, [menuOpen]);
-` : ''}
+` : ''}${''}
   return (
     <>
       <style>{CSS}</style>
@@ -403,7 +411,6 @@ ${usesCondensed ? `
         className="an-root"
         data-condensed={condensed || undefined}
         data-signed-in={signedIn || undefined}
-        data-menu-open={menuOpen || undefined}
         style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}
       >
 ${indent(tree, 8)}

@@ -25,7 +25,7 @@
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef } from './defineComponent';
 import { accountNode, signedInOnly, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
 import { SPEED_DIAL_CONDITIONS } from './speedDial';
-import { pageSlot, APP_BAR_ELEVATION, BRAND_CONDITION } from './navDefinition';
+import { pageSlot, APP_BAR_ELEVATION, BRAND_CONDITION, APP_BAR_THEME, NAV_BAR_THEME } from './navDefinition';
 
 export type MobileLayout = 'top-only' | 'top-and-bottom' | 'toolbar' | 'bottom-only';
 
@@ -189,8 +189,8 @@ function barFrame(o: MobileOptions): Pick<NodeDef, 'padding' | 'surface' | 'them
     return { padding: { top: PAD_Y, bottom: PAD_Y, left: t('Margin'), right: t('Margin') } };
   }
   return {
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    theme: NAV_BAR_THEME,
     band: true,
     elevation: APP_BAR_ELEVATION,
   };
@@ -260,8 +260,8 @@ function topBar(o: MobileOptions): NodeDef {
     padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
     width: 'fill',
     height: 'hug',
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    theme: APP_BAR_THEME,
     band: true,
     sticky: true,
     pin: 'top',
@@ -286,7 +286,7 @@ function topBar(o: MobileOptions): NodeDef {
 
 /** The toolbar: actions rather than navigation, and it can float. */
 function toolbar(o: MobileOptions): NodeDef {
-  const vertical = o.toolbarOrientation === 'vertical';
+  const vertical = o.layout === 'toolbar' && o.toolbarOrientation === 'vertical';
   /* The same one slot as the bottom bar, for the same reason: a toolbar IS
      the Nav-Bar component — its Style and Orientation are two of that
      component's three variant axes. */
@@ -300,7 +300,12 @@ function toolbar(o: MobileOptions): NodeDef {
     align: 'center',
     gap: GAP,
     width: vertical ? 'hug' : 'fill',
-    height: vertical ? 'fill' : 'hug',
+    height: 'hug',
+    /* Down is a column at the trailing edge, over the page, in the bottom
+       corner — where the thumb of the hand holding the phone already is.
+       In the flow it took a row of its own under the page and sat centred
+       there, which is neither where a vertical toolbar goes nor reachable. */
+    ...(vertical ? { overlay: { anchor: 'bottom-right' as const } } : {}),
     /* Floating sits inside the safe area and the component draws the pill;
        fixed spans the edge and the frame paints it. The corner is the
        component's, not the frame's — a radius here drew a second rounded

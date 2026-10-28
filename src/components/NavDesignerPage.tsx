@@ -32,7 +32,7 @@ import {
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
-  NAV_LAYOUTS, NAV_THEMES, NAV_SURFACES, type NavLayout, type NavOptions,
+  NAV_LAYOUTS, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
 import {
   DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
@@ -671,7 +671,9 @@ export default function NavDesignerPage() {
         defaultValue={0}
         showLabels={mobile.showLabels !== false}
         variant={mobile.barStyle === 'floating' ? 'floating' : 'fixed'}
-        orientation={mobile.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal'}
+        /* Down belongs to the TOOLBAR. Read for every layout, a Down picked
+           there turned the bottom bar of Top and bottom on its side. */
+        orientation={mobile.layout === 'toolbar' && mobile.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal'}
         fabAction={mobile.fab ? {
           icon: <NavIconGlyph name="Add" />,
           label: 'Create',
@@ -1449,53 +1451,9 @@ export default function NavDesignerPage() {
             </Card>
           )}
 
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Theme and surface</H4>
-              <Body color="quiet">
-                Names, not colors. The same definition lands in each design system's
-                own brand — what these paint depends on the palette it is imported
-                into, which is why nothing here is a hex.
-              </Body>
-
-              <Label>Theme</Label>
-              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-                {NAV_THEMES.map((t) => (
-                  <Button
-                    key={t}
-                    size="small"
-                    variant={(options.theme ?? 'Default') === t ? 'default' : 'default-outline'}
-                    onClick={() => set('theme', t)}
-                  >
-                    {t}
-                  </Button>
-                ))}
-              </HStack>
-              <Caption color="quiet">
-                Default inherits the page's own theme rather than pinning one — a nav
-                that follows its surroundings is usually what you want, which is why it
-                is not simply Primary.
-              </Caption>
-
-              <Label>Surface</Label>
-              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-                {NAV_SURFACES.map((sf) => (
-                  <Button
-                    key={sf}
-                    size="small"
-                    variant={(options.surface ?? 'Surface') === sf ? 'default' : 'default-outline'}
-                    onClick={() => set('surface', sf)}
-                  >
-                    {sf.replace('Surface-', '').replace('Surface', 'Base')}
-                  </Button>
-                ))}
-              </HStack>
-              <Caption color="quiet">
-                A rail sits one step dimmer than whatever the bar is, so it reads as a
-                distinct region without naming a second color.
-              </Caption>
-            </VStack>
-          </Card>
+          {/* No theme picker. The bars wear the design system's own App-Bar
+              and Nav-Bar themes, chosen once in the studio — a second picker
+              here could only disagree with that choice. */}
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">

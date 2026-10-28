@@ -40,8 +40,8 @@ export const ARRANGEMENT_CONDITIONS: Record<string, ConditionDef> = {
 
 export function adaptiveNavDefinition(desktop: NavOptions, mobile: MobileOptions): ComponentDefinition {
   const d = navDefinition(desktop);
-  // The phone nav wears the desktop's palette and surface: one nav, one brand.
-  const m = mobileNavDefinition({ ...mobile, theme: desktop.theme, surface: desktop.surface });
+  // Both arrangements wear the design system's App-Bar / Nav-Bar themes.
+  const m = mobileNavDefinition(mobile);
   return {
     id: 'adaptive-nav',
     label: 'Adaptive Nav',

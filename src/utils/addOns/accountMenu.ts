@@ -195,11 +195,13 @@ function accountPanel(): NodeDef {
     height: 'hug',
     radius: t('Other/Dropdown-Frame-Radius'),
     padding: { top: t('Sizing-1'), bottom: t('Sizing-1') },
-    /* Brightest, because a panel floats ABOVE what it covers and the brightest
-       level is the one that reads as nearest in both light and dark. Not a
-       shadow: the definition cannot express one, and a level that resolves
-       per theme is closer to the intent than a shadow that would not. */
-    surface: 'Surface-Brightest',
+    /* The library Popover's own frame, so the preview, the Figma build and
+       the React file (which IS a Popover) are one shape: Default theme,
+       Surface-Bright, the menu's Level 2 elevation. It was Surface-Brightest
+       with no shadow — a panel of its own rather than the system's. */
+    theme: 'Default',
+    surface: 'Surface-Bright',
+    elevation: 2,
     /* And an edge. The level alone is not enough: a panel at the brightest
        level floating over a page that is ALSO at the brightest level has no
        boundary at all, and the rows read as text lying loose on the page. The

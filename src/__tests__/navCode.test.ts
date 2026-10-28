@@ -54,13 +54,17 @@ describe('Adaptive Nav as code', () => {
     expect(code).toMatch(/\.an-root \.an-mobile/);
   });
 
-  it('makes scroll, sign-in and the account menu state on the root', () => {
+  it('makes scroll and sign-in state on the root, and the account menu a Popover', () => {
     const code = build(layouts[3], mobile);
     expect(code).toContain('.an-root:not([data-condensed]) .an-show-condensed');
     expect(code).toContain('.an-root[data-condensed] .an-hide-when-condensed');
     expect(code).toContain("window.addEventListener('scroll'");
     const withMenu = build(layouts[0], mobile);
-    expect(withMenu).toContain('.an-root:not([data-menu-open]) .an-show-account-menu');
+    // The account menu is the library's Popover, anchored to the avatar.
+    expect(withMenu).toContain('<Popover open={menuOpen}');
+    expect(withMenu).toContain('anchorRef={avatarRef}');
+    expect(withMenu).toContain('ref={avatarRef}');
+    expect(withMenu).not.toContain('data-menu-open');
     expect(withMenu).toContain('.an-root:not([data-signed-in]) .an-signed-in');
   });
 

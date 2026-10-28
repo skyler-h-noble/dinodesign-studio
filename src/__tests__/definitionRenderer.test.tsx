@@ -152,12 +152,12 @@ describe('the app bar paints itself', () => {
        but nothing paints. */
     const out = html(
       <DefinitionRenderer
-        definition={navDefinition({ layout: 'brand-left', theme: 'Primary', surface: 'Surface-Bright' })}
+        definition={navDefinition({ layout: 'brand-left' })}
         showSlots
       />,
     );
-    expect((out.match(/data-surface="Surface-Bright"/g) || []).length).toBeGreaterThan(1);
-    expect((out.match(/data-theme="Primary"/g) || []).length).toBeGreaterThan(1);
+    expect((out.match(/data-surface="Surface"/g) || []).length).toBeGreaterThan(1);
+    expect(out).toMatch(/data-theme="App-Bar"/);
   });
 
   it('and the pinned element is one that has a background', () => {

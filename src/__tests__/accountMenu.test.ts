@@ -71,7 +71,10 @@ describe('the avatar with a menu', () => {
 
   it('carries no color anywhere — only levels and token names', () => {
     const panel = find(node, 'Account-Menu')!;
-    expect(panel.surface).toBe('Surface-Brightest');
+    // Popover's frame: Default theme, Surface-Bright, Level 2.
+    expect(panel.surface).toBe('Surface-Bright');
+    expect(panel.theme).toBe('Default');
+    expect(panel.elevation).toBe(2);
     expect(panel.radius).toEqual({ token: 'Other/Dropdown-Frame-Radius' });
     /* The edge is a NAME too. A panel at the brightest level over a page that
        is also at the brightest level has no boundary, so the level alone does

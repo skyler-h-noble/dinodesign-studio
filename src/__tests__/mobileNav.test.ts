@@ -178,8 +178,10 @@ describe('fixed or floating — the frame does one thing or the other', () => {
     });
 
     it(`${name}: fixed is painted, edge to edge`, () => {
-      const f = frameOf(name, { layout, barStyle: 'fixed', theme: 'Primary', surface: 'Surface-Dim' });
-      expect(f.fills).toEqual([{ type: 'SOLID', color: { var: 'Surface-Dim/Background' } }]);
+      const f = frameOf(name, { layout, barStyle: 'fixed' });
+      // A nav bar: the design system's Nav-Bar theme, chosen in the studio.
+      expect(f.fills).toEqual([{ type: 'SOLID', color: { var: 'Surface/Background' } }]);
+      expect(f.explicitModes).toEqual({ Theme: 'Nav-Bar' });
       expect(f.paddingLeft).toBeUndefined();
       expect(f.paddingTop).toBeUndefined();
     });

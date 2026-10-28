@@ -568,14 +568,15 @@ describe('theme and surface travel as names', () => {
        collection — so a themed subtree pins the mode rather than reading a
        differently-named variable. Storing either as a color would bake one
        brand into an add-on every design system imports. */
-    const spec: any = toAddonSpec(navDefinition({
-      layout: 'brand-left', theme: 'Primary', surface: 'Surface-Bright',
-    }));
-    expect(spec.root.fills[0].color).toEqual({ var: 'Surface-Bright/Background' });
-    expect(spec.root.explicitModes).toEqual({ Theme: 'Primary' });
+    /* The bar is an APP BAR: it pins the design system's App-Bar mode — the
+       bar color chosen once in the studio — and reads its surface by path. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left' }));
+    const bar = spec.root.children[0];
+    expect(bar.fills[0].color).toEqual({ var: 'Surface/Background' });
+    expect(bar.explicitModes).toEqual({ Theme: 'App-Bar' });
   });
 
-  it('defaults to inheriting rather than pinning', () => {
+  it('the root inherits the page — only the bars pin a theme', () => {
     // A nav that follows its surroundings is usually what you want, and an
     // unset theme is how that is expressed — not by choosing one.
     const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left' }));
@@ -592,12 +593,13 @@ describe('theme and surface travel as names', () => {
     }
   });
 
-  it('the rail stays one step dimmer, whatever the bar is set to', () => {
-    /* Relative rather than fixed: a rail pinned to one surface would collide
-       with the bar at some settings and vanish into it at others. */
-    const spec: any = toAddonSpec(navDefinition({ layout: 'rail', surface: 'Surface-Bright' }));
+  it('the rail matches the bar: both wear the App-Bar theme', () => {
+    /* On a desktop the bar and the rail are one piece of chrome round the
+       page; two colors made them read as two. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'rail' }));
     const rail = spec.root.children.find((c: any) => c.name === 'Rail');
-    expect(rail.fills[0].color).toEqual({ var: 'Surface-Dim/Background' });
+    expect(rail.explicitModes).toEqual({ Theme: 'App-Bar' });
+    expect(rail.fills[0].color).toEqual({ var: 'Surface/Background' });
   });
 });
 
