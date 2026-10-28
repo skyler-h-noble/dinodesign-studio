@@ -11,7 +11,7 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, Pagination, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup, Popover } from '@omni-design/components';
+import { Accordion, AccordionDetails, AccordionGroup, AccordionSummary, Alert, AppBar, Avatar, AvatarGroup, Badge, Box, BreadcrumbItem, Breadcrumbs, Body, BottomNavigation, Button, Card, CarouselDot, CarouselDots, Checkbox, Chip, CircularProgress, DayCell, Dialog, Divider, Fab, FieldButton, FormHelper, FormLabel, LinearProgress, Link, LinkGroup, List, Loader, MESSAGE_ICONS, Modal, NumberField, OmniTreeView, Pagination, ImagePlaceholder, Player, TextInput, InputDecorator, ButtonGroup, Icon, Radio, Rail, RailItem, RailSectionTitle, Rating, Ratio, Select, Sheet, Slider, Snackbar, SpeedDial, Step, Stepper, Subtitle, Swatch, SwatchField, SwitchInput, Tab, TabList, Tabs, Tag, TextArea, TextAreaField, Tooltip, ToggleButtonGroup, Popover, IconBadge } from '@omni-design/components';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -2118,6 +2118,27 @@ const icon: ParityComponent = {
   ),
 };
 
+/* Icon Badge: a 24px icon on an Icons/Icon tile. One component in Figma, sized
+   by its Component-Size mode (IconBadge/BadgeHeight 32 / 40 / 48) — the main
+   component is pinned to `small`, so that is the size compared. */
+const iconBadge: ParityComponent = {
+  key: 'iconBadge',
+  name: 'Icon Badge',
+  nodeId: '9189:26768',
+  libFile: 'src/components/IconBadge/IconBadge.js',
+  context: { theme: 'Default', surface: 'Surface', size: 'small' },
+  parts: [
+    { figma: '__root__', css: '.parity-icon-badge .icon-badge', label: 'Tile' },
+    { figma: 'Icon', css: '.parity-icon-badge .icon-badge svg', label: 'Icon', skip: ['fill', 'border', 'shadow', 'radius (as drawn)'] },
+  ],
+  notes: ['The tile is Icons/Icon in the Primary Icons mode on both sides; the glyph is Icons/On-Icon.'],
+  render: () => (
+    <span className="parity-icon-badge" style={{ display: 'inline-flex' }}>
+      <IconBadge color="primary" size="small"><HomeIcon /></IconBadge>
+    </span>
+  ),
+};
+
 /* Image Placeholder: a Border-Variant tint (20%) with the photo glyph in
    Quiet, as large as the box. It fills its parent, so the cell gives it the
    Figma frame's size. */
@@ -2883,4 +2904,4 @@ const inputDecorator: ParityComponent = {
   },
 };
 
-export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, imagePlaceholder, input, inputDecorator, inputField, link, list, loaderStyles, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, popover, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
+export const PARITY_COMPONENTS: ParityComponent[] = [accordionGroup, accordionSegment, alert, appBar, avatar, avatarGroup, badgeCounter, box, breadcrumbs, button, buttonGroup, card, carouselDot, carouselDotGroup, checkbox, checkboxField, chip, countStep, dayCell, dialog, divider, dividerPill, drawerTitle, expandableNavRailItem, fab, fieldButton, formHelper, formLabel, hotlinkGroup, icon, iconBadge, imagePlaceholder, input, inputDecorator, inputField, link, list, loaderStyles, menuItem, messageIcons, modal, navBar, navItem, navRail, navRailItem, noCountStep, number, numberField, paginationNumber, paginationStrip, player, popover, progressBar, progressDial, radio, radioField, rating, ratingField, ratioFillHorizontal, ratioFillVertical, select, selectField, sheet, slider, sliderThumbHorizontal, sliderThumbVertical, sliderField, snackbar, speedDial, star, swatchField, stepLine, stepper, switchParity, switchField, tab, tabs, tag, textArea, textAreaField, swatch, toggleButtonGroup, tooltip, treeView, validationFrame];
