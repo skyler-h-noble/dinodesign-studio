@@ -1138,6 +1138,7 @@ function App() {
         <Route path="/test/typography" element={<TypographyTestPage />} />
         <Route path="/admin/aaid-workbench" element={<AaidWorkbenchPage />} />
         <Route path="/add-ons/nav" element={<NavDesignerPage />} />
+        <Route path="/add-ons/nav/:uuid" element={<NavDesignerPage />} />
         <Route path="/add-ons/charts" element={<ChartsAddOnPage />} />
         <Route path="/add-ons/charts/:uuid" element={<ChartsAddOnPage />} />
         <Route path="/add-ons/hero" element={<HeroAddOnPage />} />

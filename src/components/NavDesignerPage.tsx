@@ -15,11 +15,17 @@
  *   FileInput — choosing a brand mark from disk (hidden input behind a Button)
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
+import AddOnTopNav from './addOns/AddOnTopNav';
+import { systemExists } from '../utils/docs/systemCss';
+import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
+import { encodeNavState, readNavState, NAV_SHARE_VERSION } from '../utils/addOns/navShare';
 import {
-  AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
+  Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
   Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
+  OmniDesignProvider,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -125,13 +131,27 @@ export default function NavDesignerPage() {
      in Brand, the mark in Condensed-Brand, drawn as the adaptive mask the
      code uses. Preview only, like an upload: it never reaches the spec. */
   const [savedBrand, setSavedBrand] = useState<Brand | null>(null);
+  /* /add-ons/nav/<design system id>, as every other add-on. ?ds= is the old
+     way in and redirects there, so existing links keep working. */
+  const { uuid } = useParams<{ uuid?: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   useEffect(() => {
-    const ds = new URLSearchParams(window.location.search).get('ds');
-    if (!ds || !/^[0-9a-f-]{36}$/i.test(ds)) return;
+    const ds = searchParams.get('ds');
+    if (!uuid && ds && /^[0-9a-f-]{36}$/i.test(ds)) navigate(`/add-ons/nav/${ds.toLowerCase()}${window.location.hash}`, { replace: true });
+  }, [uuid, searchParams, navigate]);
+  const [exists, setExists] = useState<boolean | null>(null);
+  /* That system's published CSS, so the page — preview included — draws in its
+     brand, as Bento and Hero do. */
+  const [systemCss, setSystemCss] = useState<LiveSystemCss | null>(null);
+  useEffect(() => {
     let live = true;
-    loadBrand(ds.toLowerCase()).then((b) => { if (live) setSavedBrand(b); });
+    if (!uuid) { setExists(false); setSavedBrand(null); setSystemCss(null); return; }
+    systemExists(uuid).then((ok) => { if (live) setExists(ok); });
+    liveSystemCss(uuid).then((c) => { if (live) setSystemCss(c); });
+    loadBrand(uuid.toLowerCase()).then((b) => { if (live) setSavedBrand(b); });
     return () => { live = false; };
-  }, []);
+  }, [uuid]);
 
   /* Fills the Brand slots locally. It does NOT reach toAddonSpec: a published
      add-on is imported by every design system, so a brand baked into one would
@@ -731,6 +751,37 @@ export default function NavDesignerPage() {
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
 
+  /* The share link: everything this page decides, in #spec=. */
+  const shareLink = useMemo(() => {
+    const token = encodeNavState({
+      version: NAV_SHARE_VERSION, options, mobile, breakpoints, matrix, bottomBarAt,
+      tabs, actions, accountItems, dialItems, componentSize, selectedTab,
+    });
+    return `${window.location.origin}/add-ons/nav/${uuid || ''}#spec=${token}`;
+  }, [options, mobile, breakpoints, matrix, bottomBarAt, tabs, actions, accountItems, dialItems, componentSize, selectedTab, uuid]);
+
+  /* Opened from a share link: put the setup back. Once, on arrival — a broken
+     or foreign link leaves the defaults. */
+  useEffect(() => {
+    const st = readNavState(window.location.hash);
+    if (!st) return;
+    setOptions(st.options as NavOptions);
+    setMobile(st.mobile as MobileOptions);
+    const bps = st.breakpoints as Breakpoint[];
+    if (Array.isArray(bps) && bps.length) {
+      setBreakpoints(bps);
+      setSelectedBp(primaryBreakpoint(bps)!.id);
+    }
+    setMatrix((st.matrix || {}) as ConditionMatrix);
+    setBottomBarAt((st.bottomBarAt || {}) as Record<string, boolean>);
+    if (Array.isArray(st.tabs)) setTabs(st.tabs as NavItem[]);
+    if (Array.isArray(st.actions)) setActions(st.actions as NavButtonItem[]);
+    if (Array.isArray(st.accountItems)) setAccountItems(st.accountItems as AccountMenuItem[]);
+    if (Array.isArray(st.dialItems)) setDialItems(st.dialItems as SpeedDialItem[]);
+    if (st.componentSize) setComponentSize(st.componentSize);
+    if (st.selectedTab) setSelectedTab(st.selectedTab);
+  }, []);
+
 
 
 
@@ -881,11 +932,11 @@ export default function NavDesignerPage() {
   const editBp = (id: string, patch: Partial<Breakpoint>) =>
     setBreakpoints((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
-  return (
+  const page = (
     <div data-theme="Default" data-surface="Surface"
       style={{ background: 'var(--Background)', color: 'var(--Text)', minHeight: '100vh' }}>
       {savedBrand && <style>{BRAND_CSS}</style>}
-      <AppBar />
+      <AddOnTopNav title="Adaptive Nav" uuid={uuid} exists={exists} basePath="/add-ons/nav" />
       <Section padding="32px 24px 64px">
         {/* Wider when split. 960 is a comfortable measure for one column of
             forms, and it was the cap when everything was one column — but
@@ -1694,6 +1745,14 @@ export default function NavDesignerPage() {
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
+              <H4>Share</H4>
+              <Body>
+                The whole setup in one link — layouts, breakpoints, what shows at each
+                width, the items and the menus. Open it to carry on where this left off.
+                An uploaded mark stays on this computer.
+              </Body>
+              <CodeBlock code={shareLink} language="URL" wrap />
+              <Divider />
               <H4>Spec</H4>
               <Body>
                 What gets published. Every value is a variable NAME, so it rebinds to
@@ -1935,5 +1994,12 @@ export default function NavDesignerPage() {
       </Modal>
 
     </div>
+  );
+
+  if (exists !== true || !uuid || !systemCss) return page;
+  return (
+    <OmniDesignProvider {...systemCss.urls} defaultTheme="Default" defaultStyle="Modern" defaultSurface="Surface">
+      {page}
+    </OmniDesignProvider>
   );
 }
