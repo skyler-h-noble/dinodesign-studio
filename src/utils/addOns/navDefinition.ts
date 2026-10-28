@@ -417,7 +417,7 @@ function bar(o: NavOptions): NodeDef {
        brand uses, and for the same reason. Centring inside a single filling
        group would put the tabs wherever the menu button and the condensed
        brand happen to leave them. */
-    const tabsCentred = o.heroTabsAlign === 'center';
+    const tabsCentred = (o.heroTabsAlign ?? 'center') === 'center';
     children = tabsCentred
       ? [
           /* THREE groups, and the third is why it works. Two FILL sides with a

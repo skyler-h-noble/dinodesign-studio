@@ -52,11 +52,17 @@ export interface ScaledPreviewProps {
    *  rewrite them — which is what switching a Component-Size mode does in
    *  Figma, and what makes the preview show the size that was chosen. */
   style?: CSSProperties;
+  /** Fit the HEIGHT as well as the width. The preview's own box must then have
+   *  a definite height (a flex child with minHeight 0, say) — a 1920x1080
+   *  desktop or an 844px-tall phone fitted to width alone runs off the bottom
+   *  of the screen, so the bottom bar, the part a phone layout is about, is the
+   *  part that is not visible. */
+  fitHeight?: boolean;
 }
 
 export default function ScaledPreview(
   { width, height: deviceHeight, children, maxScale = 1, onScale, frame, clip = true,
-    style }: ScaledPreviewProps,
+    style, fitHeight = false }: ScaledPreviewProps,
 ) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -69,7 +75,13 @@ export default function ScaledPreview(
 
     const measure = () => {
       const available = el.clientWidth;
-      const next = Math.min(maxScale, available / width);
+      /* The frame's 1px border on each side counts against the room too, or
+         a fitted preview overflows its box by two pixels and scrolls. */
+      const edge = frame ? 2 : 0;
+      let next = Math.min(maxScale, (available - edge) / width);
+      if (fitHeight && deviceHeight && el.clientHeight > 0) {
+        next = Math.min(next, (el.clientHeight - edge) / deviceHeight);
+      }
       setScale(next);
       onScale?.(next);
       /* A transform does not affect layout, so the wrapper keeps the
@@ -98,7 +110,7 @@ export default function ScaledPreview(
     ro.observe(el);
     if (inner.current) ro.observe(inner.current);
     return () => ro.disconnect();
-  }, [width, deviceHeight, maxScale, onScale]);
+  }, [width, deviceHeight, maxScale, onScale, fitHeight, frame]);
 
   /* Three layers, and each earns its place.
      
@@ -111,7 +123,7 @@ export default function ScaledPreview(
   const boxWidth = Math.round(width * scale);
 
   return (
-    <div ref={outer} style={{ width: '100%', ...style }}>
+    <div ref={outer} style={{ width: '100%', ...(fitHeight ? { height: '100%', minHeight: 0 } : {}), ...style }}>
       <div style={{
         width: boxWidth,
         maxWidth: '100%',

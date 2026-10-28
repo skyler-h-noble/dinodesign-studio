@@ -5,6 +5,10 @@ import { toAddonSpec, tokensUsed, conditionsUsedBy } from '../utils/addOns/toAdd
 const ALL: NavLayout[] = NAV_LAYOUTS.map((l) => l.id);
 const full = (layout: NavLayout) =>
   navDefinition({ layout, search: true, actions: true, avatar: true });
+/* The hero's left-aligned strip, which has to be asked for: centred is the
+   hero's default. */
+const heroLeft = () =>
+  navDefinition({ layout: 'hero', search: true, actions: true, avatar: true, heroTabsAlign: 'left' });
 
 /** Accepts a spec or a bare node, so a subtree can be asserted on directly. */
 const names = (specOrNode: any): string[] => {
@@ -72,7 +76,7 @@ describe('three layouts, one component', () => {
     for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
       expect(names(toAddonSpec(full(l))), l).toContain('End');
     }
-    const heroBar = (toAddonSpec(full('hero')) as any).root.children
+    const heroBar = (toAddonSpec(heroLeft()) as any).root.children
       .find((c: any) => c.name === 'Bar');
     expect(names(heroBar)).not.toContain('End');
   });
@@ -90,7 +94,14 @@ describe('three layouts, one component', () => {
       expect(names(toAddonSpec(full(l))), l).toContain('Center');
     }
     expect(names(toAddonSpec(full('rail')))).toContain('Title');
-    expect(names(toAddonSpec(full('hero')))).not.toContain('Center');
+    expect(names(toAddonSpec(heroLeft()))).not.toContain('Center');
+  });
+
+  it('the hero centres its tabs by default', () => {
+    /* Under a full-bleed image the strip is balanced: two filling sides with
+       the tabs hugging between them, so they land on the bar's centre line. */
+    const bar = (toAddonSpec(full('hero')) as any).root.children.find((c: any) => c.name === 'Bar');
+    expect(bar.children.map((c: any) => c.name)).toEqual(['Start', 'Center', 'End']);
   });
 });
 

@@ -24,11 +24,11 @@ import { encodeNavState, readNavState, NAV_SHARE_VERSION } from '../utils/addOns
 import { adaptiveNavDefinition, arrangementRows, ARRANGEMENT_CONDITIONS } from '../utils/addOns/adaptiveNav';
 import { navCode } from '../utils/addOns/navCode';
 import {
-  Button, H1, H2, H4, Body, BodySmall, Caption, Label,
+  Button, H1, H2, H3, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
   Tabs, TabList, Tab, TabPanel, TextArea, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
   Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
-  OmniDesignProvider, Link,
+  OmniDesignProvider, Link, ToggleButtonGroup,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
@@ -794,7 +794,20 @@ export default function NavDesignerPage() {
     if (st) applyNavState(st);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [outTab, setOutTab] = useState<'code' | 'export' | 'import'>('code');
+  const [tab, setTab] = useState<'build' | 'code' | 'export' | 'import'>('build');
+  /* Where the Build grid starts on the page, so its columns can fill the rest
+     of the window exactly. */
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [gridTop, setGridTop] = useState(240);
+  useEffect(() => {
+    const measure = () => {
+      const el = gridRef.current;
+      if (el) setGridTop(Math.round(el.getBoundingClientRect().top + window.scrollY));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [tab, twoCol]);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -868,14 +881,16 @@ export default function NavDesignerPage() {
      about what that variable holds at each width leaves every decision made
      here unrecorded, while looking correct because the binding is present. */
   const fullSpec = useMemo(
-    () => toAddonSpec(combined, { breakpoints: sorted, matrix: full }),
-    [combined, sorted, full],
+    /* `studio` carries the setup as a link, so the spec pasted back into
+       Import reopens it for editing — the plugin ignores the field. */
+    () => ({ ...toAddonSpec(combined, { breakpoints: sorted, matrix: full }), studio: shareLink }),
+    [combined, sorted, full, shareLink],
   );
   /* The same definition and table, as one React file. */
   const reactCode = useMemo(() => navCode({
     definition: combined, breakpoints: sorted, matrix: full, options, mobile,
-    tabs, actions, accountItems, dialItems, componentSize,
-  }), [combined, sorted, full, options, mobile, tabs, actions, accountItems, dialItems, componentSize]);
+    tabs, actions, accountItems, dialItems, componentSize, editLink: shareLink,
+  }), [combined, sorted, full, options, mobile, tabs, actions, accountItems, dialItems, componentSize, shareLink]);
   /* Writes one cell, at this breakpoint, honouring exclusivity.
      
      Tabs and the menu button are one decision in two booleans: switching one
@@ -926,14 +941,14 @@ export default function NavDesignerPage() {
 
   const range = breakpointRange(sorted, selectedBp);
 
-  /* Lay out at the VIEWPORT width — the breakpoint's own lower bound, which is
-     where a layout breaks if it is going to.
+  /* Lay out at the DEVICE's width — the screen the breakpoint stands for, as
+     the Figma frame is (falling back to the range's lower bound).
      
      Not at the cap. A capped breakpoint is a narrow content column inside a
      wide window, and rendering only the column would hide the thing the cap
      exists for: how much empty space sits either side, and whether the nav
      still relates to the page under it. */
-  const previewWidth = Math.max(range?.from ?? 0, 320);
+  const previewWidth = current?.deviceWidth ?? Math.max(range?.from ?? 0, 320);
 
   /* How wide the preview may shrink to, and how far it takes to get there.
      
@@ -971,31 +986,39 @@ export default function NavDesignerPage() {
           gap="var(--Sizing-4)"
           style={{ maxWidth: twoCol ? 1760 : 960, margin: '0 auto' }}
         >
-          <VStack gap="var(--Sizing-1)">
-            <H1>Adaptive Nav</H1>
-            <Body color="quiet">
-              One component for every width. The desktop and phone arrangements sit in
-              the same spec, and which one shows — and which parts of it — is decided
-              per breakpoint, not by a variant.
-            </Body>
+          <Body color="quiet">
+            One component for every width. The desktop and phone arrangements sit in
+            the same spec, and which one shows — and which parts of it — is decided
+            per device, not by a variant.{' '}
             <Link href={libraryPageUrl('adaptive-nav', uuid)} target="_blank" rel="noopener">
               About the Adaptive Nav in the component library
             </Link>
-          </VStack>
+          </Body>
+
+          <Tabs value={tab} onChange={(v: typeof tab) => setTab(v)} sx={{ overflow: 'clip' }}>
+            <TabList aria-label="Adaptive Nav">
+              <Tab value="build">Build</Tab>
+              <Tab value="code">Code</Tab>
+              <Tab value="export">Export</Tab>
+              <Tab value="import">Import</Tab>
+            </TabList>
+            <TabPanel value="build">
+          <VStack gap="var(--Sizing-2)">
 
           {/* Breakpoint first, because everything below is scoped to it — the
               layout, the conditions and the preview all describe THIS width.
               Widest first: design runs desktop-down, and the narrow ones are
               what the wide layout degrades into. */}
           <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
+            {/* A segmented control, not tabs, so it does not read as a second
+                tab bar under Build / Code / Export / Import — the same device
+                picker Bento and Hero use. */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <Tabs value={selectedBp} onChange={(v: string) => setSelectedBp(v)}>
-                <TabList>
-                  {shown.map((b) => (
-                    <Tab key={b.id} value={b.id}>{b.label}</Tab>
-                  ))}
-                </TabList>
-              </Tabs>
+              <ToggleButtonGroup value={selectedBp} onChange={(v: string) => v && setSelectedBp(v)} size="small" aria-label="Device">
+                {shown.map((b) => (
+                  <Button key={b.id} value={b.id} size="small">{b.label}</Button>
+                ))}
+              </ToggleButtonGroup>
             </div>
             {/* The button owns the name; the icon carries none, or a screen
                 reader announces the control twice. */}
@@ -1025,13 +1048,22 @@ export default function NavDesignerPage() {
               collapses to one column below TWO_COL_MIN, where 40% of the
               screen is too little for either. */}
           <div
+            ref={gridRef}
             style={{
               display: 'grid',
               gridTemplateColumns: twoCol ? '40fr 60fr' : '1fr',
               gap: 'var(--Sizing-4, 32px)',
-              alignItems: 'start',
+              alignItems: twoCol ? 'stretch' : 'start',
+              /* Split, the two columns fill the window under the tabs and each
+                 scrolls on its own — the controls can be long, and neither
+                 should drag the other. The same frame as Bento. */
+              ...(twoCol ? { height: `calc(100vh - ${gridTop + 24}px)`, minHeight: 480 } : {}),
             }}
           >
+            {/* The scroll is on a wrapper, not the stack: a scrolling flex
+                column shrinks its children to fit instead of overflowing, and
+                every card came out clipped to a sliver. */}
+            <div style={twoCol ? { minWidth: 0, minHeight: 0, overflowY: 'auto', padding: 6 } : { minWidth: 0 }}>
             <VStack gap="var(--Sizing-4)" style={{ minWidth: 0 }}>
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
@@ -1741,7 +1773,7 @@ export default function NavDesignerPage() {
                       <Button
                         key={id}
                         size="small"
-                        variant={(options.heroTabsAlign ?? 'left') === id ? 'default' : 'default-outline'}
+                        variant={(options.heroTabsAlign ?? 'center') === id ? 'default' : 'default-outline'}
                         onClick={() => set('heroTabsAlign', id)}
                       >
                         {l}
@@ -1773,102 +1805,30 @@ export default function NavDesignerPage() {
             </VStack>
           </Card>
 
-          <Card padding="medium">
-            <Tabs value={outTab} onChange={(v: string) => setOutTab(v as typeof outTab)}>
-              <TabList>
-                <Tab value="code">Code</Tab>
-                <Tab value="export">Export to Figma</Tab>
-                <Tab value="import">Import</Tab>
-              </TabList>
-              <TabPanel value="code">
-                <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
-                  <Body>
-                    One React file for every width, built from the library: the parts switch
-                    at your breakpoints, the menu button opens a drawer, the account menu
-                    opens from the avatar and the hero condenses on scroll. Wrap your page
-                    in it — it draws in your design system inside your OmniDesignProvider.
-                  </Body>
-                  <CodeBlock code={reactCode} language="JSX" maxHeight={480} />
-                  <H4>Share link</H4>
-                  <Body>
-                    The whole setup in one link — open it to carry on where this left off.
-                    An uploaded mark stays on this computer.
-                  </Body>
-                  <CodeBlock code={shareLink} language="URL" wrap />
-                </VStack>
-              </TabPanel>
-              <TabPanel value="export">
-                <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
-                  <Body>
-                    In Figma, open the Omni Design plugin, open the Add-ons tab, choose
-                    Adaptive Nav and paste this spec. It builds the nav as one component and
-                    writes which parts show on each device into Devices-Type — so the nav
-                    switches with the frame's device, the same way a Bento reflows.
-                  </Body>
-                  <Body color="quiet">
-                    Every value is a variable NAME, so it binds to each design system rather
-                    than carrying these colors.
-                  </Body>
-                  <CodeBlock code={JSON.stringify(fullSpec, null, 2)} language="JSON" maxHeight={420} />
-                </VStack>
-              </TabPanel>
-              <TabPanel value="import">
-                <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
-                  <Body>
-                    Carry on with a nav made here: paste its share link.
-                  </Body>
-                  <TextArea value={importText} onChange={(e: { target: { value: string } }) => setImportText(e.target.value)}
-                    placeholder="https://…/add-ons/nav/…#spec=…" rows={3} aria-label="Share link" />
-                  {importError && <Alert severity="error"><BodySmall>{importError}</BodySmall></Alert>}
-                  <Button variant="default" style={{ alignSelf: 'flex-start' }} onClick={() => {
-                    const st = readNavState(importText);
-                    if (!st) { setImportError('That is not an Adaptive Nav link, or it was cut off when copying.'); return; }
-                    applyNavState(st); setImportError(null); setImportText(''); setOutTab('code');
-                  }}>Open</Button>
-                </VStack>
-              </TabPanel>
-            </Tabs>
-          </Card>
             </VStack>
+            </div>
 
-            {/* The right-hand column. Sticky so it stays put while the tools
-                scroll — the same job the full-width sticky did, without
-                taking the whole width to do it. */}
-            <div style={{ position: 'sticky', top: 0, minWidth: 0 }}>
-          {/* Sticky, so a change made further down is visible as it is made.
-              Everything below this point edits what is in it, and scrolling to
-              check each change and back is most of the work of using the page.
-
-              It carries its own surface: a sticky element with a transparent
-              background shows the content sliding under it, which is the one
-              thing a sticky element cannot do. */}
+            {/* The right-hand column: the preview, fitted to the column's
+                width AND height so the whole screen is in view — a 1080-tall
+                desktop or an 844-tall phone fitted to width alone ran off the
+                bottom, and the bottom bar is the part a phone layout is about.
+                
+                Stacked, it is sticky instead, and shrinks as the page scrolls
+                (the sentinel measures how far). */}
+            <div style={twoCol
+              ? { minWidth: 0, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--Sizing-1, 8px)' }
+              : { position: 'sticky', top: 0, minWidth: 0 }}>
           <div ref={sentinelRef} aria-hidden style={{ height: 0 }} />
           <div
             data-surface="Surface"
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 2,
-              background: 'var(--Background)',
-              paddingTop: 'var(--Sizing-2, 8px)',
-              paddingBottom: 'var(--Sizing-2, 8px)',
-            }}
+            style={twoCol
+              ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--Sizing-1, 8px)' }
+              : {
+                  position: 'sticky', top: 0, zIndex: 2, background: 'var(--Background)',
+                  paddingTop: 'var(--Sizing-2, 8px)', paddingBottom: 'var(--Sizing-2, 8px)',
+                }}
           >
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Preview</H4>
-
-              {/* Laid out at the breakpoint's real width and TRANSFORMED down,
-                  rather than squeezed into the card. Squeezing would make the
-                  tabs wrap and the items collapse, so what is on screen would
-                  be the narrow arrangement wearing a wide label — every
-                  judgement from it about the wrong design. */}
-              {/* The frame is drawn INSIDE the scaler, on the sized box. Around
-                  it, it spanned the container while the content sat at its own
-                  smaller width, so the empty remainder read as part of the
-                  design. Square, too: a rounded frame reads as a nav with
-                  rounded corners rather than the edge of a viewport. */}
-              <div>
+              <div style={twoCol ? { flex: 1, minHeight: 0 } : undefined}>
                 {/* Stops cropping while the menu is open. The box's height is
                     computed from the untransformed content, and an absolutely
                     positioned panel never counted towards it — so cropping
@@ -1881,6 +1841,7 @@ export default function NavDesignerPage() {
                   maxScale={previewMaxScale}
                   onScale={setScale}
                   frame
+                  fitHeight={twoCol}
                   clip={!menuShown}
                 >
                   {/* The cap goes THROUGH the renderer rather than around it.
@@ -1898,23 +1859,78 @@ export default function NavDesignerPage() {
                   />
                 </ScaledPreview>
               </div>
-
-              <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                <Caption color="quiet">
-                  {previewWidth}
-                  {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''}px
-                  {scale < 0.999 ? ` — shown at ${Math.round(scale * 100)}%` : ' — actual size'}
-                  {current?.maxWidth && current.maxWidth < previewWidth
-                    ? `, content capped at ${current.maxWidth}px`
-                    : ''}
-                </Caption>
-              </HStack>
-
-            </VStack>
-          </Card>
+              {/* The device and how far it is scaled, as Bento and Hero say it:
+                  a preview shown smaller than life without saying so gets
+                  judged at the wrong size. */}
+              <Caption color="quiet">
+                {current?.label} · {previewWidth}
+                {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''} · {Math.round(scale * 100)}%
+                {current?.maxWidth && current.maxWidth < previewWidth
+                  ? ` · content capped at ${current.maxWidth}px`
+                  : ''}
+              </Caption>
           </div>
             </div>
           </div>
+          </VStack>
+            </TabPanel>
+          <TabPanel value="code">
+            <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
+              <Body>
+                One React file for every width, built from the library: the parts switch
+                at your breakpoints, the menu button opens a drawer, the account menu
+                opens from the avatar and the hero condenses on scroll. Wrap your page
+                in it — it draws in your design system inside your OmniDesignProvider.
+              </Body>
+              <CodeBlock code={reactCode} language="JSX" maxHeight={480} />
+              <H4>Share link</H4>
+              <Body>
+                The whole setup in one link — open it to carry on where this left off.
+                An uploaded mark stays on this computer.
+              </Body>
+              <CodeBlock code={shareLink} language="URL" wrap />
+            </VStack>
+          </TabPanel>
+          <TabPanel value="export">
+            <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
+              <Body>
+                In Figma, open the Omni Design plugin, open the Add-ons tab, choose
+                Adaptive Nav and paste this spec. It builds the nav as one component and
+                writes which parts show on each device into Devices-Type — so the nav
+                switches with the frame's device, the same way a Bento reflows.
+              </Body>
+              <Body color="quiet">
+                Every value is a variable NAME, so it binds to each design system rather
+                than carrying these colors.
+              </Body>
+              <CodeBlock code={JSON.stringify(fullSpec, null, 2)} language="JSON" maxHeight={420} />
+            </VStack>
+          </TabPanel>
+          <TabPanel value="import">
+            <div style={{ maxWidth: 560, paddingTop: 'var(--Sizing-2)' }}>
+              <Card padding="medium">
+                <VStack gap="var(--Sizing-2)">
+                  <H3>Import a nav</H3>
+                  <BodySmall color="quiet">
+                    Edit a nav made with this add-on: paste its link, its React file or its
+                    Figma spec — each one carries the whole setup. Only navs made here can be
+                    opened. An uploaded logo stays on the computer it was added on.
+                  </BodySmall>
+                  <TextArea label="Nav link, code or spec" rows={4} fullWidth value={importText}
+                    onChange={(e: { target: { value: string } }) => setImportText(e.target.value)} />
+                  {importError && <Alert color="warning"><BodySmall>{importError}</BodySmall></Alert>}
+                  <HStack gap="var(--Sizing-1)">
+                    <Button variant="default-outline" size="small" disabled={!importText.trim()} onClick={() => {
+                      const st = readNavState(importText);
+                      if (!st) { setImportError('That is not an Adaptive Nav, or it was cut off when copying — only navs made with this add-on carry their setup.'); return; }
+                      applyNavState(st); setImportError(null); setImportText(''); setTab('build');
+                    }}>Load</Button>
+                  </HStack>
+                </VStack>
+              </Card>
+            </div>
+          </TabPanel>
+          </Tabs>
         </VStack>
       </Section>
 

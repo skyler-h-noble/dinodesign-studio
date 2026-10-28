@@ -29,17 +29,17 @@ describe('one Adaptive Nav across every width', () => {
   });
 
   it('a tablet breakpoint that chose the bottom bar is Mobile; a desktop one cannot be', () => {
-    const md = DEFAULT_BREAKPOINTS.find((b) => b.id === 'md')!;
-    const xl = DEFAULT_BREAKPOINTS.find((b) => b.id === 'xl')!;
-    expect(mobileAt(md, { md: true })).toBe(true);
-    expect(mobileAt(xl, { xl: true })).toBe(false);
+    const tablet = DEFAULT_BREAKPOINTS.find((b) => b.id === 'tablet-h')!;
+    const desktop = DEFAULT_BREAKPOINTS.find((b) => b.id === 'desktop')!;
+    expect(mobileAt(tablet, { 'tablet-h': true })).toBe(true);
+    expect(mobileAt(desktop, { desktop: true })).toBe(false);
   });
 
   it('publishes one spec whose responsive table switches arrangement', () => {
     const matrix = arrangementRows(DEFAULT_BREAKPOINTS, {});
     const spec: any = toAddonSpec(def, { breakpoints: DEFAULT_BREAKPOINTS, matrix });
     expect(spec.root.children.map((c: any) => c.visibleWhen)).toEqual([DESKTOP_CONDITION, MOBILE_CONDITION]);
-    expect(spec.responsive.matrix[MOBILE_CONDITION].xs).toBe(true);
-    expect(spec.responsive.matrix[DESKTOP_CONDITION].xl).toBe(true);
+    expect(spec.responsive.matrix[MOBILE_CONDITION].mobile).toBe(true);
+    expect(spec.responsive.matrix[DESKTOP_CONDITION].desktop).toBe(true);
   });
 });
