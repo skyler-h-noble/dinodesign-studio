@@ -21,10 +21,11 @@ import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
 import { encodeNavState, readNavState, NAV_SHARE_VERSION } from '../utils/addOns/navShare';
 import { adaptiveNavDefinition, arrangementRows, ARRANGEMENT_CONDITIONS } from '../utils/addOns/adaptiveNav';
+import { navCode } from '../utils/addOns/navCode';
 import {
   Button, H1, H2, H4, Body, BodySmall, Caption, Label,
   VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
-  Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
+  Tabs, TabList, Tab, TabPanel, TextArea, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
   Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
   OmniDesignProvider,
 } from '@omni-design/components';
@@ -767,11 +768,8 @@ export default function NavDesignerPage() {
     return `${window.location.origin}/add-ons/nav/${uuid || ''}#spec=${token}`;
   }, [options, mobile, breakpoints, matrix, bottomBarAt, tabs, actions, accountItems, dialItems, componentSize, selectedTab, uuid]);
 
-  /* Opened from a share link: put the setup back. Once, on arrival — a broken
-     or foreign link leaves the defaults. */
-  useEffect(() => {
-    const st = readNavState(window.location.hash);
-    if (!st) return;
+  /* A share link's setup, put back — on arrival, or pasted into Import. */
+  const applyNavState = (st: NonNullable<ReturnType<typeof readNavState>>) => {
     setOptions(st.options as NavOptions);
     setMobile(st.mobile as MobileOptions);
     const bps = st.breakpoints as Breakpoint[];
@@ -787,7 +785,17 @@ export default function NavDesignerPage() {
     if (Array.isArray(st.dialItems)) setDialItems(st.dialItems as SpeedDialItem[]);
     if (st.componentSize) setComponentSize(st.componentSize);
     if (st.selectedTab) setSelectedTab(st.selectedTab);
+  };
+  /* Opened from a share link: once, on arrival — a broken or foreign link
+     leaves the defaults. */
+  useEffect(() => {
+    const st = readNavState(window.location.hash);
+    if (st) applyNavState(st);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const [outTab, setOutTab] = useState<'code' | 'export' | 'import'>('code');
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
 
 
 
@@ -862,6 +870,11 @@ export default function NavDesignerPage() {
     () => toAddonSpec(combined, { breakpoints: sorted, matrix: full }),
     [combined, sorted, full],
   );
+  /* The same definition and table, as one React file. */
+  const reactCode = useMemo(() => navCode({
+    definition: combined, breakpoints: sorted, matrix: full, options, mobile,
+    tabs, actions, accountItems, dialItems, componentSize,
+  }), [combined, sorted, full, options, mobile, tabs, actions, accountItems, dialItems, componentSize]);
   /* Writes one cell, at this breakpoint, honouring exclusivity.
      
      Tabs and the menu button are one decision in two booleans: switching one
@@ -1757,40 +1770,60 @@ export default function NavDesignerPage() {
           </Card>
 
           <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Share</H4>
-              <Body>
-                The whole setup in one link — layouts, breakpoints, what shows at each
-                width, the items and the menus. Open it to carry on where this left off.
-                An uploaded mark stays on this computer.
-              </Body>
-              <CodeBlock code={shareLink} language="URL" wrap />
-              <Divider />
-              <H4>Spec</H4>
-              <Body>
-                What gets published. Every value is a variable NAME, so it rebinds to
-                each design system rather than carrying these colors.
-              </Body>
-              <CodeBlock
-                code={JSON.stringify(fullSpec, null, 2)}
-                language="JSON"
-                maxHeight={360}
-              />
-
-              {contentInsetCSS(insets) && (
-                <>
-                  <Divider />
-                  <H4>Content insets</H4>
+            <Tabs value={outTab} onChange={(v: string) => setOutTab(v as typeof outTab)}>
+              <TabList>
+                <Tab value="code">Code</Tab>
+                <Tab value="export">Export to Figma</Tab>
+                <Tab value="import">Import</Tab>
+              </TabList>
+              <TabPanel value="code">
+                <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
                   <Body>
-                    A pinned bar leaves the flow, so the page starts underneath it
-                    and the first thing on it is hidden. This is the CSS that
-                    clears it — in tokens, so it follows the size mode rather than
-                    being a number read off the screen once.
+                    One React file for every width, built from the library: the parts switch
+                    at your breakpoints, the menu button opens a drawer, the account menu
+                    opens from the avatar and the hero condenses on scroll. Wrap your page
+                    in it — it draws in your design system inside your OmniDesignProvider.
                   </Body>
-                  <CodeBlock code={contentInsetCSS(insets)!} language="CSS" />
-                </>
-              )}
-            </VStack>
+                  <CodeBlock code={reactCode} language="JSX" maxHeight={480} />
+                  <H4>Share link</H4>
+                  <Body>
+                    The whole setup in one link — open it to carry on where this left off.
+                    An uploaded mark stays on this computer.
+                  </Body>
+                  <CodeBlock code={shareLink} language="URL" wrap />
+                </VStack>
+              </TabPanel>
+              <TabPanel value="export">
+                <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
+                  <Body>
+                    In Figma, open the Omni Design plugin, open the Add-ons tab, choose
+                    Adaptive Nav and paste this spec. It builds the nav as one component and
+                    creates its conditions as variables with a mode per breakpoint — so
+                    switching the mode shows the nav at that width.
+                  </Body>
+                  <Body color="quiet">
+                    Every value is a variable NAME, so it binds to each design system rather
+                    than carrying these colors.
+                  </Body>
+                  <CodeBlock code={JSON.stringify(fullSpec, null, 2)} language="JSON" maxHeight={420} />
+                </VStack>
+              </TabPanel>
+              <TabPanel value="import">
+                <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
+                  <Body>
+                    Carry on with a nav made here: paste its share link.
+                  </Body>
+                  <TextArea value={importText} onChange={(e: { target: { value: string } }) => setImportText(e.target.value)}
+                    placeholder="https://…/add-ons/nav/…#spec=…" rows={3} aria-label="Share link" />
+                  {importError && <Alert severity="error"><BodySmall>{importError}</BodySmall></Alert>}
+                  <Button variant="default" style={{ alignSelf: 'flex-start' }} onClick={() => {
+                    const st = readNavState(importText);
+                    if (!st) { setImportError('That is not an Adaptive Nav link, or it was cut off when copying.'); return; }
+                    applyNavState(st); setImportError(null); setImportText(''); setOutTab('code');
+                  }}>Open</Button>
+                </VStack>
+              </TabPanel>
+            </Tabs>
           </Card>
             </VStack>
 
