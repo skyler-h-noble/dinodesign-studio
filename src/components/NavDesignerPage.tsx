@@ -681,6 +681,10 @@ export default function NavDesignerPage() {
              panel above the bar and lays the rows out in the ring's column.
              The rows are this page's list, the way the account menu's are. */
           ...(mobile.fabSpeedDial ? {
+            /* Labels in place, inside the preview's scale. Portalled to the
+               body they escaped the transform and drew at full size beside
+               a phone shown at half of it. */
+            disablePortal: true,
             actions: dialItems.map((d) => ({
               key: d.id, label: d.label, icon: <NavIconGlyph name={d.iconName || 'Add'} />,
             })),
