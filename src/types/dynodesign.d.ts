@@ -103,6 +103,7 @@ declare module '@omni-design/components' {
   export const SHAPE_NAMES: string[];
   export const MORPHABLE_SHAPES: string[];
   export const ICON_SHAPES: string[];
+  export const AVATAR_SHAPES: string[];
   export const Autocomplete: FC<any>;
   export const Checkbox: FC<any>;
   export const CheckboxGroup: FC<any>;

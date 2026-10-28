@@ -11,7 +11,7 @@ import { useParams } from 'react-router';
 import {
   Body, BodySmall, Caption, H3, VStack, HStack, Card, Alert, Button, Tabs, TabList, Tab, TabPanel,
   CodeBlock, TextArea, TextField, Select, ToggleButtonGroup, Link, ShapeButton, shapeOptions,
-  MORPHABLE_SHAPES, OmniDesignProvider,
+  MORPHABLE_SHAPES, AVATAR_SHAPES, OmniDesignProvider,
 } from '@omni-design/components';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import StarIcon from '@mui/icons-material/Star';
@@ -35,6 +35,9 @@ const ICONS: Record<string, ReactNode> = {
   PlayArrow: <PlayArrowIcon />, Check: <CheckIcon />, ThumbUp: <ThumbUpIcon />, Notifications: <NotificationsIcon />,
 };
 const COLORS = ['default', 'primary', 'secondary', 'tertiary', 'neutral'];
+/* The button shapes that can blend into one another: the avatar set's round
+   ones. */
+const MORPH_PAIR_SHAPES = AVATAR_SHAPES.filter((n: string) => MORPHABLE_SHAPES.includes(n));
 const TRIGGER_LABEL: Record<MorphTrigger, string> = { selected: 'While selected', hover: 'On hover', press: 'While pressed' };
 
 export default function MorphButtonAddOnPage() {
@@ -103,10 +106,10 @@ export default function MorphButtonAddOnPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, paddingTop: 16 }}>
               <Card padding="medium">
                 <VStack spacing={2.5}>
-                  <Select label="Shape" fullWidth value={st.shape} onChange={(v: string) => set('shape', v)} options={shapeOptions(MORPHABLE_SHAPES)} />
-                  <Select label="Morphs to" fullWidth value={st.morphTo} onChange={(v: string) => set('morphTo', v)} options={shapeOptions(MORPHABLE_SHAPES)} />
+                  <Select label="Shape" fullWidth value={st.shape} onChange={(v: string) => set('shape', v)} options={shapeOptions(MORPH_PAIR_SHAPES)} />
+                  <Select label="Morphs to" fullWidth value={st.morphTo} onChange={(v: string) => set('morphTo', v)} options={shapeOptions(MORPH_PAIR_SHAPES)} />
                   <Caption color="quiet">
-                    Only round shapes are offered: they share one outline, so one can turn into the other smoothly — in code and with Smart Animate in Figma.
+                    The button shapes that share an outline — circle, the cookies, flower and puffy — so one turns into the other smoothly, in code and with Smart Animate in Figma.
                   </Caption>
                   <VStack spacing={1}>
                     <BodySmall>When it morphs</BodySmall>
