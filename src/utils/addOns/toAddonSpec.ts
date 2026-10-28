@@ -170,8 +170,10 @@ export interface SpecResponsive {
  * nav designed to hide its search at xs and show it at md arrives with neither
  * decision recorded, looking correct because the binding is there.
  *
- * The plugin needs both halves: the breakpoints to match against Device-Sizes
- * modes by width, and the matrix to write each boolean per mode.
+ * The plugin needs both halves: the breakpoints become the modes of an
+ * "Adaptive Nav" collection (one per breakpoint, widest first), and the matrix
+ * is each boolean's value per mode — written before the component is built
+ * and bound by name (dino-figma-plugin, nav-build).
  *
  * Scroll-triggered conditions are in the table too, at false everywhere. That
  * is not a gap — no width makes them true, and omitting them would leave those
