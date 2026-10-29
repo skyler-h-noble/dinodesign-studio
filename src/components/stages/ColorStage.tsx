@@ -29,7 +29,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
-import { generateColorSchemes } from '../../utils/colorSchemes';
+import { generateColorSchemes, schemeCoreToneHex } from '../../utils/colorSchemes';
 import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma, getMatchingPeakChroma, findClosestColorN } from '../../utils/colorScale';
 import { getColorDescription } from '../../utils/colorNaming';
 import type { StageProps, ColorScheme } from '../../types';
@@ -1753,10 +1753,16 @@ export default function ColorStage({
                     handles selection; clicking a swatch directly did
                     nothing here, so the lib's Button variant was misleading.
                     For the Custom card the user still picks colors via the
-                    "Edit Colors" toggle in the card header. */}
+                    "Edit Colors" toggle in the card header.
+
+                    Painted from the GENERATED ramp, not the picked color: the
+                    core tone of each role's palette is what the design system
+                    will actually use, and a pick above the chroma cap does not
+                    survive into it. Which colors make up the combo is still
+                    decided by scheme.colors — only the paint changed. */}
                 <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                   {(['primary', 'secondary', 'tertiary'] as const).map((role, i) => {
-                    const displayColor = scheme.colors[i];
+                    const displayColor = schemeCoreToneHex(scheme, i as 0 | 1 | 2);
                     const label = ['Primary', 'Secondary', 'Tertiary'][i];
                     return (
                       <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>
