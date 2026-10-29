@@ -96,7 +96,7 @@ const THEMES: string[] = [...THEME_MODES];
  * palette they chose next to the default that resolves it.
  */
 import { solveChartPalette } from './chartPalette';
-import { solveQuietOpacities } from './quietOpacity';
+import { solveQuietOpacities, sectionQuietOverrides, QUIET_SECTION_FIX_MODES } from './quietOpacity';
 
 export function themeOrder(defaultTheme?: string): string[] {
   const rest = THEMES.filter((t) => t !== 'Default');
@@ -1672,6 +1672,12 @@ export function generateFigmaJSON(
    * colours get deleted only once nothing is bound to them (invariant 8). */
   {
     const QUIET_TARGET = 4.5;
+    /* theme|section -> mode -> percent, for the few sections the shared tone
+       alpha leaves under 4.5:1 (sectionQuietOverrides; the CSS export reads the
+       same list). Also each mode's table percent at that section's tone, so a
+       mode that does NOT need the override still gets the value it had. */
+    const sectionOverrides = new Map<string, { theme: string; section: string; tone: number; byMode: Record<string, number> }>();
+    const tablePercentByMode: Record<string, Record<number, number>> = {};
     for (const modeName of ['Light-Mode', 'Dark-Mode']) {
       const modeData = designSystemJSON.Modes?.[modeName];
       if (!modeData?.Colors || !figma.Modes[modeName]) continue;
@@ -1708,6 +1714,20 @@ export function generateFigmaJSON(
       for (const note of solved.notes)
         console.warn(`[figma] Quiet-Opacity ${modeName}: ${note}`);
 
+      tablePercentByMode[modeName] = solved.percent;
+      const toneOf = (section: any): number | null => {
+        const m = String(section?.['Quiet-Opacity']?.value ?? '').match(/^\{Quiet\.Color-(\d+)-Opacity\}$/);
+        return m ? Number(m[1]) : null;
+      };
+      const overrides = QUIET_SECTION_FIX_MODES.includes(modeName)
+        ? sectionQuietOverrides(modeData, solved, toHex, toneOf, QUIET_TARGET) : [];
+      for (const o of overrides) {
+        const key = `${o.theme}|${o.section}`;
+        const entry = sectionOverrides.get(key) ?? { theme: o.theme, section: o.section, tone: o.tone, byMode: {} };
+        entry.byMode[modeName] = o.percent;
+        sectionOverrides.set(key, entry);
+      }
+
       const group: any = {};
       for (const [n, pct] of Object.entries(solved.percent))
         group[`Color-${n}-Opacity`] = { value: pct, type: 'number' };
@@ -1722,6 +1742,30 @@ export function generateFigmaJSON(
           `Text.Containers present=${!!designSystemJSON.Modes?.[modeName]?.Text?.Containers}, ` +
           `Backgrounds present=${!!designSystemJSON.Modes?.[modeName]?.Backgrounds}.`);
       }
+    }
+
+    /* A section that needs its own Quiet opacity gets its own FLOAT in the
+       Quiet group, and its Theme/Quiet-Opacity aliases that instead of the
+       shared tone. The Theme collection is mode-independent (built once from
+       Light-Mode), so the per-mode difference has to live in Modes: the
+       variable exists in both modes, holding the override where a mode needs
+       it and that mode's own tone value where it does not. */
+    for (const { theme, section, tone, byMode } of sectionOverrides.values()) {
+      // The export names the groups Surfaces / Surfaces-Brightest; the Theme
+      // collection names them Surface / Surface-Brightest.
+      const figmaSection = section.replace(/^Surfaces/, 'Surface');
+      const name = `${theme}-${figmaSection}-Opacity`;
+      for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+        const pct = byMode[modeName] ?? tablePercentByMode[modeName]?.[tone];
+        if (pct === undefined || !figma.Modes[modeName]?.Quiet) continue;
+        figma.Modes[modeName].Quiet[name] = { value: pct, type: 'number' };
+      }
+      const target = figma.Themes?.[theme]?.[figmaSection];
+      if (target && 'Quiet-Opacity' in target) {
+        target['Quiet-Opacity'] = { value: `{Quiet.${name}}`, type: 'number' };
+      }
+      console.warn(`[figma] Quiet-Opacity: ${theme}/${figmaSection} gets its own value ` +
+        `(${Object.entries(byMode).map(([m, v]) => `${m} ${v}%`).join(', ')}) — the shared tone ${tone} left it under ${QUIET_TARGET}:1.`);
     }
   }
 

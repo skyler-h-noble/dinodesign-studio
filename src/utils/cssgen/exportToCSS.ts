@@ -12,7 +12,7 @@ import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
 import { chartColorVisionCSS } from '../chartColorVision';
-import { compositeOver, solveQuietOpacities, QUIET_PALETTES } from '../quietOpacity';
+import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS, FAB_SIZE } from '../componentSize';
 import { fabBevelVars } from '../bevelGeometry';
@@ -1760,10 +1760,9 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
    * Returns null when anything is missing, and the caller then falls back to
    * the ordinary reference rather than emitting a colour it cannot justify.
    */
-  function quietSolid(section: any, key: string): string | null {
-    const source = QUIET_SOURCE[key];
-    if (!source || !section) return null;
-    let ref: any = section['Quiet-Opacity']?.value;
+  /** The tone a section's Quiet-Opacity points at, following references. */
+  function quietToneOf(section: any): number | null {
+    let ref: any = section?.['Quiet-Opacity']?.value;
     for (let hop = 0; hop < 8 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
       const path = ref.slice(1, -1);
       if (/^Quiet\.Color-\d+-Opacity$/.test(path)) break;
@@ -1772,7 +1771,30 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       ref = next;
     }
     const tone = typeof ref === 'string' ? ref.match(/Quiet\.Color-(\d+)-Opacity/) : null;
-    const alpha = tone ? quietTable.alpha[Number(tone[1])] : undefined;
+    return tone ? Number(tone[1]) : null;
+  }
+
+  /* The few theme sections the shared tone alpha leaves under 4.5:1 get their
+     own (see sectionQuietOverrides). The Figma payload solves the same list
+     from the same module and writes it as its own Quiet float.
+
+     DARK MODE ONLY, for now. Light mode has the same kind of near-misses
+     (Quiet-* accents on the status themes, 4.42-4.50:1) and the same call
+     clears them, but light mode is held byte-for-byte while the dark-mode
+     tone work lands; turning it on for light is a one-word change here and in
+     generateFigmaJSON (QUIET_SECTION_FIX_MODES). */
+  const quietOverride = new Map<any, number>(
+    (QUIET_SECTION_FIX_MODES.includes(modeName ?? '')
+      ? sectionQuietOverrides(modeData, quietTable, (raw: any) => hexForToken(raw), quietToneOf)
+      : []
+    ).map((o) => [o.node, o.alpha] as [any, number]),
+  );
+
+  function quietSolid(section: any, key: string): string | null {
+    const source = QUIET_SOURCE[key];
+    if (!source || !section) return null;
+    const tone = quietToneOf(section);
+    const alpha = quietOverride.get(section) ?? (tone === null ? undefined : quietTable.alpha[tone]);
     if (alpha === undefined) return null;
     const bg = hexForToken(section['Background']);
     const fg = hexForToken(section[source]);
