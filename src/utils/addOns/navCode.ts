@@ -352,7 +352,7 @@ export function navCode(input: NavCodeInput): string {
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ${lib.join(', ')} } from '@omni-design/components';
-${icons.map((n) => `import ${n}Icon from '@mui/icons-material/${n}';`).join('\n')}
+${icons.map((n) => `import ${n}Icon from '@omni-design/icons/${n}';`).join('\n')}
 
 ${iconMap}
 const TABS = [

@@ -73,7 +73,7 @@ export function morphCode(s: MorphState, editLink?: string): string {
     ' */',
     `import React${toggle ? ', { useState }' : ''} from 'react';`,
     "import { ShapeButton } from '@omni-design/components';",
-    `import ${s.icon}Icon from '@mui/icons-material/${s.icon}';`,
+    `import ${s.icon}Icon from '@omni-design/icons/${s.icon}';`,
     '',
     `export default function MorphButton(${toggle ? '' : '{ onClick }'}) {`,
     ...(toggle ? ['  const [on, setOn] = useState(false);'] : []),

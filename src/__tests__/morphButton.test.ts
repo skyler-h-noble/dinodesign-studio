@@ -16,7 +16,7 @@ describe('Morph Button add-on', () => {
     expect(code).toContain('morphTo="flower"');
     expect(code).toContain('morphOn="hover"');
     expect(code).toContain('aria-label="Add to favourites"');
-    expect(code).toContain("import StarIcon from '@mui/icons-material/Star';");
+    expect(code).toContain("import StarIcon from '@omni-design/icons/Star';");
   });
 
   it('a toggle keeps its own state', () => {

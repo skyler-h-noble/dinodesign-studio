@@ -679,9 +679,10 @@ CONVERSION RULES:
         add            -> AddIcon
         chevron-right  -> ChevronRightIcon
         more_vert      -> MoreVertIcon
-    Import it from "@mui/icons-material" — that package IS allowed and is the
-    only place icons come from; the component library ships none.
-        import AddIcon from '@mui/icons-material/Add';
+    Import it from "@omni-design/icons" — the only place icons come from. It is
+    the Material Icons as plain SVG, with the same names as @mui/icons-material
+    but without MUI's styling engine; never import @mui/icons-material.
+        import AddIcon from '@omni-design/icons/Add';
 
     THE GLYPH MAY BE A TEXT LAYER. The icon set is a FONT, so the glyph is a
     text node whose CHARACTERS are the ligature — "home", "info_outline" — in
@@ -691,16 +692,18 @@ CONVERSION RULES:
     content is edited and the characters are what is actually drawn.
 
     THE Icon COMPONENT CARRIES A Style VARIANT, and it is the font family.
-    Material ships the same glyph in three corner treatments, and MUI ships a
-    matching component for each, so the variant decides the SUFFIX:
+    Material ships the same glyph in three corner treatments, and
+    @omni-design/icons ships a matching component for each (the same names
+    MUI uses), so the variant decides the SUFFIX:
 
         Style=Default  (Material Icons)        add -> AddIcon
         Style=Round    (Material Icons Round)  add -> AddRoundedIcon
         Style=Sharp    (Material Icons Sharp)  add -> AddSharpIcon
 
-        import AddRoundedIcon from '@mui/icons-material/AddRounded';
+        import AddRoundedIcon from '@omni-design/icons/AddRounded';
 
-    Note Figma says "Round" and MUI says "Rounded" — map it, do not copy it.
+    Note Figma says "Round" and the icon names say "Rounded" — map it, do not
+    copy it.
     Dropping the variant is a silent miss: a rounded icon emitted as AddIcon
     still compiles and still renders an icon, just with the wrong corners.
 

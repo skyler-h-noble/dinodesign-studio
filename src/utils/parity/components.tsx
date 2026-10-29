@@ -2098,7 +2098,7 @@ const hotlinkGroup: ParityComponent = {
 
 /* Icon: one Material glyph at Icons & Avatars › Icon-Size (24 in `small`),
    colored Icons › Icon. Style picks the glyph set — Default (filled), Round,
-   Sharp — which in code is the matching @mui/icons-material export. */
+   Sharp — which in code is the matching @omni-design/icons export (same names as @mui/icons-material). */
 const ICON_STYLE: Record<string, ReactNode> = { Default: <HomeIcon />, Round: <HomeRoundedIcon />, Sharp: <HomeSharpIcon /> };
 const icon: ParityComponent = {
   key: 'icon',

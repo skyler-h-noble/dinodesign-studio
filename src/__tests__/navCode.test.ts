@@ -41,7 +41,7 @@ describe('Adaptive Nav as code', () => {
     const libImport = code.match(/import \{ ([^}]+) \} from '@omni-design\/components';/)![1].split(', ');
     const body = code.replace(/\/\*[\s\S]*?\*\//g, '');   // not the usage example in the header
     for (const used of new Set([...body.matchAll(/<([A-Z][A-Za-z]+)[\s>/]/g)].map((m) => m[1]))) {
-      if (used.endsWith('Icon')) expect(code, used).toContain(`import ${used} from '@mui/icons-material/`);
+      if (used.endsWith('Icon')) expect(code, used).toContain(`import ${used} from '@omni-design/icons/`);
       else if (!['React', 'I'].includes(used)) expect(libImport, used).toContain(used);
     }
   });
