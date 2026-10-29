@@ -21,8 +21,11 @@
  *
  * The multiplier applies to each tone's CURRENT chroma (after the bell curve
  * and the gamut clip), so "1.0 at Color-12" means exactly today's tone.
- * Tones 1-5 and light mode are untouched, as are the fixed-seed semantic
- * ramps (Neutral, Info, Success, Warning, Error, Hotlink-Visited).
+ * Tones 1-5 and light mode are untouched. Every dark ramp is eased: the brand
+ * three inside generateSemanticDarkModeScale, the status ramps (Neutral, Info,
+ * Success, Warning, Error, Hotlink-Visited) by easeDarkLightTones after their
+ * hand-picked tones are applied, so the ease scales the tuning. Neutral is
+ * achromatic, so in practice it does not move.
  *
  * Charts are deliberately NOT eased: their tones are solved once for both
  * modes, so the export records the pre-ease tones (ToneStep.preEaseHex →

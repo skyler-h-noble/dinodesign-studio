@@ -3317,7 +3317,7 @@ function generateThemesSection(
 }
 
 /**
- * Metadata for the chart solver: the dark brand tones as they were BEFORE the
+ * Metadata for the chart solver: the dark tones (brand and status) as they were BEFORE the
  * dark-mode chroma ease (darkToneEase.ts), keyed by palette and Color-N.
  *
  * Chart colors are solved once for both modes, so handing the solver the
@@ -3332,7 +3332,11 @@ function generateThemesSection(
  */
 function chartPreEaseDarkTones(dark: Record<string, Array<{ tone: number; color: string; preEaseColor?: string }>>) {
   const out: Record<string, Record<string, { value: string; type: 'color' }>> = {};
-  for (const [key, name] of [['primary', 'Primary'], ['secondary', 'Secondary'], ['tertiary', 'Tertiary']] as const) {
+  for (const [key, name] of [
+    ['primary', 'Primary'], ['secondary', 'Secondary'], ['tertiary', 'Tertiary'],
+    ['neutral', 'Neutral'], ['info', 'Info'], ['success', 'Success'], ['warning', 'Warning'],
+    ['error', 'Error'], ['hotlink-visited', 'Hotlink-Visited'],
+  ] as const) {
     (dark?.[key] || []).forEach((entry, i) => {
       if (!entry?.preEaseColor) return;
       (out[name] ||= {})[`Color-${i + 1}`] = { value: entry.preEaseColor, type: 'color' };

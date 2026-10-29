@@ -517,6 +517,34 @@ export function generateSemanticLightModeScale(
 }
 
 /**
+ * Apply the dark-mode ease (DARK_LIGHT_TONE_CHROMA_EASE) to a finished dark
+ * ramp: each of Color-6 … Color-11 keeps its lightness (CIE L*) and its
+ * perceived hue (OKLCH) and has its CURRENT chroma multiplied by
+ * darkLightToneChromaMultiplier. Used for the status ramps, whose tones are
+ * set by hand after generation (SEMANTIC_TONES), so the ease scales the tuned
+ * tone instead of the tuning replacing the ease.
+ * An achromatic tone (Neutral) has no chroma to ease and is returned as is.
+ * The tone before the ease is kept as preEaseHex, for the chart solver.
+ */
+export function easeDarkLightTones<T extends { hex: string; preEaseHex?: string }>(scale: T[]): T[] {
+  return scale.map((t, i) => {
+    const m = darkLightToneChromaMultiplier(i + 1);
+    if (m === 1) return t;
+    const [L, C, H] = chroma(t.hex).lch();
+    if (!(C > 0.5) || isNaN(H)) return t;
+    /* Hue is held in OKLCH, the space the status hues were tuned in: scaling
+       CIE chroma at a fixed CIE hue turned Info's eased tones lavender (OKLCH
+       258 -> 270), the drift SEMANTIC_HUE_EASING exists to prevent. Lightness
+       is then put back in CIE L*, which fixes relative luminance, so every
+       contrast pairing keeps its ratio. */
+    const [lo, co, ho] = chroma(t.hex).oklch();
+    const [, cc, hh] = chroma.oklch(lo, co * m, ho).lch();
+    const eased = chroma.lch(L, cc, isNaN(hh) ? H : hh).hex();
+    return eased === t.hex ? t : { ...t, hex: eased, preEaseHex: t.preEaseHex ?? t.hex };
+  });
+}
+
+/**
  * Generate a 12-tone dark mode scale from a hex color.
  * maxChroma is a CEILING. The peak is always derived from the color's own
  * position on the bell curve; the cap only lowers it, never raises it.
@@ -526,10 +554,10 @@ export function generateSemanticDarkModeScale(
   maxChroma?: number,
   hueEasing?: HueEasing,
   options: {
-    /** Calm Color-6 … Color-12 (DARK_LIGHT_TONE_CHROMA_EASE). On for the
-     *  brand ramps; the fixed-seed semantic ramps opt out — Success and
-     *  Warning are chosen tone by tone (SEMANTIC_TONES) and the rest were
-     *  measured as they are, so easing only some of them would split the set. */
+    /** Calm Color-6 … Color-12 (DARK_LIGHT_TONE_CHROMA_EASE). On by default.
+     *  The status ramps pass false here and ease AFTER their hand-picked tones
+     *  are swapped in (easeDarkLightTones), so the ease multiplies the tuned
+     *  Success / Warning tones rather than being overwritten by them. */
     easeLightTones?: boolean;
   } = {},
 ): ToneStep[] {

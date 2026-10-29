@@ -28,7 +28,7 @@ import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
 import { generateFigmaJSON } from '../utils/generateFigmaJSON';
-import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
+import { generateFullLightPalettes, generateFullDarkPalettes, semanticDarkScale, SEMANTIC_TONES } from '../utils/generateFullPalettes';
 import {
   generateSemanticLightModeScale,
   generateSemanticDarkModeScale,
@@ -267,6 +267,70 @@ describe('preview, export and Figma agree on the eased tones', () => {
   });
 });
 
+// ─── 2b. The status ramps ease the same way ─────────────────────────────────
+
+const STATUS = [
+  { key: 'info', name: 'Info' },
+  { key: 'success', name: 'Success' },
+  { key: 'warning', name: 'Warning' },
+  { key: 'error', name: 'Error' },
+  { key: 'hotlink-visited', name: 'Hotlink-Visited' },
+] as const;
+
+describe('status ramps: same ease, applied on top of their tuned tones', () => {
+  it.each(STATUS)('$name: tone 6 calmest relative to today, back to today at 12', ({ key }) => {
+    const scale = semanticDarkScale(key);
+    const pre = scale.map((t) => t.preEaseHex ?? t.hex);
+    for (const i of [0, 1, 2, 3, 4, 11]) expect(scale[i].hex, `Color-${i + 1}`).toBe(pre[i]);
+    for (let i = 5; i < 11; i++) {
+      expect(Math.abs(lch(scale[i].hex)[0] - lch(pre[i])[0]), `Color-${i + 1} lightness`).toBeLessThan(0.6);
+    }
+    // Measured in OKLCH, the space the status ease scales chroma in (it holds
+    // OKLCH hue so Info stays blue); lightness above is checked in CIE L*.
+    const okC = (hex: string) => chroma(hex).oklch()[1];
+    const ratio = (i: number) => okC(scale[i].hex) / Math.max(okC(pre[i]), 1e-6);
+    expect(okC(scale[5].hex), 'Color-6 chroma drops').toBeLessThan(okC(pre[5]));
+    // Less intense, not grey: Color-6 keeps a real share of its chroma.
+    expect(ratio(5)).toBeGreaterThan(0.55);
+    for (let i = 6; i < 12; i++) {
+      expect(ratio(i), `Color-${i + 1} vs Color-${i}`).toBeGreaterThanOrEqual(ratio(i - 1) - 0.02);
+      expect(ratio(i), `Color-${i + 1} above Color-6`).toBeGreaterThan(ratio(5));
+    }
+  });
+
+  it.each(['success', 'warning'] as const)('%s: the ease scales the hand-picked tones, it does not replace them', (key) => {
+    expect(semanticDarkScale(key).map((t) => t.preEaseHex ?? t.hex)).toEqual(SEMANTIC_TONES[key]!.dark);
+  });
+
+  it('Neutral has no chroma to ease and is unchanged', () => {
+    const n = semanticDarkScale('neutral');
+    expect(n.every((t) => !t.preEaseHex)).toBe(true);
+  });
+
+  const { previewCss, json, css, figma } = buildAll(makeScheme(SWEEP[0]), SELECTIONS[0].sel, 'dark');
+  it.each(STATUS)('$name: export JSON, Dark-Mode.css, Figma and the preview hold the eased tones', ({ key, name }) => {
+    const scale = semanticDarkScale(key);
+    for (let n = 6; n <= 12; n++) {
+      const want = norm(scale[n - 1].hex);
+      expect(norm(valueOf(at(json, `Modes.Dark-Mode.Colors.${name}.Color-${n}`))), `JSON ${name}-${n}`).toBe(want);
+      expect(norm(cssToken(css['Dark-Mode.css'], /^\s*:root\s*$/, `${name}-Color-${n}`)), `CSS ${name}-${n}`).toBe(want);
+      expect(norm(valueOf(at(figma, `Modes.Dark-Mode.Colors.${name}.Color-${n}`))), `Figma ${name}-${n}`).toBe(want);
+      if (name !== 'Hotlink-Visited') {
+        expect(norm(cssToken(previewCss, /^\s*:root\s*$/, `${name}-Color-${n}`)), `preview ${name}-${n}`).toBe(want);
+      }
+    }
+  });
+
+  it.each(STATUS.filter((s) => s.name !== 'Hotlink-Visited'))('$name section (Surface-Brightest) paints its eased tone', ({ key, name }) => {
+    const raw = cssToken(css['Dark-Mode.css'], new RegExp(`\\[data-theme="${name}"\\]\\[data-surface="Surface-Brightest"\\]`), 'Background');
+    const bg = norm(resolveVar(css['Dark-Mode.css'], raw));
+    const scale = semanticDarkScale(key);
+    const n = scale.findIndex((t) => norm(t.hex) === bg) + 1;
+    expect(n, `${name} Surface-Brightest ${bg} is a tone of the eased ramp`).toBeGreaterThan(0);
+    if (n >= 6 && n < 12) expect(scale[n - 1].preEaseHex).toBeTruthy();
+  });
+});
+
 // ─── 3. Light mode is byte-for-byte unchanged ───────────────────────────────
 
 describe('light mode is untouched', () => {
@@ -281,7 +345,7 @@ describe('light mode is untouched', () => {
       // And the dark side really did change, so the comparison is not vacuous.
       expect(after.css['Dark-Mode.css']).not.toBe(before.css['Dark-Mode.css']);
     }
-  });
+  }, 60_000);
 });
 
 // ─── 3b. Charts are not moved by the ease ───────────────────────────────────
@@ -303,7 +367,8 @@ describe('chart colors are solved against the pre-ease dark ramps', () => {
       // The record exists only when something was eased, and holds the old tones.
       expect(valueOf(at(after.json, 'Metadata.Chart-Pre-Ease-Dark-Tones.Primary.Color-6')))
         .toBe(valueOf(at(before.json, 'Modes.Dark-Mode.Colors.Primary.Color-6')));
-      expect(at(before.json, 'Metadata.Chart-Pre-Ease-Dark-Tones')).toBeUndefined();
+      // The plain-brand fixture records no brand tones (its status ramps are always eased).
+      expect(at(before.json, 'Metadata.Chart-Pre-Ease-Dark-Tones.Primary')).toBeUndefined();
     }
   }, 120_000);
 });

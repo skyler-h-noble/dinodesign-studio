@@ -28,8 +28,10 @@ describe('Error is red at every tone', () => {
     }
   });
 
-  it('dark mode is left exactly as it was', () => {
-    expect(semanticDarkScale('error').map((t) => t.hex)).toEqual(generateSemanticDarkModeScale('#D44040', undefined, undefined, { easeLightTones: false }).map((t) => t.hex));
+  // The hue fix is light-only: before the dark-mode chroma ease
+  // (darkToneEase.ts), the dark ramp is exactly the plain generated one.
+  it('dark mode is left exactly as it was (before the dark-mode ease)', () => {
+    expect(semanticDarkScale('error').map((t) => t.preEaseHex ?? t.hex)).toEqual(generateSemanticDarkModeScale('#D44040', undefined, undefined, { easeLightTones: false }).map((t) => t.hex));
   });
 });
 

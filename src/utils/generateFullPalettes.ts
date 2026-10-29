@@ -1,4 +1,4 @@
-import { generateSemanticLightModeScale, generateSemanticDarkModeScale, type HueEasing } from './colorScale';
+import { generateSemanticLightModeScale, generateSemanticDarkModeScale, easeDarkLightTones, type HueEasing } from './colorScale';
 
 /**
  * Generate all 9 palettes needed by the CSS generation pipeline.
@@ -76,7 +76,9 @@ function withTones<T extends { hex: string }>(scale: T[], tones: string[] | unde
 /** A semantic palette's light-mode ramp, with its hue easing (or its chosen tones). */
 export const semanticLightScale = (key: string) => withTones(generateSemanticLightModeScale(SEMANTIC_SEEDS[key], undefined, undefined, SEMANTIC_HUE_EASING[key]?.light), SEMANTIC_TONES[key]?.light);
 /** A semantic palette's dark-mode ramp, with its hue easing (or its chosen tones). */
-export const semanticDarkScale = (key: string) => withTones(generateSemanticDarkModeScale(SEMANTIC_SEEDS[key], undefined, SEMANTIC_HUE_EASING[key]?.dark, { easeLightTones: false }), SEMANTIC_TONES[key]?.dark);
+/* The dark-mode ease runs LAST, after any hand-picked tones are swapped in, so it
+   multiplies the tuned Success / Warning tones rather than being replaced by them. */
+export const semanticDarkScale = (key: string) => easeDarkLightTones(withTones(generateSemanticDarkModeScale(SEMANTIC_SEEDS[key], undefined, SEMANTIC_HUE_EASING[key]?.dark, { easeLightTones: false }), SEMANTIC_TONES[key]?.dark));
 
 interface ToneEntry {
   tone: number;
