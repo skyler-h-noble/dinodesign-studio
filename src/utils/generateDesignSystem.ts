@@ -557,33 +557,17 @@ All typography components (H1–H6, Body, BodySmall, Caption, Label, etc.) accep
 ### AppBar
 
 \`\`\`jsx
-{/* Always wrap in ThemedZone */}
-{/* Mobile */}
-<ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
-  <AppBar
-    mode="mobile"              {/* "mobile" | "desktop" */}
-    mobileVariant="title"      {/* "title" | "search" (mobile only) */}
-    title="My App"             {/* shown in mobile title variant */}
-    subtitle="Tagline"         {/* optional subtitle */}
-    companyName="My App"       {/* brand name */}
-    barColor="default"         {/* "default" | "white" */}
-    rightContent={<Avatar />}  {/* React node for the right side */}
-  />
-</ThemedZone>
+{/* A site nav: links inline on wide screens, folded into a menu button
+    below 900px (collapseAt). AppBar themes itself — no wrapper needed. */}
+<AppBar
+  brand="My App"
+  navLinks={[{ label: 'Features', href: '#features' }, { label: 'Pricing', href: '#pricing' }]}
+  endSlot={<Button variant="default" size="small">Get started</Button>}
+  barColor="default"         {/* "default" | "primary" | "white" | "black" */}
+/>
 
-{/* Desktop */}
-<ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
-  <AppBar
-    mode="desktop"
-    companyName="My App"
-    navLinks={['Home', 'About', 'Contact']}
-    showRightButtons           {/* shows action buttons on right */}
-    loginType="login"          {/* login button type */}
-    menuType="hamburger"       {/* menu type */}
-    brandType="name"           {/* "name" | other */}
-    searchPosition="right"     {/* search bar position */}
-  />
-</ThemedZone>
+{/* An app screen on a phone: a search or title bar, not a site nav */}
+<AppBar mode="mobile" mobileVariant="small" title="Inbox" />   {/* "search" | "small" | "medium" | "large" */}
 \`\`\`
 
 ### BottomNavigation
