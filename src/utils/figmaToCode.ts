@@ -731,7 +731,7 @@ CONVERSION RULES:
     style={{ fontSize: N }} on <H1>-<H6>, <Body>, <Subtitle>, <Caption> etc. is
     always wrong, because size and LINE HEIGHT are published as a pair and an
     inline size only replaces half of it. The component's rule still says
-        line-height: calc(var(--H2-Line-Height) * var(--Cognitive-Multiplier, 1))
+        line-height: var(--H2-Line-Height)
     so an <H2> forced to 18px keeps H2's 40px line height, and a two-line title
     renders with a gaping hole between the lines. Nothing errors; it just looks
     loose, which is easy to mistake for a spacing choice.

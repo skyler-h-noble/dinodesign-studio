@@ -4530,6 +4530,12 @@ function generateGoogleFontsImports(jsonData: any): string {
     if (systemFonts.includes(fontName)) {
       return;
     }
+    // The Header face gets its own variable-font import below, which already
+    // covers every weight the system uses. A second, static request for it
+    // (e.g. Google+Sans+Flex:wght@640) was one more round trip for nothing.
+    if (fontName === HEADER_FAMILY) {
+      return;
+    }
     
     // Convert font name to URL format (e.g., "Open Sans" -> "Open+Sans")
     const urlFontName = fontName.replace(/\s+/g, '+');

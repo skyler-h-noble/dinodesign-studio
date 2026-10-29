@@ -888,7 +888,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
      * deleted by hand after every regenerate and recreated by the next one.
      *
      * The feature is not being removed, and this is the distinction worth
-     * keeping straight. `--Cognitive-Multiplier` is LIVE: foundation.css
+     * keeping straight. The cognitive multiplier and its overrides were removed 2026-10-29: nothing ever switched them on.
      * declares it at 1 and raises it to 1.5 under the accessibility overrides
      * further down this file, and the library multiplies line heights by it —
      * Link.js alone reads it five times. That is the whole mechanism. The JSON
@@ -1188,7 +1188,6 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
-  --Cognitive-Multiplier: 1;
   --Dropshadow-Color: 20, 20, 20;  /* fallback; overridden per-theme in Light/Dark-Mode.css */
 }
 
@@ -1546,18 +1545,6 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
   font-family: var(--Font-Family-Display);
 }
 
-/* Cognitive Accessibility Overrides */
-[data-cognitive="Dyslexia"] {
-  --Cognitive-Multiplier: 1.5;
-  --Body-Font-Family: "OpenDyslexic";
-  --Body-Font-Weight: 400;
-  --Body-Semibold-Font-Weight: 700;
-  --Body-Bold-Font-Weight: 700;
-}
-
-[data-cognitive="ADHD"] {
-  --Cognitive-Multiplier: 1.5;
-}
 `;
 
   // Button bevel is implemented entirely inside the consumer's Button

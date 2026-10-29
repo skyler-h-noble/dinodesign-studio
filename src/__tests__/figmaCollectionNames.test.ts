@@ -176,14 +176,12 @@ describe('tokens.json does not smuggle collections into Figma', () => {
     expect(gen).not.toMatch(/designSystemJSON\.Cognitive\s*=/);
   });
 
-  it('keeps --Cognitive-Multiplier in the CSS, which is the live mechanism', () => {
-    /* The feature was not removed with the section, and this is the assertion
-       that says so. foundation.css declares the multiplier at 1 and raises it
-       to 1.5 under the accessibility overrides; the library multiplies line
-       heights by it (Link.js reads it five times). Deleting THIS would be the
-       real regression, and it looks superficially like the same cleanup. */
-    expect(gen).toMatch(/--Cognitive-Multiplier:\s*1;/);
-    expect(gen).toMatch(/--Cognitive-Multiplier:\s*1\.5;/);
+  it('emits no cognitive overrides — removed 2026-10-29', () => {
+    /* The multiplier and its [data-cognitive] blocks were removed on purpose:
+       nothing ever set data-cognitive, so the 1.5 never applied and the
+       multiplier was always 1. The library no longer reads it. */
+    expect(gen).not.toMatch(/--Cognitive-Multiplier/);
+    expect(gen).not.toMatch(/data-cognitive/);
   });
 
   it('puts no top-level sections on tokens.json at all', () => {
