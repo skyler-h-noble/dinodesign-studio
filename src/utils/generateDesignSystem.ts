@@ -1721,7 +1721,12 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
     }
   }
 
-  // 8. Upload all files to Firebase Storage
+  // 8. Upload all files to Firebase Storage — with the header font request
+  //    narrowed to the axis values this system pins (~1 MB → ~130 KB).
+  const { pinHeaderFontImport } = await import('./moodAxes');
+  for (const file of uploadFiles) {
+    if (file.type === 'text/css') file.content = pinHeaderFontImport(file.content, typographyTokensCSS);
+  }
   for (const file of uploadFiles) {
     try {
       await uploadDesignSystemFile(uuid, file.name, file.content, file.type);

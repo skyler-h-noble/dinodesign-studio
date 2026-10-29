@@ -1301,3 +1301,48 @@ export function platformFontFamilyCSS(): string {
   }
   return out.join('\n');
 }
+
+/* ── Screen-width device ramps ────────────────────────────────────────────
+ *
+ * The device ramps above are selected by data-device, which something has to
+ * SET — fine for Figma frames and native shells, wrong for a web page, where
+ * the screen width is the only signal and JavaScript setting an attribute
+ * after first paint resized every heading. A media query lets the browser
+ * apply the phone / tablet ramp as it parses the sheet: no script, no timing.
+ *
+ * Built FROM the device blocks already in the stylesheet — every rule whose
+ * selector names the device, brand face only (data-fonts rules are the
+ * platform-face mode) — so the screen-width ramp cannot disagree with the
+ * data-device one. `:root:not([data-device])`: an explicit data-device (the
+ * studio pins Desktop; a native shell pins its platform) always wins.
+ * Breakpoints are the Adaptive Nav's: phone < 600, tablet 600–899.
+ */
+export function deviceMediaQueryCSS(css: string): string {
+  const declsFor = (device: string): string[] => {
+    const out: string[] = [];
+    const attr = `[data-device="${device}"]`;
+    // Comments first: one in the device block quotes `{...desktopStyles}`.
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selectors = m[1].split(',').map((x) => x.replace(/\/\*[\s\S]*?\*\//g, '').trim());
+      const hit = selectors.some((sel) => sel.includes(attr) && !sel.includes('data-fonts')
+        && sel.replace(/^:root/, '') === attr);
+      if (!hit) continue;
+      for (const d of m[2].split(';')) {
+        const line = d.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+        if (line.startsWith('--')) out.push(line);
+      }
+    }
+    return out;
+  };
+  const block = (query: string, device: string) => {
+    const decls = declsFor(device);
+    if (!decls.length) return '';
+    return `@media ${query} {\n  :root:not([data-device]) {\n${decls.map((d) => `    ${d};`).join('\n')}\n  }\n}`;
+  };
+  return [
+    '/* Screen-width device ramps — the browser picks them; nothing sets data-device. */',
+    block('(max-width: 599.98px)', 'IOS-Mobile'),
+    block('(min-width: 600px) and (max-width: 899.98px)', 'IOS-Tablet'),
+  ].filter(Boolean).join('\n');
+}
