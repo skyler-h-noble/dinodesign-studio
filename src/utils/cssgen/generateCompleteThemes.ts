@@ -1451,7 +1451,6 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Helper to build common theme config
   // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
   // For other themes, use the default container settings
-  const STATUS_HEADER_THEMES = ['Info', 'Success', 'Warning', 'Error'];
   const makeConfig = (themeName: string, theme: string, n: number): ThemeConfig => ({
     altStop2,
     themeName,
@@ -1472,16 +1471,18 @@ export function generateAllThemesWithSurfacesAndContainers(
     successText: textPalettes.success,
     warningText: textPalettes.warning,
     errorText: textPalettes.error,
-    /* A STATUS theme's heading speaks in its own palette — an Info section's
-       heading is blue, Success green, Warning amber, Error red. It used to be
-       Primary for every theme (the ternary below had 'Primary' on both arms),
-       so a pink brand painted pink headings on its Info and Success sections.
-       Header.Surfaces.<Status>.Color-N is the same curated 3:1 table every
-       palette's own Header reads, so the pairing is checked by construction.
-       Brand and Neutral themes keep the brand header. */
-    defaultHeader: STATUS_HEADER_THEMES.includes(theme)
-      ? theme
-      : (textColoring === 'tonal' ? 'Primary' : 'Primary'),
+    /* Every palette theme's heading speaks in its OWN palette: a Secondary
+       section's heading comes from the Secondary 3:1 heading table, Info's from
+       Info, Neutral's from Neutral, and Primary's (unchanged) from Primary.
+       This read `textColoring === 'tonal' ? 'Primary' : 'Primary'` — both arms
+       Primary — so every themed section carried the brand heading, and a pink
+       brand painted pink headings on its Info and Success sections.
+       Header.Surfaces.<Palette>.Color-N is the curated table each palette's own
+       Header-<Palette> already reads, so the 3:1 pairing holds by construction.
+       The nav bars are built through here from the theme they show, so a bar
+       follows that theme; the page (Default) has its own config and keeps the
+       brand heading. */
+    defaultHeader: theme,
     primaryHeader: 'Primary',
     secondaryHeader: 'Secondary',
     tertiaryHeader: 'Tertiary',

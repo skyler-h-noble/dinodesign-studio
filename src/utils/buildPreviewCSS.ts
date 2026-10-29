@@ -1831,19 +1831,34 @@ ${emitStateButtonTokens(SC)}
 ${emitTagTextTokens()}
 }
 
-/* ══ Status themes: the heading speaks in the theme's own palette ══
- * An Info section's heading is blue, Success green, Warning amber, Error red —
- * the same choice the export makes (generateCompleteThemes, defaultHeader for
- * status themes). The lib's static sheet points --Header at Primary on these
- * surfaces and --Header-<Status> at the same tone of the status palette, so
- * the heading becomes that sibling at whatever surface level the element is.
- * Same selectors and specificity as the lib's blocks, later in the cascade. */
-${['Info', 'Success', 'Warning', 'Error'].map((t) => `[data-theme="${t}"],
-[data-theme="${t}"][data-surface],
-[data-theme="${t}"] [data-surface^="Container"],
-[data-theme="${t}"][data-surface^="Container"] {
-  --Header: var(--Header-${t});
-}`).join('\n')}
+/* ══ Themed sections: the heading speaks in the theme's own palette ══
+ * A Secondary section's heading comes from Secondary, Info's from Info,
+ * Neutral's from Neutral — the same choice the export makes
+ * (generateCompleteThemes, defaultHeader = the theme). The lib's static sheet
+ * points --Header at Primary on these surfaces and --Header-<Palette> at the
+ * same tone of the theme's palette, so the heading becomes that sibling at
+ * whatever surface level the element is. Same selectors and specificity as the
+ * lib's blocks, later in the cascade; the preview's own per-theme blocks below
+ * (Tertiary Surface, Neutral Dimmest/Brightest) already use the theme palette.
+ * Primary needs no rule: its heading already is Primary. */
+${(() => {
+  /* Levels where the preview paints its OWN surface and heading for a theme
+     (the Tertiary Surface card, Neutral's black and white ends, both below):
+     the lib's --Header-<Palette> there is tuned for the lib's background, not
+     the preview's, so those levels keep the preview's own heading. */
+  const OWN_LEVELS: Record<string, string[]> = { Tertiary: ['Surface'], Neutral: ['Surface-Dimmest', 'Surface-Brightest'] };
+  return ['Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].map((t) => {
+    const own = OWN_LEVELS[t] ?? [];
+    const not = own.map((l) => `:not([data-surface="${l}"])`).join('');
+    const sels = [
+      ...(own.includes('Surface') ? [] : [`[data-theme="${t}"]`]),
+      `[data-theme="${t}"][data-surface]${not}`,
+      `[data-theme="${t}"] [data-surface^="Container"]`,
+      `[data-theme="${t}"][data-surface^="Container"]`,
+    ];
+    return `${sels.join(',\n')} {\n  --Header: var(--Header-${t});\n}`;
+  }).join('\n');
+})()}
 
 /* ══ Primary Theme ══
  * Cards with color="primary" (or other elements that set data-theme="Primary")

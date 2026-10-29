@@ -1778,11 +1778,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
      own (see sectionQuietOverrides). The Figma payload solves the same list
      from the same module and writes it as its own Quiet float.
 
-     DARK MODE ONLY, for now. Light mode has the same kind of near-misses
-     (Quiet-* accents on the status themes, 4.42-4.50:1) and the same call
-     clears them, but light mode is held byte-for-byte while the dark-mode
-     tone work lands; turning it on for light is a one-word change here and in
-     generateFigmaJSON (QUIET_SECTION_FIX_MODES). */
+     Applied in the modes QUIET_SECTION_FIX_MODES lists (both, now), which the
+     Figma payload reads too. */
   const quietOverride = new Map<any, number>(
     (QUIET_SECTION_FIX_MODES.includes(modeName ?? '')
       ? sectionQuietOverrides(modeData, quietTable, (raw: any) => hexForToken(raw), quietToneOf)

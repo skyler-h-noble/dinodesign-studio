@@ -1,13 +1,15 @@
 /**
- * A status section's heading comes from its OWN palette.
+ * A themed section's heading comes from its OWN palette.
  *
- * "Info should have info color for heading, success a success color, etc."
+ * "Info should have info color for heading, success a success color, etc." —
+ * and then the same for Secondary, Tertiary and Neutral.
  *
  * Every theme's Header used to read the Primary header table, so a pink brand
- * painted pink headings on its Info, Success, Warning and Error sections (in
- * both modes, on every surface level). Status themes now read
- * Header.{Surfaces,Containers}.<Status>.Color-N, the same curated 3:1 table
- * each palette's own Header-<Status> already used.
+ * painted pink headings on its Info, Success, Secondary... sections (in both
+ * modes, on every surface level). Each palette theme now reads
+ * Header.{Surfaces,Containers}.<Palette>.Color-N, the same curated 3:1 table
+ * each palette's own Header-<Palette> already used. The page (Default) keeps
+ * the brand heading.
  *
  * Checked on all three sides: the export JSON and its CSS, the Figma payload,
  * and the studio preview (resolved against the lib's static sheet it layers
@@ -29,7 +31,8 @@ import { generateSemanticLightModeScale, generateSemanticDarkModeScale, getMatch
 import { contrastRatio } from '../utils/quietOpacity';
 import type { ColorScheme } from '../types';
 
-const STATUS = ['Info', 'Success', 'Warning', 'Error'] as const;
+/** Every palette theme: its heading comes from its own palette (Primary's always did). */
+const STATUS = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'] as const;
 const LEVELS = ['Surface', 'Surface-Dim', 'Surface-Dimmest', 'Surface-Bright', 'Surface-Brightest'];
 const T = { family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false };
 const SEL = { background: 'white', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' };
@@ -76,7 +79,10 @@ function scopeDecl(sheets: string[], theme: string, level: string): Record<strin
   for (const css of sheets) {
     for (const b of blocks(css)) {
       const sels = b.sel.split(',').map((x) => x.trim());
-      if (sels.includes(exact) || sels.includes(wildcard)) Object.assign(out, b.decl);
+      // `[data-theme="T"][data-surface]:not([data-surface="X"])…` covers every level but the X's.
+      const wildcardWithout = sels.some((x) => x.startsWith(wildcard + ':not(')
+        && !x.includes(`:not([data-surface="${level}"])`));
+      if (sels.includes(exact) || sels.includes(wildcard) || wildcardWithout) Object.assign(out, b.decl);
     }
   }
   return out;
@@ -157,7 +163,10 @@ describe('preview: status headings follow their own palette over the lib sheet',
         const [bg] = resolve(scope.Background, scope, root);
         const [head, from] = resolve(scope.Header, scope, root);
         if (!bg || !head) continue; // a level the lib does not define
-        expect(from, `${mode} ${theme}/${level}`).toMatch(new RegExp(`^${theme}-Color-\\d+$`));
+        // A literal (the preview's black/white Neutral ends) has no palette to name.
+        if (from !== null || !/^#/.test(scope.Header ?? '')) {
+          expect(from, `${mode} ${theme}/${level}`).toMatch(new RegExp(`^${theme}-Color-\\d+$`));
+        }
         expect(contrastRatio(head, bg), `${mode} ${theme}/${level} ${head} on ${bg}`).toBeGreaterThanOrEqual(3);
         checked++;
       }

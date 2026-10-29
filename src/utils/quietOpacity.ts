@@ -258,8 +258,9 @@ export function solveQuietOpacities(
 }
 
 /** The modes sectionQuietOverrides is applied in (CSS export and Figma
- *  payload both read this). Dark only for now — see exportToCSS quietSolid. */
-export const QUIET_SECTION_FIX_MODES: readonly string[] = ['Dark-Mode'];
+ *  payload both read this). Both: light mode had 307 near-misses of the same
+ *  kind (4.40-4.50:1), cleared the same way. */
+export const QUIET_SECTION_FIX_MODES: readonly string[] = ['Light-Mode', 'Dark-Mode'];
 
 export interface SectionQuietOverride {
   theme: string;

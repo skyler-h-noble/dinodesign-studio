@@ -17,7 +17,7 @@
  *     get stronger;
  *   - the Figma payload names the same sections, aliases them to their own
  *     Quiet float, and holds light mode's existing tone value in light mode;
- *   - Light-Mode.css is identical with or without the fix.
+ *   - the same holds in light mode, where the fix also runs.
  *
  * The studio preview emits no Quiet for status-themed sections and no Quiet-*
  * accents on themed sections at all, so there is no preview pairing to change.
@@ -106,10 +106,11 @@ const BRANDS: [string, string, string][] = [
   ['#d92b2b', '#1e3a8a', '#84cc16'],
 ];
 
-describe('dark-mode Quiet on themed surfaces clears 4.5:1', () => {
+describe('Quiet on themed surfaces clears 4.5:1 in both modes', () => {
   it.each(BRANDS.flatMap((b) => ['white', 'primary'].map((bg) => ({ b, bg }))))('$b.0 on a $bg page', ({ b, bg }) => {
-    const pairs = quietPairs(cssOf(exportFor(b, bg))['Dark-Mode.css']);
-    expect(pairs.length).toBeGreaterThan(300);
+    const css = cssOf(exportFor(b, bg));
+    const pairs = [...quietPairs(css['Dark-Mode.css']), ...quietPairs(css['Light-Mode.css'])];
+    expect(pairs.length).toBeGreaterThan(600);
     const failing = pairs.filter(([, fg, back]) => contrastRatio(fg, back) < 4.5)
       .map(([w, fg, back]) => `${w} ${fg} on ${back} ${contrastRatio(fg, back).toFixed(3)}`);
     expect(failing.join('\n')).toBe('');
@@ -132,14 +133,11 @@ describe('the fix is scoped', () => {
   const figma = generateFigmaJSON(json as never);
   const figmaPlain = withoutFix(() => generateFigmaJSON(json as never));
 
-  it('light mode is identical with or without it', () => {
-    expect(fixed['Light-Mode.css']).toBe(plain['Light-Mode.css']);
-  });
-
-  it('only Quiet tokens in the sections it names change, and only upward', () => {
-    const before = new Map(quietPairs(plain['Dark-Mode.css']).map(([w, fg, bg]) => [w, { fg, bg }]));
+  it.each(['Dark-Mode', 'Light-Mode'] as const)('%s: only Quiet tokens in the sections it names change, and only upward', (mode) => {
+    const sheet = `${mode}.css`;
+    const before = new Map(quietPairs(plain[sheet]).map(([w, fg, bg]) => [w, { fg, bg }]));
     const changedSections = new Set<string>();
-    for (const [w, fg, bg] of quietPairs(fixed['Dark-Mode.css'])) {
+    for (const [w, fg, bg] of quietPairs(fixed[sheet])) {
       const was = before.get(w)!;
       expect(was.bg).toBe(bg);
       if (was.fg !== fg) {
@@ -148,30 +146,38 @@ describe('the fix is scoped', () => {
       }
     }
     // Every changed line is a Quiet-family token.
-    const a = plain['Dark-Mode.css'].split('\n'), b = fixed['Dark-Mode.css'].split('\n');
+    const a = plain[sheet].split('\n'), b = fixed[sheet].split('\n');
     expect(a.length).toBe(b.length);
     a.forEach((line, i) => {
       if (line !== b[i]) expect(b[i]).toMatch(/--(Quiet|Text-Quiet|Quiet-[A-Za-z]+|Outline-Quiet|Buttons-[A-Za-z]+-Outline-Quiet)\s*:/);
     });
+    expect(changedSections.size).toBeGreaterThan(0);
+    if (mode === 'Dark-Mode') expect(changedSections.has('Error/Surface-Brightest')).toBe(true);
 
-    // Figma names the same sections, each aliased to its own float.
-    const own = Object.keys(figma.Modes['Dark-Mode'].Quiet).filter((k) => !/^Color-\d+-Opacity$/.test(k));
-    const ownSections = new Set(own.map((k) => k.replace(/-Opacity$/, '').replace(/^([A-Za-z]+)-/, '$1/')));
-    expect([...ownSections].sort()).toEqual([...changedSections].sort());
-    expect(changedSections.has('Error/Surface-Brightest')).toBe(true);
+    // Figma names the same sections: a float of its own whose value in this
+    // mode is above that section's shared tone value.
+    const quiet = figma.Modes[mode].Quiet;
+    const own = Object.keys(quiet).filter((k) => !/^Color-\d+-Opacity$/.test(k));
+    const overriddenHere = new Set<string>();
+    for (const k of own) {
+      const [theme, ...rest] = k.replace(/-Opacity$/, '').split('-');
+      const section = rest.join('-');
+      const shared = String(figmaPlain.Themes[theme][section]['Quiet-Opacity'].value).match(/Color-(\d+)-Opacity/)![1];
+      const tone = quiet[`Color-${shared}-Opacity`].value;
+      expect(quiet[k].value, k).toBeGreaterThanOrEqual(tone);
+      if (quiet[k].value > tone) overriddenHere.add(`${theme}/${section}`);
+    }
+    expect([...overriddenHere].sort()).toEqual([...changedSections].sort());
     // Untouched sections still alias the shared tone value.
     expect(String(figma.Themes.Primary.Surface['Quiet-Opacity'].value)).toMatch(/^\{Quiet\.Color-\d+-Opacity\}$/);
   });
 
-  it('Figma: the new floats hold the override in dark mode and the existing tone value in light mode', () => {
-    const dark = figma.Modes['Dark-Mode'].Quiet, light = figma.Modes['Light-Mode'].Quiet;
-    const err = figma.Themes.Error['Surface-Brightest']['Quiet-Opacity'].value;
-    expect(err).toBe('{Quiet.Error-Surface-Brightest-Opacity}');
-    expect(dark['Error-Surface-Brightest-Opacity'].value).toBeGreaterThan(dark['Color-11-Opacity'].value);
-    expect(light['Error-Surface-Brightest-Opacity'].value).toBe(light['Color-11-Opacity'].value);
-    // Light mode's existing variables are untouched; the new ones are additions.
-    for (const [k, v] of Object.entries<{ value: number }>(figmaPlain.Modes['Light-Mode'].Quiet)) {
-      expect(light[k].value, k).toBe(v.value);
+  it('Figma: existing per-tone floats are untouched; sections that need one alias their own', () => {
+    expect(figma.Themes.Error['Surface-Brightest']['Quiet-Opacity'].value).toBe('{Quiet.Error-Surface-Brightest-Opacity}');
+    for (const mode of ['Light-Mode', 'Dark-Mode']) {
+      for (const [k, v] of Object.entries<{ value: number }>(figmaPlain.Modes[mode].Quiet)) {
+        expect(figma.Modes[mode].Quiet[k].value, `${mode} ${k}`).toBe(v.value);
+      }
     }
   });
 
