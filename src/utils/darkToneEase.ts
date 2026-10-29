@@ -38,8 +38,8 @@ export const DARK_LIGHT_TONE_CHROMA_EASE = {
   fromColorN: 6,
   /** Tone where the ease is back to today's chroma (multiplier 1.0). */
   toColorN: 12,
-  /** Color-6's multiplier: 0.6 keeps 60% of today's chroma. */
-  startMultiplier: 0.6,
+  /** Color-6's multiplier: 0.65 keeps 65% of today's chroma. */
+  startMultiplier: 0.65,
 } as const;
 
 /**

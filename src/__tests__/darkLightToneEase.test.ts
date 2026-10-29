@@ -193,6 +193,13 @@ describe('the ease curve', () => {
     }
     expect(darkLightToneChromaMultiplier(12)).toBe(1);
   });
+
+  it('is the agreed table: 0.65 at Color-6, smoothstep to 1.00 at Color-12', () => {
+    // "a tiny bit" more saturation than the first 0.60 pass.
+    expect(DARK_LIGHT_TONE_CHROMA_EASE.startMultiplier).toBe(0.65);
+    const table = [6, 7, 8, 9, 10, 11, 12].map((n) => Number(darkLightToneChromaMultiplier(n).toFixed(3)));
+    expect(table).toEqual([0.65, 0.676, 0.741, 0.825, 0.909, 0.974, 1]);
+  });
 });
 
 describe('dark ramps: tone 6 calmest, easing back to today at tone 12', () => {

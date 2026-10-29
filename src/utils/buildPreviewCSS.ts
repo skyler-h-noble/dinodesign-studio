@@ -1831,6 +1831,20 @@ ${emitStateButtonTokens(SC)}
 ${emitTagTextTokens()}
 }
 
+/* ══ Status themes: the heading speaks in the theme's own palette ══
+ * An Info section's heading is blue, Success green, Warning amber, Error red —
+ * the same choice the export makes (generateCompleteThemes, defaultHeader for
+ * status themes). The lib's static sheet points --Header at Primary on these
+ * surfaces and --Header-<Status> at the same tone of the status palette, so
+ * the heading becomes that sibling at whatever surface level the element is.
+ * Same selectors and specificity as the lib's blocks, later in the cascade. */
+${['Info', 'Success', 'Warning', 'Error'].map((t) => `[data-theme="${t}"],
+[data-theme="${t}"][data-surface],
+[data-theme="${t}"] [data-surface^="Container"],
+[data-theme="${t}"][data-surface^="Container"] {
+  --Header: var(--Header-${t});
+}`).join('\n')}
+
 /* ══ Primary Theme ══
  * Cards with color="primary" (or other elements that set data-theme="Primary")
  * also need the brand's Default-button tokens — the lib emits hardcoded

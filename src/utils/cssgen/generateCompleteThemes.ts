@@ -1451,6 +1451,7 @@ export function generateAllThemesWithSurfacesAndContainers(
   // Helper to build common theme config
   // Container N: for Light themes (n=11), container = 10 (one step darker for contrast)
   // For other themes, use the default container settings
+  const STATUS_HEADER_THEMES = ['Info', 'Success', 'Warning', 'Error'];
   const makeConfig = (themeName: string, theme: string, n: number): ThemeConfig => ({
     altStop2,
     themeName,
@@ -1471,7 +1472,16 @@ export function generateAllThemesWithSurfacesAndContainers(
     successText: textPalettes.success,
     warningText: textPalettes.warning,
     errorText: textPalettes.error,
-    defaultHeader: textColoring === 'tonal' ? 'Primary' : 'Primary',
+    /* A STATUS theme's heading speaks in its own palette — an Info section's
+       heading is blue, Success green, Warning amber, Error red. It used to be
+       Primary for every theme (the ternary below had 'Primary' on both arms),
+       so a pink brand painted pink headings on its Info and Success sections.
+       Header.Surfaces.<Status>.Color-N is the same curated 3:1 table every
+       palette's own Header reads, so the pairing is checked by construction.
+       Brand and Neutral themes keep the brand header. */
+    defaultHeader: STATUS_HEADER_THEMES.includes(theme)
+      ? theme
+      : (textColoring === 'tonal' ? 'Primary' : 'Primary'),
     primaryHeader: 'Primary',
     secondaryHeader: 'Secondary',
     tertiaryHeader: 'Tertiary',

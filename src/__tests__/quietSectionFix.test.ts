@@ -181,6 +181,10 @@ describe('the fix is scoped', () => {
       userSelections: { background: 'white', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' },
       componentStyle: 'modern', mode: 'dark', typographyStyles: [],
     } as never);
-    expect(preview).not.toMatch(/\[data-theme="(Info|Success|Warning|Error)"\]\[data-surface/);
+    // No status-theme block in the preview declares a Quiet colour.
+    const statusQuiet = blocks(preview).filter((b) =>
+      /\[data-theme="(Info|Success|Warning|Error)"\]/.test(b.sel)
+      && Object.keys(b.decl).some((k) => QUIET_TOKEN.test(k)));
+    expect(statusQuiet.map((b) => b.sel)).toEqual([]);
   });
 });
