@@ -5,7 +5,7 @@ import {
   AppBar, Card, Overline, DisplaySmall, H2, Body, Caption,
   Table, Chip, Alert, Icon,
 } from '@omni-design/components';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingUpIcon from '@omni-design/icons/TrendingUp';
 
 const STATS = [
   { label: 'Active customers', value: '1,284', delta: '+12% this month' },

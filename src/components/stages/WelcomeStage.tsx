@@ -1,6 +1,6 @@
 import { H1, Body, BodySmall, VStack, Card, HStack } from '@omni-design/components';
-import AddIcon from '@mui/icons-material/Add';
-import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import AddIcon from '@omni-design/icons/Add';
+import FolderOpenIcon from '@omni-design/icons/FolderOpen';
 import type { StageProps } from '../../types';
 
 interface Props extends StageProps {

@@ -6,7 +6,7 @@ import {
   DisplaySmall, H3, Body, BodyLarge, Overline,
   Button, ButtonGroup, Card, Divider, Icon,
 } from '@omni-design/components';
-import CheckIcon from '@mui/icons-material/Check';
+import CheckIcon from '@omni-design/icons/Check';
 
 const TIERS = [
   { name: 'Starter', price: '$0', period: '/mo', blurb: 'For trying things out.',

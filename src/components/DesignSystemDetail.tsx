@@ -24,13 +24,13 @@ import {
   Alert,
   IconBadge,
 } from '@omni-design/components';
-import ComputerIcon from '@mui/icons-material/Computer';
-import CloseIcon from '@mui/icons-material/Close';
-import CodeIcon from '@mui/icons-material/Code';
-import GridViewIcon from '@mui/icons-material/GridView';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ComputerIcon from '@omni-design/icons/Computer';
+import CloseIcon from '@omni-design/icons/Close';
+import CodeIcon from '@omni-design/icons/Code';
+import GridViewIcon from '@omni-design/icons/GridView';
+import CheckCircleOutlineIcon from '@omni-design/icons/CheckCircleOutline';
+import ContentCopyIcon from '@omni-design/icons/ContentCopy';
+import MoreVertIcon from '@omni-design/icons/MoreVert';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, addDoc, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { getPublicFileUrl, uploadDesignSystemFile } from '../utils/firebase/storage';

@@ -13,14 +13,14 @@ import {
   CodeBlock, TextArea, TextField, Select, ToggleButtonGroup, Link, ShapeButton, shapeOptions,
   MORPHABLE_SHAPES, AVATAR_SHAPES, MORPH_TARGET_SHAPES, OmniDesignProvider,
 } from '@omni-design/components';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import StarIcon from '@mui/icons-material/Star';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
-import AddIcon from '@mui/icons-material/Add';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import CheckIcon from '@mui/icons-material/Check';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import NotificationsIcon from '@mui/icons-material/Notifications';
+import FavoriteIcon from '@omni-design/icons/Favorite';
+import StarIcon from '@omni-design/icons/Star';
+import BookmarkIcon from '@omni-design/icons/Bookmark';
+import AddIcon from '@omni-design/icons/Add';
+import PlayArrowIcon from '@omni-design/icons/PlayArrow';
+import CheckIcon from '@omni-design/icons/Check';
+import ThumbUpIcon from '@omni-design/icons/ThumbUp';
+import NotificationsIcon from '@omni-design/icons/Notifications';
 import AddOnTopNav from './addOns/AddOnTopNav';
 import { systemExists } from '../utils/docs/systemCss';
 import { libraryPageUrl } from '../utils/docs/docsLink';

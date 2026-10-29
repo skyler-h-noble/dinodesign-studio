@@ -4,8 +4,8 @@
 
 import { useState } from 'react';
 import { Modal, VStack, HStack, BodySmall, Button } from '@omni-design/components';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ContentCopyIcon from '@omni-design/icons/ContentCopy';
+import CheckCircleOutlineIcon from '@omni-design/icons/CheckCircleOutline';
 import { getFigmaTemplateUrl } from '../utils/firebase/storage';
 
 export function FigmaImportModal({

@@ -14,11 +14,11 @@ import {
   Tabs, TabList, Tab, TabPanel, TextField, TextArea, Select, CodeBlock, ToggleButtonGroup, Checkbox, Link,
   OmniDesignProvider,
 } from '@omni-design/components';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ArrowUpwardIcon from '@omni-design/icons/ArrowUpward';
+import ArrowDownwardIcon from '@omni-design/icons/ArrowDownward';
+import DeleteOutlineIcon from '@omni-design/icons/DeleteOutline';
+import ExpandMoreIcon from '@omni-design/icons/ExpandMore';
+import ExpandLessIcon from '@omni-design/icons/ExpandLess';
 import AddOnTopNav, { ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
 import { DeviceSelector, BreakpointStage, bentoBreakpoints, useStageWidth, DEVICE_PREVIEW_CSS, type HeroPlatform } from './hero/DevicePreview';
 import { systemExists } from '../utils/docs/systemCss';

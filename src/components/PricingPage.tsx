@@ -2,8 +2,8 @@ import { useState } from 'react';
 import {
   Button, ButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Checkbox, Divider, Chip,
 } from '@omni-design/components';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CheckCircleOutlineIcon from '@omni-design/icons/CheckCircleOutline';
+import ArrowForwardIcon from '@omni-design/icons/ArrowForward';
 
 export type BillingPeriod = 'monthly' | 'annual';
 

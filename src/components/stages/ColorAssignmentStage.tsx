@@ -4,8 +4,8 @@ import {
 import chroma from 'chroma-js';
 import { resolveButtonChoice, type ButtonColor, type ButtonTone } from '../../utils/buttonChoice';
 import { ButtonToneGrid } from '../ButtonToneGrid';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@omni-design/icons/ExpandMore';
+import ExpandLessIcon from '@omni-design/icons/ExpandLess';
 import { useState, useRef } from 'react';
 import { toneToColorNumber } from '../../utils/colorScale';
 import {

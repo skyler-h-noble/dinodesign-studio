@@ -3,16 +3,16 @@ import {
   AppBar, Button, H1, H2, H3, Body, BodySmall, Caption, VStack, HStack, Card,
   Tabs, TabList, Tab, Section, Footer, Icon, Chip, Divider, Link,
 } from '@omni-design/components';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import SpeedIcon from '@mui/icons-material/Speed';
-import PaletteIcon from '@mui/icons-material/Palette';
-import AccessibilityNewIcon from '@mui/icons-material/AccessibilityNew';
-import DevicesIcon from '@mui/icons-material/Devices';
-import LayersIcon from '@mui/icons-material/Layers';
-import GavelIcon from '@mui/icons-material/Gavel';
-import BoltIcon from '@mui/icons-material/Bolt';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import CheckCircleOutlineIcon from '@omni-design/icons/CheckCircleOutline';
+import SpeedIcon from '@omni-design/icons/Speed';
+import PaletteIcon from '@omni-design/icons/Palette';
+import AccessibilityNewIcon from '@omni-design/icons/AccessibilityNew';
+import DevicesIcon from '@omni-design/icons/Devices';
+import LayersIcon from '@omni-design/icons/Layers';
+import GavelIcon from '@omni-design/icons/Gavel';
+import BoltIcon from '@omni-design/icons/Bolt';
+import ArrowForwardIcon from '@omni-design/icons/ArrowForward';
+import PlayCircleOutlineIcon from '@omni-design/icons/PlayCircleOutline';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import AvatarDropdown from './AvatarDropdown';

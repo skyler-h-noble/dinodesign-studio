@@ -14,7 +14,7 @@
  * icon-sized frame for the customer's own component — baking these paths in
  * would put this library's icon set into every file that imports the add-on.
  */
-import * as Icons from '@mui/icons-material';
+import * as Icons from '@omni-design/icons';
 
 /** MUI exports PascalCase. Accept what a person would reasonably type —
  *  'expand-more', 'expand more', 'expandMore' — rather than only the exact

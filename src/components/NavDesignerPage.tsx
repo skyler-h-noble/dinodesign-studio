@@ -45,7 +45,7 @@ import {
   mobileNavDefinition, MOBILE_LAYOUTS, bottomItemCounts, fitItemCount, bottomBarItems,
   type MobileLayout, type MobileOptions,
 } from '../utils/addOns/mobileNav';
-import TuneIcon from '@mui/icons-material/Tune';
+import TuneIcon from '@omni-design/icons/Tune';
 import {
   loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
 } from '../utils/addOns/brandAsset';

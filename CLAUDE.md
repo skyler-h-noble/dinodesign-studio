@@ -97,8 +97,10 @@ for token/theme details.)
 | Links | `Link` |
 
 **Do not** import any of these from `@mui/material`. The lib re-exports the
-ones it supports with OmniDesign theming wired in. Material icons
-(`@mui/icons-material`) are fine — the lib doesn't ship icons.
+ones it supports with OmniDesign theming wired in. Icons come from
+`@omni-design/icons` — the Material Icons as plain SVG, the same names as
+`@mui/icons-material` (`import AddIcon from '@omni-design/icons/Add'`) without
+MUI's styling engine. Do not import `@mui/icons-material`.
 
 ---
 
@@ -770,7 +772,7 @@ not compile — the same failure mode as `-p .`, one layer down.
 
 Before committing UI work, run a quick mental pass:
 
-1. `grep -rn "from '@mui/material'" src/` — should be empty (only `@mui/icons-material`).
+1. `grep -rn "from '@mui/" src/` — should be empty (icons come from `@omni-design/icons`).
 2. `grep -rn "<button\|<input\|<select" src/` — every hit should be in a
    shell file or have a clear comment explaining why.
 3. `grep -rn "MISSING-LIB-COMPONENT" src/` — see what's outstanding and whether

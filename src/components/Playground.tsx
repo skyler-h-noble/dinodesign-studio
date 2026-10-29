@@ -16,11 +16,11 @@ import {
   Badge,
   Divider,
 } from '@omni-design/components';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import EmailIcon from '@mui/icons-material/Email';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import SearchIcon from '@omni-design/icons/Search';
+import ClearIcon from '@omni-design/icons/Clear';
+import AttachMoneyIcon from '@omni-design/icons/AttachMoney';
+import EmailIcon from '@omni-design/icons/Email';
+import VisibilityIcon from '@omni-design/icons/Visibility';
 import { getPublicFileUrl } from '../utils/firebase/storage';
 import { systemCssUrls } from '../utils/docs/systemCss';
 import { suppressStudioSkin } from '../utils/studioSkin';

@@ -28,7 +28,7 @@ import {
   OmniDesignProvider,
 } from '@omni-design/components';
 import AddOnTopNav, { ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@omni-design/icons/DeleteOutline';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
 import { CHART_COLOR_VISION, type ColorVision } from '../utils/chartColorVision';

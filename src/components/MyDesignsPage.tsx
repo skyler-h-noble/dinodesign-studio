@@ -4,8 +4,8 @@ import {
   H3,
   H2, Body, BodySmall, VStack, HStack, Card, Button, Select,
 } from '@omni-design/components';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import OpenInNewIcon from '@omni-design/icons/OpenInNew';
+import MoreVertIcon from '@omni-design/icons/MoreVert';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { getPublicFileUrl } from '../utils/firebase/storage';

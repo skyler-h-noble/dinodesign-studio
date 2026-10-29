@@ -3,10 +3,10 @@ import JSZip from 'jszip';
 import {
   Button, H2, H3, Body, BodySmall, VStack, HStack, Card, CodeBlock,
 } from '@omni-design/components';
-import ComputerIcon from '@mui/icons-material/Computer';
-import CodeIcon from '@mui/icons-material/Code';
-import GridViewIcon from '@mui/icons-material/GridView';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ComputerIcon from '@omni-design/icons/Computer';
+import CodeIcon from '@omni-design/icons/Code';
+import GridViewIcon from '@omni-design/icons/GridView';
+import CheckCircleOutlineIcon from '@omni-design/icons/CheckCircleOutline';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import type { StageProps, ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../../types';
 import { generateAndUploadDesignSystem, SHOWCASE_BASE } from '../../utils/generateDesignSystem';

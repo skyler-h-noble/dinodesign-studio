@@ -21,11 +21,11 @@ import {
   LabelSmall,
   Typography,
 } from '@omni-design/components';
-import StarIcon from '@mui/icons-material/Star';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import LockIcon from '@mui/icons-material/Lock';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
+import StarIcon from '@omni-design/icons/Star';
+import ExpandMoreIcon from '@omni-design/icons/ExpandMore';
+import ExpandLessIcon from '@omni-design/icons/ExpandLess';
+import LockIcon from '@omni-design/icons/Lock';
+import LockOpenIcon from '@omni-design/icons/LockOpen';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';

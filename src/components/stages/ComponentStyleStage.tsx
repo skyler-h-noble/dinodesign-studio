@@ -4,9 +4,9 @@ import {
   Button, ButtonGroup, ToggleButtonGroup, H2, H3, Body, BodySmall, VStack, HStack, Card, Label, Slider,
   TextInput, SearchField,
 } from '@omni-design/components';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CalendarTodayIcon from '@omni-design/icons/CalendarToday';
+import ExpandMoreIcon from '@omni-design/icons/ExpandMore';
+import ChevronRightIcon from '@omni-design/icons/ChevronRight';
 import type { StageProps, ComponentStyle, ColorScheme, UserSelections } from '../../types';
 import { loadGoogleFonts } from '../../utils/googleFontsManager';
 import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from '../../utils/componentRadii';

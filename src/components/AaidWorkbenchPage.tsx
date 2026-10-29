@@ -16,7 +16,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import * as DynoComponents from '@omni-design/components';
-import * as MuiIcons from '@mui/icons-material';
+import * as MuiIcons from '@omni-design/icons';
 import { CustomLivePreview } from '../utils/customLivePreview';
 import {
   Card,

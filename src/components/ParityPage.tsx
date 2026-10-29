@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Body, Button, ToggleButtonGroup, Caption, Card, CodeBlock, H2, H3, HStack, Section, Select, Slider, Table, TextInput, VStack, Alert, ThemedZone,
 } from '@omni-design/components';
-import SettingsIcon from '@mui/icons-material/Settings';
+import SettingsIcon from '@omni-design/icons/Settings';
 import { fetchFigmaComponentSets, fetchFigmaImage, fetchFigmaNode, fetchFigmaNodes } from '../utils/figmaApi';
 import { applyStudioDesignSystem, STUDIO_THEMES } from '../utils/studioDesignSystem';
 import { parseFigmaSet, type FigmaPart, type FigmaSet } from '../utils/parity/figmaSet';

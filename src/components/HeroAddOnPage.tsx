@@ -25,7 +25,7 @@ import {
   DropZone, OmniDesignProvider, Chip, ToggleButtonGroup, Caption, Link,
 } from '@omni-design/components';
 import AddOnTopNav, { ADD_ON_NAV_HEIGHT } from './addOns/AddOnTopNav';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@omni-design/icons/DeleteOutline';
 import { systemExists } from '../utils/docs/systemCss';
 import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
 import {
