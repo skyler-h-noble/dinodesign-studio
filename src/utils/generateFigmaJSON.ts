@@ -7,15 +7,16 @@
  * - SurfacesContainers: links to Themes, containers get Background from Modes
  */
 
+import { parseBar, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
 import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
-import { computeRadii, migrateLegacyRadii } from './componentRadii';
+import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
 import { componentSizePayload, desktopButtonMetrics } from './componentSize';
 import { inputMetrics, floatingLabelLeading, FLOATING_LABEL_SIZES } from './inputMetrics';
 import { overlayOffsets, type DeviceMode } from './deviceChrome';
 import { SYSTEM_FAMILY_OF, systemLineHeight } from './systemTypography';
 import { platformButtonMetrics } from './platformMetrics';
-import { FAB_SIZE } from './componentSize';
+import { FAB_SIZE, fieldButtonFlat, numberfieldFlat } from './componentSize';
 import { THEME_MODES, CSS_ONLY_THEMES } from './themes';
 import {
   bevelJSON, PLATFORMS, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
@@ -95,7 +96,7 @@ const THEMES: string[] = [...THEME_MODES];
  * palette they chose next to the default that resolves it.
  */
 import { solveChartPalette } from './chartPalette';
-import { solveQuietOpacities } from './quietOpacity';
+import { solveQuietOpacities, sectionQuietOverrides, QUIET_SECTION_FIX_MODES } from './quietOpacity';
 
 export function themeOrder(defaultTheme?: string): string[] {
   const rest = THEMES.filter((t) => t !== 'Default');
@@ -742,6 +743,14 @@ export function generateFigmaJSON(
       'Icon', 'Tag',
       'Buttons', 'Default-Button', 'Default-Button-Border',
       'Backgrounds',
+      /* The state buttons' tonal entries, keyed by background tone: the fill
+         at the border's tone, with its label, states and bevel. A Modes group
+         because the tone is mode-dependent and the Theme layer is not. */
+      'Tonal-Button',
+      /* Every theme section's Default button, from the shared rule
+         (utils/cellButtons.ts): Cell-Button.<Theme>.<Section>.<field>. A Modes
+         group for the same reason as Tonal-Button. */
+      'Cell-Button',
     ];
 
     for (const section of MODES_SECTIONS) {
@@ -750,6 +759,41 @@ export function generateFigmaJSON(
         extractTokens(modeData[section], modeSection[section]);
       }
     }
+    /* Tonal-Button's bevel arrives as "r, g, b" — the format the CSS feeds to
+       rgba() — which a Figma color variable cannot parse, so it would import
+       as no color. Convert to 8-digit hex carrying the bevel opacity as alpha,
+       as the BlackWhite rows of the Button-* groups are below. */
+    {
+      const bevelPct = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
+      const alpha = Math.round(bevelPct * 255 / 100).toString(16).padStart(2, '0');
+      const toHex = (v: unknown): string | null => {
+        if (typeof v !== 'string') return null;
+        if (v.startsWith('#')) return v.length === 7 ? v + alpha : v;
+        const parts = v.split(',').map((x) => parseInt(x.trim(), 10));
+        if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+        return '#' + parts.slice(0, 3).map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('') + alpha;
+      };
+      for (const scope of Object.values<any>(modeSection['Tonal-Button'] ?? {})) {
+        for (const pal of Object.values<any>(scope ?? {})) {
+          for (const entry of Object.values<any>(pal ?? {})) {
+            for (const k of ['Highlight', 'Lowlight']) {
+              const hex = toHex(entry?.[k]?.value);
+              if (hex) entry[k] = { value: hex, type: 'color' };
+            }
+          }
+        }
+      }
+      // Cell-Button is one level shallower: <Theme>.<Section>.<field>.
+      for (const theme of Object.values<any>(modeSection['Cell-Button'] ?? {})) {
+        for (const entry of Object.values<any>(theme ?? {})) {
+          for (const k of ['Highlight', 'Lowlight']) {
+            const hex = toHex(entry?.[k]?.value);
+            if (hex) entry[k] = { value: hex, type: 'color' };
+          }
+        }
+      }
+    }
+
 
     /* Drop the anchored ends from every Background-N row.
      *
@@ -1343,7 +1387,7 @@ export function generateFigmaJSON(
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
                     'Dropshadow-Color',
-                    'Default-Background'];
+                    'Default-Background', 'Tonal-Button', 'Cell-Button'];
 
                   // If the token already references a Modes group, keep it as-is
                   // (don't resolve further — the plugin will alias to the Modes variable)
@@ -1393,8 +1437,17 @@ export function generateFigmaJSON(
                       // and Pressed, and its light values are identical to the
                       // tone-keyed ones, so light output is unchanged.
                       const shadeMatch = String(btnToken.value).match(
-                        /\{((?:Buttons|Default-Button)\.[\w-]+\.[\w-]+)\.Button\}/
+                        /\{((?:Buttons|Default-Button|Cell-Button)\.[\w-]+\.[\w-]+|Tonal-Button\.[\w-]+\.[\w-]+\.[\w-]+)\.Button\}/
                       );
+                      /* A tonal state button: everything — fill, label, states,
+                         bevel and the border, which IS the fill — comes from
+                         its Tonal-Button entry, which the Modes layer resolves
+                         per mode. Nothing to rewrite onto another table. */
+                      const tonal = !!shadeMatch && shadeMatch[1].startsWith('Tonal-Button.');
+                      /* A Cell-Button entry carries the whole button, border
+                         included — Fixed's border is NOT the fill — so every
+                         field already points into it. Leave it as written. */
+                      const cell = !!shadeMatch && shadeMatch[1].startsWith('Cell-Button.');
                       if (shadeMatch) {
                         target[key]['Hover'] = { value: `{${shadeMatch[1]}.Hover}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{${shadeMatch[1]}.Pressed}`, type: 'color' };
@@ -1423,7 +1476,11 @@ export function generateFigmaJSON(
                       // scope (Surfaces vs Containers) and the surface
                       // background's Color-N.
                       const existingBorder = target[key]['Border']?.value;
-                      if (typeof existingBorder === 'string') {
+                      if (cell) {
+                        target[key]['Border'] = { value: `{${shadeMatch![1]}.Border}`, type: 'color' };
+                      } else if (tonal) {
+                        target[key]['Border'] = { value: `{${shadeMatch![1]}.Button}`, type: 'color' };
+                      } else if (typeof existingBorder === 'string') {
                         // Match any surface scope: Surfaces, Surface-Dim,
                         // Surface-Dimmest, Surface-Bright, Containers,
                         // Container-Low(est), Container-High(est). Preserves
@@ -1615,6 +1672,12 @@ export function generateFigmaJSON(
    * colours get deleted only once nothing is bound to them (invariant 8). */
   {
     const QUIET_TARGET = 4.5;
+    /* theme|section -> mode -> percent, for the few sections the shared tone
+       alpha leaves under 4.5:1 (sectionQuietOverrides; the CSS export reads the
+       same list). Also each mode's table percent at that section's tone, so a
+       mode that does NOT need the override still gets the value it had. */
+    const sectionOverrides = new Map<string, { theme: string; section: string; tone: number; byMode: Record<string, number> }>();
+    const tablePercentByMode: Record<string, Record<number, number>> = {};
     for (const modeName of ['Light-Mode', 'Dark-Mode']) {
       const modeData = designSystemJSON.Modes?.[modeName];
       if (!modeData?.Colors || !figma.Modes[modeName]) continue;
@@ -1651,6 +1714,20 @@ export function generateFigmaJSON(
       for (const note of solved.notes)
         console.warn(`[figma] Quiet-Opacity ${modeName}: ${note}`);
 
+      tablePercentByMode[modeName] = solved.percent;
+      const toneOf = (section: any): number | null => {
+        const m = String(section?.['Quiet-Opacity']?.value ?? '').match(/^\{Quiet\.Color-(\d+)-Opacity\}$/);
+        return m ? Number(m[1]) : null;
+      };
+      const overrides = QUIET_SECTION_FIX_MODES.includes(modeName)
+        ? sectionQuietOverrides(modeData, solved, toHex, toneOf, QUIET_TARGET) : [];
+      for (const o of overrides) {
+        const key = `${o.theme}|${o.section}`;
+        const entry = sectionOverrides.get(key) ?? { theme: o.theme, section: o.section, tone: o.tone, byMode: {} };
+        entry.byMode[modeName] = o.percent;
+        sectionOverrides.set(key, entry);
+      }
+
       const group: any = {};
       for (const [n, pct] of Object.entries(solved.percent))
         group[`Color-${n}-Opacity`] = { value: pct, type: 'number' };
@@ -1665,6 +1742,30 @@ export function generateFigmaJSON(
           `Text.Containers present=${!!designSystemJSON.Modes?.[modeName]?.Text?.Containers}, ` +
           `Backgrounds present=${!!designSystemJSON.Modes?.[modeName]?.Backgrounds}.`);
       }
+    }
+
+    /* A section that needs its own Quiet opacity gets its own FLOAT in the
+       Quiet group, and its Theme/Quiet-Opacity aliases that instead of the
+       shared tone. The Theme collection is mode-independent (built once from
+       Light-Mode), so the per-mode difference has to live in Modes: the
+       variable exists in both modes, holding the override where a mode needs
+       it and that mode's own tone value where it does not. */
+    for (const { theme, section, tone, byMode } of sectionOverrides.values()) {
+      // The export names the groups Surfaces / Surfaces-Brightest; the Theme
+      // collection names them Surface / Surface-Brightest.
+      const figmaSection = section.replace(/^Surfaces/, 'Surface');
+      const name = `${theme}-${figmaSection}-Opacity`;
+      for (const modeName of ['Light-Mode', 'Dark-Mode']) {
+        const pct = byMode[modeName] ?? tablePercentByMode[modeName]?.[tone];
+        if (pct === undefined || !figma.Modes[modeName]?.Quiet) continue;
+        figma.Modes[modeName].Quiet[name] = { value: pct, type: 'number' };
+      }
+      const target = figma.Themes?.[theme]?.[figmaSection];
+      if (target && 'Quiet-Opacity' in target) {
+        target['Quiet-Opacity'] = { value: `{Quiet.${name}}`, type: 'number' };
+      }
+      console.warn(`[figma] Quiet-Opacity: ${theme}/${figmaSection} gets its own value ` +
+        `(${Object.entries(byMode).map(([m, v]) => `${m} ${v}%`).join(', ')}) — the shared tone ${tone} left it under ${QUIET_TARGET}:1.`);
     }
   }
 
@@ -1757,12 +1858,10 @@ export function generateFigmaJSON(
     const defN = defaultSettings['Default-Theme']?.N?.value || 12;
     const userBg = designSystemJSON._userSelections?.background || 'white';
 
-    // Determine Dark Mode palette and N based on user's Light Mode selection:
-    // Primary/Primary-Light → Primary Color-2
-    // White/Black → Neutral Color-2
-    const darkUsePrimary = (userBg === 'primary-light' || userBg === 'primary-base' || userBg === 'primary');
-    const darkPalette = darkUsePrimary ? 'Primary' : 'Neutral';
-    const darkN = 2;
+    // Dark mode: the chosen background's theme at Color-2 (darkPageTheme,
+    // shared with the preview and the CSS export).
+    const darkPalette = darkPageTheme(userBg);
+    const darkN = DARK_PAGE_N;
     // Dark mode containers are always tonal: Primary Color-3 or Neutral Color-3
     const darkContainerN = 3;
 
@@ -2176,15 +2275,26 @@ export function generateFigmaJSON(
      * theme and nothing else — so a light App-Bar arrives on the palette's
      * default level and a designer sets the level. That is a smaller gap
      * than the one it replaces, where the palette was wrong too. */
-    function deriveThemeName(navSettings: any): string {
+    /* Read from the bar's SELECTION ("Tertiary/Surface-Bright"), decoded by
+       parseBar — the same decoder the CSS side uses. This read the `Theme`
+       field beside it, which was written stale: Popsicle's bars were
+       Tertiary · Bright and Figma was told Primary, so the import set the
+       wrong palette and no surface level at all. Now it carries both, and the
+       plugin sets Theme AND Surface on the bar's Theme-Container. */
+    function navTarget(navSettings: any): { theme: string; surface: string } {
+      const sel = navSettings?.Selection?.value;
+      if (sel) {
+        const p = parseBar(sel);
+        if (THEMES.includes(p.theme)) return { theme: p.theme, surface: p.surface };
+      }
       const theme = navSettings?.Theme?.value;
-      return THEMES.includes(theme) ? theme : 'Default';
+      return { theme: THEMES.includes(theme) ? theme : 'Default', surface: 'Surface' };
     }
 
     figma.Navigation = {
-      'Nav-Bar': { theme: deriveThemeName(defaultSettings['Nav-Bar']) },
-      'App-Bar': { theme: deriveThemeName(defaultSettings['App-Bar']) },
-      'Status': { theme: deriveThemeName(defaultSettings['Status']) },
+      'Nav-Bar': navTarget(defaultSettings['Nav-Bar']),
+      'App-Bar': navTarget(defaultSettings['App-Bar']),
+      'Status': navTarget(defaultSettings['Status']),
     };
   }
 
@@ -2360,23 +2470,16 @@ export function generateFigmaJSON(
     // this only kicks in defensively for restored designs or hand-edited input.
     const bevelPct = csRaw.bevel ?? 0;
     // Padding tokens derived from the computed medium button radius.
-    // Single source of truth for border width — referenced by both the
-    // emitted Button-Border-Width token and the height calculations
-    // (inner height = outer - border × 2).
-    //
-    // 1px. It was 2px, which also made every Figma inner height and swatch 2px
-    // shorter than it should be, since they subtract this twice.
-    //
-    // The token keeps being emitted even though the value is now a constant
-    // nobody varies: it already ships to Figma, and a deleted Figma variable
-    // cannot be recovered by re-importing — a recreated variable gets a new id,
-    // so every layer bound to the old one stays unbound (invariant 8).
+    // Button-Border-Width is a style choice now, 1px or 2px
+    // (buttonBorderWidthPx). It only moves the border: the swatches and
+    // heights are measured off the OUTER button size. The variable keeps its
+    // name and id across the change — a value update, not a recreate, so no
+    // binding is lost (invariant 8).
     /** Button padding. Small and standard share one value; large has its own.
  *  Mirrors BUTTON_PADDING / LG_BUTTON_PADDING in exportToCSS.ts. */
 const FIGMA_BUTTON_PADDING = 8;
 const FIGMA_LG_BUTTON_PADDING = 16;
 
-const BUTTON_BORDER_WIDTH = 1;
     // Motion. Durations are FLOATs and are directly usable as Smart Animate
     // durations; the easings can only be STRINGs, since Figma prototypes pick
     // from their own presets — those ship as reference values a designer pastes
@@ -2417,7 +2520,9 @@ const BUTTON_BORDER_WIDTH = 1;
       // Large's text floor is the standard floor + 40, derived rather than a
       // second number to keep in step.
       'Lg-Button-Min-Width': (csRaw.minButtonWidth ?? 60) + 40,
-      'Button-Border-Width': BUTTON_BORDER_WIDTH,
+      'Button-Border-Width': buttonBorderWidthPx(csRaw?.buttonBorderWidth),
+      // The selected stroke: rest + 1px, its own variable (no arithmetic in Figma).
+      'Button-Selected-Border-Width': buttonSelectedBorderWidthPx(csRaw?.buttonBorderWidth),
       /* TWO paddings: small and standard share one, large has its own. Sm- is
          deliberately absent — it equals Button-Padding, so nothing selects
          between the copies (invariant 2). Lg- is a different number and
@@ -2439,10 +2544,14 @@ const BUTTON_BORDER_WIDTH = 1;
     };
     const inputExtras: Record<string, number> = {
       'Input-Padding': csRaw.inputPadding ?? (r.buttonRadius >= 8 ? 4 : 2),
+      // The NumberField's height, from the brand's button heights.
+      ...numberfieldFlat({ small: cs.smallButtonHeight, medium: cs.buttonHeight, large: cs.largeButtonHeight }),
     };
 
     figma['Component-Size'] = componentSizePayload(
-      r as never, { ...buttonFigmaMetrics, ...buttonExtras }, inputExtras);
+      r as never, { ...buttonFigmaMetrics, ...buttonExtras, ...fieldButtonFlat() }, inputExtras,
+      // App-Bar-Height = each size's button height + 2 × Sizing-2.
+      { small: cs.smallButtonHeight, medium: cs.buttonHeight, large: cs.largeButtonHeight },);
 
     /* Every column of the Devices-Type button variables that
        Component-Size/Button/Button-Height and -Icon alias into.
@@ -2865,14 +2974,6 @@ const BUTTON_BORDER_WIDTH = 1;
   // NOTE: this is the only reference into Button-Lowlight in the whole payload;
   // nothing else aliases the four flat Button-* sections. If those are ever
   // dropped to reclaim variables, this line has to move with them.
-  // The black face carries the SAME bevel alpha as the white one, which arrives
-  // through {Button-Lowlight.Neutral.Color-12} with the opacity already baked in.
-  // Derived from bevelOpacity rather than written as a literal 80: a hardcoded
-  // alpha matches at the default 50% and silently splits the moment that slider
-  // moves, leaving black's shadow a different strength from white's.
-  const bwBevelOpacity = designSystemJSON._componentStyle?.bevelOpacity ?? 50;
-  const bwBevelAlphaHex = Math.round(bwBevelOpacity * 255 / 100).toString(16).padStart(2, '0');
-
   const BW_REF = /^\{Buttons\.BlackWhite\.Color-(\d+)\.(\w+)\}$/;
   const BW_BLACK_FROM_TONE = 6;   // Color-1..5 paint white, 6..12 paint black
 
@@ -2898,19 +2999,19 @@ const BUTTON_BORDER_WIDTH = 1;
    *   Button / Border   the face itself          Colors.White / Neutral.Color-1
    *   Text              the other face           the same two, swapped
    *   Quiet             a muted neutral          Neutral.Color-5 / Color-6
-   *   Hover / Pressed   Button-Hover|Pressed.BlackWhite, tone preserved
-   *   Highlight         white is mode-invariant, so a literal is safe there;
-   *   Lowlight          black moves, so it takes the variable
+   *   Hover / Pressed /
+   *   Highlight / Lowlight   Button-*.BlackWhite, tone preserved — the bevel is
+   *                          worked out per tone from what the button shows on
+   *                          that surface, in each mode
    *
    * Colors.White and Colors.Neutral.Color-1 carry the dark-mode alpha and the
    * #0b0b0b themselves, so light/dark comes for free rather than being restated.
    *
-   * The two bevel literals are the only frozen values, and they are frozen on
-   * purpose: white's Highlight and Lowlight are identical in both modes because
-   * white does not move — the 70% lives in the fill's own alpha, not in the
-   * bevel. Their alpha is derived from bevelOpacity rather than written as 80,
-   * because a hardcoded alpha matches at the default 50% and splits silently the
-   * moment that slider moves.
+   * No bevel is frozen any more. White's used to be: identical literals in
+   * both modes, on the reasoning that white does not move — but the dark-mode
+   * white face is 70% alpha, so what it SHOWS moves, and solid white's
+   * lowlight sat at that color. The export now works the bevel out from the
+   * composite per tone (exportColorSystem, Buttons.BlackWhite).
    *
    * Retires the old black-Lowlight literal (#000000 at the bevel alpha), which
    * was correct as far as it went but froze the black bevel to light mode.
@@ -2926,13 +3027,15 @@ const BUTTON_BORDER_WIDTH = 1;
     Border:    { white: '{Colors.White}', black: '{Colors.Neutral.Color-1}' },
     Text:      { white: '{Colors.Neutral.Color-1}', black: '{Colors.White}' },
     Quiet:     { white: '{Colors.Neutral.Color-5}', black: '{Colors.Neutral.Color-6}' },
-    Highlight: { white: `#ffffff${bwBevelAlphaHex}`, black: '{Button-Highlight.BlackWhite.Color-12}' },
-    Lowlight:  { white: `#b3b3b3${bwBevelAlphaHex}`, black: '{Button-Lowlight.BlackWhite.Color-12}' },
   };
-  /* These two keep the tone from the reference — their sections carry all
-     twelve, so there is nothing to collapse. */
+  /* These keep the tone from the reference — their sections carry all twelve.
+     Highlight and Lowlight joined them once the Modes trim made room: the bevel
+     is worked out per tone from what the button shows on that surface, in each
+     mode, so a white button's bevel in dark mode (white at 70% on a dark
+     surface) is its own, not solid white's frozen as a literal. */
   const BW_TONED_SECTION: Record<string, string> = {
     Hover: 'Button-Hover', Pressed: 'Button-Pressed',
+    Highlight: 'Button-Highlight', Lowlight: 'Button-Lowlight',
   };
 
   let bwRewritten = 0, bwUnmapped = 0;
@@ -3103,6 +3206,52 @@ const BUTTON_BORDER_WIDTH = 1;
   const pageBgHex = figma.Modes?.['Light-Mode']?.Colors?.Primary?.['Color-12']?.value;
   if (typeof pageBgHex === 'string') {
     figma.pageBackground = pageBgHex;
+  }
+
+    /* Drop what nothing in Figma reads.
+     *
+     * Measured across 480 builds (8 brands x every button, card, text and
+     * background setting, 2026-10-19): none of these is referenced by the
+     * Theme layer or any other collection, and none is bound by a layer in
+     * the template file. Modes sits near Figma's 5,000-variable ceiling, and
+     * an import is additive, so a name shipped and never read is a slot taken
+     * from a name that is. The CSS keeps every table — only Figma is trimmed.
+     *
+     *   Button-Hover / -Pressed / -Highlight / -Lowlight   BlackWhite only: the
+     *       black-and-white button reads them by surface tone; every other
+     *       palette's states come from its own Buttons entry.
+     *   Default-Button   the Default entry only, without Border (the border
+     *       comes from Default-Button-Border).
+     *   Buttons   no state palettes (Tonal-Button serves them), no .Border
+     *       (Default-Button-Border does) — except Neutral's, which a layer in
+     *       the template binds directly — and no BlackWhite per-tone rows.
+     *
+     * Runs LAST, after every Modes group is built and every reference in
+     * Themes is written: the BlackWhite rows of the Button-* groups are COPIED
+     * from Buttons.BlackWhite's per-tone rows further down, so trimming those
+     * earlier emptied the copy and left 5,360 references pointing at nothing —
+     * the trap the NOTE below warns about. figmaModesTrim.test.ts fails on any
+     * reference into a trimmed name, so a new reader cannot be cut off silently. */
+  for (const modeSection of Object.values<any>(figma.Modes ?? {})) {
+    const keepOnly = (group: string, keep: (key: string) => boolean) => {
+      const g = modeSection[group];
+      if (g && typeof g === 'object') for (const k of Object.keys(g)) if (!keep(k)) delete g[k];
+    };
+    for (const group of ['Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight']) keepOnly(group, (pal) => pal === 'BlackWhite');
+    keepOnly('Default-Button', (pal) => pal === 'Default');
+    if (modeSection['Default-Button']?.Default) delete modeSection['Default-Button'].Default.Border;
+    const btns = modeSection['Buttons'];
+    if (btns && typeof btns === 'object') {
+      for (const pal of ['Info', 'Success', 'Warning', 'Error']) delete btns[pal];
+      for (const [pal, entry] of Object.entries<any>(btns)) {
+        if (!entry || typeof entry !== 'object') continue;
+        if (pal !== 'Neutral' && entry.Border && 'value' in entry.Border) delete entry.Border;
+        if (pal === 'BlackWhite') {
+          for (const k of Object.keys(entry)) if (/^Color-/.test(k)) delete entry[k];
+          if (entry.Default) { delete entry.Default.Highlight; delete entry.Default.Lowlight; }
+        }
+      }
+    }
   }
 
   return figma;

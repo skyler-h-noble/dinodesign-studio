@@ -56,8 +56,10 @@ export interface NavOptions {
    *  which is a design decision about the product rather than about the
    *  moment. */
   railExpandable?: boolean;
-  /** Palette and surface level the nav paints on. Names, never colors — the
-   *  same definition lands in each design system's own brand. */
+  /** RETIRED — ignored, kept so an old share link still reads. The bars
+   *  take the App-Bar and Nav-Bar themes the design system already chose in
+   *  the studio (APP_BAR_THEME / NAV_BAR_THEME); a second picker here could
+   *  only disagree with it. */
   theme?: string;
   surface?: string;
   /** Hero only: brand and actions animate into the strip once it sticks. */
@@ -70,6 +72,12 @@ export interface NavOptions {
    *  wants. Neither is right for both. */
   heroTabsAlign?: 'left' | 'center';
 }
+
+/** The bars' themes: the design system's own App-Bar and Nav-Bar, picked
+ *  once in the studio and a mode of the Theme collection in Figma. The top
+ *  bars and the rail are app bars; the phone's bottom bar is the nav bar. */
+export const APP_BAR_THEME = 'App-Bar';
+export const NAV_BAR_THEME = 'Nav-Bar';
 
 /** Palettes a nav can resolve against — the Theme collection's modes.
  *
@@ -163,7 +171,21 @@ export const NAV_CONDITIONS: Record<string, ConditionDef> = {
       + 'Driven by scroll position, not viewport width.',
     trigger: 'scroll',
   },
+  /* Show-Condensed's opposite: TRUE until the hero scrolls past. Figma binds
+     `visible` to a boolean and cannot invert one, so the hero's own actions —
+     which give way to the sticky strip's — need a variable that is on at rest.
+     It was bound without being declared, so it was seeded as a width condition
+     and appeared as a per-breakpoint switch. */
+  'Adaptive-Nav/Hide-When-Condensed': {
+    description:
+      'The hero\u2019s own actions: on until the hero has scrolled past, then off '
+      + '(their copies show in the sticky strip). The opposite of Show-Condensed.',
+    trigger: 'scroll',
+  },
 };
+
+/** Scroll conditions that are ON at rest — the inverse of one that is off. */
+export const ON_AT_REST = new Set(['Adaptive-Nav/Hide-When-Condensed']);
 
 /**
  * Conditions where exactly one of the set is true.
@@ -403,7 +425,7 @@ function bar(o: NavOptions): NodeDef {
        brand uses, and for the same reason. Centring inside a single filling
        group would put the tabs wherever the menu button and the condensed
        brand happen to leave them. */
-    const tabsCentred = o.heroTabsAlign === 'center';
+    const tabsCentred = (o.heroTabsAlign ?? 'center') === 'center';
     children = tabsCentred
       ? [
           /* THREE groups, and the third is why it works. Two FILL sides with a
@@ -528,8 +550,8 @@ function bar(o: NavOptions): NodeDef {
        do. Setting the attributes on the element that paints is also the rule:
        it exposes the matched set, so the text and borders inside resolve
        against the bar's surface rather than the page's. */
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    theme: APP_BAR_THEME,
     /* Paints edge to edge; its content respects the page's ceiling — EXCEPT
        above the rail. There the bar is application chrome, not a band over a
        page: its brand block has to sit on the rail's rectangle at x=0, and
@@ -562,8 +584,8 @@ function heroRoot(o: NavOptions): NodeDef {
     direction: 'column',
     width: 'fill',
     height: 'hug',
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    // No theme: the root is the PAGE and inherits it; the bars name their own.
     children: [
       {
         /* The hero and what floats on it. A wrapper rather than putting the
@@ -633,11 +655,11 @@ function railNode(fullHeight: boolean): NodeDef {
        fills what is left, which is the same instruction from the row's point
        of view — but expressed on the wrong axis it would stretch the rail
        across the page instead. */
-    height: fullHeight ? 'fill' : 'fill',
-    /* One step dimmer than the bar, so the rail reads as a distinct region
-       without naming a second color. Relative to whatever the nav is set to,
-       which is why it is a level rather than a fixed surface. */
-    surface: 'Surface-Dim',
+    height: 'fill',
+    /* The App-Bar theme, the same as the bar beside it: on a desktop the bar
+       and the rail are one piece of chrome wrapped round the page, and two
+       colors made them read as two. Nav-Bar is the phone's bottom bar. */
+    theme: APP_BAR_THEME, surface: 'Surface',
     /* VERTICAL only. The horizontal inset belongs to the Rail component — the
        design's Rail Slot insets its items by Sizing-1 — so adding Sizing-3
        here too meant 24px of definition padding around 8px of component
@@ -754,8 +776,8 @@ export function navDefinition(o: NavOptions): ComponentDefinition {
        root as tall as its bars, so the rail and the content had 153px to
        share and the page had nowhere to be. */
     height: 'fill',
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    // No theme: the root is the PAGE and inherits it; the bars name their own.
     children: o.layout === 'rail'
       ? railChildren(o)
       : [{ ...bar(o), sticky: stickyBar(o), pin: 'top' as const, elevation: APP_BAR_ELEVATION }, pageSlot()],
@@ -809,7 +831,10 @@ export function defaultNavMatrix(
            'scroll' by name seeded every trigger added afterwards as true,
            which would have opened the account menu at every breakpoint the
            moment it existed. */
-        def && def.trigger !== 'device' ? false
+        /* At rest, a scroll condition is off — except an inverse, which is on
+           until the scroll happens. */
+        ON_AT_REST.has(name) ? true
+        : def && def.trigger !== 'device' ? false
         /* By WIDTH, not by position in the list.
            
            This was "the narrowest breakpoint gets the menu button", so sm

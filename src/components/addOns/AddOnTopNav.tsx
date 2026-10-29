@@ -16,8 +16,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AppBar, Body, BodySmall, Button, H3, HStack, Link, Modal, TextField, VStack } from '@omni-design/components';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import ArrowBackIcon from '@omni-design/icons/ArrowBack';
+import SettingsOutlinedIcon from '@omni-design/icons/SettingsOutlined';
 import { componentDocsIndexUrl } from '../../utils/docs/docsLink';
 
 /** Room the sticky bar takes, for sticky content below it (the bar is 64). */

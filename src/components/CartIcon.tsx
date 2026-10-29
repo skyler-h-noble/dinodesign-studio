@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Body, BodySmall, Button, HStack, Modal, VStack } from '@omni-design/components';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import CloseIcon from '@mui/icons-material/Close';
+import ShoppingCartIcon from '@omni-design/icons/ShoppingCart';
+import CloseIcon from '@omni-design/icons/Close';
 import { useCart } from '../contexts/CartContext';
 import { ADD_ONS, formatPrice } from '../utils/addOns/registry';
 import { purchaseAddOn } from '../utils/addOns/entitlements';

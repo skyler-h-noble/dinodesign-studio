@@ -48,6 +48,13 @@ export const ADD_ONS: AddOn[] = [
   // read at, exported as PNGs and meta tags (see /add-ons/share).
   { slug: 'share-images',      title: 'Share Images',                 description: 'The picture a link shows when it is shared — in your brand, at the sizes Facebook, LinkedIn, X, Slack and Pinterest read — as PNGs, meta tags and Figma frames.', priceUsdCents: 500, available: false },
   { slug: 'bento-grid',        title: 'Bento Grid',                   description: 'Feature tiles on your layout grid, each on its own surface — reflowing from 12 columns to 8 to 4, as code and built in Figma.', priceUsdCents: 500, available: false },
+  // Generator: the app's navigation across every width — app bar, tabs or a
+  // menu button, rail, bottom bar, account menu — as one component whose parts
+  // switch per breakpoint (see /add-ons/nav).
+  { slug: 'adaptive-nav',      title: 'Adaptive Nav',                 description: 'Your app\u2019s navigation at every width — app bar, tabs or menu button, rail, bottom bar and account menu, switching per breakpoint in your brand.', priceUsdCents: 500, available: false },
+  // Generator: a ShapeButton's two shapes and when it morphs, as code and the
+  // Figma steps (see /add-ons/morph-button).
+  { slug: 'morph-button',      title: 'Morph Button',                 description: 'A button on one of your shapes that turns into another on hover, on press or while it is on — as code, and set up in Figma with Smart Animate.', priceUsdCents: 500, available: false },
   { slug: 'charts',            title: 'Charts',                       description: 'Bar, 3D bar and line charts in your brand — copy the code, or build the same chart in Figma from your components.', priceUsdCents: 500, available: false },
 ];
 

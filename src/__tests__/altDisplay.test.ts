@@ -369,7 +369,7 @@ describe('the Alt Display CSS', () => {
                          '--Alt-Color-Gradient-Stop-2']) {
       expect(`${token} in preview: ${css.includes(token)}`).toBe(`${token} in preview: true`);
     }
-  });
+  }, 30_000); // builds the whole preview; slow under a full parallel run
 
   it('offers three variants from ONE pair of stops', async () => {
     /* Mirrors the Figma Alt-Display collection: three modes pointing the same

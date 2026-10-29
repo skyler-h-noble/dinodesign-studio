@@ -97,8 +97,8 @@ DATA:
     renders the built-in photo-icon placeholder itself (no <img>, no broken
     src). Likewise emit <Ratio placeholder /> for any image slot whose source
     isn't a usable URL (e.g. a Figma imageRef hash). Only pass an <img> child
-    when you have a REAL image URL. A plain <Ratio ratio="1:1" /> with the
-    boolean false is just a blank tile.
+    when you have a REAL image URL. A plain <Ratio ratio="1:1" /> is an empty
+    Surface-Dim tile — the component's default, as in Figma.
   - <ListItem
        startDecorator={<Avatar/Ratio/Icon />}
        endDecorator={<Checkbox/Button/Icon />}
@@ -341,6 +341,9 @@ CONVERSION RULES:
     thing that will ever ask them.
 
 1. Outermost frame for Mobile / Tab / Web → <Container>.
+   <Container> is LAYOUT ONLY — it centers and caps the width and paints
+   nothing. When the frame's _aaid.modes set a Theme or Surface, wrap it:
+   <Section theme=… surface=…><Container>…</Container></Section>.
    Outermost frame for a component → <Card> or <Section> as appropriate.
 
 1a. CARD vs BOX — a frame is a <Card> ONLY if the design explicitly marks it
@@ -676,9 +679,10 @@ CONVERSION RULES:
         add            -> AddIcon
         chevron-right  -> ChevronRightIcon
         more_vert      -> MoreVertIcon
-    Import it from "@mui/icons-material" — that package IS allowed and is the
-    only place icons come from; the component library ships none.
-        import AddIcon from '@mui/icons-material/Add';
+    Import it from "@omni-design/icons" — the only place icons come from. It is
+    the Material Icons as plain SVG, with the same names as @mui/icons-material
+    but without MUI's styling engine; never import @mui/icons-material.
+        import AddIcon from '@omni-design/icons/Add';
 
     THE GLYPH MAY BE A TEXT LAYER. The icon set is a FONT, so the glyph is a
     text node whose CHARACTERS are the ligature — "home", "info_outline" — in
@@ -688,16 +692,18 @@ CONVERSION RULES:
     content is edited and the characters are what is actually drawn.
 
     THE Icon COMPONENT CARRIES A Style VARIANT, and it is the font family.
-    Material ships the same glyph in three corner treatments, and MUI ships a
-    matching component for each, so the variant decides the SUFFIX:
+    Material ships the same glyph in three corner treatments, and
+    @omni-design/icons ships a matching component for each (the same names
+    MUI uses), so the variant decides the SUFFIX:
 
         Style=Default  (Material Icons)        add -> AddIcon
         Style=Round    (Material Icons Round)  add -> AddRoundedIcon
         Style=Sharp    (Material Icons Sharp)  add -> AddSharpIcon
 
-        import AddRoundedIcon from '@mui/icons-material/AddRounded';
+        import AddRoundedIcon from '@omni-design/icons/AddRounded';
 
-    Note Figma says "Round" and MUI says "Rounded" — map it, do not copy it.
+    Note Figma says "Round" and the icon names say "Rounded" — map it, do not
+    copy it.
     Dropping the variant is a silent miss: a rounded icon emitted as AddIcon
     still compiles and still renders an icon, just with the wrong corners.
 
@@ -728,7 +734,7 @@ CONVERSION RULES:
     style={{ fontSize: N }} on <H1>-<H6>, <Body>, <Subtitle>, <Caption> etc. is
     always wrong, because size and LINE HEIGHT are published as a pair and an
     inline size only replaces half of it. The component's rule still says
-        line-height: calc(var(--H2-Line-Height) * var(--Cognitive-Multiplier, 1))
+        line-height: var(--H2-Line-Height)
     so an <H2> forced to 18px keeps H2's 40px line height, and a two-line title
     renders with a gaping hole between the lines. Nothing errors; it just looks
     loose, which is easy to mistake for a spacing choice.
@@ -1239,7 +1245,21 @@ function attachAaidNotes(node: any): void {
   if (!node || typeof node !== 'object') return;
   const shared = node.sharedPluginData;
   if (shared && shared.dino && typeof shared.dino.aaid === 'string') {
-    try { node._aaid = JSON.parse(shared.dino.aaid); } catch { /* ignore malformed note */ }
+    try {
+      node._aaid = JSON.parse(shared.dino.aaid);
+      /* Mode keys by their bare collection name. A file that hides a collection
+         from its published library names it with a leading "." (.Theme,
+         .Elevation), and notes written before the plugin stripped it carry
+         that name — which the prompt's modes.Theme / modes.Elevation would
+         read as absent, and an absent Theme means Default. */
+      const modes = node._aaid?.modes;
+      if (modes && typeof modes === 'object') {
+        for (const k of Object.keys(modes)) {
+          const bare = k.replace(/^[._]/, '');
+          if (bare !== k) { if (!(bare in modes)) modes[bare] = modes[k]; delete modes[k]; }
+        }
+      }
+    } catch { /* ignore malformed note */ }
   }
   if (node.sharedPluginData) delete node.sharedPluginData;
   if (Array.isArray(node.children)) {

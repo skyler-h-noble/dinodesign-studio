@@ -14,7 +14,7 @@ import type { SurfaceLevel } from '../surfaceWindow';
  * Theme configuration for generating Surfaces and Containers
  */
 import { monoStopTone, type AltStop2 } from '../altDisplay';
-import { toneFor, type BackgroundTheme, type SurfaceLevel as BarLevel } from '../backgroundSelection';
+import { toneFor, barToneFor, type BackgroundTheme, type SurfaceLevel as BarLevel } from '../backgroundSelection';
 
 interface ThemeConfig {
   themeName: string;
@@ -1087,7 +1087,7 @@ export function generateAllThemesWithSurfacesAndContainers(
       | 'primary-adaptive' | 'primary-fixed'
       | 'secondary-adaptive' | 'secondary-fixed'
       | 'tonal-adaptive' | 'tonal-fixed'
-      | 'laddered-adaptive' | 'laddered-fixed';
+      | 'laddered-adaptive' | 'laddered-fixed' | 'match-fixed';
     textColoring?: 'tonal' | 'black-white';
     cardColoring?: 'tonal' | 'white' | 'black'; // CRITICAL FIX: Added to pass card coloring selection to generateModesThemes
   },
@@ -1471,7 +1471,18 @@ export function generateAllThemesWithSurfacesAndContainers(
     successText: textPalettes.success,
     warningText: textPalettes.warning,
     errorText: textPalettes.error,
-    defaultHeader: textColoring === 'tonal' ? 'Primary' : 'Primary',
+    /* Every palette theme's heading speaks in its OWN palette: a Secondary
+       section's heading comes from the Secondary 3:1 heading table, Info's from
+       Info, Neutral's from Neutral, and Primary's (unchanged) from Primary.
+       This read `textColoring === 'tonal' ? 'Primary' : 'Primary'` — both arms
+       Primary — so every themed section carried the brand heading, and a pink
+       brand painted pink headings on its Info and Success sections.
+       Header.Surfaces.<Palette>.Color-N is the curated table each palette's own
+       Header-<Palette> already reads, so the 3:1 pairing holds by construction.
+       The nav bars are built through here from the theme they show, so a bar
+       follows that theme; the page (Default) has its own config and keeps the
+       brand heading. */
+    defaultHeader: theme,
     primaryHeader: 'Primary',
     secondaryHeader: 'Secondary',
     tertiaryHeader: 'Tertiary',
@@ -1544,7 +1555,7 @@ export function generateAllThemesWithSurfacesAndContainers(
     const slash = raw.split('/');
     if (slash.length === 2 && themes[slash[0]]) {
       const [t, level] = slash as [BackgroundTheme, BarLevel];
-      const n = toneFor(t, level, coreFor(t));
+      const n = barToneFor(t, level, coreFor(t));
       themes[name] = generateSingleTheme(makeConfig(t, t, n));
       continue;
     }

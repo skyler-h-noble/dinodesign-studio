@@ -2,7 +2,9 @@ import { uploadDesignSystemFile, getDesignSystemFileUrl, getPublicFileUrl } from
 import {
   bevelCSS, bevelJSON, PLATFORM_TARGET, PLATFORM_SPACER, platformButtonHeight,
   platformBevelCSS,
+  fabBevelVars,
 } from './bevelGeometry';
+import { FAB_SIZE } from './componentSize';
 import { extractHeroImage } from './heroImage';
 import { STORAGE_BUCKET } from './firebase/client';
 import type { ColorScheme, UserSelections, TypographyStyle, ComponentStyle, SurfaceStyle } from '../types';
@@ -14,7 +16,7 @@ import { generateFigmaJSON } from './generateFigmaJSON';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { typographyDeclarations } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles, SYSTEM_UI_STACK } from './typeScale';
-import { overlayOffsetCSS, DEVICE_MARGIN } from './deviceChrome';
+import { overlayOffsetCSS, overlayWidthCSS, DEVICE_MARGIN } from './deviceChrome';
 import { DEVICE_COLUMNS, DEVICE_GUTTER, gridCSS } from './layoutGrid';
 
 /**
@@ -58,6 +60,7 @@ function mapButtonStyle(button: string): string {
     case 'secondary': return 'secondary-fixed';
     case 'tonal': return 'tonal-fixed';
     case 'laddered': return 'laddered-fixed';
+    case 'match': return 'match-fixed';
     case 'black-white': return 'black-white';
     default: return 'primary-fixed';
   }
@@ -93,11 +96,13 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
 ### Install in Your Project
 
 \`\`\`bash
-npm install @omni-design/components
+npm install @omni-design/components @omni-design/icons @mui/material@^7 @emotion/react @emotion/styled
 npx @dynodesign/init ${uuid}
 \`\`\`
 
 This downloads the CSS token files into your project and sets up the provider.
+MUI is pinned to 7, the version the components' remaining MUI parts are built against.
+Icons come from \`@omni-design/icons\` (the Material Icons as plain SVG, same names as \`@mui/icons-material\`).
 
 ---
 
@@ -553,33 +558,17 @@ All typography components (H1–H6, Body, BodySmall, Caption, Label, etc.) accep
 ### AppBar
 
 \`\`\`jsx
-{/* Always wrap in ThemedZone */}
-{/* Mobile */}
-<ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
-  <AppBar
-    mode="mobile"              {/* "mobile" | "desktop" */}
-    mobileVariant="title"      {/* "title" | "search" (mobile only) */}
-    title="My App"             {/* shown in mobile title variant */}
-    subtitle="Tagline"         {/* optional subtitle */}
-    companyName="My App"       {/* brand name */}
-    barColor="default"         {/* "default" | "white" */}
-    rightContent={<Avatar />}  {/* React node for the right side */}
-  />
-</ThemedZone>
+{/* A site nav: links inline on wide screens, folded into a menu button
+    below 900px (collapseAt). AppBar themes itself — no wrapper needed. */}
+<AppBar
+  brand="My App"
+  navLinks={[{ label: 'Features', href: '#features' }, { label: 'Pricing', href: '#pricing' }]}
+  endSlot={<Button variant="default" size="small">Get started</Button>}
+  barColor="default"         {/* "default" | "primary" | "white" | "black" */}
+/>
 
-{/* Desktop */}
-<ThemedZone theme="App-Bar" surface="Surface-Bright" as="header">
-  <AppBar
-    mode="desktop"
-    companyName="My App"
-    navLinks={['Home', 'About', 'Contact']}
-    showRightButtons           {/* shows action buttons on right */}
-    loginType="login"          {/* login button type */}
-    menuType="hamburger"       {/* menu type */}
-    brandType="name"           {/* "name" | other */}
-    searchPosition="right"     {/* search bar position */}
-  />
-</ThemedZone>
+{/* An app screen on a phone: a search or title bar, not a site nav */}
+<AppBar mode="mobile" mobileVariant="small" title="Inbox" />   {/* "search" | "small" | "medium" | "large" */}
 \`\`\`
 
 ### BottomNavigation
@@ -862,6 +851,8 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
         navBar: input.userSelections.navBar as any,
         status: input.userSelections.status as any,
         button: mapButtonStyle(input.userSelections.button) as any,
+        buttonTone: input.userSelections.buttonTone,
+        buttonCellTones: input.userSelections.buttonCellTones,
         cardColoring: input.userSelections.cardColoring,
         textColoring: input.userSelections.textColoring,
       },
@@ -898,7 +889,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
      * deleted by hand after every regenerate and recreated by the next one.
      *
      * The feature is not being removed, and this is the distinction worth
-     * keeping straight. `--Cognitive-Multiplier` is LIVE: foundation.css
+     * keeping straight. The cognitive multiplier and its overrides were removed 2026-10-29: nothing ever switched them on.
      * declares it at 1 and raises it to 1.5 under the accessibility overrides
      * further down this file, and the library multiplies line heights by it —
      * Link.js alone reads it five times. That is the whole mechanism. The JSON
@@ -1083,6 +1074,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
   --Button-Bevel: ${bevelPercent};
   --Button-Bevel-Px: ${bevelPx}px;
   --Button-Bevel-Opacity: ${bevelOpacity / 100};
+${Object.entries(fabBevelVars(FAB_SIZE, bevelPercent)).map(([k, v]) => `  ${k}: ${v};`).join('\n')}
   /* Bevel geometry — the literal box-shadow numbers, same values the Figma
      Platform/Components collections carry (there as bare numbers, here as px).
      Small and large don't vary by platform, so they live here; medium's live
@@ -1197,7 +1189,6 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
   --Body-Font-Weight: var(--Set-Font-Family-Body-Weight);
   --Body-Semibold-Font-Weight: var(--Set-Font-Family-Body-Semibold-Weight);
   --Body-Bold-Font-Weight: var(--Set-Font-Family-Body-Bold-Weight);
-  --Cognitive-Multiplier: 1;
   --Dropshadow-Color: 20, 20, 20;  /* fallback; overridden per-theme in Light/Dark-Mode.css */
 }
 
@@ -1267,6 +1258,7 @@ ${bevelCSS('Lg-', largeButtonHeight, bevelPercent)}
 /* Desktop Defaults */
 :root {
   --Margin: ${DEVICE_MARGIN['Desktop']}px;
+${overlayWidthCSS('Desktop').join('\n')}
   --Columns: ${DEVICE_COLUMNS['Desktop']};
   --Gutter: ${DEVICE_GUTTER['Desktop']}px;
 ${gridCSS('  ').join('\n')}
@@ -1327,6 +1319,7 @@ ${overlayOffsetCSS('Desktop').slice(1).join('\n')}
 /* iOS Mobile */
 [data-device="IOS-Mobile"] {
   --Margin: ${DEVICE_MARGIN['IOS-Mobile']}px;
+${overlayWidthCSS('IOS-Mobile').join('\n')}
   --Columns: ${DEVICE_COLUMNS['IOS-Mobile']};
   --Gutter: ${DEVICE_GUTTER['IOS-Mobile']}px;
   --Container-Padding: var(--Sizing-2);
@@ -1376,6 +1369,7 @@ ${overlayOffsetCSS('IOS-Mobile').join('\n')}
 /* iOS Tablet */
 [data-device="IOS-Tablet"] {
   --Margin: ${DEVICE_MARGIN['IOS-Tablet-Vertical']}px;
+${overlayWidthCSS('IOS-Tablet-Vertical').join('\n')}
   --Columns: ${DEVICE_COLUMNS['IOS-Tablet-Vertical']};
   --Gutter: ${DEVICE_GUTTER['IOS-Tablet-Vertical']}px;
   --Container-Padding: var(--Sizing-3);
@@ -1432,6 +1426,7 @@ ${overlayOffsetCSS('IOS-Tablet').join('\n')}
 /* Android tablet */
 [data-device="Android-Tablet"] {
   --Margin: ${DEVICE_MARGIN['Android-Tablet-Vertical']}px;
+${overlayWidthCSS('Android-Tablet-Vertical').join('\n')}
   --Columns: ${DEVICE_COLUMNS['Android-Tablet-Vertical']};
   --Gutter: ${DEVICE_GUTTER['Android-Tablet-Vertical']}px;
   --Container-Padding: var(--Sizing-2);
@@ -1481,6 +1476,7 @@ ${overlayOffsetCSS('Android-Tablet').join('\n')}
 /* Android phone */
 [data-device="Android-Mobile"] {
   --Margin: ${DEVICE_MARGIN['Android-Mobile']}px;
+${overlayWidthCSS('Android-Mobile').join('\n')}
   --Columns: ${DEVICE_COLUMNS['Android-Mobile']};
   --Gutter: ${DEVICE_GUTTER['Android-Mobile']}px;
   --Container-Padding: var(--Sizing-2);
@@ -1550,18 +1546,6 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
   font-family: var(--Font-Family-Display);
 }
 
-/* Cognitive Accessibility Overrides */
-[data-cognitive="Dyslexia"] {
-  --Cognitive-Multiplier: 1.5;
-  --Body-Font-Family: "OpenDyslexic";
-  --Body-Font-Weight: 400;
-  --Body-Semibold-Font-Weight: 700;
-  --Body-Bold-Font-Weight: 700;
-}
-
-[data-cognitive="ADHD"] {
-  --Cognitive-Multiplier: 1.5;
-}
 `;
 
   // Button bevel is implemented entirely inside the consumer's Button
@@ -1610,6 +1594,10 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
           version: input.version ?? 1,
           lastModified: new Date().toISOString(),
           name: input.designSystemName,
+          /* The plugin points Buttons › Outline-Text / Outline-Quiet at the
+             surface's own Text / Quiet under Black & White text, and at the
+             button's palette under Tonal — the rule outlineFor applies in CSS. */
+          textColoring: (input.userSelections as { textColoring?: string } | undefined)?.textColoring ?? 'tonal',
         };
         return JSON.stringify(figmaPayload, null, 2);
       } catch (e) { console.error('❌ figma.json generation failed:', e); return '{}'; }
@@ -1721,7 +1709,12 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
     }
   }
 
-  // 8. Upload all files to Firebase Storage
+  // 8. Upload all files to Firebase Storage — with the header font request
+  //    narrowed to the axis values this system pins (~1 MB → ~130 KB).
+  const { pinHeaderFontImport } = await import('./moodAxes');
+  for (const file of uploadFiles) {
+    if (file.type === 'text/css') file.content = pinHeaderFontImport(file.content, typographyTokensCSS);
+  }
   for (const file of uploadFiles) {
     try {
       await uploadDesignSystemFile(uuid, file.name, file.content, file.type);

@@ -113,9 +113,12 @@ export interface ChartSpec {
   series: ChartSeries[];
   line: { color: string; marker: 'dot' | 'disc' | 'square' | 'triangle' | 'none'; effect: 'flat' | 'shadow' | 'ribbon'; fill: 'none' | 'solid' | 'gradient'; thickness: number; curve: 'straight' | 'smooth' };
   /** topper: the Bar's BarDecoration — a ring cap on the bar's end.
-   *  track: the Bar's Opaque Background — a 20-Fill pill the full length of the plot.
+   *  background: the Bar's Background variant — none; opaque, a tinted pill the
+   *  full length of the plot behind the bar; recessed, the same groove drawn OVER
+   *  the bar with an inner shadow, so the bar reads as set into the surface.
+   *  (Was `track: boolean`; a spec carrying track: true reads as 'opaque'.)
    *  connect: a line through the toppers' centers, straight or curved. */
-  bar: { fill: 'solid' | 'gradient'; outline: boolean; orientation: 'vertical' | 'horizontal'; shadow: boolean; topper: boolean; track: boolean; connect: 'none' | 'straight' | 'smooth' };
+  bar: { fill: 'solid' | 'gradient'; outline: boolean; orientation: 'vertical' | 'horizontal'; shadow: boolean; topper: boolean; background: 'none' | 'opaque' | 'recessed'; connect: 'none' | 'straight' | 'smooth' };
   /** shadow: the 3D look — a drop shadow under the whole pie, and on a donut
    *  an inner shadow in the hole too. */
   pie: { labels: 'none' | 'percent' | 'legend' | 'both'; hole: number; shadow: boolean };
@@ -222,7 +225,7 @@ export function chartSpecWithDefaults(raw: any): ChartSpec {
       shadow: chartBool(bar.shadow, true),
       // A StackedBar never wears a BarChartTopper; only a single Bar does.
       topper: r.type === 'bar' && chartBool(bar.topper, false),
-      track: chartBool(bar.track, false),
+      background: chartPick(bar.background, ['none', 'opaque', 'recessed'], chartBool(bar.track, false) ? 'opaque' : 'none'),
       connect: chartPick(bar.connect, ['none', 'straight', 'smooth'], 'none') as 'none' | 'straight' | 'smooth',
     },
     pie: {

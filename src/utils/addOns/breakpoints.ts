@@ -40,6 +40,10 @@ export interface Breakpoint {
    *  Tablet-Vertical 820x1180 and Tablet-Horizontal 1180x820. A made-up
    *  height would put the bottom bar somewhere no device does. */
   deviceHeight?: number;
+  /** The device's own width, for the preview. A breakpoint's minWidth is
+   *  where its RANGE starts, which is not the screen it stands for — Desktop
+   *  starts at 1280 but is designed at 1920, as the Figma frame is. */
+  deviceWidth?: number;
   /** The page's side margin at this width — the gutter between the content
    *  and the edge of the screen.
    *
@@ -56,34 +60,31 @@ export interface Breakpoint {
 /** Condition name → breakpoint id → whether it is true there. */
 export type ConditionMatrix = Record<string, Record<string, boolean>>;
 
-/* The five-step scale, with widths taken from the device clusters rather than
-   round numbers. Model names drift every product cycle; the clusters do not:
-   phones at 360-440, small tablets at 600-744, tablet landscape at 960-1180,
-   and the desktop cluster opening at 1280.
-   
-     xs   0      phones
-     sm   600    small tablets — Material's compact/medium boundary, and the
-                 narrowest tablet in the device table
-     md   900    tablet landscape and small laptops (Tablet-Horizontal Narrow
-                 is 960, so 900 catches it rather than splitting it)
-     lg   1280   where the desktop cluster starts (Desktop Narrow)
-     xl   1920   Desktop Default
+/* Four breakpoints, one per Devices-Type in the Figma file — Mobile, Tablet
+   Vertical, Tablet Horizontal and Desktop. The plugin gives each device the
+   breakpoint its Device-Width falls in, so a fifth would be a column no device
+   ever reads: it used to have an lg at 1280 that nothing in Figma landed in.
 
-   Each is a LOWER bound, so xs must be 0 — see validateBreakpoints. */
+     mobile     0      phones
+     tablet-v   600    Tablet Vertical (820) — Material's compact/medium line,
+                       and the narrowest tablet in the device table
+     tablet-h   900    Tablet Horizontal (1180); 960 is the narrowest, so 900
+                       catches it rather than splitting it
+     desktop    1280   Desktop (1920), from where the desktop cluster starts
+
+   Each is a LOWER bound, so mobile must be 0 — see validateBreakpoints. */
 export const DEFAULT_BREAKPOINTS: Breakpoint[] = [
   /* Heights are the device each breakpoint stands for, not the width times
      some ratio: a phone is tall, a tablet turned sideways is not, and the
      whole point of showing the frame is that the bottom bar lands where a
      thumb would find it. */
-  { id: 'xs', label: 'xs', minWidth: 0, deviceHeight: 844, margin: 16 },
-  { id: 'sm', label: 'sm', minWidth: 600, deviceHeight: 1180, margin: 24 },
-  { id: 'md', label: 'md', minWidth: 900, deviceHeight: 820, margin: 24 },
-  { id: 'lg', label: 'lg', minWidth: 1280, deviceHeight: 864, margin: 24 },
+  { id: 'mobile', label: 'Mobile', minWidth: 0, deviceWidth: 390, deviceHeight: 844, margin: 16 },
+  { id: 'tablet-v', label: 'Tablet Vertical', minWidth: 600, deviceWidth: 820, deviceHeight: 1180, margin: 24 },
+  { id: 'tablet-h', label: 'Tablet Horizontal', minWidth: 900, deviceWidth: 1180, deviceHeight: 820, margin: 24 },
   /* Capped and centred: past this width a nav that keeps stretching puts the
      brand and the actions absurdly far apart. 1440 is the widest of the common
-     content ceilings and sits inside Desktop Default's 1920 with room for the
-     margin. */
-  { id: 'xl', label: 'xl', minWidth: 1920, maxWidth: 1440, align: 'center', deviceHeight: 1080, margin: 64 },
+     content ceilings and sits inside Desktop's 1920 with room for the margin. */
+  { id: 'desktop', label: 'Desktop', minWidth: 1280, maxWidth: 1440, align: 'center', deviceWidth: 1920, deviceHeight: 1080, margin: 64 },
 ];
 
 /** Ascending by width. Order is MEANING here, not presentation: "the last one

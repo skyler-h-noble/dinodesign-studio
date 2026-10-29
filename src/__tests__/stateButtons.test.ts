@@ -191,3 +191,84 @@ describe('state background buttons', () => {
     expect(state.sort()).toEqual(brand.sort());
   });
 });
+
+/**
+ * State buttons are TONAL: the fill takes the border's tone on every surface,
+ * so it carries the 3:1 the border was chosen for — where it used to be one
+ * fixed tone that matched the background on the plain Surface level (1.00:1).
+ */
+describe('tonal state buttons', () => {
+  const sel = { background: 'primary', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never;
+  const { json, previewCss, figma } = buildAll(SCHEME, sel, 'light') as any;
+  const STATES = ['Info', 'Success', 'Warning', 'Error'];
+  const LEVELS = ['Surfaces-Dimmest', 'Surfaces-Dim', 'Surfaces', 'Surfaces-Bright', 'Surfaces-Brightest'];
+
+  it('fill = border, 3:1 against the surface, and a 4.5:1 label — every theme, level and mode', () => {
+    for (const mode of ['Light-Mode', 'Dark-Mode'] as const) {
+      for (const [theme, data] of Object.entries<any>(json.Modes[mode].Themes)) {
+        for (const level of LEVELS) {
+          const s = data[level];
+          const bg = s && refToHex(s.Background?.value ?? s.Background, json, mode);
+          if (!bg) continue;
+          for (const st of STATES) {
+            const b = s.Buttons?.[st];
+            if (!b) continue;
+            const fill = refToHex(b.Button.value, json, mode);
+            const label = refToHex(b.Text.value, json, mode);
+            const where = `${mode}/${theme}/${level}/${st}`;
+            expect(fill, where).toBe(refToHex(b.Border.value, json, mode));
+            expect(chroma.contrast(fill!, bg), `${where} fill vs surface`).toBeGreaterThanOrEqual(3);
+            expect(chroma.contrast(fill!, label!), `${where} label`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+    }
+  });
+
+  it('the fill moves with the level — never one tone everywhere', () => {
+    const fills = new Set(LEVELS.map((lv) => refToHex(json.Modes['Light-Mode'].Themes.Primary[lv].Buttons.Info.Button.value, json, 'Light-Mode')));
+    expect(fills.size).toBeGreaterThan(2);
+  });
+
+  it('on a state surface the Default button is the tonal state button', () => {
+    const s = json.Modes['Light-Mode'].Themes.Info.Surfaces.Buttons;
+    expect(s.Default.Button.value).toBe(s.Info.Button.value);
+  });
+
+  it('the preview paints the same state button as the export', () => {
+    // The preview's Primary theme block sits on Primary at the primary tone, as the export's Surfaces level does.
+    const start = previewCss.indexOf('[data-theme="Primary"][data-surface="Surface"] {');
+    const block = previewCss.slice(start, previewCss.indexOf('}', start));
+    const pick = (v: string) => ((block.match(new RegExp(`${v}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1] || '').toLowerCase();
+    const b = json.Modes['Light-Mode'].Themes.Primary.Surfaces.Buttons;
+    for (const st of STATES) {
+      for (const k of ['Button', 'Text', 'Hover', 'Pressed']) {
+        expect(pick(`--Buttons-${st}-${k}`), `${st} ${k}`).toBe(refToHex(b[st][k].value, json, 'Light-Mode')?.toLowerCase());
+      }
+    }
+  });
+
+  it('Figma: the Theme layer points at Tonal-Button, which has the same variables in both modes', () => {
+    const info = figma.Themes.Primary.Surface.Buttons.Info;
+    expect(info.Button.value).toMatch(/^\{Tonal-Button\.Surfaces\.Info\.Color-\d+\.Button\}$/);
+    expect(info.Border.value).toBe(info.Button.value);   // the border IS the fill
+    const keys = (m: string) => JSON.stringify(Object.keys(figma.Modes[m]['Tonal-Button'].Surfaces.Info).sort());
+    expect(keys('Light-Mode')).toBe(keys('Dark-Mode'));
+    // Every Tonal-Button value is a color Figma can parse: hex, the bevel with its opacity as alpha.
+    for (const m of ['Light-Mode', 'Dark-Mode']) {
+      for (const entry of Object.values<any>(figma.Modes[m]['Tonal-Button'].Surfaces.Info)) {
+        for (const [k, v] of Object.entries<any>(entry)) expect(v.value, `${m} ${k}`).toMatch(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i);
+      }
+    }
+  });
+});
+
+describe('Figma Modes stays under the collection limit', () => {
+  it('fewer than 5,000 variables — Figma refuses a collection past it', () => {
+    const { figma } = buildAll(SCHEME, { background: 'primary', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never, 'light') as any;
+    const count = (o: any): number => (o && typeof o === 'object' ? ('value' in o ? 1 : Object.values(o).reduce((t: number, v: any) => t + count(v), 0)) : 0);
+    // Each mode holds the same variables; the larger is the collection's size.
+    const size = Math.max(count(figma.Modes['Light-Mode']), count(figma.Modes['Dark-Mode']));
+    expect(size).toBeLessThan(5000);
+  });
+});

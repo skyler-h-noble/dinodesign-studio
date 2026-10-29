@@ -18,14 +18,18 @@ import {
   SliderInput,
   Icon,
   Swatch,
+  LabelSmall,
+  Typography,
 } from '@omni-design/components';
-import StarIcon from '@mui/icons-material/Star';
-import LockIcon from '@mui/icons-material/Lock';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
+import StarIcon from '@omni-design/icons/Star';
+import ExpandMoreIcon from '@omni-design/icons/ExpandMore';
+import ExpandLessIcon from '@omni-design/icons/ExpandLess';
+import LockIcon from '@omni-design/icons/Lock';
+import LockOpenIcon from '@omni-design/icons/LockOpen';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import chroma from 'chroma-js';
 import { extractColorsFromImage } from '../../utils/imageAnalysis';
-import { generateColorSchemes } from '../../utils/colorSchemes';
+import { generateColorSchemes, schemeCoreToneHex } from '../../utils/colorSchemes';
 import { getLightness, toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, getNaturalPeakChroma, getMatchingPeakChroma, findClosestColorN } from '../../utils/colorScale';
 import { getColorDescription } from '../../utils/colorNaming';
 import type { StageProps, ColorScheme } from '../../types';
@@ -1438,9 +1442,11 @@ export default function ColorStage({
         <VStack spacing={3}>
           <VStack spacing={1}>
             <BodySmall style={{ fontWeight: 600 }}>Core Colors</BodySmall>
+            {/* Swapping a color and typing an exact hex happen in the step
+                before this one. Here a click only chooses which color is Primary,
+                so the hint says that and nothing else. */}
             <BodySmall color="quiet">
-              <strong>Click</strong> a color to swap it for another.
-              {' '}<strong>Double-click</strong> to type an exact hex or lock it.
+              Click a color to make it your Primary.
             </BodySmall>
           </VStack>
 
@@ -1497,25 +1503,26 @@ export default function ColorStage({
                   {/* Only the chosen one is named, so the row says which is
                       Primary rather than repeating the word six times. */}
                   {isPrimary && (
-                    <BodySmall style={{ color: 'var(--Text)', fontWeight: 700, fontSize: '0.65rem', textAlign: 'center' }}>
-                      Primary
-                    </BodySmall>
+                    <LabelSmall component="span">Primary</LabelSmall>
                   )}
                 </VStack>
               );
             })}
           </div>
 
-          {/* Show/Hide Settings toggle */}
-          <div
+          {/* Show/Hide Settings toggle. A ghost text button reads as a link
+              (Hotlink + underline) and is a real button, so it takes focus and
+              Enter/Space and can say whether the panel is open. */}
+          <Button
+            variant="ghost"
+            size="small"
             onClick={() => setShowChromaSettings(!showChromaSettings)}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+            aria-expanded={showChromaSettings}
+            startIcon={showChromaSettings ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            style={{ alignSelf: 'flex-start' }}
           >
-            <span style={{ color: 'var(--Hotlink)', fontSize: '0.8rem', transform: showChromaSettings ? 'rotate(0)' : 'rotate(180deg)', transition: 'transform 0.2s', display: 'inline-block' }}>⌃</span>
-            <Link onClick={(e: React.MouseEvent) => e.preventDefault()} style={{ fontSize: '0.875rem' }}>
-              {showChromaSettings ? 'Hide Settings' : 'Show Settings'}
-            </Link>
-          </div>
+            {showChromaSettings ? 'Hide Settings' : 'Show Settings'}
+          </Button>
 
           {/* Expanded: per-color tones + chroma */}
           {showChromaSettings && (
@@ -1652,6 +1659,23 @@ export default function ColorStage({
                                 const updated = [...topColors];
                                 updated[colorIdx] = { ...updated[colorIdx], hex: step.hex };
                                 setTopColors(updated);
+                                /* The Custom scheme is rebuilt from customColorsRef, not
+                                   from topColors — so a new tone on a Custom system never
+                                   reached the scheme: its colors and extractedTones stayed
+                                   on the old tone, and Assign Colors (which reads the
+                                   scheme's tones) kept showing the old Tertiary. Replace
+                                   the authored color that WAS this tone — matched by
+                                   value, since the authored order need not follow the
+                                   Core Colors. */
+                                if (customColorsRef.current) {
+                                  const was = topColors[colorIdx]?.hex?.toLowerCase();
+                                  const role = customColorsRef.current.findIndex((h) => h.toLowerCase() === was);
+                                  if (role >= 0) {
+                                    const next = [...customColorsRef.current] as [string, string, string];
+                                    next[role] = step.hex;
+                                    customColorsRef.current = next;
+                                  }
+                                }
                                 regenerateSchemes(updated, primaryIndex);
                               }}
                             >
@@ -1694,14 +1718,19 @@ export default function ColorStage({
               onClick={() => onSchemeSelected(scheme)}
             >
               <VStack spacing={2}>
-                <HStack spacing={2} alignItems="center" style={{ width: '100%' }}>
+                {/* A plain flex row, not HStack: the Stack's spacing rule
+                    resets each child's left margin, which cancelled the link's
+                    margin-left:auto. And the name HUGS — Body defaults to
+                    width "fill", so it took the whole row and pushed Edit
+                    Colors out past the card's padding. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minWidth: 0 }}>
                   <Checkbox
                     checked={isSelected}
                     onChange={() => onSchemeSelected(scheme)}
                     color="default"
                     size="small"
                   />
-                  <Body style={{ fontWeight: 600 }}>{scheme.name}</Body>
+                  <Typography variant="body-semibold" width="hug">{scheme.name}</Typography>
                   {/* Top-right, not under the swatches: below, it made Custom
                       taller than the other five cards sharing its grid row. */}
                   {isCustom && (
@@ -1711,25 +1740,29 @@ export default function ColorStage({
                         e.stopPropagation();
                         setCustomEditing(!customEditing);
                       }}
-                      /* marginRight clears the card edge. marginLeft:auto
-                         pushes it to the end of the row, which put the
-                         underline hard against the Card's border with nothing
-                         between them. */
-                      style={{ marginLeft: 'auto', marginRight: 4, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      // marginLeft:auto pushes it to the end of the row,
+                      // inside the card's padding.
+                      style={{ marginLeft: 'auto', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                     >
                       {customEditing ? 'Done' : 'Edit Colors'}
                     </Link>
                   )}
-                </HStack>
+                </div>
 
                 {/* 3 color swatches — non-interactive. The whole card
                     handles selection; clicking a swatch directly did
                     nothing here, so the lib's Button variant was misleading.
                     For the Custom card the user still picks colors via the
-                    "Edit Colors" toggle in the card header. */}
+                    "Edit Colors" toggle in the card header.
+
+                    Painted from the GENERATED ramp, not the picked color: the
+                    core tone of each role's palette is what the design system
+                    will actually use, and a pick above the chroma cap does not
+                    survive into it. Which colors make up the combo is still
+                    decided by scheme.colors — only the paint changed. */}
                 <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                   {(['primary', 'secondary', 'tertiary'] as const).map((role, i) => {
-                    const displayColor = scheme.colors[i];
+                    const displayColor = schemeCoreToneHex(scheme, i as 0 | 1 | 2);
                     const label = ['Primary', 'Secondary', 'Tertiary'][i];
                     return (
                       <VStack key={i} spacing={1} alignItems="center" style={{ flex: 1 }}>

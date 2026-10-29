@@ -30,7 +30,7 @@ import React from 'react';
 import {
   Button, Chip, Badge, Alert, Card, Avatar, Icon, Link, Divider,
   Checkbox, Radio, RadioGroup, SwitchInput, Slider, Rating, TextInput, Breadcrumbs,
-  Pagination, Tabs, TabList, Tab, TabPanel, ButtonGroup, Accordion,
+  Pagination, Tabs, TabList, Tab, TabPanel, ButtonGroup, Accordion, AccordionGroup, AccordionSummary, AccordionDetails,
   Body, H3, VStack, HStack,
 } from '@omni-design/components';
 
@@ -124,10 +124,18 @@ export const EXAMPLES: Record<string, () => React.ReactElement> = {
     </Breadcrumbs>
   ),
   Pagination: () => <Pagination count={8} defaultPage={3} />,
+  // A segment is Summary + Details; a bare <Accordion> renders as an empty pill.
   Accordion: () => (
-    <Accordion>
-      <Body>An accordion segment, open.</Body>
-    </Accordion>
+    <AccordionGroup spacing={1}>
+      <Accordion defaultExpanded>
+        <AccordionSummary>Shipping</AccordionSummary>
+        <AccordionDetails>Orders ship within two business days.</AccordionDetails>
+      </Accordion>
+      <Accordion>
+        <AccordionSummary>Returns</AccordionSummary>
+        <AccordionDetails>Return anything within 30 days.</AccordionDetails>
+      </Accordion>
+    </AccordionGroup>
   ),
   Tabs: () => (
     <Tabs defaultValue={0}>

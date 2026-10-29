@@ -78,7 +78,8 @@ const opts = (o?: ShadowOptions): Required<ShadowOptions> => ({ ...SHADOW_DEFAUL
  *  at crispy 0 / 0.5 / 1 (Oomph 1, Resolution 0.5) give:
  *      blur/offsetY   1.8  -> 1.36 -> 0.9     (crisper = tighter blur)
  *      spread, last layer   0 -> -2.5 -> -5   (crisper = more tuck-in)
- *  Both are linear in crispy, which is what the two helpers below encode. */
+ *  The blur half is encoded below. The spread half is NOT used — see
+ *  spreadMaxPx: Figma never draws it on these frames. */
 
 /** Blur as a multiple of the vertical offset.
  *
@@ -92,10 +93,21 @@ const opts = (o?: ShadowOptions): Required<ShadowOptions> => ({ ...SHADOW_DEFAUL
  *  Treat the endpoints as provisional until captured at crispy 0 and 1. */
 const blurRatio = (crispy: number) => 1.707 - 0.9 * clamp(crispy, 0, 1);
 
-/** Largest negative spread, at the outermost layer, in px. Negative spread is
- *  what keeps outer layers from smearing — without it, stacking 10 layers just
- *  paints a grey slab. */
-const spreadMaxPx = (crispy: number) => 5 * clamp(crispy, 0, 1);
+/** Largest negative spread, at the outermost layer, in px — ZERO.
+ *
+ *  Comeau's tool tucks the outer layers in with up to -5px of spread, and this
+ *  followed it (5 x crispy). But Figma ignores a shadow's spread on any frame
+ *  that has no fill or does not clip its content, which is how nearly every
+ *  component carries its shadow — so the shadow every design was drawn against
+ *  in Figma is the spread-0 one. CSS honours spread, and at crispy 1 the -5px
+ *  pulled the outer layer wholly under the element: the Accordion's Level 1
+ *  shadow was there in the computed style and invisible on screen.
+ *
+ *  So spread is 0 and Crispy drives the blur alone — the half of it Figma has
+ *  always shown. Kept as a function of crispy so the shape of the model stays
+ *  readable where it is called. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const spreadMaxPx = (_crispy: number) => 0;
 
 /** Layer count at RESOLUTION 0 and 1. Level N never drops below N layers, and
  *  the top level reaches 10. */
@@ -562,13 +574,19 @@ export const SHADOW_LEVELS: ReadonlyArray<ShadowLevel> = [1, 2, 3, 4, 5];
  *  and the rest of the cascade already consume.
  *  The previous version referenced a per-level color token on every layer,
  *  which cost five color variables per surface and could not express a ramp. */
-export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions): string {
+export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions, rgb = 'var(--Dropshadow-Color)'): string {
   const alphas = dropshadowAlphas(level, o);
   return shadowLayers(level, o)
     .map(([x, y, blur, spread], i) =>
-      `${x}px ${y}px ${blur}px ${spread}px rgba(var(--Dropshadow-Color), ${quantizeAlpha(alphas[i])})`)
+      `${x}px ${y}px ${blur}px ${spread}px rgba(${rgb}, ${quantizeAlpha(alphas[i])})`)
     .join(', ');
 }
+
+/** The same level in NEUTRAL black — for a panel over a scrim (modal, dialog,
+ *  drawer), whose backdrop is a neutral black overlay. The surface-tinted
+ *  shadow painted onto that grey read as a coloured glow round the panel.
+ *  Published as --Effect-Level-N-Neutral; the lib's SHADOW_SCRIM_LEVEL_N reads it. */
+export const neutralEffectLevelRecipe = (level: ShadowLevel, o?: ShadowOptions) => effectLevelRecipe(level, o, '0, 0, 0');
 
 // ─── Drop-Colors: the Figma collection ──────────────────────────────────────
 //

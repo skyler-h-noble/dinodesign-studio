@@ -3,17 +3,17 @@ import {
   IconBadge,
   AppBar, Button, H2, H3, Body, DisplayMedium, AltDisplayMedium, BodySmall, VStack, HStack, Card, Tabs, TabList, Tab, Section, Footer, Icon,
 } from '@omni-design/components';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import SpeedIcon from '@mui/icons-material/Speed';
-import EnergySavingsLeafIcon from '@mui/icons-material/EnergySavingsLeaf';
-import DevicesIcon from '@mui/icons-material/Devices';
-import BrushIcon from '@mui/icons-material/Brush';
-import SyncAltIcon from '@mui/icons-material/SyncAlt';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import AccessibilityNewIcon from '@mui/icons-material/AccessibilityNew';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import CheckCircleOutlineIcon from '@omni-design/icons/CheckCircleOutline';
+import SpeedIcon from '@omni-design/icons/Speed';
+import EnergySavingsLeafIcon from '@omni-design/icons/EnergySavingsLeaf';
+import DevicesIcon from '@omni-design/icons/Devices';
+import BrushIcon from '@omni-design/icons/Brush';
+import SyncAltIcon from '@omni-design/icons/SyncAlt';
+import AutoAwesomeIcon from '@omni-design/icons/AutoAwesome';
+import RocketLaunchIcon from '@omni-design/icons/RocketLaunch';
+import AccessibilityNewIcon from '@omni-design/icons/AccessibilityNew';
+import ArrowForwardIcon from '@omni-design/icons/ArrowForward';
+import FormatQuoteIcon from '@omni-design/icons/FormatQuote';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import AvatarDropdown from './AvatarDropdown';

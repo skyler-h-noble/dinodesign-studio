@@ -141,11 +141,11 @@ describe('mode-scoped button metrics', () => {
     const d = derivedTextMetrics(HEIGHTS);
     expect(d['Button-Text']).toEqual({ medium: 16, small: 14, large: 20 });
     expect(d['Avatar-Text']).toEqual({ medium: 14, small: 12, large: 18 });
-    expect(d['Button-Icon-Only']).toEqual({ medium: 24, small: 16, large: 40 });
-    // The two values that deliberately differ from the design's table.
-    // Button-Numbers medium: design 14, the shared text slope puts it at 12.
-    // Button-Icon small:     design 20, the icon ramp puts it at 16.
-    expect(d['Button-Numbers']).toEqual({ medium: 12, small: 10, large: 16 });
+    // Button-Icon-Only is retired: an icon-only button uses Button-Icon.
+    expect(d['Button-Icon-Only']).toBeUndefined();
+    // Button-Numbers follows the design's 10 / 14 / 16 — its medium row
+    // carries its own offset off the shared slope.
+    expect(d['Button-Numbers']).toEqual({ medium: 14, small: 10, large: 16 });
     expect(d['Button-Icon']).toEqual({ medium: 20, small: 16, large: 32 });
   });
 
@@ -156,7 +156,8 @@ describe('mode-scoped button metrics', () => {
         // Only meaningful above the 10px floor, which collapses the ladder.
         if (d['Button-Numbers'][k] <= 10) continue;
         expect(d['Avatar-Text'][k]).toBe(d['Button-Text'][k] - 2);
-        expect(d['Button-Numbers'][k]).toBe(d['Button-Text'][k] - 4);
+        // Numbers sit 4px under the label, 2px at medium (the design's 14).
+        expect(d['Button-Numbers'][k]).toBe(d['Button-Text'][k] - (k === 'medium' ? 2 : 4));
       }
     }
   });
@@ -165,7 +166,7 @@ describe('mode-scoped button metrics', () => {
     for (const hs of [HEIGHTS, { buttonHeight: 40, smallButtonHeight: 28, largeButtonHeight: 64 },
                       { buttonHeight: 100, smallButtonHeight: 12, largeButtonHeight: 200 }]) {
       const d = derivedTextMetrics(hs);
-      for (const name of ['Button-Icon', 'Button-Icon-Only']) {
+      for (const name of ['Button-Icon']) {
         for (const k of ['medium', 'small', 'large'] as const) {
           expect(ICON_RAMP, `${name}.${k}`).toContain(d[name][k]);
         }

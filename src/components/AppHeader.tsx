@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppBar, Button, HStack } from '@omni-design/components';
-import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
+import NotificationsNoneIcon from '@omni-design/icons/NotificationsNone';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../utils/firebase/client';
 import { useAuth } from '../contexts/AuthContext';

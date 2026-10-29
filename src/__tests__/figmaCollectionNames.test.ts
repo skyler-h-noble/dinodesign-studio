@@ -35,15 +35,22 @@ import { DEVICES_COLLECTION } from '../utils/typographyPlatform';
  * having it is what happened with Components.
  */
 const FILE_COLLECTIONS = [
-  'Add-Ons', 'Alt-Display', 'Buttons', 'Charts', 'Component-Elevations',
-  'Component-Size', 'Device-Sizes', 'Devices-Type', 'Drop-Colors', 'Elevation',
-  'Icons & Avatars', 'Menu-Levels', 'Modes', 'Sizing', 'Spacing', 'Surface',
-  'Theme', 'Typography',
+  /* The names AS THE FILE HAS THEM (read 2026-10-19). A leading "." keeps a
+     collection out of the published library; the payload and the plugin name
+     it bare and the plugin's findCollection takes the dotted one first. This
+     list used to hold bare names for all of them, which is how a plugin that
+     looked up 'Modes' in a file holding '.Modes' — and created a visible
+     duplicate — passed this test. */
+  '.Alt-Display', 'Buttons', 'Chart', 'Chart-Colors', '.Component-Elevations',
+  'Component-Size', 'Device-Sizes', 'Devices-Type', '.Drop-Colors', '.Elevation',
+  'Icons', 'Icons & Avatars', '.Menu-Levels', '.Modes', 'Sizing', 'Spacing', 'State-Chart', 'Surface',
+  '.Theme', 'Typography',
   /* Created by the plugin's own importer (populatePageLayout) on the first
-     import that carries it — the one collection here the file did not start
-     with. Deliberate: it is new, so a duplicate cannot happen. */
+     import that carries it. Visible on purpose: designers pick its mode. */
   'Page-Layout',
 ] as const;
+/** A collection name as the payload and the plugin's lookup compare it. */
+const bare = (n: string) => n.replace(/^[._]/, '');
 
 /** Payload sections that ARE collections, and must name a real one. */
 const EMITS_COLLECTION = [
@@ -117,16 +124,16 @@ describe('the payload names only collections the file has', () => {
   });
 
   it('every collection-shaped section names a collection that exists', () => {
-    const file = new Set<string>(FILE_COLLECTIONS);
-    const missing = EMITS_COLLECTION.filter((c) => !file.has(c));
+    const file = new Set<string>(FILE_COLLECTIONS.map(bare));
+    const missing = EMITS_COLLECTION.filter((c) => !file.has(bare(c)));
     expect(missing,
       'The plugin CREATES a collection for a name the file lacks, rather than ' +
       'failing — so this is a silent duplicate, not an error.').toEqual([]);
   });
 
   it('no not-a-collection section shares a name with a collection', () => {
-    const file = new Set<string>(FILE_COLLECTIONS);
-    expect(NOT_A_COLLECTION.filter((k) => file.has(k))).toEqual([]);
+    const file = new Set<string>(FILE_COLLECTIONS.map(bare));
+    expect(NOT_A_COLLECTION.filter((k) => file.has(bare(k)))).toEqual([]);
   });
 
   it('does not emit Components — the section this check exists for', () => {
@@ -169,14 +176,12 @@ describe('tokens.json does not smuggle collections into Figma', () => {
     expect(gen).not.toMatch(/designSystemJSON\.Cognitive\s*=/);
   });
 
-  it('keeps --Cognitive-Multiplier in the CSS, which is the live mechanism', () => {
-    /* The feature was not removed with the section, and this is the assertion
-       that says so. foundation.css declares the multiplier at 1 and raises it
-       to 1.5 under the accessibility overrides; the library multiplies line
-       heights by it (Link.js reads it five times). Deleting THIS would be the
-       real regression, and it looks superficially like the same cleanup. */
-    expect(gen).toMatch(/--Cognitive-Multiplier:\s*1;/);
-    expect(gen).toMatch(/--Cognitive-Multiplier:\s*1\.5;/);
+  it('emits no cognitive overrides — removed 2026-10-29', () => {
+    /* The multiplier and its [data-cognitive] blocks were removed on purpose:
+       nothing ever set data-cognitive, so the 1.5 never applied and the
+       multiplier was always 1. The library no longer reads it. */
+    expect(gen).not.toMatch(/--Cognitive-Multiplier/);
+    expect(gen).not.toMatch(/data-cognitive/);
   });
 
   it('puts no top-level sections on tokens.json at all', () => {

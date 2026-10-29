@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Modal, Button, H3, Body, BodySmall, VStack, HStack, TextInput, Alert, Divider, Link,
 } from '@omni-design/components';
-import GoogleIcon from '@mui/icons-material/Google';
+import GoogleIcon from '@omni-design/icons/Google';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Props {

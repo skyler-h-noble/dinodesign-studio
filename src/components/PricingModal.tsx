@@ -2,8 +2,8 @@ import { useState } from 'react';
 import {
   Modal, Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Checkbox, Divider,
 } from '@omni-design/components';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CheckCircleIcon from '@omni-design/icons/CheckCircle';
+import ArrowForwardIcon from '@omni-design/icons/ArrowForward';
 
 interface Props {
   open: boolean;

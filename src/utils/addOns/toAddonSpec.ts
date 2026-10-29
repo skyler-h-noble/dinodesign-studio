@@ -170,8 +170,10 @@ export interface SpecResponsive {
  * nav designed to hide its search at xs and show it at md arrives with neither
  * decision recorded, looking correct because the binding is there.
  *
- * The plugin needs both halves: the breakpoints to match against Device-Sizes
- * modes by width, and the matrix to write each boolean per mode.
+ * The plugin needs both halves: each Devices-Type mode takes the breakpoint
+ * its Default Device-Width falls in, and the matrix gives each boolean's value
+ * there — written into Devices-Type before the component is built and bound
+ * by name (dino-figma-plugin, nav-build).
  *
  * Scroll-triggered conditions are in the table too, at false everywhere. That
  * is not a gap — no width makes them true, and omitting them would leave those
@@ -211,6 +213,8 @@ export function tokensUsed(def: ComponentDefinition): string[] {
     if (n.gap) out.add(n.gap.token);
     if (n.radius) out.add(n.radius.token);
     if (n.border) out.add(n.border.token);
+    // A one-side rule (the rail brand block's Border-Variant) is a token too.
+    if (n.borderBottom) out.add(n.borderBottom.token);
     for (const k of ['top', 'right', 'bottom', 'left'] as const) {
       const p = n.padding && n.padding[k];
       if (p) out.add(p.token);

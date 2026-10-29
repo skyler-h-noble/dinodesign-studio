@@ -1,7 +1,7 @@
 import { Button, H2, H3, Body, BodySmall, VStack, HStack, Card, Radio } from '@omni-design/components';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import TuneIcon from '@mui/icons-material/Tune';
-import BoltIcon from '@mui/icons-material/Bolt';
+import CloudUploadIcon from '@omni-design/icons/CloudUpload';
+import TuneIcon from '@omni-design/icons/Tune';
+import BoltIcon from '@omni-design/icons/Bolt';
 import { useState, useRef, useCallback } from 'react';
 import type { StageProps } from '../../types';
 import { warmAnalyzeMoodboard, getOrStartMoodboardAnalysis } from '../../utils/analyzeMoodboardClient';

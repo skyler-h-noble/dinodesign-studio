@@ -3,6 +3,7 @@ import {
   generateSemanticLightModeScale,
   generateSemanticDarkModeScale,
   getLightness,
+  toneToColorNumber,
 } from './colorScale';
 import type { ColorScheme, HueOverridesMap } from '../types';
 
@@ -164,4 +165,30 @@ export function generateColorSchemes(
     buildScheme('Split-Complementary', splitComplementary, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
     buildScheme('Custom', custom, lightMaxChroma, darkMaxChroma, lockedColors, hueOverrides),
   ];
+}
+
+const SCHEME_ROLES = ['primary', 'secondary', 'tertiary'] as const;
+
+/**
+ * The color a scheme's role will REALLY be: its core tone, read from the
+ * generated light-mode ramp rather than the raw picked color.
+ *
+ * `scheme.colors` holds what was picked or extracted. The ramp is what ships —
+ * chroma-capped, dead-zone-checked and hue-eased — so a vivid pick above the
+ * palette's cap (a #b5e61d lime at chroma 89 in a ramp capped at 70) lands in
+ * the design system as a calmer tone than the swatch that proposed it. A combo
+ * card painting `colors[i]` previewed a color the system never produces.
+ *
+ * The index is the one every downstream reader uses for the role's core tone
+ * (PC / SC / TC in ColorAssignmentStage and the export):
+ * toneToColorNumber(extractedTones[role]). Falls back to the picked color when
+ * the scheme has no ramp for the role, so an old or partial scheme still paints.
+ */
+export function schemeCoreToneHex(scheme: ColorScheme, roleIndex: 0 | 1 | 2): string {
+  const role = SCHEME_ROLES[roleIndex];
+  const picked = scheme.colors[roleIndex];
+  const ramp = scheme.tonePalettes?.[role];
+  const lightness = scheme.extractedTones?.[role] ?? (picked ? getLightness(picked) : undefined);
+  if (!ramp?.length || lightness === undefined) return picked;
+  return ramp[toneToColorNumber(lightness) - 1]?.hex ?? picked;
 }

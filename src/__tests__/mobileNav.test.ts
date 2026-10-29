@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  mobileNavDefinition, MOBILE_LAYOUTS, MAX_BOTTOM_ITEMS, maxItemsWithFab, bottomItemCounts, bottomBarItems,
+  mobileNavDefinition, MOBILE_LAYOUTS, MAX_BOTTOM_ITEMS, maxItemsWithFab, bottomItemCounts, fitItemCount, bottomBarItems,
   type MobileLayout,
 } from '../utils/addOns/mobileNav';
 import { toAddonSpec, conditionsUsedBy, conditionsToPublish, tokensUsed } from '../utils/addOns/toAddonSpec';
@@ -80,6 +80,19 @@ describe('the bar is ONE slot, filled by the Nav-Bar component', () => {
     const spec: any = toAddonSpec(mobileNavDefinition({ layout: 'toolbar' }));
     const toolbar = spec.root.children.find((c: any) => c.name === 'Toolbar');
     expect(toolbar.children.some((c: any) => c.name === 'Nav-Item-Slot')).toBe(true);
+  });
+});
+
+describe('a centred FAB takes only even counts', () => {
+  it('pairs the items either side of it; at the end any count fits', () => {
+    expect(bottomItemCounts(true, true)).toEqual([2, 4]);
+    expect(bottomItemCounts(true, false)).toEqual([2, 3, 4]);
+  });
+  it('moves an odd count up to the nearest one the bar can hold', () => {
+    expect(fitItemCount(3, true, true)).toBe(4);
+    expect(fitItemCount(5, true, true)).toBe(4);
+    expect(fitItemCount(3, true, false)).toBe(3);
+    expect(fitItemCount(5, false)).toBe(5);
   });
 });
 
@@ -178,8 +191,10 @@ describe('fixed or floating — the frame does one thing or the other', () => {
     });
 
     it(`${name}: fixed is painted, edge to edge`, () => {
-      const f = frameOf(name, { layout, barStyle: 'fixed', theme: 'Primary', surface: 'Surface-Dim' });
-      expect(f.fills).toEqual([{ type: 'SOLID', color: { var: 'Surface-Dim/Background' } }]);
+      const f = frameOf(name, { layout, barStyle: 'fixed' });
+      // A nav bar: the design system's Nav-Bar theme, chosen in the studio.
+      expect(f.fills).toEqual([{ type: 'SOLID', color: { var: 'Surface/Background' } }]);
+      expect(f.explicitModes).toEqual({ Theme: 'Nav-Bar' });
       expect(f.paddingLeft).toBeUndefined();
       expect(f.paddingTop).toBeUndefined();
     });

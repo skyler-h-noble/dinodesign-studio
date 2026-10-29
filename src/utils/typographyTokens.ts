@@ -10,7 +10,7 @@
    by URL, so src/ is where it belongs. */
 import typographyTokensRaw from '../assets/typography-tokens.css?raw';
 import { buildTypographyTokensCSS as spliceDesktopBlock } from './cssgen/generateTypographyTokensCSS';
-import { platformFontFamilyCSS } from './typographyPlatform';
+import { platformFontFamilyCSS, deviceMediaQueryCSS } from './typographyPlatform';
 import type { TypographyStyle } from '../types';
 
 /** The static file, verbatim. Kept for tooling that wants the shipped ramp. */
@@ -24,5 +24,9 @@ export function buildTypographyTokensCSS(typography: TypographyStyle[] | null | 
      affect correctness — but it does put the whole Omni/System table in one
      readable place at the end of the file instead of scattering six
      declarations through each device block. */
-  return `${spliceDesktopBlock(typographyTokensRaw, typography)}\n\n${platformFontFamilyCSS()}\n`;
+  const body = `${spliceDesktopBlock(typographyTokensRaw, typography)}\n\n${platformFontFamilyCSS()}\n`;
+  /* The same phone / tablet ramps, applied by screen width so a web page
+     needs no data-device. Derived from the blocks above; LAST, so it reads
+     the final values. */
+  return `${body}\n${deviceMediaQueryCSS(body)}\n`;
 }

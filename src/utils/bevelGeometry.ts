@@ -223,3 +223,19 @@ export function bevelPairs(prefix: string, height: number, percent: number): Rec
   return { [`${prefix}Bevel`]: b, [`${prefix}Bevel-Negative`]: -b };
 }
 
+
+/**
+ * The FAB's bevel in CSS — --FAB-Bevel / --Sm-FAB-Bevel / --Lg-FAB-Bevel, the
+ * same numbers Figma holds as Devices-Type FAB-Bevel / FAB-Sm-Bevel /
+ * FAB-Lg-Bevel (and reads through Component-Size › FAB/FAB-Bevel per size).
+ * Sized off the FAB's own width, not a button height: it is a bigger control,
+ * so its edge is deeper. Not per platform — Devices-Type holds the FAB bevel
+ * identically in every device column.
+ */
+export function fabBevelVars(fabSize: { small: number; medium: number; large: number }, percent: number): Record<string, string> {
+  return {
+    '--FAB-Bevel': `${bevelSize(fabSize.medium, percent)}px`,
+    '--Sm-FAB-Bevel': `${bevelSize(fabSize.small, percent)}px`,
+    '--Lg-FAB-Bevel': `${bevelSize(fabSize.large, percent)}px`,
+  };
+}

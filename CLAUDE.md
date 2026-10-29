@@ -83,21 +83,24 @@ for token/theme details.)
 | Headings | `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `DisplayLarge`, `DisplaySmall` |
 | Body text | `Body`, `BodyLarge`, `BodySmall`, `Subtitle`, `SubtitleLarge` — Body has no bold; see [Body weights](#body-weights) |
 | Labels | `Label`, `Overline`, `Caption` |
-| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `Fab` |
+| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `ToggleButtonGroup` (segmented choice), `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
 | Selection | `Checkbox`, `Radio`, `RadioGroup`, `SwitchInput`, `Slider`/`SliderInput`, `RangeSlider`, `Rating` |
+| Dates | `DatePicker` (single or `selectionMode="range"`), `DayCell` |
 | Layout | `VStack`, `HStack`, `Stack`, `Box`, `Grid`, `Container`, `Divider`, `Spacing` |
 | Surfaces | `Card`, `SelectableCard`, `Paper`, `Surfaced`, `ThemedZone` |
 | Navigation | `Tabs`/`Tab`/`TabList`/`TabPanel`, `Breadcrumbs`, `Pagination`, `Stepper`, `BottomNavigation`, `AppBar`, `Sidebar` |
-| Disclosure | `Accordion`, `Drawer`, `Modal`, `Dialog`, `Tooltip`, `Popover` (via `Dropdown` — see below) |
+| Disclosure | `Accordion`, `Drawer`, `Modal`, `Dialog`, `Tooltip` (one solid style), `Popover` (portal panel; also see `Dropdown` below) |
 | Feedback | `Alert`, `Snackbar`, `CircularProgress`, `LinearProgress`, `Badge` |
 | Data | `Chip`, `Avatar`, `AvatarGroup`, `Table`, `List`, `Skeleton` |
 | Code | `CodeBlock`, `CopyButton` — see [Code blocks](#code-blocks) |
 | Links | `Link` |
 
 **Do not** import any of these from `@mui/material`. The lib re-exports the
-ones it supports with OmniDesign theming wired in. Material icons
-(`@mui/icons-material`) are fine — the lib doesn't ship icons.
+ones it supports with OmniDesign theming wired in. Icons come from
+`@omni-design/icons` — the Material Icons as plain SVG, the same names as
+`@mui/icons-material` (`import AddIcon from '@omni-design/icons/Add'`) without
+MUI's styling engine. Do not import `@mui/icons-material`.
 
 ---
 
@@ -154,9 +157,12 @@ The portal pattern is in `MyDesignsPage.tsx` (ellipsis menu) and
 (account dropdown). Both anchor a panel via `getBoundingClientRect`, render
 through `createPortal(document.body)`, and close on outside-click + Escape.
 
-If you need that in a new file, tag it `MISSING-LIB-COMPONENT: Popover` — the
-lib still has no portal-based popover, and that gap is real even though `Menu`
-is not broken.
+For anything else that floats, use the lib's **`Popover`**: it portals,
+places itself (`placement`, flips at the viewport edge), draws an optional
+`arrow`, closes on outside-click / Escape / Tab-out, and moves focus in and
+back to the anchor. `role="tooltip"` + `autoFocus={false}` makes it a hover
+card (AvatarGroup's details card is one). It is the menu panel's frame, so
+every floating thing is one shape. The two hand-rolled panels above predate it.
 
 Its 18 failing ARIA tests are **test** bugs, not component bugs: they assert on
 `getByText('Actions')`, which returns the inner Typography `<p>`, while
@@ -193,16 +199,18 @@ entry up meant every tool reading this file believed a workaround was load-
 bearing and that the component could not be trusted — the same way the `Menu`
 entry made a working menu go unused for months.
 
-Use it as normal:
+Selection moved to **`ToggleButtonGroup`**. `ButtonGroup` is a group of
+buttons, each with its own `onClick`; `value` / `onChange` on it still work but
+warn and will go in the next major. For a segmented choice:
 
 ```tsx
-<ButtonGroup value={selected} onChange={setSelected} size="small">
+<ToggleButtonGroup value={selected} onChange={setSelected} size="small">
   <Button value="a" size="small">A</Button>
   <Button value="b" size="small">B</Button>
-</ButtonGroup>
+</ToggleButtonGroup>
 ```
 
-Always pass `value` + `onChange` to the group and `value=` on each child
+Pass `value` + `onChange` to the group and `value=` on each child
 (controlled mode). Do NOT set `variant` on the children: the group assigns it
 per segment — the palette when selected, `-outline` when not — and an explicit
 one wins over that, which is how a group ends up with every segment looking
@@ -339,7 +347,8 @@ item's hover highlight. Pixels, not a percent: a dropdown's height is
 content-driven, so a percent would make a long menu absurdly round.
 
 **Links do not change colour on hover.** The design system emits no hover tone
-for links; the underline thickens instead. Do not add one — any value would be
+for links; the underline goes away instead (hover and pressed; focus keeps it —
+Figma's Link set). Do not add one — any value would be
 invented rather than derived, on text carrying a 4.5:1 requirement. The lib's
 `Link` reads `--Link` / `--Link-Visited`, which nothing defines; it falls back
 to `--Hotlink` / `--Hotlink-Visited`, which is what the generator actually
@@ -547,13 +556,16 @@ sizes, same leading.
 ```tsx
 <Body>Normal body copy.</Body>
 <Typography variant="body-semibold">Semibold body copy.</Typography>
-<Subtitle color="standard">Bold body copy.</Subtitle>
+<Subtitle>Bold body copy.</Subtitle>
 ```
 
-Two traps: `variant="body-bold"` silently resolves to the *semibold* style (it
-is a back-compat alias, not a 700), and Subtitle defaults to `color="header"`
-while Body defaults to `color="standard"` — so pass `color="standard"` when you
-are using Subtitle purely to get weight, or the text changes colour too.
+One trap: `variant="body-bold"` silently resolves to the *semibold* style (it
+is a back-compat alias, not a 700).
+
+Subtitle defaults to `--Text`, like Body (from `@omni-design/components`
+0.14.29). It used to default to `--Header`, but Subtitle is body-sized and
+needs 4.5:1, while `--Header` only promises the 3:1 that large text gets.
+Headings (h1–h6, display) keep `--Header`.
 
 Full rationale and the `--Body-Bold-Font-Weight` caveat: the lib's CLAUDE.md,
 *Body has two weights — Subtitle is the bold one*.
@@ -760,7 +772,7 @@ not compile — the same failure mode as `-p .`, one layer down.
 
 Before committing UI work, run a quick mental pass:
 
-1. `grep -rn "from '@mui/material'" src/` — should be empty (only `@mui/icons-material`).
+1. `grep -rn "from '@mui/" src/` — should be empty (icons come from `@omni-design/icons`).
 2. `grep -rn "<button\|<input\|<select" src/` — every hit should be in a
    shell file or have a clear comment explaining why.
 3. `grep -rn "MISSING-LIB-COMPONENT" src/` — see what's outstanding and whether

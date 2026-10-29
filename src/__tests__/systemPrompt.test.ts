@@ -66,12 +66,15 @@ describe('SYSTEM_PROMPT integrity', () => {
 //
 // The prompt showed <Icon><AddIcon /></Icon> in one example and never said
 // where AddIcon comes from, how a Figma node becomes that name, or that
-// @mui/icons-material is the source. The model saw the glyph — Drift reported
+// the icon package is the source. The model saw the glyph — Drift reported
 // it as "Icon > add" — and dropped it, because "Icon" says where it goes and
 // nothing said the CHILD says what it is.
 describe('SYSTEM_PROMPT icon rules', () => {
   it('names the icon package', () => {
-    expect(SYSTEM_PROMPT).toContain('@mui/icons-material');
+    // @omni-design/icons: the Material Icons as plain SVG, MUI's names.
+    expect(SYSTEM_PROMPT).toContain("from '@omni-design/icons/Add'");
+    // Named only to say "never import" it — no example imports from it.
+    expect(SYSTEM_PROMPT).not.toMatch(/from '@mui\/icons-material/);
   });
 
   it('shows the name transform, not just one example', () => {

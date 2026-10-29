@@ -50,6 +50,34 @@ export async function fetchFigmaNode(
   return node.document;
 }
 
+/** Many nodes in as few requests as possible — the parity sweep's whole set
+ *  list in a handful of calls rather than one (plus an image) per component,
+ *  which is what kept running the token into Figma's rate limit. */
+export async function fetchFigmaNodes(
+  fileKey: string,
+  nodeIds: string[],
+  token: string,
+  chunk = 25,
+): Promise<Record<string, any>> {
+  const out: Record<string, any> = {};
+  for (let i = 0; i < nodeIds.length; i += chunk) {
+    const ids = nodeIds.slice(i, i + chunk);
+    const url = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(ids.join(','))}&plugin_data=shared`;
+    // A 429 is waited out (Retry-After, else a growing pause), not failed on.
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      res = await fetch(url, { headers: { 'X-Figma-Token': token } });
+      if (res.status !== 429) break;
+      const wait = Number(res.headers.get('Retry-After')) || 15 * (attempt + 1);
+      await new Promise((r) => setTimeout(r, Math.min(wait, 90) * 1000));
+    }
+    if (!res || !res.ok) throw new Error(`Figma API ${res?.status}: ${await res?.text().catch(() => 'unknown')}`);
+    const json = await res.json();
+    for (const id of ids) if (json.nodes?.[id]?.document) out[id] = json.nodes[id].document;
+  }
+  return out;
+}
+
 /** Fetch a rendered PNG of the frame at the given scale. */
 export async function fetchFigmaImage(
   fileKey: string,
@@ -97,4 +125,40 @@ export async function fetchFigmaVariables(
   } catch {
     return {};
   }
+}
+
+/** The file's published component sets — name, node id and page. Only sets
+ *  that have been published to the team library appear here. */
+export async function fetchFigmaComponentSets(
+  fileKey: string,
+  token: string,
+): Promise<Array<{ nodeId: string; name: string; page: string }>> {
+  const res = await fetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, {
+    headers: { 'X-Figma-Token': token },
+  });
+  if (!res.ok) throw new Error(`Figma component sets API ${res.status}`);
+  const json = await res.json();
+  const sets: Array<{ nodeId: string; name: string; page: string }> = (json.meta?.component_sets ?? []).map((s: any) => ({
+    nodeId: s.node_id,
+    name: s.name,
+    page: s.containing_frame?.pageName ?? '',
+  }));
+  /* The listing carries the name as last PUBLISHED. Ask the file for each
+     set's current name too, so a rename — like a leading "." that makes a set
+     private — counts at once rather than at the next library publish. A
+     failure here keeps the published names. */
+  try {
+    const ids = sets.map((x) => x.nodeId).join(',');
+    const nodes = await fetch(`https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(ids)}&depth=1`, {
+      headers: { 'X-Figma-Token': token },
+    });
+    if (nodes.ok) {
+      const nj = await nodes.json();
+      for (const x of sets) {
+        const doc = nj.nodes?.[x.nodeId]?.document;
+        if (doc?.name) x.name = doc.name;
+      }
+    }
+  } catch { /* keep the published names */ }
+  return sets;
 }

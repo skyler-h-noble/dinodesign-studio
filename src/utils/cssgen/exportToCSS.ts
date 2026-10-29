@@ -10,9 +10,12 @@
 
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
-import { compositeOver, solveQuietOpacities, QUIET_PALETTES } from '../quietOpacity';
+import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
+import { chartColorVisionCSS } from '../chartColorVision';
+import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
-import { navMetricsCSS } from '../componentSize';
+import { navMetricsCSS, FAB_SIZE } from '../componentSize';
+import { fabBevelVars } from '../bevelGeometry';
 import { menuLevelCSS } from '../menuLevels';
 import { EYEBROW_WEB_FAMILY } from '../typographyPlatform';
 import { CSS_THEME_NAMES } from '../themes';
@@ -20,10 +23,10 @@ import { variantHex8, BORDER_VARIANT_ALPHA } from '../variantAlpha';
 import type { DesignSystem } from '../../types/designSystem';
 import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
-import { computeRadii, migrateLegacyRadii } from '../componentRadii';
+import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from '../componentRadii';
 import { motionCSS, motionModeCSS } from '../motion';
 import { solveThemeScrims, generateTextOverImageCSS } from './generateTextOverImage';
-import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
   generateHeaderVariables,
@@ -33,7 +36,7 @@ import {
   generateChartsVariables
 } from './cssGeneratorHelpers';
 import { generateAllThemesCSS } from './generateThemeCSS';
-import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars } from '../componentSize';
+import { lineMetricsVars, selectionMetricsVars, tooltipMetricsVars, fieldMetricsVars, otherMetricsVars } from '../componentSize';
 import { altDisplayWeight } from '../altDisplay';
 import { weightsFor } from '../googleFontWeights';
 
@@ -1104,6 +1107,64 @@ function generateThemeColorsVariables(modeData: any): string {
  * Creates selectors like [data-theme="Primary-Light"] with scoped variables
  * Returns the CSS outside of :root block (to be appended after :root closes)
  */
+/**
+ * The Default theme's four surface references, {Default-Background.<level>}
+ * → a Backgrounds row. Brightest is not a member of the row: like every other
+ * theme it points at a DIFFERENT row's Surface — Bright is one tone up, and
+ * Brightest takes 11 unless Bright already claimed it, in which case 12.
+ * Shared with utils/cellButtons.ts.
+ */
+export function defaultSurfaceRefs(defPal: string, defN: number): Record<string, string> {
+  const row = `Backgrounds.${defPal}.Background-${defN}`;
+  const defBrightN = Math.min(defN + 1, 12);
+  const defBrightestN = defBrightN >= 11 ? 12 : 11;
+  return {
+    'Default-Background.Surface': `{${row}.Surfaces.Surface}`,
+    'Default-Background.Surface-Dim': `{${row}.Surfaces.Surface-Dim}`,
+    'Default-Background.Surface-Bright': `{${row}.Surfaces.Surface-Bright}`,
+    'Default-Background.Surface-Brightest': `{Backgrounds.${defPal}.Background-${defBrightestN}.Surfaces.Surface}`,
+  };
+}
+
+/**
+ * The palette and tone the Default theme's surfaces sit on, in one mode — what
+ * {Default-Background.*} resolves to. Shared with utils/cellButtons.ts, which
+ * must compute the page's button against the same background the CSS paints.
+ */
+export function defaultBackgroundTone(fullJsonData: any, modeData: any, modeName?: string): { defPal: string; defN: number } {
+  const metadata = fullJsonData?.Metadata || modeData?.Metadata;
+  const bgSelection = metadata?.['Background']?.value;
+  const primaryToneVal = metadata?.['Extracted-Tones']?.Primary?.value;
+  const primaryN = primaryToneVal ? toneToColorNumber(primaryToneVal) : 9;
+
+  // Map user's background selection to palette + Color-N (same as getBgThemeAndN in exportColorSystem)
+  let defPal = 'Primary';
+  let defN = 11; // default: primary-light
+  switch (bgSelection) {
+    case 'white': defPal = 'Neutral'; defN = 12; break;
+    case 'black': defPal = 'Neutral'; defN = 1; break;
+    case 'primary-base': case 'primary': defPal = 'Primary'; defN = primaryN; break;
+    case 'primary-light': defPal = 'Primary'; defN = 11; break;
+    default: defPal = metadata?.['Background-Theme']?.value || 'Primary'; defN = 11; break;
+  }
+  // Dark mode does NOT reuse the light-mode palette/tone. The selection above
+  // describes the LIGHT background; in dark mode the Default theme sits on the
+  // dark end of the ramp instead. Mirrors generateFigmaJSON.ts, which already
+  // did this — without it the CSS resolved Default-Background.Surface to
+  // Backgrounds.Neutral.Background-12, a LIGHT color in the dark palette, so
+  // the Default theme rendered light-on-dark in Figma and dark-on-light on the
+  // web. Both files were internally consistent, so contrast checks passed on
+  // each; only a cross-artifact comparison caught it.
+  const isDarkMode = modeName === 'Dark-Mode';
+  if (isDarkMode) {
+    // The chosen theme at Color-2 — darkPageTheme, shared with the preview and
+    // the Figma payload. A grid pick stored only as Background-Theme keeps it.
+    defPal = typeof bgSelection === 'string' && bgSelection ? darkPageTheme(bgSelection) : (metadata?.['Background-Theme']?.value || 'Neutral');
+    defN = DARK_PAGE_N;
+  }
+  return { defPal, defN };
+}
+
 function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: string): string {
   /* Shadow controls, resolved once per call. dropshadowBaseHex depends on
      INTENSITY, so a surface's shadow hex is wrong — not missing, wrong — if
@@ -1245,35 +1306,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   // These map to the user's selected background palette at their extracted tone.
   // Use token references (not resolved values) so resolveTokenForCSS can follow the chain.
   {
-    const metadata = fullJsonData?.Metadata || modeData?.Metadata;
-    const bgSelection = metadata?.['Background']?.value;
-    const primaryToneVal = metadata?.['Extracted-Tones']?.Primary?.value;
-    const primaryN = primaryToneVal ? toneToColorNumber(primaryToneVal) : 9;
-
-    // Map user's background selection to palette + Color-N (same as getBgThemeAndN in exportColorSystem)
-    let defPal = 'Primary';
-    let defN = 11; // default: primary-light
-    switch (bgSelection) {
-      case 'white': defPal = 'Neutral'; defN = 12; break;
-      case 'black': defPal = 'Neutral'; defN = 1; break;
-      case 'primary-base': case 'primary': defPal = 'Primary'; defN = primaryN; break;
-      case 'primary-light': defPal = 'Primary'; defN = 11; break;
-      default: defPal = metadata?.['Background-Theme']?.value || 'Primary'; defN = 11; break;
-    }
-    // Dark mode does NOT reuse the light-mode palette/tone. The selection above
-    // describes the LIGHT background; in dark mode the Default theme sits on the
-    // dark end of the ramp instead. Mirrors generateFigmaJSON.ts, which already
-    // did this — without it the CSS resolved Default-Background.Surface to
-    // Backgrounds.Neutral.Background-12, a LIGHT color in the dark palette, so
-    // the Default theme rendered light-on-dark in Figma and dark-on-light on the
-    // web. Both files were internally consistent, so contrast checks passed on
-    // each; only a cross-artifact comparison caught it.
+    const { defPal, defN } = defaultBackgroundTone(fullJsonData, modeData, modeName);
     const isDarkMode = modeName === 'Dark-Mode';
-    const darkUsePrimary = bgSelection === 'primary-light' || bgSelection === 'primary-base' || bgSelection === 'primary';
-    if (isDarkMode) {
-      defPal = darkUsePrimary ? 'Primary' : 'Neutral';
-      defN = 2;                       // dark surfaces sit at Color-2
-    }
     const colorN = `Color-${defN}`;
     // Dark containers are always tonal at Color-3 (see generateFigmaJSON).
     const contN = isDarkMode ? 3 : defN;
@@ -1282,9 +1316,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // Background surfaces/containers — reference Backgrounds.{Palette}.Background-{N}
     const bgKey = `Backgrounds.${defPal}.Background-${defN}`;
     const contBgKey = `Backgrounds.${defPal}.Background-${contN}`;
-    tokenLookup['Default-Background.Surface'] = `{${bgKey}.Surfaces.Surface}`;
-    tokenLookup['Default-Background.Surface-Dim'] = `{${bgKey}.Surfaces.Surface-Dim}`;
-    tokenLookup['Default-Background.Surface-Bright'] = `{${bgKey}.Surfaces.Surface-Bright}`;
+    Object.assign(tokenLookup, defaultSurfaceRefs(defPal, defN));
     // Surface-Brightest. overrideSurface in generateCompleteThemes routes the
     // Default theme's brightest surface through Default-Background alongside
     // the other three, but this lookup was never given the matching entry — so
@@ -1300,10 +1332,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // the same. Same rule as generateSingleTheme: Bright is one tone up, and
     // Brightest takes 11 unless Bright has already claimed it, in which case 12.
 
-    const defBrightN = Math.min(defN + 1, 12);
-    const defBrightestN = defBrightN >= 11 ? 12 : 11;
-    tokenLookup['Default-Background.Surface-Brightest'] =
-      `{Backgrounds.${defPal}.Background-${defBrightestN}.Surfaces.Surface}`;
+    // (Surface-Brightest is set by defaultSurfaceRefs above.)
     // No Default-Background.Surface-Dimmest: the Default theme keeps
     // generateSingleTheme's own {Backgrounds.<pal>.Background-4...} reference
     // for that surface. Surface-Dimmest is pinned to Color-4 in every theme and
@@ -1315,20 +1344,53 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     tokenLookup['Default-Background.Container-High'] = `{${contBgKey}.Containers.Container-High}`;
     tokenLookup['Default-Background.Container-Highest'] = `{${contBgKey}.Containers.Container-Highest}`;
 
+    /* The text a Default-theme CARD carries is read at the tone of the card's
+       ACTUAL face, not at the page tone. The face follows the card setting —
+       on a primary-base page with white cards it is near-white (#f6f7f7) — but
+       the text was read at {Text.Containers.<pal>.Color-<pageTone>}, the table
+       for a TONAL card at the page tone: a dark card. Light text landed on a
+       light card. The face is resolved and matched to its nearest tone by
+       lightness; a tonal card still lands on the page tone, unchanged. */
+    const faceHex = (() => {
+      let ref: unknown = `{${contBgKey}.Containers.Container}`;
+      for (let hop = 0; hop < 10 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
+        const path = (ref as string).slice(1, -1);
+        if (tokenLookup[path]) { ref = tokenLookup[path]; continue; }
+        let node: any = modeData;
+        for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) break; }
+        if (node === undefined) { node = fullJsonData; for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) break; } }
+        ref = typeof node === 'string' ? node : node?.value;
+      }
+      return typeof ref === 'string' && /^#[0-9a-f]{6}/i.test(ref) ? ref.slice(0, 7) : null;
+    })();
+    const lightnessOf = (hex: string) => { const [r, g, b] = [1, 3, 5].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y; };
+    let faceN = contN;
+    if (faceHex) {
+      const tones = modeData?.Colors?.[defPal] ?? {};
+      let best = Infinity;
+      for (let n = 1; n <= 12; n++) {
+        let v: any = tones[`Color-${n}`]?.value;
+        if (typeof v !== 'string' || !v.startsWith('#')) continue;
+        const dist = Math.abs(lightnessOf(v.slice(0, 7)) - lightnessOf(faceHex));
+        if (dist < best) { best = dist; faceN = n; }
+      }
+    }
+    const faceColorN = `Color-${faceN}`;
+
     // Text, Header, Quiet, Border, etc. — reference {Section.Surfaces.Palette.Color-N}
     const props = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
     for (const prop of props) {
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
-      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${contColorN}}`;
+      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${faceColorN}}`;
     }
     tokenLookup['Default-Background.Container-Quiet-Opacity'] =
-      `{Quiet.${contColorN}-Opacity}`;
+      `{Quiet.${faceColorN}-Opacity}`;
     tokenLookup['Default-Background.Container-Text-Match'] =
-      `{Text.Containers.${defPal}.${contColorN}}`;
+      `{Text.Containers.${defPal}.${faceColorN}}`;
     tokenLookup['Default-Background.Container-Header-Match'] =
-      `{Header.Containers.${defPal}.${contColorN}}`;
+      `{Header.Containers.${defPal}.${faceColorN}}`;
     tokenLookup['Default-Background.Container-Text-BW'] =
-      `{Default-Button-Border.Containers.BlackWhite.${contColorN}}`;
+      `{Default-Button-Border.Containers.BlackWhite.${faceColorN}}`;
     // Focus-Visible uses a flat path (no palette nesting) AND is keyed by
     // Background-N, not Color-N. Using colorN here produced
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the
@@ -1698,10 +1760,9 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
    * Returns null when anything is missing, and the caller then falls back to
    * the ordinary reference rather than emitting a colour it cannot justify.
    */
-  function quietSolid(section: any, key: string): string | null {
-    const source = QUIET_SOURCE[key];
-    if (!source || !section) return null;
-    let ref: any = section['Quiet-Opacity']?.value;
+  /** The tone a section's Quiet-Opacity points at, following references. */
+  function quietToneOf(section: any): number | null {
+    let ref: any = section?.['Quiet-Opacity']?.value;
     for (let hop = 0; hop < 8 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
       const path = ref.slice(1, -1);
       if (/^Quiet\.Color-\d+-Opacity$/.test(path)) break;
@@ -1710,7 +1771,27 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       ref = next;
     }
     const tone = typeof ref === 'string' ? ref.match(/Quiet\.Color-(\d+)-Opacity/) : null;
-    const alpha = tone ? quietTable.alpha[Number(tone[1])] : undefined;
+    return tone ? Number(tone[1]) : null;
+  }
+
+  /* The few theme sections the shared tone alpha leaves under 4.5:1 get their
+     own (see sectionQuietOverrides). The Figma payload solves the same list
+     from the same module and writes it as its own Quiet float.
+
+     Applied in the modes QUIET_SECTION_FIX_MODES lists (both, now), which the
+     Figma payload reads too. */
+  const quietOverride = new Map<any, number>(
+    (QUIET_SECTION_FIX_MODES.includes(modeName ?? '')
+      ? sectionQuietOverrides(modeData, quietTable, (raw: any) => hexForToken(raw), quietToneOf)
+      : []
+    ).map((o) => [o.node, o.alpha] as [any, number]),
+  );
+
+  function quietSolid(section: any, key: string): string | null {
+    const source = QUIET_SOURCE[key];
+    if (!source || !section) return null;
+    const tone = quietToneOf(section);
+    const alpha = quietOverride.get(section) ?? (tone === null ? undefined : quietTable.alpha[tone]);
     if (alpha === undefined) return null;
     const bg = hexForToken(section['Background']);
     const fg = hexForToken(section[source]);
@@ -1718,8 +1799,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     return compositeOver(fg, bg, alpha);
   }
 
-  function processTokens(obj: any, prefix: string = ''): string[] {
+  function processTokens(obj: any, prefix: string = '', section: any = obj): string[] {
     const lines: string[] = [];
+    // The nearest enclosing theme section (the object that owns Background) —
+    // what a nested Quiet, e.g. Buttons.Default.Outline-Quiet, is muted against.
+    const ctx = obj && typeof obj === 'object' && 'Background' in obj ? obj : section;
 
     Object.keys(obj).forEach(key => {
       const value = obj[key];
@@ -1751,7 +1835,26 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       if (key === 'Quiet-Opacity') return;
 
       if (QUIET_SOURCE[key] !== undefined) {
-        const solid = quietSolid(obj, key);
+        /* A button's Outline-Quiet sits one level down, in Buttons.<P>, with
+           no Background or Quiet-Opacity of its own. When it IS the surface's
+           Quiet (Black & White text, Neutral, BlackWhite), it takes the same
+           composited solid as --Quiet — the color Figma draws, Text at the
+           Quiet opacity — rather than the raw quiet tone its reference names.
+           A palette Outline-Quiet (Tonal text) is a different color and keeps
+           its reference. */
+        /* Which of the section's Quiet roles this button's Outline-Quiet IS —
+           the surface Quiet (Black & White, Neutral, BlackWhite) or a palette's
+           Quiet-<Pal> (Tonal: a Secondary outline rests on Quiet-Secondary).
+           Either way it takes that role's composited solid, so the button and
+           the --Quiet-<Pal> beside it are the same color. Matched by reference
+           first, then by resolved hex. */
+        const sourceRole = ctx !== obj && key === 'Outline-Quiet'
+          && value && typeof value === 'object' && 'value' in value
+          ? (['Quiet', ...QUIET_PALETTES.map((p) => `Quiet-${p}`)].find((role) =>
+              ctx[role] && (ctx[role].value === value.value
+                || (hexForToken(value) !== null && hexForToken(value) === hexForToken(ctx[role])))) ?? null)
+          : null;
+        const solid = ctx === obj ? quietSolid(obj, key) : sourceRole ? quietSolid(ctx, sourceRole) : null;
         if (solid) {
           lines.push(`  ${prefix ? `--${prefix}-${key}` : `--${key}`}: ${solid};`);
           return;
@@ -1769,7 +1872,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       // Check if this is a nested object (like Buttons, Icons, etc.)
       else if (value && typeof value === 'object' && !('value' in value)) {
         const newPrefix = prefix ? `${prefix}-${key}` : key;
-        lines.push(...processTokens(value, newPrefix));
+        lines.push(...processTokens(value, newPrefix, ctx));
       }
     });
 
@@ -3677,10 +3780,10 @@ export function generateModeCSSFile(jsonData: DesignSystem, modeName: string): s
  *
  * This MIRRORS the Figma Chart collection, which is what the Charts add-on's
  * Figma build paints with, so the code and the Figma chart agree:
- *   Chart-1..4   the brand four alias the Icons on that surface —
- *                .Theme/Surface-{ground}/Icons/{Primary,Secondary,Tertiary,Neutral}
- *                in Figma, var(--Icons-*) here, which resolves per surface the
- *                same way.
+ *   Chart-1..4   the brand four at their SOLVED tones (solveChartPalette
+ *                writes all ten), the same values Figma's .Modes/Chart/{ground}
+ *                carries. They were var(--Icons-*), the solver's rejected first
+ *                approach, while 5..10 were solved around different picks.
  *   Chart-5..10  the solved palette — the SAME solveChartPalette() result the
  *                Figma payload writes to .Modes/Chart/{ground}/Color-N.
  *   Chart-Lines  Border-Variant on that surface. Gridlines are decorative, so
@@ -3705,7 +3808,16 @@ export function chartGroundCSS(jsonData: any, modeName: string): string {
     const g = grounds[level];
     if (!g) continue;
     out.push(`[data-surface="${level}"] {`);
-    BRAND_ICONS.forEach((icon, i) => out.push(`  --Chart-${i + 1}: var(--Icons-${icon});`));
+    /* Chart-1..4 are the SOLVED brand tones, like 5..10 — not the surface's
+       Icons. The solver arranges 5..10 around its own brand picks (its notes:
+       Icons "tune for icon contrast", which drives a light ground dark and
+       collapsed Primary/Tertiary to dE 1.8), so drawing the Icons here showed
+       a set nobody solved for. The Icon is the fallback only when the solver
+       left a brand series out. */
+    BRAND_ICONS.forEach((icon, i) => {
+      const hex = g[`Color-${i + 1}`]?.value;
+      out.push(`  --Chart-${i + 1}: ${hex || `var(--Icons-${icon})`};`);
+    });
     for (let n = 5; n <= 10; n++) {
       const hex = g[`Color-${n}`]?.value;
       if (hex) out.push(`  --Chart-${n}: ${hex};`);
@@ -3715,7 +3827,10 @@ export function chartGroundCSS(jsonData: any, modeName: string): string {
     out.push(`  --Chart-Lines: ${LINES[level]};`);
     out.push('}');
   }
-  return out.join('\n') + '\n';
+  /* The color-vision sets, on the same grounds — after the brand blocks, and
+     more specific, so data-color-vision wins wherever it is set. */
+  const levels = (['Surface-Brightest', 'Surface-Dimmest'] as const).filter((l) => grounds[l]);
+  return out.join('\n') + '\n' + chartColorVisionCSS(levels);
 }
 
 /**
@@ -3896,7 +4011,8 @@ function generateStyleCSS(jsonData: any): string {
       props.push(`${indent}--Lg-Card-Radius: ${Math.min(Math.round(cappedCard * 1.25), REFERENCE_BUTTON_HEIGHT)}px;`);
       props.push(`${indent}--Card-Padding: ${borderRadius >= 16 ? 20 : 16}px;`);
       // Button & Input tokens derived from --Button-Radius.
-      props.push(`${indent}--Button-Border-Width: 1px;`);
+      props.push(`${indent}--Button-Border-Width: ${buttonBorderWidthPx(jsonData._componentStyle?.buttonBorderWidth)}px;`);
+      props.push(`${indent}--Button-Selected-Border-Width: ${buttonSelectedBorderWidthPx(jsonData._componentStyle?.buttonBorderWidth)}px;`);
       props.push(`${indent}--Button-Padding: ${BUTTON_PADDING}px;`);
       props.push(`${indent}--Sm-Button-Padding: var(--Button-Padding);`);
       props.push(`${indent}--Lg-Button-Padding: ${LG_BUTTON_PADDING}px;`);
@@ -4431,6 +4547,12 @@ function generateGoogleFontsImports(jsonData: any): string {
   fontFamilies.forEach(fontName => {
     // Skip system fonts
     if (systemFonts.includes(fontName)) {
+      return;
+    }
+    // The Header face gets its own variable-font import below, which already
+    // covers every weight the system uses. A second, static request for it
+    // (e.g. Google+Sans+Flex:wght@640) was one more round trip for nothing.
+    if (fontName === HEADER_FAMILY) {
       return;
     }
     
@@ -5224,6 +5346,14 @@ export function generateBaseCSS(jsonData: any): string {
     for (const [name, value] of Object.entries(selectionMetricsVars())) {
       lines.push(`  ${name}: ${value};`);
     }
+    // Field Button and NumberField — see fieldMetricsVars in componentSize.ts.
+    for (const [name, value] of Object.entries(fieldMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
+    // Progress, TextArea, Rating, the floating label and Sheet — otherMetricsVars.
+    for (const [name, value] of Object.entries(otherMetricsVars())) {
+      lines.push(`  ${name}: ${value};`);
+    }
     for (const [name, value] of Object.entries(lineMetricsVars())) {
       lines.push(`  ${name}: ${value};`);
     }
@@ -5322,7 +5452,8 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Sm-Input-Swatch-Radius: ${r.smInputSwatchRadius}px;`);
     lines.push(`  --Lg-Input-Swatch-Radius: ${r.lgInputSwatchRadius}px;`);
     lines.push(`  --Input-Padding: ${csRaw.inputPadding ?? (btnR >= 8 ? 4 : 2)}px;`);
-    lines.push(`  --Button-Border-Width: 1px;`);
+    lines.push(`  --Button-Border-Width: ${buttonBorderWidthPx(csRaw?.buttonBorderWidth)}px;`);
+    lines.push(`  --Button-Selected-Border-Width: ${buttonSelectedBorderWidthPx(csRaw?.buttonBorderWidth)}px;`);
     // Minimum button width — the floor the label box cannot shrink below, so a
     // one-word button ("OK") still reads as a button rather than a chip.
     //
@@ -5350,6 +5481,8 @@ export function generateBaseCSS(jsonData: any): string {
     lines.push(`  --Button-Bevel: ${bevelPercent};`);
     lines.push(`  --Button-Bevel-Px: ${bevelPx}px;`);
     lines.push(`  --Button-Bevel-Opacity: ${bevelOpacity / 100};`);
+    // The FAB's bevel, from its own width — the values Figma's FAB-Bevel holds.
+    for (const [k, v] of Object.entries(fabBevelVars(FAB_SIZE, bevelPercent))) lines.push(`  ${k}: ${v};`);
     // Effect levels — box-shadow recipes. --Dropshadow-Color is overridden
     // per-theme in Light-Mode.css / Dark-Mode.css; the nested var() resolves
     // at the consuming element so themed values still apply even though
@@ -5361,6 +5494,10 @@ export function generateBaseCSS(jsonData: any): string {
     const effOpts = shadowOptionsFromStyle(csRaw);
     for (const lvl of SHADOW_LEVELS) {
       lines.push(`  --Effect-Level-${lvl}: ${effectLevelRecipe(lvl, effOpts)};`);
+    }
+    // Neutral twins for panels over a scrim (modal, dialog, drawer).
+    for (const lvl of SHADOW_LEVELS) {
+      lines.push(`  --Effect-Level-${lvl}-Neutral: ${neutralEffectLevelRecipe(lvl, effOpts)};`);
     }
     lines.push('}');
     lines.push('');

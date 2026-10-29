@@ -253,19 +253,6 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   //
   // Capping the total fixes both — above the cap the curve is flat, so the
   // cliff has nothing to fall off.
-  /* Accordion corner — follows the button radius, capped at half the summary's
-   * height so it cannot saturate into a stadium.
-   *
-   * An accordion summary is about one button tall, so a pill-able
-   * --Button-Radius rounds it into a lozenge; buttons are deliberately
-   * pill-able, accordions are not. Half the height is the point at which a
-   * corner stops being a corner, which makes it the right maximum.
-   *
-   * This lived inline in buildPreviewCSS, so --Accordion-Radius reached the
-   * studio preview and nothing else — not the CSS export, not Figma. The lib
-   * therefore fell back to --Button-Radius everywhere real, which is the pill
-   * the token exists to prevent. */
-  const accordionRadius = Math.min(buttonRadius, Math.floor(cs.buttonHeight / 2));
 
   /* The accordion's focus ring, for FIGMA's benefit only.
    *
@@ -274,17 +261,34 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
    * inside an 8px corner emerges at 5px with nobody computing it. Figma cannot
    * do arithmetic on a variable, so the two values have to be stated.
    *
-   * The inset is 3, not the 1 that `inner()` applies to Input. Input's inner
-   * focus sits 1px in; the accordion's sits 3px in, matching the lib's
-   * outlineOffset: -3px. Reusing inner() here would emit 7 and put Figma's
-   * ring a step off what the CSS actually draws — the two would look
-   * concentric in neither place. */
-  const ACCORDION_FOCUS_INSET = 3;
-  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_INSET;
-  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_FOCUS_INSET);
+   * The OUTSIDE ring (a lone segment) has its outer edge 3px out — a 2px
+   * outline 1px off the segment — so its corner is radius + 3. The INSIDE
+   * ring (a connected segment) has its outer edge 2px in — a 3px outline at
+   * -5px, as Figma's frame 2px in with an INSIDE stroke — so its corner is
+   * radius - 2. That was radius - 3, from when the inner ring sat 3px in: a
+   * 16px corner gave 13 where the ring now needs 14, and Figma's inset ring
+   * ran 1px off concentric. */
+  const ACCORDION_FOCUS_OUTSET = 3;
+  const ACCORDION_INNER_FOCUS_INSET = 2;
 
   const CARD_RADIUS_MAX = 24;
   const cardRadius = Math.min(cardCornerBase + cardPadding, CARD_RADIUS_MAX);
+
+  /* Accordion corner — the dropdown frame's rule: min(Button-Radius,
+   * Card-Radius, 16px).
+   *
+   * It follows the button so a square brand stays square, but an accordion is
+   * a SURFACE that opens into a card, so it is never rounder than the brand's
+   * cards and never past 16px. It was min(button, height / 2), which on a pill
+   * brand made a closed 40px segment a full stadium and an open one a card
+   * with 20px corners, so the shape changed as it opened.
+   *
+   * (This lived inline in buildPreviewCSS once, so --Accordion-Radius reached
+   * the preview and nothing else; it is computed here for all three outputs.) */
+  const ACCORDION_RADIUS_MAX = 16;
+  const accordionRadius = Math.min(buttonRadius, cardRadius, ACCORDION_RADIUS_MAX);
+  const accordionFocusRadius = accordionRadius + ACCORDION_FOCUS_OUTSET;
+  const accordionInnerFocusRadius = Math.max(0, accordionRadius - ACCORDION_INNER_FOCUS_INSET);
 
   /* Small and large cards, scaled PROPORTIONALLY off the resolved medium.
    *
@@ -463,28 +467,21 @@ export function computeRadii(cs: RadiiInput): ComputedRadii {
   const LIST_ITEM_PADDING_FLOOR = { small: 8, medium: 12, large: 16 };
   const padFor = (floor: number, radius: number) => Math.max(floor, radius);
 
-  /* The gap BETWEEN rows equals the padding INSIDE one.
-   *
-   * A clickable list separates its rows so each reads as its own tappable
-   * surface; a non-clickable one keeps them at 0 and joins them with hairlines.
-   * The library already draws exactly that — `gap: clickable ? var(--Sizing-1)
-   * : 0` — and Figma's List has the matching `Type=non-clickable|clickable`.
-   *
-   * Equal, not merely both-8. Today they are both Sizing-1 and so move
-   * together, but only by coincidence: point either at another rung and the
-   * relationship breaks with nothing to catch it. Stated here, the padding is
-   * the hinge and the gap follows by construction.
-   *
-   * The gap is the SEPARATED value. A non-clickable list is 0 and does not read
-   * this — zero is the absence of a gap, not a smaller one, so deriving it
-   * would invent a spacing nobody asked for. */
   const listItemPadding = padFor(LIST_ITEM_PADDING_FLOOR.medium, listItemRadius);
   const smListItemPadding = padFor(LIST_ITEM_PADDING_FLOOR.small, smListItemRadius);
   const lgListItemPadding = padFor(LIST_ITEM_PADDING_FLOOR.large, lgListItemRadius);
 
-  const listItemGap = listItemPadding;
-  const smListItemGap = smListItemPadding;
-  const lgListItemGap = lgListItemPadding;
+  /* The gap INSIDE a row — between the image, the text and the decorators
+   * (Figma's Content frame itemSpacing; ListItem's `gap`). NOT between rows:
+   * that is the List's own Sizing-1 when clickable, 0 when joined.
+   *
+   * A fixed density step, 4 / 8 / 12. It used to equal the padding, which
+   * follows the corner — so a pill brand put 30px between a row's image and
+   * its title. The padding clears the curve; the gap sits mid-row, nowhere
+   * near a corner, so the radius has nothing to say about it. */
+  const listItemGap = 8;
+  const smListItemGap = 4;
+  const lgListItemGap = 12;
 
   /* The ring is inset 2: 1px clear of the drawn edge, plus the row's own 1px
      border. Concentric means the ring's radius drops by the same 2 — the
@@ -651,4 +648,24 @@ export function migrateLegacyRadii<T extends Partial<RadiiInput> & { radius?: nu
     smallButtonHeight: cs.smallButtonHeight ?? 24,
     largeButtonHeight: cs.largeButtonHeight ?? 56,
   } as T & RadiiInput;
+}
+
+/**
+ * The button border width, a style choice: 1px (default) or 2px.
+ *
+ * One value for the CSS export, the Figma payload and the live preview. Only
+ * the border moves — the inner heights and swatches are measured off the
+ * OUTER button size, so a 2px border does not change a button's footprint. A
+ * SELECTED button draws one pixel more (buttonSelectedBorderWidthPx).
+ */
+export function buttonBorderWidthPx(v?: number | null): 1 | 2 {
+  return v === 2 ? 2 : 1;
+}
+
+/** A SELECTED button's border: the rest width plus 1px — 2px on a 1px brand,
+ *  3px on a 2px one — so selection always reads one pixel heavier. Its own
+ *  token because a Figma variable cannot be arithmetic: the selected stroke
+ *  binds to this the way the rest stroke binds to Button-Border-Width. */
+export function buttonSelectedBorderWidthPx(v?: number | null): 2 | 3 {
+  return (buttonBorderWidthPx(v) + 1) as 2 | 3;
 }

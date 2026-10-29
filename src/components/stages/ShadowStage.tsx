@@ -160,8 +160,8 @@ export default function ShadowStage({ customizations, onChange, surfaceHex }: Pr
                 value={c.shadowCrispy} aria-label="Crispy"
                 onChange={(_: unknown, v: number | number[]) => set('shadowCrispy', v as number)} />
               <BodySmall color="quiet" style={{ fontSize: '0.65rem' }}>
-                Blur {(1.8 - 0.9 * c.shadowCrispy).toFixed(2)}× the offset, tuck-in
-                −{(5 * c.shadowCrispy).toFixed(1)}px. Crisper = tighter.
+                Blur {(1.707 - 0.9 * c.shadowCrispy).toFixed(2)}× the offset. Crisper = a tighter,
+                sharper edge.
               </BodySmall>
             </VStack>
 

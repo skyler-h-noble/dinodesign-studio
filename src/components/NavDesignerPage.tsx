@@ -6,22 +6,33 @@
  * reaches the Figma component and the React one as the same decision rather
  * than as two things that have to be kept in step.
  *
- * The preview is a SCHEMATIC, deliberately. Rendering the real component would
- * mean a second implementation of the layout in this page, and the two would
- * disagree the moment either changed — the exact failure this architecture
- * exists to avoid. Boxes showing which slot sits where is the honest amount to
- * promise from a definition that has no behaviour in it yet.
+ * The preview is the definition rendered by DefinitionRenderer, with each slot
+ * filled by the real library component (Tabs, Rail, BottomNavigation,
+ * SearchField…) at the breakpoint's own width — the layout comes from the
+ * definition, the parts from the lib, so neither is a second implementation.
+ *
+ * MISSING-LIB-COMPONENT tags in this file:
+ *   FileInput — choosing a brand mark from disk (hidden input behind a Button)
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
+import AddOnTopNav from './addOns/AddOnTopNav';
+import { systemExists } from '../utils/docs/systemCss';
+import { libraryPageUrl } from '../utils/docs/docsLink';
+import { liveSystemCss, type LiveSystemCss } from '../utils/addOns/charts/liveSystemCss';
+import { encodeNavState, readNavState, NAV_SHARE_VERSION } from '../utils/addOns/navShare';
+import { adaptiveNavDefinition, arrangementRows, ARRANGEMENT_CONDITIONS } from '../utils/addOns/adaptiveNav';
+import { navCode } from '../utils/addOns/navCode';
 import {
-  AppBar, Button, H1, H2, H4, Body, BodySmall, Caption, Label,
-  VStack, HStack, Card, Divider, SwitchInput, Chip, CodeBlock, Section,
-  Tabs, TabList, Tab, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
+  Button, H1, H2, H3, H4, Body, BodySmall, Caption, Label,
+  VStack, HStack, Card, SelectableCard, Divider, SwitchInput, Chip, CodeBlock, Section,
+  Tabs, TabList, Tab, TabPanel, TextArea, TextField, Alert, Modal, RadioGroup, Avatar, Checkbox,
   Rail, BottomNavigation, MenuItem, MenuDivider, Ratio, SearchField, Subtitle, LabelExtraSmall,
+  OmniDesignProvider, Link, ToggleButtonGroup,
 } from '@omni-design/components';
 import {
   navDefinition, defaultNavMatrix, applyExclusivity, NAV_EXCLUSIVE,
-  NAV_LAYOUTS, NAV_THEMES, NAV_SURFACES, type NavLayout, type NavOptions,
+  NAV_LAYOUTS, type NavLayout, type NavOptions,
 } from '../utils/addOns/navDefinition';
 import {
   DEFAULT_BREAKPOINTS, sortBreakpoints, displayBreakpoints, primaryBreakpoint,
@@ -31,10 +42,10 @@ import {
 } from '../utils/addOns/breakpoints';
 import ScaledPreview from './ScaledPreview';
 import {
-  mobileNavDefinition, MOBILE_LAYOUTS, maxItemsWithFab, bottomItemCounts, bottomBarItems,
+  mobileNavDefinition, MOBILE_LAYOUTS, bottomItemCounts, fitItemCount, bottomBarItems,
   type MobileLayout, type MobileOptions,
 } from '../utils/addOns/mobileNav';
-import TuneIcon from '@mui/icons-material/Tune';
+import TuneIcon from '@omni-design/icons/Tune';
 import {
   loadBrandAsset, releaseBrandAsset, BRAND_TYPES, type BrandAsset,
 } from '../utils/addOns/brandAsset';
@@ -43,7 +54,7 @@ import {
   type NavItem, type NavButtonItem, type Session,
 } from '../utils/addOns/navContent';
 import {
-  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, type AccountMenuItem,
+  DEFAULT_ACCOUNT_MENU, ACCOUNT_MENU_CONDITION, SIGNED_IN_CONDITION, SIGNED_OUT_CONDITION, type AccountMenuItem,
 } from '../utils/addOns/accountMenu';
 import NavItemEditor from './NavItemEditor';
 import AccountMenuEditor from './AccountMenuEditor';
@@ -123,13 +134,27 @@ export default function NavDesignerPage() {
      in Brand, the mark in Condensed-Brand, drawn as the adaptive mask the
      code uses. Preview only, like an upload: it never reaches the spec. */
   const [savedBrand, setSavedBrand] = useState<Brand | null>(null);
+  /* /add-ons/nav/<design system id>, as every other add-on. ?ds= is the old
+     way in and redirects there, so existing links keep working. */
+  const { uuid } = useParams<{ uuid?: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   useEffect(() => {
-    const ds = new URLSearchParams(window.location.search).get('ds');
-    if (!ds || !/^[0-9a-f-]{36}$/i.test(ds)) return;
+    const ds = searchParams.get('ds');
+    if (!uuid && ds && /^[0-9a-f-]{36}$/i.test(ds)) navigate(`/add-ons/nav/${ds.toLowerCase()}${window.location.hash}`, { replace: true });
+  }, [uuid, searchParams, navigate]);
+  const [exists, setExists] = useState<boolean | null>(null);
+  /* That system's published CSS, so the page — preview included — draws in its
+     brand, as Bento and Hero do. */
+  const [systemCss, setSystemCss] = useState<LiveSystemCss | null>(null);
+  useEffect(() => {
     let live = true;
-    loadBrand(ds.toLowerCase()).then((b) => { if (live) setSavedBrand(b); });
+    if (!uuid) { setExists(false); setSavedBrand(null); setSystemCss(null); return; }
+    systemExists(uuid).then((ok) => { if (live) setExists(ok); });
+    liveSystemCss(uuid).then((c) => { if (live) setSystemCss(c); });
+    loadBrand(uuid.toLowerCase()).then((b) => { if (live) setSavedBrand(b); });
     return () => { live = false; };
-  }, []);
+  }, [uuid]);
 
   /* Fills the Brand slots locally. It does NOT reach toAddonSpec: a published
      add-on is imported by every design system, so a brand baked into one would
@@ -174,6 +199,9 @@ export default function NavDesignerPage() {
      one value for the whole nav — and true is the state a product is in
      most of the time, so it is the one to design in. */
   const [signedIn, setSignedIn] = useState(true);
+  /* Scrolled past the hero, for the preview — the condensed state. A scroll
+     position, so one value for the whole nav, like Signed in. */
+  const [scrolled, setScrolled] = useState(false);
 
   const editingItem = editing
     ? (editing.kind === 'tab' ? tabs : actions).find((i) => i.id === editing.id) ?? null
@@ -243,6 +271,12 @@ export default function NavDesignerPage() {
        variable imports unbound and silently looks like a design decision. */
     return { definition: def, spec: toAddonSpec(def) };   // spec re-derived below with the table
   }, [options, mobile, onMobile]);
+
+  /* The nav across EVERY width: both arrangements under one root, switched by
+     Adaptive-Nav/Desktop and /Mobile per breakpoint. This is what is
+     published, matrixed and previewed; `definition` above stays the
+     arrangement being edited at this breakpoint, for the controls. */
+  const combined = useMemo(() => adaptiveNavDefinition(options, mobile), [options, mobile]);
 
   /* What the nav occupies, so the page can keep clear of it. Derived from the
      definition rather than measured, so it follows the arrangement and the
@@ -579,17 +613,10 @@ export default function NavDesignerPage() {
        come from the definition, so they follow the arrangement and the size
        mode instead of being copied out of devtools. */
     const page = (
-      <div
-        data-theme="Default"
-        data-surface="Surface"
-        style={{
-          flex: 1,
-          minHeight: 120,
-          width: '100%',
-          background: 'var(--Background)',
-          boxSizing: 'border-box',
-        }}
-      >
+      /* The lib's Section paints the region (theme + surface + Background),
+         rather than a div setting data-surface and painting it by hand. */
+      <Section as="div" theme="Default" surface="Surface" padding="0"
+        style={{ flex: 1, minHeight: 120, width: '100%', boxSizing: 'border-box' }}>
         <div style={{
           height: '100%',
           border: '1px dashed var(--Border-Variant)',
@@ -598,7 +625,7 @@ export default function NavDesignerPage() {
         }}>
           <Caption color="quiet">Content</Caption>
         </div>
-      </div>
+      </Section>
     );
 
     /* The library's Rail and BottomNavigation, not shapes drawn here.
@@ -644,7 +671,9 @@ export default function NavDesignerPage() {
         defaultValue={0}
         showLabels={mobile.showLabels !== false}
         variant={mobile.barStyle === 'floating' ? 'floating' : 'fixed'}
-        orientation={mobile.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal'}
+        /* Down belongs to the TOOLBAR. Read for every layout, a Down picked
+           there turned the bottom bar of Top and bottom on its side. */
+        orientation={mobile.layout === 'toolbar' && mobile.toolbarOrientation === 'vertical' ? 'vertical' : 'horizontal'}
         fabAction={mobile.fab ? {
           icon: <NavIconGlyph name="Add" />,
           label: 'Create',
@@ -652,6 +681,10 @@ export default function NavDesignerPage() {
              panel above the bar and lays the rows out in the ring's column.
              The rows are this page's list, the way the account menu's are. */
           ...(mobile.fabSpeedDial ? {
+            /* Labels in place, inside the preview's scale. Portalled to the
+               body they escaped the transform and drew at full size beside
+               a phone shown at half of it. */
+            disablePortal: true,
             actions: dialItems.map((d) => ({
               key: d.id, label: d.label, icon: <NavIconGlyph name={d.iconName || 'Add'} />,
             })),
@@ -706,20 +739,19 @@ export default function NavDesignerPage() {
       'Nav-Item-Slot': bottomNav,
       'Menu-Button': menuButton,
       Search: search,
-      /* The bottom bar's items, one slot each.
-         
-         The definition builds Nav-Item-N stacks holding Nav-Icon-N and
-         Nav-Label-N, because a designer needs those frames in Figma. The
-         preview was filling `Nav-Item-Slot` — which is a STACK, not a slot, so
-         nothing landed and every item rendered as two dashed boxes. Filling
-         the leaves puts real content in the definition's own structure rather
-         than replacing it with a component that would not match. */
-      ...Object.fromEntries(
-        tabs.flatMap((t, i) => [
-          [`Nav-Icon-${i + 1}`, <NavIconGlyph key={`ni${i}`} name={t.startIconName || t.endIconName || 'Home'} />],
-          [`Nav-Label-${i + 1}`, <LabelExtraSmall key={`nl${i}`}>{t.label}</LabelExtraSmall>],
-        ]),
-      ),
+      /* The mobile top bar's action slots: the actions as icon buttons, the
+         phone's form of them. They rendered as empty dashed boxes. */
+      ...Object.fromEntries([0, 1, 2].map((k) => {
+        const list = [...groupFor('always'), ...groupFor(signedIn ? 'signed-in' : 'signed-out')];
+        const a = list[k];
+        const fallback = [['Search', 'Search'], ['Notifications', 'Notifications'], ['MoreVert', 'More']][k];
+        const icon = a ? (a.startIconName || a.endIconName || fallback[0]) : fallback[0];
+        return [`Action-${k + 1}`, (
+          <Button key={`ma${k}`} iconOnly variant="ghost" size={componentSize} aria-label={a ? a.label : fallback[1]}>
+            <NavIconGlyph name={icon} />
+          </Button>
+        )];
+      })),
       Title: title,
       Brand: brandPlaceholder,
       'Condensed-Brand': brandPlaceholder,
@@ -730,9 +762,61 @@ export default function NavDesignerPage() {
     return out;
   }, [brand, savedBrand, tabs, actions, mobile.showLabels, mobile.barStyle, mobile.toolbarOrientation, mobile.fab, mobile.fabPosition, mobile.fabSpeedDial, dialItems, mobile.itemCount,
       avatarOpensMenu, menuOpen, accountItems, componentSize, insets, heroCap,
-      options.railExpandable]);
+      options.railExpandable, signedIn]);
   const [scale, setScale] = useState(1);
   const [matrix, setMatrix] = useState<ConditionMatrix>({});
+
+  /* The share link: everything this page decides, in #spec=. */
+  const shareLink = useMemo(() => {
+    const token = encodeNavState({
+      version: NAV_SHARE_VERSION, options, mobile, breakpoints, matrix, bottomBarAt,
+      tabs, actions, accountItems, dialItems, componentSize, selectedTab,
+    });
+    return `${window.location.origin}/add-ons/nav/${uuid || ''}#spec=${token}`;
+  }, [options, mobile, breakpoints, matrix, bottomBarAt, tabs, actions, accountItems, dialItems, componentSize, selectedTab, uuid]);
+
+  /* A share link's setup, put back — on arrival, or pasted into Import. */
+  const applyNavState = (st: NonNullable<ReturnType<typeof readNavState>>) => {
+    setOptions(st.options as NavOptions);
+    setMobile(st.mobile as MobileOptions);
+    const bps = st.breakpoints as Breakpoint[];
+    if (Array.isArray(bps) && bps.length) {
+      setBreakpoints(bps);
+      setSelectedBp(primaryBreakpoint(bps)!.id);
+    }
+    setMatrix((st.matrix || {}) as ConditionMatrix);
+    setBottomBarAt((st.bottomBarAt || {}) as Record<string, boolean>);
+    if (Array.isArray(st.tabs)) setTabs(st.tabs as NavItem[]);
+    if (Array.isArray(st.actions)) setActions(st.actions as NavButtonItem[]);
+    if (Array.isArray(st.accountItems)) setAccountItems(st.accountItems as AccountMenuItem[]);
+    if (Array.isArray(st.dialItems)) setDialItems(st.dialItems as SpeedDialItem[]);
+    if (st.componentSize) setComponentSize(st.componentSize);
+    if (st.selectedTab) setSelectedTab(st.selectedTab);
+  };
+  /* Opened from a share link: once, on arrival — a broken or foreign link
+     leaves the defaults. */
+  useEffect(() => {
+    const st = readNavState(window.location.hash);
+    if (st) applyNavState(st);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [tab, setTab] = useState<'build' | 'code' | 'export' | 'import'>('build');
+  const [platform, setPlatform] = useState<'ios' | 'android'>('ios');
+  /* Where the Build grid starts on the page, so its columns can fill the rest
+     of the window exactly. */
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [gridTop, setGridTop] = useState(240);
+  useEffect(() => {
+    const measure = () => {
+      const el = gridRef.current;
+      if (el) setGridTop(Math.round(el.getBoundingClientRect().top + window.scrollY));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [tab, twoCol]);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
 
 
 
@@ -746,7 +830,7 @@ export default function NavDesignerPage() {
     /* Only what THIS arrangement gates on. Completing over every declared
        condition put a Show-Rail switch on a layout with no rail — and worse,
        switched ON, saying a part exists when it does not. */
-    const names = conditionsUsedBy(definition);
+    const names = conditionsUsedBy(combined);
     /* Seeded from the bar's own CONTENT, not from the width alone. Four long
        labels beside a search field and two actions overlap at 900 where four
        short ones fit comfortably — same breakpoint, different answer — so the
@@ -763,9 +847,12 @@ export default function NavDesignerPage() {
         size: componentSize,
       }, available);
     });
-    return completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true);
-  }, [definition, matrix, sorted, tabs, actions, options.actions, options.search,
-      options.avatar, options.layout, componentSize]);
+    /* Desktop / Mobile come from the arrangement chosen per breakpoint (forced
+       below 600), never from the matrix — they are written over it. */
+    return { ...completeMatrix(matrix, names, sorted, (c, bp) => seed[c]?.[bp.id] ?? true),
+      ...arrangementRows(sorted, bottomBarAt) };
+  }, [combined, matrix, sorted, tabs, actions, options.actions, options.search,
+      options.avatar, options.layout, componentSize, bottomBarAt]);
 
   const matrixActive = useMemo(() => conditionsAt(full, selectedBp), [full, selectedBp]);
 
@@ -784,8 +871,16 @@ export default function NavDesignerPage() {
      panel would be shut at every breakpoint with no way to look at it. */
   const menuShown = menuOpen && avatarOpensMenu && avatarPresent && signedIn;
   const active = useMemo<Record<string, boolean>>(
-    () => ({ ...matrixActive, [ACCOUNT_MENU_CONDITION]: menuShown, [SIGNED_IN_CONDITION]: signedIn }),
-    [matrixActive, menuShown, signedIn],
+    () => ({
+      ...matrixActive,
+      [ACCOUNT_MENU_CONDITION]: menuShown,
+      [SIGNED_IN_CONDITION]: signedIn,
+      /* Signed-out was never set, so a visitor's actions never showed. */
+      [SIGNED_OUT_CONDITION]: !signedIn,
+      'Adaptive-Nav/Show-Condensed': scrolled,
+      'Adaptive-Nav/Hide-When-Condensed': !scrolled,
+    }),
+    [matrixActive, menuShown, signedIn, scrolled],
   );
 
   /* The spec, WITH the responsive table. Derived after the matrix because it
@@ -793,9 +888,16 @@ export default function NavDesignerPage() {
      about what that variable holds at each width leaves every decision made
      here unrecorded, while looking correct because the binding is present. */
   const fullSpec = useMemo(
-    () => toAddonSpec(definition, { breakpoints: sorted, matrix: full }),
-    [definition, sorted, full],
+    /* `studio` carries the setup as a link, so the spec pasted back into
+       Import reopens it for editing — the plugin ignores the field. */
+    () => ({ ...toAddonSpec(combined, { breakpoints: sorted, matrix: full }), studio: shareLink }),
+    [combined, sorted, full, shareLink],
   );
+  /* The same definition and table, as one React file. */
+  const reactCode = useMemo(() => navCode({
+    definition: combined, breakpoints: sorted, matrix: full, options, mobile,
+    tabs, actions, accountItems, dialItems, componentSize, editLink: shareLink,
+  }), [combined, sorted, full, options, mobile, tabs, actions, accountItems, dialItems, componentSize, shareLink]);
   /* Writes one cell, at this breakpoint, honouring exclusivity.
      
      Tabs and the menu button are one decision in two booleans: switching one
@@ -846,14 +948,23 @@ export default function NavDesignerPage() {
 
   const range = breakpointRange(sorted, selectedBp);
 
-  /* Lay out at the VIEWPORT width — the breakpoint's own lower bound, which is
-     where a layout breaks if it is going to.
+  /* Lay out at the DEVICE's width — the screen the breakpoint stands for, as
+     the Figma frame is (falling back to the range's lower bound).
      
      Not at the cap. A capped breakpoint is a narrow content column inside a
      wide window, and rendering only the column would hide the thing the cap
      exists for: how much empty space sits either side, and whether the nav
      still relates to the page under it. */
-  const previewWidth = Math.max(range?.from ?? 0, 320);
+  const previewWidth = current?.deviceWidth ?? Math.max(range?.from ?? 0, 320);
+  /* Which platform's type a tablet or phone draws in. Omni switches type on
+     data-device, not width — iOS's nav label is 10px, Android's 12, Desktop's
+     11 — so the preview has to say which device it is. Desktop is the :root
+     default and sets none. */
+  const previewDevice = !current || current.id === 'desktop' || current.minWidth >= 1280
+    ? null
+    : current.minWidth < 600
+      ? (platform === 'ios' ? 'IOS-Mobile' : 'Android-Mobile')
+      : (platform === 'ios' ? 'IOS-Tablet' : 'Android-Tablet');
 
   /* How wide the preview may shrink to, and how far it takes to get there.
      
@@ -876,11 +987,11 @@ export default function NavDesignerPage() {
   const editBp = (id: string, patch: Partial<Breakpoint>) =>
     setBreakpoints((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
-  return (
+  const page = (
     <div data-theme="Default" data-surface="Surface"
       style={{ background: 'var(--Background)', color: 'var(--Text)', minHeight: '100vh' }}>
       {savedBrand && <style>{BRAND_CSS}</style>}
-      <AppBar />
+      <AddOnTopNav title="Adaptive Nav" uuid={uuid} exists={exists} basePath="/add-ons/nav" />
       <Section padding="32px 24px 64px">
         {/* Wider when split. 960 is a comfortable measure for one column of
             forms, and it was the cap when everything was one column — but
@@ -891,28 +1002,45 @@ export default function NavDesignerPage() {
           gap="var(--Sizing-4)"
           style={{ maxWidth: twoCol ? 1760 : 960, margin: '0 auto' }}
         >
-          <VStack gap="var(--Sizing-1)">
-            <H1>Adaptive Nav</H1>
-            <Body color="quiet">
-              One component, one variant per layout. Which parts appear at which
-              width is a mode, not a variant — so this is three specs, not nine.
-            </Body>
-          </VStack>
+          <Body color="quiet">
+            One component for every width. The desktop and phone arrangements sit in
+            the same spec, and which one shows — and which parts of it — is decided
+            per device, not by a variant.{' '}
+            <Link href={libraryPageUrl('adaptive-nav', uuid)} target="_blank" rel="noopener">
+              About the Adaptive Nav in the component library
+            </Link>
+          </Body>
+
+          <Tabs value={tab} onChange={(v: typeof tab) => setTab(v)} sx={{ overflow: 'clip' }}>
+            <TabList aria-label="Adaptive Nav">
+              <Tab value="build">Build</Tab>
+              <Tab value="code">Code</Tab>
+              <Tab value="export">Export</Tab>
+              <Tab value="import">Import</Tab>
+            </TabList>
+            <TabPanel value="build">
+          <VStack gap="var(--Sizing-2)">
 
           {/* Breakpoint first, because everything below is scoped to it — the
               layout, the conditions and the preview all describe THIS width.
               Widest first: design runs desktop-down, and the narrow ones are
               what the wide layout degrades into. */}
           <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center' }}>
+            {/* A segmented control, not tabs, so it does not read as a second
+                tab bar under Build / Code / Export / Import — the same device
+                picker Bento and Hero use. */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <Tabs value={selectedBp} onChange={(v: string) => setSelectedBp(v)}>
-                <TabList>
-                  {shown.map((b) => (
-                    <Tab key={b.id} value={b.id}>{b.label}</Tab>
-                  ))}
-                </TabList>
-              </Tabs>
+              <ToggleButtonGroup value={selectedBp} onChange={(v: string) => v && setSelectedBp(v)} size="small" aria-label="Device">
+                {shown.map((b) => (
+                  <Button key={b.id} value={b.id} size="small">{b.label}</Button>
+                ))}
+              </ToggleButtonGroup>
             </div>
+            {/* Tablets and phones draw in their platform's type. */}
+            <ToggleButtonGroup value={platform} onChange={(v: 'ios' | 'android') => v && setPlatform(v)} size="small" aria-label="Platform">
+              <Button value="ios" size="small">iOS</Button>
+              <Button value="android" size="small">Android</Button>
+            </ToggleButtonGroup>
             {/* The button owns the name; the icon carries none, or a screen
                 reader announces the control twice. */}
             <Button
@@ -941,13 +1069,22 @@ export default function NavDesignerPage() {
               collapses to one column below TWO_COL_MIN, where 40% of the
               screen is too little for either. */}
           <div
+            ref={gridRef}
             style={{
               display: 'grid',
               gridTemplateColumns: twoCol ? '40fr 60fr' : '1fr',
               gap: 'var(--Sizing-4, 32px)',
-              alignItems: 'start',
+              alignItems: twoCol ? 'stretch' : 'start',
+              /* Split, the two columns fill the window under the tabs and each
+                 scrolls on its own — the controls can be long, and neither
+                 should drag the other. The same frame as Bento. */
+              ...(twoCol ? { height: `calc(100vh - ${gridTop + 24}px)`, minHeight: 480 } : {}),
             }}
           >
+            {/* The scroll is on a wrapper, not the stack: a scrolling flex
+                column shrinks its children to fit instead of overflowing, and
+                every card came out clipped to a sliver. */}
+            <div style={twoCol ? { minWidth: 0, minHeight: 0, overflowY: 'auto', padding: 6 } : { minWidth: 0 }}>
             <VStack gap="var(--Sizing-4)" style={{ minWidth: 0 }}>
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
@@ -997,34 +1134,23 @@ export default function NavDesignerPage() {
                 {NAV_LAYOUTS.map((l) => {
                   const selected = options.layout === l.id;
                   return (
-                    <div
+                    <SelectableCard
                       key={l.id}
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={selected}
+                      selected={selected}
                       aria-label={l.label}
+                      /* The lib's selectable card: role, Enter / Space, the
+                         selected ring and the states, instead of a div styled
+                         to look like one. */
                       onClick={() => {
                         set('layout', l.id as NavLayout);
                         setBottomBarAt((m) => ({ ...m, [selectedBp]: false }));
                       }}
-                      onKeyDown={(e) => {
-                        // A div taking a click has to take Enter and Space too,
-                        // or the picker is unreachable from the keyboard.
-                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); set('layout', l.id as NavLayout); }
-                      }}
-                      style={{
-                        cursor: 'pointer',
-                        padding: 'var(--Sizing-1, 4px)',
-                        borderRadius: 'var(--Card-Radius, 8px)',
-                        border: '2px solid ' + (selected ? 'var(--Buttons-Primary-Border)' : 'var(--Border-Variant)'),
-                        outlineOffset: 2,
-                      }}
                     >
-                      <NavLayoutPreview layout={l.id as NavLayout} options={options} />
-                      <div style={{ padding: 'var(--Sizing-1, 4px) var(--Sizing-2, 8px)' }}>
+                      <VStack gap="var(--Sizing-1)">
+                        <NavLayoutPreview layout={l.id as NavLayout} options={options} />
                         <Label>{l.label}</Label>
-                      </div>
-                    </div>
+                      </VStack>
+                    </SelectableCard>
                   );
                 })}
               </div>
@@ -1259,7 +1385,7 @@ export default function NavDesignerPage() {
                     <Divider />
                     <Label>{mobile.layout === 'toolbar' ? 'Toolbar items' : 'Navigation items'}</Label>
                     <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                      {bottomItemCounts(!!mobile.fab).map((n) => (
+                      {bottomItemCounts(!!mobile.fab, (mobile.fabPosition ?? 'center') === 'center').map((n) => (
                         <Button
                           key={n}
                           size="small"
@@ -1274,7 +1400,9 @@ export default function NavDesignerPage() {
                       Two to five. Five is a reach limit rather than a taste one: below
                       about 64px a target stops being reliably hittable with a thumb, and
                       five items is where a 360px phone reaches that. A FAB takes one of
-                      the five, because it sits in the same row. One is not navigation.
+                      the five, because it sits in the same row — and with a centred one
+                      the count is 2 or 4, so the items pair up either side of it. One
+                      is not navigation.
                     </Caption>
 
                     <SwitchInput
@@ -1291,9 +1419,10 @@ export default function NavDesignerPage() {
                         setMobile((m) => ({
                           ...m,
                           fab: on,
-                          // Adding a FAB shrinks the ceiling, so a count that
-                          // was legal a moment ago has to come down with it.
-                          itemCount: Math.min(m.itemCount ?? 4, maxItemsWithFab(on)),
+                          // A FAB lowers the ceiling and takes only even counts,
+                          // so a count that was legal a moment ago moves to the
+                          // nearest one that still is.
+                          itemCount: fitItemCount(m.itemCount ?? 4, on, (m.fabPosition ?? 'center') === 'center'),
                         }));
                       }}
                       label="FAB"
@@ -1304,7 +1433,11 @@ export default function NavDesignerPage() {
                           {([['center', 'Centred'], ['end', 'At the end']] as const).map(([id, l]) => (
                             <Button key={id} size="small"
                               variant={(mobile.fabPosition ?? 'center') === id ? 'default' : 'default-outline'}
-                              onClick={() => setMobileOpt('fabPosition', id)}>{l}</Button>
+                              onClick={() => setMobile((m) => ({
+                                ...m, fabPosition: id,
+                                // Centring it allows only even counts; 3 becomes 4.
+                                itemCount: fitItemCount(m.itemCount ?? 4, true, id === 'center'),
+                              }))}>{l}</Button>
                           ))}
                         </HStack>
                         <Caption color="quiet">
@@ -1344,53 +1477,9 @@ export default function NavDesignerPage() {
             </Card>
           )}
 
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Theme and surface</H4>
-              <Body color="quiet">
-                Names, not colors. The same definition lands in each design system's
-                own brand — what these paint depends on the palette it is imported
-                into, which is why nothing here is a hex.
-              </Body>
-
-              <Label>Theme</Label>
-              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-                {NAV_THEMES.map((t) => (
-                  <Button
-                    key={t}
-                    size="small"
-                    variant={(options.theme ?? 'Default') === t ? 'default' : 'default-outline'}
-                    onClick={() => set('theme', t)}
-                  >
-                    {t}
-                  </Button>
-                ))}
-              </HStack>
-              <Caption color="quiet">
-                Default inherits the page's own theme rather than pinning one — a nav
-                that follows its surroundings is usually what you want, which is why it
-                is not simply Primary.
-              </Caption>
-
-              <Label>Surface</Label>
-              <HStack gap="var(--Sizing-1)" style={{ flexWrap: 'wrap' }}>
-                {NAV_SURFACES.map((sf) => (
-                  <Button
-                    key={sf}
-                    size="small"
-                    variant={(options.surface ?? 'Surface') === sf ? 'default' : 'default-outline'}
-                    onClick={() => set('surface', sf)}
-                  >
-                    {sf.replace('Surface-', '').replace('Surface', 'Base')}
-                  </Button>
-                ))}
-              </HStack>
-              <Caption color="quiet">
-                A rail sits one step dimmer than whatever the bar is, so it reads as a
-                distinct region without naming a second color.
-              </Caption>
-            </VStack>
-          </Card>
+          {/* No theme picker. The bars wear the design system's own App-Bar
+              and Nav-Bar themes, chosen once in the studio — a second picker
+              here could only disagree with that choice. */}
 
           <Card padding="medium">
             <VStack gap="var(--Sizing-3)">
@@ -1406,13 +1495,9 @@ export default function NavDesignerPage() {
 
               <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                 {brand && (
-                  <div style={{
-                    border: '1px solid var(--Border)',
-                    borderRadius: 'var(--Card-Radius, 8px)',
-                    padding: 'var(--Sizing-2, 8px)',
-                  }}>
+                  <Card padding="small">
                     <img src={brand.url} alt="" style={{ height: 32, width: 'auto', display: 'block' }} />
-                  </div>
+                  </Card>
                 )}
                 <Button variant="default-outline" onClick={() => brandInput.current?.click()}>
                   {brand ? 'Replace' : 'Upload a mark'}
@@ -1479,9 +1564,12 @@ export default function NavDesignerPage() {
                 ))}
               </HStack>
               <Caption color="quiet">
-                Rail-Width {componentSize === 'small' ? 72 : componentSize === 'large' ? 96 : 80}px
-                {' · '}App-Bar Height {componentSize === 'small' ? 56 : componentSize === 'large' ? 72 : 64}px
-                {' · '}Nav-Bar Height {componentSize === 'small' ? 73 : componentSize === 'large' ? 93 : 83}px
+                {/* From NAV_METRICS, the table the CSS and Figma read — it was
+                    three hard-coded ternaries that had drifted (Rail 72 / 96,
+                    App-Bar 72). App-Bar is the size's button height + 32. */}
+                Rail-Width {NAV_METRICS['Rail-Width'][componentSize]}px
+                {' · '}App-Bar-Height {NAV_METRICS['App-Bar-Height'][componentSize]}px
+                {' · '}Nav-Bar Height {NAV_METRICS['Nav-Bar Height'][componentSize]}px
               </Caption>
 
               <Divider />
@@ -1498,6 +1586,24 @@ export default function NavDesignerPage() {
                 as its own variable so a design can differ for a visitor. Here it
                 gates the account — off shows the bar with no avatar.
               </Caption>
+              {usedConditions.includes('Adaptive-Nav/Show-Condensed') && (
+                <>
+                  <Divider />
+                  <Label>Scrolled past the hero</Label>
+                  <HStack gap="var(--Sizing-2)">
+                    {([[false, 'At top'], [true, 'Scrolled']] as const).map(([v, l]) => (
+                      <Button key={l} size="small"
+                        variant={scrolled === v ? 'default' : 'default-outline'}
+                        onClick={() => setScrolled(v)}>{l}</Button>
+                    ))}
+                  </HStack>
+                  <Caption color="quiet">
+                    A scroll position, not a width: the brand and actions move into the
+                    sticky strip once the hero has gone. Published as Show-Condensed and its
+                    opposite, Hide-When-Condensed.
+                  </Caption>
+                </>
+              )}
             </VStack>
           </Card>
 
@@ -1560,10 +1666,15 @@ export default function NavDesignerPage() {
                     layout with no rail and nothing to turn it back on. */}
                 {otherConditions
                   .filter((n) => !['Adaptive-Nav/Show-Brand', 'Adaptive-Nav/Show-Search',
-                                   'Adaptive-Nav/Show-Actions', 'Adaptive-Nav/Show-Avatar',
-                                   /* Its own control, under the sizes: one value, not
-                                      one per width. */
-                                   SIGNED_IN_CONDITION].includes(n))
+                                   'Adaptive-Nav/Show-Actions', 'Adaptive-Nav/Show-Avatar'].includes(n))
+                  /* Width conditions only. Scroll, session and interaction
+                     conditions are not per-breakpoint — they had switches here,
+                     and flipping one wrote the published matrix. Signed in and
+                     Scrolled have their own one-value controls under the sizes;
+                     the account menu opens from the avatar. */
+                  .filter((n) => definition.conditions?.[n]?.trigger === 'device')
+                  // The arrangement is chosen with the layout cards, not a switch.
+                  .filter((n) => !(n in ARRANGEMENT_CONDITIONS))
                   .map((name) => (
                     <SwitchInput
                       key={name}
@@ -1646,7 +1757,7 @@ export default function NavDesignerPage() {
                       <Button
                         key={id}
                         size="small"
-                        variant={(options.heroTabsAlign ?? 'left') === id ? 'default' : 'default-outline'}
+                        variant={(options.heroTabsAlign ?? 'center') === id ? 'default' : 'default-outline'}
                         onClick={() => set('heroTabsAlign', id)}
                       >
                         {l}
@@ -1678,74 +1789,30 @@ export default function NavDesignerPage() {
             </VStack>
           </Card>
 
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Spec</H4>
-              <Body>
-                What gets published. Every value is a variable NAME, so it rebinds to
-                each design system rather than carrying these colors.
-              </Body>
-              <CodeBlock
-                code={JSON.stringify(fullSpec, null, 2)}
-                language="JSON"
-                maxHeight={360}
-              />
-
-              {contentInsetCSS(insets) && (
-                <>
-                  <Divider />
-                  <H4>Content insets</H4>
-                  <Body>
-                    A pinned bar leaves the flow, so the page starts underneath it
-                    and the first thing on it is hidden. This is the CSS that
-                    clears it — in tokens, so it follows the size mode rather than
-                    being a number read off the screen once.
-                  </Body>
-                  <CodeBlock code={contentInsetCSS(insets)!} language="CSS" />
-                </>
-              )}
             </VStack>
-          </Card>
-            </VStack>
+            </div>
 
-            {/* The right-hand column. Sticky so it stays put while the tools
-                scroll — the same job the full-width sticky did, without
-                taking the whole width to do it. */}
-            <div style={{ position: 'sticky', top: 0, minWidth: 0 }}>
-          {/* Sticky, so a change made further down is visible as it is made.
-              Everything below this point edits what is in it, and scrolling to
-              check each change and back is most of the work of using the page.
-
-              It carries its own surface: a sticky element with a transparent
-              background shows the content sliding under it, which is the one
-              thing a sticky element cannot do. */}
+            {/* The right-hand column: the preview, fitted to the column's
+                width AND height so the whole screen is in view — a 1080-tall
+                desktop or an 844-tall phone fitted to width alone ran off the
+                bottom, and the bottom bar is the part a phone layout is about.
+                
+                Stacked, it is sticky instead, and shrinks as the page scrolls
+                (the sentinel measures how far). */}
+            <div style={twoCol
+              ? { minWidth: 0, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--Sizing-1, 8px)' }
+              : { position: 'sticky', top: 0, minWidth: 0 }}>
           <div ref={sentinelRef} aria-hidden style={{ height: 0 }} />
           <div
             data-surface="Surface"
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 2,
-              background: 'var(--Background)',
-              paddingTop: 'var(--Sizing-2, 8px)',
-              paddingBottom: 'var(--Sizing-2, 8px)',
-            }}
+            style={twoCol
+              ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--Sizing-1, 8px)' }
+              : {
+                  position: 'sticky', top: 0, zIndex: 2, background: 'var(--Background)',
+                  paddingTop: 'var(--Sizing-2, 8px)', paddingBottom: 'var(--Sizing-2, 8px)',
+                }}
           >
-          <Card padding="medium">
-            <VStack gap="var(--Sizing-3)">
-              <H4>Preview</H4>
-
-              {/* Laid out at the breakpoint's real width and TRANSFORMED down,
-                  rather than squeezed into the card. Squeezing would make the
-                  tabs wrap and the items collapse, so what is on screen would
-                  be the narrow arrangement wearing a wide label — every
-                  judgement from it about the wrong design. */}
-              {/* The frame is drawn INSIDE the scaler, on the sized box. Around
-                  it, it spanned the container while the content sat at its own
-                  smaller width, so the empty remainder read as part of the
-                  design. Square, too: a rounded frame reads as a nav with
-                  rounded corners rather than the edge of a viewport. */}
-              <div>
+              <div style={twoCol ? { flex: 1, minHeight: 0 } : undefined}>
                 {/* Stops cropping while the menu is open. The box's height is
                     computed from the untransformed content, and an absolutely
                     positioned panel never counted towards it — so cropping
@@ -1758,6 +1825,8 @@ export default function NavDesignerPage() {
                   maxScale={previewMaxScale}
                   onScale={setScale}
                   frame
+                  fitHeight={twoCol}
+                  device={previewDevice}
                   clip={!menuShown}
                 >
                   {/* The cap goes THROUGH the renderer rather than around it.
@@ -1765,7 +1834,7 @@ export default function NavDesignerPage() {
                       page either side of a floating colored strip; passed in,
                       each band paints edge to edge and only its content caps. */}
                   <DefinitionRenderer
-                    definition={definition}
+                    definition={combined}
                     conditions={active}
                     slots={slotContent}
                     contentMaxWidth={current?.maxWidth}
@@ -1775,23 +1844,78 @@ export default function NavDesignerPage() {
                   />
                 </ScaledPreview>
               </div>
-
-              <HStack gap="var(--Sizing-2)" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                <Caption color="quiet">
-                  {previewWidth}
-                  {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''}px
-                  {scale < 0.999 ? ` — shown at ${Math.round(scale * 100)}%` : ' — actual size'}
-                  {current?.maxWidth && current.maxWidth < previewWidth
-                    ? `, content capped at ${current.maxWidth}px`
-                    : ''}
-                </Caption>
-              </HStack>
-
-            </VStack>
-          </Card>
+              {/* The device and how far it is scaled, as Bento and Hero say it:
+                  a preview shown smaller than life without saying so gets
+                  judged at the wrong size. */}
+              <Caption color="quiet">
+                {current?.label} · {previewWidth}
+                {current?.deviceHeight ? ` × ${current.deviceHeight}` : ''} · {Math.round(scale * 100)}%
+                {current?.maxWidth && current.maxWidth < previewWidth
+                  ? ` · content capped at ${current.maxWidth}px`
+                  : ''}
+              </Caption>
           </div>
             </div>
           </div>
+          </VStack>
+            </TabPanel>
+          <TabPanel value="code">
+            <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
+              <Body>
+                One React file for every width, built from the library: the parts switch
+                at your breakpoints, the menu button opens a drawer, the account menu
+                opens from the avatar and the hero condenses on scroll. Wrap your page
+                in it — it draws in your design system inside your OmniDesignProvider.
+              </Body>
+              <CodeBlock code={reactCode} language="JSX" maxHeight={480} />
+              <H4>Share link</H4>
+              <Body>
+                The whole setup in one link — open it to carry on where this left off.
+                An uploaded mark stays on this computer.
+              </Body>
+              <CodeBlock code={shareLink} language="URL" wrap />
+            </VStack>
+          </TabPanel>
+          <TabPanel value="export">
+            <VStack gap="var(--Sizing-3)" style={{ paddingTop: 'var(--Sizing-2)' }}>
+              <Body>
+                In Figma, open the Omni Design plugin, open the Add-ons tab, choose
+                Adaptive Nav and paste this spec. It builds the nav as one component and
+                writes which parts show on each device into Devices-Type — so the nav
+                switches with the frame's device, the same way a Bento reflows.
+              </Body>
+              <Body color="quiet">
+                Every value is a variable NAME, so it binds to each design system rather
+                than carrying these colors.
+              </Body>
+              <CodeBlock code={JSON.stringify(fullSpec, null, 2)} language="JSON" maxHeight={420} />
+            </VStack>
+          </TabPanel>
+          <TabPanel value="import">
+            <div style={{ maxWidth: 560, paddingTop: 'var(--Sizing-2)' }}>
+              <Card padding="medium">
+                <VStack gap="var(--Sizing-2)">
+                  <H3>Import a nav</H3>
+                  <BodySmall color="quiet">
+                    Edit a nav made with this add-on: paste its link, its React file or its
+                    Figma spec — each one carries the whole setup. Only navs made here can be
+                    opened. An uploaded logo stays on the computer it was added on.
+                  </BodySmall>
+                  <TextArea label="Nav link, code or spec" rows={4} fullWidth value={importText}
+                    onChange={(e: { target: { value: string } }) => setImportText(e.target.value)} />
+                  {importError && <Alert color="warning"><BodySmall>{importError}</BodySmall></Alert>}
+                  <HStack gap="var(--Sizing-1)">
+                    <Button variant="default-outline" size="small" disabled={!importText.trim()} onClick={() => {
+                      const st = readNavState(importText);
+                      if (!st) { setImportError('That is not an Adaptive Nav, or it was cut off when copying — only navs made with this add-on carry their setup.'); return; }
+                      applyNavState(st); setImportError(null); setImportText(''); setTab('build');
+                    }}>Load</Button>
+                  </HStack>
+                </VStack>
+              </Card>
+            </div>
+          </TabPanel>
+          </Tabs>
         </VStack>
       </Section>
 
@@ -1921,5 +2045,12 @@ export default function NavDesignerPage() {
       </Modal>
 
     </div>
+  );
+
+  if (exists !== true || !uuid || !systemCss) return page;
+  return (
+    <OmniDesignProvider {...systemCss.urls} defaultTheme="Default" defaultStyle="Modern" defaultSurface="Surface">
+      {page}
+    </OmniDesignProvider>
   );
 }

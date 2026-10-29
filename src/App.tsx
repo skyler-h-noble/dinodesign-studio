@@ -50,6 +50,7 @@ import LandingPage from './components/LandingPage';
 import AddOnCatalogPage from './components/AddOnCatalogPage';
 import AccessibilityReport from './components/AccessibilityReport';
 import DesignSystemDetail from './components/DesignSystemDetail';
+import ParityPage from './components/ParityPage';
 import MyDesignsPage from './components/MyDesignsPage';
 import AdminProposals from './components/AdminProposals';
 import TypographyTestPage from './components/TypographyTestPage';
@@ -59,6 +60,7 @@ import ChartsAddOnPage from './components/ChartsAddOnPage';
 import HeroAddOnPage from './components/HeroAddOnPage';
 import BrandAddOnPage from './components/BrandAddOnPage';
 import BentoAddOnPage from './components/BentoAddOnPage';
+import MorphButtonAddOnPage from './components/MorphButtonAddOnPage';
 
 /**
  * Re-map a scheme's tone palettes onto a new role order.
@@ -135,6 +137,7 @@ function MainApp() {
     navBar: 'primary-light',
     status: 'primary-light',
     button: 'primary',
+    buttonTone: 'fixed',
     cardColoring: 'tonal',
     textColoring: 'tonal',
     decorativeMode: 'surface-components',
@@ -1113,6 +1116,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/parity" element={<ParityPage />} />
         <Route path="/add-ons" element={<AddOnCatalogPage />} />
         <Route path="/create" element={<MainApp />} />
         <Route path="/playground" element={<Playground />} />
@@ -1135,6 +1139,7 @@ function App() {
         <Route path="/test/typography" element={<TypographyTestPage />} />
         <Route path="/admin/aaid-workbench" element={<AaidWorkbenchPage />} />
         <Route path="/add-ons/nav" element={<NavDesignerPage />} />
+        <Route path="/add-ons/nav/:uuid" element={<NavDesignerPage />} />
         <Route path="/add-ons/charts" element={<ChartsAddOnPage />} />
         <Route path="/add-ons/charts/:uuid" element={<ChartsAddOnPage />} />
         <Route path="/add-ons/hero" element={<HeroAddOnPage />} />
@@ -1145,6 +1150,8 @@ function App() {
         <Route path="/add-ons/share" element={<HeroAddOnPage variant="share" key="share" />} />
         <Route path="/add-ons/share/:uuid" element={<HeroAddOnPage variant="share" key="share" />} />
         <Route path="/add-ons/bento" element={<BentoAddOnPage />} />
+        <Route path="/add-ons/morph-button" element={<MorphButtonAddOnPage />} />
+        <Route path="/add-ons/morph-button/:uuid" element={<MorphButtonAddOnPage />} />
         <Route path="/add-ons/bento/:uuid" element={<BentoAddOnPage />} />
       </Routes>
     </BrowserRouter>

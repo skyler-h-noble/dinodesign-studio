@@ -1,19 +1,21 @@
+import { overlayWidthCSS } from './deviceChrome';
 import chroma from 'chroma-js';
 import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
 import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDarkModeScale, blendColors } from './colorScale';
-import { SEMANTIC_SEEDS } from './generateFullPalettes';
+import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generateFullPalettes';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
-import { parseBackground, parseBar, toneFor } from './backgroundSelection';
+import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
 import { menuLevelCSS } from './menuLevels';
-import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
 // lib's defaults for these resolve to {palette}-Color-9 regardless of the
 // surface tone, which fails WCAG on light surfaces. These helpers return
 // design-token references (e.g. "{Colors.Primary.Color-8}") that we then
 // convert to CSS var() form below.
-import { getFixedTextToken, getFixedHeaderToken, getFixedIconToken, iconToneAt } from './cssgen/exportColorSystem';
+import { getFixedTextToken, textTableToken, getFixedHeaderToken, getFixedIconToken, iconToneAt } from './cssgen/exportColorSystem';
+import { resolveButtonChoice, buttonForSurface, type ButtonPalette, type ButtonTone, type CellTone } from './buttonChoice';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
 
@@ -30,7 +32,7 @@ function tokenRefToVar(ref: string): string {
 
 /** Build the eight per-palette Text-* token lines for a surface or
  *  container with the given background tone. */
-function buildTextPaletteLines(backgroundN: number, isContainer: boolean): string {
+function buildTextPaletteLines(backgroundN: number, isContainer: boolean, isDark = false): string {
   const palettes: Array<['Primary' | 'Secondary' | 'Tertiary' | 'Neutral' | 'Info' | 'Success' | 'Warning' | 'Error', string]> = [
     ['Primary',   'Text-Primary'],
     ['Secondary', 'Text-Secondary'],
@@ -42,7 +44,7 @@ function buildTextPaletteLines(backgroundN: number, isContainer: boolean): strin
     ['Error',     'Text-Error'],
   ];
   return palettes
-    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(getFixedTextToken(backgroundN, isContainer, palette))};`)
+    .map(([palette, varName]) => `  --${varName}: ${tokenRefToVar(textTableToken(backgroundN, isContainer, palette, isDark))};`)
     .join('\n');
 }
 
@@ -173,6 +175,27 @@ function buildHeaderPaletteLines(backgroundN: number, isContainer: boolean): str
  * Called every time the user changes a selection or toggles light/dark.
  */
 
+/** One cell of the Advanced tone grid: a theme at a surface level, its
+ *  surface tokens and the Default button it gets. */
+export interface ButtonGridCell {
+  theme: ButtonPalette;
+  level: string;
+  /** What the cell is set to: Fixed, Tonal, or a picked tone. */
+  tone: CellTone;
+  /** Every tone the cell could take — the button palette in this mode's ramp —
+   *  with its contrast against the background. Empty for Black/White. */
+  options: Array<{ tone: number; hex: string; contrast: number }>;
+  /** The tones Fixed and Tonal resolve to here, for labelling the picker. */
+  fixedHex: string;
+  tonalTone: number;
+  /** The cell's tone is its own, not the main choice's. */
+  custom: boolean;
+  vars: Record<string, string>;
+  /** Fill against the background, and border against the background. */
+  fillContrast: number;
+  borderContrast: number;
+}
+
 interface BuildInput {
   colorScheme: ColorScheme;
   userSelections: UserSelections;
@@ -198,6 +221,14 @@ interface BuildInput {
   }>;
   mode: 'light' | 'dark';
   typographyStyles?: import('../types').TypographyStyle[];
+  /** Receives the Default button on every theme x surface level, for the
+   *  Advanced tone grid. Same function every scope's button comes from. */
+  onButtonGrid?: (cells: ButtonGridCell[]) => void;
+  /** Receives defaultButtonFor itself, so the EXPORT can compute each theme
+   *  section's Default button with the same function (utils/cellButtons.ts). */
+  onButtonResolver?: (resolve: (surfacePal: string, surfaceNum: number, surfaceHex: string, isContainer?: boolean, level?: string) => {
+    bg: string; text: string; quiet: string; border: string; hover: string; active: string; outlineText: string; outlineQuiet: string;
+  }) => void;
 }
 
 // Neutral gray scale (12 tones) for black/white card coloring.
@@ -208,7 +239,8 @@ interface BuildInput {
 // against the export's #e2e2e2 — and it had no dark variant at all, so dark
 // mode silently painted the light greys.
 const NEUTRAL_LIGHT: string[] = generateSemanticLightModeScale('#808080').map(t => t.hex);
-const NEUTRAL_DARK: string[] = generateSemanticDarkModeScale('#808080').map(t => t.hex);
+// The export's own dark Neutral (eased like every other dark ramp).
+const NEUTRAL_DARK: string[] = semanticDarkScale('neutral').map(t => t.hex);
 
 // ── Contrast-checked tone lookup ──
 // Starting points from neutral lightness calculations.
@@ -248,7 +280,7 @@ function contrastRatio(hex1: string, hex2: string): number {
  * Starts from the lookup table suggestion, then nudges if the actual
  * palette hex values don't meet the required contrast ratio.
  */
-function findAccessibleTone(
+export function findAccessibleTone(
   bgHex: string,
   palette: Array<{ hex: string }>,
   startN: number,
@@ -436,11 +468,55 @@ function finalizePreviewCSS(css: string): string {
   return `${withOutlineQuiet(css)}\n\n${libRadiusOverrideCSS()}\n`;
 }
 
+/* The outline / ghost button label pair, for every palette, in every scope
+   that sets the surface's --Text / --Quiet.
+
+   An outline button has no fill, so its label sits on the SURFACE. Where a
+   scope knows its surface, it writes the pair itself (outlineFor in
+   buildPreviewCSS): the BUTTON's palette at its text and quiet tones under
+   Tonal text, so a Secondary outline reads Secondary. Anything it did not
+   write falls back here to the surface's own Text and Quiet. The preview
+   once wrote neither, so the lib's own static values showed through: Neutral-Color-1
+   (near-black) for the hover label, in dark mode too, which is how an outline
+   button's hover text vanished on a dark page. Under Black & White text the
+   pair is always the surface's Text / Quiet, so the label is black or white. */
+const OUTLINE_PALETTES = ['Default', 'Primary', 'Secondary', 'Tertiary'];
+
 function withOutlineQuiet(css: string): string {
-  return css.replace(
+  /* A non-Default palette whose Outline-Quiet is just var(--Quiet) is not
+     written at all. The lib reads var(--Buttons-<P>-Outline-Quiet,
+     var(--Outline-Quiet)), and the fallback resolves in whatever zone the
+     button sits in. Written out, var(--Quiet) resolves on the element that
+     declares it and is INHERITED as that fixed color into every nested zone
+     the preview does not write itself — the Brand page's grey (#aaa, 2.2:1)
+     on a Warning Alert's button. Same rule as the export, which gives only
+     Default a per-palette Outline-Quiet. */
+  css = css.replace(/^[ \t]*--Buttons-(?!Default-)[A-Za-z]+-Outline-Quiet:\s*var\(--Quiet\);[ \t]*\n/gm, '');
+  const withAlias = css.replace(
     /^([ \t]*)(--Quiet:[^;]+;)/gm,
     (_m, indent: string, decl: string) => `${indent}${decl}\n${indent}--Outline-Quiet: var(--Quiet);`,
   );
+  /* Block by block, so a scope that already wrote its own outline pair (the
+     button's palette tones under Tonal text — see outlineFor) keeps it, and
+     only the gaps fall back to the surface's Text / Quiet. */
+  return withAlias.replace(/\{([^{}]*)\}/g, (whole, body: string) => {
+    const setsText = /^\s*--Text:/m.test(body);
+    const setsQuiet = /^\s*--Quiet:/m.test(body);
+    if (!setsText && !setsQuiet) return whole;
+    const missing: string[] = [];
+    for (const p of OUTLINE_PALETTES) {
+      if (setsText && !body.includes(`--Buttons-${p}-Outline-Text:`)) missing.push(`  --Buttons-${p}-Outline-Text: var(--Text);`);
+      /* Quiet: Default only, as the export does. For the others the lib's own
+         fallback, var(--Outline-Quiet), already resolves per scope. Written
+         here as var(--Quiet), it resolved on THIS element and was inherited
+         as a fixed color into any nested zone the preview does not write — a
+         Warning Alert inside a Brand card got the card's grey (#777, 4.2:1 on
+         the alert), because the export's Warning scope, by design, defines no
+         per-palette Outline-Quiet to override it. */
+      if (p === 'Default' && setsQuiet && !body.includes(`--Buttons-${p}-Outline-Quiet:`)) missing.push(`  --Buttons-${p}-Outline-Quiet: var(--Quiet);`);
+    }
+    return missing.length ? `{${body.replace(/\s*$/, '')}\n${missing.join('\n')}\n}` : whole;
+  });
 }
 
 export function buildPreviewCSS(input: BuildInput): string {
@@ -490,21 +566,21 @@ export function buildPreviewCSS(input: BuildInput): string {
      export uses rather than restated here. */
   const SEMANTIC_RAMPS: Record<string, Array<{ hex: string }>> = {
     Neutral: NEUTRAL.map((hex) => ({ hex })),
-    Info:    (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.info)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.info)),
-    Success: (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.success)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.success)),
-    Warning: (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.warning)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.warning)),
-    Error:   (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS.error)
-                     : generateSemanticLightModeScale(SEMANTIC_SEEDS.error)),
+    Info:    (isDark ? semanticDarkScale('info')
+                     : semanticLightScale('info')),
+    Success: (isDark ? semanticDarkScale('success')
+                     : semanticLightScale('success')),
+    Warning: (isDark ? semanticDarkScale('warning')
+                     : semanticLightScale('warning')),
+    Error:   (isDark ? semanticDarkScale('error')
+                     : semanticLightScale('error')),
     /* The tenth palette. Purple (#8B5CF6), a real ramp in Figma's Modes
        collection and in the export — and the LAST of the scales the preview
        referenced without defining. --Hotlink-Visited and --Link-Visited both
        resolve through it, so visited links painted nothing in the playground
        while the export and Figma had the color all along. */
-    'Hotlink-Visited': (isDark ? generateSemanticDarkModeScale(SEMANTIC_SEEDS['hotlink-visited'])
-                               : generateSemanticLightModeScale(SEMANTIC_SEEDS['hotlink-visited'])),
+    'Hotlink-Visited': (isDark ? semanticDarkScale('hotlink-visited')
+                               : semanticLightScale('hotlink-visited')),
   };
   /* The brand three resolve to the LIGHT ramp in BOTH modes — that is what the
      :root and [data-theme="Brand"] blocks emit, and it is deliberate (the same
@@ -597,16 +673,13 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // ── Resolve surface background ──
   let surfaceBg: string;
-  // Track whether dark mode uses primary or neutral palette for surface
-  let darkUsePrimary = false;
+  /* Dark mode: the chosen background's THEME at Color-2 — darkPageTheme, the
+     one rule the export and the Figma payload use too. */
+  const darkTheme = darkPageTheme(sel.background);
+  const darkThemeRamp = (t: string) => (t === 'Primary' ? primary : t === 'Secondary' ? secondary : t === 'Tertiary' ? tertiary : null);
   if (isDark) {
-    switch (sel.background) {
-      case 'white': surfaceBg = neutral(2); break;
-      case 'black': surfaceBg = neutral(2); break;
-      case 'primary-base': surfaceBg = p(primary, 2); darkUsePrimary = true; break;
-      case 'primary-light': surfaceBg = p(primary, 2); darkUsePrimary = true; break;
-      default: surfaceBg = neutral(3);
-    }
+    const ramp = darkThemeRamp(darkTheme);
+    surfaceBg = ramp ? p(ramp, DARK_PAGE_N) : neutral(DARK_PAGE_N);
   } else {
     switch (sel.background) {
       case 'black': surfaceBg = '#1a1a1a'; break;
@@ -625,9 +698,9 @@ export function buildPreviewCSS(input: BuildInput): string {
     hex: NEUTRAL[i], tone: [1,10,19,28,37,58,71,81,90,95,98,99][i],
   })) as typeof primary;
   if (isDark) {
-    surfacePalette = darkUsePrimary ? primary : neutralPaletteArr;
-    surfacePaletteName = darkUsePrimary ? 'Primary' : 'Neutral';
-    surfaceN = 2;
+    surfacePalette = darkThemeRamp(darkTheme) ?? neutralPaletteArr;
+    surfacePaletteName = darkTheme;
+    surfaceN = DARK_PAGE_N;
   } else {
     // Theme x surface, resolved through the same table the export uses. The
     // switch this replaces had a case per legacy string and a `default:` that
@@ -757,7 +830,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     // makes a Secondary app bar over a Primary page expressible; the four
     // strings above could only ever say Primary or Neutral.
     const sel = parseBar(opt);
-    return { palette: sel.theme, n: toneFor(sel.theme, sel.surface, coreFor(sel.theme)) };
+    return { palette: sel.theme, n: barToneFor(sel.theme, sel.surface, coreFor(sel.theme)) };
   }
 
   function navColor(opt: string) {
@@ -824,7 +897,8 @@ export function buildPreviewCSS(input: BuildInput): string {
   } else {
     // Tonal
     if (isDark) {
-      containerBg = darkUsePrimary ? p(primary, 3) : neutral(3);
+      const ramp = darkThemeRamp(darkTheme);
+      containerBg = ramp ? p(ramp, 3) : neutral(3);
     } else {
       containerBg = p(surfacePalette, tonalContainerN);
     }
@@ -896,7 +970,7 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // Tertiary container always uses its own palette — never white/black
   if (isDark) {
-    tertiaryContainerBg = darkUsePrimary ? p(tertiary, 3) : p(tertiary, 3);
+    tertiaryContainerBg = p(tertiary, 3);
   } else {
     tertiaryContainerBg = p(tertiary, 10);
   }
@@ -976,63 +1050,146 @@ export function buildPreviewCSS(input: BuildInput): string {
   // the export, whose Buttons.BlackWhite table keys on tone alone.
   // Buttons always use light/vibrant palette so they stay bright in dark mode
   const effectiveButton = sel.button;
-  // Button text uses contrast-verified tones against the button background
-  // Buttons always use vibrant (light) palette
-  // btnBg = button fill color (RESOLVED hex from palette, not var() reference)
-  // btnText = accessible text on btnBg (resolved hex)
-  // btnBorder = border with 3:1 contrast to SURFACE (resolved hex)
-  let btnBg: string, btnText: string, btnBorder: string;
+  const btnChoice = resolveButtonChoice(sel.button, sel.buttonTone);
 
-  // On Primary/Primary-Light backgrounds, primary/tonal buttons use border color
-  // (primary color too similar to background)
-  const isPrimaryBg = sel.background === 'primary-light' || sel.background === 'primary-base';
-  const borderToneN = getAccessibleTones(surfaceBg, surfaceN, primaryLight).border;
+  /* The Default button on ONE surface — every scope below asks this.
+     The scopes each had their own switch on the button mode, and they had
+     drifted: the page used the primary border tone for "tonal", the theme
+     blocks used the surface's palette, the surface levels used the brand tone,
+     and the bars reused the PAGE's button whatever they sat on. One function,
+     given the surface's palette, tone and hex, is the only way they agree.
 
-  switch (effectiveButton) {
-    case 'tonal': {
-      // Tonal: button fill = border color (has 3:1 contrast to surface)
-      btnBg = p(primaryLight, borderToneN);
-      const tonalTones = getAccessibleTones(btnBg, borderToneN, primaryLight);
-      btnText = p(primaryLight, tonalTones.text);
-      btnBorder = p(primaryLight, getAccessibleTones(surfaceBg, surfaceN, primaryLight).border);
-      break;
+     Color comes from the pick (buttonPaletteFor). Fixed reads the brand tone
+     off the button ramp and lets the border carry the 3:1. Tonal keeps the
+     same color and moves the fill to iconToneAt(surfaceN) in the current
+     mode's ramp — the tone Border, Icons and Focus use, and the one the state
+     buttons already take — so the fill is its own border. */
+  const modeRamp = (name: ButtonPalette): typeof vPrimary =>
+    name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary
+      : name === 'Neutral' ? neutralPaletteArr : vPrimary;
+  const btnRamp = (name: ButtonPalette): typeof vPrimary =>
+    name === 'Secondary' ? bSecondary : name === 'Tertiary' ? bTertiary
+      : name === 'Neutral' ? neutralPaletteArr : bPrimary;
+  const btnBaseN = (name: ButtonPalette): number =>
+    name === 'Secondary' ? btnSC : name === 'Tertiary' ? btnTC : btnPC;
+  interface DefaultButton { bg: string; text: string; quiet: string; border: string; hover: string; active: string; outlineText: string; outlineQuiet: string }
+  const BW_BLACK = '#1a1a1a';
+  /* A filled button's label follows Text Coloring. Black & White → a black or
+     white label, whichever contrasts more with the fill, and the resting label
+     (Quiet, which the lib rests a solid button on) is the same color: a muted
+     grey is not black or white, and on a mid-tone fill it is the first thing
+     to fail 4.5:1. Tonal → the fill's palette at its text and quiet tones. */
+  /* An OUTLINE button's label sits on the surface, so it is checked against
+     the surface, in the button's own palette: a Secondary outline reads a
+     Secondary tone — quiet at rest, text on interaction — not the surface's
+     palette. Black & White text (or a Black/White button) keeps the surface's
+     own Text / Quiet, which are black or white. */
+  const outlineFor = (name: ButtonPalette | 'black-white', surfaceHex: string, surfaceNum: number) => {
+    if (effectiveTextColoring === 'black-white' || name === 'black-white' || name === 'Neutral') {
+      return { outlineText: 'var(--Text)', outlineQuiet: 'var(--Quiet)' };
     }
-    case 'secondary': {
-      btnBg = p(bSecondary, btnSC);
-      const scTones = getAccessibleTones(btnBg, btnSC, bSecondary);
-      btnText = p(vSecondary, scTones.text);
-      btnBorder = p(vSecondary, getAccessibleTones(surfaceBg, surfaceN, vSecondary).border);
-      break;
+    const pal = modeRamp(name);
+    const t = getAccessibleTones(surfaceHex, surfaceNum, pal);
+    return { outlineText: p(pal, t.text), outlineQuiet: p(pal, t.quiet) };
+  };
+  const labelFor = (bg: string, n: number, pal: typeof vPrimary): { text: string; quiet: string } => {
+    if (effectiveTextColoring === 'black-white') {
+      const label = contrastRatio(bg, '#ffffff') >= contrastRatio(bg, BW_BLACK) ? '#ffffff' : BW_BLACK;
+      return { text: label, quiet: label };
     }
-    case 'laddered': {
-      btnBg = p(bSecondary, btnSC);
-      const ladTones = getAccessibleTones(btnBg, btnSC, bSecondary);
-      btnText = p(vSecondary, ladTones.text);
-      btnBorder = p(vSecondary, getAccessibleTones(surfaceBg, surfaceN, vSecondary).border);
-      break;
+    const tones = getAccessibleTones(bg, n, pal);
+    return { text: p(pal, tones.text), quiet: p(pal, tones.quiet) };
+  };
+  /* A cell's own tone (Advanced). The grid names its level; a scope only
+     knows its tone, so it is matched against both ladders a theme's levels
+     can sit on — the theme ladder (bars, themed sections) and the page one. */
+  const cellToneFor = (sp: ButtonPalette, n: number, level?: string): CellTone | undefined => {
+    const tones = sel.buttonCellTones;
+    if (!tones) return undefined;
+    if (level) return tones[`${sp}/${level}`];
+    for (const lvl of SURFACE_LEVELS) {
+      const t = tones[`${sp}/${lvl}`];
+      if (!t) continue;
+      const core = coreFor(sp);
+      if (barToneFor(sp, lvl, core) === n || toneFor(sp, lvl, core) === n) return t;
     }
-    case 'black-white':
-      btnBg = isLight(surfaceBg) ? '#1a1a1a' : '#ffffff';
-      btnText = isLight(surfaceBg) ? WHITE_TEXT : '#1a1a1a';
-      btnBorder = btnBg;
-      break;
-    default: {
-      // Primary: use border color on primary backgrounds, PC on other backgrounds
-      if (isPrimaryBg) {
-        btnBg = p(primaryLight, borderToneN);
-        const bgTones = getAccessibleTones(btnBg, borderToneN, primaryLight);
-        btnText = p(primaryLight, bgTones.text);
-      } else {
-        btnBg = p(bPrimary, btnPC);
-        const defTones = getAccessibleTones(btnBg, btnPC, bPrimary);
-        btnText = p(vPrimary, defTones.text);
-      }
-      btnBorder = p(primaryLight, getAccessibleTones(surfaceBg, surfaceN, primaryLight).border);
+    return undefined;
+  };
+  const defaultButtonFor = (
+    surfacePal: string, surfaceNum: number, surfaceHex: string, isContainer = false, level?: string,
+  ): DefaultButton => {
+    const sp: ButtonPalette = (['Primary', 'Secondary', 'Tertiary'] as const).includes(surfacePal as never)
+      ? surfacePal as ButtonPalette : 'Neutral';
+    // The rule, or this background's Advanced override (buttonChoice.ts).
+    const eff = buttonForSurface(btnChoice, sp, isContainer ? undefined : cellToneFor(sp, surfaceNum, level));
+    if (eff.color === 'black-white') {
+      // The face follows the surface's lightness: black on light, white on dark.
+      // NEUTRAL runs dark→light, so the tone tables mis-resolve it; derive the
+      // label and states from the face instead.
+      /* The white face is OPAQUE white. It was WHITE_TEXT — the 70% white that
+         is right for TEXT in dark mode — so in dark mode the face became a
+         translucent grey, and its resting label (Quiet, neutral 6) a grey on
+         grey. A black or white button carries a black or white label, at rest
+         and on interaction alike. */
+      const white = !isLight(surfaceHex);
+      const bg = white ? '#ffffff' : neutral(1);
+      // White on the black face is the mode's white text (70% in dark mode —
+      // still about 10:1 on near-black), the value the export writes.
+      const label = white ? BW_BLACK : WHITE_TEXT;
+      const states = white
+        ? { hover: activeAndHoverFor(neutralPaletteArr, 11).hover, active: activeAndHoverFor(neutralPaletteArr, isDark ? 10 : 12).active }
+        : { hover: activeAndHoverFor(neutralPaletteArr, isDark ? 2 : 1).hover, active: activeAndHoverFor(neutralPaletteArr, isDark ? 3 : 1).active };
+      return { bg, text: label, quiet: label, border: bg, ...states, ...outlineFor('black-white', surfaceHex, surfaceNum) };
     }
-  }
-
-  const defaultBtnText = containerText;
-  const defaultBtnBorder = borderFor(containerBg);
+    const name: ButtonPalette = eff.color;
+    /* A tone picked outright (Advanced grid). The fill is that tone of the
+       button's palette in this mode's ramp. If it clears 3:1 the fill is its
+       own border, as Tonal is; if it does not, the border keeps the 3:1 the
+       control needs, as Fixed does. */
+    if (typeof eff.tone === 'number') {
+      const pal = modeRamp(name);
+      const T = Math.max(1, Math.min(12, Math.round(eff.tone)));
+      const bg = p(pal, T);
+      const border = contrastRatio(bg, surfaceHex) >= 3
+        ? bg
+        : p(pal, getAccessibleTones(surfaceHex, surfaceNum, pal).border);
+      return { bg, ...labelFor(bg, T, pal), border, ...activeAndHoverFor(pal, T), ...outlineFor(name, surfaceHex, surfaceNum) };
+    }
+    if (eff.tone === 'tonal') {
+      const pal = modeRamp(name);
+      const T = iconToneAt(Math.max(1, Math.min(12, surfaceNum)), isContainer, isDark);
+      const bg = p(pal, T);
+      return { bg, ...labelFor(bg, T, pal), border: bg, ...activeAndHoverFor(pal, T), ...outlineFor(name, surfaceHex, surfaceNum) };
+    }
+    const pal = btnRamp(name);
+    /* Base on base: a Fixed button whose brand tone IS the background (the
+       same palette at its own Surface tone) would be invisible, 1:1 against
+       it. It moves one tone lighter by default; the border still holds 3:1. */
+    const brandN = btnBaseN(name);
+    const n = p(pal, brandN).toLowerCase() === surfaceHex.toLowerCase()
+      ? (brandN < 12 ? brandN + 1 : brandN - 1)
+      : brandN;
+    const bg = p(pal, n);
+    const borderPal = modeRamp(name);
+    return {
+      bg, ...labelFor(bg, n, pal),
+      border: p(borderPal, getAccessibleTones(surfaceHex, surfaceNum, borderPal).border),
+      ...activeAndHoverFor(pal, n),
+      ...outlineFor(name, surfaceHex, surfaceNum),
+    };
+  };
+  const defaultButtonLines = (b: DefaultButton, prefix = ''): string =>
+    `  --${prefix}Buttons-Default-Button: ${b.bg};
+  --${prefix}Buttons-Default-Text: ${b.text};
+  --${prefix}Buttons-Default-Quiet: ${b.quiet};
+  --${prefix}Buttons-Default-Border: ${b.border};
+  --${prefix}Buttons-Default-Hover: ${b.hover};
+  --${prefix}Buttons-Default-Pressed: ${b.active};
+  --${prefix}Buttons-Default-Highlight: ${highlightFor(b.bg)};
+  --${prefix}Buttons-Default-Lowlight: ${lowlightFor(b.bg)};
+  --${prefix}Buttons-Default-Outline-Text: ${b.outlineText};
+  --${prefix}Buttons-Default-Outline-Quiet: ${b.outlineQuiet};`;
+  const pageBtn = defaultButtonFor(surfacePaletteName, surfaceN, surfaceBg);
 
   // ── Default-button palette per surface theme + button mode ──
   // The lib's CSS hardcodes --Buttons-Default-Hover etc. under every
@@ -1041,51 +1198,13 @@ export function buildPreviewCSS(input: BuildInput): string {
   // inner content to [data-theme="Tertiary"], and the lib's hardcoded pink
   // hover wins over the brand's main block (different selector, closer
   // ancestor). We re-emit the Default-button tokens inside each per-palette
-  // surface block below using the same mode logic the main block uses, but
-  // anchored to that surface's palette per the user's cascade rules:
-  //   primary mode   → all surfaces use Primary
-  //   secondary mode → all surfaces use Secondary
-  //   tonal mode     → button palette matches the surface palette
-  //   laddered mode  → Primary surface→Secondary, Secondary→Tertiary, Tertiary→Primary
-  //   black-white    → B/W based on surface lightness
+  // surface block below through defaultButtonFor, anchored to that surface's
+  // palette and tone (see buttonChoice.ts for the color/tone rules).
   type SurfaceTheme = 'Primary' | 'Secondary' | 'Tertiary';
   const palFor = (name: SurfaceTheme): typeof vPrimary =>
     name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
   const nFor = (name: SurfaceTheme): number =>
     name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
-  // Button equivalents of palFor/nFor. Tonal and laddered buttons take their
-  // color from a surface's palette, but they are still buttons — in dark mode
-  // that has to resolve to the light ramp at Color-8, not the dark surface tone.
-  const btnPalFor = (name: SurfaceTheme): typeof bPrimary =>
-    name === 'Secondary' ? bSecondary : name === 'Tertiary' ? bTertiary : bPrimary;
-  const btnNFor = (name: SurfaceTheme): number =>
-    isDark ? DARK_BUTTON_N : nFor(name);
-  // `name` is which palette family the button draws from. The fill reads it
-  // from the light ramp (buttons cross over in dark mode); the BORDER has to
-  // read the same family out of the CURRENT mode's ramp, because the border's
-  // job is to hold 3:1 against the surface and the surface is a dark-ramp
-  // color in dark mode. The export does this by construction — its
-  // Border.Surfaces refs resolve inside whichever Modes block is being
-  // written — so the preview has to name the family to match it.
-  const getDefaultBtnPalForSurface = (
-    surfaceTheme: SurfaceTheme,
-  ): { pal: typeof vPrimary; n: number; name: SurfaceTheme | 'Neutral' } => {
-    switch (effectiveButton) {
-      case 'primary': return { pal: bPrimary, n: btnPC, name: 'Primary' };
-      case 'secondary': return { pal: bSecondary, n: btnSC, name: 'Secondary' };
-      case 'tonal': return { pal: btnPalFor(surfaceTheme), n: btnNFor(surfaceTheme), name: surfaceTheme };
-      case 'laddered': {
-        const next: SurfaceTheme = surfaceTheme === 'Primary' ? 'Secondary'
-          : surfaceTheme === 'Secondary' ? 'Tertiary' : 'Primary';
-        return { pal: btnPalFor(next), n: btnNFor(next), name: next };
-      }
-      case 'black-white': {
-        const bg = p(palFor(surfaceTheme), nFor(surfaceTheme));
-        return { pal: NEUTRAL.map(h => ({ hex: h })) as any, n: isLight(bg) ? 1 : 12, name: 'Neutral' };
-      }
-      default: return { pal: bPrimary, n: btnPC, name: 'Primary' };
-    }
-  };
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
   // Buttons-Tertiary-*). The lib's Light-Mode.css hardcodes these under every
   // theme/surface combo (including pink #f5dddd for every -Hover token), so
@@ -1100,17 +1219,44 @@ export function buildPreviewCSS(input: BuildInput): string {
     ];
     return palettes.map(({ name, pal, n }) => {
       const bg = p(pal, n);
-      const tones = getAccessibleTones(bg, n, pal);
+      const label = labelFor(bg, n, pal);
       const palBorder = p(pal, getAccessibleTones(surfaceBgForBorder, surfaceNForBorder, pal).border);
+      const o = outlineFor(name as ButtonPalette, surfaceBgForBorder, surfaceNForBorder);
       const { active, hover } = activeAndHoverFor(pal, n);
       return `  --Buttons-${name}-Button: ${bg};
-  --Buttons-${name}-Text: ${p(pal, tones.text)};
+  --Buttons-${name}-Text: ${label.text};
   --Buttons-${name}-Border: ${palBorder};
   --Buttons-${name}-Hover: ${hover};
   --Buttons-${name}-Pressed: ${active};
   --Buttons-${name}-Highlight: ${highlightFor(bg)};
   --Buttons-${name}-Lowlight: ${lowlightFor(bg)};
-  --Buttons-${name}-Quiet: ${p(pal, tones.quiet)};`;
+  --Buttons-${name}-Quiet: ${label.quiet};
+  --Buttons-${name}-Outline-Text: ${o.outlineText};
+  --Buttons-${name}-Outline-Quiet: ${o.outlineQuiet};`;
+    }).join('\n');
+  };
+
+  /* State buttons are TONAL: the fill takes the border's tone for the surface
+     it sits on — the same tone iconToneAt gives, the one table Border, Icons
+     and Focus share — so the fill clears 3:1 on every surface level. The label,
+     states and bevel follow the fill's tone. Mirrors the export's Tonal-Button
+     pass (exportColorSystem.ts); the preview used to emit no state buttons at
+     all, so they fell through to the lib's own colors. */
+  const emitStateButtonTokens = (surfaceNForBorder: number): string => {
+    const T = iconToneAt(Math.max(1, Math.min(12, surfaceNForBorder)), false, isDark);
+    return ['Info', 'Success', 'Warning', 'Error'].map((name) => {
+      const pal = SEMANTIC_RAMPS[name];
+      const fill = p(pal as typeof primary, T);
+      const label = labelFor(fill, T, pal as typeof primary);
+      const { active, hover } = activeAndHoverFor(pal, T);
+      return `  --Buttons-${name}-Button: ${fill};
+  --Buttons-${name}-Text: ${label.text};
+  --Buttons-${name}-Border: ${fill};
+  --Buttons-${name}-Hover: ${hover};
+  --Buttons-${name}-Pressed: ${active};
+  --Buttons-${name}-Highlight: ${highlightFor(fill)};
+  --Buttons-${name}-Lowlight: ${lowlightFor(fill)};
+  --Buttons-${name}-Quiet: ${label.quiet};`;
     }).join('\n');
   };
 
@@ -1146,57 +1292,8 @@ export function buildPreviewCSS(input: BuildInput): string {
     }).join('\n');
   };
 
-  const emitDefaultBtnTokens = (surfaceTheme: SurfaceTheme): string => {
-    const { pal, n, name: btnPalName } = getDefaultBtnPalForSurface(surfaceTheme);
-    const sbg = p(palFor(surfaceTheme), nFor(surfaceTheme));
-    const sn = nFor(surfaceTheme);
-    // Same palette family as the fill, but read out of THIS mode's ramp.
-    const borderPal: typeof vPrimary = btnPalName === 'Neutral'
-      ? (NEUTRAL.map(h => ({ hex: h })) as never)
-      : palFor(btnPalName);
-    // The white face's fill is {White} (#ffffff, 70% in dark), NOT Neutral
-    // Color-12 — whiteFace() in generateButtonsSimplified.ts writes {White}.
-    const bg = effectiveButton === 'black-white' && n === 12 ? WHITE_TEXT : p(pal, n);
-    const tones = getAccessibleTones(bg, n, pal);
-    // black-white: NEUTRAL is ordered dark→light (opposite the brand palettes),
-    // so the tone-table math mis-resolves the text/hover. BW is definitionally
-    // black-or-white, so derive text + hover explicitly from the bg's lightness:
-    // a black button gets white text and a subtle lighter hover (NOT a near-white
-    // scrim); a white button gets dark text and a subtle darker hover.
-    const isBW = effectiveButton === 'black-white';
-    const txt = isBW ? (isLight(bg) ? neutral(1) : WHITE_TEXT) : p(pal, tones.text);
-    // Black-white is the one style where the border IS the fill — a black
-    // button on a light tone and a white button on a dark tone, border matching
-    // and text inverted. Every other style keeps the tonal 3:1 border.
-    const palBorder = isBW
-      ? bg
-      : p(borderPal, getAccessibleTones(sbg, sn, borderPal).border);
-    // Black-white states read the Neutral Hover/Pressed tables at the indices
-    // blackFace()/whiteFace() name in generateButtonsSimplified.ts, rather than
-    // stepping from the fill. The white face's fill is pure white, which is off
-    // the ramp, so stepping from it would miss; and the dark faces deliberately
-    // start a tone or two in from the end.
-    const bwStates = () => {
-      if (isLight(bg)) return { // white face
-        hover: activeAndHoverFor(neutralPaletteArr, 11).hover,
-        active: activeAndHoverFor(neutralPaletteArr, isDark ? 10 : 12).active,
-      };
-      return { // black face
-        hover: activeAndHoverFor(neutralPaletteArr, isDark ? 2 : 1).hover,
-        active: activeAndHoverFor(neutralPaletteArr, isDark ? 3 : 1).active,
-      };
-    };
-    const { hover, active } = isBW ? bwStates() : activeAndHoverFor(pal, n);
-    const quiet = isBW ? (isLight(bg) ? neutral(6) : WHITE_TEXT) : p(pal, tones.quiet);
-    return `  --Buttons-Default-Button: ${bg};
-  --Buttons-Default-Text: ${txt};
-  --Buttons-Default-Quiet: ${quiet};
-  --Buttons-Default-Border: ${palBorder};
-  --Buttons-Default-Hover: ${hover};
-  --Buttons-Default-Pressed: ${active};
-  --Buttons-Default-Highlight: ${highlightFor(bg)};
-  --Buttons-Default-Lowlight: ${lowlightFor(bg)};`;
-  };
+  const emitDefaultBtnTokens = (surfaceTheme: SurfaceTheme): string =>
+    defaultButtonLines(defaultButtonFor(surfaceTheme, nFor(surfaceTheme), p(palFor(surfaceTheme), nFor(surfaceTheme))));
 
   // ── Tertiary tag + text — always vibrant (light palette) ──
   const tagN = Math.max(TC - 2, 1);
@@ -1233,17 +1330,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     const scopeBtnBorderPrimary = p(primaryLight, getAccessibleTones(scopeBg, scopeN, primaryLight).border);
     const scopeBtnBorderSecondary = p(vSecondary, getAccessibleTones(scopeBg, scopeN, vSecondary).border);
     const scopeBtnBorderTertiary = p(vTertiary, getAccessibleTones(scopeBg, scopeN, vTertiary).border);
-    let scopeDefaultBtnBorder: string;
-    switch (effectiveButton) {
-      case 'tonal':
-        scopeDefaultBtnBorder = p(primaryLight, getAccessibleTones(scopeBg, scopeN, primaryLight).border); break;
-      case 'secondary': case 'laddered':
-        scopeDefaultBtnBorder = p(vSecondary, getAccessibleTones(scopeBg, scopeN, vSecondary).border); break;
-      case 'black-white':
-        scopeDefaultBtnBorder = btnBg; break;
-      default:
-        scopeDefaultBtnBorder = p(primaryLight, getAccessibleTones(scopeBg, scopeN, primaryLight).border); break;
-    }
+    const scopeBtn = defaultButtonFor(surfacePaletteName, scopeN, scopeBg);
     const neutralPalette = NEUTRAL.map(h => ({ hex: h }));
     const neutralBorderN = getAccessibleTones(scopeBg, scopeN, neutralPalette).border;
     const tonal = effectiveTextColoring === 'tonal';
@@ -1283,51 +1370,14 @@ export function buildPreviewCSS(input: BuildInput): string {
   --Border-Variant: ${borderVariantVal};
   --Hover: ${scopeHover};
   --Pressed: ${scopeActive};
-  --Hotlink: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
+  --Hotlink: ${tokenRefToVar(textTableToken(scopeN, false, 'Info', isDark))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
-  --Link: ${tokenRefToVar(getFixedTextToken(scopeN, false, 'Info'))};
+  --Link: ${tokenRefToVar(textTableToken(scopeN, false, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${hotlinkColorN});
   --Buttons-Primary-Border: ${scopeBtnBorderPrimary};
   --Buttons-Secondary-Border: ${scopeBtnBorderSecondary};
   --Buttons-Tertiary-Border: ${scopeBtnBorderTertiary};
-  --Buttons-Default-Border: ${scopeDefaultBtnBorder};
-${(() => {
-    // Defensive Default-button emission for the surface variant scopes
-    // (Surface-Dim / Bright / Dimmest). Without these, Buttons-Default-*
-    // inherit from the parent Brand block which is correct IN THEORY, but
-    // ANY same-or-higher-specificity rule injected by a downstream stylesheet
-    // (a Container override, a theme inside the scope, the lib's
-    // [data-surface] rules) would shadow the inherited value at this scope.
-    // Explicit at-scope values make the studio's chosen button mode stick
-    // through to ButtonGroup / Slider / etc. controls inside Surface-Dim
-    // panels like the ComponentStyleStage left nav.
-    let defPal: typeof vPrimary = vPrimary;
-    let defN = btnPC;
-    switch (effectiveButton) {
-      case 'secondary': case 'laddered': defPal = bSecondary; defN = btnSC; break;
-      case 'tonal': defPal = bPrimary; defN = btnPC; break;
-      case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(scopeBg) ? 1 : 12; break;
-      default: defPal = bPrimary; defN = btnPC; break;
-    }
-    const defBg = p(defPal, defN);
-    const defTones = getAccessibleTones(defBg, defN, defPal);
-    // black-white: explicit contrast text + subtle hover (NEUTRAL tone math is inverted).
-    const defIsBW = effectiveButton === 'black-white';
-    const defTxt = defIsBW ? (isLight(defBg) ? '#1a1a1a' : WHITE_TEXT) : p(defPal, defTones.text);
-    const { hover, active } = defIsBW
-      ? (isLight(defBg) ? { hover: '#e0e0e0', active: '#cccccc' } : { hover: '#1a1a1a', active: '#2e2e2e' })
-      : activeAndHoverFor(defPal, defN);
-    const defQuiet = defIsBW
-      ? (isLight(defBg) ? neutral(6) : WHITE_TEXT)
-      : p(defPal, defTones.quiet);
-    return `  --Buttons-Default-Button: ${defBg};
-  --Buttons-Default-Text: ${defTxt};
-  --Buttons-Default-Quiet: ${defQuiet};
-  --Buttons-Default-Hover: ${hover};
-  --Buttons-Default-Pressed: ${active};
-  --Buttons-Default-Highlight: ${highlightFor(defBg)};
-  --Buttons-Default-Lowlight: ${lowlightFor(defBg)};`;
-  })()}`;
+${defaultButtonLines(scopeBtn)}`;
   }
 
   // ── Build CSS ──
@@ -1338,6 +1388,64 @@ ${(() => {
   // descendant redefines what it points at, it inherits the computed value.
   // So the alias has to repeat in every scope that sets --Quiet, and doing
   // that by hand across ~40 scopes is how one gets missed.
+  // The Fixed fill on a background, with the base-on-base step (above).
+  const fixedFillFor = (name: ButtonPalette, surfaceHex: string): string => {
+    const pal = btnRamp(name);
+    const brandN = btnBaseN(name);
+    return p(pal, brandN).toLowerCase() === surfaceHex.toLowerCase()
+      ? p(pal, brandN < 12 ? brandN + 1 : brandN - 1)
+      : p(pal, brandN);
+  };
+  input.onButtonResolver?.(defaultButtonFor);
+  if (input.onButtonGrid) {
+    const cells: ButtonGridCell[] = [];
+    for (const theme of ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const) {
+      for (const level of SURFACE_LEVELS) {
+        const n = barToneFor(theme, level, coreFor(theme));
+        const ramp = modeRamp(theme);
+        // Neutral's darkest level is a literal black in both modes, not a tone
+        // (neutralSurfaceWindow / generateSingleTheme) — no tone is true black.
+        const bg = theme === 'Neutral' && level === 'Surface-Dimmest' ? '#000000' : p(ramp, n);
+        const tones = getAccessibleTones(bg, n, ramp);
+        const tonalText = effectiveTextColoring === 'tonal' && theme !== 'Neutral';
+        const b = defaultButtonFor(theme, n, bg, false, level);
+        const own = sel.buttonCellTones?.[`${theme}/${level}`];
+        /* Black & White text: black or white, and Quiet from the NEUTRAL
+           ladder at the tone that holds 4.5:1 on this background — what the
+           export's Quiet.Surfaces.BW table is. quietFor's two fixed greys
+           (#777 / #aaa) fail on every mid-tone background in the grid. */
+        const bwQuiet = p(neutralPaletteArr, getAccessibleTones(bg, n, neutralPaletteArr).quiet);
+        const quiet = tonalText ? p(ramp, tones.quiet) : bwQuiet;
+        const btnName = btnChoice.color === 'black-white' ? null : buttonForSurface(btnChoice, theme).color as ButtonPalette;
+        const optRamp = btnName ? modeRamp(btnName) : [];
+        cells.push({
+          theme, level,
+          tone: btnChoice.color === 'black-white' ? 'fixed' : (own ?? btnChoice.tone),
+          options: optRamp.map((t, i) => ({ tone: i + 1, hex: t.hex, contrast: contrastRatio(t.hex, bg) })),
+          fixedHex: btnName ? fixedFillFor(btnName, bg) : b.bg,
+          tonalTone: iconToneAt(Math.max(1, Math.min(12, n)), false, isDark),
+          custom: Boolean(own) && btnChoice.color !== 'black-white',
+          vars: {
+            '--Background': bg,
+            '--Text': tonalText ? p(ramp, tones.text) : textFor(bg),
+            '--Quiet': quiet, '--Text-Quiet': quiet,
+            '--Border': p(ramp, tones.border),
+            '--Hover': activeAndHoverFor(ramp, n).hover,
+            '--Pressed': activeAndHoverFor(ramp, n).active,
+            '--Buttons-Default-Button': b.bg, '--Buttons-Default-Text': b.text, '--Buttons-Default-Quiet': b.quiet,
+            '--Buttons-Default-Border': b.border, '--Buttons-Default-Hover': b.hover, '--Buttons-Default-Pressed': b.active,
+            '--Buttons-Default-Highlight': highlightFor(b.bg), '--Buttons-Default-Lowlight': lowlightFor(b.bg),
+            '--Buttons-Default-Outline-Text': b.outlineText.startsWith('var(') ? (tonalText ? p(ramp, tones.text) : textFor(bg)) : b.outlineText,
+            '--Buttons-Default-Outline-Quiet': b.outlineQuiet.startsWith('var(') ? quiet : b.outlineQuiet,
+          },
+          fillContrast: contrastRatio(b.bg, bg),
+          borderContrast: contrastRatio(b.border, bg),
+        });
+      }
+    }
+    input.onButtonGrid(cells);
+  }
+
   return finalizePreviewCSS(`
 /* ══ Palette Colors — always light (vibrant) palette ══ */
 /* Surfaces/containers use direct hex values from dark palette when in dark mode */
@@ -1366,14 +1474,11 @@ ${(() => {
 ${(() => {
   const ac = appBarConfig;
   const tones = getAccessibleTones(appBarBg, ac.n, primaryLight);
-  let abPal = 'Primary', abN = btnPC;
-  switch (effectiveButton) {
-    case 'secondary': case 'laddered': abPal = 'Secondary'; abN = btnSC; break;
-    case 'black-white': abPal = 'Neutral'; abN = isLight(appBarBg) ? 1 : 12; break;
-    default: abPal = 'Primary'; abN = btnPC; break;
-  }
-  const abPalArr = abPal === 'Secondary' ? secondaryLight : abPal === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
-  const { active: abOldHoverHex, hover: abHoverHex } = activeAndHoverFor(abPalArr, abN);
+  /* The button sits ON the bar, so it is the bar's Default button — its
+     border, and under Tonal its fill, answer to the bar's tone, not the
+     page's. The lib rests a solid button's label on --Buttons-{C}-Quiet, so
+     Quiet is measured against the button (defaultButtonFor does). */
+  const abBtn = defaultButtonFor(ac.palette, ac.n, appBarBg);
   // Surface --Hover / --Pressed for the App Bar context: based on the App Bar's
   // own BG tone, not whatever is inherited from the page surface (Primary-Light
   // would otherwise leak through and make ghost-button hovers look near-white).
@@ -1389,14 +1494,14 @@ ${(() => {
      This emitted "transparent", so every variant="default" button in the bar
      came out unfilled and unbevelled, reading as an outline button where
      someone had asked for a solid one. The block gave the game away: it was
-     already emitting --Buttons-Default-Highlight and -Lowlight from btnBg, the
+     already emitting --Buttons-Default-Highlight and -Lowlight from the fill, the
      two tokens that exist only to bevel a fill that was never painted.
 
      Fill, text and border move together. Once the button is filled its label
      has to contrast with the BUTTON rather than the bar, so leaving the text on
-     the bar's tone would have traded a missing fill for a failing one. Quiet
-     stays on the BAR's palette on purpose — that is what a ghost or text button
-     reads, and those sit directly on the bar with no fill between. */
+     the bar's tone would have traded a missing fill for a failing one — and
+     that includes Quiet, which the lib uses as the resting label (abBtn.quiet
+     above). */
   // Library components like AppBar set their own data-theme="App-Bar" on their
   // root element, which would otherwise override these vars. The nested
   // descendant selector lets that inner element still inherit the branded
@@ -1427,21 +1532,14 @@ ${(() => {
   --Border: var(--${ac.palette}-Color-${tones.border});
   --Hover: ${appBarHover};
   --Pressed: ${appBarActive};
-  --Buttons-Primary-Button: ${btnBg};
-  --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: ${btnBorder};
-  --Buttons-Primary-Hover: ${abHoverHex};
-  --Buttons-Primary-Pressed: ${abOldHoverHex};
-  --Buttons-Default-Button: ${btnBg};
-  --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Quiet: var(--${ac.palette}-Color-${tones.quiet});
-  --Buttons-Default-Border: ${btnBorder};
-  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
-  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
-  --Buttons-Default-Hover: ${abHoverHex};
-  --Buttons-Default-Pressed: ${abOldHoverHex};
-  --Buttons-Primary-Highlight: ${highlightFor(btnBg)};
-  --Buttons-Primary-Lowlight: ${lowlightFor(btnBg)};
+  --Buttons-Primary-Button: ${abBtn.bg};
+  --Buttons-Primary-Text: ${abBtn.text};
+  --Buttons-Primary-Border: ${abBtn.border};
+  --Buttons-Primary-Hover: ${abBtn.hover};
+  --Buttons-Primary-Pressed: ${abBtn.active};
+${defaultButtonLines(abBtn)}
+  --Buttons-Primary-Highlight: ${highlightFor(abBtn.bg)};
+  --Buttons-Primary-Lowlight: ${lowlightFor(abBtn.bg)};
 }`;
 })()}
 
@@ -1477,16 +1575,18 @@ ${vibrantLines()}
   /* --Hotlink and friends share the contrast-tuned Info text mapping so
      ghost-variant buttons (which inherit color from --Hotlink) read on
      any surface tone. Same getFixedTextToken lookup as --Text-Info above. */
-  --Hotlink: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
+  --Hotlink: ${tokenRefToVar(textTableToken(surfaceN, false, 'Info', isDark))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
-  --Link: ${tokenRefToVar(getFixedTextToken(surfaceN, false, 'Info'))};
+  --Link: ${tokenRefToVar(textTableToken(surfaceN, false, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
-${buildTextPaletteLines(surfaceN, false)}
+${buildTextPaletteLines(surfaceN, false, isDark)}
 ${buildIconPaletteLines(surfaceN, false, isDark, surfacePaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
 ${buildHeaderPaletteLines(surfaceN, false)}
+${emitStateButtonTokens(surfaceN)}
   --Focus-Visible: #3b82f6;
   --Effect-Level-0: none;
 ${SHADOW_LEVELS.map((l) => `  --Effect-Level-${l}: ${effectLevelRecipe(l, shadowOpts)};`).join('\n')}
+${SHADOW_LEVELS.map((l) => `  --Effect-Level-${l}-Neutral: ${neutralEffectLevelRecipe(l, shadowOpts)};`).join('\n')}
 
 ${(() => {
     // Generate all button palette tokens
@@ -1497,42 +1597,23 @@ ${(() => {
     ];
     return allPalettes.map(({ name, palette: pal, n }) => {
       const bg = p(pal, n);
-      const tones = getAccessibleTones(bg, n, pal);
+      const label = labelFor(bg, n, pal);
       const palBorder = p(pal, getAccessibleTones(surfaceBg, surfaceN, pal).border);
+      const o = outlineFor(name as ButtonPalette, surfaceBg, surfaceN);
       const { active, hover } = activeAndHoverFor(pal, n);
       return `  --Buttons-${name}-Button: ${p(pal, n)};
-  --Buttons-${name}-Text: ${p(pal, tones.text)};
+  --Buttons-${name}-Text: ${label.text};
   --Buttons-${name}-Border: ${palBorder};
   --Buttons-${name}-Hover: ${hover};
   --Buttons-${name}-Pressed: ${active};
   --Buttons-${name}-Highlight: ${highlightFor(bg)};
   --Buttons-${name}-Lowlight: ${lowlightFor(bg)};
-  --Buttons-${name}-Quiet: ${p(pal, tones.quiet)};`;
+  --Buttons-${name}-Quiet: ${label.quiet};
+  --Buttons-${name}-Outline-Text: ${o.outlineText};
+  --Buttons-${name}-Outline-Quiet: ${o.outlineQuiet};`;
     }).join('\n');
   })()}
-${(() => {
-    // Default button uses the selected button mode's palette and tones
-    let defPal: typeof vPrimary = vPrimary;
-    let defN = btnPC;
-    switch (effectiveButton) {
-      case 'secondary': case 'laddered': defPal = bSecondary; defN = btnSC; break;
-      case 'tonal': defPal = bPrimary; defN = btnPC; break;
-      case 'black-white': defPal = NEUTRAL.map(h => ({ hex: h })) as any; defN = isLight(surfaceBg) ? 1 : 12; break;
-      default: defPal = bPrimary; defN = btnPC; break;
-    }
-    const { active: defActive, hover: defHover } = activeAndHoverFor(defPal, defN);
-    const defQuiet = effectiveButton === 'black-white'
-      ? (isLight(btnBg) ? neutral(6) : WHITE_TEXT)
-      : p(defPal, getAccessibleTones(btnBg, defN, defPal).quiet);
-    return `  --Buttons-Default-Button: ${btnBg};
-  --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Quiet: ${defQuiet};
-  --Buttons-Default-Border: ${btnBorder};
-  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
-  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
-  --Buttons-Default-Hover: ${defHover};
-  --Buttons-Default-Pressed: ${defActive};`;
-  })()}
+${defaultButtonLines(pageBtn)}
 ${emitTagTextTokens()}
 
   --Container: ${containerBg};
@@ -1545,82 +1626,17 @@ ${emitTagTextTokens()}
   --Container-Header: ${containerHeader};
   --Container-Quiet: ${containerQuiet};
   --Container-Border: ${containerBorder};
-${(() => {
-    let cp = 'Primary', cn = btnPC;
-    switch (effectiveButton) {
-      case 'secondary': case 'laddered': cp = 'Secondary'; cn = btnSC; break;
-      case 'black-white': cp = 'Neutral'; cn = isLight(containerBg) ? 1 : 12; break;
-      default: cp = 'Primary'; cn = btnPC; break;
-    }
-    // Container button border uses the button mode's palette.
-    // For black-white mode the border must match the button fill (so a black
-    // button has a black border, a white button has a white border) — never
-    // the container's neutral border tone.
-    let contBtnBorder = containerBorder;
-    if (cp === 'Neutral') {
-      contBtnBorder = btnBg;
-    } else {
-      const contPal = cp === 'Secondary' ? vSecondary : cp === 'Tertiary' ? vTertiary : vPrimary;
-      contBtnBorder = p(contPal, getAccessibleTones(containerBg, containerN, contPal).border);
-    }
-    const cpArr = cp === 'Secondary' ? secondaryLight : cp === 'Neutral' ? NEUTRAL.map(h => ({hex: h})) as any : primaryLight;
-    const { active: contActive, hover: contHover } = activeAndHoverFor(cpArr, cn);
-    const contQuietHex = cp === 'Neutral'
-      ? (isLight(btnBg) ? neutral(6) : WHITE_TEXT)
-      : p(cpArr, getAccessibleTones(btnBg, cn, cpArr).quiet);
-    return `  --Container-Buttons-Default-Button: ${btnBg};
-  --Container-Buttons-Default-Text: ${btnText};
-  --Container-Buttons-Default-Quiet: ${contQuietHex};
-  --Container-Buttons-Default-Border: ${contBtnBorder};
-  --Container-Buttons-Default-Highlight: ${highlightFor(btnBg)};
-  --Container-Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
-  --Container-Buttons-Default-Hover: ${contHover};
-  --Container-Buttons-Default-Pressed: ${contActive};`;
-  })()}
+${defaultButtonLines(defaultButtonFor(containerPaletteName, containerN, containerBg, true), 'Container-')}
 }
 
 /* ══ Container Surface ══ */
 ${(() => {
-  // The button border must follow the chosen button-mode palette (so it
-  // matches Button / Text), not the container surface's palette. Mirrors the
-  // logic in the --Container-Buttons-Default-Border block above.
-  let buttonModePaletteName: 'Primary' | 'Secondary' | 'Tertiary' | 'Neutral' = 'Primary';
-  let buttonModePalette: typeof vPrimary = vPrimary;
-  let buttonModeN: number = btnPC;
-  switch (effectiveButton) {
-    case 'secondary': case 'laddered': buttonModePaletteName = 'Secondary'; buttonModePalette = bSecondary; buttonModeN = btnSC; break;
-    case 'black-white': buttonModePaletteName = 'Neutral'; buttonModePalette = NEUTRAL.map(h => ({ hex: h })) as any; buttonModeN = isLight(containerBg) ? 1 : 12; break;
-    default: buttonModePaletteName = 'Primary'; buttonModePalette = bPrimary; buttonModeN = btnPC; break;
-  }
-  const buttonModeBorderN = getAccessibleTones(containerBg, containerN, buttonModePalette).border;
-  // In black-white mode the border must match the button fill itself (black
-  // button → black border, white button → white border), regardless of the
-  // accessible-border tone the surface would normally derive.
-  const buttonBorderCss = effectiveButton === 'black-white'
-    ? btnBg
-    : `var(--${buttonModePaletteName}-Color-${buttonModeBorderN})`;
-  // Default button hover/active — based on the button's OWN palette tone (the
-  // button is filled with btnBg = palette[buttonModeN]), not the container's
-  // surface tone. Otherwise on a white card (containerN=12) the hover would
-  // resolve to ~white via the activeAndHoverFor endpoint rule.
-  const { active: contBtnActive, hover: contBtnHover } = activeAndHoverFor(buttonModePalette, buttonModeN);
-  // Black-White buttons must contrast with the CARD they sit on, not the page
-  // surface. A BW button inside a BLACK card must be WHITE — the surface-based
-  // btnBg would make it black (invisible on the card). Derive from the
-  // container's own lightness; non-BW buttons keep their surface-based color.
-  const contIsBW = effectiveButton === 'black-white';
-  const contDefBg = contIsBW ? (isLight(containerBg) ? NEUTRAL[0] : NEUTRAL[NEUTRAL.length - 1]) : btnBg;
-  const contDefText = contIsBW ? (isLight(containerBg) ? '#ffffff' : '#1a1a1a') : btnText;
-  const contDefBorder = contIsBW ? contDefBg : buttonBorderCss;
-  const contDefHover = contIsBW ? (isLight(contDefBg) ? '#e0e0e0' : '#1a1a1a') : contBtnHover;
-  const contDefActive = contIsBW ? (isLight(contDefBg) ? '#cccccc' : '#2e2e2e') : contBtnActive;
-  // Quiet ON the Default button's own fill — the button-mode palette at the
-  // button's tone, same table and index its Text reads. BW mirrors the
-  // export's Quiet.Surfaces.BW row: grey on the white face, the text color
-  // itself on the black face.
-  const contDefQuiet = contIsBW
-    ? (isLight(contDefBg) ? NEUTRAL[5] : '#ffffff')
-    : p(buttonModePalette, getAccessibleTones(contDefBg, buttonModeN, buttonModePalette).quiet);
+  // The Default button on the CARD, not the page: a Black/White button inside
+  // a black card has to be white, and a tonal button takes the tone that
+  // clears 3:1 against the card it sits on.
+  const contBtn = defaultButtonFor(containerPaletteName, containerN, containerBg, true);
+  const contDefBg = contBtn.bg, contDefText = contBtn.text, contDefQuiet = contBtn.quiet;
+  const contDefBorder = contBtn.border, contDefHover = contBtn.hover, contDefActive = contBtn.active;
   /* NO --Background here, and its absence is the fix.
    *
    * This rule covers all five container levels, so setting --Background once
@@ -1655,6 +1671,19 @@ ${(() => {
 [data-surface] [data-surface="Container-Highest"],
 [data-surface] [data-surface="Container-Low"],
 [data-surface] [data-surface="Container-Lowest"] {
+  /* The five level VALUES, restated on the card itself. Not --Background
+     (see above) — the values it reads. A page that wraps Brand inside
+     another theme (the studio shell is data-theme="Default") also matches
+     that theme's [data-theme="Default"] [data-surface^="Container"] rule,
+     which redeclares --Container on the card and beats what it inherits
+     from Brand. The card then painted the studio's near-white while
+     --Header and --Text below stayed tuned for this brand's container — on
+     a black-background system, near-white text on a near-white card. */
+  --Container-Lowest: ${containerLowest};
+  --Container-Low: ${containerLow};
+  --Container: ${containerBg};
+  --Container-High: ${containerHigh};
+  --Container-Highest: ${containerHighest};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
@@ -1670,11 +1699,11 @@ ${(() => {
      Without emitting at Container scope, Ghost-variant buttons inside a
      Card inherit Hotlink from the parent Surface scope (often wrong tone)
      or from the lib's Light-Mode.css [data-surface^="Container"] default. */
-  --Hotlink: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
+  --Hotlink: ${tokenRefToVar(textTableToken(containerN, true, 'Info', isDark))};
   --Hotlink-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
-  --Link: ${tokenRefToVar(getFixedTextToken(containerN, true, 'Info'))};
+  --Link: ${tokenRefToVar(textTableToken(containerN, true, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
-${buildTextPaletteLines(containerN, true)}
+${buildTextPaletteLines(containerN, true, isDark)}
 ${buildIconPaletteLines(containerN, true, isDark, containerPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText, containerTones.text)}
 ${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${contDefBg};
@@ -1718,17 +1747,20 @@ ${(() => {
     ];
     return perPalette.map(({ name, pal, n }) => {
       const bg = p(pal, n);
-      const tones = getAccessibleTones(bg, n, pal);
+      const label = labelFor(bg, n, pal);
       const palBorder = p(pal, getAccessibleTones(containerBg, containerN, pal).border);
+      const o = outlineFor(name as ButtonPalette, containerBg, containerN);
       const { active, hover } = activeAndHoverFor(pal, n);
       return `  --Buttons-${name}-Button: ${bg};
-  --Buttons-${name}-Text: ${p(pal, tones.text)};
+  --Buttons-${name}-Text: ${label.text};
   --Buttons-${name}-Border: ${palBorder};
   --Buttons-${name}-Hover: ${hover};
   --Buttons-${name}-Pressed: ${active};
   --Buttons-${name}-Highlight: ${highlightFor(bg)};
   --Buttons-${name}-Lowlight: ${lowlightFor(bg)};
-  --Buttons-${name}-Quiet: ${p(pal, tones.quiet)};`;
+  --Buttons-${name}-Quiet: ${label.quiet};
+  --Buttons-${name}-Outline-Text: ${o.outlineText};
+  --Buttons-${name}-Outline-Quiet: ${o.outlineQuiet};`;
     }).join('\n');
   })()}
 }`;
@@ -1781,6 +1813,7 @@ ${(() => {
   --Tag-Tertiary-Text: ${tagText};
 ${emitDefaultBtnTokens('Tertiary')}
 ${emitPerPaletteButtonTokens(tertiarySurfaceBg, TC)}
+${emitStateButtonTokens(TC)}
 ${emitTagTextTokens()}
 }`;
 })()}
@@ -1794,8 +1827,38 @@ ${emitTagTextTokens()}
   --Surface: var(--Secondary-Color-${SC});
 ${emitDefaultBtnTokens('Secondary')}
 ${emitPerPaletteButtonTokens(p(vSecondary, SC), SC)}
+${emitStateButtonTokens(SC)}
 ${emitTagTextTokens()}
 }
+
+/* ══ Themed sections: the heading speaks in the theme's own palette ══
+ * A Secondary section's heading comes from Secondary, Info's from Info,
+ * Neutral's from Neutral — the same choice the export makes
+ * (generateCompleteThemes, defaultHeader = the theme). The lib's static sheet
+ * points --Header at Primary on these surfaces and --Header-<Palette> at the
+ * same tone of the theme's palette, so the heading becomes that sibling at
+ * whatever surface level the element is. Same selectors and specificity as the
+ * lib's blocks, later in the cascade; the preview's own per-theme blocks below
+ * (Tertiary Surface, Neutral Dimmest/Brightest) already use the theme palette.
+ * Primary needs no rule: its heading already is Primary. */
+${(() => {
+  /* Levels where the preview paints its OWN surface and heading for a theme
+     (the Tertiary Surface card, Neutral's black and white ends, both below):
+     the lib's --Header-<Palette> there is tuned for the lib's background, not
+     the preview's, so those levels keep the preview's own heading. */
+  const OWN_LEVELS: Record<string, string[]> = { Tertiary: ['Surface'], Neutral: ['Surface-Dimmest', 'Surface-Brightest'] };
+  return ['Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].map((t) => {
+    const own = OWN_LEVELS[t] ?? [];
+    const not = own.map((l) => `:not([data-surface="${l}"])`).join('');
+    const sels = [
+      ...(own.includes('Surface') ? [] : [`[data-theme="${t}"]`]),
+      `[data-theme="${t}"][data-surface]${not}`,
+      `[data-theme="${t}"] [data-surface^="Container"]`,
+      `[data-theme="${t}"][data-surface^="Container"]`,
+    ];
+    return `${sels.join(',\n')} {\n  --Header: var(--Header-${t});\n}`;
+  }).join('\n');
+})()}
 
 /* ══ Primary Theme ══
  * Cards with color="primary" (or other elements that set data-theme="Primary")
@@ -1806,6 +1869,7 @@ ${emitTagTextTokens()}
 [data-theme="Primary"][data-surface="Surface"] {
 ${emitDefaultBtnTokens('Primary')}
 ${emitPerPaletteButtonTokens(p(primaryLight, PC), PC)}
+${emitStateButtonTokens(PC)}
 ${emitTagTextTokens()}
 }
 
@@ -1813,30 +1877,17 @@ ${emitTagTextTokens()}
 ${(() => {
   const nc = navBarConfig;
   const tones = getAccessibleTones(navBarBg, nc.n, primaryLight);
-  // Use the button mode's palette for hover/active
-  let navDefPal: typeof vPrimary = vPrimary;
-  let navDefN = btnPC;
-  switch (effectiveButton) {
-    case 'secondary': case 'laddered': navDefPal = bSecondary; navDefN = btnSC; break;
-    // Match btnBg's logic (surfaceBg-based), NOT navBarBg-based. btnBg
-    // resolves from the page surface so the button color is consistent
-    // across nav bars. Picking the hover tone from navBarBg used to give
-    // a black button (from surface=light) a white hover (from navBarBg=
-    // dark) — totally invisible after hovering.
-    case 'black-white': navDefPal = NEUTRAL.map(h => ({ hex: h })) as any; navDefN = isLight(surfaceBg) ? 1 : 12; break;
-    default: navDefPal = bPrimary; navDefN = btnPC; break;
-  }
-  const { active: navDefOldHoverHex, hover: navDefHoverHex } = activeAndHoverFor(navDefPal, navDefN);
   const navBorderN = tones.border;
   // Surface --Hover/--Pressed for Nav Bar context — based on Nav Bar's own tone.
   const navBarSurfacePalette = rampFor(nc.palette);
   const { active: navBarActive, hover: navBarHover } = activeAndHoverFor(navBarSurfacePalette, nc.n);
-  // The button sits ON the nav bar, so its border has to contrast with the BAR,
-  // not with the page surface. btnBorder is derived from surfaceBg, so when
-  // Default Buttons = Primary and the nav bar is also Primary, the border lands
-  // on the bar's own color and the button dissolves into the strip — a solid
-  // band of color with a label on it and no button shape at all.
-  const navBtnBorder = p(navDefPal, getAccessibleTones(navBarBg, nc.n, navDefPal).border);
+  /* The button sits ON the nav bar, so it is the bar's Default button: its
+     border (and under Tonal, its fill) answers to the bar's tone. Reusing the
+     page's button here put a Primary border on a Primary bar and the button
+     dissolved into the strip. Its resting label is its Quiet, measured
+     against the button — the footer's Continue came out dark on dark when it
+     inherited the page's. */
+  const navBtn = defaultButtonFor(nc.palette, nc.n, navBarBg);
 
   /* Bare [data-theme="Nav-Bar"] for the same reason as App-Bar above: the
      lib's BottomNavigation and Sidebar set it on their own roots, outside any
@@ -1866,20 +1917,15 @@ ${(() => {
   --Container-Lowest: ${containerLowest};
   --Container-High: ${containerHigh};
   --Container-Highest: ${containerHighest};
-  --Buttons-Primary-Button: ${btnBg};
-  --Buttons-Primary-Text: ${btnText};
-  --Buttons-Primary-Border: ${effectiveButton === 'black-white' ? btnBg : navBtnBorder};
-  --Buttons-Primary-Hover: ${navDefHoverHex};
-  --Buttons-Primary-Pressed: ${navDefOldHoverHex};
-  --Buttons-Default-Button: ${btnBg};
-  --Buttons-Default-Text: ${btnText};
-  --Buttons-Default-Border: ${effectiveButton === 'black-white' ? btnBg : navBtnBorder};
-  --Buttons-Default-Highlight: ${highlightFor(btnBg)};
-  --Buttons-Default-Lowlight: ${lowlightFor(btnBg)};
-  --Buttons-Default-Hover: ${navDefHoverHex};
-  --Buttons-Default-Pressed: ${navDefOldHoverHex};
-  --Buttons-Primary-Highlight: ${highlightFor(btnBg)};
-  --Buttons-Primary-Lowlight: ${lowlightFor(btnBg)};
+  --Buttons-Primary-Button: ${navBtn.bg};
+  --Buttons-Primary-Text: ${navBtn.text};
+  --Buttons-Primary-Quiet: ${navBtn.quiet};
+  --Buttons-Primary-Border: ${navBtn.border};
+  --Buttons-Primary-Hover: ${navBtn.hover};
+  --Buttons-Primary-Pressed: ${navBtn.active};
+${defaultButtonLines(navBtn)}
+  --Buttons-Primary-Highlight: ${highlightFor(navBtn.bg)};
+  --Buttons-Primary-Lowlight: ${lowlightFor(navBtn.bg)};
 }`;
 })()}
 
@@ -2054,12 +2100,7 @@ ${(() => {
   const cappedStyleRadius = Math.min(r.buttonRadius, buttonHeight);
   const cappedCardRadius = Math.min(r.cardRadius, buttonHeight);
   const cappedModalRadius = Math.min(r.modalRadius, buttonHeight);
-  // Accordion-specific cap. The Accordion summary is ~buttonHeight tall, so
-  // using --Style-Border-Radius at full cap (= buttonHeight) saturates into
-  // a stadium shape (radius ≥ height/2). Buttons are intentionally pill-able,
-  // accordions aren't. We can't lower --Style-Border-Radius without also
-  // de-pilling buttons, so emit a dedicated --Accordion-Radius capped at
-  // half the button height and override the lib's Accordion rule below.
+  // Accordion corner: min(button, card, 16) — see componentRadii.ts.
   const cappedAccordionRadius = r.accordionRadius;
   // Button radius caps at the LARGE button height — beyond that CSS clamps a
   // pill anyway, and uncapped values (e.g. 100) over-round anything that reads
@@ -2100,6 +2141,7 @@ ${(() => {
   --Sm-Card-Padding: ${r.smCardPadding}px;
   --Lg-Card-Padding: ${r.lgCardPadding}px;
   --Modal-Padding: ${r.modalPadding}px;
+${overlayWidthCSS('Desktop').join('\n')}
   --Sm-Modal-Padding: ${r.smModalPadding}px;
   --Lg-Modal-Padding: ${r.lgModalPadding}px;
   --Modal-Radius: ${cappedModalRadius}px;

@@ -308,3 +308,41 @@ export function headerFontQueryParam(): string {
   const ranges = tags.map((t) => `${AXES[t].min}..${AXES[t].max}`).join(',');
   return `family=${HEADER_FAMILY.replace(/\s+/g, '+')}:${tags.join(',')}@${ranges}`;
 }
+
+/* A PUBLISHED system pins its axes. The full-range request above is what the
+   studio needs while someone drags the sliders, but it is ~1 MB of font; a
+   system's CSS sets one value per axis (--Font-Width-Header: 72, …), so it
+   needs only those. Measured on the bundled default theme: 1009 KB → 132 KB.
+
+   Read back out of the system's own typography CSS, so the request cannot
+   disagree with the values the page uses. An axis the CSS does not pin keeps
+   its full range; weights narrow to the span the header styles use. */
+const AXIS_TOKEN: Record<string, string> = {
+  GRAD: 'Font-Grade-Header', ROND: 'Font-Roundness-Header', opsz: 'Font-Optical-Size-Header',
+  slnt: 'Font-Slant-Header', wdth: 'Font-Width-Header',
+};
+export function pinnedHeaderFontQueryParam(typographyCSS: string): string {
+  const tags = ['GRAD', 'ROND', 'opsz', 'slnt', 'wdth', 'wght'];
+  const num = (re: RegExp) => [...typographyCSS.matchAll(re)].map((m) => Number(m[1])).filter((n) => Number.isFinite(n));
+  const values = tags.map((t) => {
+    if (t === 'wght') {
+      const w = num(/--(?:Font-Weight-Header|Header-Clamped-Weight|Set-Font-Family-Header-Weight|(?:H[1-6]|Header|Display)[A-Za-z0-9-]*-Font-Weight):\s*(\d+)\s*;/g)
+        .filter((n) => n >= AXES.wght.min && n <= AXES.wght.max);
+      if (!w.length) return `${AXES.wght.min}..${AXES.wght.max}`;
+      const lo = Math.min(...w), hi = Math.max(...w);
+      return lo === hi ? String(lo) : `${lo}..${hi}`;
+    }
+    const pinned = new Set(num(new RegExp(`--${AXIS_TOKEN[t]}:\\s*(-?[\\d.]+)\\s*;`, 'g')));
+    if (pinned.size === 1) {
+      const v = [...pinned][0];
+      if (v >= AXES[t].min && v <= AXES[t].max) return String(v);
+    }
+    return `${AXES[t].min}..${AXES[t].max}`;
+  });
+  return `family=${HEADER_FAMILY.replace(/\s+/g, '+')}:${tags.join(',')}@${values.join(',')}`;
+}
+
+/** Swap the full-range header request in a stylesheet for the pinned one. */
+export function pinHeaderFontImport(css: string, typographyCSS: string): string {
+  return css.split(headerFontQueryParam()).join(pinnedHeaderFontQueryParam(typographyCSS));
+}

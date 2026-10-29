@@ -285,7 +285,12 @@ export const NAV_METRICS = {
      All three modes stay, so layers bound at small or large keep their
      binding — they just read 80 now. */
   'Rail-Width': { medium: 80, small: 80, large: 80 },
-  'App-Bar-Height': { medium: 64, small: 56, large: 72 },
+  /* App-Bar-Height is DERIVED: the size's Button-Height + 16 above and below
+     (Sizing-2), so a bar always holds that size's buttons and tabs (a tab is a
+     button's height). These are the values at the default buttons (24 / 32 /
+     56); the brand's own heights replace them — see appBarHeight(). Large was
+     a typed 72, which left a 56px button 8px each side. */
+  'App-Bar-Height': { medium: 64, small: 56, large: 88 },
   /* The bottom bar. 83 at medium is the design's own figure (Nav-Bar
      7442:31305, 398x83); the other two follow App-Bar-Height's proportions
      rather than being measured, because the design has no small or large
@@ -320,6 +325,117 @@ export const LINE_METRICS = {
   'Step bar':      { medium: 2,  small: 1,   large: 4 },
   'No Count Step': { medium: 12, small: 8,   large: 16 },
 } as const;
+
+/* ── Field Button and NumberField ─────────────────────────────────────────
+ *
+ * Figma: Component-Size › Button/FieldButton-Width, Button/FieldButton-Height
+ * and Input/Numberfield (added 2026-10-24).
+ *
+ *   FieldButton-Width   40 / 48 / 64 — a shape, stated: the icon plus even
+ *                       padding at each size, so the stepper scales with its
+ *                       height instead of staying 48 everywhere
+ *   FieldButton-Height  the button height. Not written by the payload: in the
+ *                       file it should ALIAS Button/Button-Height (which follows
+ *                       the device), and a literal written over an alias
+ *                       detaches it. CSS points it at --Button-Height.
+ *   Numberfield         the field's height: two stacked steppers, the column's
+ *                       1px border top and bottom, and the divider between —
+ *                       2 x Button-Height + 2 + Divider. 50.5 / 67 / 116 at the
+ *                       studio heights, exactly the file's numbers. Derived, so
+ *                       it follows a brand that picks other button heights.
+ */
+export const FIELD_BUTTON_WIDTH = { small: 40, medium: 48, large: 64 } as const;
+
+export function numberfieldHeight(buttonHeight: number, size: SizeMode): number {
+  return 2 * buttonHeight + 2 + LINE_METRICS.Divider[size];
+}
+
+/** Button group: FieldButton-Width, in the Name / Sm- / Lg- shape. */
+export function fieldButtonFlat(): Record<string, number> {
+  return {
+    'FieldButton-Width': FIELD_BUTTON_WIDTH.medium,
+    'Sm-FieldButton-Width': FIELD_BUTTON_WIDTH.small,
+    'Lg-FieldButton-Width': FIELD_BUTTON_WIDTH.large,
+  };
+}
+
+/** Input group: Numberfield, from the brand's three button heights. */
+export function numberfieldFlat(h: { small: number; medium: number; large: number }): Record<string, number> {
+  return {
+    'Numberfield': numberfieldHeight(h.medium, 'medium'),
+    'Sm-Numberfield': numberfieldHeight(h.small, 'small'),
+    'Lg-Numberfield': numberfieldHeight(h.large, 'large'),
+  };
+}
+
+/** The same as CSS. Height and the field are calc()s of the live tokens, so
+ *  they cannot drift from the button height or the divider they derive from. */
+export function fieldMetricsVars(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [p, size, h] of [['', 'medium', 'Button-Height'], ['Sm-', 'small', 'Sm-Button-Height'], ['Lg-', 'large', 'Lg-Button-Height']] as const) {
+    out[`--${p}FieldButton-Width`] = `${FIELD_BUTTON_WIDTH[size]}px`;
+    out[`--${p}FieldButton-Height`] = `var(--${h})`;
+    out[`--${p}Numberfield`] = `calc(2 * var(--${h}) + 2px + var(--${p}Divider, ${LINE_METRICS.Divider[size]}px))`;
+  }
+  return out;
+}
+
+/* ── Component sizes the lib reads but the stylesheet did not carry ──────
+ *
+ * Each lives in Figma's Component-Size collection and each is read by name in
+ * the lib with Figma's number as its fallback — so it painted right, but a
+ * brand that moved the value in Figma never reached code. Values are Figma's
+ * (2026-10-26). Where Figma's value varies by DEVICE (Sheet, the floating
+ * label's line height and tracking), this is the Desktop column — the one a
+ * consumer that never sets data-device gets, as the overlay offsets do.
+ *
+ *   Progress-Bar-Width     the bar's thickness              8 / 4 / 16
+ *   Progress-Dial-Radius   the dial's size: Sizing-10 / -6 / -15 (80 / 48 / 120)
+ *   Text-Area-Min-Height   the shortest TextArea            88 / 74 / 102
+ *   Rating, Rating-Icon    a star's box and glyph           24 / 24 / 32
+ *   Floating-Label-*       Dynamic-Floating-Label: 12 / 11 / 14 at 500,
+ *                          0.5 tracking, 16.8 / 14.4 / 19.2 leading
+ *   ToolBar, ToolBarShort  the nav bar's height: 80, and 64 for the FAB styles
+ *   Sheet                  a sheet's height: Sheet Half (540) at medium,
+ *                          Sheet Third at small, the device height at large
+ */
+export const OTHER_METRICS = {
+  'Progress-Bar-Width':   { medium: 8,  small: 4,  large: 16 },
+  'Text-Area-Min-Height': { medium: 88, small: 74, large: 102 },
+  'Rating':               { medium: 24, small: 24, large: 32 },
+  // Nav-Bar heights (Other/ToolBar, Other/ToolBarShort): the fixed and floating
+  // bar, and the shorter pill of the two FAB styles. Equal across sizes in Figma.
+  'ToolBar':              { medium: 80, small: 80, large: 80 },
+  'ToolBarShort':         { medium: 64, small: 64, large: 64 },
+  'Rating-Icon':          { medium: 24, small: 24, large: 32 },
+} as const;
+
+export function otherMetricsVars(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, byMode] of Object.entries(OTHER_METRICS)) {
+    out[`--${name}`] = `${byMode.medium}px`;
+    out[`--Sm-${name}`] = `${byMode.small}px`;
+    out[`--Lg-${name}`] = `${byMode.large}px`;
+  }
+  // Aliases of the Sizing scale in Figma, so aliases here too.
+  out['--Progress-Dial-Radius'] = 'var(--Sizing-10, 80px)';
+  out['--Sm-Progress-Dial-Radius'] = 'var(--Sizing-6, 48px)';
+  out['--Lg-Progress-Dial-Radius'] = 'var(--Sizing-15, 120px)';
+  // The floating label — the raised label inside a Floating input.
+  out['--Floating-Label-Small-Font-Size'] = '11px';
+  out['--Floating-Label-Medium-Font-Size'] = '12px';
+  out['--Floating-Label-Large-Font-Size'] = '14px';
+  out['--Floating-Label-Small-Line-Height'] = '14.4px';
+  out['--Floating-Label-Medium-Line-Height'] = '16.8px';
+  out['--Floating-Label-Large-Line-Height'] = '19.2px';
+  out['--Floating-Label-Font-Weight'] = '500';
+  out['--Floating-Label-Letter-Spacing'] = '0.5px';
+  // Sheet heights (Desktop column).
+  out['--Sheet'] = '540px';
+  out['--Sm-Sheet'] = '540px';
+  out['--Lg-Sheet'] = '100dvh';
+  return out;
+}
 
 /* ── Switch ───────────────────────────────────────────────────────────────
  *
@@ -544,9 +660,19 @@ export const TOOLTIP_METRICS = {
   },
 } as const;
 
+/* The gap between a selection control and its Form-Label — ONE variable for
+   Checkbox Field, RadioField and SwitchField, so a form mixing the three puts
+   every label the same distance from its control. Bound in the file
+   2026-10-22 (it had been Sizing-Half on Checkbox, Sizing-1 / Sizing-Half on
+   Switch, Radio-Gap on Radio). Same literal as Checkbox-Gap and Radio-Gap. */
+export const LABEL_METRICS = {
+  'Label-Gap': SELECTION_GAP,
+} as const;
+
 export const SELECTION_METRICS = {
   ...RADIO_METRICS,
   ...CHECKBOX_METRICS,
+  ...LABEL_METRICS,
 } as const;
 
 
@@ -565,8 +691,16 @@ function flattenByMode(
   return out;
 }
 
-export function navMetricsFlat(): Record<string, number> {
-  return flattenByMode(NAV_METRICS as never);
+/** Space above and below a control in the app bar: Sizing-2. */
+export const APP_BAR_PAD = 16;
+export const appBarHeight = (buttonHeight: number) => buttonHeight + 2 * APP_BAR_PAD;
+
+/** Figma's Other group. Given the brand's three button heights, App-Bar-Height
+ *  follows them; without, the defaults in NAV_METRICS. */
+export function navMetricsFlat(h?: { small: number; medium: number; large: number }): Record<string, number> {
+  const table: any = { ...NAV_METRICS };
+  if (h) table['App-Bar-Height'] = { small: appBarHeight(h.small), medium: appBarHeight(h.medium), large: appBarHeight(h.large) };
+  return flattenByMode(table as never);
 }
 
 export function lineMetricsFlat(): Record<string, number> {
@@ -638,6 +772,7 @@ const SELECTION_METRIC_CSS: Record<string, string> = {
   'Checkbox-Radius': 'Checkbox-Radius',
   'Checkbox-Icon': 'Checkbox-Icon',
   'Checkbox-Gap': 'Checkbox-Gap',
+  'Label-Gap': 'Label-Gap',
 };
 
 /**
@@ -668,7 +803,14 @@ export function lineMetricsVars(): Record<string, string> {
 
 /** The nav chrome as a record — the form App.tsx spreads into inline style. */
 export function navMetricsVars(): Record<string, string> {
-  return metricsVars(NAV_METRICS as never, NAV_METRIC_CSS);
+  const out = metricsVars(NAV_METRICS as never, NAV_METRIC_CSS);
+  /* App-Bar-Height is a calc() of the live button height, so it follows the
+     brand AND the device (iOS / Android buttons are taller) — the same move
+     the NumberField's height makes. Figma gets the number. */
+  for (const [p, h] of [['', 'Button-Height'], ['Sm-', 'Sm-Button-Height'], ['Lg-', 'Lg-Button-Height']] as const) {
+    out[`--${p}App-Bar-Height`] = `calc(var(--${h}) + 2 * var(--Sizing-2, ${APP_BAR_PAD}px))`;
+  }
+  return out;
 }
 
 /** Radio and Checkbox as CSS custom properties.
@@ -839,6 +981,8 @@ export function componentSizePayload(
    * Lg-Name bag; Input has no such bag, hence this parameter.
    */
   inputExtras: Record<string, number> = {},
+  /** The brand's three button heights — App-Bar-Height derives from them. */
+  buttonHeights?: { small: number; medium: number; large: number },
 ): ComponentSizePayload {
   return componentSizeFigma({
     Button: {
@@ -1031,11 +1175,13 @@ export function componentSizePayload(
          update-only, so these land on the variables already in the file —
          which is the point: the number then has one home instead of living
          in Figma and being re-typed in CSS. */
-      ...navMetricsFlat(),
+      ...navMetricsFlat(buttonHeights),
       /* Divider / Step bar / No Count Step — see LINE_METRICS. Same reason as
          the nav metrics: the lib holds these as literals too, so writing them
          keeps one number in one place. */
       ...lineMetricsFlat(),
+      /* Other/Label-Gap — see LABEL_METRICS. */
+      ...flattenByMode(LABEL_METRICS as never),
     },
   });
 }

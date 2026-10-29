@@ -188,8 +188,8 @@ export default function ShadowTuner() {
                   onChange={(_e: unknown, v: number) => set('crispy', v)}
                 />
                 <Caption color="quiet">
-                  Drives blur and spread together: blur {(1.8 - 0.9 * o.crispy).toFixed(2)}× the
-                  offset, outer tuck-in −{(5 * o.crispy).toFixed(1)}px. Crisper = tighter.
+                  Blur {(1.707 - 0.9 * o.crispy).toFixed(2)}× the offset. Crisper = a tighter, sharper
+                  edge. No spread: Figma does not draw it on component shadows, so code does not either.
                 </Caption>
               </VStack>
 

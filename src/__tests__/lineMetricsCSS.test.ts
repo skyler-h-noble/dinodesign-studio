@@ -288,7 +288,10 @@ describe('the nav chrome and accordion focus radii reach the stylesheet', () => 
 
   it.each([
     ['--Sm-Rail-Width', '80px'], ['--Rail-Width', '80px'], ['--Lg-Rail-Width', '80px'],
-    ['--Sm-App-Bar-Height', '56px'], ['--App-Bar-Height', '64px'], ['--Lg-App-Bar-Height', '72px'],
+    // App-Bar-Height follows the button height: + 2 × Sizing-2 (16) per size.
+    ['--Sm-App-Bar-Height', 'calc(var(--Sm-Button-Height) + 2 * var(--Sizing-2, 16px))'],
+    ['--App-Bar-Height', 'calc(var(--Button-Height) + 2 * var(--Sizing-2, 16px))'],
+    ['--Lg-App-Bar-Height', 'calc(var(--Lg-Button-Height) + 2 * var(--Sizing-2, 16px))'],
     ['--Sm-Nav-Bar-Height', '73px'], ['--Nav-Bar-Height', '83px'], ['--Lg-Nav-Bar-Height', '93px'],
   ])('%s is %s', (name, value) => {
     expect(decl(css(), name)).toBe(`${name}: ${value};`);

@@ -1,3 +1,4 @@
+import { buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRadii';
 /**
  * The component-style custom properties — button radii, heights, padding,
  * bevel, card radius — derived ONCE from the user's slider values.
@@ -21,7 +22,8 @@
 // same duplicate-declaration trap this module exists to close.
 import type { ComponentStyle } from '../types';
 import { buttonModeMetricVars } from './buttonSizing';
-import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars } from './componentSize';
+import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars, fieldMetricsVars, otherMetricsVars, FAB_SIZE } from './componentSize';
+import { fabBevelVars } from './bevelGeometry';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -36,6 +38,8 @@ export interface StyleCustomizations {
   smallButtonHeight?: number;
   largeButtonHeight?: number;
   minButtonWidth?: number;
+  /** 1 or 2 (px). See buttonBorderWidthPx. */
+  buttonBorderWidth?: number;
   bevel?: number;
   bevelOpacity?: number;
 }
@@ -110,6 +114,7 @@ export function componentStyleVars(
     '--Button-Bevel': `${bevel}`,
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
     '--Button-Bevel-Px': `${bevelPx}px`,
+    ...fabBevelVars(FAB_SIZE, bevel),
     /* Button-Height / Sm- / Lg- now come from buttonModeMetricVars above, so
        they are not restated here — one source, matching Figma's names.
        These two remain as ALIASES: ToggleButtonGroup, Autocomplete and Input
@@ -118,6 +123,8 @@ export function componentStyleVars(
        working rather than silently dropping them. */
     '--Small-Button-Height': 'var(--Sm-Button-Height)',
     '--Large-Button-Height': 'var(--Lg-Button-Height)',
+    '--Button-Border-Width': `${buttonBorderWidthPx(custom?.buttonBorderWidth)}px`,
+    '--Button-Selected-Border-Width': `${buttonSelectedBorderWidthPx(custom?.buttonBorderWidth)}px`,
     '--Button-Min-Width': `${minButtonWidth}px`,
     '--Lg-Button-Min-Width': `${minButtonWidth + LG_BUTTON_MIN_WIDTH_OFFSET}px`,
     '--Card-Radius': `${cardRadius}px`,
@@ -129,6 +136,8 @@ export function componentStyleVars(
     ...lineMetricsVars(),
     /* Radio / Checkbox box, dot, check, gap and the shared touch target. */
     ...selectionMetricsVars(),
+    ...fieldMetricsVars(),
+    ...otherMetricsVars(),
     ...tooltipMetricsVars(),
     /* Rail-Width / App-Bar-Height / Nav-Bar-Height. The record form of the
        same table navMetricsCSS() writes into the exported stylesheet and into

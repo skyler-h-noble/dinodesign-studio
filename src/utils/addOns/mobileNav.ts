@@ -25,7 +25,7 @@
 import { t, type ComponentDefinition, type ConditionDef, type NodeDef } from './defineComponent';
 import { accountNode, signedInOnly, ACCOUNT_MENU_CONDITIONS } from './accountMenu';
 import { SPEED_DIAL_CONDITIONS } from './speedDial';
-import { pageSlot, APP_BAR_ELEVATION, BRAND_CONDITION } from './navDefinition';
+import { pageSlot, APP_BAR_ELEVATION, BRAND_CONDITION, APP_BAR_THEME, NAV_BAR_THEME } from './navDefinition';
 
 export type MobileLayout = 'top-only' | 'top-and-bottom' | 'toolbar' | 'bottom-only';
 
@@ -99,11 +99,26 @@ export function maxItemsWithFab(fab: boolean): number {
   return fab ? MAX_BOTTOM_ITEMS - 1 : MAX_BOTTOM_ITEMS;
 }
 
-/** The counts the bar can hold: two up to the ceiling. */
-export function bottomItemCounts(fab: boolean): number[] {
+/** The counts the bar can hold: two up to the ceiling — and with a CENTRED
+ *  FAB, only even counts. The items pair up either side of it; with three,
+ *  one side holds two and the other one, and the bar reads lopsided round
+ *  the thing it is built around. A FAB at the end has no sides to balance,
+ *  so any count fits beside it. */
+export function bottomItemCounts(fab: boolean, centred = false): number[] {
   const out: number[] = [];
-  for (let n = MIN_BOTTOM_ITEMS; n <= maxItemsWithFab(fab); n++) out.push(n);
+  for (let n = MIN_BOTTOM_ITEMS; n <= maxItemsWithFab(fab); n++) {
+    if (!(fab && centred) || n % 2 === 0) out.push(n);
+  }
   return out;
+}
+
+/** The count to keep when the FAB is switched: the current one if the bar
+ *  can still hold it, else the nearest it can — up, so an odd count gains an
+ *  item rather than losing one the user chose. */
+export function fitItemCount(n: number, fab: boolean, centred = false): number {
+  const ok = bottomItemCounts(fab, centred);
+  if (ok.includes(n)) return n;
+  return ok.find((c) => c > n) ?? ok[ok.length - 1];
 }
 
 /** Which of the nav's items the bar shows, at the count asked for.
@@ -189,8 +204,8 @@ function barFrame(o: MobileOptions): Pick<NodeDef, 'padding' | 'surface' | 'them
     return { padding: { top: PAD_Y, bottom: PAD_Y, left: t('Margin'), right: t('Margin') } };
   }
   return {
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    theme: NAV_BAR_THEME,
     band: true,
     elevation: APP_BAR_ELEVATION,
   };
@@ -249,6 +264,9 @@ function topBar(o: MobileOptions): NodeDef {
   const centred = o.brandAlign === 'center';
   return {
     name: 'Bar',
+    /* Declared and published, and it was bound to nothing — so switching it
+       off at a breakpoint changed the matrix and nothing in the nav. */
+    presence: { when: 'Adaptive-Nav/Show-Top-Bar' },
     kind: 'stack',
     direction: 'row',
     justify: 'between',
@@ -257,8 +275,8 @@ function topBar(o: MobileOptions): NodeDef {
     padding: { top: PAD_Y, bottom: PAD_Y, left: PAD_X, right: PAD_X },
     width: 'fill',
     height: 'hug',
-    surface: o.surface ?? 'Surface',
-    theme: o.theme,
+    surface: 'Surface',
+    theme: APP_BAR_THEME,
     band: true,
     sticky: true,
     pin: 'top',
@@ -283,7 +301,7 @@ function topBar(o: MobileOptions): NodeDef {
 
 /** The toolbar: actions rather than navigation, and it can float. */
 function toolbar(o: MobileOptions): NodeDef {
-  const vertical = o.toolbarOrientation === 'vertical';
+  const vertical = o.layout === 'toolbar' && o.toolbarOrientation === 'vertical';
   /* The same one slot as the bottom bar, for the same reason: a toolbar IS
      the Nav-Bar component — its Style and Orientation are two of that
      component's three variant axes. */
@@ -297,7 +315,12 @@ function toolbar(o: MobileOptions): NodeDef {
     align: 'center',
     gap: GAP,
     width: vertical ? 'hug' : 'fill',
-    height: vertical ? 'fill' : 'hug',
+    height: 'hug',
+    /* Down is a column at the trailing edge, over the page, in the bottom
+       corner — where the thumb of the hand holding the phone already is.
+       In the flow it took a row of its own under the page and sat centred
+       there, which is neither where a vertical toolbar goes nor reachable. */
+    ...(vertical ? { overlay: { anchor: 'bottom-right' as const } } : {}),
     /* Floating sits inside the safe area and the component draws the pill;
        fixed spans the edge and the frame paints it. The corner is the
        component's, not the frame's — a radius here drew a second rounded

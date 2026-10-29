@@ -155,7 +155,9 @@ describe('Quiet-Opacity reaches the Figma payload', () => {
     expect(M.Colors.BW['Color-1'].value).toBe('#ffffff');
     expect(M.Text.Surfaces.BW['Color-1'].value).toBe('{Colors.White}');
     // and the payload is written anyway
-    expect(Object.keys(OUT.Modes['Light-Mode'].Quiet)).toHaveLength(12);
+    // Twelve per-tone floats. A section the shared tone leaves under 4.5:1 in
+    // dark mode adds its own float beside them (sectionQuietOverrides).
+    expect(Object.keys(OUT.Modes['Light-Mode'].Quiet).filter((k) => /^Color-\d+-Opacity$/.test(k))).toHaveLength(12);
   });
 
   it('the Theme collection gets Quiet-Opacity and NO Quiet colours', () => {
@@ -345,11 +347,21 @@ describe('Quiet-Opacity reaches the Figma payload', () => {
              test's one-hop resolver cannot follow; the themed ones carry the
              tone in the reference. */
           if (themeName === 'Default') continue;
+          /* CSS-only themes (App-Bar, Nav-Bar, Status) have no Figma Theme and
+             so no bound alpha to compare against; their Quiet floor is
+             asserted directly in quietSectionFix.test.ts. */
+          if (!OUT.Themes?.[themeName]) continue;
           for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
             const ref = section?.['Quiet-Opacity']?.value;
             const tone = typeof ref === 'string' && ref.match(/Quiet\.Color-(\d+)-Opacity/);
             if (!tone) continue;
-            const alpha = OUT.Modes[mode].Quiet[`Color-${tone[1]}-Opacity`]?.value / 100;
+            /* The alpha Figma actually binds: the section's Theme/Quiet-Opacity,
+               which is the shared tone float or, for a section that needed one
+               (sectionQuietOverrides), its own. */
+            const figmaRef = String(OUT.Themes?.[themeName]?.[sectionName.replace(/^Surfaces/, 'Surface')]
+              ?.['Quiet-Opacity']?.value ?? `{Quiet.Color-${tone[1]}-Opacity}`);
+            const key = figmaRef.match(/^\{Quiet\.(.+)\}$/)?.[1] ?? `Color-${tone[1]}-Opacity`;
+            const alpha = OUT.Modes[mode].Quiet[key]?.value / 100;
             const bg = deref(mode, section.Background);
             const fg = deref(mode, section.Text);
             if (alpha === undefined || !bg || !fg) continue;

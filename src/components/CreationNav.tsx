@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Button, H3 } from '@omni-design/components';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@omni-design/icons/ArrowBack';
+import CloseIcon from '@omni-design/icons/Close';
 
 interface TopBarProps {
   designSystemName: string;

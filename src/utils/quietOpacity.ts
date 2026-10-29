@@ -256,3 +256,81 @@ export function solveQuietOpacities(
 
   return { alpha, percent, notes };
 }
+
+/** The modes sectionQuietOverrides is applied in (CSS export and Figma
+ *  payload both read this). Both: light mode had 307 near-misses of the same
+ *  kind (4.40-4.50:1), cleared the same way. */
+export const QUIET_SECTION_FIX_MODES: readonly string[] = ['Light-Mode', 'Dark-Mode'];
+
+export interface SectionQuietOverride {
+  theme: string;
+  /** the theme section's key, e.g. 'Surfaces-Brightest' */
+  section: string;
+  /** the section object itself, so a caller walking the same tree can key on it */
+  node: any;
+  tone: number;
+  /** the tone's shared alpha, which this section could not use */
+  tableAlpha: number;
+  alpha: number;
+  percent: number;
+  /** the worst Quiet ratio the shared alpha gave this section */
+  worstBefore: number;
+}
+
+/**
+ * Sections whose Quiet the shared per-tone alpha leaves under `target`, and
+ * the smallest alpha that clears every Quiet-* in each.
+ *
+ * Why the shared table can miss: solveQuietOpacities measures each palette's
+ * OWN Text on its own ground (Text.Surfaces.Error.Color-11 on Error Color-11).
+ * A themed section paints the THEME's Text instead — the Neutral text table —
+ * on that ground, so its composite can land a hair short even though every
+ * pairing the table measured passed. Measured: dark Error / Surface-Brightest,
+ * Neutral text on Error Color-11, 4.47-4.50:1.
+ *
+ * Scoped on purpose. Only a section that actually fails gets a value of its
+ * own; every passing section keeps the shared tone alpha, untouched. The
+ * replacement is the same kind of answer the table gives — the smallest
+ * opacity of the section's own Text that reaches the target (a narrow pass is
+ * a pass) — so Quiet still follows Text, in CSS as a solid and in Figma as an
+ * alias at that opacity.
+ *
+ * `toneOf` returns the tone a section's Quiet-Opacity points at (each caller
+ * resolves references its own way), or null when it is not a tone reference.
+ */
+export function sectionQuietOverrides(
+  modeData: any,
+  table: QuietTable,
+  toHex: (raw: any) => string | null,
+  toneOf: (section: any) => number | null,
+  target = 4.5,
+): SectionQuietOverride[] {
+  const out: SectionQuietOverride[] = [];
+  for (const [theme, themeNode] of Object.entries<any>(modeData?.Themes || {})) {
+    if (!themeNode || typeof themeNode !== 'object') continue;
+    for (const [section, node] of Object.entries<any>(themeNode)) {
+      if (!node || typeof node !== 'object' || !('Background' in node) || !('Quiet-Opacity' in node)) continue;
+      const tone = toneOf(node);
+      const tableAlpha = tone === null ? undefined : table.alpha[tone];
+      if (tone === null || tableAlpha === undefined) continue;
+      const bg = toHex(node.Background);
+      if (!bg) continue;
+      const texts: Record<string, string> = {};
+      for (const key of ['Text', ...QUIET_PALETTES.map((p) => `Text-${p}`)]) {
+        const hex = node[key] ? toHex(node[key]) : null;
+        if (hex) texts[key] = hex;
+      }
+      let worstBefore = Infinity;
+      for (const hex of Object.values(texts)) {
+        // A solid that already fails is a Text-table problem no opacity can fix.
+        if (contrastRatio(hex, bg) < target) continue;
+        worstBefore = Math.min(worstBefore, contrastRatio(compositeOver(hex, bg, tableAlpha), bg));
+      }
+      if (!(worstBefore < target)) continue;
+      const solved = quietOpacityFor(texts, bg, target);
+      if (!solved || solved.alpha <= tableAlpha) continue;
+      out.push({ theme, section, node, tone, tableAlpha, alpha: solved.alpha, percent: solved.percent, worstBefore });
+    }
+  }
+  return out;
+}

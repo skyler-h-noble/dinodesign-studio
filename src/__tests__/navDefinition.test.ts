@@ -5,6 +5,10 @@ import { toAddonSpec, tokensUsed, conditionsUsedBy } from '../utils/addOns/toAdd
 const ALL: NavLayout[] = NAV_LAYOUTS.map((l) => l.id);
 const full = (layout: NavLayout) =>
   navDefinition({ layout, search: true, actions: true, avatar: true });
+/* The hero's left-aligned strip, which has to be asked for: centred is the
+   hero's default. */
+const heroLeft = () =>
+  navDefinition({ layout: 'hero', search: true, actions: true, avatar: true, heroTabsAlign: 'left' });
 
 /** Accepts a spec or a bare node, so a subtree can be asserted on directly. */
 const names = (specOrNode: any): string[] => {
@@ -72,7 +76,7 @@ describe('three layouts, one component', () => {
     for (const l of ['brand-left', 'brand-centre', 'rail'] as NavLayout[]) {
       expect(names(toAddonSpec(full(l))), l).toContain('End');
     }
-    const heroBar = (toAddonSpec(full('hero')) as any).root.children
+    const heroBar = (toAddonSpec(heroLeft()) as any).root.children
       .find((c: any) => c.name === 'Bar');
     expect(names(heroBar)).not.toContain('End');
   });
@@ -90,7 +94,14 @@ describe('three layouts, one component', () => {
       expect(names(toAddonSpec(full(l))), l).toContain('Center');
     }
     expect(names(toAddonSpec(full('rail')))).toContain('Title');
-    expect(names(toAddonSpec(full('hero')))).not.toContain('Center');
+    expect(names(toAddonSpec(heroLeft()))).not.toContain('Center');
+  });
+
+  it('the hero centres its tabs by default', () => {
+    /* Under a full-bleed image the strip is balanced: two filling sides with
+       the tabs hugging between them, so they land on the bar's centre line. */
+    const bar = (toAddonSpec(full('hero')) as any).root.children.find((c: any) => c.name === 'Bar');
+    expect(bar.children.map((c: any) => c.name)).toEqual(['Start', 'Center', 'End']);
   });
 });
 
@@ -151,8 +162,13 @@ describe('the responsive axis is bound, never baked', () => {
   it('every condition used is declared', () => {
     // A breakpoint invented by a typo is a layer that never shows and never
     // errors.
-    for (const l of ALL) {
-      const spec: any = toAddonSpec(full(l));
+    /* Plus the condensed hero: its scroll-gated parts only exist with
+       condensed on, and without walking them Hide-When-Condensed was bound but
+       never checked — which is how it went undeclared. */
+    const defs = [...ALL.map((l) => [l, full(l)] as const),
+      ['hero condensed', navDefinition({ layout: 'hero', search: true, actions: true, avatar: true, condensed: true })] as const];
+    for (const [l, d] of defs) {
+      const spec: any = toAddonSpec(d);
       const conds: string[] = [];
       const walk = (n: any) => { if (n.visibleWhen) conds.push(n.visibleWhen); (n.children || []).forEach(walk); };
       walk(spec.root);
@@ -296,6 +312,7 @@ describe('the condensed state is scroll-driven, not width-driven', () => {
        waved through by the person adding it. */
     const notWidthDriven = new Set([
       'Adaptive-Nav/Show-Condensed',
+      'Adaptive-Nav/Hide-When-Condensed',
       'Adaptive-Nav/Show-Account-Menu',
       /* Session, not width, and a PAIR — Figma binds `visible` to a boolean
          and cannot invert one, so "signed out" needs its own name rather than
@@ -531,6 +548,17 @@ describe('the responsive table travels with the spec', () => {
     const condensed = spec.responsive.matrix['Adaptive-Nav/Show-Condensed'];
     expect(condensed).toEqual({ xs: false, md: false });
   });
+
+  it('Hide-When-Condensed is declared, a scroll condition, and ON at rest', () => {
+    expect(NAV_CONDITIONS['Adaptive-Nav/Hide-When-Condensed']?.trigger).toBe('scroll');
+    const hero = navDefinition({ layout: 'hero', avatar: true, actions: true, condensed: true });
+    const spec: any = toAddonSpec(hero, {
+      breakpoints: BPS,
+      matrix: defaultNavMatrix(Object.keys(NAV_CONDITIONS), BPS),
+    });
+    // The hero's own actions show until the scroll — their opposite is off.
+    expect(spec.responsive.matrix['Adaptive-Nav/Hide-When-Condensed']).toEqual({ xs: true, md: true });
+  });
 });
 
 describe('theme and surface travel as names', () => {
@@ -540,14 +568,15 @@ describe('theme and surface travel as names', () => {
        collection — so a themed subtree pins the mode rather than reading a
        differently-named variable. Storing either as a color would bake one
        brand into an add-on every design system imports. */
-    const spec: any = toAddonSpec(navDefinition({
-      layout: 'brand-left', theme: 'Primary', surface: 'Surface-Bright',
-    }));
-    expect(spec.root.fills[0].color).toEqual({ var: 'Surface-Bright/Background' });
-    expect(spec.root.explicitModes).toEqual({ Theme: 'Primary' });
+    /* The bar is an APP BAR: it pins the design system's App-Bar mode — the
+       bar color chosen once in the studio — and reads its surface by path. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left' }));
+    const bar = spec.root.children[0];
+    expect(bar.fills[0].color).toEqual({ var: 'Surface/Background' });
+    expect(bar.explicitModes).toEqual({ Theme: 'App-Bar' });
   });
 
-  it('defaults to inheriting rather than pinning', () => {
+  it('the root inherits the page — only the bars pin a theme', () => {
     // A nav that follows its surroundings is usually what you want, and an
     // unset theme is how that is expressed — not by choosing one.
     const spec: any = toAddonSpec(navDefinition({ layout: 'brand-left' }));
@@ -564,12 +593,13 @@ describe('theme and surface travel as names', () => {
     }
   });
 
-  it('the rail stays one step dimmer, whatever the bar is set to', () => {
-    /* Relative rather than fixed: a rail pinned to one surface would collide
-       with the bar at some settings and vanish into it at others. */
-    const spec: any = toAddonSpec(navDefinition({ layout: 'rail', surface: 'Surface-Bright' }));
+  it('the rail matches the bar: both wear the App-Bar theme', () => {
+    /* On a desktop the bar and the rail are one piece of chrome round the
+       page; two colors made them read as two. */
+    const spec: any = toAddonSpec(navDefinition({ layout: 'rail' }));
     const rail = spec.root.children.find((c: any) => c.name === 'Rail');
-    expect(rail.fills[0].color).toEqual({ var: 'Surface-Dim/Background' });
+    expect(rail.explicitModes).toEqual({ Theme: 'App-Bar' });
+    expect(rail.fills[0].color).toEqual({ var: 'Surface/Background' });
   });
 });
 

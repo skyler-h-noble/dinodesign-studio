@@ -145,18 +145,11 @@ function escapes(node: NodeDef): boolean {
   return (node.children || []).some((c) => !!c.overlay || escapes(c));
 }
 
-function renderNode(
-  node: NodeDef, opts: RenderOptions, key?: string,
-  parentDirection: 'row' | 'column' = 'column',
-): ReactNode {
-  /* Presence is evaluated, not baked. `visibleWhen` in the Figma spec and this
-     check are the same decision on two targets — which is why the definition
-     stores the condition rather than a resolved boolean. */
-  if (node.presence && node.presence !== 'always') {
-    if (!opts.conditions?.[node.presence.when]) return null;
-  }
-
-  const style: CSSProperties = {
+/** The box a node draws — flex, tokens, sizing, pinning, elevation,
+ *  overlay, surface. Exported so the code generator (navCode) writes the same
+ *  style the preview renders: one layout, two outputs. */
+export function nodeStyle(node: NodeDef, parentDirection: 'row' | 'column'): CSSProperties {
+  return {
     display: 'flex',
     flexDirection: node.direction === 'column' ? 'column' : 'row',
     justifyContent: node.justify ? JUSTIFY[node.justify] : undefined,
@@ -208,6 +201,41 @@ function renderNode(
     // The surface's own fill. data-surface below is what makes this resolve.
     ...(node.surface || node.theme ? { background: 'var(--Background)', color: 'var(--Text)' } : {}),
   };
+}
+
+/** A filled slot: the region (outer) and the box its content sits in
+ *  (inner). Exported for the code generator, for the same reason as nodeStyle. */
+export function slotStyles(node: NodeDef, style: CSSProperties): { outer: CSSProperties; inner: CSSProperties } {
+  const column = node.direction === 'column';
+  const cross = column ? 'stretch' : 'center';
+  const fillsX = node.width === 'fill';
+  const fillsY = node.height === 'fill';
+  const isRegion = fillsX || fillsY;
+  return {
+    outer: { ...style, alignItems: fillsY ? 'stretch' : cross },
+    inner: {
+      flexShrink: isRegion ? 1 : 0,
+      display: 'flex',
+      flexDirection: column ? 'column' : 'row',
+      alignItems: fillsY ? 'stretch' : cross,
+      ...(fillsX ? { width: '100%', minWidth: 0 } : {}),
+      ...(fillsY ? { flex: '1 1 auto' } : {}),
+    },
+  };
+}
+
+function renderNode(
+  node: NodeDef, opts: RenderOptions, key?: string,
+  parentDirection: 'row' | 'column' = 'column',
+): ReactNode {
+  /* Presence is evaluated, not baked. `visibleWhen` in the Figma spec and this
+     check are the same decision on two targets — which is why the definition
+     stores the condition rather than a resolved boolean. */
+  if (node.presence && node.presence !== 'always') {
+    if (!opts.conditions?.[node.presence.when]) return null;
+  }
+
+  const style = nodeStyle(node, parentDirection);
 
   /* Both attributes, never a named color. data-theme and data-surface expose
      the whole matched set — Background, Text, Quiet, Border and the rest — so
@@ -258,19 +286,11 @@ function renderNode(
          
          An item is hug on both axes, so nothing that needs the protection
          loses it. */
-      const fillsX = node.width === 'fill';
-      const fillsY = node.height === 'fill';
-      const isRegion = fillsX || fillsY;
+      void cross;
+      const w = slotStyles(node, style);
       return (
-        <div key={key} style={{ ...style, alignItems: fillsY ? 'stretch' : cross }} {...surfaceAttrs}>
-          <div style={{
-            flexShrink: isRegion ? 1 : 0,
-            display: 'flex',
-            flexDirection: column ? 'column' : 'row',
-            alignItems: fillsY ? 'stretch' : cross,
-            ...(fillsX ? { width: '100%', minWidth: 0 } : {}),
-            ...(fillsY ? { flex: '1 1 auto' } : {}),
-          }}>
+        <div key={key} style={w.outer} {...surfaceAttrs}>
+          <div style={w.inner}>
             {supplied}
           </div>
         </div>
