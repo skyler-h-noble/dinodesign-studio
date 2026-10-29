@@ -341,6 +341,9 @@ CONVERSION RULES:
     thing that will ever ask them.
 
 1. Outermost frame for Mobile / Tab / Web → <Container>.
+   <Container> is LAYOUT ONLY — it centers and caps the width and paints
+   nothing. When the frame's _aaid.modes set a Theme or Surface, wrap it:
+   <Section theme=… surface=…><Container>…</Container></Section>.
    Outermost frame for a component → <Card> or <Section> as appropriate.
 
 1a. CARD vs BOX — a frame is a <Card> ONLY if the design explicitly marks it

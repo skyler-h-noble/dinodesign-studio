@@ -83,7 +83,7 @@ for token/theme details.)
 | Headings | `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `DisplayLarge`, `DisplaySmall` |
 | Body text | `Body`, `BodyLarge`, `BodySmall`, `Subtitle`, `SubtitleLarge` — Body has no bold; see [Body weights](#body-weights) |
 | Labels | `Label`, `Overline`, `Caption` |
-| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `Fab` |
+| Buttons | `Button` (variants: primary/secondary/tertiary/neutral/info/success/warning/error/default + `-outline`/`ghost`/`text` — there is no `-light` shape, see below), `ButtonGroup`, `ToggleButtonGroup` (segmented choice), `Fab` |
 | Inputs | `TextField`, `TextInput`, `EmailTextField`, `PasswordTextField`, `NumberField`, `SearchField`, `TextArea`, `Autocomplete`, `Select` |
 | Selection | `Checkbox`, `Radio`, `RadioGroup`, `SwitchInput`, `Slider`/`SliderInput`, `RangeSlider`, `Rating` |
 | Dates | `DatePicker` (single or `selectionMode="range"`), `DayCell` |
@@ -197,16 +197,18 @@ entry up meant every tool reading this file believed a workaround was load-
 bearing and that the component could not be trusted — the same way the `Menu`
 entry made a working menu go unused for months.
 
-Use it as normal:
+Selection moved to **`ToggleButtonGroup`**. `ButtonGroup` is a group of
+buttons, each with its own `onClick`; `value` / `onChange` on it still work but
+warn and will go in the next major. For a segmented choice:
 
 ```tsx
-<ButtonGroup value={selected} onChange={setSelected} size="small">
+<ToggleButtonGroup value={selected} onChange={setSelected} size="small">
   <Button value="a" size="small">A</Button>
   <Button value="b" size="small">B</Button>
-</ButtonGroup>
+</ToggleButtonGroup>
 ```
 
-Always pass `value` + `onChange` to the group and `value=` on each child
+Pass `value` + `onChange` to the group and `value=` on each child
 (controlled mode). Do NOT set `variant` on the children: the group assigns it
 per segment — the palette when selected, `-outline` when not — and an explicit
 one wins over that, which is how a group ends up with every segment looking

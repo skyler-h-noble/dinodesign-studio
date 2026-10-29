@@ -96,11 +96,12 @@ function buildDinoTokensMd(uuid: string, input: GenerateInput): string {
 ### Install in Your Project
 
 \`\`\`bash
-npm install @omni-design/components
+npm install @omni-design/components @mui/material@^7 @mui/icons-material@^7 @emotion/react @emotion/styled
 npx @dynodesign/init ${uuid}
 \`\`\`
 
 This downloads the CSS token files into your project and sets up the provider.
+MUI is pinned to 7: MUI 9 removed icons the components import, and the build fails on it.
 
 ---
 
