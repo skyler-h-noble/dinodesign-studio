@@ -3317,6 +3317,31 @@ function generateThemesSection(
 }
 
 /**
+ * Metadata for the chart solver: the dark brand tones as they were BEFORE the
+ * dark-mode chroma ease (darkToneEase.ts), keyed by palette and Color-N.
+ *
+ * Chart colors are solved once for both modes, so handing the solver the
+ * calmer dark tones re-solved the LIGHT-mode chart as well. Recording the
+ * pre-ease hexes lets solveChartPalette see exactly the ramp it always saw:
+ * light-mode charts stay byte-for-byte as they were and dark-mode charts keep
+ * their saturation (a chart mark is small and must stay distinguishable; the
+ * ease is for large surfaces).
+ *
+ * Metadata, not a color token: nothing in CSS or Figma reads it, and a system
+ * exported before the ease simply has no entry, so its charts are untouched.
+ */
+function chartPreEaseDarkTones(dark: Record<string, Array<{ tone: number; color: string; preEaseColor?: string }>>) {
+  const out: Record<string, Record<string, { value: string; type: 'color' }>> = {};
+  for (const [key, name] of [['primary', 'Primary'], ['secondary', 'Secondary'], ['tertiary', 'Tertiary']] as const) {
+    (dark?.[key] || []).forEach((entry, i) => {
+      if (!entry?.preEaseColor) return;
+      (out[name] ||= {})[`Color-${i + 1}`] = { value: entry.preEaseColor, type: 'color' };
+    });
+  }
+  return Object.keys(out).length ? { 'Chart-Pre-Ease-Dark-Tones': out } : {};
+}
+
+/**
  * Export the entire color system to a JSON structure
  */
 export function exportColorSystemToJSON(
@@ -3517,6 +3542,7 @@ export function exportColorSystemToJSON(
       ...(userSelections?.background && {
         'Background': { value: userSelections.background, type: 'string' }
       }),
+      ...chartPreEaseDarkTones(darkModeTonePalettes),
       'Button-Config': {
         DefaultButtonType: { 
           value: buttonStyle === 'black-white' 

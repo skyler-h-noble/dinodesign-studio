@@ -239,7 +239,7 @@ interface BuildInput {
 // against the export's #e2e2e2 — and it had no dark variant at all, so dark
 // mode silently painted the light greys.
 const NEUTRAL_LIGHT: string[] = generateSemanticLightModeScale('#808080').map(t => t.hex);
-const NEUTRAL_DARK: string[] = generateSemanticDarkModeScale('#808080').map(t => t.hex);
+const NEUTRAL_DARK: string[] = generateSemanticDarkModeScale('#808080', undefined, undefined, { easeLightTones: false }).map(t => t.hex);
 
 // ── Contrast-checked tone lookup ──
 // Starting points from neutral lightness calculations.

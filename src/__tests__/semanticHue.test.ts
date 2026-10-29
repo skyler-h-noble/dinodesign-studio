@@ -29,7 +29,7 @@ describe('Error is red at every tone', () => {
   });
 
   it('dark mode is left exactly as it was', () => {
-    expect(semanticDarkScale('error').map((t) => t.hex)).toEqual(generateSemanticDarkModeScale('#D44040').map((t) => t.hex));
+    expect(semanticDarkScale('error').map((t) => t.hex)).toEqual(generateSemanticDarkModeScale('#D44040', undefined, undefined, { easeLightTones: false }).map((t) => t.hex));
   });
 });
 
@@ -39,8 +39,8 @@ describe('Error is red at every tone', () => {
 describe('Success and Warning keep their labels', () => {
   const label = (hex: string) => Math.max(chroma.contrast(hex, '#ffffff'), chroma.contrast(hex, '#1a1a1a'));
   const generated = {
-    success: { light: generateSemanticLightModeScale('#2E9E5A'), dark: generateSemanticDarkModeScale('#2E9E5A') },
-    warning: { light: generateSemanticLightModeScale('#D4941A'), dark: generateSemanticDarkModeScale('#D4941A') },
+    success: { light: generateSemanticLightModeScale('#2E9E5A'), dark: generateSemanticDarkModeScale('#2E9E5A', undefined, undefined, { easeLightTones: false }) },
+    warning: { light: generateSemanticLightModeScale('#D4941A'), dark: generateSemanticDarkModeScale('#D4941A', undefined, undefined, { easeLightTones: false }) },
   };
   for (const key of ['success', 'warning'] as const) {
     for (const mode of ['light', 'dark'] as const) {

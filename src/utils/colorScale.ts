@@ -4,6 +4,7 @@ import chroma from 'chroma-js';
 // predicting. Both modules are leaves — no cycle back into this file.
 import { lightModeTextFixed } from './cssgen/lightModeTonalTextFixedStructure';
 import { getStaticQuietTokensForLightMode } from './cssgen/staticQuietStructures';
+import { darkLightToneChromaMultiplier } from './darkToneEase';
 
 /** The 12-tone light mode scale mapped to LCH lightness values */
 export const TONE_SCALE = [1, 10, 19, 28, 37, 58, 71, 81, 90, 95, 98, 99] as const;
@@ -30,6 +31,11 @@ export interface ToneStep {
     to: string;
     reason: string;
   };
+  /** Dark mode only: this tone's hex BEFORE the dark-mode chroma ease
+   *  (darkToneEase.ts). Set only on tones the ease changed. The chart solver
+   *  reads it so chart colors — solved once for both modes — are not moved by
+   *  a change meant for dark-mode surfaces. */
+  preEaseHex?: string;
 }
 
 /**
@@ -238,6 +244,10 @@ function computeHueScale(
   return hues;
 }
 
+// The dark-mode ease for Color-6 … Color-12 — the curve and why — lives in
+// darkToneEase.ts; generateScaledTones applies it.
+export { DARK_LIGHT_TONE_CHROMA_EASE, darkLightToneChromaMultiplier } from './darkToneEase';
+
 /**
  * Generate a 12-tone scale using a bell-curve chroma distribution.
  * maxChroma controls the peak. The peak position shifts based on hue.
@@ -249,7 +259,8 @@ function generateScaledTones(
   toneScale: readonly number[] = TONE_SCALE,
   isDarkMode: boolean = false,
   lockedHex?: string,
-  hueEasing?: HueEasing
+  hueEasing?: HueEasing,
+  easeDarkLightTones: boolean = false,
 ): ToneStep[] {
   const [userL, , userH] = chroma(hex).lch();
   const { steps } = generateNaturalScale(hex, toneScale);
@@ -273,26 +284,34 @@ function generateScaledTones(
   // Generate all tones normally first
   const tones: ToneStep[] = steps.map((step, index) => {
     const toneHue = hueScale[index];
-    const desiredC = Math.min(maxChroma * bellCurve[index], step.chroma);
+    // The dark-mode ease scales the tone's chroma AFTER the gamut clip, so the
+    // multiplier is a share of what the tone has today — see
+    // DARK_LIGHT_TONE_CHROMA_EASE.
+    const ease = isDarkMode && easeDarkLightTones ? darkLightToneChromaMultiplier(index + 1) : 1;
+    const baseC = Math.min(maxChroma * bellCurve[index], step.chroma);
 
-    let result: string;
-    try {
-      const generated = chroma.lch(step.tone, desiredC, toneHue);
-      const [, , gh] = generated.lch();
-      if (!isNaN(toneHue) && !isNaN(gh) && Math.abs(gh - toneHue) > 10 && desiredC > 0.5) {
-        result = chroma.lch(step.tone, desiredC * 0.9, toneHue).hex();
-      } else {
-        result = generated.hex();
+    const toneHex = (desiredC: number): string => {
+      try {
+        const generated = chroma.lch(step.tone, desiredC, toneHue);
+        const [, , gh] = generated.lch();
+        if (!isNaN(toneHue) && !isNaN(gh) && Math.abs(gh - toneHue) > 10 && desiredC > 0.5) {
+          return chroma.lch(step.tone, desiredC * 0.9, toneHue).hex();
+        }
+        return generated.hex();
+      } catch {
+        return chroma.lch(step.tone, 0, toneHue).hex();
       }
-    } catch {
-      result = chroma.lch(step.tone, 0, toneHue).hex();
-    }
+    };
+
+    const result = toneHex(baseC * ease);
+    const preEase = ease === 1 ? result : toneHex(baseC);
 
     return {
       tone: step.tone,
       lightness: step.tone,
       hex: result,
       colorNumber: index + 1,
+      ...(preEase !== result ? { preEaseHex: preEase } : {}),
     };
   });
 
@@ -505,7 +524,14 @@ export function generateSemanticLightModeScale(
 export function generateSemanticDarkModeScale(
   hex: string,
   maxChroma?: number,
-  hueEasing?: HueEasing
+  hueEasing?: HueEasing,
+  options: {
+    /** Calm Color-6 … Color-12 (DARK_LIGHT_TONE_CHROMA_EASE). On for the
+     *  brand ramps; the fixed-seed semantic ramps opt out — Success and
+     *  Warning are chosen tone by tone (SEMANTIC_TONES) and the rest were
+     *  measured as they are, so easing only some of them would split the set. */
+    easeLightTones?: boolean;
+  } = {},
 ): ToneStep[] {
   /* Ceiling, not target — see the light-mode note above. */
   const [l, c, h] = chroma(hex).lch();
@@ -517,7 +543,10 @@ export function generateSemanticDarkModeScale(
     ? Math.min(naturalPeak, maxChroma)
     : naturalPeak;
 
-  return generateScaledTones(hex, peakChroma, DARK_TONE_SCALE, true, undefined, hueEasing);
+  return generateScaledTones(
+    hex, peakChroma, DARK_TONE_SCALE, true, undefined, hueEasing,
+    options.easeLightTones ?? true,
+  );
 }
 
 /**

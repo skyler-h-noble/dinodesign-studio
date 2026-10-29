@@ -76,15 +76,21 @@ function withTones<T extends { hex: string }>(scale: T[], tones: string[] | unde
 /** A semantic palette's light-mode ramp, with its hue easing (or its chosen tones). */
 export const semanticLightScale = (key: string) => withTones(generateSemanticLightModeScale(SEMANTIC_SEEDS[key], undefined, undefined, SEMANTIC_HUE_EASING[key]?.light), SEMANTIC_TONES[key]?.light);
 /** A semantic palette's dark-mode ramp, with its hue easing (or its chosen tones). */
-export const semanticDarkScale = (key: string) => withTones(generateSemanticDarkModeScale(SEMANTIC_SEEDS[key], undefined, SEMANTIC_HUE_EASING[key]?.dark), SEMANTIC_TONES[key]?.dark);
+export const semanticDarkScale = (key: string) => withTones(generateSemanticDarkModeScale(SEMANTIC_SEEDS[key], undefined, SEMANTIC_HUE_EASING[key]?.dark, { easeLightTones: false }), SEMANTIC_TONES[key]?.dark);
 
 interface ToneEntry {
   tone: number;
   color: string;
+  /** The dark-mode tone before the chroma ease, when the ease changed it
+   *  (ToneStep.preEaseHex). Not a token — exportColorSystemToJSON records it
+   *  in Metadata for the chart solver only. */
+  preEaseColor?: string;
 }
 
-function convertPalette(palette: Array<{ tone: number; lightness: number; hex: string; colorNumber: number }>): ToneEntry[] {
-  return palette.map(t => ({ tone: t.tone, color: t.hex }));
+function convertPalette(palette: Array<{ tone: number; lightness: number; hex: string; colorNumber: number; preEaseHex?: string }>): ToneEntry[] {
+  return palette.map(t => (t.preEaseHex
+    ? { tone: t.tone, color: t.hex, preEaseColor: t.preEaseHex }
+    : { tone: t.tone, color: t.hex }));
 }
 
 export function generateFullLightPalettes(

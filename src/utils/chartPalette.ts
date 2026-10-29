@@ -663,12 +663,29 @@ export function solveChartPalette(designSystemJSON: any, modesPresent: string[] 
     const chartDefN = designSystemJSON.Metadata?.['Default-Settings']?.['Default-Theme']?.N?.value || 12;
     const bgKeyFor = (mode: string) => `Background-${mode === 'Dark-Mode' ? 2 : chartDefN}`;
 
+    /* Charts keep the dark ramps from BEFORE the dark-mode chroma ease.
+     *
+     * The brand dark ramps calm Color-6 … Color-11 (darkToneEase.ts) because
+     * those tones paint large surfaces. A chart mark is the opposite case:
+     * small, and it has to stay vivid enough to tell series apart. And the tone
+     * is solved ONCE for both modes, so feeding the solver the calmer dark
+     * tones re-solved the LIGHT-mode chart too — measured, 28 of 168 light-mode
+     * exports moved two to nine series, some to near-white — a dark-mode
+     * decision changing light mode.
+     *
+     * The export records each eased tone's pre-ease hex in
+     * Metadata['Chart-Pre-Ease-Dark-Tones']; the chart reads those in place of
+     * the eased ones. A system exported before the ease has no entry and its
+     * ramps were never eased, so it reads exactly what it always did. */
+    const preEase: Record<string, Record<string, { value?: string }>> =
+      designSystemJSON.Metadata?.['Chart-Pre-Ease-Dark-Tones'] || {};
     const rampsFor = (mode: string): Record<string, Ramp> => {
       const out: Record<string, Ramp> = {};
       for (const [pal, tones] of Object.entries<any>(designSystemJSON.Modes?.[mode]?.Colors || {})) {
         const r: Ramp = {};
+        const original = mode === 'Dark-Mode' ? preEase[pal] : undefined;
         for (let n = 1; n <= 12; n++) {
-          const v = tones?.[`Color-${n}`]?.value;
+          const v = original?.[`Color-${n}`]?.value ?? tones?.[`Color-${n}`]?.value;
           if (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) r[n] = v.toLowerCase();
         }
         if (Object.keys(r).length === 12) out[pal] = r;
