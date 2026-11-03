@@ -25,7 +25,7 @@ import { fontFamiliesByStyle } from '../../data/fontFamilies';
 import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGenerator';
 import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from '../componentRadii';
 import { motionCSS, motionModeCSS } from '../motion';
-import { solveThemeScrims, generateTextOverImageCSS } from './generateTextOverImage';
+import { buildTextOverImageCSSFromModeSheets, MODE_SWITCH_VAR } from './generateTextOverImage';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
@@ -3391,71 +3391,6 @@ function generateCSSHeader(jsonData: any): string {
  * 2. Multiple modes: { "Light-Mode-Tonal": {...}, "Light-Mode-Professional": {...}, "Dark-Mode": {...} }
  * 3. Nested modes: { Backgrounds: {...}, Modes: { "Light-Mode-Tonal": {...}, ... }, Theme: {...} }
  */
-/**
- * Resolve every theme's Background/Text pair and solve its scrim.
- *
- * Reads the SAME two tokens the theme publishes, so a scrim can never protect
- * a color the theme is not actually using. Light-Mode only: a scrim is a
- * property of the theme's own pair, and the dark pair gets its own entry from
- * the Dark-Mode tree when a consumer switches.
- */
-function buildTextOverImageCSS(jsonData: any): string {
-  const mode = jsonData?.Modes?.['Light-Mode'];
-  const themes = mode?.Themes;
-  if (!themes) return '';
-
-  const deref = (value: any): string => {
-    let v = typeof value === 'string' ? value : value?.value;
-    for (let hop = 0; hop < 8 && typeof v === 'string' && v.startsWith('{'); hop++) {
-      const path = v.slice(1, -1).split('.');
-      let node: any = mode;
-      for (const key of path) node = node?.[key];
-      if (node === undefined) {
-        node = jsonData;
-        for (const key of path) node = node?.[key];
-      }
-      v = typeof node === 'string' ? node : node?.value;
-    }
-    return typeof v === 'string' ? v : '';
-  };
-
-  // Every foreground a themed poster can put on the scrim, with the ratio it
-  // owes. Header takes 3:1 (large text); the rest are body-sized and take 4.5.
-  // Solving only Text was the original defect — a poster whose title is
-  // --Header and whose eyebrow is --Eyebrow got a scrim tuned for neither.
-  const ROLES: { role: string; key: string; target: number }[] = [
-    // --Text is in because H4-H6 use it: a poster title is --Header on H1-H3
-    // and --Text below that, so the scrim has to hold whichever the consumer
-    // reaches for. Header owes 3:1 (large text), Text and Eyebrow owe 4.5.
-    { role: '--Text', key: 'Text', target: 4.5 },
-    { role: '--Eyebrow', key: 'Eyebrow', target: 4.5 },
-    { role: '--Header', key: 'Header', target: 3 },
-    // --Quiet is deliberately OUT. It is the lowest-contrast text the system
-    // ships and it drove the scrim to 0.87 average — near-opaque, hiding the
-    // photograph — while being the one role a poster never puts on an image.
-    // Body copy or a quiet caption over an image is the exceptional case and
-    // should carry its own heavier scrim rather than every hero paying for it.
-  ];
-
-  const pairs: Record<string, { background: string; foregrounds: any[] }> = {};
-  for (const [name, theme] of Object.entries<any>(themes)) {
-    const surfaces = theme?.Surfaces;
-    if (!surfaces) continue;
-    const background = deref(surfaces.Background);
-    if (!/^#[0-9a-f]{6}$/i.test(background)) continue;
-
-    const foregrounds = ROLES
-      .map(r => ({ role: r.role, hex: deref(surfaces[r.key]), target: r.target }))
-      // An 8-digit hex carries alpha; the solver needs opaque values, and
-      // translucent text over a photo is a different problem than this one.
-      .filter(f => /^#[0-9a-f]{6}$/i.test(f.hex));
-
-    if (!foregrounds.length) continue;
-    pairs[name] = { background, foregrounds };
-  }
-  if (!Object.keys(pairs).length) return '';
-  return generateTextOverImageCSS(solveThemeScrims(pairs));
-}
 
 /** How much wider a large button's minimum width is than the standard one.
  *  Mirrored in generateFigmaJSON.ts, which emits the same pair to Figma. */
@@ -3513,6 +3448,17 @@ function aliasTextQuiet(css: string): string {
   );
 }
 
+/**
+ * `--Mode-Dark`: 0 in the light sheet, 1 in the dark one.
+ *
+ * A sheet that is loaded once and never swapped (text-over-image.css) cannot
+ * tell which mode sheet sits beside it; this one number lets it pick its
+ * per-mode value with calc(). Mode sheets are the only place it is set.
+ */
+function modeSwitchCSS(mode: string): string {
+  return `\n:root {\n  ${MODE_SWITCH_VAR}: ${mode === 'Dark-Mode' ? 1 : 0};\n}\n`;
+}
+
 export function generateCSSFiles(jsonData: any): { [filename: string]: string } {
   const cssFiles: { [filename: string]: string } = {}; 
   
@@ -3564,6 +3510,7 @@ img {
 `;
         }
         validatedCSS += chartGroundCSS(jsonData, mode);
+        validatedCSS += modeSwitchCSS(mode);
         cssFiles[`${mode}.css`] = validatedCSS;
         console.log(`✅ Generated ${mode}.css (${css.split('\n').length} lines)`);
       } else {
@@ -3579,9 +3526,11 @@ img {
     cssFiles['base.css'] = validatedBaseCSS;
     console.log(`✅ Generated base.css (${baseCSS.split('\n').length} lines)`);
 
-    // Text-over-image scrims — one per theme, solved for the worst possible
-    // image. See generateTextOverImage.ts for why this needs no image.
-    const scrimCSS = buildTextOverImageCSS(jsonData);
+    // Text-over-image scrims — one per theme and mode, solved for the worst
+    // possible image from the two mode sheets just built, so they protect
+    // exactly the colors a consumer loads. See generateTextOverImage.ts.
+    const scrimCSS = buildTextOverImageCSSFromModeSheets(
+      cssFiles['Light-Mode.css'] ?? '', cssFiles['Dark-Mode.css'] ?? '');
     if (scrimCSS) {
       cssFiles['text-over-image.css'] = scrimCSS;
       console.log('✅ Generated text-over-image.css');
@@ -3627,7 +3576,8 @@ img {
         const css = generateModeCSSFromSingleMode(modesData[mode], mode, jsonData);
         // Validate and clean CSS before adding to output
         const validatedCSS = css.split('\n').map(line => validateCSSLine(line)).join('\n')
-          + chartGroundCSS(jsonData, mode);
+          + chartGroundCSS(jsonData, mode)
+          + modeSwitchCSS(mode);
         cssFiles[`${mode}.css`] = validatedCSS;
         console.log(`✅ Generated ${mode}.css (${css.split('\n').length} lines)`);
       }

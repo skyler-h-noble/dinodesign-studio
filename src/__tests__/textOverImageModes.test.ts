@@ -302,22 +302,31 @@ const files = () => {
 };
 
 describe('on a generated design system', () => {
-  it('light floors match what the current export publishes, theme for theme', () => {
+  it('the export publishes each theme\'s light and dark floor, solved from its own mode sheets', () => {
     const f = files();
-    const published: Record<string, number> = {};
-    for (const m of f['text-over-image.css'].matchAll(/\[data-theme="([^"]+)"\] \{\n {2}--Overlay-Scrim: ([\d.]+);/g)) {
-      published[m[1]] = Number(m[2]);
-    }
-    expect(Object.keys(published).length).toBeGreaterThan(5);
+    const css = f['text-over-image.css'];
     const s = byTheme([f['Light-Mode.css'], f['Dark-Mode.css']]);
-    for (const [theme, alpha] of Object.entries(published)) {
-      expect(s[theme]?.light?.alpha, theme).toBe(alpha);
+    let checked = 0;
+    for (const [theme, solved] of Object.entries<any>(s)) {
+      const light = solved.light?.alpha, dark = solved.dark?.alpha;
+      if (light == null || dark == null) continue;
+      checked++;
+      expect(css, `${theme} light`).toContain(`--Overlay-Scrim-Light: ${light};`);
+      expect(css, `${theme} dark`).toContain(`--Overlay-Scrim-Dark: ${dark};`);
     }
+    expect(checked).toBeGreaterThan(5);
   });
 
-  it('adds Default, which the export skipped', () => {
+  it('the mode sheets carry the switch the floors select on', () => {
     const f = files();
-    expect(f['text-over-image.css']).not.toContain('[data-theme="Default"]');
+    expect(f['Light-Mode.css']).toMatch(/--Mode-Dark: 0;/);
+    expect(f['Dark-Mode.css']).toMatch(/--Mode-Dark: 1;/);
+    expect(f['text-over-image.css']).toContain('var(--Mode-Dark, 0)');
+  });
+
+  it('publishes Default, which the old export skipped', () => {
+    const f = files();
+    expect(f['text-over-image.css']).toContain('[data-theme="Default"]');
     const s = byTheme([f['Light-Mode.css'], f['Dark-Mode.css']]);
     expect(s.Default.light?.feasible).toBe(true);
     expect(s.Default.dark?.feasible).toBe(true);
