@@ -23,7 +23,7 @@
  */
 import { buildPreviewCSS } from './buildPreviewCSS';
 import { parseBackground, parseBar } from './backgroundSelection';
-import { defaultBackgroundTone, defaultSurfaceRefs } from './cssgen/exportToCSS';
+import { defaultBackgroundTone, defaultSurfaceRefs, defaultDimmestRef } from './cssgen/exportToCSS';
 
 type Ramp = { tone: number; color: string }[];
 type Palettes = Record<string, Ramp>;
@@ -94,7 +94,7 @@ export function applyCellButtons(colorSystem: any, input: Input): number {
     // The Default theme reads its surfaces through {Default-Background.*},
     // which only the CSS / Figma generators expand. Expand it the same way.
     const { defPal, defN } = defaultBackgroundTone(colorSystem, modeData, modeName);
-    const defaultRefs = defaultSurfaceRefs(defPal, defN);
+    const defaultRefs = defaultSurfaceRefs(defPal, defN, defaultDimmestRef(colorSystem, modeData, modeName));
     const deref = (ref: unknown): string | null => {
       let value: any = ref;
       for (let hop = 0; hop < 10 && typeof value === 'string' && value.startsWith('{'); hop++) {

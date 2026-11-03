@@ -249,7 +249,7 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     /* No darkTheme. It was hard-coded 'Neutral' here, and the Provider obeyed
        it: in dark mode the root switched from Default to Neutral, bypassing
        the Default theme that carries the chosen page background into dark
-       mode (its own palette at tone 2, DARK_PAGE_N). A Primary-background
+       mode (its own palette at tone 3, DARK_PAGE_N). A Primary-background
        system went neutral. The Provider (0.36.3+) also ignores the field in
        already-published files. */
   }, null, 2);

@@ -26,6 +26,8 @@
  *   surface equals the fill's contrast against the surface.
  */
 
+import { darkLadderMaps } from './darkLadder';
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 type Mode = 'Light' | 'Dark';
@@ -277,10 +279,32 @@ function colorNKey(n: number | 'Vibrant'): string {
   return n === 'Vibrant' ? 'Color-Vibrant' : `Color-${n}`;
 }
 
+/**
+ * Dark mode keys its Surfaces tables by the light-mode index each surface
+ * level uses, not by tone (utils/darkLadder.ts). Reading "the table for a
+ * tone-t surface" therefore means finding an index that is painted at t. An
+ * index answers for the lightest tone any theme paints it at, so the nearest
+ * one at or above t is the conservative read. A light tone that no theme
+ * paints keeps its own entry while that entry was not re-keyed; once it was,
+ * the table no longer answers for that tone and the surface (a row level no
+ * theme paints in dark mode) is not graded — null.
+ */
+function tableKeyForTone(map: Record<number, number> | null | undefined, toneKey: string): string | null {
+  const t = Number(toneKey.replace('Color-', ''));
+  if (!map || !Number.isFinite(t)) return toneKey;
+  if (t <= 5) {
+    const at = Object.entries(map).filter(([, v]) => v >= t)
+      .sort((a, b) => a[1] - b[1] || Number(a[0]) - Number(b[0]));
+    if (at.length) return `Color-${at[0][0]}`;
+  }
+  return map[t] === undefined ? toneKey : null;
+}
+
 function collectChecks(
   modeTree: any,
   bg: BackgroundChoice,
   surfaceBg: string,
+  isDark = false,
 ): ReportCheck[] {
   const checks: ReportCheck[] = [];
   // The background choice's nominal Color-N is only correct for the base
@@ -288,7 +312,12 @@ function collectChecks(
   // at different tones. Map the actual surface hex back to the palette's
   // closest Color-N so Text / Header / Quiet / Border / button-border
   // lookups use the accessible tone for this surface's real lightness.
-  const bgColorKey = closestColorNKey(modeTree, bg.palette, surfaceBg);
+  const toneKey = closestColorNKey(modeTree, bg.palette, surfaceBg);
+  const maps = isDark ? darkLadderMaps(modeTree) : null;
+  const globalKey = tableKeyForTone(maps?.global, toneKey);
+  const stateKey = tableKeyForTone(maps?.byPalette[bg.palette], toneKey) ?? globalKey;
+  if (!globalKey || !stateKey) return checks;
+  const bgColorKey: string = globalKey;
 
   // ── Text (4.5:1) ──
   // Text.Surfaces.{palette}.Color-{N} is keyed by the surface's tone index,
@@ -299,8 +328,8 @@ function collectChecks(
   // An interactive surface changes background under the text on hover/pressed,
   // so text + quiet must clear 4.5 against ALL three states, not just resting.
   // The surface's hover/pressed scrims are Hover/Pressed.{palette}.Color-N.
-  const surfaceHover = getHex(modeTree, `Hover.${bg.palette}.${bgColorKey}`);
-  const surfacePressed = getHex(modeTree, `Pressed.${bg.palette}.${bgColorKey}`);
+  const surfaceHover = getHex(modeTree, `Hover.${bg.palette}.${stateKey}`);
+  const surfacePressed = getHex(modeTree, `Pressed.${bg.palette}.${stateKey}`);
   const textStates: Array<{ bg: string; suffix: string }> = [{ bg: surfaceBg, suffix: '' }];
   if (surfaceHover) textStates.push({ bg: surfaceHover, suffix: ' → Hover' });
   if (surfacePressed) textStates.push({ bg: surfacePressed, suffix: ' → Pressed' });
@@ -518,7 +547,7 @@ export function buildAccessibilityReport(tokens: any): ReportSection[] {
       for (const surface of SURFACE_LEVELS) {
         const surfaceBg = resolveSurface(tree, bg, surface);
         if (!surfaceBg) continue; // skip if the token system doesn't define this combo
-        const checks = collectChecks(tree, bg, surfaceBg);
+        const checks = collectChecks(tree, bg, surfaceBg, mode === 'Dark');
         sections.push({
           mode,
           background: `${bg.label} (${bg.palette}-${bg.colorN})`,
@@ -545,7 +574,7 @@ export function buildAccessibilityReport(tokens: any): ReportSection[] {
           background: `${palette} theme (${palette}-${n})`,
           surfaceLevel: 'Surface',
           surfaceBg,
-          checks: collectChecks(tree, bg, surfaceBg),
+          checks: collectChecks(tree, bg, surfaceBg, mode === 'Dark'),
         });
       }
     }

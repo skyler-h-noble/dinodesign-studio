@@ -191,23 +191,27 @@ describe('Surface-Brightest', () => {
     walk(json.Modes['Dark-Mode'].Themes, 0);
     expect(dangling).toEqual([]);
 
-    /* And there should be NONE left: the ends are anchored per theme, so Theme
-       aliases {Colors.<palette>.Color-N} directly and the per-row copies are
-       dead weight. This keeps them from creeping back. The previous version
-       guarded that such references EXISTED, which was right while the row was
-       their only home. */
-    let rowEndRefs = 0;
+    /* And only the anchors use one. The ends are anchored per theme, so a
+       toned end reads its tone's row (Background-<n>.Surfaces.Surface) and
+       the per-row copies stay dead weight. The one exception is a literal
+       anchor — Neutral's black — which has no tone row to read and names its
+       row's end instead, so dark mode can paint tone 1 there
+       (darkLadderPass, step 1). This keeps any other from creeping back. */
+    const rowEndRefs: string[] = [];
     const count = (node: any, depth: number) => {
       if (!node || typeof node !== 'object' || depth > 16) return;
       if (typeof node.value === 'string') {
-        if (/\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/.test(node.value)) rowEndRefs++;
+        if (/\.Surfaces\.(Surface-Dimmest|Surface-Brightest)\}$/.test(node.value)
+          && !/^\{Backgrounds\.[\w-]+\.Background-(1\.Surfaces\.Surface-Dimmest|12\.Surfaces\.Surface-Brightest)\}$/.test(node.value)) {
+          rowEndRefs.push(node.value);
+        }
         return;
       }
       for (const k of Object.keys(node)) if (k !== 'type') count(node[k], depth + 1);
     };
     count(json.Modes['Light-Mode'].Themes, 0);
     count(json.Modes['Dark-Mode'].Themes, 0);
-    expect(rowEndRefs).toBe(0);
+    expect(rowEndRefs).toEqual([]);
   });
 
   it('emits no per-row copies of the anchored ends', () => {
@@ -222,11 +226,14 @@ describe('Surface-Brightest', () => {
        pointing at them either way. This is what fails if the strip is removed. */
     const f: any = withStyle();
     const found: string[] = [];
+    // Kept only where the Theme layer reads it (Neutral's black anchor).
+    const read = JSON.stringify(f.Themes);
     for (const mode of ['Light-Mode', 'Dark-Mode']) {
       const bg = f.Modes?.[mode]?.Backgrounds || {};
       for (const palette of Object.keys(bg)) {
         for (const row of Object.keys(bg[palette] || {})) {
           for (const k of ['Surface-Dimmest', 'Surface-Brightest']) {
+            if (read.includes(`{Backgrounds.${palette}.${row}.Surfaces.${k}}`)) continue;
             if (bg[palette][row]?.Surfaces?.[k]) found.push(`${mode}/${palette}/${row}/${k}`);
           }
         }
@@ -345,11 +352,22 @@ describe('Surface-Brightest', () => {
   // kept deriving Dimmest as surface-minus-two and Neutral's darkest surface painted
   // Color-8 - a mid grey - on a page whose markup already said Surface-Dimmest.
   // A module tested in isolation proves the rule, not that the rule is in force.
-  it('locks Neutral Surface-Dimmest to true black, in BOTH modes', () => {
-    for (const mode of ['Light-Mode', 'Dark-Mode'] as const) {
-      const bg = json.Modes[mode].Themes.Neutral?.['Surfaces-Dimmest']?.Background?.value;
-      expect(bg, `${mode} Neutral Surface-Dimmest`).toBe('#000000');
-    }
+  /* Light mode only, since the dark ladder (utils/darkLadder.ts): dark mode
+     paints Neutral's tone 1 there unless the designer chose black (a Black
+     page or black cards). The reference goes through the row's end so the
+     two modes can differ; light mode still resolves to the literal black. */
+  it('locks Neutral Surface-Dimmest to true black in light mode', () => {
+    const resolve = (mode: string) => {
+      let v: any = json.Modes[mode].Themes.Neutral?.['Surfaces-Dimmest']?.Background?.value;
+      for (let hop = 0; hop < 6 && typeof v === 'string' && v.startsWith('{'); hop++) {
+        let n: any = json.Modes[mode];
+        for (const k of v.slice(1, -1).split('.')) n = n?.[k];
+        v = n?.value;
+      }
+      return v;
+    };
+    expect(resolve('Light-Mode')).toBe('#000000');
+    expect(resolve('Dark-Mode')).toBe(json.Modes['Dark-Mode'].Colors.Neutral['Color-1'].value);
   });
 
   it('does not lock Default, which only borrows the Neutral palette', () => {
@@ -359,7 +377,9 @@ describe('Surface-Brightest', () => {
     // Not the literal black the Neutral lock produces — Default only borrows
     // the palette, and keying the lock off the PALETTE blacked it out too.
     expect(bg).not.toBe('#000000');
-    expect(bg).toMatch(/^\{Colors\./);
+    // Through Default-Background, so dark mode can paint the page palette's
+    // tone 1 while light mode keeps the tone its roles name.
+    expect(bg).toBe('{Default-Background.Surface-Dimmest}');
   });
 
   it('keeps Neutral Surface-Brightest mode-aware rather than a literal white', () => {
@@ -371,7 +391,10 @@ describe('Surface-Brightest', () => {
        window says white, because Neutral's Color-12 IS pure white in light
        mode while a hard #ffffff would light dark mode's brightest surface to
        white instead of the dark ramp's top. */
-    expect(light).toMatch(/^\{Colors\.Neutral\.Color-12\}$/);
+    // Through the tone's own row, which holds Color-12 in light mode and the
+    // dark ladder's tone 5 in dark mode (darkLadderPass, step 1).
+    expect(light).toMatch(/^\{Backgrounds\.Neutral\.Background-12\.Surfaces\.Surface\}$/);
+    expect(json.Modes['Light-Mode'].Backgrounds.Neutral['Background-12'].Surfaces.Surface.value).toBe('{Colors.Neutral.Color-12}');
     expect(light).not.toBe('#ffffff');
   });
 

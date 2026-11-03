@@ -151,8 +151,13 @@ describe('the fix is scoped', () => {
     a.forEach((line, i) => {
       if (line !== b[i]) expect(b[i]).toMatch(/--(Quiet|Text-Quiet|Quiet-[A-Za-z]+|Outline-Quiet|Buttons-[A-Za-z]+-Outline-Quiet)\s*:/);
     });
-    expect(changedSections.size).toBeGreaterThan(0);
-    if (mode === 'Dark-Mode') expect(changedSections.has('Error/Surface-Brightest')).toBe(true);
+    /* Light mode still has near-misses to rescue. Dark mode's reported one —
+       Error / Surface-Brightest, Neutral text on a LIGHT Error tone 11 — is
+       gone with the dark ladder (utils/darkLadder.ts): that surface is tone 5
+       now and its Quiet passes on the shared value, so dark mode may need no
+       rescue at all. What still has to hold is the shape: whatever it names
+       moves upward and only there. */
+    if (mode === 'Light-Mode') expect(changedSections.size).toBeGreaterThan(0);
 
     // Figma names the same sections: a float of its own whose value in this
     // mode is above that section's shared tone value.
@@ -173,7 +178,13 @@ describe('the fix is scoped', () => {
   });
 
   it('Figma: existing per-tone floats are untouched; sections that need one alias their own', () => {
-    expect(figma.Themes.Error['Surface-Brightest']['Quiet-Opacity'].value).toBe('{Quiet.Error-Surface-Brightest-Opacity}');
+    // Every section with a float of its own aliases it.
+    const own = Object.keys(figma.Modes['Light-Mode'].Quiet).filter((k) => !/^Color-\d+-Opacity$/.test(k));
+    expect(own.length).toBeGreaterThan(0);
+    for (const k of own) {
+      const [theme, ...rest] = k.replace(/-Opacity$/, '').split('-');
+      expect(figma.Themes[theme][rest.join('-')]['Quiet-Opacity'].value, k).toBe(`{Quiet.${k}}`);
+    }
     for (const mode of ['Light-Mode', 'Dark-Mode']) {
       for (const [k, v] of Object.entries<{ value: number }>(figmaPlain.Modes[mode].Quiet)) {
         expect(figma.Modes[mode].Quiet[k].value, `${mode} ${k}`).toBe(v.value);

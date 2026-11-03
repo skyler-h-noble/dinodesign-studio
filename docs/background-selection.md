@@ -87,8 +87,9 @@ Two wiring gaps did need closing:
 
 - **Dark mode.** The fallback honoured `backgroundN`, which is a LIGHT-mode
   position — a `Surface-Brightest` pick would have painted a near-white page in
-  dark mode. Every legacy branch lands on Color-2, so grid selections do too:
-  the theme carries over, the tone does not.
+  dark mode. The theme carries over, the tone does not: in dark mode the page
+  is the chosen palette's **tone 3** (see [Dark mode](#dark-mode-the-ladder)
+  below; it was tone 2 until 2026-11-03).
 - **The preview.** `buildPreviewCSS` had a case per legacy string and a
   `default:` that fell through to white, so all sixteen new combinations would
   have previewed as a white page while the export painted the real one — a
@@ -118,6 +119,55 @@ variables is recoverable; **deleting them is not** (invariant 8), so do not
 "clean up" the two new keys.
 
 ---
+
+## Dark mode: the ladder
+
+Decided by the owner from the Figma mockups (2026-11-03). In dark mode every
+theme — Default included, no special case — paints its five levels on tones
+1-5 of its own palette:
+
+| level | dark tone |
+| --- | --- |
+| Surface-Dimmest | 1 |
+| Surface-Dim | 2 |
+| Surface | 3 — so the dark **page** is tone 3 |
+| Surface-Bright | 4 |
+| Surface-Brightest | 5 |
+
+Strictly darkest to lightest, all inside the dark band. Light mode does not
+change: the grid above is the light-mode picture.
+
+**Tone 1 is the palette's own tinted tone 1, not black** — Neutral's
+Surface-Dimmest included — unless the designer chose black (the Black page, or
+black cards). Then Neutral's tone-1 levels paint `#000000`.
+
+### How it gets there
+
+Source: `src/utils/darkLadder.ts` (rules) and
+`src/utils/cssgen/darkLadderPass.ts` (applied to the JSON at the end of
+`exportColorSystemToJSON`, so the CSS export and the Figma payload both read
+it).
+
+The Theme layer is mode-independent — Figma builds it once, from Light-Mode —
+and it names LIGHT-mode tone indices: Primary's Surface reads
+`{Text.Surfaces.Neutral.Color-6}` because it paints tone 6 in light mode. So
+the dark ladder lives in the Modes layer: in dark mode the table entry at a
+light-mode index holds the curated answer for the dark tone that index is
+painted at. Each theme's window of indices is read from its own references;
+where two themes name one index for different tones (Info's Bright and
+Primary's Surface are both 6), the entry answers for the lighter one, which is
+safe because every dark-mode foreground is lighter than its surface.
+
+The few references that named a tone directly — a theme's Surface-Dimmest /
+Brightest (`{Colors.<P>.Color-3}` / `-11`), Neutral's black anchor, the
+Default theme's Surface-Dimmest — now name a Backgrounds row (or
+Default-Background), which resolves to the same tone in light mode.
+
+`DARK_PAGE_N` (3) is the tone the page paints; the export reads its tables at
+the page palette's Surface index, through the same window.
+
+Tests: `src/__tests__/darkLadder.test.ts` (what the CSS paints, the preview
+and Figma agree, light mode byte-identical).
 
 ## Related
 

@@ -11,6 +11,10 @@
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
+import {
+  themeWindows, windowForPalette, darkLadderMaps, darkCardLadder, cardRolesFit, exactIndexForTone,
+  DARK_LADDER_TONE, SECTION_LEVEL,
+} from '../darkLadder';
 import { chartColorVisionCSS } from '../chartColorVision';
 import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
@@ -1117,7 +1121,7 @@ function generateThemeColorsVariables(modeData: any): string {
 /** The roles of one black/white button face (Buttons.BlackWhite.<key>). */
 export const BLACK_WHITE_ROLES = ['Button', 'Text', 'Quiet', 'Border', 'Hover', 'Pressed', 'Highlight', 'Lowlight'] as const;
 
-export function defaultSurfaceRefs(defPal: string, defN: number): Record<string, string> {
+export function defaultSurfaceRefs(defPal: string, defN: number, dimmest?: string): Record<string, string> {
   const row = `Backgrounds.${defPal}.Background-${defN}`;
   const defBrightN = Math.min(defN + 1, 12);
   const defBrightestN = defBrightN >= 11 ? 12 : 11;
@@ -1126,7 +1130,27 @@ export function defaultSurfaceRefs(defPal: string, defN: number): Record<string,
     'Default-Background.Surface-Dim': `{${row}.Surfaces.Surface-Dim}`,
     'Default-Background.Surface-Bright': `{${row}.Surfaces.Surface-Bright}`,
     'Default-Background.Surface-Brightest': `{Backgrounds.${defPal}.Background-${defBrightestN}.Surfaces.Surface}`,
+    ...(dimmest ? { 'Default-Background.Surface-Dimmest': dimmest } : {}),
   };
+}
+
+/**
+ * The Default theme's Surface-Dimmest background, per mode.
+ *
+ * Its roles name a tone index directly (Text.Surfaces.<P>.Color-3 and so on),
+ * but its background goes through Default-Background so dark mode can paint
+ * the page palette's tone 1 there (utils/darkLadder.ts). In light mode it is
+ * exactly the tone those roles name, so nothing moves.
+ */
+export function defaultDimmestRef(fullJsonData: any, modeData: any, modeName?: string): string | undefined {
+  if (modeName === 'Dark-Mode') {
+    const { defPal } = defaultBackgroundTone(fullJsonData, modeData, modeName);
+    const n = windowForPalette(modeData, defPal)?.['Surface-Dimmest'];
+    return n ? `{Backgrounds.${defPal}.Background-${n}.Surfaces.Surface}` : undefined;
+  }
+  const own = themeWindows(modeData).find((w) => w.theme === 'Default');
+  const n = own?.index['Surface-Dimmest'];
+  return own && n ? `{Colors.${own.palette}.Color-${n}}` : undefined;
 }
 
 /**
@@ -1160,10 +1184,14 @@ export function defaultBackgroundTone(fullJsonData: any, modeData: any, modeName
   // each; only a cross-artifact comparison caught it.
   const isDarkMode = modeName === 'Dark-Mode';
   if (isDarkMode) {
-    // The chosen theme at Color-2 — darkPageTheme, shared with the preview and
-    // the Figma payload. A grid pick stored only as Background-Theme keeps it.
+    // The chosen theme on its tone 3 — darkPageTheme, shared with the preview
+    // and the Figma payload. A grid pick stored only as Background-Theme keeps
+    // it. defN is an INDEX into the tables, and in dark mode the tables are
+    // keyed by the light-mode index each level uses (utils/darkLadder.ts), so
+    // the page reads the index of its palette's own Surface level — which
+    // paints tone 3. DARK_PAGE_N only answers when there are no themes to read.
     defPal = typeof bgSelection === 'string' && bgSelection ? darkPageTheme(bgSelection) : (metadata?.['Background-Theme']?.value || 'Neutral');
-    defN = DARK_PAGE_N;
+    defN = windowForPalette(modeData, defPal)?.Surface ?? DARK_PAGE_N;
   }
   return { defPal, defN };
 }
@@ -1198,6 +1226,24 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   // Build a flat lookup: token path → final resolved value
   // This traverses ALL JSON sections and follows references until we reach a Color-N or hex
   const tokenLookup: Record<string, string> = {};
+
+  /* Hover / Pressed are computed from the palette and the tone their
+     reference names. In dark mode a surface's reference names the LIGHT-mode
+     index of its level, which paints another tone (utils/darkLadder.ts), so
+     the state is computed for the tone actually painted. References that read
+     a tone as a tone (a button fill's hover) were pinned by the dark-ladder
+     pass and no longer name a re-keyed index, so they pass through unchanged. */
+  const hoverToneMap = modeName === 'Dark-Mode' ? darkLadderMaps(modeData).byPalette : null;
+  const resolveHA = (token: string): string | null => {
+    if (!modeData?.Colors) return null;
+    let t = token;
+    if (hoverToneMap) {
+      const m = t.replace(/[{}]/g, '').match(/^(Hover|Pressed)\.([\w-]+)\.Color-(\d+)$/);
+      const tone = m ? hoverToneMap[m[2]]?.[Number(m[3])] : undefined;
+      if (m && tone) t = `{${m[1]}.${m[2]}.Color-${tone}}`;
+    }
+    return resolveHoverActiveToken(t, modeData.Colors);
+  };
 
   function buildLookup(obj: any, prefix: string) {
     if (!obj || typeof obj !== 'object') return;
@@ -1260,6 +1306,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   // Border-Variant = border color at 20% opacity (8-digit hex suffix '33')
   // The Border section has the border color, so we resolve it and append '26'
   const palettesForBV = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error', 'Hotlink-Visited'];
+  /* In dark mode a Surfaces index names the tone it is painted at through the
+     dark ladder (utils/darkLadder.ts), not itself. */
+  const surfaceToneAt = modeName === 'Dark-Mode'
+    ? ((m) => (i: number) => m[i] ?? i)(darkLadderMaps(modeData).global)
+    : (i: number) => i;
   for (const pal of palettesForBV) {
     for (let i = 1; i <= 12; i++) {
       const colorN = `Color-${i}`;
@@ -1281,7 +1332,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
             // the BACKGROUND tone, so the palette entry at that key is the
             // surface this border sits on. A flat alpha measured a 27x spread
             // in perceived weight across themes; see variantAlpha.ts.
-            const surfaceHex = modeData?.Colors?.[pal]?.[colorN]?.value;
+            const surfaceHex = modeData?.Colors?.[pal]?.[ctx === 'Surfaces' ? `Color-${surfaceToneAt(i)}` : colorN]?.value;
             tokenLookup[`Border-Variant.${ctx}.${pal}.${colorN}`] =
               variantHex8(hex, BORDER_VARIANT_ALPHA, surfaceHex);
           }
@@ -1311,15 +1362,28 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   {
     const { defPal, defN } = defaultBackgroundTone(fullJsonData, modeData, modeName);
     const isDarkMode = modeName === 'Dark-Mode';
-    const colorN = `Color-${defN}`;
-    // Dark containers are always tonal at Color-3 (see generateFigmaJSON).
+    /* Dark mode: defN and the scope tones below are the page palette's window
+       INDICES — right for its rows and its Hover/Pressed, which are keyed by
+       the background's palette. Every other role reads the entry that answers
+       for exactly the tone the level paints (exactIndexForTone): an index the
+       page shares with another theme can hold the answer for a lighter tone. */
+    const ladderMaps = isDarkMode ? darkLadderMaps(modeData) : null;
+    const roleIndex = (winIdx: number): number => {
+      const tone = ladderMaps?.byPalette[defPal]?.[winIdx];
+      return ladderMaps && tone ? exactIndexForTone(ladderMaps.global, tone, winIdx) : winIdx;
+    };
+    const colorN = `Color-${roleIndex(defN)}`;
+    const stateColorN = `Color-${defN}`;
+    // Dark containers read row 3: in dark mode every row carries the same
+    // tonal card ladder (the one lifted above a tone-3 surface, darkLadderPass),
+    // and the CSS lifts cards per surface level on top of it.
     const contN = isDarkMode ? 3 : defN;
     const contColorN = `Color-${contN}`;
 
     // Background surfaces/containers — reference Backgrounds.{Palette}.Background-{N}
     const bgKey = `Backgrounds.${defPal}.Background-${defN}`;
     const contBgKey = `Backgrounds.${defPal}.Background-${contN}`;
-    Object.assign(tokenLookup, defaultSurfaceRefs(defPal, defN));
+    Object.assign(tokenLookup, defaultSurfaceRefs(defPal, defN, defaultDimmestRef(fullJsonData, modeData, modeName)));
     // Surface-Brightest. overrideSurface in generateCompleteThemes routes the
     // Default theme's brightest surface through Default-Background alongside
     // the other three, but this lookup was never given the matching entry — so
@@ -1407,7 +1471,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // Background-N, not Color-N. Using colorN here produced
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the
     // Default theme's focus ring unbound in both modes.
-    const backgroundN = `Background-${defN}`;
+    const backgroundN = `Background-${roleIndex(defN)}`;
     /* The card's ring is keyed by the card's FACE tone, like its text: with
        black cards on a light page the face is near-black while contN is
        the page tone, and a ring solved for a light card (Info-5, 2.6:1)
@@ -1418,8 +1482,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     tokenLookup['Default-Background.Container-Focus-Visible'] = `{Focus-Visible.Containers.${containerBackgroundN}}`;
 
     // Hover/Pressed — reference {Hover/Pressed.Palette.Color-N}
-    tokenLookup['Default-Background.Hover'] = `{Hover.${defPal}.${colorN}}`;
-    tokenLookup['Default-Background.Pressed'] = `{Pressed.${defPal}.${colorN}}`;
+    tokenLookup['Default-Background.Hover'] = `{Hover.${defPal}.${stateColorN}}`;
+    tokenLookup['Default-Background.Pressed'] = `{Pressed.${defPal}.${stateColorN}}`;
     // Container states come from the Containers group, which is computed from
     // the container color. The flat family is indexed by background tone and
     // would send a dark container to a light hover.
@@ -1466,18 +1530,27 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       }
       return null;
     };
-    const surfaceScopes: Array<{ prefix: string; tone: number }> = [
-      { prefix: '', tone: defN },
-      { prefix: 'Surface-Dim-', tone: Math.max(defN - 1, 1) },
-      { prefix: 'Surface-Bright-', tone: Math.min(defN + 1, 12) },
+    /* In dark mode the page is its palette's theme, level for level: the same
+       window of indices, which the tables answer for tones 1-5
+       (utils/darkLadder.ts). `tone` below is that INDEX. */
+    const darkWindow = isDarkMode ? windowForPalette(modeData, defPal) : null;
+    const surfaceScopes: Array<{ prefix: string; tone: number; section: string }> = darkWindow ? [
+      { prefix: '', tone: darkWindow.Surface ?? defN, section: 'Surfaces' },
+      { prefix: 'Surface-Dim-', tone: darkWindow['Surface-Dim'] ?? Math.max(defN - 1, 1), section: 'Surfaces-Dim' },
+      { prefix: 'Surface-Bright-', tone: darkWindow['Surface-Bright'] ?? Math.min(defN + 1, 12), section: 'Surfaces-Bright' },
+      { prefix: 'Surface-Brightest-', tone: darkWindow['Surface-Brightest'] ?? 11, section: 'Surfaces-Brightest' },
+    ] : [
+      { prefix: '', tone: defN, section: 'Surfaces' },
+      { prefix: 'Surface-Dim-', tone: Math.max(defN - 1, 1), section: 'Surfaces-Dim' },
+      { prefix: 'Surface-Bright-', tone: Math.min(defN + 1, 12), section: 'Surfaces-Bright' },
       // Surface-Brightest: 11, or 12 once Bright has taken 11. Must match
       // generateCompleteThemes' brightestN or Default's brightest surface
       // pairs its foregrounds with a different tone than it paints.
-      { prefix: 'Surface-Brightest-', tone: Math.min(defN + 1, 12) >= 11 ? 12 : 11 },
+      { prefix: 'Surface-Brightest-', tone: Math.min(defN + 1, 12) >= 11 ? 12 : 11, section: 'Surfaces-Brightest' },
     ];
 
-    for (const { prefix, tone } of surfaceScopes) {
-      const vColorN = `Color-${tone}`;
+    for (const { prefix, tone, section } of surfaceScopes) {
+      const vColorN = `Color-${roleIndex(tone)}`;
       // Base roles resolve from their own family at the surface's own palette.
       for (const prop of props) {
         tokenLookup[`Default-Background.${prefix}${prop}`] = `{${prop}.Surfaces.${defPal}.${vColorN}}`;
@@ -1556,6 +1629,18 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         tokenLookup[`Default-Background.${prefix}On-Match`] =
           `{Text.Surfaces.${matchOnTone.palette}.Color-${matchOnTone.n}}`;
       }
+      /* Dark mode: the Text table is keyed by SURFACE index there, so reading
+         it at an icon's tone no longer means "text on that tone". The page is
+         its palette's theme level for level, so it takes that theme's own
+         On-* — which the dark-ladder pass already points at the right text
+         for the icon drawn there. */
+      if (darkWindow) {
+        const icons = modeData?.Themes?.[defPal]?.[section]?.Icons;
+        for (const pal of [...accentPalettes, 'Default', 'Match']) {
+          const v = icons?.[`On-${pal}`]?.value;
+          if (typeof v === 'string') tokenLookup[`Default-Background.${prefix}On-${pal}`] = v;
+        }
+      }
       // Icons-Default tracks --Text in every other theme (verified across all
       // 20); Default must not be the exception. Its -Variant is the alpha form,
       // matching generateSingleTheme's non-BW branch.
@@ -1569,14 +1654,14 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       tokenLookup[`Default-Background.${prefix}Icons-Default-Variant`] = `{Icon-Variant.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Hotlink`] = `{Text.Surfaces.Info.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Hotlink-Visited`] = `{Text.Surfaces.Hotlink-Visited.${vColorN}}`;
-      tokenLookup[`Default-Background.${prefix}Focus-Visible`] = `{Focus-Visible.Surfaces.Background-${tone}}`;
+      tokenLookup[`Default-Background.${prefix}Focus-Visible`] = `{Focus-Visible.Surfaces.Background-${roleIndex(tone)}}`;
       /* The surface's alpha, carried in the same {Quiet.Color-N-Opacity} shape
          every other theme writes directly, so one resolver handles all of them.
          Default differs only in that its tone has to be looked up rather than
          written into the reference by generateCompleteThemes. */
       tokenLookup[`Default-Background.${prefix}Quiet-Opacity`] = `{Quiet.${vColorN}-Opacity}`;
-      tokenLookup[`Default-Background.${prefix}Hover`] = `{Hover.${defPal}.${vColorN}}`;
-      tokenLookup[`Default-Background.${prefix}Pressed`] = `{Pressed.${defPal}.${vColorN}}`;
+      tokenLookup[`Default-Background.${prefix}Hover`] = `{Hover.${defPal}.Color-${tone}}`;
+      tokenLookup[`Default-Background.${prefix}Pressed`] = `{Pressed.${defPal}.Color-${tone}}`;
     }
 
 
@@ -1628,7 +1713,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
 
       // Resolve Hover/Pressed tokens directly to hex when possible
       if (modeData?.Colors) {
-        const haHex = resolveHoverActiveToken(current, modeData.Colors);
+        const haHex = resolveHA(current);
         if (haHex) return haHex;
       }
 
@@ -1637,7 +1722,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       if (btnHAMatch && modeData?.Buttons && modeData?.Colors) {
         const innerToken = modeData.Buttons?.[btnHAMatch[1]]?.[btnHAMatch[2]]?.[btnHAMatch[3]]?.value;
         if (innerToken) {
-          const hex = resolveHoverActiveToken(innerToken, modeData.Colors);
+          const hex = resolveHA(innerToken);
           if (hex) return hex;
         }
       }
@@ -1694,7 +1779,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
 
           // Check if resolved is a hover/active token → resolve to hex
           if (modeData?.Colors) {
-            const haResolved = resolveHoverActiveToken(resolved, modeData.Colors);
+            const haResolved = resolveHA(resolved);
             if (haResolved) return haResolved;
           }
 
@@ -1772,7 +1857,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
      payload reads. Solving them again here independently is exactly the
      divergence invariant 5 warns about: both sides would be self-consistent
      and paint different colours. */
-  const quietTable = solveQuietOpacities(modeData, (raw: any) => hexForToken(raw));
+  const quietTable = solveQuietOpacities(modeData, (raw: any) => hexForToken(raw), 4.5, surfaceToneAt);
   for (const note of quietTable.notes)
     console.warn(`[css] Quiet ${modeName ?? ''}: ${note}`);
 
@@ -1946,7 +2031,9 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
 
   const sections: string[] = [];
   const themes = modeData.Themes;
-  
+  const isDarkSheet = modeName === 'Dark-Mode';
+  const ladderWindows = isDarkSheet ? themeWindows(modeData) : [];
+
   // Process each theme (Primary-Light, Primary, Secondary, etc.)
   Object.keys(themes).forEach(themeName => {
     const theme = themes[themeName];
@@ -1997,12 +2084,50 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       }
     ];
 
+    /* Dark mode: cards lift above the surface they sit on (utils/darkLadder.ts).
+       Each surface level declares its own five card colors, and the cards
+       inherit them, so a Container reads the ladder of the surface it is on.
+       The Containers block below then leaves --Container-* alone — set on the
+       card itself, it would win over the surface's and flatten every level to
+       one ladder again. The top of tone 5's lift is wherever the cards' own
+       roles stop passing. */
+    const containerTokenLines = theme.Containers && typeof theme.Containers === 'object'
+      ? processTokens(theme.Containers) : [];
+    const cardLadderLines = (() => {
+      if (!isDarkSheet) return null;
+      const palette = isDefaultTheme
+        ? defaultBackgroundTone(fullJsonData, modeData, modeName).defPal
+        : ladderWindows.find((w) => w.theme === themeName)?.palette;
+      const ramp = Array.from({ length: 12 }, (_, i) => modeData?.Colors?.[palette ?? '']?.[`Color-${i + 1}`]?.value)
+        .map((v) => (typeof v === 'string' ? v.slice(0, 7) : ''));
+      if (!palette || ramp.some((h) => !/^#[0-9a-f]{6}$/i.test(h))) return null;
+      const roles: Record<string, string> = {};
+      for (const line of containerTokenLines) {
+        const m = line.match(/^\s*(--[\w-]+):\s*(.+);$/);
+        if (!m || /^--Container(-|$)/.test(m[1])) continue;
+        const v = m[2].trim();
+        const viaVar = v.match(/^var\(--([\w-]+)-(Color-\d+)\)$/);
+        const hex = viaVar ? modeData?.Colors?.[viaVar[1]]?.[viaVar[2]]?.value : v;
+        if (typeof hex === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(hex)) roles[m[1]] = hex;
+      }
+      const fits = cardRolesFit(roles);
+      const out: Record<string, string[]> = {};
+      for (const [section, level] of Object.entries(SECTION_LEVEL)) {
+        const tone = DARK_LADDER_TONE[level];
+        const { cards } = darkCardLadder(ramp, tone, tone === 5 ? fits : undefined);
+        out[section] = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest']
+          .map((name, i) => `  --${name}: ${cards[i]};`);
+      }
+      return out;
+    })();
+
     for (const variant of surfaceVariants) {
       const variantData = theme[variant.key];
       if (variantData && typeof variantData === 'object') {
         const surfaceLines: string[] = [];
         surfaceLines.push(`/* Theme: ${themeName} - ${variant.key} */`);
         surfaceLines.push(`${variant.selector} {`);
+        if (cardLadderLines?.[variant.key]) surfaceLines.push(...cardLadderLines[variant.key]);
 
         // DEBUG: Check if Buttons and Tag exist
         if (variantData.Buttons) {
@@ -2063,6 +2188,13 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     if (theme.Containers && typeof theme.Containers === 'object') {
       const containerLines: string[] = [];
       containerLines.push(`/* Theme: ${themeName} - Containers */`);
+      /* Dark mode: a card with no theme above it sits on the Default page, so
+         it carries Default's card roles — the same floor the bare surface
+         selectors give. Its colors now come from the page's own card ladder
+         (above); without the roles it would keep the page's Quiet, which is
+         solved for tone 3 and not for the lifted card. (0,1,0), so any real
+         theme above still wins. */
+      if (isDefaultTheme && cardLadderLines) containerLines.push('[data-surface^="Container"],');
       containerLines.push(`[data-theme="${themeName}"] [data-surface^="Container"],`);
       containerLines.push(`[data-theme="${themeName}"][data-surface^="Container"] {`);
       
@@ -2078,8 +2210,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         console.log(`      ✗ Containers.Tag NOT FOUND`);
       }
       
-      // Recursively process all tokens in Containers
-      const tokenLines = processTokens(theme.Containers);
+      // Recursively process all tokens in Containers. In dark mode the five
+      // card colors come from the surface the card sits on (see above).
+      const tokenLines = cardLadderLines
+        ? containerTokenLines.filter((l) => !/^\s*--Container(-Lowest|-Low|-High|-Highest)?:/.test(l))
+        : containerTokenLines;
       containerLines.push(...tokenLines);
 
       // Ensure Dropshadow-Color exists — compute from Container background if missing

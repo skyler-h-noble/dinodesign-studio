@@ -9,7 +9,9 @@
  * what lands on large areas: Color-6 IS a themed section's Surface, Color-7 its
  * Surface-Bright, Color-11 its Surface-Brightest. Color-6 had light mode's full
  * mid-tone chroma, so a whole dark-mode section was painted at the brand's
- * loudest.
+ * loudest. (Since the dark ladder, utils/darkLadder.ts, dark-mode sections
+ * paint tones 1-5 instead; the ease still governs every light tone that
+ * remains — buttons, icons, borders, text.)
  *
  * The ease lives in the dark-ramp generator, so the preview, the CSS export and
  * the Figma payload all read the same eased ramp. These tests drive the real
@@ -254,23 +256,30 @@ describe('preview, export and Figma agree on the eased tones', () => {
     }
   });
 
-  it('a dark-mode Primary section (Surface) paints the eased Color-6 in the export', () => {
-    // The case that prompted the change: <Section theme="Primary" surface="Surface">.
+  it('a dark-mode Primary section (Surface) paints its dark-ladder tone in the export', () => {
+    // The case that prompted the ease was <Section theme="Primary"
+    // surface="Surface"> painting Color-6. Since the dark ladder
+    // (utils/darkLadder.ts) every theme's levels paint tones 1-5 in dark
+    // mode — Surface tone 3, Bright tone 4 — which the ease leaves alone.
     const bg = cssToken(css['Dark-Mode.css'], /\[data-theme="Primary"\]\[data-surface="Surface"\]/, 'Background');
-    expect(norm(resolveVar(css['Dark-Mode.css'], bg))).toBe(norm(eased[5].hex));
-    // Surface-Bright and Surface-Brightest follow their own eased tones.
+    expect(norm(resolveVar(css['Dark-Mode.css'], bg))).toBe(norm(eased[2].hex));
     const bright = cssToken(css['Dark-Mode.css'], /\[data-theme="Primary"\]\[data-surface="Surface-Bright"\]/, 'Background');
-    expect(norm(resolveVar(css['Dark-Mode.css'], bright))).toBe(norm(eased[6].hex));
+    expect(norm(resolveVar(css['Dark-Mode.css'], bright))).toBe(norm(eased[3].hex));
+    expect(eased[2].hex).toBe(plain[2].hex);
   });
 
   it('the preview reads the eased ramp where it draws from the dark palette', () => {
-    // The page's Default button border is dark Color-6 in both pipelines.
+    // The page's Default button border agrees between the two pipelines.
     const preview = norm(cssToken(previewCss, /\[data-theme="Brand"\],\s*\[data-theme="Brand"\]\[data-surface="Surface"\]/, 'Buttons-Default-Border'));
     const exportRaw = cssToken(css['Dark-Mode.css'], /^\s*:root,/, 'Buttons-Default-Border');
     const exported = norm(resolveVar(css['Dark-Mode.css'], exportRaw));
     expect(preview).toBe(exported);
-    expect(preview).toBe(norm(eased[5].hex));
-    expect(preview).not.toBe(norm(plain[5].hex));
+    /* Since the dark ladder the page is tone 3, so the border is no longer
+       Color-6 — but whichever light tone it lands on is read from the EASED
+       ramp, in both pipelines. */
+    const at = eased.findIndex((t) => norm(t.hex) === preview);
+    expect(at, `${preview} is not a tone of the eased ramp`).toBeGreaterThanOrEqual(5);
+    expect(preview).not.toBe(norm(plain[at].hex));
   });
 });
 

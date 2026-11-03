@@ -26,6 +26,7 @@ import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/ge
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 import { compositeOver, contrastRatio } from '../utils/quietOpacity';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
+import { darkLadderMaps } from '../utils/darkLadder';
 
 /** the eight palettes that are actually painted as a surface */
 const PALETTES = ['Neutral', 'Primary', 'Secondary', 'Tertiary',
@@ -60,6 +61,12 @@ function buildSystem() {
 
 const SYSTEM = buildSystem();
 const OUT = generateFigmaJSON(SYSTEM) as any;
+
+/* The ground a Surfaces index is painted on. In dark mode the tables are keyed
+   by the light-mode index each level uses, and an index answers for the
+   lightest tone any theme paints it at (utils/darkLadder.ts). */
+const DARK_TONE = darkLadderMaps(SYSTEM.Modes['Dark-Mode']).global;
+const groundTone = (mode: string, n: number) => (mode === 'Dark-Mode' ? DARK_TONE[n] ?? n : n);
 
 /** follow one alias hop the way the emitter does, for the assertions below */
 function hexOf(mode: string, raw: any): string | null {
@@ -103,7 +110,7 @@ describe('Quiet-Opacity reaches the Figma payload', () => {
           for (const pal of PALETTES) {
             const fg = hexOf(mode, M.Text?.[branch]?.[pal]?.[`Color-${n}`]);
             const bg = branch === 'Surfaces'
-              ? hexOf(mode, M.Colors?.[pal]?.[`Color-${n}`])
+              ? hexOf(mode, M.Colors?.[pal]?.[`Color-${groundTone(mode, n)}`])
               : hexOf(mode, M.Backgrounds?.[pal]?.[`Background-${n}`]?.Containers?.['Container-Highest']);
             if (!fg || !bg) continue;
             const ratio = contrastRatio(compositeOver(fg, bg, alpha), bg);
@@ -127,7 +134,7 @@ describe('Quiet-Opacity reaches the Figma payload', () => {
           for (const pal of PALETTES) {
             const fg = hexOf(mode, M.Text?.[branch]?.[pal]?.[`Color-${n}`]);
             const bg = branch === 'Surfaces'
-              ? hexOf(mode, M.Colors?.[pal]?.[`Color-${n}`])
+              ? hexOf(mode, M.Colors?.[pal]?.[`Color-${groundTone(mode, n)}`])
               : hexOf(mode, M.Backgrounds?.[pal]?.[`Background-${n}`]?.Containers?.['Container-Highest']);
             if (!fg || !bg) continue;
             worst = Math.min(worst, contrastRatio(compositeOver(fg, bg, alpha), bg));

@@ -129,11 +129,14 @@ describe('black/white face follows what the section paints', () => {
     });
   }
 
-  it('dark mode · the Default theme\'s page surfaces carry the white face; its light Brightest the black', () => {
+  /* Every level is dark since the dark ladder (utils/darkLadder.ts) —
+     Brightest is tone 5, not the light tone it used to be — so every Default
+     surface carries the white face. */
+  it('dark mode · the Default theme\'s page surfaces all carry the white face', () => {
     for (const s of REPORT_SURFACES.filter((x) => x.startsWith('Surface'))) {
       const el: CascadeElement = { attrs: { 'data-surface': s }, parent: { attrs: { 'data-theme': 'Default' }, parent: root } };
       const v = cascade.computed(el);
-      const shouldBeWhite = s !== 'Surface-Brightest';
+      const shouldBeWhite = true;
       expect(white(v['--Buttons-BlackWhite-Button']), `${s} ${v['--Buttons-BlackWhite-Button']} on ${v['--Background']}`).toBe(shouldBeWhite);
     }
   });

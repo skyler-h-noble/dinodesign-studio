@@ -7,6 +7,7 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
+import { DARK_LADDER_TONE, darkCardLadder, blackChosen } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -695,7 +696,8 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // ── Resolve surface background ──
   let surfaceBg: string;
-  /* Dark mode: the chosen background's THEME at Color-2 — darkPageTheme, the
+  /* Dark mode: the chosen background's THEME on its tone 3 (DARK_PAGE_N, the
+     dark ladder's Surface) — darkPageTheme, the
      one rule the export and the Figma payload use too. */
   const darkTheme = darkPageTheme(sel.background);
   const darkThemeRamp = (t: string) => (t === 'Primary' ? primary : t === 'Secondary' ? secondary : t === 'Tertiary' ? tertiary : null);
@@ -857,6 +859,15 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   function navColor(opt: string) {
     const { palette, n } = resolveNavOption(opt);
+    /* Dark mode: a bar is a theme like any other, so its Surface paints its
+       palette's tone 3 (utils/darkLadder.ts) — what the export's App-Bar /
+       Nav-Bar / Status themes paint. The legacy Black bar is Neutral's
+       darkest level, tone 1. */
+    if (isDark) {
+      const tone = opt === 'black' ? DARK_LADDER_TONE['Surface-Dimmest'] : DARK_LADDER_TONE.Surface;
+      if (palette === 'Neutral') return neutral(tone);
+      return p(palette === 'Secondary' ? secondary : palette === 'Tertiary' ? tertiary : primary, tone);
+    }
     // Secondary and Tertiary bars read their OWN ramp. This used to fall
     // through to `p(primary, n)` for every non-neutral palette, which was
     // harmless while the picker could only say Primary — and would have
@@ -876,9 +887,13 @@ export function buildPreviewCSS(input: BuildInput): string {
     return p(primary, n);
   }
 
-  const statusConfig = resolveNavOption(sel.status);
-  const appBarConfig = resolveNavOption(sel.appBar);
-  const navBarConfig = resolveNavOption(sel.navBar);
+  /* Dark mode: a bar paints its palette's tone 3 (tone 1 for the legacy Black
+     bar), so the tone its tokens and button are solved against is that one. */
+  const barTone = (opt: string, c: { palette: string; n: number }) =>
+    (isDark ? { ...c, n: opt === 'black' ? DARK_LADDER_TONE['Surface-Dimmest'] : DARK_LADDER_TONE.Surface } : c);
+  const statusConfig = barTone(sel.status, resolveNavOption(sel.status));
+  const appBarConfig = barTone(sel.appBar, resolveNavOption(sel.appBar));
+  const navBarConfig = barTone(sel.navBar, resolveNavOption(sel.navBar));
   const statusBg = navColor(sel.status);
   const appBarBg = navColor(sel.appBar);
   const navBarBg = navColor(sel.navBar);
@@ -978,6 +993,13 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerBg = at(0.94);
     containerHigh = at(0.96);
     containerHighest = neutral(1);
+  } else if (isDark) {
+    /* Dark mode, every card style: the cards lift above the page they sit on,
+       Lowest to Highest, along the page palette's own ramp — the export's
+       card ladder for a tone-3 surface (utils/darkLadder.ts). */
+    const ramp12 = Array.from({ length: 12 }, (_, i) => surfacePalette[i]?.hex ?? '#000000');
+    const { cards } = darkCardLadder(ramp12, DARK_PAGE_N);
+    [containerLowest, containerLow, containerBg, containerHigh, containerHighest] = cards;
   } else if (!isDark && effectiveCardColoring === 'white') {
     // White cards ramp too, at much higher opacities — they must still read as
     // white. The floor is pure white and each raised level takes on more of
@@ -1232,8 +1254,9 @@ export function buildPreviewCSS(input: BuildInput): string {
   type SurfaceTheme = 'Primary' | 'Secondary' | 'Tertiary';
   const palFor = (name: SurfaceTheme): typeof vPrimary =>
     name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
+  // Dark mode: a theme's Surface level paints its tone 3 (utils/darkLadder.ts).
   const nFor = (name: SurfaceTheme): number =>
-    name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
+    isDark ? DARK_LADDER_TONE.Surface : name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
   // Buttons-Tertiary-*). The lib's Light-Mode.css hardcodes these under every
   // theme/surface combo (including pink #f5dddd for every -Hover token), so
@@ -1319,6 +1342,20 @@ export function buildPreviewCSS(input: BuildInput): string {
       const pick = ranked.find(c => c.ratio >= 4.5) ?? ranked[0];
       return `  --Tag-${name}-Text: ${pick.css};`;
     }).join('\n');
+  };
+
+  /* Dark mode paints a theme's Surface on its tone 3 (utils/darkLadder.ts),
+     where the lib's static sheet still assumes a light tone — so the preview
+     states the roles for the surface it actually paints. The :root palette
+     vars are the LIGHT ramp, so the tones are found on that ramp. */
+  const darkSurfaceRoleLines = (name: string, bgHex: string, lightRamp: Array<{ hex: string }>): string => {
+    const t = getAccessibleTones(bgHex, DARK_LADDER_TONE.Surface, lightRamp);
+    return [
+      `  --Header: var(--${name}-Color-${t.header});`,
+      `  --Text: var(--${name}-Color-${t.text});`,
+      `  --Quiet: var(--${name}-Color-${t.quiet});`,
+      `  --Border: var(--${name}-Color-${t.border});`,
+    ].join('\n');
   };
 
   const emitDefaultBtnTokens = (surfaceTheme: SurfaceTheme): string =>
@@ -1430,11 +1467,16 @@ ${defaultButtonLines(scopeBtn)}`;
     const cells: ButtonGridCell[] = [];
     for (const theme of ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const) {
       for (const level of SURFACE_LEVELS) {
-        const n = barToneFor(theme, level, coreFor(theme));
+        /* Dark mode: every theme paints its levels on tones 1-5 of its own
+           palette (utils/darkLadder.ts) — the background the export's
+           Cell-Button solves each cell against. */
+        const n = isDark ? DARK_LADDER_TONE[level] : barToneFor(theme, level, coreFor(theme));
         const ramp = modeRamp(theme);
-        // Neutral's darkest level is a literal black in both modes, not a tone
+        // Neutral's darkest level is a literal black in light mode, not a tone
         // (neutralSurfaceWindow / generateSingleTheme) — no tone is true black.
-        const bg = theme === 'Neutral' && level === 'Surface-Dimmest' ? '#000000' : p(ramp, n);
+        // In dark mode it is Neutral's own tone 1 unless black was chosen.
+        const bg = theme === 'Neutral' && level === 'Surface-Dimmest' && (!isDark || blackChosen(sel))
+          ? '#000000' : p(ramp, n);
         const tones = getAccessibleTones(bg, n, ramp);
         const tonalText = effectiveTextColoring === 'tonal' && theme !== 'Neutral';
         const b = defaultButtonFor(theme, n, bg, false, level);
@@ -1583,10 +1625,18 @@ ${NEUTRAL.map((hex, i) => `  --Neutral-Color-${i + 1}: ${hex};`).join('\n')}
 ${semanticScaleLines()}
 ${vibrantLines()}
 
-  --Background: var(--${surfacePaletteName}-Color-${surfaceN});
+${isDark
+    /* The Brand block's palette vars are the LIGHT ramp for the brand three,
+       so dark mode states the dark page, and its Dim / Bright neighbours on
+       the dark ladder, as hex. */
+    ? `  --Background: ${surfaceBg};
+  --Surface: ${surfaceBg};
+  --Surface-Dim: ${p(surfacePalette, DARK_LADDER_TONE['Surface-Dim'])};
+  --Surface-Bright: ${p(surfacePalette, DARK_LADDER_TONE['Surface-Bright'])};`
+    : `  --Background: var(--${surfacePaletteName}-Color-${surfaceN});
   --Surface: var(--${surfacePaletteName}-Color-${surfaceN});
   --Surface-Dim: var(--${surfacePaletteName}-Color-${Math.max(surfaceN - 1, 1)});
-  --Surface-Bright: var(--${surfacePaletteName}-Color-${Math.min(surfaceN + 1, 12)});
+  --Surface-Bright: var(--${surfacePaletteName}-Color-${Math.min(surfaceN + 1, 12)});`}
   --Container-Lowest: ${containerLowest};
   --Container-Low: ${containerLow};
   --Container: ${containerBg};
@@ -1817,10 +1867,13 @@ ${(() => {
   const tertiaryThemePal = isDark ? tertiaryDark : tertiaryLight;
   const tertiarySurfaceBg = p(tertiaryThemePal, tertiaryThemeN);
   const tertiarySurfaceTones = getAccessibleTones(tertiarySurfaceBg, tertiaryThemeN, tertiaryThemePal);
+  /* The :root palette vars are the LIGHT ramp in both modes, so a dark
+     surface states its dark-ramp hex instead of naming a tone. */
+  const tertiarySurfaceValue = isDark ? tertiarySurfaceBg : `var(--Tertiary-Color-${tertiaryThemeN})`;
   return `[data-theme="Tertiary"],
 [data-theme="Tertiary"][data-surface="Surface"] {
-  --Background: var(--Tertiary-Color-${tertiaryThemeN});
-  --Surface: var(--Tertiary-Color-${tertiaryThemeN});
+  --Background: ${tertiarySurfaceValue};
+  --Surface: ${tertiarySurfaceValue};
   --Header: var(--Tertiary-Color-${tertiarySurfaceTones.header});
   --Text: var(--Tertiary-Color-${tertiarySurfaceTones.text});
   --Quiet: var(--Tertiary-Color-${tertiarySurfaceTones.quiet});
@@ -1841,8 +1894,8 @@ ${(() => {
   --Tag-Tertiary-BG: ${tagBg};
   --Tag-Tertiary-Text: ${tagText};
 ${emitDefaultBtnTokens('Tertiary')}
-${emitPerPaletteButtonTokens(tertiarySurfaceBg, TC)}
-${emitStateButtonTokens(TC)}
+${emitPerPaletteButtonTokens(tertiarySurfaceBg, tertiaryThemeN)}
+${emitStateButtonTokens(tertiaryThemeN)}
 ${emitTagTextTokens()}
 }`;
 })()}
@@ -1852,11 +1905,12 @@ ${emitTagTextTokens()}
  * secondary-themed surfaces don't shift when the main Background changes. */
 [data-theme="Secondary"],
 [data-theme="Secondary"][data-surface="Surface"] {
-  --Background: var(--Secondary-Color-${SC});
-  --Surface: var(--Secondary-Color-${SC});
+  --Background: ${isDark ? p(vSecondary, nFor('Secondary')) : `var(--Secondary-Color-${SC})`};
+  --Surface: ${isDark ? p(vSecondary, nFor('Secondary')) : `var(--Secondary-Color-${SC})`};
+${isDark ? darkSurfaceRoleLines('Secondary', p(vSecondary, nFor('Secondary')), secondaryLight) : ''}
 ${emitDefaultBtnTokens('Secondary')}
-${emitPerPaletteButtonTokens(p(vSecondary, SC), SC)}
-${emitStateButtonTokens(SC)}
+${emitPerPaletteButtonTokens(p(vSecondary, nFor('Secondary')), nFor('Secondary'))}
+${emitStateButtonTokens(nFor('Secondary'))}
 ${emitTagTextTokens()}
 }
 
@@ -1875,7 +1929,11 @@ ${(() => {
      (the Tertiary Surface card, Neutral's black and white ends, both below):
      the lib's --Header-<Palette> there is tuned for the lib's background, not
      the preview's, so those levels keep the preview's own heading. */
-  const OWN_LEVELS: Record<string, string[]> = { Tertiary: ['Surface'], Neutral: ['Surface-Dimmest', 'Surface-Brightest'] };
+  const OWN_LEVELS: Record<string, string[]> = {
+    Tertiary: ['Surface'], Neutral: ['Surface-Dimmest', 'Surface-Brightest'],
+    // Dark mode: the preview paints Secondary's Surface itself (tone 3).
+    ...(isDark ? { Secondary: ['Surface'] } : {}),
+  };
   return ['Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].map((t) => {
     const own = OWN_LEVELS[t] ?? [];
     const not = own.map((l) => `:not([data-surface="${l}"])`).join('');
@@ -1896,9 +1954,12 @@ ${(() => {
  * which would otherwise win over the main Brand block. */
 [data-theme="Primary"],
 [data-theme="Primary"][data-surface="Surface"] {
+${isDark ? `  --Background: ${p(vPrimary, nFor('Primary'))};
+  --Surface: ${p(vPrimary, nFor('Primary'))};
+${darkSurfaceRoleLines('Primary', p(vPrimary, nFor('Primary')), primaryLight)}` : ''}
 ${emitDefaultBtnTokens('Primary')}
-${emitPerPaletteButtonTokens(p(primaryLight, PC), PC)}
-${emitStateButtonTokens(PC)}
+${emitPerPaletteButtonTokens(isDark ? p(vPrimary, nFor('Primary')) : p(primaryLight, PC), nFor('Primary'))}
+${emitStateButtonTokens(nFor('Primary'))}
 ${emitTagTextTokens()}
 }
 

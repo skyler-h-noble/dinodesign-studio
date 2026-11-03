@@ -185,6 +185,11 @@ export function solveQuietOpacities(
   modeData: any,
   toHex: (raw: any) => string | null,
   target = 4.5,
+  /** The tone a Surfaces index is painted at. In dark mode the tables are
+   *  keyed by the light-mode index each level uses, so index 6 can mean
+   *  tone 3 or 4 (utils/darkLadder.ts) — and the entry answers for the
+   *  lighter, which is the ground to solve against. Identity in light mode. */
+  surfaceTone: (n: number) => number = (n) => n,
 ): QuietTable {
   const alpha: Record<number, number> = {};
   const percent: Record<number, number> = {};
@@ -192,7 +197,7 @@ export function solveQuietOpacities(
 
   const groundFor = (branch: string, palette: string, n: number): string | null =>
     branch === 'Surfaces'
-      ? toHex(modeData?.Colors?.[palette]?.[`Color-${n}`])
+      ? toHex(modeData?.Colors?.[palette]?.[`Color-${surfaceTone(n)}`])
       : toHex(modeData?.Backgrounds?.[palette]?.[`Background-${n}`]
           ?.Containers?.['Container-Highest']);
 

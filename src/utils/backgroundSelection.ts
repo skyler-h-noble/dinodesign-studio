@@ -19,6 +19,7 @@
  * those brands white.
  */
 import { surfaceWindow, neutralSurfaceWindow, MIN_SURFACE_TONE, MAX_SURFACE_TONE } from './surfaceWindow';
+import { DARK_LADDER_TONE } from './darkLadder';
 
 export const ALL_THEMES = ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const;
 export type BackgroundTheme = typeof ALL_THEMES[number];
@@ -199,16 +200,21 @@ export function parseBackground(
 }
 
 /**
- * The Default page in DARK mode: the chosen background's THEME at Color-2.
+ * The Default page in DARK mode: the chosen background's THEME at Color-3 —
+ * its Surface level on the dark ladder (utils/darkLadder.ts: every theme's
+ * levels paint tones 1-5 in dark mode, Surface at 3).
  *
  * docs/background-selection.md: "the theme carries over, the tone does not".
  * The preview, the CSS export and the Figma payload each had their own copy
  * of this, and they had drifted: all three kept the theme only for the
  * primary strings (so a Secondary or Tertiary pick went Neutral), and the
- * preview's copy lacked plain 'primary' entirely, painting that choice as a
- * Neutral page at tone 3 while the export painted Primary-2.
+ * preview's copy lacked plain 'primary' entirely.
+ *
+ * This is the TONE the page paints. The export reads its tables at the page
+ * palette's Surface INDEX (defaultBackgroundTone), which the dark tables
+ * answer for this tone.
  */
-export const DARK_PAGE_N = 2;
+export const DARK_PAGE_N = DARK_LADDER_TONE.Surface;
 export function darkPageTheme(value: string | BackgroundSelection | null | undefined): BackgroundTheme {
   return parseBackground(value).theme;
 }

@@ -8,6 +8,8 @@
  */
 
 import { parseBar, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
+import { darkLadderMaps, windowForPalette, exactIndexForTone } from './darkLadder';
+import { defaultDimmestRef } from './cssgen/exportToCSS';
 import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
 import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRadii';
 import { buttonModeMetricFigma } from './buttonSizing';
@@ -751,6 +753,14 @@ export function generateFigmaJSON(
          (utils/cellButtons.ts): Cell-Button.<Theme>.<Section>.<field>. A Modes
          group for the same reason as Tonal-Button. */
       'Cell-Button',
+      /* Content ON an icon, keyed by the icon's tone (darkLadderPass, step 4):
+         the light value is the Text entry it always was; in dark mode, where
+         icons on the new dark surfaces are light, it is the dark text for
+         them. A Modes group because that flip is per mode. */
+      'Icon-On',
+      /* A card's palette-color role (a dark card's link) that has to follow
+         the lighter dark-mode cards (darkLadderPass, step 6). */
+      'Card-Accent',
     ];
 
     for (const section of MODES_SECTIONS) {
@@ -811,14 +821,28 @@ export function generateFigmaJSON(
      * Only the Figma payload is trimmed. The JSON and CSS pipelines keep
      * computing the ends, so surfaceWindow stays the one definition and a
      * future dark-mode remap still has them to work from. */
+    /* Except an end the Theme layer DOES read: a black or white anchor
+       (Neutral's Surface-Dimmest) names its row's end, because a literal
+       #000000 cannot follow the dark ladder to tone 1 (darkLadderPass,
+       step 1). One variable, not 378. */
+    const themeRefs = new Set<string>();
+    {
+      const collect = (n: any) => {
+        if (!n || typeof n !== 'object') return;
+        if (typeof n.value === 'string' && n.value.startsWith('{Backgrounds.')) { themeRefs.add(n.value.slice(1, -1)); return; }
+        for (const v of Object.values(n)) collect(v);
+      };
+      collect(designSystemJSON.Modes?.['Light-Mode']?.Themes);
+    }
     const bgSection = modeSection['Backgrounds'];
     if (bgSection) {
       for (const palette of Object.keys(bgSection)) {
         for (const row of Object.keys(bgSection[palette] || {})) {
           const surfaces = bgSection[palette][row]?.Surfaces;
           if (!surfaces) continue;
-          delete surfaces['Surface-Dimmest'];
-          delete surfaces['Surface-Brightest'];
+          for (const end of ['Surface-Dimmest', 'Surface-Brightest']) {
+            if (!themeRefs.has(`Backgrounds.${palette}.${row}.Surfaces.${end}`)) delete surfaces[end];
+          }
         }
       }
     }
@@ -1109,6 +1133,15 @@ export function generateFigmaJSON(
     // Computed groups: Border-Variant, Dropshadow-Color per palette per Color-N
     if (colors) {
       const palettes = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
+      /* Dark mode: a surface index names the tone its level is painted at
+         (utils/darkLadder.ts), so the surface a Border-Variant sits on, and
+         the shadow a surface casts, are read at that tone. */
+      const ladder = modeName === 'Dark-Mode' ? darkLadderMaps(modeData) : null;
+      const groundFor = (palette: string, colorKey: string, byPalette: boolean): string | undefined => {
+        const n = Number(colorKey.replace('Color-', ''));
+        const tone = ladder ? (byPalette ? ladder.byPalette[palette]?.[n] : ladder.global[n]) : undefined;
+        return (colors[palette]?.[tone ? `Color-${tone}` : colorKey] as any)?.value;
+      };
 
       // Border-Variant: border color at 20% opacity (hex + '33')
       // Uses the Border section values if available, otherwise derives from palette
@@ -1130,7 +1163,8 @@ export function generateFigmaJSON(
               // that key is the surface this border sits on — which is what the
               // adaptive alpha needs to keep the perceived weight even.
               modeSection['Border-Variant'][section][palette][colorKey] = {
-                value: variantHex8(borderHex, BORDER_VARIANT_ALPHA, (colorVal as any).value),
+                value: variantHex8(borderHex, BORDER_VARIANT_ALPHA,
+                  section === 'Surfaces' ? groundFor(palette, colorKey, false) : (colorVal as any).value),
                 type: 'color',
               };
             }
@@ -1178,7 +1212,7 @@ export function generateFigmaJSON(
         modeSection['Dropshadow-Color'][palette] = {};
         for (const [colorKey, colorVal] of Object.entries(colors[palette])) {
           if (!colorKey.startsWith('Color-') || colorKey.endsWith('-Vibrant')) continue;
-          const bgHex = (colorVal as any).value;
+          const bgHex = groundFor(palette, colorKey, true) ?? (colorVal as any).value;
           if (bgHex && bgHex.startsWith('#')) {
             modeSection['Dropshadow-Color'][palette][colorKey] = {
               value: dropshadowBaseHex(bgHex, shadowOpts), type: 'color',
@@ -1244,8 +1278,13 @@ export function generateFigmaJSON(
           };
           return true;
         }
-        const bgMatch = resolveToColorAlias(bgToken, lookup)
-          .match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
+        /* A black or white anchor now names its row's end so it can follow the
+           dark ladder (darkLadderPass, step 1). Its shadow links to the tone
+           the anchor stands for, 1 or 12, so it follows the mode as well. */
+        const anchor = bgToken.match(/^\{Backgrounds\.([\w-]+)\.Background-(1|12)\.Surfaces\.Surface-(?:Dimmest|Brightest)\}$/);
+        const bgMatch = anchor
+          ? [bgToken, anchor[1], `Color-${anchor[2]}`]
+          : resolveToColorAlias(bgToken, lookup).match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
         if (bgMatch) {
           target['Dropshadow-Color'] = {
             value: `{Dropshadow-Color.${bgMatch[1]}.${bgMatch[2]}}`, type: 'color',
@@ -1303,7 +1342,10 @@ export function generateFigmaJSON(
                     continue;
                   }
                   // Extract palette and Color-N from the background ref
-                  const bgAlias = resolveToColorAlias(bgToken, lookup);
+                  // A black/white anchor's row end links to the tone it stands
+                  // for (see emitDropshadowRefs).
+                  const anchor = bgToken.match(/^\{Backgrounds\.([\w-]+)\.Background-(1|12)\.Surfaces\.Surface-(?:Dimmest|Brightest)\}$/);
+                  const bgAlias = anchor ? `{Colors.${anchor[1]}.Color-${anchor[2]}}` : resolveToColorAlias(bgToken, lookup);
                   const bgMatch = bgAlias.match(/\{Colors\.([\w-]+)\.(Color-[\w-]+)\}/);
                   if (bgMatch) {
                     target['Dropshadow-Color'] = {
@@ -1732,7 +1774,10 @@ export function generateFigmaJSON(
       /* The solve itself lives in quietOpacity.ts, not here, because the CSS
          export has to paint the colour this number describes — invariant 5,
          and a table computed twice is a table that drifts. */
-      const solved = solveQuietOpacities(modeData, toHex, QUIET_TARGET);
+      // Dark mode: a Surfaces index is painted at its dark-ladder tone.
+      const ladderTone = modeName === 'Dark-Mode' ? darkLadderMaps(modeData).global : null;
+      const solved = solveQuietOpacities(modeData, toHex, QUIET_TARGET,
+        ladderTone ? (n: number) => ladderTone[n] ?? n : undefined);
       for (const note of solved.notes)
         console.warn(`[figma] Quiet-Opacity ${modeName}: ${note}`);
 
@@ -1884,11 +1929,12 @@ export function generateFigmaJSON(
     const defN = defaultSettings['Default-Theme']?.N?.value || 12;
     const userBg = designSystemJSON._userSelections?.background || 'white';
 
-    // Dark mode: the chosen background's theme at Color-2 (darkPageTheme,
+    // Dark mode: the chosen background's theme on its tone 3 (darkPageTheme,
     // shared with the preview and the CSS export).
     const darkPalette = darkPageTheme(userBg);
     const darkN = DARK_PAGE_N;
-    // Dark mode containers are always tonal: Primary Color-3 or Neutral Color-3
+    // Dark mode cards: every row carries the tonal ladder lifted above a tone-3
+    // surface (darkLadderPass), so any row reads the same; row 3 is the page's.
     const darkContainerN = 3;
 
     /* Default-Background is no longer emitted to Figma — 466 unreferenced
@@ -1916,7 +1962,18 @@ export function generateFigmaJSON(
 
       const isDark = modeName === 'Dark-Mode';
       const bgPalette = isDark ? darkPalette : defTheme;
-      const bgN = isDark ? darkN : defN;
+      /* Dark mode: the page is its palette's theme level for level — the same
+         window of INDICES, which the dark tables answer for tones 1-5
+         (utils/darkLadder.ts). Same rule as exportToCSS's defaultBackgroundTone. */
+      const darkWindow = isDark ? windowForPalette(modeData, darkPalette) : null;
+      const bgN = isDark ? (darkWindow?.Surface ?? darkN) : defN;
+      /* Rows and Hover/Pressed read the window index; every other role reads
+         the entry for exactly the tone painted. Same rule as exportToCSS. */
+      const ladderMaps = isDark ? darkLadderMaps(modeData) : null;
+      const roleIndex = (winIdx: number): number => {
+        const tone = ladderMaps?.byPalette[bgPalette]?.[winIdx];
+        return ladderMaps && tone ? exactIndexForTone(ladderMaps.global, tone, winIdx) : winIdx;
+      };
       const contPalette = isDark ? darkPalette : defTheme;
       const contN = isDark ? darkContainerN : (defaultSettings['Card-Coloring']?.ContN?.value || 12);
 
@@ -1968,8 +2025,20 @@ export function generateFigmaJSON(
       {
         const brightN = Math.min(bgN + 1, 12);
         const brightestN = brightN >= 11 ? 12 : 11;
-        const hex = modeColors?.[bgPalette]?.[`Color-${brightestN}`]?.value;
+        // Dark mode paints the row the window names (tone 5), not the tone.
+        const rowHex = darkWindow?.['Surface-Brightest']
+          ? resolveToHex(`{Backgrounds.${bgPalette}.Background-${darkWindow['Surface-Brightest']}.Surfaces.Surface}`, modeLookup, modeColors)
+          : null;
+        const hex = rowHex || modeColors?.[bgPalette]?.[`Color-${brightestN}`]?.value;
         if (hex) defBg['Surface-Brightest'] = { value: hex, type: 'color' };
+      }
+      // Surface-Dimmest: what the Default theme's own Dimmest background reads
+      // ({Default-Background.Surface-Dimmest}), per mode — the same reference
+      // exportToCSS expands.
+      {
+        const ref = defaultDimmestRef(designSystemJSON, modeData, modeName);
+        const hex = ref ? resolveToHex(ref, modeLookup, modeColors) : null;
+        if (hex) defBg['Surface-Dimmest'] = { value: hex, type: 'color' };
       }
 
       // Container variants — use the appropriate container N
@@ -1993,7 +2062,7 @@ export function generateFigmaJSON(
       };
 
       // Surface properties — Text, Header, Quiet, Border, etc. for the default bg
-      const surfaceColorN = `Color-${bgN}`;
+      const surfaceColorN = `Color-${roleIndex(bgN)}`;
       // Focus-Visible is deliberately absent here: unlike these sections it is NOT
       // palette-nested (Focus-Visible.Surfaces is keyed directly by Background-N),
       // so the [palette][Color-N] lookup below always missed and the key was never
@@ -2016,7 +2085,7 @@ export function generateFigmaJSON(
       // Every other theme references {Backgrounds.<pal>.Background-N...} plus
       // {Text.Surfaces.<pal>.Color-N} with a single consistent N, so its tokens
       // stay paired. Default cannot: its background depends on the user's
-      // selection AND differs per mode (light Neutral-12, dark Neutral-2), and
+      // selection AND differs per mode (light Neutral-12, dark Neutral-3 since the dark ladder), and
       // the Theme layer is mode-independent. Hence the Default-Background
       // indirection — which therefore has to cover EVERY role, not just the base
       // ones. Any role left behind keeps a hardcoded light-mode tone and pairs a
@@ -2112,7 +2181,7 @@ export function generateFigmaJSON(
         return null;
       };
 
-      const writeExtras = (prefix: string, tone: number) => {
+      const writeExtras = (prefix: string, tone: number, stateTone: number = tone) => {
         /* Both, and the -Variant twin reads the SAME 'Icon' section — it is the
            icon color at full strength, not a dimmed copy.
            The dimming is no longer in the value. In the file an Icon-Variant is
@@ -2175,7 +2244,7 @@ export function generateFigmaJSON(
         }
 
         for (const state of ['Hover', 'Pressed']) {
-          let hex = modeData[state]?.[bgPalette]?.[`Color-${tone}`]?.value;
+          let hex = modeData[state]?.[bgPalette]?.[`Color-${stateTone}`]?.value;
           if (!hex) continue;
           if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
           if (hex?.startsWith('#')) defBg[`${prefix}${state}`] = { value: hex, type: 'color' };
@@ -2201,12 +2270,14 @@ export function generateFigmaJSON(
       // Default-Background — that surface is pinned to Color-4 in every theme
       // and mode, so it is already mode-correct. See the note beside
       // overrideSurface in generateCompleteThemes.ts.
-      const surfaceTargets: Array<{ prefix: string; tone: number | null }> = [
-        { prefix: '', tone: bgN },
+      const surfaceTargets: Array<{ prefix: string; tone: number | null; section?: string }> = [
+        { prefix: '', tone: bgN, section: 'Surfaces' },
       ];
       for (const variant of ['Surface-Dim', 'Surface-Bright']) {
         if (defBg[variant]?.value === undefined) continue;
-        surfaceTargets.push({ prefix: `${variant}-`, tone: toneForHex(defBg[variant].value) });
+        // Dark mode keys by the window's index, not the painted tone.
+        const tone = darkWindow?.[variant as 'Surface-Dim' | 'Surface-Bright'] ?? toneForHex(defBg[variant].value);
+        surfaceTargets.push({ prefix: `${variant}-`, tone, section: `Surfaces-${variant.slice(8)}` });
       }
       // Surface-Brightest is not a variant of Background-N like Dim and Bright
       // are — it is a different Background-N (11, or 12 once Bright has taken
@@ -2217,10 +2288,11 @@ export function generateFigmaJSON(
       const defBrightTone = Math.min(bgN + 1, 12);
       surfaceTargets.push({
         prefix: 'Surface-Brightest-',
-        tone: defBrightTone >= 11 ? 12 : 11,
+        tone: darkWindow?.['Surface-Brightest'] ?? (defBrightTone >= 11 ? 12 : 11),
+        section: 'Surfaces-Brightest',
       });
       /* The Default theme's tone differs per mode (light Neutral-12, dark
-         Neutral-2) and the Theme collection is mode-independent, so Default's
+         Neutral-3 since the dark ladder) and the Theme collection is mode-independent, so Default's
          alpha cannot alias {Quiet.Color-N-Opacity} with a fixed N the way the
          other themes do — it has to come through Default-Background like every
          other role, at whatever tone this mode actually resolved to. */
@@ -2229,16 +2301,28 @@ export function generateFigmaJSON(
         return typeof v === 'number' ? v : null;
       };
 
-      for (const { prefix, tone } of surfaceTargets) {
+      for (const { prefix, tone, section } of surfaceTargets) {
         if (tone === null) continue;
         if (modeName === 'Light-Mode') defaultLightTones[prefix] = tone;
         for (const role of ROLE_SOURCES) {
-          const hex = resolveRoleAt(role, tone);
+          const hex = resolveRoleAt(role, roleIndex(tone));
           if (hex) defBg[`${prefix}${role.role}`] = { value: hex, type: 'color' };
         }
-        const alpha = quietAlphaAt(tone);
+        const alpha = quietAlphaAt(roleIndex(tone));
         if (alpha !== null) defBg[`${prefix}Quiet-Opacity`] = { value: alpha, type: 'number' };
-        writeExtras(prefix, tone);
+        writeExtras(prefix, roleIndex(tone), tone);
+        /* Dark mode: the Text table is keyed by surface index, so "the text at
+           the icon's tone" no longer reads as such. Take the page palette's
+           own theme On-* for this level — the dark-ladder pass pointed those
+           at the text for the icon actually drawn there. Same as exportToCSS. */
+        if (darkWindow && section) {
+          const icons = modeData.Themes?.[darkPalette]?.[section]?.Icons;
+          for (const pal of [...ACCENT_PALETTES, 'Default', 'Match']) {
+            const raw = icons?.[`On-${pal}`]?.value;
+            const hex = typeof raw === 'string' ? (raw.startsWith('#') ? raw : resolveToHex(raw, modeLookup, modeColors)) : null;
+            if (hex?.startsWith('#')) defBg[`${prefix}On-${pal}`] = { value: hex, type: 'color' };
+          }
+        }
       }
 
 
@@ -2253,7 +2337,7 @@ export function generateFigmaJSON(
         if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
         return hex || null;
       };
-      const fvSurface = readFocusVisible('Surfaces', bgN);
+      const fvSurface = readFocusVisible('Surfaces', roleIndex(bgN));
       if (fvSurface) defBg['Focus-Visible'] = { value: fvSurface, type: 'color' };
       const fvContainer = readFocusVisible('Containers', contN);
       if (fvContainer) defBg['Container-Focus-Visible'] = { value: fvContainer, type: 'color' };

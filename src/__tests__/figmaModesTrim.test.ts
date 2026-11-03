@@ -172,7 +172,17 @@ describe('Figma Modes trim', () => {
        by mode: the Default theme's (Default-Background, its tone moves
        between modes) and the cards' (Container-Color-N rows, only the tones a
        card reads — dark-mode cards are all dark). ~60 variables; ~550 of room
-       remain. */
+       remain.
+       The dark ladder (utils/darkLadder.ts) added up to ~22: the Icon-On group
+       (content on an icon flips from light to dark text in dark mode, one
+       entry per light color a palette's On-* uses), Neutral's black-anchor
+       row end, and a Card-Accent entry with black cards. It is measured on a
+       white and a black page too, which carry the most. */
     expect(n).toBeLessThan(4450);
-  });
+    for (const background of ['white', 'black']) {
+      const other = (buildAll(makeScheme(BRANDS[0]), { background, button: 'primary', cardColoring: background === 'black' ? 'black' : 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;
+      let m = 0; walk(other.Modes['Light-Mode'], [], () => m++);
+      expect(m, `${background} page`).toBeLessThan(4450);
+    }
+  }, 60_000);
 });
