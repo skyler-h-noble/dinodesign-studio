@@ -19,6 +19,7 @@
  *   npx tsx scripts/pin-header-font.ts --id X [--id Y …]          # report
  *   npx tsx scripts/pin-header-font.ts --id X [--id Y …] --write  # apply
  *   … --write --backup DIR   # also save each original file under DIR first
+ *   … --restore DIR --write  # put the files saved by --backup back
  *
  * Auth: Application Default Credentials.
  */
@@ -41,6 +42,7 @@ const ROOT = 'design-systems';
 const args = process.argv.slice(2);
 const write = args.includes('--write');
 const backup = (() => { const i = args.indexOf('--backup'); return i >= 0 ? args[i + 1] : null; })();
+const restore = (() => { const i = args.indexOf('--restore'); return i >= 0 ? args[i + 1] : null; })();
 const ids = args.flatMap((a, i) => (a === '--id' ? [args[i + 1]] : []));
 if (!ids.length) { console.error('Pass at least one --id.'); process.exit(1); }
 
@@ -49,6 +51,31 @@ async function main() {
   const bucket = admin.storage().bucket();
   const full = headerFontQueryParam();
   let changed = 0;
+
+  if (restore) {
+    for (const id of ids) {
+      const dir = path.join(restore, ROOT, id);
+      for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.css'))) {
+        const file = bucket.file(`${ROOT}/${id}/${name}`);
+        const [meta] = await file.getMetadata();
+        const wasGzip = meta.contentEncoding === 'gzip';
+        const css = fs.readFileSync(path.join(dir, name), 'utf8');
+        console.log(`restore ${file.name}`);
+        changed++;
+        if (!write) continue;
+        const body = wasGzip ? zlib.gzipSync(Buffer.from(css, 'utf8'), { level: 9 }) : Buffer.from(css, 'utf8');
+        await file.save(body, {
+          contentType: meta.contentType || 'text/css',
+          metadata: {
+            ...(wasGzip ? { contentEncoding: 'gzip' } : {}),
+            cacheControl: meta.cacheControl || 'no-cache, max-age=0, must-revalidate',
+          },
+        });
+      }
+    }
+    console.log(`\n${write ? 'RESTORED' : 'DRY RUN'} — ${changed} file(s)`);
+    return;
+  }
 
   for (const id of ids) {
     const [typo] = await bucket.file(`${ROOT}/${id}/typography-tokens.css`).download();
