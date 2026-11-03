@@ -7953,12 +7953,13 @@ export function exportColorSystemToJSON(
   console.log(`🚦 [JSON Export] State backgrounds: ${redirectedButtons} button palettes redirected to their own state`);
 
   /* The dark-mode surface ladder (utils/darkLadder.ts): every theme paints
-     tones 1-5 in dark mode, the page sits on tone 3, and the tables the Theme
-     layer reads are re-keyed so its light-mode indices answer for those tones.
+     black and tones 1-4 in dark mode, the page sits on tone 2, cards are tone 5
+     at five opacities, and the tables the Theme layer reads are re-keyed so its
+     light-mode indices answer for those tones.
      After every pass that writes Theme references (it reads them), and before
      Cell-Button, which solves each section's button against the background
      the section actually paints. */
-  const ladder = DARK_LADDER.enabled ? applyDarkLadder(colorSystem, userSelections as never) : null;
+  const ladder = DARK_LADDER.enabled ? applyDarkLadder(colorSystem) : null;
   if (ladder) {
     console.log(`🌙 [JSON Export] Dark ladder: ${ladder.remapped} entries re-keyed, ${ladder.pinned} tone readers pinned, ` +
       `${ladder.rows} row values, ${ladder.iconOn} Icon-On entries, ${ladder.repointed} Theme references repointed`);

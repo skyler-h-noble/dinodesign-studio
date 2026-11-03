@@ -7,7 +7,7 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { DARK_LADDER_TONE, darkCardLadder, blackChosen } from './darkLadder';
+import { DARK_LADDER_TONE, DARK_CARD_TONE, darkCardHex, darkTableTone, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -696,7 +696,7 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // ── Resolve surface background ──
   let surfaceBg: string;
-  /* Dark mode: the chosen background's THEME on its tone 3 (DARK_PAGE_N, the
+  /* Dark mode: the chosen background's THEME on its tone 2 (DARK_PAGE_N, the
      dark ladder's Surface) — darkPageTheme, the
      one rule the export and the Figma payload use too. */
   const darkTheme = darkPageTheme(sel.background);
@@ -860,11 +860,12 @@ export function buildPreviewCSS(input: BuildInput): string {
   function navColor(opt: string) {
     const { palette, n } = resolveNavOption(opt);
     /* Dark mode: a bar is a theme like any other, so its Surface paints its
-       palette's tone 3 (utils/darkLadder.ts) — what the export's App-Bar /
-       Nav-Bar / Status themes paint. The legacy Black bar is Neutral's
-       darkest level, tone 1. */
+       palette's tone 2 (utils/darkLadder.ts) — what the export's App-Bar /
+       Nav-Bar / Status themes paint. The legacy Black bar is the darkest
+       level, which is pure black in dark mode. */
     if (isDark) {
-      const tone = opt === 'black' ? DARK_LADDER_TONE['Surface-Dimmest'] : DARK_LADDER_TONE.Surface;
+      if (opt === 'black') return '#000000';
+      const tone = DARK_LADDER_TONE.Surface;
       if (palette === 'Neutral') return neutral(tone);
       return p(palette === 'Secondary' ? secondary : palette === 'Tertiary' ? tertiary : primary, tone);
     }
@@ -887,10 +888,12 @@ export function buildPreviewCSS(input: BuildInput): string {
     return p(primary, n);
   }
 
-  /* Dark mode: a bar paints its palette's tone 3 (tone 1 for the legacy Black
-     bar), so the tone its tokens and button are solved against is that one. */
+  /* Dark mode: a bar paints its palette's tone 2 (black for the legacy Black
+     bar), so the tone its tokens and button are solved against is that one.
+     Black has no tone of its own; its tokens are tone 1's (darkTableTone),
+     which pass on black too. */
   const barTone = (opt: string, c: { palette: string; n: number }) =>
-    (isDark ? { ...c, n: opt === 'black' ? DARK_LADDER_TONE['Surface-Dimmest'] : DARK_LADDER_TONE.Surface } : c);
+    (isDark ? { ...c, n: opt === 'black' ? darkTableTone('Surface-Dimmest') : DARK_LADDER_TONE.Surface } : c);
   const statusConfig = barTone(sel.status, resolveNavOption(sel.status));
   const appBarConfig = barTone(sel.appBar, resolveNavOption(sel.appBar));
   const navBarConfig = barTone(sel.navBar, resolveNavOption(sel.navBar));
@@ -994,12 +997,13 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerHigh = at(0.96);
     containerHighest = neutral(1);
   } else if (isDark) {
-    /* Dark mode, every card style: the cards lift above the page they sit on,
-       Lowest to Highest, along the page palette's own ramp — the export's
-       card ladder for a tone-3 surface (utils/darkLadder.ts). */
-    const ramp12 = Array.from({ length: 12 }, (_, i) => surfacePalette[i]?.hex ?? '#000000');
-    const { cards } = darkCardLadder(ramp12, DARK_PAGE_N);
-    [containerLowest, containerLow, containerBg, containerHigh, containerHighest] = cards;
+    /* Dark mode, every card style: the page palette's tone 5 at five
+       opacities, laid over the surface (utils/darkLadder.ts, Cards) — the
+       export's cards. The roles below are solved on SOLID tone 5, the lightest
+       thing a card can paint and so the hardest ground for every role; the
+       alpha forms are what the blocks below emit (darkCardEmit). */
+    const face = p(surfacePalette, DARK_CARD_TONE);
+    containerLowest = containerLow = containerBg = containerHigh = containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'white') {
     // White cards ramp too, at much higher opacities — they must still read as
     // white. The floor is pure white and each raised level takes on more of
@@ -1012,9 +1016,10 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerHighest = at(0.92);
   }
 
-  // Tertiary container always uses its own palette — never white/black
+  // Tertiary container always uses its own palette — never white/black.
+  // Dark mode: tone 5, solid here for solving; emitted at Container's opacity.
   if (isDark) {
-    tertiaryContainerBg = p(tertiary, 3);
+    tertiaryContainerBg = p(tertiary, DARK_CARD_TONE);
   } else {
     tertiaryContainerBg = p(tertiary, 10);
   }
@@ -1022,10 +1027,19 @@ export function buildPreviewCSS(input: BuildInput): string {
   // ── Text coloring (always tonal in dark mode) ──
   // surfaceN already computed above for nav color resolution
   // containerN must match the actual container background, not the mode
-  const containerN = effectiveCardColoring === 'white' ? 12
+  const containerN = isDark ? DARK_CARD_TONE
+    : effectiveCardColoring === 'white' ? 12
     : effectiveCardColoring === 'black' ? 3
-    : isDark ? 3 : tonalContainerN;
-  const tertiaryContainerN = isDark ? 3 : 10;
+    : tonalContainerN;
+  const tertiaryContainerN = isDark ? DARK_CARD_TONE : 10;
+  /* What the card levels EMIT. Dark mode: the solid face above at each level's
+     opacity, so the browser lays it over whatever surface the card is on. */
+  const darkCardEmit = (face: string, level: DarkCardLevel) => (isDark ? darkCardHex(face, level) : face);
+  const cardLowestOut = darkCardEmit(containerLowest, 'Container-Lowest');
+  const cardLowOut = darkCardEmit(containerLow, 'Container-Low');
+  const cardOut = darkCardEmit(containerBg, 'Container');
+  const cardHighOut = darkCardEmit(containerHigh, 'Container-High');
+  const cardHighestOut = darkCardEmit(containerHighest, 'Container-Highest');
 
   let surfaceText: string;
   let surfaceHeader: string;
@@ -1254,7 +1268,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   type SurfaceTheme = 'Primary' | 'Secondary' | 'Tertiary';
   const palFor = (name: SurfaceTheme): typeof vPrimary =>
     name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
-  // Dark mode: a theme's Surface level paints its tone 3 (utils/darkLadder.ts).
+  // Dark mode: a theme's Surface level paints its tone 2 (utils/darkLadder.ts).
   const nFor = (name: SurfaceTheme): number =>
     isDark ? DARK_LADDER_TONE.Surface : name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
@@ -1344,7 +1358,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     }).join('\n');
   };
 
-  /* Dark mode paints a theme's Surface on its tone 3 (utils/darkLadder.ts),
+  /* Dark mode paints a theme's Surface on its tone 2 (utils/darkLadder.ts),
      where the lib's static sheet still assumes a light tone — so the preview
      states the roles for the surface it actually paints. The :root palette
      vars are the LIGHT ramp, so the tones are found on that ramp. */
@@ -1467,15 +1481,16 @@ ${defaultButtonLines(scopeBtn)}`;
     const cells: ButtonGridCell[] = [];
     for (const theme of ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const) {
       for (const level of SURFACE_LEVELS) {
-        /* Dark mode: every theme paints its levels on tones 1-5 of its own
-           palette (utils/darkLadder.ts) — the background the export's
-           Cell-Button solves each cell against. */
-        const n = isDark ? DARK_LADDER_TONE[level] : barToneFor(theme, level, coreFor(theme));
+        /* Dark mode: every theme paints its levels black and tones 1-4 of its
+           own palette (utils/darkLadder.ts) — the background the export's
+           Cell-Button solves each cell against. Black has no tone, so its
+           tokens are read at tone 1 (darkTableTone). */
+        const n = isDark ? darkTableTone(level) : barToneFor(theme, level, coreFor(theme));
         const ramp = modeRamp(theme);
         // Neutral's darkest level is a literal black in light mode, not a tone
         // (neutralSurfaceWindow / generateSingleTheme) — no tone is true black.
-        // In dark mode it is Neutral's own tone 1 unless black was chosen.
-        const bg = theme === 'Neutral' && level === 'Surface-Dimmest' && (!isDark || blackChosen(sel))
+        // In dark mode every theme's darkest level is black.
+        const bg = level === 'Surface-Dimmest' && (isDark || theme === 'Neutral')
           ? '#000000' : p(ramp, n);
         const tones = getAccessibleTones(bg, n, ramp);
         const tonalText = effectiveTextColoring === 'tonal' && theme !== 'Neutral';
@@ -1637,11 +1652,11 @@ ${isDark
   --Surface: var(--${surfacePaletteName}-Color-${surfaceN});
   --Surface-Dim: var(--${surfacePaletteName}-Color-${Math.max(surfaceN - 1, 1)});
   --Surface-Bright: var(--${surfacePaletteName}-Color-${Math.min(surfaceN + 1, 12)});`}
-  --Container-Lowest: ${containerLowest};
-  --Container-Low: ${containerLow};
-  --Container: ${containerBg};
-  --Container-High: ${containerHigh};
-  --Container-Highest: ${containerHighest};
+  --Container-Lowest: ${cardLowestOut};
+  --Container-Low: ${cardLowOut};
+  --Container: ${cardOut};
+  --Container-High: ${cardHighOut};
+  --Container-Highest: ${cardHighestOut};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
@@ -1695,11 +1710,11 @@ ${(() => {
 ${defaultButtonLines(pageBtn)}
 ${emitTagTextTokens()}
 
-  --Container: ${containerBg};
-  --Container-Low: ${containerLow};
-  --Container-Lowest: ${containerLowest};
-  --Container-High: ${containerHigh};
-  --Container-Highest: ${containerHighest};
+  --Container: ${cardOut};
+  --Container-Low: ${cardLowOut};
+  --Container-Lowest: ${cardLowestOut};
+  --Container-High: ${cardHighOut};
+  --Container-Highest: ${cardHighestOut};
   --Container-Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Container-Text: ${containerText};
   --Container-Header: ${containerHeader};
@@ -1758,11 +1773,11 @@ ${(() => {
      from Brand. The card then painted the studio's near-white while
      --Header and --Text below stayed tuned for this brand's container — on
      a black-background system, near-white text on a near-white card. */
-  --Container-Lowest: ${containerLowest};
-  --Container-Low: ${containerLow};
-  --Container: ${containerBg};
-  --Container-High: ${containerHigh};
-  --Container-Highest: ${containerHighest};
+  --Container-Lowest: ${cardLowestOut};
+  --Container-Low: ${cardLowOut};
+  --Container: ${cardOut};
+  --Container-High: ${cardHighOut};
+  --Container-Highest: ${cardHighestOut};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
   --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
   --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
@@ -1860,10 +1875,10 @@ ${(() => {
   // tertiary palette at the user's TC tone so the H3 / body / border
   // resolve to readable tertiary tones.
   // In dark mode a Tertiary surface goes DARK, the same way the page background
-  // and the tertiary CONTAINER already do (p(tertiary, 3) above). Pinning it to
-  // TC in both modes is what left the tertiary card cream on a dark page — the
-  // one card that never followed the mode.
-  const tertiaryThemeN = isDark ? 3 : TC;
+  // and the tertiary CONTAINER already do. Pinning it to TC in both modes is
+  // what left the tertiary card cream on a dark page — the one card that never
+  // followed the mode. Dark: its Surface level on the dark ladder, tone 2.
+  const tertiaryThemeN = isDark ? DARK_LADDER_TONE.Surface : TC;
   const tertiaryThemePal = isDark ? tertiaryDark : tertiaryLight;
   const tertiarySurfaceBg = p(tertiaryThemePal, tertiaryThemeN);
   const tertiarySurfaceTones = getAccessibleTones(tertiarySurfaceBg, tertiaryThemeN, tertiaryThemePal);
@@ -1884,7 +1899,7 @@ ${(() => {
      the chip stays in sync if the user changes their primary. */
   --Tag-Default-BG: var(--Tag-Primary-BG);
   --Tag-Default-Text: var(--Tag-Primary-Text);
-  --Container: ${tertiaryContainerBg};
+  --Container: ${darkCardEmit(tertiaryContainerBg, 'Container')};
   --Container-Text: ${tertiaryText};
   --Container-Header: ${tertiaryHeader};
   --Container-Quiet: ${tertiaryQuiet};
@@ -1931,7 +1946,7 @@ ${(() => {
      the preview's, so those levels keep the preview's own heading. */
   const OWN_LEVELS: Record<string, string[]> = {
     Tertiary: ['Surface'], Neutral: ['Surface-Dimmest', 'Surface-Brightest'],
-    // Dark mode: the preview paints Secondary's Surface itself (tone 3).
+    // Dark mode: the preview paints Secondary's Surface itself (tone 2).
     ...(isDark ? { Secondary: ['Surface'] } : {}),
   };
   return ['Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].map((t) => {
@@ -2002,11 +2017,11 @@ ${(() => {
      Without these, Card components inside the phone don't react to
      cardColoring changes. Values come from the same containerBg / etc.
      computed earlier from the user's cardColoring selection. */
-  --Container: ${containerBg};
-  --Container-Low: ${containerLow};
-  --Container-Lowest: ${containerLowest};
-  --Container-High: ${containerHigh};
-  --Container-Highest: ${containerHighest};
+  --Container: ${cardOut};
+  --Container-Low: ${cardLowOut};
+  --Container-Lowest: ${cardLowestOut};
+  --Container-High: ${cardHighOut};
+  --Container-Highest: ${cardHighestOut};
   --Buttons-Primary-Button: ${navBtn.bg};
   --Buttons-Primary-Text: ${navBtn.text};
   --Buttons-Primary-Quiet: ${navBtn.quiet};

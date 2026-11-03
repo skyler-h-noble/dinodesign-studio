@@ -130,7 +130,7 @@ describe('black/white face follows what the section paints', () => {
   }
 
   /* Every level is dark since the dark ladder (utils/darkLadder.ts) —
-     Brightest is tone 5, not the light tone it used to be — so every Default
+     Brightest is tone 4, not the light tone it used to be — so every Default
      surface carries the white face. */
   it('dark mode · the Default theme\'s page surfaces all carry the white face', () => {
     for (const s of REPORT_SURFACES.filter((x) => x.startsWith('Surface'))) {

@@ -352,11 +352,11 @@ describe('Surface-Brightest', () => {
   // kept deriving Dimmest as surface-minus-two and Neutral's darkest surface painted
   // Color-8 - a mid grey - on a page whose markup already said Surface-Dimmest.
   // A module tested in isolation proves the rule, not that the rule is in force.
-  /* Light mode only, since the dark ladder (utils/darkLadder.ts): dark mode
-     paints Neutral's tone 1 there unless the designer chose black (a Black
-     page or black cards). The reference goes through the row's end so the
-     two modes can differ; light mode still resolves to the literal black. */
-  it('locks Neutral Surface-Dimmest to true black in light mode', () => {
+  /* Black in both modes: in dark mode every theme's Surface-Dimmest is pure
+     black (utils/darkLadder.ts). The reference goes through the row's end so
+     the two modes can differ for the other themes; for Neutral both resolve to
+     the literal black. */
+  it('locks Neutral Surface-Dimmest to true black in both modes', () => {
     const resolve = (mode: string) => {
       let v: any = json.Modes[mode].Themes.Neutral?.['Surfaces-Dimmest']?.Background?.value;
       for (let hop = 0; hop < 6 && typeof v === 'string' && v.startsWith('{'); hop++) {
@@ -367,7 +367,7 @@ describe('Surface-Brightest', () => {
       return v;
     };
     expect(resolve('Light-Mode')).toBe('#000000');
-    expect(resolve('Dark-Mode')).toBe(json.Modes['Dark-Mode'].Colors.Neutral['Color-1'].value);
+    expect(resolve('Dark-Mode')).toBe('#000000');
   });
 
   it('does not lock Default, which only borrows the Neutral palette', () => {
@@ -377,8 +377,8 @@ describe('Surface-Brightest', () => {
     // Not the literal black the Neutral lock produces — Default only borrows
     // the palette, and keying the lock off the PALETTE blacked it out too.
     expect(bg).not.toBe('#000000');
-    // Through Default-Background, so dark mode can paint the page palette's
-    // tone 1 while light mode keeps the tone its roles name.
+    // Through Default-Background, so dark mode can paint black while light
+    // mode keeps the tone its roles name.
     expect(bg).toBe('{Default-Background.Surface-Dimmest}');
   });
 
@@ -392,7 +392,7 @@ describe('Surface-Brightest', () => {
        mode while a hard #ffffff would light dark mode's brightest surface to
        white instead of the dark ramp's top. */
     // Through the tone's own row, which holds Color-12 in light mode and the
-    // dark ladder's tone 5 in dark mode (darkLadderPass, step 1).
+    // dark ladder's tone 4 in dark mode (darkLadderPass, step 1).
     expect(light).toMatch(/^\{Backgrounds\.Neutral\.Background-12\.Surfaces\.Surface\}$/);
     expect(json.Modes['Light-Mode'].Backgrounds.Neutral['Background-12'].Surfaces.Surface.value).toBe('{Colors.Neutral.Color-12}');
     expect(light).not.toBe('#ffffff');

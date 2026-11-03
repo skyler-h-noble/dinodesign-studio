@@ -1929,12 +1929,13 @@ export function generateFigmaJSON(
     const defN = defaultSettings['Default-Theme']?.N?.value || 12;
     const userBg = designSystemJSON._userSelections?.background || 'white';
 
-    // Dark mode: the chosen background's theme on its tone 3 (darkPageTheme,
+    // Dark mode: the chosen background's theme on its tone 2 (darkPageTheme,
     // shared with the preview and the CSS export).
     const darkPalette = darkPageTheme(userBg);
     const darkN = DARK_PAGE_N;
-    // Dark mode cards: every row carries the tonal ladder lifted above a tone-3
-    // surface (darkLadderPass), so any row reads the same; row 3 is the page's.
+    // Dark mode cards: every row of a palette carries the same five cards, tone 5
+    // at 45-100% opacity (darkLadderPass), so any row reads the same; row 3 it is.
+    // Figma lays the translucent fill over the frame below, as the browser does.
     const darkContainerN = 3;
 
     /* Default-Background is no longer emitted to Figma — 466 unreferenced
@@ -1963,7 +1964,7 @@ export function generateFigmaJSON(
       const isDark = modeName === 'Dark-Mode';
       const bgPalette = isDark ? darkPalette : defTheme;
       /* Dark mode: the page is its palette's theme level for level — the same
-         window of INDICES, which the dark tables answer for tones 1-5
+         window of INDICES, which the dark tables answer for black and tones 1-4
          (utils/darkLadder.ts). Same rule as exportToCSS's defaultBackgroundTone. */
       const darkWindow = isDark ? windowForPalette(modeData, darkPalette) : null;
       const bgN = isDark ? (darkWindow?.Surface ?? darkN) : defN;
@@ -2025,7 +2026,7 @@ export function generateFigmaJSON(
       {
         const brightN = Math.min(bgN + 1, 12);
         const brightestN = brightN >= 11 ? 12 : 11;
-        // Dark mode paints the row the window names (tone 5), not the tone.
+        // Dark mode paints the row the window names (tone 4), not the tone.
         const rowHex = darkWindow?.['Surface-Brightest']
           ? resolveToHex(`{Backgrounds.${bgPalette}.Background-${darkWindow['Surface-Brightest']}.Surfaces.Surface}`, modeLookup, modeColors)
           : null;
@@ -2085,7 +2086,7 @@ export function generateFigmaJSON(
       // Every other theme references {Backgrounds.<pal>.Background-N...} plus
       // {Text.Surfaces.<pal>.Color-N} with a single consistent N, so its tokens
       // stay paired. Default cannot: its background depends on the user's
-      // selection AND differs per mode (light Neutral-12, dark Neutral-3 since the dark ladder), and
+      // selection AND differs per mode (light Neutral-12, dark Neutral-2), and
       // the Theme layer is mode-independent. Hence the Default-Background
       // indirection — which therefore has to cover EVERY role, not just the base
       // ones. Any role left behind keeps a hardcoded light-mode tone and pairs a
@@ -2292,7 +2293,7 @@ export function generateFigmaJSON(
         section: 'Surfaces-Brightest',
       });
       /* The Default theme's tone differs per mode (light Neutral-12, dark
-         Neutral-3 since the dark ladder) and the Theme collection is mode-independent, so Default's
+         Neutral-2) and the Theme collection is mode-independent, so Default's
          alpha cannot alias {Quiet.Color-N-Opacity} with a fixed N the way the
          other themes do — it has to come through Default-Background like every
          other role, at whatever tone this mode actually resolved to. */

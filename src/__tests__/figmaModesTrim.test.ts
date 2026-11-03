@@ -176,7 +176,9 @@ describe('Figma Modes trim', () => {
        The dark ladder (utils/darkLadder.ts) added up to ~22: the Icon-On group
        (content on an icon flips from light to dark text in dark mode, one
        entry per light color a palette's On-* uses), Neutral's black-anchor
-       row end, and a Card-Accent entry with black cards. It is measured on a
+       row end, and a Card-Accent entry where a card link fails on tone 5. The
+       tone-5 cards replaced the lifted card colors value for value (same
+       variables, new values), so they add none. It is measured on a
        white and a black page too, which carry the most. */
     expect(n).toBeLessThan(4450);
     for (const background of ['white', 'black']) {
