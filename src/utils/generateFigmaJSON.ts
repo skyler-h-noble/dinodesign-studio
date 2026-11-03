@@ -957,7 +957,10 @@ export function generateFigmaJSON(
         };
         for (const sec of btnSections) (modeSection as any)[sec].BlackWhite = {};
         for (const [colorKey, entry] of Object.entries<any>(bwButtons)) {
-          if (!colorKey.startsWith('Color-')) continue;
+          /* Container-Color-N rows come too: a card's black/white face is its
+             own per-mode decision (in dark mode every card is dark, whatever
+             its tone), so its states cannot borrow the surface row's. */
+          if (!colorKey.startsWith('Color-') && !colorKey.startsWith('Container-Color-')) continue;
           for (const sec of btnSections) {
             const raw = entry?.[SLOT_FOR[sec]]?.value;
             const isBevel = sec === 'Button-Highlight' || sec === 'Button-Lowlight';
@@ -1079,6 +1082,25 @@ export function generateFigmaJSON(
             const next = (mustUseFill ? fill : tonal) || tonal || fill;
             if (next) dbb[scope][palette][colorKey] = { value: next, type: 'color' };
           }
+        }
+      }
+      /* The label and resting label of a black/white button on a CARD, per
+         mode. Figma's Theme layer cannot pick a face by mode, and a card's
+         face differs by mode (dark mode's cards are all dark), so the face
+         lives here in the Modes layer: the fill already does —
+         Default-Button-Border.Containers.BlackWhite is the face itself — and
+         these two carry the text that goes on it. Read from the resolved
+         Buttons.BlackWhite Container-Color-N rows, so they match the CSS. */
+      const bwRows: any = (modeSection as any).Buttons?.BlackWhite;
+      if (dbb.Containers && bwRows) {
+        for (const [section, slot] of [['BlackWhite-Text', 'Text'], ['BlackWhite-Quiet', 'Quiet']] as const) {
+          const out: any = {};
+          for (const [key, row] of Object.entries<any>(bwRows)) {
+            const m = key.match(/^Container-(Color-\d+)$/);
+            const v = row?.[slot]?.value;
+            if (m && typeof v === 'string' && v.startsWith('#')) out[m[1]] = { value: v, type: 'color' };
+          }
+          if (Object.keys(out).length) dbb.Containers[section] = out;
         }
       }
       modeSection['Default-Button-Border'] = dbb;
@@ -1853,6 +1875,10 @@ export function generateFigmaJSON(
   // Maps user's nav selections to Theme/Tone/Surface modes for the Figma plugin
   // ── Default Background — add to both Light and Dark mode sections ──
   const defaultSettings = designSystemJSON.Metadata?.['Default-Settings'];
+  /* The light-mode tone of each Default-theme surface prefix, recorded while
+     Default-Background is built and read by the Default-theme button rewrite
+     further down. */
+  const defaultLightTones: Record<string, number> = {};
   if (defaultSettings) {
     const defTheme = defaultSettings['Default-Theme']?.Theme?.value || 'Neutral';
     const defN = defaultSettings['Default-Theme']?.N?.value || 12;
@@ -1896,6 +1922,21 @@ export function generateFigmaJSON(
 
       const modeColors = modeData.Colors;
       const modeLookup = buildTokenLookup(modeData);
+      /* A button value as a Figma color. The export stores a bevel as an
+         "r, g, b" triplet (the CSS composes rgb(var(--…-Highlight))); Figma
+         needs a hex, carrying the bevel opacity as alpha — the same shape the
+         Button-Highlight / Button-Lowlight sections hold. */
+      const bevelAlpha = Math.round((designSystemJSON._componentStyle?.bevelOpacity ?? 50) * 255 / 100)
+        .toString(16).padStart(2, '0');
+      const asColorValue = (v: unknown, role: string): string | null => {
+        if (typeof v !== 'string') return null;
+        const isBevel = role === 'Highlight' || role === 'Lowlight';
+        if (v.startsWith('#')) return isBevel && v.length === 7 ? `${v}${bevelAlpha}` : v;
+        if (!isBevel) return null;
+        const parts = v.split(',').map((x) => parseInt(x.trim(), 10));
+        if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+        return '#' + parts.slice(0, 3).map((n) => n.toString(16).padStart(2, '0')).join('') + bevelAlpha;
+      };
       const bgKey = `Background-${bgN}`;
       const bgData = modeData.Backgrounds?.[bgPalette]?.[bgKey];
 
@@ -2124,6 +2165,15 @@ export function generateFigmaJSON(
           if (onHex?.startsWith('#')) defBg[`${prefix}On-${role}`] = { value: onHex, type: 'color' };
         }
 
+        /* The black/white button face at this surface's real tone, matching
+           exportToCSS's Default-Background.*Buttons-BlackWhite-<Role>. The
+           table holds resolved values (hex, or an r,g,b bevel triplet). */
+        const bwFace = modeData.Buttons?.BlackWhite?.[`Color-${tone}`];
+        for (const [role, token] of Object.entries<any>(bwFace ?? {})) {
+          const v = asColorValue(token?.value, role);
+          if (v) defBg[`${prefix}Buttons-BlackWhite-${role}`] = { value: v, type: 'color' };
+        }
+
         for (const state of ['Hover', 'Pressed']) {
           let hex = modeData[state]?.[bgPalette]?.[`Color-${tone}`]?.value;
           if (!hex) continue;
@@ -2181,6 +2231,7 @@ export function generateFigmaJSON(
 
       for (const { prefix, tone } of surfaceTargets) {
         if (tone === null) continue;
+        if (modeName === 'Light-Mode') defaultLightTones[prefix] = tone;
         for (const role of ROLE_SOURCES) {
           const hex = resolveRoleAt(role, tone);
           if (hex) defBg[`${prefix}${role.role}`] = { value: hex, type: 'color' };
@@ -2262,6 +2313,20 @@ export function generateFigmaJSON(
         let hex = token?.value;
         if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
         if (hex?.startsWith('#')) defBg['Container-Eyebrow'] = { value: hex, type: 'color' };
+      }
+
+      /* The card's Text-BW and black/white button, from the Containers half
+         of each table at the card row — matching exportToCSS's
+         Default-Background.Container-Text-BW / -Buttons-BlackWhite-*. */
+      {
+        let bw = modeData['Default-Button-Border']?.Containers?.BlackWhite?.[contColorN]?.value;
+        if (bw?.includes('{')) bw = resolveToHex(bw, modeLookup, modeColors) || bw;
+        if (bw?.startsWith('#')) defBg['Container-Text-BW'] = { value: bw, type: 'color' };
+        const face = modeData.Buttons?.BlackWhite?.[`Container-${contColorN}`];
+        for (const [role, token] of Object.entries<any>(face ?? {})) {
+          const v = asColorValue(token?.value, role);
+          if (v) defBg[`Container-Buttons-BlackWhite-${role}`] = { value: v, type: 'color' };
+        }
       }
 
       const contAlpha = quietAlphaAt(contN);
@@ -3051,10 +3116,35 @@ const FIGMA_LG_BUTTON_PADDING = 16;
     Highlight: 'Button-Highlight', Lowlight: 'Button-Lowlight',
   };
 
+  /* A CARD's black/white face, `{Buttons.BlackWhite.Container-Color-<n>.<Role>}`.
+   * Unlike a surface, a card keyed to tone n does not keep one face in both
+   * modes — dark mode draws every card dark — so a literal per face would be
+   * right in one mode only. Every target here is a Modes variable that holds
+   * the per-mode answer: the face itself (Default-Button-Border's BlackWhite
+   * map), the label and resting label written beside it, and the card rows of
+   * the four state sections. */
+  const BW_CARD_REF = /^\{Buttons\.BlackWhite\.Container-Color-(\d+)\.(\w+)\}$/;
+  const BW_CARD_TARGET: Record<string, (tone: number) => string> = {
+    Button: (t) => `{Default-Button-Border.Containers.BlackWhite.Color-${t}}`,
+    Border: (t) => `{Default-Button-Border.Containers.BlackWhite.Color-${t}}`,
+    Text: (t) => `{Default-Button-Border.Containers.BlackWhite-Text.Color-${t}}`,
+    Quiet: (t) => `{Default-Button-Border.Containers.BlackWhite-Quiet.Color-${t}}`,
+  };
+
   let bwRewritten = 0, bwUnmapped = 0;
   const rewriteBlackWhite = (n: any, d: number) => {
     if (!n || typeof n !== 'object' || d > 12) return;
     if (typeof n.value === 'string') {
+      const card = n.value.match(BW_CARD_REF);
+      if (card) {
+        const tone = Number(card[1]);
+        const role = card[2];
+        const toned = BW_TONED_SECTION[role];
+        if (toned) { n.value = `{${toned}.BlackWhite.Container-Color-${tone}}`; bwRewritten++; }
+        else if (BW_CARD_TARGET[role]) { n.value = BW_CARD_TARGET[role](tone); bwRewritten++; }
+        else bwUnmapped++;
+        return;
+      }
       const m = n.value.match(BW_REF);
       if (m) {
         const tone = Number(m[1]);
@@ -3071,6 +3161,48 @@ const FIGMA_LG_BUTTON_PADDING = 16;
     }
     for (const [k, v] of Object.entries(n)) if (k !== 'type') rewriteBlackWhite(v, d + 1);
   };
+  /* The Default theme's palette-button borders and state buttons, which the
+   * export routes through Default-Background so the CSS can read them at the
+   * tone each mode really paints (generateCompleteThemes routeDefaultButtons).
+   *
+   * Figma keeps the light-mode tables it had: Default-Button-Border for the
+   * borders and Tonal-Button for the state buttons, at the light-mode tone.
+   * Writing per-mode copies into Default-Background would add ~150 variables
+   * to a Modes collection near Figma's 5,000 ceiling, and Figma does not need
+   * them for the border: there Default-Button-Border keeps each tone's own
+   * border in dark mode (it is the CSS that flushed the border to the fill,
+   * which is what made Default's light Brightest button edge vanish). The
+   * state buttons keep their light-mode tone in dark mode, as before. The
+   * black/white face is the one that must move with the mode, and it does —
+   * Default-Background carries it. */
+  const DEFAULT_BTN_REF = /^\{Default-Background\.(.*)Buttons-(\w+)-(\w+)\}$/;
+  const STATE_BUTTONS = new Set(['Info', 'Success', 'Warning', 'Error']);
+  let defaultBtnRewritten = 0;
+  const rewriteDefaultButtons = (n: any, d: number) => {
+    if (!n || typeof n !== 'object' || d > 12) return;
+    if (typeof n.value === 'string') {
+      const m = n.value.match(DEFAULT_BTN_REF);
+      if (!m || m[2] === 'BlackWhite') return;
+      const tone = defaultLightTones[m[1]];
+      if (tone === undefined) return;
+      if (STATE_BUTTONS.has(m[2]) && m[3] === 'Border') {
+        // A tonal state button's border IS its fill, as everywhere else.
+        n.value = `{Tonal-Button.Surfaces.${m[2]}.Color-${tone}.Button}`;
+        defaultBtnRewritten++;
+      } else if (m[3] === 'Border') {
+        n.value = `{Default-Button-Border.Surfaces.${m[2]}.Color-${tone}}`;
+        defaultBtnRewritten++;
+      } else if (STATE_BUTTONS.has(m[2])) {
+        n.value = `{Tonal-Button.Surfaces.${m[2]}.Color-${tone}.${m[3]}}`;
+        defaultBtnRewritten++;
+      }
+      return;
+    }
+    for (const [k, v] of Object.entries(n)) if (k !== 'type') rewriteDefaultButtons(v, d + 1);
+  };
+  rewriteDefaultButtons(figma.Themes, 0);
+  console.log(`▢ [Figma] Default-theme button borders and state buttons kept on their light-mode tables (${defaultBtnRewritten} references)`);
+
   rewriteBlackWhite(figma.Themes, 0);
   rewriteBlackWhite(figma.SurfacesContainers, 0);
   console.log(
@@ -3260,8 +3392,42 @@ const FIGMA_LG_BUTTON_PADDING = 16;
         if (!entry || typeof entry !== 'object') continue;
         if (pal !== 'Neutral' && entry.Border && 'value' in entry.Border) delete entry.Border;
         if (pal === 'BlackWhite') {
-          for (const k of Object.keys(entry)) if (/^Color-/.test(k)) delete entry[k];
+          // Card rows (Container-Color-N) too: like the surface rows, the
+          // Theme layer reads them through the sections they were copied to.
+          for (const k of Object.keys(entry)) if (/^(Container-)?Color-/.test(k)) delete entry[k];
           if (entry.Default) { delete entry.Default.Highlight; delete entry.Default.Lowlight; }
+        }
+      }
+    }
+  }
+
+  /* Card black/white rows only where a card reads them. A theme's cards sit on
+     a handful of tones (its own tone + 1, Neutral's 11, the bars'), so the
+     twelve-row card copies in Button-Hover / -Pressed / -Highlight / -Lowlight
+     and Default-Button-Border.Containers.BlackWhite-Text / -Quiet are mostly
+     unread — and every unread row is a variable Modes cannot spare. The
+     Theme layer's references were all written above, so anything not named
+     by one now is safe to leave out. */
+  {
+    const referenced = new Set<string>();
+    const collect = (n: any, d: number) => {
+      if (!n || typeof n !== 'object' || d > 14) return;
+      if (typeof n.value === 'string') { if (n.value.startsWith('{')) referenced.add(n.value.slice(1, -1)); return; }
+      for (const [k, v] of Object.entries(n)) if (k !== 'type') collect(v, d + 1);
+    };
+    collect(figma.Themes, 0);
+    collect(figma.SurfacesContainers, 0);
+    for (const modeSection of Object.values<any>(figma.Modes ?? {})) {
+      for (const group of ['Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight']) {
+        const rows = modeSection[group]?.BlackWhite;
+        for (const k of Object.keys(rows ?? {})) {
+          if (k.startsWith('Container-') && !referenced.has(`${group}.BlackWhite.${k}`)) delete rows[k];
+        }
+      }
+      for (const section of ['BlackWhite-Text', 'BlackWhite-Quiet']) {
+        const rows = modeSection['Default-Button-Border']?.Containers?.[section];
+        for (const k of Object.keys(rows ?? {})) {
+          if (!referenced.has(`Default-Button-Border.Containers.${section}.${k}`)) delete rows[k];
         }
       }
     }

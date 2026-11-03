@@ -879,7 +879,7 @@ function generateSingleTheme(config: ThemeConfig): any {
         // button inside a container takes its face from the container it sits
         // on rather than from the surface behind it.
         const cSrc = config.blackWhiteButton
-          ? `Buttons.BlackWhite.Color-${config.contN}`
+          ? `Buttons.BlackWhite.Container-Color-${config.contN}`
           : `Default-Button.Default.${config.cShade}`;
         return {
           'Button': { value: `{${cSrc}.Button}`, type: 'color' },
@@ -920,16 +920,18 @@ function generateSingleTheme(config: ThemeConfig): any {
       },
       // BlackWhite — same table, keyed to the CONTAINER's tone rather than the
       // surface's, so a black/white button inside a container reads against
-      // the container it actually sits on.
+      // the container it actually sits on. The `Container-` keys carry the
+      // face chosen for a CARD at that tone in each mode — a card and a
+      // surface share a tone number but not a color in dark mode.
       'BlackWhite': {
-        'Button': { value: `{Buttons.BlackWhite.Color-${config.contN}.Button}`, type: 'color' },
-        'Text': { value: `{Buttons.BlackWhite.Color-${config.contN}.Text}`, type: 'color' },
-        'Quiet': { value: `{Buttons.BlackWhite.Color-${config.contN}.Quiet}`, type: 'color' },
-        'Border': { value: `{Buttons.BlackWhite.Color-${config.contN}.Border}`, type: 'color' },
-        'Hover': { value: `{Buttons.BlackWhite.Color-${config.contN}.Hover}`, type: 'color' },
-        'Pressed': { value: `{Buttons.BlackWhite.Color-${config.contN}.Pressed}`, type: 'color' },
-        'Highlight': { value: `{Buttons.BlackWhite.Color-${config.contN}.Highlight}`, type: 'color' },
-        'Lowlight': { value: `{Buttons.BlackWhite.Color-${config.contN}.Lowlight}`, type: 'color' }
+        'Button': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Button}`, type: 'color' },
+        'Text': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Text}`, type: 'color' },
+        'Quiet': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Quiet}`, type: 'color' },
+        'Border': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Border}`, type: 'color' },
+        'Hover': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Hover}`, type: 'color' },
+        'Pressed': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Pressed}`, type: 'color' },
+        'Highlight': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Highlight}`, type: 'color' },
+        'Lowlight': { value: `{Buttons.BlackWhite.Container-Color-${config.contN}.Lowlight}`, type: 'color' }
       },
       'Neutral': {
         'Button': { value: `{Buttons.Neutral.${config.cShade}.Button}`, type: 'color' },
@@ -1340,6 +1342,62 @@ export function generateAllThemesWithSurfacesAndContainers(
     }
   }
 
+  // Route the Default theme's BUTTON edges and black/white faces through
+  // Default-Background too.
+  //
+  // Same reason as the roles above: the Theme layer is mode-independent, and
+  // the Default theme's tones move between modes (white page: tone 12 light,
+  // tone 2 dark; its Brightest is tone 11 in dark — a LIGHT surface). Its
+  // buttons kept references fixed at the light-mode tone:
+  //   - Buttons.BlackWhite.Color-12 is the black face, so in dark mode a black
+  //     button sat on the near-black page (1.0:1);
+  //   - the dark-mode flush above made every palette button's border its own
+  //     pastel fill, which is right on a dark surface and invisible on the
+  //     light Brightest one (~1.1:1), where every other theme draws a
+  //     surface-aware border from Border.Surfaces.<palette>.
+  // Routed, the producers (exportToCSS tokenLookup, generateFigmaJSON
+  // ROLE_SOURCES) read both tables at the tone this surface really paints in
+  // each mode. Light mode resolves to exactly the references it had before.
+  // Runs after the flush so the flush cannot overwrite it.
+  const DEFAULT_BORDER_PALETTES = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
+    'Info', 'Success', 'Warning', 'Error'];
+  const BLACK_WHITE_REF = /^\{Buttons\.BlackWhite\.(?:Default|(?:Container-)?Color-\d+)\.(\w+)\}$/;
+  const routeDefaultButtons = (group: string, fgPrefix: string) => {
+    const buttons = themes.Default?.[group]?.Buttons;
+    if (!buttons) return;
+    for (const pal of DEFAULT_BORDER_PALETTES) {
+      if (buttons[pal]?.Border === undefined) continue;
+      buttons[pal].Border = { value: `{Default-Background.${fgPrefix}Buttons-${pal}-Border}`, type: 'color' };
+    }
+    // Black/white faces, wherever they appear — the BlackWhite button and, in
+    // black-white mode, the Default button that reads the same table.
+    for (const btn of Object.values(buttons) as any[]) {
+      if (!btn || typeof btn !== 'object') continue;
+      for (const [role, token] of Object.entries<any>(btn)) {
+        const m = String(token?.value ?? '').match(BLACK_WHITE_REF);
+        if (!m) continue;
+        btn[role] = { value: `{Default-Background.${fgPrefix}Buttons-BlackWhite-${m[1]}}`, type: 'color' };
+      }
+    }
+  };
+  routeDefaultButtons('Surfaces', '');
+  routeDefaultButtons('Surfaces-Dim', 'Surface-Dim-');
+  routeDefaultButtons('Surfaces-Bright', 'Surface-Bright-');
+  routeDefaultButtons('Surfaces-Brightest', 'Surface-Brightest-');
+  // Cards: only the black/white face moves (a card's palette borders are
+  // keyed to the card tone already); the face follows the card's real color.
+  {
+    const buttons = themes.Default?.Containers?.Buttons;
+    for (const btn of Object.values(buttons ?? {}) as any[]) {
+      if (!btn || typeof btn !== 'object') continue;
+      for (const [role, token] of Object.entries<any>(btn)) {
+        const m = String(token?.value ?? '').match(BLACK_WHITE_REF);
+        if (!m) continue;
+        btn[role] = { value: `{Default-Background.Container-Buttons-BlackWhite-${m[1]}}`, type: 'color' };
+      }
+    }
+  }
+
   // Override Default Containers
   if (themes.Default?.Containers) {
     themes.Default.Containers['Container'] = { value: '{Default-Background.Container}', type: 'color' };
@@ -1459,9 +1517,24 @@ export function generateAllThemesWithSurfacesAndContainers(
     surfaceScopedButton: isSurfaceScopedButton,
     blackWhiteButton: isBlackWhiteButton,
     contTheme: theme,
-    contN: n === 11 ? 10 : n === 12 ? 11 : Math.min(n + 1, 12),
+    /* Black cards key every themed card to tone 3, as the Default theme's do
+       (getSimplifiedDefaultSettings: black → ContN 3).
+
+       With black cards every Background-N row paints its cards near-black,
+       but a themed card kept its tone-relative key (n + 1). The card
+       foreground tables are keyed by that number, and in light mode a key of
+       6+ means a LIGHT card — so a Primary section's black card carried
+       dark text, borders and icons (1.9:1 on #110d11). Tone 3 is a dark
+       key in both modes, which is what the card actually is, so every
+       foreground table already holds the right answer there. The card's
+       color is unchanged: the row at tone 3 paints the same black card. */
+    contN: userSelections?.cardColoring === 'black'
+      ? 3
+      : n === 11 ? 10 : n === 12 ? 11 : Math.min(n + 1, 12),
     shade: n >= 9 ? 'Medium' as const : 'Light' as const,
-    cShade: n === 11 ? 'Medium' as const : defaultSettings.containerShade,
+    cShade: userSelections?.cardColoring === 'black'
+      ? 'Light' as const
+      : n === 11 ? 'Medium' as const : defaultSettings.containerShade,
     defaultText: textPalettes.default,
     primaryText: textPalettes.primary,
     secondaryText: textPalettes.secondary,

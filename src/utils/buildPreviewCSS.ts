@@ -1145,7 +1145,14 @@ export function buildPreviewCSS(input: BuildInput): string {
          translucent grey, and its resting label (Quiet, neutral 6) a grey on
          grey. A black or white button carries a black or white label, at rest
          and on interaction alike. */
-      const white = !isLight(surfaceHex);
+      /* Whichever face CONTRASTS more with the surface — the button's edge
+         is its fill, so that is the 3:1 it has to clear. isLight's
+         brightness cut put a white face on a saturated mid tone (Popsicle's
+         Secondary #00a8cc reads 0.48 "bright", so dark): 2.81:1, where black
+         measures 7.5:1. */
+      const white = chroma.valid(surfaceHex)
+        ? contrastRatio('#ffffff', surfaceHex) > contrastRatio('#000000', surfaceHex)
+        : !isLight(surfaceHex);
       const bg = white ? '#ffffff' : neutral(1);
       // White on the black face is the mode's white text (70% in dark mode —
       // still about 10:1 on near-black), the value the export writes.

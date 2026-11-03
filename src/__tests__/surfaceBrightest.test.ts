@@ -415,7 +415,15 @@ describe('Surface-Brightest', () => {
     };
     walk({ Themes: f.Themes }, '', 0);
     expect(seen.size).toBeGreaterThan(0);
-    for (const v of seen) expect(v, 'a frozen bevel').toMatch(/^\{Button-(Lowlight|Highlight)\.BlackWhite\.Color-\d+\}$/);
+    /* Three mode-aware homes: a surface's row; a card's row (dark-mode cards
+       are all dark, so a card keyed to tone n takes its own face); and, for
+       the Default theme — whose tone itself moves between modes — its
+       Default-Background entry, which the Modes layer writes per mode. */
+    for (const v of seen) {
+      expect(v, 'a frozen bevel').toMatch(
+        /^\{(Button-(Lowlight|Highlight)\.BlackWhite\.(Container-)?Color-\d+|Default-Background\.[\w-]*Buttons-BlackWhite-(Lowlight|Highlight))\}$/,
+      );
+    }
 
     /* And the white face's dark bevel is its own: darker than what the button
        shows, not solid white's. */

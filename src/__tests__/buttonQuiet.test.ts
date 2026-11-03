@@ -28,6 +28,8 @@ import chroma from 'chroma-js';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
+import { Cascade } from '../utils/cssCascade';
+import { orderSheets } from '../utils/renderedAccessibilityReport';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
 
@@ -55,7 +57,7 @@ function scheme(colors: [string, string, string]) {
 }
 
 function build(sch: ReturnType<typeof scheme>, sel: Sel) {
-  return exportColorSystemToJSON(
+  const json = exportColorSystemToJSON(
     generateFullLightPalettes(
       sch.tonePalettes.primary as never, sch.tonePalettes.secondary as never,
       sch.tonePalettes.tertiary as never),
@@ -69,9 +71,33 @@ function build(sch: ReturnType<typeof scheme>, sel: Sel) {
     { background: sel.background as never, button: sel.button as never,
       cardColoring: sel.cardColoring as never, textColoring: sel.textColoring as never },
   ) as never as Record<string, never>;
+  // generateDesignSystem attaches the selections before the Figma generator
+  // runs; the Default-Background lookup below needs them.
+  (json as Record<string, unknown>)._userSelections = { ...sel };
+  return json;
 }
 
 /** Follow a {A.B.C} reference to a literal, across the mode boundary. */
+/* The Default theme routes its buttons through Default-Background, whose
+   values exist only once the CSS producer resolves them at the tone the page
+   paints in each mode (exportToCSS tokenLookup). So for those the test reads
+   what the published sheet gives the Default theme's section — the same
+   cascade the rendered accessibility report grades. */
+const cascadeCache = new WeakMap<object, Record<string, Cascade>>();
+function defaultSectionValues(json: any, mode: string, section: string): Record<string, string> {
+  if (!cascadeCache.has(json)) {
+    const files = generateCSSFiles(json);
+    cascadeCache.set(json, {
+      'Light-Mode': new Cascade(orderSheets(files, 'Light')),
+      'Dark-Mode': new Cascade(orderSheets(files, 'Dark')),
+    });
+  }
+  const surface = section === 'Containers' ? 'Container' : section.replace(/^Surfaces/, 'Surface');
+  const root = { attrs: {}, root: true };
+  const el = { attrs: { 'data-surface': surface }, parent: { attrs: { 'data-theme': 'Default' }, parent: root } };
+  return cascadeCache.get(json)![mode].computed(el as never);
+}
+
 function makeResolver(json: any, mode: string) {
   const M = json.Modes[mode];
   const res = (v: unknown, depth = 0): string => {
@@ -137,7 +163,10 @@ describe('button Quiet — the exported token', () => {
               if (!section?.Buttons) continue;
               for (const [pal, e] of Object.entries<any>(section.Buttons)) {
                 if (!e?.Quiet) continue;
-                const fill = resolve(e.Button), quiet = resolve(e.Quiet);
+                const routed = String(e.Button?.value ?? '').startsWith('{Default-Background.');
+                const cssValues = routed ? defaultSectionValues(json, mode, sn) : null;
+                const fill = cssValues ? (cssValues[`--Buttons-${pal}-Button`] ?? 'NONE') : resolve(e.Button);
+                const quiet = cssValues ? (cssValues[`--Buttons-${pal}-Quiet`] ?? 'NONE') : resolve(e.Quiet);
                 if (!fill.startsWith('#') || !quiet.startsWith('#')) {
                   fails.push(`${tn}/${sn}/${pal} unresolved fill=${fill} quiet=${quiet}`);
                   continue;

@@ -1114,6 +1114,9 @@ function generateThemeColorsVariables(modeData: any): string {
  * Brightest takes 11 unless Bright already claimed it, in which case 12.
  * Shared with utils/cellButtons.ts.
  */
+/** The roles of one black/white button face (Buttons.BlackWhite.<key>). */
+export const BLACK_WHITE_ROLES = ['Button', 'Text', 'Quiet', 'Border', 'Hover', 'Pressed', 'Highlight', 'Lowlight'] as const;
+
 export function defaultSurfaceRefs(defPal: string, defN: number): Record<string, string> {
   const row = `Backgrounds.${defPal}.Background-${defN}`;
   const defBrightN = Math.min(defN + 1, 12);
@@ -1391,6 +1394,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       `{Header.Containers.${defPal}.${faceColorN}}`;
     tokenLookup['Default-Background.Container-Text-BW'] =
       `{Default-Button-Border.Containers.BlackWhite.${faceColorN}}`;
+    // The card's black/white button, at the same face tone as its Text-BW.
+    for (const role of BLACK_WHITE_ROLES) {
+      tokenLookup[`Default-Background.Container-Buttons-BlackWhite-${role}`] =
+        `{Buttons.BlackWhite.Container-${faceColorN}.${role}}`;
+    }
     // The card's eyebrow, keyed by the card row (contN) — the Eyebrows
     // Containers table is solved against the five card levels of that row.
     // Same key generateFigmaJSON uses for Container-Eyebrow.
@@ -1400,7 +1408,12 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the
     // Default theme's focus ring unbound in both modes.
     const backgroundN = `Background-${defN}`;
-    const containerBackgroundN = `Background-${contN}`;
+    /* The card's ring is keyed by the card's FACE tone, like its text: with
+       black cards on a light page the face is near-black while contN is
+       the page tone, and a ring solved for a light card (Info-5, 2.6:1)
+       was drawn on a black one. A tonal card's face is its own tone, so
+       nothing moves there. */
+    const containerBackgroundN = `Background-${faceN}`;
     tokenLookup['Default-Background.Focus-Visible'] = `{Focus-Visible.Surfaces.${backgroundN}}`;
     tokenLookup['Default-Background.Container-Focus-Visible'] = `{Focus-Visible.Containers.${containerBackgroundN}}`;
 
@@ -1479,6 +1492,27 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       // this surface's tone. Must stay in step with generateFigmaJSON's
       // ROLE_SOURCES (Eyebrow) and exportColorSystem's Default routing.
       tokenLookup[`Default-Background.${prefix}Eyebrow`] = `{Eyebrows.Surfaces.${defPal}.${vColorN}}`;
+      // The Default theme's buttons (generateCompleteThemes routeDefaultButtons):
+      // each palette's border from its own Border table, and the black/white
+      // face from the BlackWhite table, both at the tone this surface paints
+      // in THIS mode. Must stay in step with ROLE_SOURCES / writeExtras in
+      // generateFigmaJSON.ts.
+      for (const pal of accentPalettes) {
+        tokenLookup[`Default-Background.${prefix}Buttons-${pal}-Border`] = `{Border.Surfaces.${pal}.${vColorN}}`;
+      }
+      for (const role of BLACK_WHITE_ROLES) {
+        tokenLookup[`Default-Background.${prefix}Buttons-BlackWhite-${role}`] = `{Buttons.BlackWhite.${vColorN}.${role}}`;
+      }
+      // State buttons are tonal (exportColorSystem, Tonal-Button): the whole
+      // button comes from the entry at this surface's tone.
+      for (const state of ['Info', 'Success', 'Warning', 'Error']) {
+        const entry = modeData?.['Tonal-Button']?.Surfaces?.[state]?.[vColorN];
+        for (const field of ['Button', 'Text', 'Quiet', 'Hover', 'Pressed', 'Highlight', 'Lowlight']) {
+          tokenLookup[`Default-Background.${prefix}Buttons-${state}-${field}`] = entry?.[field]
+            ? `{Tonal-Button.Surfaces.${state}.${vColorN}.${field}}`
+            : `{Buttons.${state}.Medium.${field}}`;
+        }
+      }
       // Accents resolve from their OWN palette at the surface's tone.
       for (const pal of accentPalettes) {
         tokenLookup[`Default-Background.${prefix}Text-${pal}`] = `{Text.Surfaces.${pal}.${vColorN}}`;

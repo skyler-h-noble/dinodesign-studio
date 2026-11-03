@@ -7154,6 +7154,20 @@ export function exportColorSystemToJSON(
         if (!buttons || typeof buttons !== 'object') continue;
         for (const pal of TONAL_STATES) {
           const btn = buttons[pal];
+          /* The Default theme's surfaces route their button borders through
+             Default-Background (generateCompleteThemes routeDefaultButtons),
+             because the tone they sit on moves between modes. Its state
+             buttons follow the same way: the producers resolve
+             Default-Background.<prefix>Buttons-<State>-<Field> to this table's
+             entry at the tone the surface paints in each mode — in light mode
+             the very entry the tone-keyed reference used to name. */
+          const routed = String(btn?.Border?.value ?? '').match(/^\{Default-Background\.(.*)Buttons-(\w+)-Border\}$/);
+          if (routed && routed[2] === pal) {
+            for (const k of [...TONAL_FIELDS, 'Highlight', 'Lowlight']) {
+              btn[k] = { value: `{Default-Background.${routed[1]}Buttons-${pal}-${k}}`, type: 'color' };
+            }
+            continue;
+          }
           const m = String(btn?.Border?.value ?? '').match(tonalRef);
           if (!m || !table[m[1]]?.[m[2]]?.[`Color-${m[3]}`]) continue;
           const base = `Tonal-Button.${m[1]}.${m[2]}.Color-${m[3]}`;
@@ -7259,6 +7273,116 @@ export function exportColorSystemToJSON(
       return typeof v === 'string' ? v : '';
     };
 
+    /* Is a resolved hex light? Relative luminance above 0.18 — the crossover
+       where black and white text have equal contrast — so "light" means
+       black is the better partner. Alpha is ignored: #ffffffb3 is white. */
+    const isLightHex = (hex: string): boolean => {
+      const c = hex.replace('#', '').slice(0, 6);
+      if (!/^[0-9a-f]{6}$/i.test(c)) return false;
+      const n = parseInt(c, 16);
+      const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+        const sr = v / 255;
+        return sr <= 0.03928 ? sr / 12.92 : Math.pow((sr + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2] > 0.18;
+    };
+
+    // ── Default-Button-Border.<scope>.BlackWhite, per mode and per scope ──
+    //
+    // This map decides black or white for a section keyed to tone N, and both
+    // the Text-BW role and the black/white button face read it. It used to be
+    // one fixed table — white on tones 1-5, black from 6 up — in both modes and
+    // both scopes. The tone number is the LIGHT-mode layout, though: in dark
+    // mode a card keyed to tone 7 paints a near-black color, so black text and
+    // black buttons landed on black cards (1.0-1.15:1).
+    //
+    // The Text tables already answer "what does a key-N section paint in this
+    // mode" correctly for every scope — Text.<scope>.BW is black or white text
+    // solved per mode and per scope, and it passes everywhere the report
+    // looks. So the face is read from that decision instead of restated: BW
+    // text that is light means the background is dark, which takes the white
+    // face. Surfaces come out exactly as before; dark-mode cards flip to white.
+    for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+      const modeData: any = colorSystem.Modes[modeName];
+      for (const scope of ['Surfaces', 'Containers'] as const) {
+        const bwText = modeData?.Text?.[scope]?.BW;
+        const map = modeData?.['Default-Button-Border']?.[scope]?.BlackWhite;
+        if (!bwText || !map) continue;
+        for (const key of Object.keys(map)) {
+          if (!bwText[key]) continue;
+          const hex = resolveRef(modeData, bwText[key]);
+          if (!hex.startsWith('#')) continue;
+          map[key] = {
+            value: isLightHex(hex) ? '{Colors.White}' : '{Colors.Neutral.Color-1}',
+            type: 'color',
+          };
+        }
+      }
+    }
+
+    // ── Card Quiet, checked against all five card levels ──
+    //
+    // The curated Quiet tables pick one tone per card key, tuned for the
+    // standard card. A card row paints five levels, and on a tinted status
+    // card the lowest one is the darkest: Info's Container-Lowest is #aeccfe,
+    // where Info's quiet (#0056af) measures 4.36:1 while the other four pass.
+    // The eyebrow had the same shape and is solved against all five levels
+    // (buildEyebrows, containerHexes); this does the same for Quiet, and only
+    // where the curated cell actually fails — a cell that passes is the
+    // design and is left exactly as it is. A failing cell moves the fewest
+    // steps along its own palette that clear 4.5:1 on every level of every
+    // card row that reads it.
+    let quietCellsMoved = 0;
+    for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
+      const modeData: any = colorSystem.Modes[modeName];
+      const quietContainers = modeData?.Quiet?.Containers;
+      if (!quietContainers || !modeData?.Themes) continue;
+      const LEVELS = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
+      // Every card row a Quiet cell is read on: cell "P|Color-N" -> card hexes.
+      const cardsByCell = new Map<string, Set<string>>();
+      for (const theme of Object.values<any>(modeData.Themes)) {
+        const cont = theme?.Containers;
+        const row = String(cont?.Container?.value ?? '').match(/^\{Backgrounds\.([\w-]+)\.(Background-\d+)\.Containers\.Container\}$/);
+        if (!row) continue;   // the Default theme routes its card through Default-Background
+        const levels = LEVELS
+          .map((lvl) => resolveRef(modeData, modeData.Backgrounds?.[row[1]]?.[row[2]]?.Containers?.[lvl]))
+          .filter((h) => /^#[0-9a-f]{6}/i.test(h))
+          .map((h) => h.slice(0, 7));
+        for (const [role, token] of Object.entries<any>(cont)) {
+          if (role !== 'Quiet' && !role.startsWith('Quiet-')) continue;
+          const cell = String(token?.value ?? '').match(/^\{Quiet\.Containers\.([\w-]+)\.(Color-\d+)\}$/);
+          if (!cell) continue;
+          const key = `${cell[1]}|${cell[2]}`;
+          const set = cardsByCell.get(key) ?? new Set<string>();
+          levels.forEach((h) => set.add(h));
+          cardsByCell.set(key, set);
+        }
+      }
+      for (const [key, cardSet] of cardsByCell) {
+        const [pal, colorKey] = key.split('|');
+        const cellToken = quietContainers[pal]?.[colorKey];
+        const current = String(cellToken?.value ?? '').match(/^\{Colors\.([\w-]+)\.Color-(\d+)\}$/);
+        if (!current || !cardSet.size) continue;
+        const ramp = (n: number) => resolveRef(modeData, modeData.Colors?.[current[1]]?.[`Color-${n}`]);
+        const passesAll = (hex: string) => /^#[0-9a-f]{6}/i.test(hex)
+          && [...cardSet].every((bg) => getContrastRatio(bg, hex.slice(0, 7)) >= 4.5);
+        const curN = Number(current[2]);
+        if (passesAll(ramp(curN))) continue;
+        // Nearest tone that passes, in either direction; ties go to the one
+        // further from the card (darker on a light card, lighter on a dark).
+        const cardIsLight = [...cardSet].every((bg) => getLuminance(bg) > 0.18);
+        let picked: number | null = null;
+        for (let step = 1; step < 12 && picked === null; step++) {
+          const order = cardIsLight ? [curN - step, curN + step] : [curN + step, curN - step];
+          picked = order.find((n) => n >= 1 && n <= 12 && passesAll(ramp(n))) ?? null;
+        }
+        if (picked === null) continue;
+        quietContainers[pal][colorKey] = { ...cellToken, value: `{Colors.${current[1]}.Color-${picked}}` };
+        quietCellsMoved++;
+      }
+    }
+    console.log(`🤫 [JSON Export] Card Quiet checked against all five card levels (${quietCellsMoved} cells moved)`);
+
     for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
       const modeData: any = colorSystem.Modes[modeName];
       const faces: Record<string, any> = {};
@@ -7302,8 +7426,15 @@ export function exportColorSystemToJSON(
         return { Highlight: { value: computeHighlight(shown), type: 'color' }, Lowlight: { value: computeLowlight(shown), type: 'color' } };
       };
 
-      // White face on tones 1-5, black from 6 up — the same threshold the
-      // Default-Button-Border BlackWhite map uses, so the two cannot drift.
+      // The face for each key is the one the Default-Button-Border BlackWhite
+      // map (rebuilt above from the Text tables) chose for that scope in this
+      // mode, so the button, its border and Text-BW cannot disagree.
+      const faceFor = (scope: 'Surfaces' | 'Containers', colorKey: string, toneNumber: number) => {
+        const ref = modeData?.['Default-Button-Border']?.[scope]?.BlackWhite?.[colorKey];
+        const hex = ref ? resolveRef(modeData, ref) : '';
+        if (hex.startsWith('#')) return isLightHex(hex) ? faces.White : faces.Black;
+        return toneNumber >= 6 ? faces.Black : faces.White;
+      };
       const table: any = {};
       for (const colorKey of Object.keys(modeData.Colors?.Neutral ?? {})) {
         if (!colorKey.startsWith('Color-')) continue;
@@ -7312,12 +7443,29 @@ export function exportColorSystemToJSON(
         // BACKGROUND's tone, and Vibrant is never a background — it is a
         // button fill. An entry for it would be a cell nothing can index.
         if (!Number.isFinite(toneNumber)) continue;
-        const face = toneNumber >= 6 ? faces.Black : faces.White;
+        const face = faceFor('Surfaces', colorKey, toneNumber);
         table[colorKey] = {
           Button: { ...face.Button }, Text: { ...face.Text }, Quiet: { ...face.Quiet },
           Border: { ...face.Border },
           Hover: { ...face.Hover }, Pressed: { ...face.Pressed },
           ...bevelOver(face, resolveRef(modeData, modeData.Colors?.Neutral?.[colorKey])),
+        };
+        // `Container-Color-N`: the same button for a CARD keyed to tone N.
+        //
+        // Surfaces and cards share a tone number but not a color: in dark mode
+        // every card is drawn from the dark end of the ramp whatever its key,
+        // so the surface entry at tone 7 (black face, for a light surface) put
+        // a black button on a black card. Cards get their own keys, with the
+        // face the Containers map chose. Added alongside the surface keys,
+        // which stay as they were.
+        const cardFace = faceFor('Containers', colorKey, toneNumber);
+        table[`Container-${colorKey}`] = {
+          Button: { ...cardFace.Button }, Text: { ...cardFace.Text }, Quiet: { ...cardFace.Quiet },
+          Border: { ...cardFace.Border },
+          Hover: { ...cardFace.Hover }, Pressed: { ...cardFace.Pressed },
+          ...bevelOver(cardFace, resolveRef(modeData,
+            modeData.Backgrounds?.Neutral?.[`Background-${toneNumber}`]?.Containers?.Container)
+            || resolveRef(modeData, modeData.Colors?.Neutral?.[colorKey])),
         };
       }
       // A `Default` key for the Default THEME.
@@ -7493,12 +7641,18 @@ export function exportColorSystemToJSON(
   for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
     const themes: any = (colorSystem.Modes[modeName] as any)?.Themes;
     if (!themes) continue;
-    for (const theme of Object.values<any>(themes)) {
+    for (const [themeName, theme] of Object.entries<any>(themes)) {
       for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
         if (!section || typeof section !== 'object' || !section['Text-Primary']) continue;
         const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
         const tone = String(section['Text-Primary'].value || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
-        if (tone) {
+        // Default's cards keep a real tone in Text-Primary, but that tone is
+        // the light-mode card's: the card's actual face follows the card
+        // setting and the mode (a black card on a white page, a dark card in
+        // dark mode). Its Text already routes through Default-Background for
+        // that reason, so Text-BW goes the same way rather than reading the
+        // light-mode tone.
+        if (tone && !(themeName === 'Default' && scope === 'Containers')) {
           section['Text-BW'] = {
             value: `{Default-Button-Border.${scope}.BlackWhite.${tone}}`,
             type: 'color',
@@ -7590,6 +7744,21 @@ export function exportColorSystemToJSON(
              reference names the same tone, so it is the second source; if
              neither has one, the surface's text color is used as-is. */
           const toneOf = (ref: unknown) => String(ref || '').match(/\.(Color-[\w-]+)\}$/)?.[1];
+          /* The Default theme's surfaces carry no tone at all: their roles —
+             button borders included — route through Default-Background,
+             because the tone they paint differs per mode. The palette text
+             they need is already there at the right tone (Text-<Palette>,
+             Text-BW), so the outline label reads it by the same prefix. */
+          const defaultPrefix = String(section['Text-Primary']?.value || '')
+            .match(/^\{Default-Background\.(.*)Text-Primary\}$/)?.[1];
+          if (defaultPrefix !== undefined && (OUTLINE_TEXT_PALETTES.has(pal) || pal === 'BlackWhite')) {
+            entry['Outline-Text'] = {
+              value: `{Default-Background.${defaultPrefix}Text-${pal === 'BlackWhite' ? 'BW' : pal}}`,
+              type: 'color',
+            };
+            outlineTextTokens++;
+            continue;
+          }
           const tone = toneOf(entry.Border?.value) || toneOf(section['Text-Match']?.value);
           if (!tone) {
             if (section.Text?.value) { entry['Outline-Text'] = { value: section.Text.value, type: 'color' }; outlineTextTokens++; }

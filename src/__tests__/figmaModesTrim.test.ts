@@ -167,7 +167,12 @@ describe('Figma Modes trim', () => {
        section's Default button as its own light/dark entry, so Figma gets the
        per-cell tones the Advanced grid sets. ~190 variables after sharing the
        page and bar entries with the theme sections they sit on. Figma's hard
-       limit is 5,000; this keeps ~600 of room. */
-    expect(n).toBeLessThan(4400);
+       limit is 5,000; this keeps ~600 of room.
+       4,450 (from 4,400) for the black/white face the Theme layer cannot pick
+       by mode: the Default theme's (Default-Background, its tone moves
+       between modes) and the cards' (Container-Color-N rows, only the tones a
+       card reads — dark-mode cards are all dark). ~60 variables; ~550 of room
+       remain. */
+    expect(n).toBeLessThan(4450);
   });
 });
