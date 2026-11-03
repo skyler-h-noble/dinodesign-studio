@@ -316,7 +316,25 @@ export function headerFontQueryParam(): string {
 
    Read back out of the system's own typography CSS, so the request cannot
    disagree with the values the page uses. An axis the CSS does not pin keeps
-   its full range; weights narrow to the span the header styles use. */
+   its full range.
+
+   Every axis but optical size spans back to its default, and weights always
+   cover 400..700. None of it costs bytes — Google ships those axes either way
+   (measured 2026-11-03: Surf 189 KB, Popsicle 282 KB, Cocktails 132 KB, with
+   or without the spans); optical size is the axis that weighs (Surf 549 KB
+   with it open). What the spans buy:
+   - Slant and width are what the browser MATCHES a face on (font-style,
+     font-stretch). Pinned at slant -9 the face is `oblique 9deg`, and pinned
+     at width 106 it is `font-stretch: 106%`; text that sets neither asks for
+     normal / 100%, so on a page holding another system's face (the portfolio
+     switches systems) the browser picks THAT face instead. Spanning back to
+     the default keeps each face a match for plain text.
+   - Grade and roundness bring text that takes the header family without the
+     header's settings closer to the studio preview, which loads every axis.
+   - Weights: body-weight text in the header family is not clamped to the
+     nearest header weight.
+   Header text, which carries the system's own settings, draws the same as the
+   full font either way (within 0.2px, Chrome). */
 const AXIS_TOKEN: Record<string, string> = {
   GRAD: 'Font-Grade-Header', ROND: 'Font-Roundness-Header', opsz: 'Font-Optical-Size-Header',
   slnt: 'Font-Slant-Header', wdth: 'Font-Width-Header',
@@ -329,13 +347,18 @@ export function pinnedHeaderFontQueryParam(typographyCSS: string): string {
       const w = num(/--(?:Font-Weight-Header|Header-Clamped-Weight|Set-Font-Family-Header-Weight|(?:H[1-6]|Header|Display)[A-Za-z0-9-]*-Font-Weight):\s*(\d+)\s*;/g)
         .filter((n) => n >= AXES.wght.min && n <= AXES.wght.max);
       if (!w.length) return `${AXES.wght.min}..${AXES.wght.max}`;
-      const lo = Math.min(...w), hi = Math.max(...w);
-      return lo === hi ? String(lo) : `${lo}..${hi}`;
+      const lo = Math.max(AXES.wght.min, Math.min(...w, 400));
+      const hi = Math.min(AXES.wght.max, Math.max(...w, 700));
+      return `${lo}..${hi}`;
     }
     const pinned = new Set(num(new RegExp(`--${AXIS_TOKEN[t]}:\\s*(-?[\\d.]+)\\s*;`, 'g')));
     if (pinned.size === 1) {
       const v = [...pinned][0];
-      if (v >= AXES[t].min && v <= AXES[t].max) return String(v);
+      if (v >= AXES[t].min && v <= AXES[t].max) {
+        if (t === 'opsz' || v === AXES[t].def) return String(v);
+        const d = AXES[t].def;
+        return `${Math.min(v, d)}..${Math.max(v, d)}`;
+      }
     }
     return `${AXES[t].min}..${AXES[t].max}`;
   });
