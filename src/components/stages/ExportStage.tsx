@@ -341,7 +341,7 @@ export default function ExportStage({
   const showcaseBase = SHOWCASE_BASE;
   const playgroundUrl = `${showcaseBase}/?user=${dinoId || ''}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${dinoId || ''}/md`;
-  const installCmd = `npm install @omni-design/components && npx @dynodesign/init ${dinoId || ''}`;
+  const installCmd = `npm install @omni-design/components @omni-design/icons @mui/material@^7 @emotion/react @emotion/styled`;
   const hasId = !!dinoId;
   const copyTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 

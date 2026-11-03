@@ -12,9 +12,13 @@ it is `@omni-design/components`, and the provider went from `DynoDesignProvider`
 to `OmniDesignProvider`. The old package stays published — several experiments
 pin `^0.4.1` / `^0.5.0` / `^0.6.0` and keep resolving against it — so BOTH names
 are live on npm and neither is a typo. In this repo, only the Omni name is
-correct. The one deliberate exception is `src/utils/generateDesignSystem.ts`,
-which writes a CLAUDE.md for END USERS: what it emits has to match whatever
-version they install, so change it only alongside a release.
+correct. The one deliberate exception is `src/utils/endUserDocs.ts` (called
+from `generateDesignSystem.ts`), which writes the CLAUDE.md for END USERS —
+uploaded as `DINO-TOKENS.md` and served at `/api/tokens/:id/md`. It states the
+system's own choices (page background, App-Bar / Nav-Bar / Status, button,
+cards, text) and the rules; `src/__tests__/endUserDocs.test.ts` keeps both from
+being dropped. What it emits has to match whatever version users install, so
+change it only alongside a lib release.
 
 ---
 
@@ -442,7 +446,7 @@ the design system can compute them — components consume them through
 
 Why this matters: setting `data-theme` + `data-surface` exposes the full set
 of paired tokens — `--Background`, `--Text`, `--Quiet`, `--Header`,
-`--Border`, `--Border-Variant`, `--Hover`, `--Active`, `--Hotlink`, the per-
+`--Border`, `--Border-Variant`, `--Hover`, `--Pressed`, `--Hotlink`, the per-
 palette `--Buttons-*-Border/Highlight/Lowlight` overrides — all tuned for
 that surface's tone. Writing `background: var(--Surface)` paints the box but
 leaves text/quiet/border on the parent's tone, so contrast breaks the moment

@@ -840,7 +840,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
   const showcaseBase = SHOWCASE_BASE;
   const playgroundUrl = `${showcaseBase}/?user=${id}`;
   const claudeMdUrl = `${window.location.origin}/api/tokens/${id}/md`;
-  const installCmd = `npm install @omni-design/components && npx @dynodesign/init ${id}`;
+  const installCmd = `npm install @omni-design/components @omni-design/icons @mui/material@^7 @emotion/react @emotion/styled`;
 
   return (
     <VStack spacing={5}>
