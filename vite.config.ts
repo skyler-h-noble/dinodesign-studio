@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
@@ -20,6 +20,11 @@ export default defineConfig({
        test while working in a real build. A stub is indistinguishable from a
        file with no content, so any test of that pipeline passed on nothing. */
     css: true,
+    /* Agent worktrees live under .claude/worktrees and are full copies of the
+       repo, often mid-change. Without this the suite (and the pre-commit
+       hook) ran every copy's tests too, so one unfinished worktree blocked
+       commits in the main checkout. */
+    exclude: [...configDefaults.exclude, '.claude/**'],
   },
   resolve: {
     preserveSymlinks: true,
