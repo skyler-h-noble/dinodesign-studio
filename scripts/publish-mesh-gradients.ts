@@ -16,6 +16,17 @@
  *
  *   node scripts/publish-mesh-gradients.ts            # show what would happen
  *   node scripts/publish-mesh-gradients.ts --write    # actually upload
+ *   node scripts/publish-mesh-gradients.ts --only <id>[,<id>...]   # just these systems
+ *
+ * Republishing is also how a system gets the DARK variant (see darkMeshCSS in
+ * meshGradientCSS.ts) — the light part of the file is unchanged. For each
+ * system the dry run fetches the currently published mesh-gradient.css and the
+ * two mode sheets (public, read-only) and prints:
+ *   - whether the light part of the new file matches what is live, rules for
+ *     rule (comments ignored), so a republish cannot quietly move the light mesh;
+ *   - the text's worst contrast over the mesh in each mode, against that
+ *     system's real palette, so a dark variant that fails 4.5:1 is seen BEFORE
+ *     it is uploaded.
  *
  * Auth: Application Default Credentials.
  *   gcloud auth application-default login
@@ -23,7 +34,10 @@
  */
 
 import { createRequire } from 'node:module';
-import { generateMeshGradientCSS, type MeshGradient } from '../src/utils/meshGradientCSS.ts';
+import {
+  generateMeshGradientCSS, darkMeshBackground, DARK_MESH_TEXT, type MeshGradient,
+} from '../src/utils/meshGradientCSS.ts';
+import { readPalette, meshContrast, resolveTextColor } from '../src/utils/meshGradientContrast.ts';
 
 // firebase-admin is CJS and lives in functions/node_modules (the studio root
 // has none). Same trick the other scripts in here use.
@@ -40,10 +54,42 @@ const ROOT = 'design-systems';
 const CACHE_CONTROL = 'no-cache, max-age=0, must-revalidate';
 
 const write = process.argv.includes('--write');
+const onlyAt = process.argv.indexOf('--only');
+const only = onlyAt > -1
+  ? new Set((process.argv[onlyAt + 1] || '').split(',').map((s) => s.trim()).filter(Boolean))
+  : null;
+if (only && !only.size) {
+  console.error('--only needs a comma-separated list of design system ids.');
+  process.exit(1);
+}
 
-function publicUrl(id: string): string {
-  const path = encodeURIComponent(`${ROOT}/${id}/${FILENAME}`);
+function publicUrl(id: string, file = FILENAME): string {
+  const path = encodeURIComponent(`${ROOT}/${id}/${file}`);
   return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${path}?alt=media`;
+}
+
+/** A published file's text, or null when it is not there. Read-only. */
+async function fetchPublished(id: string, file: string): Promise<string | null> {
+  try {
+    const res = await fetch(publicUrl(id, file));
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** Worst text contrast over the mesh in one mode, as a printable line. */
+function contrastLine(background: string, text: string, sheet: string | null): string {
+  if (!sheet) return 'mode sheet not published — not checked';
+  const palette = readPalette(sheet);
+  const hex = resolveTextColor(text, palette);
+  if (!hex) return `text ${text} does not resolve — not checked`;
+  const r = meshContrast(background, hex, palette);
+  if (r.missing.length) return `UNDEFINED in this sheet: ${r.missing.join(', ')}`;
+  const worst = Math.min(r.worstStop, r.worstMesh);
+  return `${worst.toFixed(2)}:1 worst (text ${hex}) ${worst >= 4.5 ? 'ok' : 'FAILS 4.5:1'}`;
 }
 
 async function main() {
@@ -60,6 +106,7 @@ async function main() {
     // would emit `--Mesh-Gradient: undefined`, which paints nothing and reports
     // nothing. Skip loudly rather than shipping a dud file.
     if (!mesh || typeof mesh.background !== 'string' || !mesh.background.trim()) return;
+    if (only && !only.has(doc.id)) return;
     targets.push({ id: doc.id, name: data.name || '(unnamed)', mesh });
   });
 
@@ -81,6 +128,24 @@ async function main() {
     // background declaration is dropped silently.
     const tokens = [...new Set(css.match(/var\(--[\w-]+\)/g) || [])];
     console.log(`   tokens: ${tokens.length} referenced — consumer must load foundation.css + Light-Mode.css`);
+
+    const [live, lightSheet, darkSheet] = await Promise.all([
+      fetchPublished(t.id, FILENAME),
+      fetchPublished(t.id, 'Light-Mode.css'),
+      fetchPublished(t.id, 'Dark-Mode.css'),
+    ]);
+    if (live === null) {
+      console.log('   live : (not published yet)');
+    } else {
+      const liveRules = stripComments(live.split('/* Dark mode.')[0]);
+      const same = stripComments(css).startsWith(liveRules);
+      console.log(`   live : light rules ${same ? 'unchanged' : 'DIFFER from what is published'}${live.includes('@container style(') ? ' (already has the dark variant)' : ''}`);
+    }
+    const dark = darkMeshBackground(t.mesh.background);
+    console.log(`   light: ${contrastLine(t.mesh.background, t.mesh.color || 'var(--Text)', lightSheet)}`);
+    console.log(`   dark : ${dark
+      ? contrastLine(dark, DARK_MESH_TEXT, darkSheet)
+      : 'NO dark variant — the stack has a color that is not a palette tone (see darkMeshBackground)'}`);
 
     if (write) {
       await bucket.file(path).save(css, {

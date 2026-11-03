@@ -26,7 +26,7 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { parseMeshGradient, generateMeshGradientCSS } from '../src/utils/meshGradientCSS.ts';
+import { parseMeshGradient, generateMeshGradientCSS, darkMeshBackground } from '../src/utils/meshGradientCSS.ts';
 
 const require = createRequire(import.meta.url);
 const admin = require('../functions/node_modules/firebase-admin');
@@ -78,6 +78,11 @@ async function main() {
   const css = generateMeshGradientCSS(mesh);
   const path = `${ROOT}/${id}/${FILENAME}`;
   console.log(`  file  : ${path} (${Buffer.byteLength(css)} bytes)`);
+  // The file carries its own dark-mode variant when every stop is a palette
+  // tone; say so either way, since a missing one only shows on a dark page.
+  console.log(darkMeshBackground(mesh.background)
+    ? '  dark  : included (stops mirrored to tones 1-5, white text)'
+    : '  dark  : NONE — a stop is not a palette tone, so the mesh stays light in dark mode');
 
   if (!write) {
     console.log('\nNothing was written. Re-run with --write to commit.');
