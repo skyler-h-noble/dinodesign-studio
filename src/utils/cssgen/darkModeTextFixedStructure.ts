@@ -128,7 +128,12 @@ const darkModeTextSurfaces = {
       'Color-1': { value: '{Colors.Hotlink-Visited.Color-9}', type: 'color' as const },
       'Color-2': { value: '{Colors.Hotlink-Visited.Color-9}', type: 'color' as const },
       'Color-3': { value: '{Colors.Hotlink-Visited.Color-10}', type: 'color' as const },
-      'Color-4': { value: '{Colors.Error.Color-10}', type: 'color' as const },
+      // Hotlink-Visited, not Error. This cell was copied from the Error table
+      // above with its palette left behind, and Containers are derived from
+      // Color-4 (containersFromSurfaces below), so every dark-mode card drew
+      // its visited links in Error's peach. It passed contrast, which is why
+      // nothing caught it: a visited link has to stay in the visited hue.
+      'Color-4': { value: '{Colors.Hotlink-Visited.Color-10}', type: 'color' as const },
       'Color-5': { value: '{Colors.Hotlink-Visited.Color-12}', type: 'color' as const },
       'Color-6': { value: '{Colors.Hotlink-Visited.Color-1}', type: 'color' as const },
       'Color-7': { value: '{Colors.Hotlink-Visited.Color-1}', type: 'color' as const },
