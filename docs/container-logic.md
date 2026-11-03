@@ -115,64 +115,82 @@ the top level is the pure colour.
 | `Container-High` | 96% |
 | `Container-Highest` | **Neutral Color-1** |
 
-### Dark mode — tone 5 laid over the surface
+### Dark mode — solid colors mixed from tone 5 and the surface
 
-Owner's final model (2026-11-03; it replaces a "lift each card along the
-surface's ramp" model from earlier that day). In dark mode a card is **one
-color, the theme palette's tone 5**, at an opacity that rises with the level,
-**laid over whatever surface it sits on**:
+Owner's final model (2026-11-03). In dark mode a card is the theme palette's
+**tone 5 mixed with the surface it sits on**, with more tone 5 at each level.
+Every value is a **solid color** — no opacity on containers:
 
 | level | dark mode |
 | --- | --- |
-| `Container-Lowest` | tone 5 at 45% |
-| `Container-Low` | tone 5 at 60% |
-| `Container` | tone 5 at 75% |
-| `Container-High` | tone 5 at 88% |
-| `Container-Highest` | tone 5 at 100% (solid) |
+| `Container-Lowest` | 45% tone 5, 55% surface |
+| `Container-Low` | 60% tone 5 |
+| `Container` | 75% tone 5 |
+| `Container-High` | 88% tone 5 |
+| `Container-Highest` | tone 5 itself |
+
+The mix is `blendColors(tone5, surface, share)` — the same function, and the
+same "one color over the background" shape, light-mode cards use (above). It
+is worked out ahead of time and written as a plain 6-digit hex.
 
 The surfaces are black and tones 1-4 ([background-selection.md](background-selection.md#dark-mode-the-ladder)),
 so tone 5 is lighter than every one of them and a card always reads as raised.
-The same card is darker on black than on tone 4, because more of the surface
-shows through. Every card style (tonal, white, black) is tonal in dark mode.
+The same card is darker on black than on tone 4, because it is mixed with a
+darker surface. Every card style (tonal, white, black) is tonal in dark mode.
 
-**Why opacity:** it is one mechanism that the CSS and Figma can both express
-without knowing the surface. The value is stored once per palette and level,
-in the dark Backgrounds rows (`darkLadderPass`, step 5), as an 8-digit hex
-(Highest stays the `Color-5` reference):
+**Why solid.** The owner's rule: "No opacity on containers — they should be
+solid colors." A solid color can be picked, inspected and matched; it reads
+the same in every tool; and what a card paints does not depend on what the
+renderer happens to composite under it. (The first version of this model,
+ab8c3e6, painted tone 5 *with* an alpha byte and let the browser and Figma
+composite it. The colors a single card shows are the same either way, to
+within one step of rounding — the 8-bit alpha was 115/255, not exactly 45%.)
 
-- **CSS:** the theme's Containers block declares `--Container-*` on the card,
-  exactly as light mode does, and the browser composites the translucent
-  `--Background` over the surface. Nothing is declared per surface.
-- **Figma:** the same RGBA is the value of the existing Container variables,
-  and Figma composites the fill over the frame below. It has to be the
-  resolved color: a color variable holds one RGBA or one alias, with no
-  opacity on an alias, and the plugin API binds only a paint's *color* to a
-  variable (`VariableBindablePaintField = 'color'`), never its opacity — so the
-  "alias + bound opacity float" trick the drop shadows use is not available to
-  fills from code. No variables were added; the Surface collection's five
-  Container modes keep working unchanged.
+**Where the colors live.** Because the mix depends on the surface, each
+surface level carries its own five card colors and the cards on it inherit
+them:
 
-The opacities are stored as an 8-bit alpha (115, 153, 191, 224, 255 of 255),
-the precision both an 8-digit hex and Figma's RGBA hold, so both paint the
-same number.
+- **CSS export:** every dark surface block — all five levels (black, tones
+  1-4) of every theme, the bare page (`:root`) and the bare
+  `[data-surface="Surface-*"]` floors included — declares its five
+  `--Container-*` (`exportToCSS.ts`, `generateThemesVariables`). The theme's
+  Containers block leaves those five alone in dark mode: set on the card they
+  would beat the surface's and give every surface the page's cards.
+- **Preview:** the same, in step — the page, its Dim and Bright levels and the
+  Primary / Secondary / Tertiary sections each state their own five, restated
+  on the cards inside them (the preview's Container Surface block restates the
+  page's cards on every card, so the levels restate theirs at a higher
+  specificity). `darkLadder.test.ts` holds the preview to the export per theme.
+- **Figma:** the Surface collection's Container modes hold **one value per
+  theme and level**, so they can mix against only one surface. They use the
+  **page** surface (tone 2): `Container-<level>` = `blendColors(tone5, tone2,
+  share)`, solid, and Highest stays an alias to tone 5. **In Figma a card on
+  Surface-Bright or Surface-Brightest shows the page mix** (a touch darker than
+  the code paints there); the code mixes per surface. The values are stored in
+  the dark Backgrounds rows (`darkLadderPass`, step 5), which is where Figma
+  reads them; no variables were added or removed.
 
-**Card roles pass on every composite.** Every role a card carries (text,
+**Card roles pass on every card color.** Every role a card carries (text,
 quiet, links, eyebrow, headers, borders, icons, focus, buttons and their
 outline labels, tags) is lighter than the card in dark mode, so it is hardest
-to read on the lightest card — and no card can paint lighter than solid tone 5.
+to read on the lightest card — and no card is lighter than tone 5.
 `darkLadderPass` step 6 checks each card table cell on tone 5; a passing cell is
 left exactly as it is, a failing one moves the fewest steps up its own palette
 that clear it (the same move the Card Quiet block makes). `darkLadder.test.ts`
-then checks every role on all 25 composites per theme (5 levels x 5 surfaces).
+then checks every role on all 25 card colors per theme (5 levels x 5 surfaces):
+4,500 across the test systems, none failing.
 
-**Nested cards** composite twice, between the outer card and tone 5 — never
-past tone 5 — so their roles pass too (measured: 9,000 nested composites
-across five brands, none failing). They are supported; they just separate less
-from the card around them.
+**A card inside a card uses a higher Container level** — High or Highest inside
+a Container card. Cards inherit the surface's five colors, so a higher level
+inside is lighter than its parent and exactly the color that level has on the
+surface; its roles are the ones already checked there (measured: 7,200 nested
+higher-level cards, none failing). A *lower* level inside a higher one (Lowest
+inside Container) comes out darker than its parent — that is not the pattern.
+Its roles still pass (9,000 measured), but use a higher level.
 
 **Known limit:** on Surface-Brightest (tone 4) the cards sit between tone 4 and
-tone 5, so the low levels barely separate from the surface. Every composite
-still measures lighter than its surface (none rounds equal across the five test
+tone 5, so the low levels barely separate from the surface. Every card still
+measures lighter than its surface (none rounds equal across the five test
 brands), but the step is small.
 
 ---
@@ -180,7 +198,7 @@ brands), but the step is small.
 ## Which tone a tonal card uses
 
 This section is the **light-mode** rule (a dark background in light mode, such
-as Black, included). Dark mode's cards are tone 5 laid over the surface instead
+as Black, included). Dark mode's cards are solid mixes of tone 5 and the surface instead
 (above); `generateSimplifiedBackgrounds` still computes dark rows, and the dark
 ladder pass then replaces their cards.
 

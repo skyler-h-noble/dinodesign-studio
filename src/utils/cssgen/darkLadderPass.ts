@@ -34,16 +34,17 @@
  *    dark value is the dark text for the icon actually drawn there.
  *
  * 5. Backgrounds rows paint the ladder (black, tones 1-4), and every row's
- *    five cards become tone 5 of its palette at 45 / 60 / 75 / 88 / 100%
- *    opacity. The CSS and Figma both read these values, so a card composites
- *    over whatever surface it sits on in both.
+ *    five cards become SOLID colors: tone 5 of its palette mixed with the
+ *    palette's page surface (tone 2) at 45 / 60 / 75 / 88 / 100%. Figma reads
+ *    these (one value per theme, so the page mix); the CSS declares each
+ *    surface level's own mix on top (exportToCSS, per-surface --Container-*).
  *
  * 6. Card roles that fail on the lightest card a level can produce (solid
  *    tone 5) move up their own palette until they pass.
  */
 import chroma from 'chroma-js';
 import {
-  darkLadderMaps, themeWindows, labL, darkCardHex, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
+  darkLadderMaps, themeWindows, labL, darkCardHex, darkSurfaceHex, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
   type DarkLadderLevel,
 } from '../darkLadder';
 
@@ -348,31 +349,34 @@ export function applyDarkLadder(colorSystem: Json) {
     }
   }
 
-  /* ── 5. Every row's cards: tone 5 at five opacities ──────────────────────
+  /* ── 5. Every row's cards: tone 5 mixed with the page, solid ─────────────
    *
-   * The same five values in every row of a palette, because a card no longer
-   * depends on the surface: it is laid over it (utils/darkLadder.ts, Cards).
-   * Highest is solid tone 5 and stays a reference, so it follows the palette.
-   * The other four are tone 5 with an alpha. A color variable cannot hold "this
-   * alias at 45%" (its value is one RGBA or one alias), and the Figma plugin
-   * API can only bind a paint's COLOR to a variable, not its opacity — so the
-   * resolved RGBA is written, here, once, for the CSS and Figma to share. */
+   * No opacity on cards (utils/darkLadder.ts, Cards): each level is a solid
+   * color, tone 5 mixed with the surface under it. These rows are what Figma's
+   * Surface collection reads, and it holds one value per theme and level, so
+   * the rows carry the mix against the PAGE surface (tone 2) — the same five in
+   * every row of a palette. The CSS states each surface level's own mix on that
+   * surface; these rows are only its fallback for a theme with no window.
+   * Highest is tone 5 itself and stays a reference, so it follows the palette. */
   for (const pal of Object.keys(dark.Backgrounds ?? {})) {
     const tone5 = String(dark.Colors?.[pal]?.[`Color-${DARK_CARD_TONE}`]?.value ?? '').slice(0, 7);
     if (!/^#[0-9a-f]{6}$/i.test(tone5)) continue;
+    const ramp = Array.from({ length: 12 }, (_, i) => String(dark.Colors?.[pal]?.[`Color-${i + 1}`]?.value ?? '').slice(0, 7));
+    if (!/^#[0-9a-f]{6}$/i.test(ramp[DARK_LADDER_TONE.Surface - 1])) continue;
+    const page = darkSurfaceHex(ramp, 'Surface');
     for (const [rowName, row] of Object.entries<Json>(dark.Backgrounds[pal] ?? {})) {
       if (!row?.Containers) continue;
       for (const level of DARK_CARD_LEVELS) {
         writeLeaf(dark, `Backgrounds.${pal}.${rowName}.Containers.${level}`,
-          level === 'Container-Highest' ? `{Colors.${pal}.Color-${DARK_CARD_TONE}}` : darkCardHex(tone5, level));
+          level === 'Container-Highest' ? `{Colors.${pal}.Color-${DARK_CARD_TONE}}` : darkCardHex(tone5, page, level));
       }
     }
   }
 
   /* ── 6. Card roles carry the lightest card ───────────────────────────────
    *
-   * A card is tone 5 laid over a surface, so the lightest thing any card can
-   * paint is solid tone 5 (Highest, or any level over a surface as light as
+   * A card is tone 5 mixed with a surface, so the lightest thing any card can
+   * paint is tone 5 itself (Highest, or any level on a surface as light as
    * tone 5 — none is). Every dark-mode card role is lighter than the card, so
    * that lightest card is where each one is hardest to read; passing there
    * means passing on every level over every surface. The card tables were

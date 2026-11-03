@@ -7,7 +7,7 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { DARK_LADDER_TONE, DARK_CARD_TONE, darkCardHex, darkTableTone, type DarkCardLevel } from './darkLadder';
+import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -997,11 +997,12 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerHigh = at(0.96);
     containerHighest = neutral(1);
   } else if (isDark) {
-    /* Dark mode, every card style: the page palette's tone 5 at five
-       opacities, laid over the surface (utils/darkLadder.ts, Cards) — the
-       export's cards. The roles below are solved on SOLID tone 5, the lightest
-       thing a card can paint and so the hardest ground for every role; the
-       alpha forms are what the blocks below emit (darkCardEmit). */
+    /* Dark mode, every card style: the page palette's tone 5 mixed with the
+       surface the card sits on, as SOLID colors (utils/darkLadder.ts, Cards) —
+       the export's cards. The roles below are solved on tone 5 itself, the
+       lightest thing a card can paint and so the hardest ground for every
+       role; the mixes are what the blocks below emit (darkCardEmit, and each
+       surface level's own five). */
     const face = p(surfacePalette, DARK_CARD_TONE);
     containerLowest = containerLow = containerBg = containerHigh = containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'white') {
@@ -1017,7 +1018,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   }
 
   // Tertiary container always uses its own palette — never white/black.
-  // Dark mode: tone 5, solid here for solving; emitted at Container's opacity.
+  // Dark mode: tone 5 for solving; emitted mixed with the Tertiary surface.
   if (isDark) {
     tertiaryContainerBg = p(tertiary, DARK_CARD_TONE);
   } else {
@@ -1032,9 +1033,26 @@ export function buildPreviewCSS(input: BuildInput): string {
     : effectiveCardColoring === 'black' ? 3
     : tonalContainerN;
   const tertiaryContainerN = isDark ? DARK_CARD_TONE : 10;
-  /* What the card levels EMIT. Dark mode: the solid face above at each level's
-     opacity, so the browser lays it over whatever surface the card is on. */
-  const darkCardEmit = (face: string, level: DarkCardLevel) => (isDark ? darkCardHex(face, level) : face);
+  /* What the card levels EMIT. Dark mode: the face above mixed with the page
+     (solid, no opacity); each surface level below states its own mix. */
+  const darkCardEmit = (face: string, level: DarkCardLevel) => (isDark ? darkCardHex(face, surfaceBg, level) : face);
+  /* Dark mode: the five card colors for a surface, and the same five restated
+     on the cards inside it. The Container Surface block restates the PAGE's
+     cards on every card (a studio-shell rule would otherwise win), so a
+     surface level has to restate its own at a higher specificity. */
+  const darkCardDecls = (face: string, surface: string): string => {
+    const cards = darkCardHexes(face, surface);
+    return DARK_CARD_LEVELS.map((l) => `  --${l}: ${cards[l]};`).join('\n');
+  };
+  /* A card inside `selectors`, and — for a theme-only selector — a card that
+     names the theme itself. */
+  const darkCardScope = (selectors: string[], face: string, surface: string): string => {
+    const cardSels = selectors.flatMap((sel) => [
+      `${sel} [data-surface^="Container"]`,
+      ...(sel.includes('data-surface') ? [] : [`${sel}[data-surface^="Container"]`]),
+    ]);
+    return `${cardSels.join(',\n')} {\n${darkCardDecls(face, surface)}\n}`;
+  };
   const cardLowestOut = darkCardEmit(containerLowest, 'Container-Lowest');
   const cardLowOut = darkCardEmit(containerLow, 'Container-Low');
   const cardOut = darkCardEmit(containerBg, 'Container');
@@ -1899,7 +1917,7 @@ ${(() => {
      the chip stays in sync if the user changes their primary. */
   --Tag-Default-BG: var(--Tag-Primary-BG);
   --Tag-Default-Text: var(--Tag-Primary-Text);
-  --Container: ${darkCardEmit(tertiaryContainerBg, 'Container')};
+  --Container: ${isDark ? darkCardHex(tertiaryContainerBg, tertiarySurfaceBg, 'Container') : tertiaryContainerBg};
   --Container-Text: ${tertiaryText};
   --Container-Header: ${tertiaryHeader};
   --Container-Quiet: ${tertiaryQuiet};
@@ -1977,7 +1995,15 @@ ${emitPerPaletteButtonTokens(isDark ? p(vPrimary, nFor('Primary')) : p(primaryLi
 ${emitStateButtonTokens(nFor('Primary'))}
 ${emitTagTextTokens()}
 }
-
+${isDark ? `
+/* Dark mode: cards in a Primary / Secondary / Tertiary section are that
+   theme's tone 5 mixed with the theme's Surface (tone 2), as in the export.
+   Restated on the card, after the Container Surface block that restates the
+   page's cards on every card. */
+${darkCardScope(['[data-theme="Primary"]'], p(vPrimary, DARK_CARD_TONE), p(vPrimary, nFor('Primary')))}
+${darkCardScope(['[data-theme="Secondary"]'], p(vSecondary, DARK_CARD_TONE), p(vSecondary, nFor('Secondary')))}
+${darkCardScope(['[data-theme="Tertiary"]'], p(vTertiary, DARK_CARD_TONE), p(vTertiary, DARK_LADDER_TONE.Surface))}
+` : ''}
 /* ══ Nav Bar ══ */
 ${(() => {
   const nc = navBarConfig;
@@ -2068,6 +2094,11 @@ ${(() => {
      The App-Bar block above already warns about exactly this shape: "Keep this
      narrow — matching [data-theme=Brand] descendants would also catch sibling
      content." Same trap, one selector over. */
+  /* Dark mode: each level's own five card colors, mixed with that level's
+     surface (utils/darkLadder.ts, Cards), restated on the cards inside it. */
+  const face = p(surfacePalette, DARK_CARD_TONE);
+  const levelCards = (level: string, bg: string) =>
+    darkCardScope([`[data-theme="Brand"] [data-surface="${level}"]`, `[data-theme="Brand"][data-surface="${level}"]`], face, bg);
   return `[data-theme="Brand"] [data-surface="Surface-Dim"],
 [data-theme="Brand"][data-surface="Surface-Dim"] {
   --Background: var(--Surface-Dim);
@@ -2083,7 +2114,7 @@ ${buildScopeTokens(dimmestBg, dimmestN)}
   --Background: var(--Surface-Bright);
 ${buildScopeTokens(brightBg, brightN)}
 }
-[data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }`;
+[data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }${isDark ? '\n' + [levelCards('Surface-Dim', dimBg), levelCards('Surface-Dimmest', dimmestBg), levelCards('Surface-Bright', brightBg)].join('\n') : ''}`;
 })()}
 
 /* ══ Clickable Elements — border inherits 3:1 contrast from context ══ */

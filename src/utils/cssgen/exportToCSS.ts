@@ -11,7 +11,10 @@
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
-import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone } from '../darkLadder';
+import {
+  themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone, darkCardHexes, darkSurfaceHex,
+  SECTION_LEVEL, DARK_CARD_LEVELS, DARK_CARD_TONE,
+} from '../darkLadder';
 import { chartColorVisionCSS } from '../chartColorVision';
 import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
@@ -1372,8 +1375,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     const colorN = `Color-${roleIndex(defN)}`;
     const stateColorN = `Color-${defN}`;
     // Dark containers read row 3: in dark mode every row of a palette carries
-    // the same five cards, tone 5 at 45-100% opacity (darkLadderPass), which
-    // the browser lays over whatever surface the card is on.
+    // the same five cards, solid tone 5 mixed with the page (darkLadderPass).
+    // The sheet then states each surface level's own mix (generateThemesVariables).
     const contN = isDarkMode ? 3 : defN;
     const contColorN = `Color-${contN}`;
 
@@ -1415,8 +1418,12 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
        for a TONAL card at the page tone: a dark card. Light text landed on a
        light card. The face is resolved and matched to its nearest tone by
        lightness; a tonal card still lands on the page tone, unchanged. */
+    /* Dark mode reads Highest — tone 5 itself, the lightest card any surface
+       carries and the one every card role is solved for (darkLadderPass step
+       6). The Container row holds the PAGE mix, a step darker, which would key
+       the roles a tone too low. */
     const faceHex = (() => {
-      let ref: unknown = `{${contBgKey}.Containers.Container}`;
+      let ref: unknown = `{${contBgKey}.Containers.${isDarkMode ? 'Container-Highest' : 'Container'}}`;
       for (let hop = 0; hop < 10 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
         const path = (ref as string).slice(1, -1);
         if (tokenLookup[path]) { ref = tokenLookup[path]; continue; }
@@ -2029,6 +2036,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   const sections: string[] = [];
   const themes = modeData.Themes;
   const isDarkSheet = modeName === 'Dark-Mode';
+  const ladderWindows = isDarkSheet ? themeWindows(modeData) : [];
 
   // Process each theme (Primary-Light, Primary, Secondary, etc.)
   Object.keys(themes).forEach(themeName => {
@@ -2084,13 +2092,32 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       }
     ];
 
-    /* Dark mode: a card is tone 5 at its level's opacity, laid over whatever
-       surface it sits on (utils/darkLadder.ts, Cards). That value is the same
-       on every surface, so — as in light mode — the card declares its own
-       --Container-* (the Containers block below) and the browser composites
-       it over the surface. Nothing is declared per surface. */
+    /* Dark mode: a card is a SOLID color, tone 5 mixed with the surface it
+       sits on (utils/darkLadder.ts, Cards) — no opacity. The mix depends on
+       the surface, so each surface level declares its own five --Container-*
+       and the cards on it inherit them; a card inside a card inherits the
+       same five, so a higher level inside lifts above its parent. The
+       Containers block below then leaves the five alone — set on the card
+       itself they would win over the surface's and give every surface the
+       page's cards again. */
     const containerTokenLines = theme.Containers && typeof theme.Containers === 'object'
       ? processTokens(theme.Containers) : [];
+    const cardLines = ((): Record<string, string[]> | null => {
+      if (!isDarkSheet) return null;
+      const palette = isDefaultTheme
+        ? defaultBackgroundTone(fullJsonData, modeData, modeName).defPal
+        : ladderWindows.find((w) => w.theme === themeName)?.palette;
+      const ramp = Array.from({ length: 12 }, (_, i) => modeData?.Colors?.[palette ?? '']?.[`Color-${i + 1}`]?.value)
+        .map((v) => (typeof v === 'string' ? v.slice(0, 7) : ''));
+      if (!palette || ramp.some((h) => !/^#[0-9a-f]{6}$/i.test(h))) return null;
+      const tone5 = ramp[DARK_CARD_TONE - 1];
+      const out: Record<string, string[]> = {};
+      for (const [section, level] of Object.entries(SECTION_LEVEL)) {
+        const cards = darkCardHexes(tone5, darkSurfaceHex(ramp, level));
+        out[section] = DARK_CARD_LEVELS.map((name) => `  --${name}: ${cards[name]};`);
+      }
+      return out;
+    })();
 
     for (const variant of surfaceVariants) {
       const variantData = theme[variant.key];
@@ -2098,6 +2125,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         const surfaceLines: string[] = [];
         surfaceLines.push(`/* Theme: ${themeName} - ${variant.key} */`);
         surfaceLines.push(`${variant.selector} {`);
+        if (cardLines?.[variant.key]) surfaceLines.push(...cardLines[variant.key]);
 
         // DEBUG: Check if Buttons and Tag exist
         if (variantData.Buttons) {
@@ -2159,9 +2187,10 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       const containerLines: string[] = [];
       containerLines.push(`/* Theme: ${themeName} - Containers */`);
       /* Dark mode: a card with no theme above it sits on the Default page, so
-         it carries Default's card colors and roles — the same floor the bare
-         surface selectors give. Without them it would keep the page's Quiet,
-         which is solved for the tone-2 page and not for the tone-5 card.
+         it carries Default's card roles — the same floor the bare surface
+         selectors give (its colors come from the surface it sits on). Without
+         them it would keep the page's Quiet, which is solved for the tone-2
+         page and not for the card.
          (0,1,0), so any real theme above still wins. */
       if (isDefaultTheme && isDarkSheet) containerLines.push('[data-surface^="Container"],');
       containerLines.push(`[data-theme="${themeName}"] [data-surface^="Container"],`);
@@ -2179,13 +2208,19 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         console.log(`      ✗ Containers.Tag NOT FOUND`);
       }
       
-      // Recursively process all tokens in Containers.
-      const tokenLines = containerTokenLines;
+      // Recursively process all tokens in Containers. In dark mode the five
+      // card colors come from the surface the card sits on (see above).
+      const tokenLines = cardLines
+        ? containerTokenLines.filter((l) => !/^\s*--Container(-Lowest|-Low|-High|-Highest)?:/.test(l))
+        : containerTokenLines;
       containerLines.push(...tokenLines);
 
       // Ensure Dropshadow-Color exists — compute from Container background if missing
       if (!tokenLines.some(l => l.includes('--Dropshadow-Color'))) {
-        const contToken = theme.Containers.Container?.value;
+        /* Dark mode: from the card's face, tone 5 (Highest) — what the preview
+           derives it from too. The Container row now holds the page mix. */
+        const contToken = (cardLines ? theme.Containers['Container-Highest']?.value : undefined)
+          ?? theme.Containers.Container?.value;
         if (contToken) {
           const contResolved = resolveTokenForCSS(contToken, '--Container');
           let contHex: string | null = contResolved.startsWith('#') ? contResolved : null;

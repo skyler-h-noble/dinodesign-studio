@@ -141,11 +141,15 @@ change: the grid above is the light-mode picture.
 choice; a tinted tone 1 is not wanted there. It no longer depends on whether
 the designer picked a Black page or black cards.
 
-Cards sit on top of these as **tone 5 at five opacities** (45 / 60 / 75 / 88 /
-100%), laid over whatever surface they are on — see
-[Container logic](container-logic.md#dark-mode--tone-5-laid-over-the-surface).
-Tone 5 is the first tone the surfaces do not use, so a card is always lighter
-than the surface under it.
+Cards sit on top of these as **solid colors mixed from tone 5 and the surface
+they are on** — 45 / 60 / 75 / 88 / 100% tone 5, `blendColors`, no opacity —
+see [Container logic](container-logic.md#dark-mode--solid-colors-mixed-from-tone-5-and-the-surface).
+Each surface level declares its own five card colors and the cards inherit
+them. Figma holds one value per theme, so its cards are the mix on the page
+(tone 2) wherever they sit; the CSS and preview mix per surface. Tone 5 is the
+first tone the surfaces do not use, so a card is always lighter than the
+surface under it. A card inside a card uses a higher Container level (High or
+Highest).
 
 This replaces a first dark ladder from earlier the same day (every surface
 one tone higher, no black, cards lifted along each surface's ramp).

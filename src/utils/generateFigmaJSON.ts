@@ -1933,9 +1933,12 @@ export function generateFigmaJSON(
     // shared with the preview and the CSS export).
     const darkPalette = darkPageTheme(userBg);
     const darkN = DARK_PAGE_N;
-    // Dark mode cards: every row of a palette carries the same five cards, tone 5
-    // at 45-100% opacity (darkLadderPass), so any row reads the same; row 3 it is.
-    // Figma lays the translucent fill over the frame below, as the browser does.
+    // Dark mode cards: every row of a palette carries the same five SOLID cards,
+    // tone 5 mixed with the page surface (tone 2) at 45/60/75/88/100%
+    // (darkLadderPass), so any row reads the same; row 3 it is. Figma's Surface
+    // collection holds one value per theme and level, so it can only mix against
+    // one surface — the page. A card on Bright or Brightest in Figma therefore
+    // shows the page mix; the CSS and preview mix per surface (darkLadder.ts).
     const darkContainerN = 3;
 
     /* Default-Background is no longer emitted to Figma — 466 unreferenced

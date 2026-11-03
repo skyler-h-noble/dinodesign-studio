@@ -12,8 +12,8 @@
  *   Surface-Brightest tone 4
  *
  * of the theme's own palette (the Default theme: the page-background palette).
- * Strictly darkest to lightest, all inside the dark band. Cards are tone 5 at
- * five opacities laid over whatever surface they sit on (see Cards below).
+ * Strictly darkest to lightest, all inside the dark band. Cards are solid
+ * colors mixed from tone 5 and the surface they sit on (see Cards below).
  * Light mode does not change.
  *
  * This replaces the first dark ladder (tones 1-5, page on tone 3, cards
@@ -50,6 +50,7 @@
  * rule: whatever passes on tone 1 passes on black.
  */
 import chroma from 'chroma-js';
+import { blendColors } from './colorScale';
 
 export const DARK_LADDER_LEVELS = [
   'Surface-Dimmest', 'Surface-Dim', 'Surface', 'Surface-Bright', 'Surface-Brightest',
@@ -177,36 +178,47 @@ export function darkSurfaceHex(ramp: string[], level: DarkLadderLevel): string {
 
 /* ─── Cards ───────────────────────────────────────────────────────────────
  *
- * A card (the five Container levels) in dark mode is ONE color, the theme
- * palette's tone 5, painted at an opacity that rises with the level:
+ * A card (the five Container levels) in dark mode is the theme palette's
+ * tone 5 MIXED with the surface the card sits on, with more tone 5 at each
+ * level:
  *
- *   Container-Lowest   tone 5 at 45%
- *   Container-Low      tone 5 at 60%
- *   Container          tone 5 at 75%
- *   Container-High     tone 5 at 88%
- *   Container-Highest  tone 5 at 100%  (solid)
+ *   Container-Lowest   45% tone 5, 55% surface
+ *   Container-Low      60% tone 5
+ *   Container          75% tone 5
+ *   Container-High     88% tone 5
+ *   Container-Highest  tone 5 itself
  *
- * laid over whatever surface the card sits on. The surface shows through, so
- * the same card is darker on black than on tone 4, and always lighter than the
- * surface under it because tone 5 is lighter than every surface.
+ * Every value is a SOLID color, mixed ahead of time with blendColors — the
+ * same mix light-mode cards use (docs/container-logic.md). Nothing is painted
+ * with opacity. The owner's rule: "No opacity on containers — they should be
+ * solid colors." A solid color can be picked, inspected and matched, reads the
+ * same in every tool, and does not depend on what a renderer composites under
+ * it.
  *
- * Why opacity rather than a color computed per surface: it is one mechanism
- * that the CSS and Figma can both express without knowing the surface. In CSS
- * the card's --Background is an 8-digit hex and the browser composites it; in
- * Figma it is the same RGBA in the Container variable and Figma composites the
- * fill over the frame below. Nothing has to be generated per surface.
+ * Because the mix depends on the surface, each surface level carries its own
+ * five card colors and the cards on it inherit them:
+ *   CSS and preview — every dark surface block (black, tones 1-4, every theme,
+ *                     the bare page included) declares its five --Container-*.
+ *   Figma           — the Surface collection holds ONE value per theme and
+ *                     level, so it can mix against only one surface: the page
+ *                     (tone 2). In Figma a card on Bright or Brightest shows
+ *                     the page mix; the code mixes per surface.
+ *
+ * The same card is lighter on a lighter surface, and always lighter than the
+ * surface under it, because tone 5 is lighter than every surface.
+ *
+ * A card inside a card uses a HIGHER Container level (High or Highest inside a
+ * Container card). Cards inherit the surface's colors, so a higher level is
+ * lighter than its parent — and the same color as that level directly on the
+ * surface.
+ *
+ * Every role a card carries has to pass on every card color. For the light
+ * foregrounds dark mode uses, the lightest card is the hardest, and no card is
+ * lighter than solid tone 5 — so a role that passes on tone 5 passes on every
+ * card of every surface.
  *
  * Known limit: on Surface-Brightest (tone 4) the cards sit between tone 4 and
  * tone 5, so the low levels barely separate from the surface.
- *
- * Every role a card carries has to pass on every composite a level can
- * produce. For the light foregrounds dark mode uses, the lightest composite is
- * the hardest, and no composite is lighter than solid tone 5 — so a role that
- * passes on tone 5 passes on every card, nested cards included (a card inside
- * a card composites between the outer card and tone 5, never past it).
- *
- * The opacities are stored as an 8-bit alpha, the precision both an 8-digit
- * hex and Figma's RGBA hold, so CSS and Figma paint the same number.
  */
 export const DARK_CARD_TONE = 5;
 export const DARK_CARD_LEVELS = [
@@ -221,16 +233,16 @@ export const DARK_CARD_ALPHA: Record<DarkCardLevel, number> = {
   'Container-Highest': 1,
 };
 
-/** The alpha byte a card level is written with (115 for 45%, 255 for 100%). */
-export function darkCardAlphaByte(level: DarkCardLevel): number {
-  return Math.round(DARK_CARD_ALPHA[level] * 255);
+/** A card level's SOLID color: tone 5 mixed with the surface it sits on. */
+export function darkCardHex(tone5: string, surface: string, level: DarkCardLevel): string {
+  const face = chroma(tone5).hex('rgb').toLowerCase();
+  if (DARK_CARD_ALPHA[level] >= 1) return face;
+  return blendColors(face, chroma(surface).hex('rgb'), DARK_CARD_ALPHA[level]).toLowerCase();
 }
 
-/** A card level's color: tone 5 with the level's alpha (8-digit hex below 100%). */
-export function darkCardHex(tone5: string, level: DarkCardLevel): string {
-  const base = chroma(tone5).hex('rgb').toLowerCase();
-  const a = darkCardAlphaByte(level);
-  return a >= 255 ? base : `${base}${a.toString(16).padStart(2, '0')}`;
+/** The five card colors for one surface, lowest first. */
+export function darkCardHexes(tone5: string, surface: string): Record<DarkCardLevel, string> {
+  return Object.fromEntries(DARK_CARD_LEVELS.map((l) => [l, darkCardHex(tone5, surface, l)])) as Record<DarkCardLevel, string>;
 }
 
 export function labL(hex: string): number {
