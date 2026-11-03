@@ -2064,7 +2064,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     const surfaceVariants: { key: string; selector: string }[] = [
       {
         key: 'Surfaces',
-        selector: `${bare(null)}${bare('Surface')}[data-theme="${themeName}"],\n[data-theme="${themeName}"][data-surface="Surface"]`
+        /* The descendant form too, like the four levels below. Without it an
+           element marked data-surface="Surface" INSIDE a themed section fell
+           through to the bare Default rule and painted the page's Surface —
+           every theme's nested Surface was the same page color. */
+        selector: `${bare(null)}${bare('Surface')}[data-theme="${themeName}"],\n[data-theme="${themeName}"] [data-surface="Surface"],\n[data-theme="${themeName}"][data-surface="Surface"]`
       },
       {
         key: 'Surfaces-Dim',
@@ -6148,7 +6152,7 @@ function generateThemeDataAttributesCSS(jsonData: any): string {
     { name: 'Default', selector: ':root' },
     ...CSS_THEME_NAMES.map((name) => ({
       name,
-      selector: `[data-theme="${name}"],\n[data-theme="${name}"][data-surface="Surface"]`,
+      selector: `[data-theme="${name}"],\n[data-theme="${name}"] [data-surface="Surface"],\n[data-theme="${name}"][data-surface="Surface"]`,
     })),
   ];
   
