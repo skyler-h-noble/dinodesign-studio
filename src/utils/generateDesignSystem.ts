@@ -246,13 +246,12 @@ export async function generateAndUploadDesignSystem(input: GenerateInput): Promi
     defaultTheme: 'Default',
     defaultStyle: input.componentStyle.charAt(0).toUpperCase() + input.componentStyle.slice(1),
     defaultSurface: 'Surface',
-    /* A theme that exists. 'Neutral-Dark' was written here and there is no
-       such theme any more — the root would have bound nothing in dark mode
-       and fallen through to Default, silently.
-       
-       Dark mode is the mode STYLESHEET; every theme resolves to its dark
-       values under it. This only says which palette the root carries. */
-    darkTheme: 'Neutral',
+    /* No darkTheme. It was hard-coded 'Neutral' here, and the Provider obeyed
+       it: in dark mode the root switched from Default to Neutral, bypassing
+       the Default theme that carries the chosen page background into dark
+       mode (its own palette at tone 2, DARK_PAGE_N). A Primary-background
+       system went neutral. The Provider (0.36.3+) also ignores the field in
+       already-published files. */
   }, null, 2);
 
   // 5. Build foundation.css and styles.css (simple static files)
