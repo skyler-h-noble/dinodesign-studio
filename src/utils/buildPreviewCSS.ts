@@ -14,7 +14,7 @@ import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevel
 // surface tone, which fails WCAG on light surfaces. These helpers return
 // design-token references (e.g. "{Colors.Primary.Color-8}") that we then
 // convert to CSS var() form below.
-import { getFixedTextToken, textTableToken, getFixedHeaderToken, getFixedIconToken, iconToneAt } from './cssgen/exportColorSystem';
+import { getFixedTextToken, textTableToken, getFixedHeaderToken, getFixedIconToken, iconToneAt, accessibleIconTone } from './cssgen/exportColorSystem';
 import { resolveButtonChoice, buttonForSurface, type ButtonPalette, type ButtonTone, type CellTone } from './buttonChoice';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
@@ -107,8 +107,16 @@ function buildIconPaletteLines(
   };
 
   for (const pal of palettes) {
-    const iconTone = iconToneAt(n, isContainer, isDark);
-    const iconVar = tokenRefToVar(getFixedIconToken(n, isContainer, pal, isDark));
+    /* Surfaces step past the table where it misses 3:1 — the export's Icon
+       tables apply the same accessibleIconTone, so both land on one tone.
+       Containers keep the table, as the export does. */
+    const tableTone = iconToneAt(n, isContainer, isDark);
+    const iconTone = isContainer
+      ? tableTone
+      : accessibleIconTone(tableTone, (t) => hexOf(pal, t), palettes.map((p) => hexOf(p, n)));
+    const iconVar = iconTone === tableTone
+      ? tokenRefToVar(getFixedIconToken(n, isContainer, pal, isDark))
+      : `var(--${pal}-Color-${iconTone})`;
     lines.push(`  --Icons-${pal}: ${iconVar};`);
     /* Icon-Variant holds the SAME value as Icon — generateIconVariantPaletteStructure
        returns generateIconPaletteStructure verbatim. The variant's transparency is a

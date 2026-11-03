@@ -1648,6 +1648,44 @@ export function iconToneAt(n: number, isContainer: boolean, isDark: boolean): nu
 }
 
 /**
+ * The icon tone that clears 3:1 (WCAG 1.4.11) on every background it serves.
+ *
+ * iconToneAt's table is right on most surfaces but lands just short on a
+ * saturated mid-tone one: on Popsicle's lilac (#cc90d8) tone 5 measured
+ * 2.94:1, on Surf's orange (#f0843c) 2.67:1. Starting from the table's tone,
+ * this steps along the icon's OWN palette, away from the backgrounds, until
+ * every one clears 3:1. Tones that already pass never move; if nothing
+ * passes, the table's tone stands and the rendered report flags it.
+ *
+ * Shared by the export's Icon tables and the preview's --Icons-*, so the two
+ * cannot pick different tones (invariant 5).
+ */
+export function accessibleIconTone(
+  baseTone: number,
+  iconHexAt: (tone: number) => string | null | undefined,
+  backgrounds: Array<string | null | undefined>,
+): number {
+  const isHex = (h: unknown): h is string => typeof h === 'string' && /^#[0-9a-f]{6}/i.test(h);
+  const bgs = backgrounds.filter(isHex);
+  const clears = (t: number) => {
+    const h = iconHexAt(t);
+    return isHex(h) && bgs.every((b) => getContrastRatio(h, b) >= 3);
+  };
+  if (!bgs.length || clears(baseTone)) return baseTone;
+  const base = iconHexAt(baseTone);
+  if (!isHex(base)) return baseTone;
+  const lum = (h: string) => {
+    const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const bgLum = bgs.reduce((sum, b) => sum + lum(b), 0) / bgs.length;
+  const step = lum(base) <= bgLum ? -1 : 1;   // a darker icon steps darker
+  for (let t = baseTone + step; t >= 1 && t <= 12; t += step) if (clears(t)) return t;
+  return baseTone;
+}
+
+/**
  * Get fixed Icon token reference, in the same shape as getFixedTextToken /
  * getFixedHeaderToken so the preview can consume all three the same way.
  */
@@ -5496,6 +5534,40 @@ export function exportColorSystemToJSON(
     if (tokenValue.startsWith('#')) return tokenValue;
     return null;
   };
+
+  // ── Icons, checked against the surfaces they serve ──
+  //
+  // Icon.Surfaces.<pal>.Color-N is used by every theme whose surface sits at
+  // tone N, whatever its palette, so it must clear 3:1 against all eight
+  // palettes' Color-N. accessibleIconTone moves only the cells that do not.
+  // Runs before Icons.On-<pal> below, which reads the icon's final tone.
+  {
+    const ICON_PALS = ['Neutral', 'Primary', 'Secondary', 'Tertiary', 'Info', 'Success', 'Warning', 'Error'];
+    for (const mode of modesForSystem) {
+      const modeTree = colorSystem.Modes[mode] as any;
+      const colors = modeTree?.Colors;
+      const iconSurfaces = modeTree?.Icon?.Surfaces;
+      if (!colors || !iconSurfaces) continue;
+      const isDark = mode === 'Dark-Mode';
+      const hexAt = (pal: string, t: number): string | null => {
+        const v = colors?.[pal]?.['Color-' + t]?.value;
+        return typeof v === 'string' ? (resolveColorToken(v, colors, modeTree.Backgrounds) ?? null) : null;
+      };
+      let moved = 0;
+      for (const pal of ICON_PALS) {
+        if (!iconSurfaces[pal]) continue;
+        for (let n = 1; n <= 12; n++) {
+          const base = iconToneAt(n, false, isDark);
+          const tone = accessibleIconTone(base, (t) => hexAt(pal, t), ICON_PALS.map((p) => hexAt(p, n)));
+          if (tone !== base) {
+            iconSurfaces[pal]['Color-' + n] = { value: `{Colors.${pal}.Color-${tone}}`, type: 'color' };
+            moved++;
+          }
+        }
+      }
+      console.log(`🎯 [JSON Export] ${mode} Icons checked against their surfaces (${moved} cells moved)`);
+    }
+  }
 
   modesForSystem.forEach(mode => {
     const themes = (colorSystem.Modes[mode] as any).Themes;
