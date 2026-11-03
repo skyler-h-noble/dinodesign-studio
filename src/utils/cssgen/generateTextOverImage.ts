@@ -189,18 +189,9 @@ export function solveThemeScrims(
   });
 }
 
-/**
- * Emit the CSS.
- *
- * The scrim is painted with `color-mix(in srgb, var(--Background) N%,
- * transparent)` rather than a baked rgba, matching dino-overlay's non-literal
- * output — so the overlay keeps following the theme instead of freezing one
- * theme's color into the rule.
- */
-export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
-  if (!scrims.length) return '';
+/** The comment every text-over-image.css opens with. */
+function headerLines(modeAware: boolean): string[] {
   const lines: string[] = [];
-
   lines.push('/* ── Text over image ─────────────────────────────────────────');
   lines.push(' *');
   lines.push(' * --Overlay-Scrim: the minimum overlay opacity that keeps --Text,');
@@ -214,34 +205,34 @@ export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
   lines.push(' * This is a FLOOR for the worst possible photograph, not a recommendation.');
   lines.push(' * Most images need considerably less; measure against the real image and');
   lines.push(' * lower it. Going below this value means some images will fail.');
-  lines.push(' */');
-
-  for (const s of scrims) {
-    if (!s.feasible || s.alpha === null) {
-      lines.push(`/* ${s.theme}: no opacity satisfies ${s.driver} `
-        + `(best ${s.ratio.toFixed(2)}:1 at full opacity) — this theme's own `
-        + `${s.driver}/Background pair is the limit, not the image. */`);
-      continue;
-    }
-    const pct = Math.round(s.alpha * 1000) / 10;
-    lines.push(`/* ${s.theme}: set by ${s.driver} */`);
-    lines.push(`[data-theme="${s.theme}"] {`);
-    lines.push(`  --Overlay-Scrim: ${s.alpha};`);
-    lines.push(`  --Overlay-Scrim-Paint: color-mix(in srgb, var(--Background) ${pct}%, transparent);`);
-    lines.push(`}`);
+  if (modeAware) {
+    lines.push(' *');
+    lines.push(' * Light and dark mode each get their own floor, because each mode has its');
+    lines.push(' * own Background/Text pair: --Overlay-Scrim-Light and --Overlay-Scrim-Dark.');
+    lines.push(` * --Overlay-Scrim picks between them with ${MODE_SWITCH_VAR}, which`);
+    lines.push(' * Light-Mode.css sets to 0 and Dark-Mode.css to 1, so swapping the mode');
+    lines.push(' * sheet is enough and this file never needs swapping. Where the mode sheet');
+    lines.push(` * does not define ${MODE_SWITCH_VAR}, the light floor is used.`);
   }
+  lines.push(' */');
+  return lines;
+}
 
-  // ── The component ──────────────────────────────────────────────────────
-  //
-  // Structure and class names match dino-overlay's export, so a layout proven
-  // in the tool drops straight in. What is NOT carried over is its theme block:
-  //
-  //   .overlay-figure[data-theme="Primary"] { --Background: #261626; ... }
-  //
-  // The tool emits literal hexes there because it has no design system behind
-  // it. In a generated bundle those would OVERRIDE the brand with the tool's own
-  // colors on every theme — so the rules are dropped and `data-theme` resolves
-  // through the design system exactly as it does everywhere else.
+/**
+ * The text-over-image component rules, shared by both emitters.
+ *
+ * Structure and class names match dino-overlay's export, so a layout proven
+ * in the tool drops straight in. What is NOT carried over is its theme block:
+ *
+ *   .overlay-figure[data-theme="Primary"] { --Background: #261626; ... }
+ *
+ * The tool emits literal hexes there because it has no design system behind
+ * it. In a generated bundle those would OVERRIDE the brand with the tool's own
+ * colors on every theme — so the rules are dropped and `data-theme` resolves
+ * through the design system exactly as it does everywhere else.
+ */
+function componentLines(): string[] {
+  const lines: string[] = [];
   lines.push('');
   lines.push('/* Text-over-image component. Put data-theme on the figure to');
   lines.push('   choose its scrim and text pair; both resolve from the system. */');
@@ -302,6 +293,280 @@ export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
   lines.push('  font-size: clamp(20px, 5cqw, var(--Display-Small-Font-Size, 40px));');
   lines.push('  line-height: 1.2;');
   lines.push('}');
+  return lines;
+}
 
+/**
+ * Emit the CSS from light-mode scrims only.
+ *
+ * The original single-mode output, kept as it was so a caller that still
+ * passes one set of scrims gets exactly what it always got. New callers should
+ * use `buildTextOverImageCSSFromModeSheets`, which also solves dark mode.
+ *
+ * The scrim is painted with `color-mix(in srgb, var(--Background) N%,
+ * transparent)` rather than a baked rgba, matching dino-overlay's non-literal
+ * output — so the overlay keeps following the theme instead of freezing one
+ * theme's color into the rule.
+ */
+export function generateTextOverImageCSS(scrims: ThemeScrim[]): string {
+  if (!scrims.length) return '';
+  const lines: string[] = headerLines(false);
+
+  for (const s of scrims) {
+    if (!s.feasible || s.alpha === null) {
+      lines.push(`/* ${s.theme}: no opacity satisfies ${s.driver} `
+        + `(best ${s.ratio.toFixed(2)}:1 at full opacity) — this theme's own `
+        + `${s.driver}/Background pair is the limit, not the image. */`);
+      continue;
+    }
+    const pct = Math.round(s.alpha * 1000) / 10;
+    lines.push(`/* ${s.theme}: set by ${s.driver} */`);
+    lines.push(`[data-theme="${s.theme}"] {`);
+    lines.push(`  --Overlay-Scrim: ${s.alpha};`);
+    lines.push(`  --Overlay-Scrim-Paint: color-mix(in srgb, var(--Background) ${pct}%, transparent);`);
+    lines.push(`}`);
+  }
+
+  lines.push(...componentLines());
   return lines.join('\n');
+}
+
+// ── Both modes ────────────────────────────────────────────────────────────
+//
+// The floor depends on the Background/Text pair, and each mode has its own
+// pair. Solving only Light-Mode (what the single-mode path does) left dark
+// mode with light-mode numbers: the paint followed the dark --Background, but
+// the opacity was solved for colors that are not on the page.
+//
+// text-over-image.css is loaded once and never swapped, so it cannot simply
+// hold "the dark values". It holds BOTH, and a number the mode sheet sets
+// chooses between them. That keeps the consumer's contract as it is: swap
+// Light-Mode.css for Dark-Mode.css and everything follows.
+
+/**
+ * The custom property that tells text-over-image.css which mode is loaded:
+ * 0 in Light-Mode.css, 1 in Dark-Mode.css. A number rather than a word so it
+ * can go in calc() — CSS cannot branch on a word.
+ */
+export const MODE_SWITCH_VAR = '--Mode-Dark';
+
+/**
+ * Every foreground a themed poster can put on the scrim, with the ratio it
+ * owes. Header owes 3:1 (large text); Text and Eyebrow are body-sized and owe
+ * 4.5. --Text is in because H4-H6 use it: a poster title is --Header on H1-H3
+ * and --Text below that, so the scrim has to hold whichever the consumer
+ * reaches for.
+ *
+ * --Quiet is deliberately OUT. It is the lowest-contrast text the system ships
+ * and it drove the scrim to 0.87 average — near-opaque, hiding the photograph —
+ * while being the one role a poster never puts on an image.
+ *
+ * Same list as buildTextOverImageCSS in exportToCSS.ts.
+ */
+export const TEXT_OVER_IMAGE_ROLES: { role: string; target: number }[] = [
+  { role: '--Text', target: 4.5 },
+  { role: '--Eyebrow', target: 4.5 },
+  { role: '--Header', target: 3 },
+];
+
+interface CssBlock { selectors: string[]; decls: Record<string, string> }
+
+/** Top-level `selector { declarations }` blocks of a stylesheet. At-rule
+ *  blocks (@media and the like) are skipped whole; the mode sheets do not put
+ *  theme blocks inside them. */
+function parseBlocks(css: string): CssBlock[] {
+  const src = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks: CssBlock[] = [];
+  let i = 0;
+  let start = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === ';') { start = i + 1; i++; continue; }   // @import …; between blocks
+    if (ch !== '{') { i++; continue; }
+    const prelude = src.slice(start, i).trim();
+    let depth = 1;
+    let j = i + 1;
+    while (j < src.length && depth > 0) {
+      if (src[j] === '{') depth++;
+      else if (src[j] === '}') depth--;
+      j++;
+    }
+    const body = src.slice(i + 1, j - 1);
+    if (!prelude.startsWith('@')) {
+      const decls: Record<string, string> = {};
+      for (const part of body.split(';')) {
+        const m = /^\s*(--[\w-]+)\s*:\s*([\s\S]+?)\s*$/.exec(part);
+        if (m) decls[m[1]] = m[2];
+      }
+      blocks.push({ selectors: prelude.split(',').map((x) => x.trim()).filter(Boolean), decls });
+    }
+    i = j;
+    start = j;
+  }
+  return blocks;
+}
+
+/** Follow var() chains to a literal, looking in each scope in turn. Returns
+ *  '' when the chain ends at a name nothing defines. */
+function resolveVar(value: string, scopes: Record<string, string>[], depth = 0): string {
+  const v = value.trim();
+  if (depth > 16) return '';
+  const m = /^var\(\s*(--[\w-]+)\s*(?:,\s*([\s\S]*))?\)$/.exec(v);
+  if (!m) return v;
+  for (const scope of scopes) {
+    if (scope[m[1]] !== undefined) return resolveVar(scope[m[1]], scopes, depth + 1);
+  }
+  return m[2] !== undefined ? resolveVar(m[2], scopes, depth + 1) : '';
+}
+
+export interface SheetTheme {
+  background: string;
+  foregrounds: Foreground[];
+  /** Selectors the theme's floor is emitted under. */
+  selectors: string[];
+}
+
+/**
+ * Read each theme's resolved Background and foregrounds out of a GENERATED
+ * mode sheet (Light-Mode.css or Dark-Mode.css).
+ *
+ * Reading the sheet rather than tokens.json means the scrim is solved for
+ * exactly the colors the page paints — the same sheet the consumer loads — so
+ * the two cannot disagree. It also covers the Default theme, whose colors are
+ * put together inside the CSS export (`{Default-Background.*}`) and never
+ * appear resolved in tokens.json. The token-based path dropped Default without
+ * a word, so an element with no data-theme above it had no scrim at all.
+ *
+ * A theme's block is the one whose selector list includes `[data-theme="X"]`
+ * on its own — its base surface.
+ */
+export function readModeSheetThemes(css: string): Record<string, SheetTheme> {
+  const blocks = parseBlocks(css);
+  const root = blocks.find((b) => b.selectors.length === 1 && b.selectors[0] === ':root')?.decls ?? {};
+  const out: Record<string, SheetTheme> = {};
+  const isHex6 = (h: string) => /^#[0-9a-f]{6}$/i.test(h);
+
+  for (const block of blocks) {
+    const themeSel = block.selectors.find((s) => /^\[data-theme="[^"]+"\]$/.test(s));
+    if (!themeSel) continue;
+    const theme = /"([^"]+)"/.exec(themeSel)![1];
+    if (out[theme]) continue;
+
+    const scopes = [block.decls, root];
+    const background = resolveVar(block.decls['--Background'] ?? '', scopes);
+    if (!isHex6(background)) continue;
+    const foregrounds = TEXT_OVER_IMAGE_ROLES
+      .map((r) => ({ role: r.role, hex: resolveVar(block.decls[r.role] ?? '', scopes), target: r.target }))
+      // An 8-digit hex carries alpha; the solver needs opaque values, and
+      // translucent text over a photo is a different problem than this one.
+      .filter((f) => isHex6(f.hex));
+    if (!foregrounds.length) continue;
+
+    // Default lives on :root as well as [data-theme="Default"], so an element
+    // with no data-theme anywhere above it still gets a scrim.
+    const selectors = block.selectors.includes(':root') ? [':root', themeSel] : [themeSel];
+    out[theme] = { background, foregrounds, selectors };
+  }
+  return out;
+}
+
+/** One theme's floors in both modes. */
+export interface ModeScrims {
+  theme: string;
+  selectors: string[];
+  light: ThemeScrim | null;
+  dark: ThemeScrim | null;
+}
+
+/** Solve every theme in both modes. Themes come in the light sheet's order,
+ *  then any that exist only in the dark sheet. */
+export function solveModeScrims(lightCss: string, darkCss: string): ModeScrims[] {
+  const lightThemes = readModeSheetThemes(lightCss);
+  const darkThemes = readModeSheetThemes(darkCss);
+  const lightSolved = new Map(solveThemeScrims(lightThemes).map((s) => [s.theme, s]));
+  const darkSolved = new Map(solveThemeScrims(darkThemes).map((s) => [s.theme, s]));
+  const names = [...Object.keys(lightThemes), ...Object.keys(darkThemes).filter((t) => !(t in lightThemes))];
+  return names.map((theme) => ({
+    theme,
+    selectors: (lightThemes[theme] ?? darkThemes[theme]).selectors,
+    light: lightSolved.get(theme) ?? null,
+    dark: darkSolved.get(theme) ?? null,
+  }));
+}
+
+/** The opacity to paint for one mode. A theme no opacity can satisfy gets 1 —
+ *  the most a scrim can do — rather than no scrim at all; its comment says it
+ *  still fails. */
+function usableAlpha(s: ThemeScrim): number {
+  return s.feasible && s.alpha !== null ? s.alpha : 1;
+}
+
+function describe(mode: string, s: ThemeScrim): string {
+  if (s.feasible && s.alpha !== null) return `${mode} set by ${s.driver}`;
+  return `${mode}: no opacity satisfies ${s.driver} (best ${s.ratio.toFixed(2)}:1 at full `
+    + `opacity) — this theme's own ${s.driver}/Background pair is the limit, not the image`;
+}
+
+const pctOf = (a: number) => Math.round(a * 1000) / 10;
+
+/** Emit the CSS for both modes. */
+export function generateModeAwareTextOverImageCSS(scrims: ModeScrims[]): string {
+  const usable = scrims.filter((s) => s.light || s.dark);
+  if (!usable.length) return '';
+  const lines: string[] = headerLines(true);
+  const sw = `var(${MODE_SWITCH_VAR}, 0)`;
+
+  // A page that marks its mode on an element (often <html data-mode="dark">)
+  // gets the right floor even before its mode sheet sets the switch. Not
+  // relied on — the mode sheet's value is the general route.
+  lines.push('');
+  lines.push('/* Optional: a page that marks its mode with data-mode gets the matching');
+  lines.push(`   floor even if its mode sheet does not set ${MODE_SWITCH_VAR}. */`);
+  lines.push(`[data-mode="light"] { ${MODE_SWITCH_VAR}: 0; }`);
+  lines.push(`[data-mode="dark"] { ${MODE_SWITCH_VAR}: 1; }`);
+  lines.push('');
+
+  for (const s of usable) {
+    const notes = [s.light && describe('light', s.light), s.dark && describe('dark', s.dark)].filter(Boolean);
+    lines.push(`/* ${s.theme}: ${notes.join('; ')} */`);
+    lines.push(`${s.selectors.join(',\n')} {`);
+    if (s.light && s.dark) {
+      const l = usableAlpha(s.light);
+      const d = usableAlpha(s.dark);
+      lines.push(`  --Overlay-Scrim-Light: ${l};`);
+      lines.push(`  --Overlay-Scrim-Dark: ${d};`);
+      if (l === d) {
+        lines.push(`  --Overlay-Scrim: ${l};`);
+        lines.push(`  --Overlay-Scrim-Paint: color-mix(in srgb, var(--Background) ${pctOf(l)}%, transparent);`);
+      } else {
+        // Exact at both ends: a switch of 0 gives l * 1 + d * 0 = l, 1 gives d.
+        lines.push(`  --Overlay-Scrim: calc(${l} * (1 - ${sw}) + ${d} * ${sw});`);
+        lines.push('  --Overlay-Scrim-Paint: color-mix(in srgb, var(--Background) calc(var(--Overlay-Scrim) * 100%), transparent);');
+      }
+    } else {
+      // In one mode only: state that mode's floor and nothing else.
+      const only = (s.light ?? s.dark)!;
+      const a = usableAlpha(only);
+      lines.push(`  --Overlay-Scrim-${s.light ? 'Light' : 'Dark'}: ${a};`);
+      lines.push(`  --Overlay-Scrim: ${a};`);
+      lines.push(`  --Overlay-Scrim-Paint: color-mix(in srgb, var(--Background) ${pctOf(a)}%, transparent);`);
+    }
+    lines.push('}');
+  }
+
+  lines.push(...componentLines());
+  return lines.join('\n');
+}
+
+/**
+ * text-over-image.css for both modes, from the two generated mode sheets.
+ *
+ * Covers each theme's BASE surface, plus Default on :root. An element that
+ * repaints --Background with data-surface (Surface-Dim, a Container, …) keeps
+ * the floor and the paint its theme block resolved: both are custom properties
+ * holding var(), which resolve where they are declared and are inherited as
+ * finished values. So the paint and the floor always describe the same pair.
+ */
+export function buildTextOverImageCSSFromModeSheets(lightCss: string, darkCss: string): string {
+  return generateModeAwareTextOverImageCSS(solveModeScrims(lightCss, darkCss));
 }
