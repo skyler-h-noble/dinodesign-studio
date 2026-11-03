@@ -1,5 +1,15 @@
 /**
- * Accessibility report generator.
+ * Token-table contrast checks (tests only).
+ *
+ * NOT what the /accessibility-report page shows any more. That page grades the
+ * published CSS through renderedAccessibilityReport.ts, because this module
+ * decides for itself which token applies to each surface and so agrees with
+ * the generator even when both are wrong (it passed every dark-mode card
+ * eyebrow while they rendered at 1.2-1.5:1). It is kept as a check on the
+ * tables themselves, which the generator's tests lean on; ReportCheck and
+ * ReportSection are shared with the rendered report.
+ *
+ * Original description follows.
  *
  * Reads a design system's tokens.json (the structure emitted by
  * src/utils/generateDesignSystem.ts) and computes WCAG 2.2 AA contrast checks

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { getPublicFileUrl } from '../utils/firebase/storage';
-import { buildAccessibilityReport, type ReportSection } from '../utils/accessibilityReport';
+import type { ReportSection } from '../utils/accessibilityReport';
+import { buildRenderedAccessibilityReport, orderSheets } from '../utils/renderedAccessibilityReport';
 import { buildTargetAreaReport, TARGET_AREA_MIN, type TargetSection } from '../utils/targetAreaReport';
 
 type Status = 'loading' | 'ready' | 'not-found' | 'error';
@@ -11,6 +12,9 @@ export default function AccessibilityReport() {
   const uuid = searchParams.get('id');
   const [status, setStatus] = useState<Status>('loading');
   const [tokens, setTokens] = useState<any>(null);
+  /* The published CSS — what a page actually loads, and what the contrast
+     section grades. tokens.json still supplies the name and target sizes. */
+  const [sheets, setSheets] = useState<Record<string, string> | null>(null);
   const [designName, setDesignName] = useState<string>('');
 
   useEffect(() => {
@@ -33,18 +37,27 @@ export default function AccessibilityReport() {
       .catch(() => {
         if (!cancelled) setStatus('error');
       });
+    const CSS_FILES = ['foundation.css', 'core.css', 'Light-Mode.css', 'Dark-Mode.css', 'base.css', 'styles.css'];
+    Promise.all(CSS_FILES.map((f) =>
+      fetch(getPublicFileUrl(uuid, f)).then((r) => (r.ok ? r.text() : '')).catch(() => '')))
+      .then((texts) => {
+        if (!cancelled) setSheets(Object.fromEntries(CSS_FILES.map((f, i) => [f, texts[i]])));
+      });
     return () => { cancelled = true; };
   }, [uuid]);
 
   const sections = useMemo<ReportSection[]>(() => {
-    if (!tokens) return [];
+    if (!sheets) return [];
     try {
-      return buildAccessibilityReport(tokens);
+      return buildRenderedAccessibilityReport({
+        light: orderSheets(sheets, 'Light'),
+        dark: orderSheets(sheets, 'Dark'),
+      });
     } catch (err) {
       console.error('Failed to build report:', err);
       return [];
     }
-  }, [tokens]);
+  }, [sheets]);
 
   const targetSections = useMemo<TargetSection[]>(() => {
     if (!tokens) return [];
@@ -56,7 +69,7 @@ export default function AccessibilityReport() {
     }
   }, [tokens]);
 
-  if (status === 'loading') {
+  if (status === 'loading' || (status === 'ready' && !sheets)) {
     return <ReportShell><p>Loading accessibility report…</p></ReportShell>;
   }
   if (status === 'not-found') {
