@@ -88,8 +88,8 @@ Two wiring gaps did need closing:
 - **Dark mode.** The fallback honoured `backgroundN`, which is a LIGHT-mode
   position — a `Surface-Brightest` pick would have painted a near-white page in
   dark mode. The theme carries over, the tone does not: in dark mode the page
-  is the chosen palette's **tone 3** (see [Dark mode](#dark-mode-the-ladder)
-  below; it was tone 2 until 2026-11-03).
+  is the chosen palette's **tone 2** (see [Dark mode](#dark-mode-the-ladder)
+  below).
 - **The preview.** `buildPreviewCSS` had a case per legacy string and a
   `default:` that fell through to white, so all sixteen new combinations would
   have previewed as a white page while the export painted the real one — a
@@ -122,24 +122,33 @@ variables is recoverable; **deleting them is not** (invariant 8), so do not
 
 ## Dark mode: the ladder
 
-Decided by the owner from the Figma mockups (2026-11-03). In dark mode every
-theme — Default included, no special case — paints its five levels on tones
-1-5 of its own palette:
+Decided by the owner (final model, 2026-11-03). In dark mode every theme —
+Default included, no special case — paints its five levels like this, on its
+own palette (the Default theme: the page-background palette):
 
-| level | dark tone |
+| level | dark mode paints |
 | --- | --- |
-| Surface-Dimmest | 1 |
-| Surface-Dim | 2 |
-| Surface | 3 — so the dark **page** is tone 3 |
-| Surface-Bright | 4 |
-| Surface-Brightest | 5 |
+| Surface-Dimmest | **pure black `#000000`** |
+| Surface-Dim | tone 1 |
+| Surface | tone 2 — so the dark **page** is tone 2 |
+| Surface-Bright | tone 3 |
+| Surface-Brightest | tone 4 |
 
 Strictly darkest to lightest, all inside the dark band. Light mode does not
 change: the grid above is the light-mode picture.
 
-**Tone 1 is the palette's own tinted tone 1, not black** — Neutral's
-Surface-Dimmest included — unless the designer chose black (the Black page, or
-black cards). Then Neutral's tone-1 levels paint `#000000`.
+**Surface-Dimmest is black for every theme.** That is the owner's deliberate
+choice; a tinted tone 1 is not wanted there. It no longer depends on whether
+the designer picked a Black page or black cards.
+
+Cards sit on top of these as **tone 5 at five opacities** (45 / 60 / 75 / 88 /
+100%), laid over whatever surface they are on — see
+[Container logic](container-logic.md#dark-mode--tone-5-laid-over-the-surface).
+Tone 5 is the first tone the surfaces do not use, so a card is always lighter
+than the surface under it.
+
+This replaces a first dark ladder from earlier the same day (every surface
+one tone higher, no black, cards lifted along each surface's ramp).
 
 ### How it gets there
 
@@ -154,20 +163,22 @@ and it names LIGHT-mode tone indices: Primary's Surface reads
 the dark ladder lives in the Modes layer: in dark mode the table entry at a
 light-mode index holds the curated answer for the dark tone that index is
 painted at. Each theme's window of indices is read from its own references;
-where two themes name one index for different tones (Info's Bright and
-Primary's Surface are both 6), the entry answers for the lighter one, which is
-safe because every dark-mode foreground is lighter than its surface.
+where two themes name one index for different tones, the entry answers for the
+lighter one, which is safe because every dark-mode foreground is lighter than
+its surface. Black has no row of its own in the tables (they are keyed by tones
+1-12), so Surface-Dimmest reads tone 1's answers — by the same rule, whatever
+passes on tone 1 passes on black.
 
 The few references that named a tone directly — a theme's Surface-Dimmest /
 Brightest (`{Colors.<P>.Color-3}` / `-11`), Neutral's black anchor, the
 Default theme's Surface-Dimmest — now name a Backgrounds row (or
 Default-Background), which resolves to the same tone in light mode.
 
-`DARK_PAGE_N` (3) is the tone the page paints; the export reads its tables at
+`DARK_PAGE_N` (2) is the tone the page paints; the export reads its tables at
 the page palette's Surface index, through the same window.
 
-Tests: `src/__tests__/darkLadder.test.ts` (what the CSS paints, the preview
-and Figma agree, light mode byte-identical).
+Tests: `src/__tests__/darkLadder.test.ts` (what the CSS paints per brand x
+theme, the preview and Figma agree, light mode byte-identical).
 
 ## Related
 

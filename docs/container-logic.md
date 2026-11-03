@@ -13,7 +13,7 @@ Two implementations produce these values and they must agree
 | --- | --- |
 | Export / Figma | `src/utils/cssgen/generateSimplifiedBackgrounds.ts` |
 | Phone preview | `src/utils/buildPreviewCSS.ts` |
-| Dark-mode card lift (both, shared) | `src/utils/darkLadder.ts` (`darkCardLadder`), applied by `cssgen/darkLadderPass.ts` and `cssgen/exportToCSS.ts` |
+| Dark-mode cards (both, shared) | `src/utils/darkLadder.ts` (`DARK_CARD_ALPHA`, `darkCardHex`), written by `cssgen/darkLadderPass.ts` |
 
 Verified by `src/__tests__/containerTone.test.ts` and
 `scripts/audit-containers.ts`.
@@ -115,57 +115,74 @@ the top level is the pure colour.
 | `Container-High` | 96% |
 | `Container-Highest` | **Neutral Color-1** |
 
-### Dark mode — cards lift above the surface they sit on
+### Dark mode — tone 5 laid over the surface
 
-Since 2026-11-03 (with the dark surface ladder, see
-[background-selection.md](background-selection.md#dark-mode-the-ladder)) dark
-cards are no longer one fixed ramp (it was Color-3 blended over Color-2 for
-every surface). On every surface the five levels **lift above that surface**,
-Lowest to Highest, along the surface's own palette ramp — each step blends
-toward the next lighter tone of the same palette, so the hue holds. Every card
-style is tonal in dark mode.
+Owner's final model (2026-11-03; it replaces a "lift each card along the
+surface's ramp" model from earlier that day). In dark mode a card is **one
+color, the theme palette's tone 5**, at an opacity that rises with the level,
+**laid over whatever surface it sits on**:
 
-| surface tone | how far the cards lift |
+| level | dark mode |
 | --- | --- |
-| 1-2 (Dimmest, Dim) | two tones up |
-| 3-4 (Surface, Bright) | one tone up |
-| 5 (Brightest) | toward tone 6, only as far as every card role still passes |
+| `Container-Lowest` | tone 5 at 45% |
+| `Container-Low` | tone 5 at 60% |
+| `Container` | tone 5 at 75% |
+| `Container-High` | tone 5 at 88% |
+| `Container-Highest` | tone 5 at 100% (solid) |
 
-The lift is measured in perceived lightness (CIELAB L*), not tones, because
-palettes space their tones differently. **Minimum step: 0.9 L\*** between
-neighbouring levels, the surface included, on tones 1-4. If a span would give
-less — a flat stretch of ramp, or the few distinct 8-bit colors a short dark
-lift passes through — the top extends further up the ramp, never past tone 5.
-The five levels then take the rounded colors nearest equal L* shares that keep
-that step.
+The surfaces are black and tones 1-4 ([background-selection.md](background-selection.md#dark-mode-the-ladder)),
+so tone 5 is lighter than every one of them and a card always reads as raised.
+The same card is darker on black than on tone 4, because more of the surface
+shows through. Every card style (tonal, white, black) is tonal in dark mode.
 
-**Brightest's cap** is set by role contrast: the cards rise toward tone 6
-until the first card role (Text, Quiet, links, eyebrow, headers, borders,
-icons, focus, a button's edge by fill or border, outline labels — the rendered
-report's list) would drop under its WCAG threshold. For Popsicle's Primary
-that is 8.5%, with Quiet binding at 4.50. The card roles are held to at least
-0.5 L* a level there: any card table cell that would fail on a card
-`5 x 0.5` L* above tone 5 moves the fewest steps up its own palette that clear
-it (`darkLadderPass`, step 6 — the same move the Card Quiet block makes);
-passing cells are left alone.
+**Why opacity:** it is one mechanism that the CSS and Figma can both express
+without knowing the surface. The value is stored once per palette and level,
+in the dark Backgrounds rows (`darkLadderPass`, step 5), as an 8-digit hex
+(Highest stays the `Color-5` reference):
 
-Where they live: each dark surface block in the CSS declares its own five
-`--Container-*` and cards inherit them; the theme's Containers block no
-longer sets them in dark mode (set on the card itself it would win and
-flatten every level to one ladder). The JSON's dark Backgrounds rows carry the
-ladder for a tone-3 surface, which is what Figma reads.
+- **CSS:** the theme's Containers block declares `--Container-*` on the card,
+  exactly as light mode does, and the browser composites the translucent
+  `--Background` over the surface. Nothing is declared per surface.
+- **Figma:** the same RGBA is the value of the existing Container variables,
+  and Figma composites the fill over the frame below. It has to be the
+  resolved color: a color variable holds one RGBA or one alias, with no
+  opacity on an alias, and the plugin API binds only a paint's *color* to a
+  variable (`VariableBindablePaintField = 'color'`), never its opacity — so the
+  "alias + bound opacity float" trick the drop shadows use is not available to
+  fills from code. No variables were added; the Surface collection's five
+  Container modes keep working unchanged.
 
-**Figma limitation:** a Figma card has no idea what surface it sits on — the
-Surface collection's ten modes are the five surfaces and five containers, and
-the cap is ten — so Figma's dark cards are the tone-3 surface's ladder on
-every surface. Only the CSS lifts them per surface.
+The opacities are stored as an 8-bit alpha (115, 153, 191, 224, 255 of 255),
+the precision both an 8-digit hex and Figma's RGBA hold, so both paint the
+same number.
+
+**Card roles pass on every composite.** Every role a card carries (text,
+quiet, links, eyebrow, headers, borders, icons, focus, buttons and their
+outline labels, tags) is lighter than the card in dark mode, so it is hardest
+to read on the lightest card — and no card can paint lighter than solid tone 5.
+`darkLadderPass` step 6 checks each card table cell on tone 5; a passing cell is
+left exactly as it is, a failing one moves the fewest steps up its own palette
+that clear it (the same move the Card Quiet block makes). `darkLadder.test.ts`
+then checks every role on all 25 composites per theme (5 levels x 5 surfaces).
+
+**Nested cards** composite twice, between the outer card and tone 5 — never
+past tone 5 — so their roles pass too (measured: 9,000 nested composites
+across five brands, none failing). They are supported; they just separate less
+from the card around them.
+
+**Known limit:** on Surface-Brightest (tone 4) the cards sit between tone 4 and
+tone 5, so the low levels barely separate from the surface. Every composite
+still measures lighter than its surface (none rounds equal across the five test
+brands), but the step is small.
 
 ---
 
 ## Which tone a tonal card uses
 
 This section is the **light-mode** rule (a dark background in light mode, such
-as Black, included). Dark mode's cards follow the lift above instead.
+as Black, included). Dark mode's cards are tone 5 laid over the surface instead
+(above); `generateSimplifiedBackgrounds` still computes dark rows, and the dark
+ladder pass then replaces their cards.
 
 The face follows the **background's lightness — not the mode**:
 
@@ -274,7 +291,7 @@ The comment above them describes a Color-1/2/3 shift that no longer happens.
 ```bash
 npx vitest run src/__tests__/containerTone.test.ts   # ramp shape, both pipelines
 npx tsx scripts/audit-containers.ts                  # contrast, every level and style
-npx vitest run src/__tests__/darkLadder.test.ts      # dark: cards lift above every surface, roles pass
+npx vitest run src/__tests__/darkLadder.test.ts      # dark: tone-5 cards over every surface, roles pass
 ```
 
 The ramp test covers every `Background-N`, not just the four a user can pick — a
