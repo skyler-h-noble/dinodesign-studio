@@ -2030,6 +2030,10 @@ export function generateFigmaJSON(
         // straight at the map, needing no indirection) linked correctly. That
         // asymmetry is the visible symptom of a role missing from this list.
         { role: 'Text-BW', section: 'Default-Button-Border', pal: 'BlackWhite' },
+        /* The eyebrow, from its own table at the background palette — the
+           same key exportToCSS writes for Default-Background.<prefix>Eyebrow.
+           Without it Default's eyebrow fell back to Text-Secondary. */
+        { role: 'Eyebrow', section: 'Eyebrows', pal: null },
       ];
 
       /** Resolve one role at a given background tone, or null. */
@@ -2249,6 +2253,15 @@ export function generateFigmaJSON(
         let hex = token?.value;
         if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
         if (hex) defBg[`Container-${role}`] = { value: hex, type: 'color' };
+      }
+
+      {
+        // Container-Eyebrow: the Eyebrows Containers table at the card row,
+        // matching exportToCSS's Default-Background.Container-Eyebrow.
+        const token = modeData.Eyebrows?.Containers?.[contPalette]?.[contColorN];
+        let hex = token?.value;
+        if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
+        if (hex?.startsWith('#')) defBg['Container-Eyebrow'] = { value: hex, type: 'color' };
       }
 
       const contAlpha = quietAlphaAt(contN);

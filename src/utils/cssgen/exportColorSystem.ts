@@ -4699,6 +4699,24 @@ export function exportColorSystemToJSON(
     return max === 0 ? 0 : ((max - min) / max) * max;
   };
 
+  /** The five card colors a Background-N row paints, as hex. Container
+   *  values are {Colors.<Palette>.Color-N} references or literal hex (the
+   *  Low/High blends); anything else is skipped rather than guessed. */
+  const CONTAINER_LEVELS = ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest'];
+  const containerHexes = (mode: 'light' | 'dark', palette: string, toneN: number): string[] => {
+    const row = (colorSystem.Modes[mode === 'light' ? 'Light-Mode' : 'Dark-Mode'] as any)
+      ?.Backgrounds?.[palette]?.[`Background-${toneN}`]?.Containers;
+    if (!row) return [];
+    const out: string[] = [];
+    for (const level of CONTAINER_LEVELS) {
+      const v = String(row[level]?.value ?? '');
+      const ref = v.match(/^\{Colors\.(\w+)\.Color-(\d+)\}$/);
+      const hex = ref ? eyebrowRamp(mode, ref[1])?.[Number(ref[2]) - 1]?.color : /^#[0-9a-f]{6}$/i.test(v) ? v : undefined;
+      if (hex) out.push(hex);
+    }
+    return out;
+  };
+
   const buildEyebrows = (textStructure: any, mode: 'light' | 'dark'): any => {
     const eyebrows: any = { Surfaces: {}, Containers: {} };
     for (const scope of ['Surfaces', 'Containers']) {
@@ -4735,11 +4753,20 @@ export function exportColorSystemToJSON(
           // This is also why Text's answer is so dark. Near-black is not
           // over-caution — it is the only thing that clears eight different
           // backgrounds at once.
-          const bgHexes = Number.isFinite(toneN)
-            ? EYEBROW_BACKDROP_PALETTES
-                .map((bp) => eyebrowRamp(mode, bp)?.[toneN - 1]?.color)
-                .filter((h): h is string => !!h)
-            : [];
+          //
+          // In the Containers scope the eyebrow sits on the CARD, not on the
+          // surface the card sits on, and in dark mode those are far apart: a
+          // tone-7 Secondary surface carries a #2a1717 card. Solving against the
+          // surface tone put a dark eyebrow on every dark card (1.2-1.5:1) while
+          // Text, which is solved against the card, passed. So containers solve
+          // against all five card levels of every backdrop palette at this tone.
+          const bgHexes = !Number.isFinite(toneN)
+            ? []
+            : scope === 'Containers'
+              ? EYEBROW_BACKDROP_PALETTES.flatMap((bp) => containerHexes(mode, bp, toneN))
+              : EYEBROW_BACKDROP_PALETTES
+                  .map((bp) => eyebrowRamp(mode, bp)?.[toneN - 1]?.color)
+                  .filter((h): h is string => !!h);
 
           let pickedIdx = -1;
           if (bgHexes.length && fgRamp) {
@@ -7384,6 +7411,24 @@ export function exportColorSystemToJSON(
       for (const [sectionName, section] of Object.entries<any>(theme ?? {})) {
         if (!section || typeof section !== 'object' || !section['Text-Primary']) continue;
         const scope = sectionName.startsWith('Container') ? 'Containers' : 'Surfaces';
+
+        // The Default theme's tone differs per mode, so its roles route through
+        // Default-Background (generateCompleteThemes overrideSurface) and carry
+        // no Color-N for the table lookup below. Left to the fallback, its
+        // eyebrow became Text-Secondary — a body-copy color, darker than the
+        // eyebrow solve would pick (Popsicle: tone 4 at 9.4:1 where the table's
+        // answer is brighter). Route the eyebrow the same way; the producers
+        // (exportToCSS tokenLookup, generateFigmaJSON) resolve it from the
+        // Eyebrows table at Default's real palette and tone.
+        const routed = String(section['Text-Primary'].value || '').match(/^\{Default-Background\.(.*)Text-Primary\}$/);
+        // Default's cards are routed by name rather than through Text-Primary
+        // (their accent roles keep table keys), so they are matched by scope.
+        if (themeName === 'Default' && (routed || scope === 'Containers')) {
+          const prefix = scope === 'Containers' ? 'Container-' : routed![1];
+          section.Eyebrow = { value: `{Default-Background.${prefix}Eyebrow}`, type: 'color' };
+          eyebrowTokens++;
+          continue;
+        }
 
         // Prefer the Eyebrows TABLE, which is where the eyebrow's own decisions
         // live — the rotation, the 4.5:1 solve, and the dark-mode Color-Vibrant

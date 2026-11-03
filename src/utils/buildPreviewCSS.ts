@@ -636,7 +636,21 @@ export function buildPreviewCSS(input: BuildInput): string {
       : rot === 'Secondary' ? secondaryLight
       : rot === 'Tertiary' ? tertiaryLight
       : (NEUTRAL.map(h => ({ hex: h })) as typeof primary);
-    return `var(--${rot}-Color-${getAccessibleTones(bgHex, toneN, ramp).text})`;
+    /* The most chromatic tone that clears 4.5:1 on this background — the
+       same rule the export's Eyebrows table applies (exportColorSystem
+       buildEyebrows, HSV chroma). This took the TEXT tone, the darkest safe
+       answer, so the studio showed a tone-4 eyebrow where the published CSS
+       carries tone 5 (Popsicle: 9.4:1 vs 6.6:1, both passing). Falls back to
+       the text tone when nothing in the ramp passes. */
+    let best = -1, bestPop = -1;
+    ramp.forEach((t, i) => {
+      if (!t?.hex || chroma.contrast(t.hex, bgHex) < 4.5) return;
+      const [, sat, val] = chroma(t.hex).hsv();
+      const pop = (Number.isFinite(sat) ? sat : 0) * val;
+      if (pop > bestPop) { bestPop = pop; best = i; }
+    });
+    const n = best >= 0 ? best + 1 : getAccessibleTones(bgHex, toneN, ramp).text;
+    return `var(--${rot}-Color-${n})`;
   };
 
   const vibrantLines = () => [

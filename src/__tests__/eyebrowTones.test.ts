@@ -168,10 +168,19 @@ describe('Eyebrows own their tones', () => {
         for (const [key, v] of Object.entries<any>(tones)) {
           if (!String(v.value).startsWith('{Colors.')) continue;   // Text fallback
           const fg = refToHex(v.value, json, mode);
-          const bg = refToHex(`{Colors.${bgPal}.${key}}`, json, mode);
-          if (!fg || !bg) continue;
-          const r = chroma.contrast(fg, bg);
-          if (r < 4.5) bad.push(`${scope}/${bgPal}/${key} = ${r.toFixed(2)}`);
+          if (!fg) continue;
+          // A Containers entry sits on the CARD a Background-N row paints, not
+          // on the surface tone — solved against all five card levels.
+          const n = key.replace('Color-', '');
+          const bgs = scope === 'Containers'
+            ? ['Container', 'Container-Low', 'Container-Lowest', 'Container-High', 'Container-Highest']
+                .map((l) => refToHex(`{Backgrounds.${bgPal}.Background-${n}.Containers.${l}}`, json, mode))
+            : [refToHex(`{Colors.${bgPal}.${key}}`, json, mode)];
+          for (const bg of bgs) {
+            if (!bg) continue;
+            const r = chroma.contrast(fg, bg);
+            if (r < 4.5) bad.push(`${scope}/${bgPal}/${key} = ${r.toFixed(2)}`);
+          }
         }
       }
     }

@@ -1391,6 +1391,10 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       `{Header.Containers.${defPal}.${faceColorN}}`;
     tokenLookup['Default-Background.Container-Text-BW'] =
       `{Default-Button-Border.Containers.BlackWhite.${faceColorN}}`;
+    // The card's eyebrow, keyed by the card row (contN) — the Eyebrows
+    // Containers table is solved against the five card levels of that row.
+    // Same key generateFigmaJSON uses for Container-Eyebrow.
+    tokenLookup['Default-Background.Container-Eyebrow'] = `{Eyebrows.Containers.${defPal}.${contColorN}}`;
     // Focus-Visible uses a flat path (no palette nesting) AND is keyed by
     // Background-N, not Color-N. Using colorN here produced
     // {Focus-Visible.Surfaces.Color-12}, which never resolves — leaving the
@@ -1471,6 +1475,10 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       // cover EVERY role or Default keeps a hardcoded light-mode value.
       tokenLookup[`Default-Background.${prefix}Text-BW`] =
         `{Default-Button-Border.Surfaces.BlackWhite.${vColorN}}`;
+      // Eyebrow: the Eyebrows table at Default's own background palette and
+      // this surface's tone. Must stay in step with generateFigmaJSON's
+      // ROLE_SOURCES (Eyebrow) and exportColorSystem's Default routing.
+      tokenLookup[`Default-Background.${prefix}Eyebrow`] = `{Eyebrows.Surfaces.${defPal}.${vColorN}}`;
       // Accents resolve from their OWN palette at the surface's tone.
       for (const pal of accentPalettes) {
         tokenLookup[`Default-Background.${prefix}Text-${pal}`] = `{Text.Surfaces.${pal}.${vColorN}}`;
