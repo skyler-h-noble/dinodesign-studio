@@ -33,18 +33,18 @@
  *    a small Icon-On group whose light value is the old reference and whose
  *    dark value is the dark text for the icon actually drawn there.
  *
- * 5. Backgrounds rows paint the ladder (black, tones 1-4), and every row's
- *    five cards become SOLID colors: tone 5 of its palette mixed with the
- *    palette's page surface (tone 2) at 45 / 60 / 75 / 88 / 100%. Figma reads
- *    these (one value per theme, so the page mix); the CSS declares each
- *    surface level's own mix on top (exportToCSS, per-surface --Container-*).
+ * 5. Backgrounds rows paint the ladder (tones 1-5; black on Neutral's tone 1
+ *    only where the designer chose black), and every row's five cards become
+ *    SOLID colors: tone 4 of its palette mixed with the palette's page
+ *    (tone 3) at 50 / 65 / 75 / 90 / 100% — ONE set per palette, the same on
+ *    every surface. Figma and the CSS both read these.
  *
- * 6. Card roles that fail on the lightest card a level can produce (solid
- *    tone 5) move up their own palette until they pass.
+ * 6. Card roles that fail on the lightest card (tone 4 itself, Highest) move
+ *    up their own palette until they pass.
  */
 import chroma from 'chroma-js';
 import {
-  darkLadderMaps, themeWindows, labL, darkCardHex, darkSurfaceHex, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
+  darkLadderMaps, themeWindows, labL, darkCardHexesForRamp, blackChosen, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
   type DarkLadderLevel,
 } from '../darkLadder';
 
@@ -97,7 +97,13 @@ const refOf = (v: unknown): string | null =>
  */
 export const DARK_LADDER = { enabled: true };
 
-export function applyDarkLadder(colorSystem: Json) {
+/** The two user selections the ladder reads: whether black was chosen. */
+export interface DarkLadderSelections {
+  background?: string;
+  cardColoring?: string;
+}
+
+export function applyDarkLadder(colorSystem: Json, sel?: DarkLadderSelections) {
   const light = colorSystem?.Modes?.['Light-Mode'];
   const dark = colorSystem?.Modes?.['Dark-Mode'];
   if (!light?.Themes || !dark?.Themes) return null;
@@ -172,12 +178,16 @@ export function applyDarkLadder(colorSystem: Json) {
 
   /* The rows. Every index a window names paints that level's tone on its
      Surface; the core row (the theme's own Surface index) carries the whole
-     ladder, because the Theme's Dim and Bright read it there. Surface-Dimmest
-     is pure black for every theme (the owner's choice, not a tinted tone 1),
-     so its rows hold the literal. */
+     ladder, because the Theme's Dim and Bright read it there. Tones 1-5; the
+     one literal is pure black where the Neutral palette paints tone 1 and the
+     designer chose black (blackChosen: a Black page or black cards). */
+  const black = blackChosen(sel);
   const rowWrites = new Map<string, string>();   // leaf path -> literal value
   for (const w of windows) {
-    const paint = (level: DarkLadderLevel) => (DARK_LADDER_TONE[level] === 0 ? '#000000' : `{Colors.${w.palette}.Color-${DARK_LADDER_TONE[level]}}`);
+    const paint = (level: DarkLadderLevel) => {
+      const t = DARK_LADDER_TONE[level];
+      return t === 1 && black && w.palette === 'Neutral' ? '#000000' : `{Colors.${w.palette}.Color-${t}}`;
+    };
     for (const [level, n] of Object.entries(w.index) as [DarkLadderLevel, number][]) {
       rowWrites.set(`Backgrounds.${w.palette}.Background-${n}.Surfaces.Surface`, paint(level));
     }
@@ -349,48 +359,47 @@ export function applyDarkLadder(colorSystem: Json) {
     }
   }
 
-  /* ── 5. Every row's cards: tone 5 mixed with the page, solid ─────────────
+  /* ── 5. Every row's cards: tone 4 mixed with the page, solid ─────────────
    *
    * No opacity on cards (utils/darkLadder.ts, Cards): each level is a solid
-   * color, tone 5 mixed with the surface under it. These rows are what Figma's
-   * Surface collection reads, and it holds one value per theme and level, so
-   * the rows carry the mix against the PAGE surface (tone 2) — the same five in
-   * every row of a palette. The CSS states each surface level's own mix on that
-   * surface; these rows are only its fallback for a theme with no window.
-   * Highest is tone 5 itself and stays a reference, so it follows the palette. */
+   * color, tone 4 mixed with the PAGE (tone 3) at 50 / 65 / 75 / 90%, and
+   * Highest is tone 4 itself, kept as a reference so it follows the palette.
+   * One set per palette, written into every row: a card is the same color on
+   * every surface level. Figma's Surface collection and the CSS Containers
+   * block both read these rows, so the two hold the same values.
+   * (generateSimplifiedBackgrounds' dark rows still compute the pre-ladder
+   * mix, Color-3 over Color-2; this replaces it with the same shape one tone
+   * up, from the final dark Colors.) */
   for (const pal of Object.keys(dark.Backgrounds ?? {})) {
-    const tone5 = String(dark.Colors?.[pal]?.[`Color-${DARK_CARD_TONE}`]?.value ?? '').slice(0, 7);
-    if (!/^#[0-9a-f]{6}$/i.test(tone5)) continue;
     const ramp = Array.from({ length: 12 }, (_, i) => String(dark.Colors?.[pal]?.[`Color-${i + 1}`]?.value ?? '').slice(0, 7));
-    if (!/^#[0-9a-f]{6}$/i.test(ramp[DARK_LADDER_TONE.Surface - 1])) continue;
-    const page = darkSurfaceHex(ramp, 'Surface');
+    if (!/^#[0-9a-f]{6}$/i.test(ramp[DARK_CARD_TONE - 1]) || !/^#[0-9a-f]{6}$/i.test(ramp[DARK_LADDER_TONE.Surface - 1])) continue;
+    const cards = darkCardHexesForRamp(ramp);
     for (const [rowName, row] of Object.entries<Json>(dark.Backgrounds[pal] ?? {})) {
       if (!row?.Containers) continue;
       for (const level of DARK_CARD_LEVELS) {
         writeLeaf(dark, `Backgrounds.${pal}.${rowName}.Containers.${level}`,
-          level === 'Container-Highest' ? `{Colors.${pal}.Color-${DARK_CARD_TONE}}` : darkCardHex(tone5, page, level));
+          level === 'Container-Highest' ? `{Colors.${pal}.Color-${DARK_CARD_TONE}}` : cards[level]);
       }
     }
   }
 
   /* ── 6. Card roles carry the lightest card ───────────────────────────────
    *
-   * A card is tone 5 mixed with a surface, so the lightest thing any card can
-   * paint is tone 5 itself (Highest, or any level on a surface as light as
-   * tone 5 — none is). Every dark-mode card role is lighter than the card, so
-   * that lightest card is where each one is hardest to read; passing there
-   * means passing on every level over every surface. The card tables were
-   * tuned for the old dark cards, Color-2..4, so a few cells that passed there
-   * fail on tone 5 — an eyebrow at a mid tone, for one. Palettes share one
-   * lightness per tone by construction, so one neutral ground at the lightest
-   * tone 5 stands for all of them. A cell that passes is the design and is
-   * left exactly as it is; a failing one moves the fewest steps up its own
-   * palette (lighter, away from the dark card) that clear it — the same move
-   * the Card Quiet block makes. */
-  const tone5L = Math.max(...windows.map((w) => labL(String(dark.Colors?.[w.palette]?.[`Color-${DARK_CARD_TONE}`]?.value ?? '').slice(0, 7)))
+   * A card is tone 4 mixed with the page (tone 3), so the lightest thing any
+   * card paints is tone 4 itself (Highest). Every dark-mode card role is
+   * lighter than the card, so that lightest card is where each one is hardest
+   * to read; passing there means passing on every level. The card tables were
+   * tuned for dark cards on Color-2..4, so nearly every cell already passes on
+   * tone 4; any that does not moves up. Palettes share one lightness per tone
+   * by construction, so one neutral ground at the lightest tone 4 stands for
+   * all of them. A cell that passes is the design and is left exactly as it
+   * is; a failing one moves the fewest steps up its own palette (lighter, away
+   * from the dark card) that clear it — the same move the Card Quiet block
+   * makes. */
+  const cardFaceL = Math.max(...windows.map((w) => labL(String(dark.Colors?.[w.palette]?.[`Color-${DARK_CARD_TONE}`]?.value ?? '').slice(0, 7)))
     .filter((l) => Number.isFinite(l)));
-  if (Number.isFinite(tone5L)) {
-    const ground = chroma.lab(tone5L, 0, 0).hex();
+  if (Number.isFinite(cardFaceL)) {
+    const ground = chroma.lab(cardFaceL, 0, 0).hex();
     const contrastOn = (hex: string) => {
       const c = chroma(hex);
       const fg = c.alpha() < 1 ? chroma.mix(ground, c.alpha(1), c.alpha(), 'rgb') : c;
@@ -440,7 +449,7 @@ export function applyDarkLadder(colorSystem: Json) {
 
     /* A card role the Theme layer names as a palette COLOR rather than a
        table cell — a dark card's link is {Colors.Info.Color-Vibrant} — is the
-       same color in both modes and cannot follow the tone-5 cards. When it
+       same color in both modes and cannot follow the dark cards. When it
        fails on the lightest card it goes through a one-entry Card-Accent group
        (light: the color it always was; dark: the nearest lighter tone that
        clears), so the Theme reference stays one name in both modes.

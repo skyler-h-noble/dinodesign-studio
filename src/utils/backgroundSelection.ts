@@ -200,9 +200,9 @@ export function parseBackground(
 }
 
 /**
- * The Default page in DARK mode: the chosen background's THEME at Color-2 —
+ * The Default page in DARK mode: the chosen background's THEME at Color-3 —
  * its Surface level on the dark ladder (utils/darkLadder.ts: every theme's
- * levels paint black and tones 1-4 in dark mode, Surface at 2).
+ * levels paint tones 1-5 in dark mode, Surface at 3).
  *
  * docs/background-selection.md: "the theme carries over, the tone does not".
  * The preview, the CSS export and the Figma payload each had their own copy

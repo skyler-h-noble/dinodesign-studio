@@ -88,7 +88,7 @@ Two wiring gaps did need closing:
 - **Dark mode.** The fallback honoured `backgroundN`, which is a LIGHT-mode
   position — a `Surface-Brightest` pick would have painted a near-white page in
   dark mode. The theme carries over, the tone does not: in dark mode the page
-  is the chosen palette's **tone 2** (see [Dark mode](#dark-mode-the-ladder)
+  is the chosen palette's **tone 3** (see [Dark mode](#dark-mode-the-ladder)
   below).
 - **The preview.** `buildPreviewCSS` had a case per legacy string and a
   `default:` that fell through to white, so all sixteen new combinations would
@@ -122,37 +122,45 @@ variables is recoverable; **deleting them is not** (invariant 8), so do not
 
 ## Dark mode: the ladder
 
-Decided by the owner (final model, 2026-11-03). In dark mode every theme —
-Default included, no special case — paints its five levels like this, on its
-own palette (the Default theme: the page-background palette):
+Decided by the owner (2026-11-04). In dark mode every theme — Default
+included, no special case — paints its five levels like this, on its own
+palette (the Default theme: the page-background palette):
 
 | level | dark mode paints |
 | --- | --- |
-| Surface-Dimmest | **pure black `#000000`** |
-| Surface-Dim | tone 1 |
-| Surface | tone 2 — so the dark **page** is tone 2 |
-| Surface-Bright | tone 3 |
-| Surface-Brightest | tone 4 |
+| Surface-Dimmest | tone 1 |
+| Surface-Dim | tone 2 |
+| Surface | tone 3 — so the dark **page** is tone 3 (`DARK_PAGE_N`) |
+| Surface-Bright | tone 4 |
+| Surface-Brightest | tone 5 |
 
 Strictly darkest to lightest, all inside the dark band. Light mode does not
 change: the grid above is the light-mode picture.
 
-**Surface-Dimmest is black for every theme.** That is the owner's deliberate
-choice; a tinted tone 1 is not wanted there. It no longer depends on whether
-the designer picked a Black page or black cards.
+**No pure black, except where the designer chose it.** A Black page
+(`Neutral/Surface-Dimmest`, or the legacy `black`) or black cards keep the
+selection rule from 7ad2bf4 (`blackChosen`): wherever the **Neutral** palette
+paints its tone 1 — Neutral's Surface-Dimmest, and the Default theme's when
+the page palette is Neutral — it paints `#000000` instead. Every other tone 1
+is the palette's own tinted tone 1. (Before the ladder work, Neutral's
+Surface-Dimmest was locked to black in dark mode for everyone; the black-only-
+when-chosen rule is the narrower one the owner asked to keep.)
 
-Cards sit on top of these as **solid colors mixed from tone 5 and the surface
-they are on** — 45 / 60 / 75 / 88 / 100% tone 5, `blendColors`, no opacity —
-see [Container logic](container-logic.md#dark-mode--solid-colors-mixed-from-tone-5-and-the-surface).
-Each surface level declares its own five card colors and the cards inherit
-them. Figma holds one value per theme, so its cards are the mix on the page
-(tone 2) wherever they sit; the CSS and preview mix per surface. Tone 5 is the
-first tone the surfaces do not use, so a card is always lighter than the
-surface under it. A card inside a card uses a higher Container level (High or
-Highest).
+Cards are **solid colors mixed from tone 4 and the page (tone 3)** — one step
+above the page, 50 / 65 / 75 / 90 / 100% tone 4, `blendColors`, no opacity —
+see [Container logic](container-logic.md#dark-mode--tone-4-mixed-with-the-page-one-set-per-theme).
+**One set per theme, the same on every surface level**, so Figma, the CSS and
+the preview hold exactly the same five values. On the page and the Dim levels
+a card reads as raised. On Surface-Bright (tone 4) and Surface-Brightest
+(tone 5) the cards sit level with or darker than the surface — an accepted
+consequence, not worked around: in dark mode cards belong on the page and the
+Dim levels. A card inside a card uses a higher Container level (High or
+Highest), which is lighter because the levels rise toward tone 4.
 
-This replaces a first dark ladder from earlier the same day (every surface
-one tone higher, no black, cards lifted along each surface's ramp).
+History: this is the first dark ladder's surfaces (7ad2bf4, tones 1-5, page on
+tone 3) with the pre-ladder card relationship shifted up one tone. In between,
+ab8c3e6 / 7ed5bc8 painted black and tones 1-4 with the page on tone 2 and
+tone-5 cards; that model is gone.
 
 ### How it gets there
 
@@ -169,16 +177,16 @@ light-mode index holds the curated answer for the dark tone that index is
 painted at. Each theme's window of indices is read from its own references;
 where two themes name one index for different tones, the entry answers for the
 lighter one, which is safe because every dark-mode foreground is lighter than
-its surface. Black has no row of its own in the tables (they are keyed by tones
-1-12), so Surface-Dimmest reads tone 1's answers — by the same rule, whatever
-passes on tone 1 passes on black.
+its surface. Black (only where chosen) has no row of its own in the tables
+(they are keyed by tones 1-12), so it reads tone 1's answers — by the same
+rule, whatever passes on tone 1 passes on black.
 
 The few references that named a tone directly — a theme's Surface-Dimmest /
 Brightest (`{Colors.<P>.Color-3}` / `-11`), Neutral's black anchor, the
 Default theme's Surface-Dimmest — now name a Backgrounds row (or
 Default-Background), which resolves to the same tone in light mode.
 
-`DARK_PAGE_N` (2) is the tone the page paints; the export reads its tables at
+`DARK_PAGE_N` (3) is the tone the page paints; the export reads its tables at
 the page palette's Surface index, through the same window.
 
 Tests: `src/__tests__/darkLadder.test.ts` (what the CSS paints per brand x

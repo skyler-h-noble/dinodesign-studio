@@ -259,13 +259,13 @@ describe('preview, export and Figma agree on the eased tones', () => {
   it('a dark-mode Primary section (Surface) paints its dark-ladder tone in the export', () => {
     // The case that prompted the ease was <Section theme="Primary"
     // surface="Surface"> painting Color-6. Since the dark ladder
-    // (utils/darkLadder.ts) every theme's levels paint black and tones 1-4 in
-    // dark mode — Surface tone 2, Bright tone 3 — which the ease leaves alone.
+    // (utils/darkLadder.ts) every theme's levels paint tones 1-5 in dark
+    // mode — Surface tone 3, Bright tone 4 — which the ease leaves alone.
     const bg = cssToken(css['Dark-Mode.css'], /\[data-theme="Primary"\]\[data-surface="Surface"\]/, 'Background');
-    expect(norm(resolveVar(css['Dark-Mode.css'], bg))).toBe(norm(eased[1].hex));
+    expect(norm(resolveVar(css['Dark-Mode.css'], bg))).toBe(norm(eased[2].hex));
     const bright = cssToken(css['Dark-Mode.css'], /\[data-theme="Primary"\]\[data-surface="Surface-Bright"\]/, 'Background');
-    expect(norm(resolveVar(css['Dark-Mode.css'], bright))).toBe(norm(eased[2].hex));
-    expect(eased[1].hex).toBe(plain[1].hex);
+    expect(norm(resolveVar(css['Dark-Mode.css'], bright))).toBe(norm(eased[3].hex));
+    expect(eased[2].hex).toBe(plain[2].hex);
   });
 
   it('the preview reads the eased ramp where it draws from the dark palette', () => {
@@ -274,7 +274,7 @@ describe('preview, export and Figma agree on the eased tones', () => {
     const exportRaw = cssToken(css['Dark-Mode.css'], /^\s*:root,/, 'Buttons-Default-Border');
     const exported = norm(resolveVar(css['Dark-Mode.css'], exportRaw));
     expect(preview).toBe(exported);
-    /* Since the dark ladder the page is tone 2, so the border is no longer
+    /* Since the dark ladder the page is tone 3, so the border is no longer
        Color-6 — but whichever light tone it lands on is read from the EASED
        ramp, in both pipelines. */
     const at = eased.findIndex((t) => norm(t.hex) === preview);

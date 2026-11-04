@@ -187,7 +187,7 @@ export function solveQuietOpacities(
   target = 4.5,
   /** The tone a Surfaces index is painted at. In dark mode the tables are
    *  keyed by the light-mode index each level uses, so index 6 can mean
-   *  tone 2 or 3 (utils/darkLadder.ts) — and the entry answers for the
+   *  tone 3 or 4 (utils/darkLadder.ts) — and the entry answers for the
    *  lighter, which is the ground to solve against. Identity in light mode. */
   surfaceTone: (n: number) => number = (n) => n,
 ): QuietTable {

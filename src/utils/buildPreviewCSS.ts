@@ -7,7 +7,7 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, type DarkCardLevel } from './darkLadder';
+import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -696,7 +696,7 @@ export function buildPreviewCSS(input: BuildInput): string {
 
   // ── Resolve surface background ──
   let surfaceBg: string;
-  /* Dark mode: the chosen background's THEME on its tone 2 (DARK_PAGE_N, the
+  /* Dark mode: the chosen background's THEME on its tone 3 (DARK_PAGE_N, the
      dark ladder's Surface) — darkPageTheme, the
      one rule the export and the Figma payload use too. */
   const darkTheme = darkPageTheme(sel.background);
@@ -860,11 +860,11 @@ export function buildPreviewCSS(input: BuildInput): string {
   function navColor(opt: string) {
     const { palette, n } = resolveNavOption(opt);
     /* Dark mode: a bar is a theme like any other, so its Surface paints its
-       palette's tone 2 (utils/darkLadder.ts) — what the export's App-Bar /
-       Nav-Bar / Status themes paint. The legacy Black bar is the darkest
-       level, which is pure black in dark mode. */
+       palette's tone 3 (utils/darkLadder.ts) — what the export's App-Bar /
+       Nav-Bar / Status themes paint. The legacy Black bar is Neutral's
+       darkest level: tone 1, or pure black when black was chosen. */
     if (isDark) {
-      if (opt === 'black') return '#000000';
+      if (opt === 'black') return blackChosen(sel) ? '#000000' : neutral(DARK_LADDER_TONE['Surface-Dimmest']);
       const tone = DARK_LADDER_TONE.Surface;
       if (palette === 'Neutral') return neutral(tone);
       return p(palette === 'Secondary' ? secondary : palette === 'Tertiary' ? tertiary : primary, tone);
@@ -888,10 +888,9 @@ export function buildPreviewCSS(input: BuildInput): string {
     return p(primary, n);
   }
 
-  /* Dark mode: a bar paints its palette's tone 2 (black for the legacy Black
-     bar), so the tone its tokens and button are solved against is that one.
-     Black has no tone of its own; its tokens are tone 1's (darkTableTone),
-     which pass on black too. */
+  /* Dark mode: a bar paints its palette's tone 3 (tone 1 for the legacy Black
+     bar — black when chosen, whose tokens are tone 1's: darkTableTone), so the
+     tone its tokens and button are solved against is that one. */
   const barTone = (opt: string, c: { palette: string; n: number }) =>
     (isDark ? { ...c, n: opt === 'black' ? darkTableTone('Surface-Dimmest') : DARK_LADDER_TONE.Surface } : c);
   const statusConfig = barTone(sel.status, resolveNavOption(sel.status));
@@ -997,12 +996,11 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerHigh = at(0.96);
     containerHighest = neutral(1);
   } else if (isDark) {
-    /* Dark mode, every card style: the page palette's tone 5 mixed with the
-       surface the card sits on, as SOLID colors (utils/darkLadder.ts, Cards) —
-       the export's cards. The roles below are solved on tone 5 itself, the
-       lightest thing a card can paint and so the hardest ground for every
-       role; the mixes are what the blocks below emit (darkCardEmit, and each
-       surface level's own five). */
+    /* Dark mode, every card style: the page palette's tone 4 mixed with the
+       page (tone 3), as SOLID colors (utils/darkLadder.ts, Cards) — the
+       export's cards, one set for every surface level. The roles below are
+       solved on tone 4 itself, the lightest thing a card can paint and so the
+       hardest ground for every role; the mixes are what darkCardEmit emits. */
     const face = p(surfacePalette, DARK_CARD_TONE);
     containerLowest = containerLow = containerBg = containerHigh = containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'white') {
@@ -1018,7 +1016,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   }
 
   // Tertiary container always uses its own palette — never white/black.
-  // Dark mode: tone 5 for solving; emitted mixed with the Tertiary surface.
+  // Dark mode: tone 4 for solving; emitted mixed with the Tertiary page (tone 3).
   if (isDark) {
     tertiaryContainerBg = p(tertiary, DARK_CARD_TONE);
   } else {
@@ -1033,25 +1031,17 @@ export function buildPreviewCSS(input: BuildInput): string {
     : effectiveCardColoring === 'black' ? 3
     : tonalContainerN;
   const tertiaryContainerN = isDark ? DARK_CARD_TONE : 10;
-  /* What the card levels EMIT. Dark mode: the face above mixed with the page
-     (solid, no opacity); each surface level below states its own mix. */
+  /* What the card levels EMIT. Dark mode: the face above (tone 4) mixed with
+     the page (tone 3) — solid, no opacity, one set for every surface level. */
   const darkCardEmit = (face: string, level: DarkCardLevel) => (isDark ? darkCardHex(face, surfaceBg, level) : face);
-  /* Dark mode: the five card colors for a surface, and the same five restated
-     on the cards inside it. The Container Surface block restates the PAGE's
-     cards on every card (a studio-shell rule would otherwise win), so a
-     surface level has to restate its own at a higher specificity. */
-  const darkCardDecls = (face: string, surface: string): string => {
-    const cards = darkCardHexes(face, surface);
-    return DARK_CARD_LEVELS.map((l) => `  --${l}: ${cards[l]};`).join('\n');
-  };
-  /* A card inside `selectors`, and — for a theme-only selector — a card that
-     names the theme itself. */
-  const darkCardScope = (selectors: string[], face: string, surface: string): string => {
-    const cardSels = selectors.flatMap((sel) => [
-      `${sel} [data-surface^="Container"]`,
-      ...(sel.includes('data-surface') ? [] : [`${sel}[data-surface^="Container"]`]),
-    ]);
-    return `${cardSels.join(',\n')} {\n${darkCardDecls(face, surface)}\n}`;
+  /* Dark mode: a theme's five card colors, stated on the cards inside it and
+     on a card that names the theme itself. The Container Surface block
+     restates the PAGE's cards on every card (a studio-shell rule would
+     otherwise win), so a theme restates its own at a higher specificity. */
+  const darkCardScope = (sel: string, face: string, page: string): string => {
+    const cards = darkCardHexes(face, page);
+    return `${sel} [data-surface^="Container"],\n${sel}[data-surface^="Container"] {\n`
+      + DARK_CARD_LEVELS.map((l) => `  --${l}: ${cards[l]};`).join('\n') + '\n}';
   };
   const cardLowestOut = darkCardEmit(containerLowest, 'Container-Lowest');
   const cardLowOut = darkCardEmit(containerLow, 'Container-Low');
@@ -1286,7 +1276,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   type SurfaceTheme = 'Primary' | 'Secondary' | 'Tertiary';
   const palFor = (name: SurfaceTheme): typeof vPrimary =>
     name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
-  // Dark mode: a theme's Surface level paints its tone 2 (utils/darkLadder.ts).
+  // Dark mode: a theme's Surface level paints its tone 3 (utils/darkLadder.ts).
   const nFor = (name: SurfaceTheme): number =>
     isDark ? DARK_LADDER_TONE.Surface : name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
@@ -1376,7 +1366,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     }).join('\n');
   };
 
-  /* Dark mode paints a theme's Surface on its tone 2 (utils/darkLadder.ts),
+  /* Dark mode paints a theme's Surface on its tone 3 (utils/darkLadder.ts),
      where the lib's static sheet still assumes a light tone — so the preview
      states the roles for the surface it actually paints. The :root palette
      vars are the LIGHT ramp, so the tones are found on that ramp. */
@@ -1499,16 +1489,15 @@ ${defaultButtonLines(scopeBtn)}`;
     const cells: ButtonGridCell[] = [];
     for (const theme of ['Primary', 'Secondary', 'Tertiary', 'Neutral'] as const) {
       for (const level of SURFACE_LEVELS) {
-        /* Dark mode: every theme paints its levels black and tones 1-4 of its
-           own palette (utils/darkLadder.ts) — the background the export's
-           Cell-Button solves each cell against. Black has no tone, so its
-           tokens are read at tone 1 (darkTableTone). */
+        /* Dark mode: every theme paints its levels on tones 1-5 of its own
+           palette (utils/darkLadder.ts) — the background the export's
+           Cell-Button solves each cell against. */
         const n = isDark ? darkTableTone(level) : barToneFor(theme, level, coreFor(theme));
         const ramp = modeRamp(theme);
         // Neutral's darkest level is a literal black in light mode, not a tone
         // (neutralSurfaceWindow / generateSingleTheme) — no tone is true black.
-        // In dark mode every theme's darkest level is black.
-        const bg = level === 'Surface-Dimmest' && (isDark || theme === 'Neutral')
+        // In dark mode it is Neutral's own tone 1 unless black was chosen.
+        const bg = theme === 'Neutral' && level === 'Surface-Dimmest' && (!isDark || blackChosen(sel))
           ? '#000000' : p(ramp, n);
         const tones = getAccessibleTones(bg, n, ramp);
         const tonalText = effectiveTextColoring === 'tonal' && theme !== 'Neutral';
@@ -1895,7 +1884,7 @@ ${(() => {
   // In dark mode a Tertiary surface goes DARK, the same way the page background
   // and the tertiary CONTAINER already do. Pinning it to TC in both modes is
   // what left the tertiary card cream on a dark page — the one card that never
-  // followed the mode. Dark: its Surface level on the dark ladder, tone 2.
+  // followed the mode. Dark: its Surface level on the dark ladder, tone 3.
   const tertiaryThemeN = isDark ? DARK_LADDER_TONE.Surface : TC;
   const tertiaryThemePal = isDark ? tertiaryDark : tertiaryLight;
   const tertiarySurfaceBg = p(tertiaryThemePal, tertiaryThemeN);
@@ -1964,7 +1953,7 @@ ${(() => {
      the preview's, so those levels keep the preview's own heading. */
   const OWN_LEVELS: Record<string, string[]> = {
     Tertiary: ['Surface'], Neutral: ['Surface-Dimmest', 'Surface-Brightest'],
-    // Dark mode: the preview paints Secondary's Surface itself (tone 2).
+    // Dark mode: the preview paints Secondary's Surface itself (tone 3).
     ...(isDark ? { Secondary: ['Surface'] } : {}),
   };
   return ['Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'].map((t) => {
@@ -1997,12 +1986,13 @@ ${emitTagTextTokens()}
 }
 ${isDark ? `
 /* Dark mode: cards in a Primary / Secondary / Tertiary section are that
-   theme's tone 5 mixed with the theme's Surface (tone 2), as in the export.
-   Restated on the card, after the Container Surface block that restates the
-   page's cards on every card. */
-${darkCardScope(['[data-theme="Primary"]'], p(vPrimary, DARK_CARD_TONE), p(vPrimary, nFor('Primary')))}
-${darkCardScope(['[data-theme="Secondary"]'], p(vSecondary, DARK_CARD_TONE), p(vSecondary, nFor('Secondary')))}
-${darkCardScope(['[data-theme="Tertiary"]'], p(vTertiary, DARK_CARD_TONE), p(vTertiary, DARK_LADDER_TONE.Surface))}
+   theme's own five — its tone 4 mixed with its page tone 3, as in the export
+   (one set per theme, the same on every surface level). Restated on the card,
+   after the Container Surface block that restates the page's cards on every
+   card. */
+${darkCardScope('[data-theme="Primary"]', p(vPrimary, DARK_CARD_TONE), p(vPrimary, DARK_LADDER_TONE.Surface))}
+${darkCardScope('[data-theme="Secondary"]', p(vSecondary, DARK_CARD_TONE), p(vSecondary, DARK_LADDER_TONE.Surface))}
+${darkCardScope('[data-theme="Tertiary"]', p(vTertiary, DARK_CARD_TONE), p(vTertiary, DARK_LADDER_TONE.Surface))}
 ` : ''}
 /* ══ Nav Bar ══ */
 ${(() => {
@@ -2073,7 +2063,10 @@ ${(() => {
   const dimmestN = Math.max(surfaceN - 2, 1);
   const dimBg = p(surfacePalette, dimN);
   const brightBg = p(surfacePalette, brightN);
-  const dimmestBg = p(surfacePalette, dimmestN);
+  /* Dark mode: tones 1-5 with the page on 3 (utils/darkLadder.ts), so these
+     are the ladder's own Dim (2), Bright (4) and Dimmest (1) — black on a
+     Neutral page only when the designer chose black (blackChosen). */
+  const dimmestBg = isDark && surfacePaletteName === 'Neutral' && blackChosen(sel) ? '#000000' : p(surfacePalette, dimmestN);
   /* NO descendant arm for plain Surface below, and that is the rule rather
      than an omission.
      
@@ -2094,11 +2087,6 @@ ${(() => {
      The App-Bar block above already warns about exactly this shape: "Keep this
      narrow — matching [data-theme=Brand] descendants would also catch sibling
      content." Same trap, one selector over. */
-  /* Dark mode: each level's own five card colors, mixed with that level's
-     surface (utils/darkLadder.ts, Cards), restated on the cards inside it. */
-  const face = p(surfacePalette, DARK_CARD_TONE);
-  const levelCards = (level: string, bg: string) =>
-    darkCardScope([`[data-theme="Brand"] [data-surface="${level}"]`, `[data-theme="Brand"][data-surface="${level}"]`], face, bg);
   return `[data-theme="Brand"] [data-surface="Surface-Dim"],
 [data-theme="Brand"][data-surface="Surface-Dim"] {
   --Background: var(--Surface-Dim);
@@ -2106,7 +2094,7 @@ ${buildScopeTokens(dimBg, dimN)}
 }
 [data-theme="Brand"] [data-surface="Surface-Dimmest"],
 [data-theme="Brand"][data-surface="Surface-Dimmest"] {
-  --Background: var(--${surfacePaletteName}-Color-${dimmestN});
+  --Background: ${isDark ? dimmestBg : `var(--${surfacePaletteName}-Color-${dimmestN})`};
 ${buildScopeTokens(dimmestBg, dimmestN)}
 }
 [data-theme="Brand"] [data-surface="Surface-Bright"],
@@ -2114,7 +2102,7 @@ ${buildScopeTokens(dimmestBg, dimmestN)}
   --Background: var(--Surface-Bright);
 ${buildScopeTokens(brightBg, brightN)}
 }
-[data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }${isDark ? '\n' + [levelCards('Surface-Dim', dimBg), levelCards('Surface-Dimmest', dimmestBg), levelCards('Surface-Bright', brightBg)].join('\n') : ''}`;
+[data-theme="Brand"][data-surface="Surface"]             { --Background: var(--Surface); }`;
 })()}
 
 /* ══ Clickable Elements — border inherits 3:1 contrast from context ══ */

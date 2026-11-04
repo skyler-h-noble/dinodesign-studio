@@ -153,7 +153,7 @@ describe('the fix is scoped', () => {
     });
     /* Light mode still has near-misses to rescue. Dark mode's reported one —
        Error / Surface-Brightest, Neutral text on a LIGHT Error tone 11 — is
-       gone with the dark ladder (utils/darkLadder.ts): that surface is tone 4
+       gone with the dark ladder (utils/darkLadder.ts): that surface is tone 5
        now and its Quiet passes on the shared value, so dark mode may need no
        rescue at all. What still has to hold is the shape: whatever it names
        moves upward and only there. */

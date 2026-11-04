@@ -7954,16 +7954,17 @@ export function exportColorSystemToJSON(
   console.log(`🚦 [JSON Export] State backgrounds: ${redirectedButtons} button palettes redirected to their own state`);
 
   /* The dark-mode surface ladder (utils/darkLadder.ts): every theme paints
-     black and tones 1-4 in dark mode, the page sits on tone 2, cards are tone 5
-     at five opacities, and the tables the Theme layer reads are re-keyed so its
+     tones 1-5 in dark mode, the page sits on tone 3, cards are solid mixes of
+     tone 4 over the page (one set per theme), and the tables the Theme layer reads are re-keyed so its
      light-mode indices answer for those tones.
      After every pass that writes Theme references (it reads them), and before
      Cell-Button, which solves each section's button against the background
      the section actually paints. */
-  const ladder = DARK_LADDER.enabled ? applyDarkLadder(colorSystem) : null;
+  const ladder = DARK_LADDER.enabled ? applyDarkLadder(colorSystem, userSelections as never) : null;
   if (ladder) {
     console.log(`🌙 [JSON Export] Dark ladder: ${ladder.remapped} entries re-keyed, ${ladder.pinned} tone readers pinned, ` +
-      `${ladder.rows} row values, ${ladder.iconOn} Icon-On entries, ${ladder.repointed} Theme references repointed`);
+      `${ladder.rows} row values, ${ladder.iconOn} Icon-On entries, ${ladder.repointed} Theme references repointed, ` +
+      `${ladder.cardRoles} card roles lifted for the tone-4 cards`);
   }
 
   /* The Default button on every theme section, from the same function the

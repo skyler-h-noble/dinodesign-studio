@@ -12,7 +12,7 @@ describe('the dark Default page', () => {
     ['primary', 'Primary'], ['primary-base', 'Primary'], ['primary-light', 'Primary'],
     ['Secondary/Surface-Bright', 'Secondary'], ['Tertiary/Surface-Dim', 'Tertiary'],
     ['Neutral/Surface', 'Neutral'],
-  ])('%s → %s at Color-2 (its Surface level on the dark ladder)', (bg, theme) => {
+  ])('%s → %s at Color-3 (its Surface level on the dark ladder)', (bg, theme) => {
     expect(darkPageTheme(bg)).toBe(theme);
     const meta = { Metadata: { Background: { value: bg } } };
     expect(defaultBackgroundTone(meta, {}, 'Dark-Mode')).toEqual({ defPal: theme, defN: DARK_PAGE_N });
