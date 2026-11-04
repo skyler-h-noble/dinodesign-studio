@@ -9,7 +9,7 @@ import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
 import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
-import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, effectLevelScopeCSS, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
 // lib's defaults for these resolve to {palette}-Color-9 regardless of the
 // surface tone, which fails WCAG on light surfaces. These helpers return
@@ -470,11 +470,13 @@ function getAccessibleTones(
  * preview and export are separate implementations and drift silently, so the
  * two have to be changed together.
  */
-function finalizePreviewCSS(css: string): string {
+function finalizePreviewCSS(css: string, shadowOpts?: ShadowOptions): string {
   /* Appended at the single exit point both return paths funnel through, and
-     emitted by exportToCSS from the same helper, so the studio and the
-     published bundle cannot disagree (invariant 5). */
-  return `${withOutlineQuiet(css)}\n\n${libRadiusOverrideCSS()}\n`;
+     emitted by exportToCSS from the same helpers, so the studio and the
+     published bundle cannot disagree (invariant 5). effectLevelScopeCSS
+     re-declares the shadow recipes on every themed scope so each one resolves
+     --Dropshadow-Color against its own band, not the preview root's. */
+  return `${withOutlineQuiet(css)}\n\n${effectLevelScopeCSS(shadowOpts)}\n\n${libRadiusOverrideCSS()}\n`;
 }
 
 /* The outline / ghost button label pair, for every palette, in every scope
@@ -2404,5 +2406,5 @@ ${isDark ? `/* ══ Dark mode image treatment ══
   --Text-Quiet: var(--Quiet, var(--Neutral-Color-5));
   --Border: var(--Neutral-Color-5);
 }
-`);
+`, shadowOpts);
 }

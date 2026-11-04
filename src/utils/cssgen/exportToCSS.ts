@@ -28,7 +28,7 @@ import { generateSurfaceDataAttributesFromJSON } from './surfaceDataAttributesGe
 import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from '../componentRadii';
 import { motionCSS, motionModeCSS } from '../motion';
 import { buildTextOverImageCSSFromModeSheets, MODE_SWITCH_VAR } from './generateTextOverImage';
-import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
+import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, effectLevelScopeFromCSS, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from '../dropshadow';
 import { HEADER_FAMILY, headerFontQueryParam } from '../moodAxes';
 import { 
   generateHeaderVariables,
@@ -3673,7 +3673,13 @@ img {
     
     // Generate base.css with Charts, Effect, Surfaces, Containers
     console.log('🔨 Generating base.css...');
-    const baseCSS = generateBaseCSS(jsonData);
+    /* The shadow recipes again, on every themed scope, so each one resolves
+       --Dropshadow-Color against its own band rather than :root's
+       (dropshadow.ts, EFFECT_LEVEL_SCOPE_SELECTOR). Appended last, from the
+       recipes base.css itself declares, so it cannot disagree with them. */
+    const baseCore = generateBaseCSS(jsonData);
+    const effectScope = effectLevelScopeFromCSS(baseCore);
+    const baseCSS = effectScope ? `${baseCore}\n\n${effectScope}\n` : baseCore;
     // Validate and clean CSS before adding to output
     const validatedBaseCSS = baseCSS.split('\n').map(line => validateCSSLine(line)).join('\n');
     cssFiles['base.css'] = validatedBaseCSS;
@@ -5595,9 +5601,11 @@ export function generateBaseCSS(jsonData: any): string {
     // The FAB's bevel, from its own width — the values Figma's FAB-Bevel holds.
     for (const [k, v] of Object.entries(fabBevelVars(FAB_SIZE, bevelPercent))) lines.push(`  ${k}: ${v};`);
     // Effect levels — box-shadow recipes. --Dropshadow-Color is overridden
-    // per-theme in Light-Mode.css / Dark-Mode.css; the nested var() resolves
-    // at the consuming element so themed values still apply even though
-    // these are defined statically here.
+    // per-theme in Light-Mode.css / Dark-Mode.css. The nested var() does NOT
+    // resolve at the consuming element: a custom property is substituted
+    // where it is declared, so this :root copy alone gave every element the
+    // root's shadow color. generateCSSFiles appends effectLevelScopeFromCSS
+    // to base.css, re-declaring the winning recipes on every themed scope.
     lines.push(`  --Effect-Level-0: none;`);
     /* One --Dropshadow-Color per surface with per-layer alpha literals, which
        is Comeau's shape. The geometry and the alpha ramp both come from the

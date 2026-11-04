@@ -5537,6 +5537,71 @@ export function exportColorSystemToJSON(
     return null;
   };
 
+  /* --Dropshadow-Color for every theme section, from the background that
+   * section FINALLY paints.
+   *
+   * Two things were wrong when this ran inline in the per-theme pass:
+   *
+   * 1. It took any truthy resolveColorToken result as a hex. That function
+   *    returns the raw `.value` of the node a {Backgrounds.…} token names, and
+   *    the value is often another reference — Backgrounds.Secondary.
+   *    Background-6.Surfaces.Surface holds {Colors.Secondary.Color-6}. The
+   *    shadow math was handed that STRING, parsed it as black, and every
+   *    themed Surface / Surface-Dim / Surface-Bright (and the Neutral theme's
+   *    light Surface levels) shipped --Dropshadow-Color: 8, 8, 8 — a
+   *    near-black shadow on a colored band, while the preview and Figma
+   *    derived the tint from the real background. References are now followed
+   *    until they land on a hex.
+   *
+   * 2. It ran before the dark-mode surface ladder (applyDarkLadder) re-points
+   *    the dark Backgrounds rows, so dark sections took their shadow color
+   *    from the PRE-ladder background — dark Neutral Surface from #cccccc,
+   *    a light grey, under a near-black band. It now runs after every pass
+   *    that rewrites a background.
+   *
+   * One color per section, the same dropshadowBaseHex math the preview and
+   * the Figma Modes use (src/__tests__/dropshadowTint.test.ts). */
+  const hexResolverFor = (mode: 'Light-Mode' | 'Dark-Mode') => {
+    const modeTree = colorSystem.Modes[mode] as any;
+    const resolve = (tokenValue: unknown, depth = 0): string | null => {
+      if (typeof tokenValue !== 'string' || !tokenValue || depth > 12) return null;
+      if (tokenValue.startsWith('#')) return tokenValue;
+      if (!tokenValue.startsWith('{')) return null;
+      const viaColors = resolveColorToken(tokenValue, modeTree?.Colors, modeTree?.Backgrounds);
+      if (viaColors) return resolve(viaColors, depth + 1);
+      let node: any = modeTree;
+      for (const part of tokenValue.replace(/[{}]/g, '').split('.')) {
+        if (!node || typeof node !== 'object') return null;
+        node = node[part];
+      }
+      return resolve(node && typeof node === 'object' ? node.value : node, depth + 1);
+    };
+    return resolve;
+  };
+  const DROPSHADOW_SECTIONS = ['Surfaces', 'Surfaces-Dim', 'Surfaces-Dimmest', 'Surfaces-Bright', 'Surfaces-Brightest', 'Containers'];
+  const assignDropshadowColors = (): number => {
+    let written = 0;
+    for (const mode of modesForSystem) {
+      const themes = (colorSystem.Modes[mode] as any)?.Themes;
+      if (!themes) continue;
+      const toHex = hexResolverFor(mode);
+      for (const theme of Object.values<any>(themes)) {
+        for (const section of DROPSHADOW_SECTIONS) {
+          const sectionData = theme?.[section];
+          if (!sectionData) continue;
+          const bgToken = section === 'Containers'
+            ? sectionData.Container?.value
+            : (sectionData.Surface?.value || sectionData.Background?.value);
+          const hex = toHex(bgToken);
+          if (!hex) continue;
+          sectionData['Dropshadow-Color'] = { value: computeDropshadowRGB(hex), type: 'color' };
+          written++;
+        }
+      }
+    }
+    return written;
+  };
+
   // ── Icons, checked against the surfaces they serve ──
   //
   // Icon.Surfaces.<pal>.Color-N is used by every theme whose surface sits at
@@ -5664,40 +5729,8 @@ export function exportColorSystemToJSON(
       // in the mode-independent Theme layer. See the note at its former call
       // site below.)
 
-      // Helper: resolve any token to hex by following the full chain
-      const resolveToHex = (tokenValue: string): string | null => {
-        if (!tokenValue) return null;
-        if (tokenValue.startsWith('#')) return tokenValue;
-
-        // Try resolveColorToken first
-        let hex = resolveColorToken(tokenValue, colors, backgrounds);
-        if (hex) return hex;
-
-        // Navigate the modeData by token path
-        const path = tokenValue.replace(/[{}]/g, '').split('.');
-        let current: any = (colorSystem.Modes[mode] as any);
-        for (const part of path) {
-          if (!current || typeof current !== 'object') { current = null; break; }
-          current = current[part];
-        }
-        if (current?.value) {
-          if (current.value.startsWith('#')) return current.value;
-          // One more level
-          hex = resolveColorToken(current.value, colors, backgrounds);
-          if (hex) return hex;
-          // Navigate again
-          const innerPath = current.value.replace(/[{}]/g, '').split('.');
-          let inner: any = (colorSystem.Modes[mode] as any);
-          for (const part of innerPath) {
-            if (!inner || typeof inner !== 'object') { inner = null; break; }
-            inner = inner[part];
-          }
-          if (inner?.value && inner.value.startsWith('#')) return inner.value;
-        }
-        return null;
-      };
-
-      // Add Dropshadow-Color and Border-Variant to all sections
+      // Border-Variant for every section. (Dropshadow-Color moved to
+      // assignDropshadowColors, run at the end — see there.)
       /* Surfaces-Brightest belongs in every list that enumerates the surface
          levels. It was added as a level after these were written, and each one
          that missed it left that level short a role — silently, because a
@@ -5706,21 +5739,6 @@ export function exportColorSystemToJSON(
       allThemeSections.forEach(section => {
         const sectionData = theme[section];
         if (!sectionData) return;
-
-        // Find the background token for this section
-        let bgToken: string | null = null;
-        if (section === 'Containers') {
-          bgToken = sectionData.Container?.value;
-        } else {
-          bgToken = sectionData.Surface?.value || sectionData.Background?.value;
-        }
-
-        if (bgToken) {
-          const hex = resolveToHex(bgToken);
-          if (hex) {
-            sectionData['Dropshadow-Color'] = { value: computeDropshadowRGB(hex), type: 'color' };
-          }
-        }
 
         // Border-Variant is deliberately NOT baked here.
         //
@@ -7966,6 +7984,9 @@ export function exportColorSystemToJSON(
       `${ladder.rows} row values, ${ladder.iconOn} Icon-On entries, ${ladder.repointed} Theme references repointed, ` +
       `${ladder.cardRoles} card roles lifted for the tone-4 cards`);
   }
+
+  /* After the ladder: it is the last pass that re-points a background. */
+  console.log(`🌑 [JSON Export] Dropshadow-Color from final backgrounds: ${assignDropshadowColors()} theme sections`);
 
   /* The Default button on every theme section, from the same function the
      preview and the Advanced tone grid use — see utils/cellButtons.ts. Last,

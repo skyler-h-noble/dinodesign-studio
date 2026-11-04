@@ -3055,6 +3055,59 @@ const FIGMA_LG_BUTTON_PADDING = 16;
     return missing;
   };
 
+  /* Shadow color for a section whose dark background is not the one its
+   * Dropshadow-Color alias was keyed for.
+   *
+   * The Theme layer aliases a section's shadow to Dropshadow-Color.<pal>.<N>,
+   * picked from its LIGHT background, and that cell's dark value is the dark
+   * ladder's ground for <N>. Since the dark-mode bands (cssgen/darkBandPass.ts)
+   * the Primary / Secondary / Tertiary themes paint their own lighter tones in
+   * dark mode, so a band painting #888f69 took the shadow of the ladder's
+   * near-black ground (19, 22, 11) — and a Containers group carries one light
+   * literal in both modes. The CSS derives each section's shadow from what it
+   * finally paints (exportColorSystem, assignDropshadowColors); wherever the
+   * Figma alias resolves to anything else in either mode, the section gets a
+   * Band entry holding the CSS value per mode, so the two agree by
+   * construction. Only those sections — every other alias already matches. */
+  {
+    const triplet = (v: unknown): string | null => {
+      if (typeof v !== 'string') return null;
+      if (v.startsWith('#')) return v.slice(0, 7).toLowerCase();
+      const m = v.match(/^\s*(\d+),\s*(\d+),\s*(\d+)\s*$/);
+      return m ? '#' + m.slice(1, 4).map((x) => Number(x).toString(16).padStart(2, '0')).join('') : null;
+    };
+    const figmaDs = (mode: string, value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      if (value.startsWith('#')) return triplet(value);
+      const m = value.match(/^\{Dropshadow-Color\.([\w-]+)\.(Color-[\w-]+)\}$/);
+      return m ? triplet(figma.Modes?.[mode]?.['Dropshadow-Color']?.[m[1]]?.[m[2]]?.value) : null;
+    };
+    const lightSection: any = figma.Modes?.['Light-Mode'];
+    let bandShadows = 0;
+    for (const [themeName, figmaTheme] of Object.entries<any>(figma.Themes ?? {})) {
+      for (const internalKey of SURFACE_GROUPS_INTERNAL) {
+        const target = figmaTheme?.[SURFACE_GROUP_NAMES[internalKey]];
+        const current = target?.['Dropshadow-Color']?.value;
+        if (!target || typeof current !== 'string') continue;
+        const want = {
+          light: triplet(designSystemJSON.Modes?.['Light-Mode']?.Themes?.[themeName]?.[internalKey]?.['Dropshadow-Color']?.value),
+          dark: triplet(designSystemJSON.Modes?.['Dark-Mode']?.Themes?.[themeName]?.[internalKey]?.['Dropshadow-Color']?.value),
+        };
+        if (!want.light || !want.dark || !lightSection || !figma.Modes?.['Dark-Mode']) continue;
+        const have = { light: figmaDs('Light-Mode', current), dark: figmaDs('Dark-Mode', current) };
+        // A reference this cannot read (Default-Background, a Band entry) is left alone.
+        if (!have.light || !have.dark) continue;
+        if (have.light === want.light && have.dark === want.dark) continue;
+        const name = `Dropshadow-${themeName}-${SURFACE_GROUP_NAMES[internalKey]}`;
+        (lightSection[BAND_GROUP] ??= {})[name] = { value: want.light, type: 'color' };
+        pendingBandDark[name] = want.dark;
+        target['Dropshadow-Color'] = { value: `{${BAND_GROUP}.${name}}`, type: 'color' };
+        bandShadows++;
+      }
+    }
+    if (bandShadows) console.log(`🌑 [Figma] ${bandShadows} section shadow colors moved to ${BAND_GROUP} entries (dark background differs from the alias)`);
+  }
+
   const unresolvedBefore = countUnresolved();
 
   if (Object.keys(pendingBandDark).length && figma.Modes?.['Dark-Mode']) {

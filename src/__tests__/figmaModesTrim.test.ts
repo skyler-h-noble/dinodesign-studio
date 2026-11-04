@@ -198,7 +198,15 @@ describe('Figma Modes trim', () => {
        +132 / +117); the worst case is a brand whose light Surfaces sit on
        tone 8+ (Surf's published Primary is tone 9), measured below:
        4,719 on a white page. ~280 of room to the hard limit remain. It is
-       measured on a white and a black page too, which carry the most. */
+       measured on a white and a black page too, which carry the most.
+       +23 for section shadow colors (generateFigmaJSON, "Shadow color for a
+       section whose dark background is not the one its alias was keyed
+       for"): one Band entry per band section (3 themes x 6) whose dark
+       background is the band's own tone rather than the ladder ground its
+       Dropshadow-Color alias reads, and one per non-band Containers group,
+       whose single literal was the light value in both modes. Measured: this
+       brand 4,598 / 4,598 / 4,555, Surf 4,788 — 12 under this guard, ~210
+       under Figma's 5,000. */
     expect(n).toBeLessThan(4800);
     for (const background of ['white', 'black']) {
       const other = (buildAll(makeScheme(BRANDS[0]), { background, button: 'primary', cardColoring: background === 'black' ? 'black' : 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;

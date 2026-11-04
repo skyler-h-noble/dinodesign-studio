@@ -541,7 +541,10 @@ export function libRadiusOverrideCSS(): string {
    already-resolved string. Every card would have taken the ROOT's shadow
    color rather than its own surface's. The lib avoids this by inlining the
    rgba in JS so the var() lands on the consuming element — see
-   DinoDesign/src/components/_shadows.js. */
+   DinoDesign/src/components/_shadows.js.
+   (Later the lib went token-first, var(--Effect-Level-N, literal), and hit
+   exactly this: every card took the root's color. effectLevelScopeCSS is the
+   fix — the recipes are re-declared on every themed scope.) */
 
 /** Map the studio's persisted `_componentStyle` record onto ShadowOptions.
  *
@@ -580,6 +583,56 @@ export function effectLevelRecipe(level: ShadowLevel, o?: ShadowOptions, rgb = '
     .map(([x, y, blur, spread], i) =>
       `${x}px ${y}px ${blur}px ${spread}px rgba(${rgb}, ${quantizeAlpha(alphas[i])})`)
     .join(', ');
+}
+
+/** Where the tinted recipes are declared AGAIN, beyond :root.
+ *
+ *  A custom property's var() is substituted on the element that DECLARES it.
+ *  Declared only at :root, `--Effect-Level-N: … rgba(var(--Dropshadow-Color), a)`
+ *  resolved --Dropshadow-Color against the ROOT, and every descendant inherited
+ *  that finished string — so every card, menu and app bar on the page cast the
+ *  root's shadow color whatever band it sat in. A Card inside
+ *  `<Section theme="Secondary">` painted rgba(133, 133, 133, …), the Default
+ *  page's grey, in light mode and the page's near-black in dark mode.
+ *
+ *  Re-declaring the same text on every element that can change
+ *  --Dropshadow-Color makes each themed scope re-substitute it, so an element
+ *  inherits the recipe already resolved against its nearest band: a card shell
+ *  (which carries no data-* of its own) takes its Section's tint. Every scope
+ *  that sets --Dropshadow-Color does so on a [data-theme][data-surface]
+ *  selector, so these two attributes are exactly the set that needs it.
+ *
+ *  The -Neutral twins are literal black and need no re-declaration. */
+export const EFFECT_LEVEL_SCOPE_SELECTOR = '[data-theme], [data-surface]';
+
+/** The re-declaration block for a given set of recipes, level -> value. */
+export function effectLevelScopeBlock(recipes: Partial<Record<ShadowLevel, string>>): string {
+  return [
+    `${EFFECT_LEVEL_SCOPE_SELECTOR} {`,
+    ...SHADOW_LEVELS.filter((l) => recipes[l]).map((l) => `  --Effect-Level-${l}: ${recipes[l]};`),
+    '}',
+  ].join('\n');
+}
+
+/** The re-declaration block for the user's Shadow controls. The preview emits
+ *  this; the CSS export re-declares whatever its own :root blocks finally
+ *  declare (effectLevelScopeFromCSS), which is the same text whenever the
+ *  controls reach both (invariant 5). */
+export function effectLevelScopeCSS(o?: ShadowOptions): string {
+  return effectLevelScopeBlock(Object.fromEntries(SHADOW_LEVELS.map((l) => [l, effectLevelRecipe(l, o)])));
+}
+
+/** The re-declaration block for a stylesheet: the LAST --Effect-Level-1..5 it
+ *  declares (the one that wins at :root), copied verbatim. base.css can carry
+ *  two :root copies — the Effects section and the Shadow-controls block — and
+ *  the scoped copy has to match whichever the cascade picks. Empty when the
+ *  sheet declares none. */
+export function effectLevelScopeFromCSS(css: string): string {
+  const recipes: Partial<Record<ShadowLevel, string>> = {};
+  for (const m of css.matchAll(/--Effect-Level-([1-5]):\s*([^;]+);/g)) {
+    if (m[2].includes('var(--Dropshadow-Color')) recipes[Number(m[1]) as ShadowLevel] = m[2].trim();
+  }
+  return Object.keys(recipes).length ? effectLevelScopeBlock(recipes) : '';
 }
 
 /** The same level in NEUTRAL black — for a panel over a scrim (modal, dialog,
