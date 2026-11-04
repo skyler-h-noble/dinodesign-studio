@@ -7,7 +7,7 @@ import { nearestAvailableWeight } from '../googleFontWeights';
 import { altStop2Palette } from '../altDisplay';
 import { variantHex8, ICON_VARIANT_ALPHA } from '../variantAlpha';
 import { dropshadowBaseHex, effectLevelRecipe } from '../dropshadow';
-import { HEADER_FAMILY } from '../moodAxes';
+import { HEADER_FAMILY, roundHeaderWeight } from '../moodAxes';
 import type { TypographyStyle } from '../../types';
 import chroma from 'chroma-js';
 import { 
@@ -3854,7 +3854,8 @@ export function exportColorSystemToJSON(
     // nothing downloads and the browser substitutes — silently, with every
     // token still reading correctly. Clamping here means the emitted token and
     // the @import can never disagree about which weight was requested.
-    'Set-Header-Font-Weight': { value: String(typography?.header?.axes?.wght ?? typography?.header?.weight ?? '600'), type: 'string' },
+    // A standard weight — see roundHeaderWeight (moodAxes.ts).
+    'Set-Header-Font-Weight': { value: String(roundHeaderWeight(Number(typography?.header?.axes?.wght ?? typography?.header?.weight ?? 600))), type: 'string' },
     'Set-Decorative-Font-Weight': {
       value: String(nearestAvailableWeight(decorativeFamily, typography?.decorative?.weight || '600') ?? (typography?.decorative?.weight || '600')),
       type: 'string',

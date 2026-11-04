@@ -35,9 +35,10 @@ describe('mood → Google Sans Flex axes', () => {
 
   it('still sets the header AGAINST a heavy display', () => {
     // The opposition rule must survive the mapping — a heavy Display pins the
-    // header thin regardless of which mood it came from.
+    // header thin regardless of which mood it came from. Weights publish as a
+    // standard weight (roundHeaderWeight), so the 280 cap lands on 300.
     const heavy = moodToAxes('whimsical_playful', { displayWeight: 'heavy' } as any);
-    expect(heavy.wght).toBeLessThanOrEqual(280);
+    expect(heavy.wght).toBeLessThanOrEqual(300);
   });
 
   it('unknown moods still resolve rather than throw', () => {

@@ -165,6 +165,19 @@ export interface AxisOptions {
 
 const clamp = (v: number, a: AxisSpec) => Math.round(Math.max(a.min, Math.min(a.max, v)));
 
+/* The Header's weight is a STANDARD weight: 100, 200 ... 900. Google serves a
+   standard weight as a static instance and anything in between (640) — or any
+   range — as the variable file. Measured 2026-11-04 on Cocktails' latin file:
+   wght 600 = 61 KB, wght 640 = 136 KB; grade, width and the other spans did
+   not change either number. Rounding moves a heading at most 50 units, which
+   is ~75 KB off every page. Applied wherever the weight is produced (mood
+   axes, resolveRoles, the exported Set-Header-Font-Weight, the slider) so the
+   preview, the CSS and Figma cannot disagree. */
+export function roundHeaderWeight(w: number): number {
+  if (!Number.isFinite(w)) return 400;
+  return Math.min(900, Math.max(100, Math.round(w / 100) * 100));
+}
+
 /**
  * Header axes for a mood, set against the Display.
  *
@@ -232,6 +245,7 @@ export function moodToAxes(mood = 'Modern', opts: AxisOptions = {}): AxisValues 
 
   const out: AxisValues = {};
   for (const k of Object.keys(AXES)) out[k] = clamp(base[k] ?? AXES[k].def, AXES[k]);
+  out.wght = roundHeaderWeight(out.wght);
   return out;
 }
 
@@ -318,11 +332,18 @@ export function headerFontQueryParam(): string {
    disagree with the values the page uses. An axis the CSS does not pin keeps
    its full range.
 
-   Every axis but optical size spans back to its default, and weights always
-   cover 400..700. None of it costs bytes — Google ships those axes either way
-   (measured 2026-11-03: Surf 189 KB, Popsicle 282 KB, Cocktails 132 KB, with
-   or without the spans); optical size is the axis that weighs (Surf 549 KB
-   with it open). What the spans buy:
+   Every axis but optical size and weight spans back to its default. Those
+   spans cost no bytes — Google ships grade, roundness, slant and width either
+   way. Optical size and WEIGHT are the axes that weigh: an open weight range
+   is a variable weight axis, a single weight is a static instance (measured
+   2026-11-04, Cocktails' latin file: wght 400..700 = 136 KB, wght 600 = 61 KB;
+   the grade/width spans did not change either number). So weight is pinned
+   to the weights the header styles use, a range only when they use several.
+   An earlier version kept 400..700 so body-weight text set in the header
+   family by a consumer kept its weight; that cost 75 KB on every page for
+   text the system never asks for. Such text now draws at the nearest header
+   weight — give it the system's header weight, or load the face yourself.
+   What the remaining spans buy:
    - Slant and width are what the browser MATCHES a face on (font-style,
      font-stretch). Pinned at slant -9 the face is `oblique 9deg`, and pinned
      at width 106 it is `font-stretch: 106%`; text that sets neither asks for
@@ -331,8 +352,6 @@ export function headerFontQueryParam(): string {
      the default keeps each face a match for plain text.
    - Grade and roundness bring text that takes the header family without the
      header's settings closer to the studio preview, which loads every axis.
-   - Weights: body-weight text in the header family is not clamped to the
-     nearest header weight.
    Header text, which carries the system's own settings, draws the same as the
    full font either way (within 0.2px, Chrome). */
 const AXIS_TOKEN: Record<string, string> = {
@@ -347,9 +366,9 @@ export function pinnedHeaderFontQueryParam(typographyCSS: string): string {
       const w = num(/--(?:Font-Weight-Header|Header-Clamped-Weight|Set-Font-Family-Header-Weight|(?:H[1-6]|Header|Display)[A-Za-z0-9-]*-Font-Weight):\s*(\d+)\s*;/g)
         .filter((n) => n >= AXES.wght.min && n <= AXES.wght.max);
       if (!w.length) return `${AXES.wght.min}..${AXES.wght.max}`;
-      const lo = Math.max(AXES.wght.min, Math.min(...w, 400));
-      const hi = Math.min(AXES.wght.max, Math.max(...w, 700));
-      return `${lo}..${hi}`;
+      const lo = Math.min(...w);
+      const hi = Math.max(...w);
+      return lo === hi ? String(lo) : `${lo}..${hi}`;
     }
     const pinned = new Set(num(new RegExp(`--${AXIS_TOKEN[t]}:\\s*(-?[\\d.]+)\\s*;`, 'g')));
     if (pinned.size === 1) {

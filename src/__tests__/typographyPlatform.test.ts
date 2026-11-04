@@ -282,8 +282,9 @@ describe('the Devices-Type source', () => {
     const weight = (k: string) => resolved(D, sourceName('Omni', groupedProp(k, 'Font-Weight')));
 
     expect(weight('Display-Large')).toBe(800);   // the Decorative pick
-    expect(weight('H1')).toBe(250);              // the Header pick
-    expect(weight('H3')).toBe(250);
+    // The Header pick, as a standard weight (roundHeaderWeight: 250 -> 300).
+    expect(weight('H1')).toBe(300);
+    expect(weight('H3')).toBe(300);
     expect(weight('Body-Medium')).toBe(300);
 
     /* H4-H6 are the user's header weight too, with a FLOOR of 500. Only ever
@@ -419,7 +420,7 @@ describe('the Devices-Type source', () => {
     const raw = (k: string) => D[sourceName('Omni', groupedProp(k, 'Font-Weight'))].value;
 
     expect(D[weightRootName('Omni', 'Display')].value).toBe(800);
-    expect(D[weightRootName('Omni', 'Headers')].value).toBe(250);
+    expect(D[weightRootName('Omni', 'Headers')].value).toBe(300);   // 250 rounded
     expect(D[weightRootName('Omni', 'Body')].value).toBe(300);
 
     /* The Display root is still published — a designer may want to move the

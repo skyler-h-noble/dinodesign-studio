@@ -12,7 +12,7 @@
 
 import { Body, Caption, Card, Checkbox, Button, Link, VStack, HStack, Slider, Divider } from '@omni-design/components';
 import { weightsFor, nearestAvailableWeight } from '../../utils/googleFontWeights';
-import { AXES, HEADER_FAMILY, type AxisValues } from '../../utils/moodAxes';
+import { AXES, HEADER_FAMILY, roundHeaderWeight, type AxisValues } from '../../utils/moodAxes';
 import type { FontMatchState } from '../../hooks/useFontMatch';
 import type { FontScore } from '../../utils/fontMatch';
 import { FontChip } from './FontChip';
@@ -141,7 +141,7 @@ function roleCss(role: 'Display' | 'Header' | 'Eyebrow' | 'Body', sys: TypeSyste
     return {
       fontFamily: `"${HEADER_FAMILY}", sans-serif`,
       fontVariationSettings: axesToCss(sys.header.axes),
-      fontWeight: sys.header.axes.wght,
+      fontWeight: roundHeaderWeight(sys.header.axes.wght),
       fontSize,
       lineHeight: 1.2,
       letterSpacing: sys.header.letterSpacing,
@@ -391,7 +391,7 @@ function HeaderPresets({
                 preview={<span style={{
                   fontFamily: `"${HEADER_FAMILY}", sans-serif`,
                   fontVariationSettings: axesToCss(p.axes),
-                  fontWeight: p.axes.wght,
+                  fontWeight: roundHeaderWeight(p.axes.wght),
                 }}>Ag</span>}
                 label={p.label}
                 selected={axesToCss(p.axes) === currentCss}
@@ -711,16 +711,23 @@ export function RolePanels(p: RolePanelsProps) {
                           against your Display instead of swapping it for another font.
                         </Caption>
                       )}
-                      {p.advanced && Object.entries(AXES).map(([tag, spec]) => (
-                        <RangeField
-                          key={tag}
-                          label={`${spec.label} (${s.header.axes[tag]})`}
-                          value={s.header.axes[tag]}
-                          min={spec.min}
-                          max={spec.max}
-                          onChange={(v) => p.onHeaderAxis(tag, v)}
-                        />
-                      ))}
+                      {p.advanced && Object.entries(AXES).map(([tag, spec]) => {
+                        // Weight lands on standard weights only (roundHeaderWeight):
+                        // what the slider shows is what gets published.
+                        const isWeight = tag === 'wght';
+                        const value = isWeight ? roundHeaderWeight(s.header.axes[tag]) : s.header.axes[tag];
+                        return (
+                          <RangeField
+                            key={tag}
+                            label={`${spec.label} (${value})`}
+                            value={value}
+                            min={isWeight ? 100 : spec.min}
+                            max={isWeight ? 900 : spec.max}
+                            step={isWeight ? 100 : 1}
+                            onChange={(v) => p.onHeaderAxis(tag, isWeight ? roundHeaderWeight(v) : v)}
+                          />
+                        );
+                      })}
                       {/* Letter spacing is not an axis, so it sits outside the
                           axis loop and stays available without opening Advanced
                           — you reach for it while setting a headline. */}

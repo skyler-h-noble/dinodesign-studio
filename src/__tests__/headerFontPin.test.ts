@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { headerFontQueryParam, pinnedHeaderFontQueryParam, pinHeaderFontImport } from '../utils/moodAxes';
 
 // A published system pins its axes, so it should request only those values —
-// the full-range face is ~1 MB, the pinned one ~130 KB.
+// the full-range face is ~1 MB; Cocktails' pinned latin file is 61 KB at one
+// weight, 136 KB with a 400..700 weight range.
 // Measured against the full font in Chrome (2026-11-03): header text with the
 // system's settings draws within 0.2px either way.
 const typography = `:root {
@@ -22,14 +23,21 @@ describe('pinned header font request', () => {
     // GRAD 50 -> 0..50, wdth 72 -> 72..100, ROND 0 is the default so stays 0;
     // opsz is not set above, so it keeps 6..144.
     expect(pinnedHeaderFontQueryParam(typography))
-      .toBe('family=Google+Sans+Flex:GRAD,ROND,opsz,slnt,wdth,wght@0..50,0,6..144,0,72..100,400..900');
+      .toBe('family=Google+Sans+Flex:GRAD,ROND,opsz,slnt,wdth,wght@0..50,0,6..144,0,72..100,600..900');
   });
 
-  it('weights always cover 400..700, widened to the header styles', () => {
-    const narrow = typography.replace('--H1-Font-Weight: 900;', '').replace('--H4-Font-Weight: 600;', '');
-    expect(pinnedHeaderFontQueryParam(narrow)).toMatch(/,400\.\.700$/);
-    const light = narrow.replace('--Font-Weight-Header: 640;', '--Font-Weight-Header: 261;');
-    expect(pinnedHeaderFontQueryParam(light)).toMatch(/,261\.\.700$/);
+  // Weight is an axis that costs bytes: request only the header weights. A
+  // range only when the header styles use several; never a 400..700 floor.
+  it('weight is the header styles\' weights only — one value when there is one', () => {
+    const one = typography.replace('--H1-Font-Weight: 900;', '').replace('--H4-Font-Weight: 600;', '');
+    expect(pinnedHeaderFontQueryParam(one)).toMatch(/,640$/);
+    const light = one.replace(/640/g, '261');
+    expect(pinnedHeaderFontQueryParam(light)).toMatch(/,261$/);
+    expect(pinnedHeaderFontQueryParam(typography)).toMatch(/,600\.\.900$/);
+  });
+
+  it('body weights are not part of the request', () => {
+    expect(pinnedHeaderFontQueryParam(typography)).not.toMatch(/400/);
   });
 
   // Pinned at -9, Google serves the face as `font-style: oblique 9deg`, which
@@ -52,7 +60,7 @@ describe('pinned header font request', () => {
   it('swaps the full-range import in a stylesheet', () => {
     const css = `@import url('https://fonts.googleapis.com/css2?${headerFontQueryParam()}&display=swap');\n:root{}`;
     const out = pinHeaderFontImport(css, typography);
-    expect(out).toContain('wght@0..50,0,6..144,0,72..100,400..900');
+    expect(out).toContain('wght@0..50,0,6..144,0,72..100,600..900');
     expect(out).not.toContain(headerFontQueryParam());
   });
 });

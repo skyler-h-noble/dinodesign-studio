@@ -28,7 +28,7 @@
 // untouched. Only the values and the generation logic come from omni.
 
 import type { TypographyStyle } from '../types';
-import { HEADER_FAMILY, moodToAxes } from './moodAxes';
+import { HEADER_FAMILY, moodToAxes, roundHeaderWeight } from './moodAxes';
 import { altDisplayWeight } from './altDisplay';
 import { weightsFor } from './googleFontWeights';
 
@@ -575,14 +575,17 @@ export function resolveRoles(styles: TypographyStyle[] | undefined | null): Reso
   // got computed) still resolves: it falls back to the neutral Modern setting.
   header.family = HEADER_FAMILY;
   if (header.axes) {
-    // Weight is the wght axis, so the two can never disagree.
-    header.weight = header.axes.wght ?? header.weight;
+    // Weight is the wght axis, so the two can never disagree. A standard
+    // weight (roundHeaderWeight): a design saved at 640 publishes at 600.
+    header.weight = roundHeaderWeight(header.axes.wght ?? header.weight);
+    header.axes = { ...header.axes, wght: header.weight };
   } else {
     // No axes recorded — the Figma payload rebuilds roles from tokens.json,
     // which carries a weight but not the axis set. Synthesise the neutral
     // setting for the variation string, but seed wght from the weight the
     // design actually states: overwriting it with Modern's 520 shipped every
     // header at the default weight instead of the one on the slider.
+    header.weight = roundHeaderWeight(header.weight);
     header.axes = { ...moodToAxes('Modern'), wght: header.weight };
   }
 
