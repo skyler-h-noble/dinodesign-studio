@@ -998,6 +998,10 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
   for (const file of uploadFiles) {
     if (file.type === 'text/css') file.content = pinHeaderFontImport(file.content, typographyTokensCSS);
   }
+  // Font @imports in foundation.css only, and listed in theme.json for the
+  // Provider to request up front (fontImports.ts).
+  const { consolidateFontImports } = await import('./fontImports');
+  consolidateFontImports(uploadFiles);
   for (const file of uploadFiles) {
     try {
       await uploadDesignSystemFile(uuid, file.name, file.content, file.type);
