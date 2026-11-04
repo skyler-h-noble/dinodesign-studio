@@ -4,6 +4,9 @@
 // localStorage — acceptable for the admin-only dev tool, NOT for end-user
 // distribution. Phase 2 moves this call to a Cloud Function.
 
+import { compileFigmaFrame, type CompileReport, type CompileResult } from './aaid/compile';
+import { IRIndex, type IRNode } from './aaid/ir';
+
 /** Lib catalog + conversion rules. This is the "AAID" document referenced
  *  in the patent (claims 62–72) — keep it in sync with CLAUDE.md. */
 const LIB_CATALOG = `
@@ -1332,7 +1335,15 @@ export async function convertFigmaToCode(
   // attached. Helps the AAID produce brand-appropriate code (e.g. choosing
   // a DisplayLarge vs DisplaySmall variant when the header font is a
   // script/handwritten face).
-  const brandBlock = brand
+  const brandBlock = brandBlockFor(brand);
+
+  const userMessage = fullUserMessage(frameJson, variables, brandBlock);
+  const { jsx, missingComponents, rawResponse } = await callAnthropic(SYSTEM_PROMPT, userMessage, anthropicApiKey);
+  return { jsx, missingComponents, rawResponse, notes };
+}
+
+function brandBlockFor(brand?: BrandMeta): string {
+  return brand
     ? `BRAND CONTEXT (from Design ID):
 - Design system name: ${brand.designSystemName ?? '(unset)'}
 - Header font family: ${brand.headerFontFamily ?? '(unset)'}
@@ -1343,15 +1354,20 @@ Generated code references universal token names; their values resolve at runtime
 
 `
     : '';
+}
 
-  const userMessage = `Convert this Figma frame to a OmniDesign component file:
+function fullUserMessage(frameJson: unknown, variables: Record<string, unknown>, brandBlock: string): string {
+  return `Convert this Figma frame to a OmniDesign component file:
 
 ${brandBlock}VARIABLES:
 ${JSON.stringify(variables, null, 2)}
 
 FRAME:
 ${JSON.stringify(frameJson, null, 2)}`;
+}
 
+/** One Messages API call; returns the file with fences stripped. */
+async function callAnthropic(system: string, userMessage: string, anthropicApiKey: string): Promise<Omit<ConvertResult, 'notes'>> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1363,7 +1379,7 @@ ${JSON.stringify(frameJson, null, 2)}`;
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
-      system: SYSTEM_PROMPT,
+      system,
       messages: [{ role: 'user', content: userMessage }],
     }),
   });
@@ -1417,5 +1433,151 @@ ${JSON.stringify(frameJson, null, 2)}`;
     if (!missingComponents.includes(m[1])) missingComponents.push(m[1]);
   }
 
-  return { jsx, missingComponents, rawResponse: text, notes };
+  return { jsx, missingComponents, rawResponse: text };
+}
+
+// ── The deterministic option ────────────────────────────────────────────────
+//
+// compileFigmaFrame (src/utils/aaid/) maps everything the rules above state as
+// a table — modes, variants, layout, typography, list rows — with no model at
+// all, and marks whatever it cannot map as {/* FALLBACK: … */}. The hybrid
+// converter below sends a model ONLY those nodes, with the compiled file as
+// context, instead of the whole frame plus the full rule document. When the
+// compiler covers everything, no call is made.
+
+/** The system prompt for the fallback-only call: the constraints that still
+ *  matter for a handful of nodes, not the ~1,000-line rule document. */
+export const FALLBACK_SYSTEM_PROMPT = `You finish a React component file for the OmniDesign component system. A deterministic compiler already converted a Figma frame; its output is correct everywhere EXCEPT at {/* FALLBACK: <reason> · node <id> · <name> */} markers (or a prop written as null /* FALLBACK … */).
+
+Replace each marker with JSX for the Figma node described below it, and change nothing else in the file.
+
+RULES
+- Only components exported by @omni-design/components; icons only as default imports from @omni-design/icons/<Name>. Add any new import you use.
+- Never inline color, background, border, radius or box-shadow. Backgrounds come from data-theme + data-surface (or Box theme / surface / elevation props); text color from the typography color prop.
+- Spacing only as var(--Sizing-*) when the px matches a token exactly; otherwise the literal px.
+- Never invent text: every string comes from the node data. Never invent token names.
+- scope "self" means only that node's own arrangement is unresolved — its children are already compiled in the file below the marker; wrap or reorder them, do not rewrite them.
+- A component the lib lacks: a // MISSING-LIB-COMPONENT: <Name> comment block, then a minimal lib-only placeholder.
+- An accessible name you inferred: a // DERIVED-ARIA-LABEL: "<label>" on <Component> — <why> line at the top.
+${TOKEN_CATALOG}
+Output ONLY the complete file — no commentary, no markdown fences.`;
+
+function findIR(root: IRNode, id: string): IRNode | undefined {
+  if (root.id === id) return root;
+  for (const c of root.children ?? []) {
+    const hit = findIR(c, id);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** A node for the prompt: its IR, with a 'self' fallback's children reduced
+ *  to names (they are compiled already and sit in the code). */
+function promptNode(n: IRNode, selfOnly: boolean): unknown {
+  if (!selfOnly) return n;
+  const { children, ...rest } = n;
+  return { ...rest, children: (children ?? []).map((c) => ({ id: c.id, name: c.name, type: c.type, box: c.box, at: c.at })) };
+}
+
+/**
+ * The minimal prompt for a compiled frame: only its FALLBACK nodes, plus the
+ * compiled file as context. null when there is nothing left for a model to do.
+ */
+export function buildFallbackPrompt(result: CompileResult): { system: string; user: string } | null {
+  const { fallbacks } = result.report;
+  if (!fallbacks.length) return null;
+  const index = new IRIndex(result.ir.root);
+  const seen = new Set<string>();
+  const nodes: unknown[] = [];
+  for (const f of fallbacks) {
+    if (seen.has(f.id)) continue;
+    seen.add(f.id);
+    const n = findIR(result.ir.root, f.id);
+    if (!n) continue;
+    const inherited: Record<string, string> = {};
+    for (const c of ['Theme', 'Surface', 'Buttons', 'Component-Size', 'Icons & Avatars']) {
+      const m = index.mode(n, c);
+      if (m && !n.modes?.[c]) inherited[c] = m;
+    }
+    const reasons = fallbacks.filter((x) => x.id === f.id).map((x) => x.reason);
+    const entry: Record<string, unknown> = { id: f.id, name: f.name, reasons };
+    if (f.scope) entry.scope = f.scope;
+    if (Object.keys(inherited).length) entry.inheritedModes = inherited;
+    entry.node = promptNode(n, f.scope === 'self');
+    nodes.push(entry);
+  }
+  const user = `COMPILED FILE (replace only the FALLBACK markers):
+${result.code}
+FALLBACK NODES (${nodes.length}):
+${JSON.stringify(nodes)}`;
+  return { system: FALLBACK_SYSTEM_PROMPT, user };
+}
+
+/** Rough token count — the ~4 characters per token rule of thumb. */
+export function approxTokens(chars: number): number {
+  return Math.ceil(chars / 4);
+}
+
+export interface PromptSizeComparison {
+  /** convertFigmaToCode's prompt: the full rule document + the whole frame. */
+  full: { chars: number; tokens: number };
+  /** The hybrid's prompt: fallback nodes + compiled code, or zero when none. */
+  fallbackOnly: { chars: number; tokens: number };
+  /** 1 - fallbackOnly / full. */
+  saving: number;
+  report: CompileReport;
+}
+
+/**
+ * The token-saving metric: the prompt convertFigmaToCode WOULD send for this
+ * frame, against the one convertFigmaToCodeHybrid sends. Pure — no network,
+ * and the caller's frame is not mutated.
+ */
+export function comparePromptSizes(frameJson: unknown, variables: Record<string, unknown> = {}, brand?: BrandMeta): PromptSizeComparison {
+  const result = compileFigmaFrame(frameJson);
+  /* Exactly what convertFigmaToCode does to the frame before sending it. */
+  const sent = JSON.parse(JSON.stringify(frameJson ?? null));
+  attachAaidNotes(sent);
+  pruneHiddenNodes(sent);
+  const fullChars = SYSTEM_PROMPT.length + fullUserMessage(sent, variables, brandBlockFor(brand)).length;
+  const fb = buildFallbackPrompt(result);
+  const fbChars = fb ? fb.system.length + fb.user.length : 0;
+  return {
+    full: { chars: fullChars, tokens: approxTokens(fullChars) },
+    fallbackOnly: { chars: fbChars, tokens: approxTokens(fbChars) },
+    saving: fullChars ? Math.round((1 - fbChars / fullChars) * 10000) / 10000 : 0,
+    report: result.report,
+  };
+}
+
+export interface HybridConvertResult extends ConvertResult {
+  /** 'compiled' = no model call was made; 'hybrid' = a fallback-only call. */
+  mode: 'compiled' | 'hybrid';
+  compiled: CompileReport;
+}
+
+/**
+ * Deterministic first, model only for what is left. Same signature as
+ * convertFigmaToCode so the workbench can offer it as an option.
+ */
+export async function convertFigmaToCodeHybrid(
+  frameJson: unknown,
+  _variables: Record<string, unknown>,
+  anthropicApiKey: string,
+  _brand?: BrandMeta,
+): Promise<HybridConvertResult> {
+  const result = compileFigmaFrame(frameJson);
+  const notes = summariseAaid(liftedCopy(frameJson), { nodes: 0, withNote: 0, modes: {} });
+  const prompt = buildFallbackPrompt(result);
+  if (!prompt) {
+    return { jsx: result.code, missingComponents: [], rawResponse: '', notes, mode: 'compiled', compiled: result.report };
+  }
+  const out = await callAnthropic(prompt.system, prompt.user, anthropicApiKey);
+  return { ...out, notes, mode: 'hybrid', compiled: result.report };
+}
+
+function liftedCopy(frameJson: unknown): any {
+  const copy = JSON.parse(JSON.stringify(frameJson ?? null));
+  attachAaidNotes(copy);
+  return copy;
 }
