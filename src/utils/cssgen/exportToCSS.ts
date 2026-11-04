@@ -2068,23 +2068,23 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
            element marked data-surface="Surface" INSIDE a themed section fell
            through to the bare Default rule and painted the page's Surface —
            every theme's nested Surface was the same page color. */
-        selector: `${bare(null)}${bare('Surface')}[data-theme="${themeName}"],\n[data-theme="${themeName}"] [data-surface="Surface"],\n[data-theme="${themeName}"][data-surface="Surface"]`
+        selector: `${bare(null)}${bare('Surface')}[data-theme="${themeName}"],\n[data-theme="${themeName}"] [data-surface="Surface"]:not([data-theme]),\n[data-theme="${themeName}"][data-surface="Surface"]`
       },
       {
         key: 'Surfaces-Dim',
-        selector: `${bare('Surface-Dim')}[data-theme="${themeName}"] [data-surface="Surface-Dim"],\n[data-theme="${themeName}"][data-surface="Surface-Dim"]`
+        selector: `${bare('Surface-Dim')}[data-theme="${themeName}"] [data-surface="Surface-Dim"]:not([data-theme]),\n[data-theme="${themeName}"][data-surface="Surface-Dim"]`
       },
       {
         key: 'Surfaces-Dimmest',
-        selector: `${bare('Surface-Dimmest')}[data-theme="${themeName}"] [data-surface="Surface-Dimmest"],\n[data-theme="${themeName}"][data-surface="Surface-Dimmest"]`
+        selector: `${bare('Surface-Dimmest')}[data-theme="${themeName}"] [data-surface="Surface-Dimmest"]:not([data-theme]),\n[data-theme="${themeName}"][data-surface="Surface-Dimmest"]`
       },
       {
         key: 'Surfaces-Bright',
-        selector: `${bare('Surface-Bright')}[data-theme="${themeName}"] [data-surface="Surface-Bright"],\n[data-theme="${themeName}"][data-surface="Surface-Bright"]`
+        selector: `${bare('Surface-Bright')}[data-theme="${themeName}"] [data-surface="Surface-Bright"]:not([data-theme]),\n[data-theme="${themeName}"][data-surface="Surface-Bright"]`
       },
       {
         key: 'Surfaces-Brightest',
-        selector: `${bare('Surface-Brightest')}[data-theme="${themeName}"] [data-surface="Surface-Brightest"],\n[data-theme="${themeName}"][data-surface="Surface-Brightest"]`
+        selector: `${bare('Surface-Brightest')}[data-theme="${themeName}"] [data-surface="Surface-Brightest"]:not([data-theme]),\n[data-theme="${themeName}"][data-surface="Surface-Brightest"]`
       }
     ];
 
@@ -2169,7 +2169,12 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
          which is solved for the tone-3 page and not for the card.
          (0,1,0), so any real theme above still wins. */
       if (isDefaultTheme && isDarkSheet) containerLines.push('[data-surface^="Container"],');
-      containerLines.push(`[data-theme="${themeName}"] [data-surface^="Container"],`);
+      /* :not([data-theme]): an element with its OWN theme is matched by its
+         same-element rule below. Without the guard, a themed card inside
+         another theme's section matched both at equal specificity and took
+         whichever theme came later in the file (a Primary card in a
+         Secondary band painted Secondary). Same guard on the surfaces. */
+      containerLines.push(`[data-theme="${themeName}"] [data-surface^="Container"]:not([data-theme]),`);
       containerLines.push(`[data-theme="${themeName}"][data-surface^="Container"] {`);
       
       // DEBUG: Check if Buttons and Tag exist in Containers

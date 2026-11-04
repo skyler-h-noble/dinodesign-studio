@@ -32,3 +32,25 @@ describe.each(['Light', 'Dark'] as const)('%s mode', (mode) => {
     });
   }
 });
+
+/* An element with its OWN data-theme inside another theme's section takes its
+   own theme. The descendant form ([data-theme="Secondary"] [data-surface=…])
+   used to match it too, at the same specificity as its same-element rule, so
+   whichever theme came later in the file won: a Primary Surface-Brightest
+   block in a Secondary band painted Secondary (found 2026-11-04 on a
+   clean-room store). The descendant forms now carry :not([data-theme]). */
+describe.each(['Light', 'Dark'] as const)('%s mode · a themed element inside another theme', (mode) => {
+  const c = new Cascade(orderSheets(files, mode));
+  const bg = (el: CascadeElement) => c.computed(el)['--Background'];
+  const pairs = [['Secondary', 'Primary'], ['Primary', 'Secondary'], ['Tertiary', 'Primary'], ['Primary', 'Neutral']];
+  for (const [outer, inner] of pairs) {
+    for (const surface of ['Surface', 'Surface-Bright', 'Surface-Brightest', 'Container', 'Container-High']) {
+      it(`${inner} ${surface} inside a ${outer} section paints ${inner}`, () => {
+        const section: CascadeElement = { attrs: { 'data-theme': outer, 'data-surface': 'Surface' }, parent: root };
+        const nested = bg({ attrs: { 'data-theme': inner, 'data-surface': surface }, parent: section });
+        const alone = bg({ attrs: { 'data-theme': inner, 'data-surface': surface }, parent: root });
+        expect(nested).toBe(alone);
+      });
+    }
+  }
+});

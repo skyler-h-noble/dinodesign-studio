@@ -56,6 +56,16 @@ describe('cssCascade', () => {
     expect(v['--B']).toBeUndefined();
   });
 
+  it(':not() of one attribute negates it, at that attribute\'s specificity', () => {
+    const c = new Cascade([`
+      [data-theme="A"] [data-surface="S"]:not([data-theme]) { --X: #111111; }
+      [data-theme="B"][data-surface="S"] { --X: #222222; }
+    `]);
+    const section = themed('A');
+    expect(c.computed(surface('S', section))['--X']).toBe('#111111');
+    expect(c.computed({ attrs: { 'data-theme': 'B', 'data-surface': 'S' }, parent: section })['--X']).toBe('#222222');
+  });
+
   it('skips at-rule blocks and selectors it cannot match exactly', () => {
     const c = new Cascade([`
       @media (min-width: 1px) { :root { --X: #ff0000; } }

@@ -16,13 +16,13 @@
  *     declaration read under a different surface).
  *
  * It understands only the selector forms the generator emits: `:root`,
- * attribute selectors (`[a]`, `[a="v"]`, `[a^="v"]`), compounds of those, and
- * the descendant combinator. Anything else (classes, pseudo-classes, at-rule
+ * attribute selectors (`[a]`, `[a="v"]`, `[a^="v"]`), `:not()` of one
+ * attribute selector, compounds of those, and the descendant combinator. Anything else (classes, pseudo-classes, at-rule
  * blocks) is skipped, never approximated — a rule it cannot match exactly is
  * a rule it does not apply.
  */
 
-type AttrTest = { name: string; op: 'exists' | '=' | '^='; value: string };
+type AttrTest = { name: string; op: 'exists' | '=' | '^='; value: string; not?: boolean };
 type Compound = { root: boolean; attrs: AttrTest[] };
 type Selector = { parts: Compound[]; specificity: number };
 type Rule = { selectors: Selector[]; decls: Record<string, string>; order: number };
@@ -35,14 +35,17 @@ export interface CascadeElement {
   parent?: CascadeElement;
 }
 
-const COMPOUND_PART = /^(?::root|\[[\w-]+(?:\^?="[^"]*")?\])+$/;
+const ATTR = '\\[[\\w-]+(?:\\^?="[^"]*")?\\]';
+const COMPOUND_PART = new RegExp(`^(?::root|${ATTR}|:not\\(${ATTR}\\))+$`);
 
 function parseCompound(text: string): Compound | null {
   if (!COMPOUND_PART.test(text)) return null;
   const root = text.includes(':root');
   const attrs: AttrTest[] = [];
-  for (const m of text.matchAll(/\[([\w-]+)(?:(\^?=)"([^"]*)")?\]/g)) {
-    attrs.push({ name: m[1], op: m[2] === '^=' ? '^=' : m[2] === '=' ? '=' : 'exists', value: m[3] ?? '' });
+  // :not([a]) / :not([a="v"]) — one attribute test, negated. Specificity is its
+  // argument's, so it counts like the attribute it wraps.
+  for (const m of text.matchAll(/(:not\()?\[([\w-]+)(?:(\^?=)"([^"]*)")?\]\)?/g)) {
+    attrs.push({ name: m[2], op: m[3] === '^=' ? '^=' : m[3] === '=' ? '=' : 'exists', value: m[4] ?? '', not: !!m[1] });
   }
   return { root, attrs };
 }
@@ -100,10 +103,8 @@ function compoundMatches(c: Compound, el: CascadeElement): boolean {
   if (c.root && !el.root) return false;
   return c.attrs.every((a) => {
     const v = el.attrs[a.name];
-    if (v === undefined) return false;
-    if (a.op === 'exists') return true;
-    if (a.op === '=') return v === a.value;
-    return v.startsWith(a.value);
+    const hit = v === undefined ? false : a.op === 'exists' ? true : a.op === '=' ? v === a.value : v.startsWith(a.value);
+    return a.not ? !hit : hit;
   });
 }
 
