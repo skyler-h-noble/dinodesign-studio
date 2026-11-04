@@ -564,7 +564,7 @@ describe('hover and pressed never read worse than the resting button', () => {
         }
       }
     }
-  });
+  }, 30_000); // one export per button mode; slow under a full parallel run
 });
 
 describe('the accessibility floor holds across brands', () => {

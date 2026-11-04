@@ -12,6 +12,7 @@ import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
 import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone } from '../darkLadder';
+import { LADDER_PAGE_ICONS_KEY } from './darkBandPass';
 import { chartColorVisionCSS } from '../chartColorVision';
 import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
@@ -1636,9 +1637,13 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
          On-* — which the dark-ladder pass already points at the right text
          for the icon drawn there. */
       if (darkWindow) {
-        const icons = modeData?.Themes?.[defPal]?.[section]?.Icons;
+        /* A band theme (Primary / Secondary / Tertiary) has left the ladder
+           for its own lighter tones, so the page reads the On-* that theme
+           had on the ladder, recorded by the band pass. */
+        const ladderIcons = modeData?.[LADDER_PAGE_ICONS_KEY]?.[defPal]?.[section];
+        const icons = ladderIcons ?? modeData?.Themes?.[defPal]?.[section]?.Icons;
         for (const pal of [...accentPalettes, 'Default', 'Match']) {
-          const v = icons?.[`On-${pal}`]?.value;
+          const v = ladderIcons ? ladderIcons[`On-${pal}`] : icons?.[`On-${pal}`]?.value;
           if (typeof v === 'string') tokenLookup[`Default-Background.${prefix}On-${pal}`] = v;
         }
       }

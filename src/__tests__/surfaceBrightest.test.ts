@@ -19,6 +19,7 @@ import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { exportColorSystemToJSON } from '../utils/cssgen/exportColorSystem';
 import { generateCSSFiles } from '../utils/cssgen/exportToCSS';
 import { generateFigmaJSON, themeOrder } from '../utils/generateFigmaJSON';
+import { themeWindows } from '../utils/darkLadder';
 import { parseBackground, toneFor, SURFACE_LEVELS } from '../utils/backgroundSelection';
 import { generateFullLightPalettes, generateFullDarkPalettes } from '../utils/generateFullPalettes';
 import { generateSemanticLightModeScale, generateSemanticDarkModeScale } from '../utils/colorScale';
@@ -334,9 +335,15 @@ describe('Surface-Brightest', () => {
        level's tone. The tone still has to be checked, and the foregrounds are
        where it is observable: they are keyed by exactly the tone the level
        paints, which is the pairing that must hold. */
-    const toneOf = (theme: string, sec: string) =>
-      (String(json.Modes['Light-Mode'].Themes[theme]?.[sec]?.Text?.value || '')
-        .match(/Color-(\d+)\}$/) || [])[1];
+    /* The band themes (Primary / Secondary / Tertiary) no longer name their
+       table index in dark mode's interest (cssgen/darkBandPass.ts), so the
+       index each level's foregrounds are keyed by is read from the windows the
+       ladder records — the same index their Text named before. */
+    const windows = themeWindows(json.Modes['Light-Mode']);
+    const toneOf = (theme: string, sec: string) => {
+      const level = sec.replace('Surfaces', 'Surface');
+      return String(windows.find((w) => w.theme === theme)?.index[level as 'Surface-Brightest'] ?? '');
+    };
     expect(toneOf('Neutral', 'Surfaces-Brightest')).toBe('12');
     for (const t of ['Primary', 'Secondary', 'Info']) {
       expect(toneOf(t, 'Surfaces-Brightest'), `${t} should land on 11`).toBe('11');

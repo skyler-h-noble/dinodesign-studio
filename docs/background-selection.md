@@ -122,8 +122,8 @@ variables is recoverable; **deleting them is not** (invariant 8), so do not
 
 ## Dark mode: the ladder
 
-Decided by the owner (2026-11-04). In dark mode every theme — Default
-included, no special case — paints its five levels like this, on its own
+Decided by the owner (2026-11-04). In dark mode every theme except the three
+bands below — Default included — paints its five levels like this, on its own
 palette (the Default theme: the page-background palette):
 
 | level | dark mode paints |
@@ -161,6 +161,78 @@ History: this is the first dark ladder's surfaces (7ad2bf4, tones 1-5, page on
 tone 3) with the pre-ladder card relationship shifted up one tone. In between,
 ab8c3e6 / 7ed5bc8 painted black and tones 1-4 with the page on tone 2 and
 tone-5 cards; that model is gone.
+
+### Bands: Primary, Secondary and Tertiary keep their color
+
+Decided by the owner later the same day (2026-11-04, after the Figma mockup
+"Surf — dark mode colors (tones 1–5)", node 10837:2). For the **Primary,
+Secondary and Tertiary themes only**, dark mode keeps some color:
+
+| level | dark mode paints |
+| --- | --- |
+| Surface | **S = min(L, 8)**, where L is the tone that theme's Surface paints in light mode |
+| Surface-Dimmest | S - 2 |
+| Surface-Dim | S - 1 |
+| Surface-Bright | S + 1 |
+| Surface-Brightest | S + 2 |
+
+(clamped to 1..12), on the theme's own palette, from the dark ramp. A light
+tone 1-7 "stays true" — the same index, painted from the dark ramp — and 8-12
+is capped at 8. Surf: Primary light 9 -> dark 8 (levels 6 / 7 / 8 / 9 / 10),
+Secondary 9 -> 8, Tertiary 7 -> 7 (5 / 6 / 7 / 8 / 9). Popsicle and Cocktails
+sit on light tone 6, so their bands are 4 / 5 / 6 / 7 / 8.
+
+Cards are the ladder's card relationship shifted onto the band: tone S+1 mixed
+over S at 50 / 65 / 75 / 90 / 100% (see
+[Container logic](container-logic.md#dark-mode-bands-cards-one-tone-above-the-band)).
+
+**Unchanged:** the Default theme and the page (tones 1-5, page 3, cards tone 4
+over 3), Neutral, Info, Success, Warning, Error, App-Bar, Nav-Bar, Status and
+the black rule. Light mode is byte-identical.
+
+A band surface is often LIGHT (tones 6+ of the dark ramp start at L* 58), so its
+foregrounds are dark: text, headers, links, the eyebrow (still the rotation's
+palette), borders, focus, icons, buttons and tags are re-solved for the band
+and graded by the same rendered report as every other surface. Each role takes,
+in order: what it already names if that clears the band; another index of the
+same table that is right in both modes; the palette tone its light answer IS
+(the light table's own choice, from the dark ramp — "stays true"); or the dark
+table's own answer for the tone the band paints. State and black/white buttons
+move as a unit, and a state button's border stays its fill.
+
+**How it gets there.** `cssgen/darkBandPass.ts`, step 7 of the dark-ladder pass.
+It runs after the ladder, so every shared table, row and map is exactly what
+the ladder made it and nothing another theme reads moves; only these three
+themes' own Theme references change, in both modes, always to something that
+resolves to the same light-mode color. The Theme layer is mode-independent, so
+wherever a band needs a different dark answer for the same light reference it
+needs a Modes variable of its own (`Band`, `Band-Button`; `Band-CSS` holds the
+roles Figma draws as an alias at an opacity, and is the CSS's only). The windows
+the maps are built from are recorded before the step (`Ladder-Windows`), and the
+page reads the On-* its palette's theme had on the ladder (`Ladder-Page-Icons`).
+
+**Figma cost.** Modes grows by ~115-165 variables for a brand on light tone 6
+and ~280 for one on tone 8+ (Surf), most of it state and black/white buttons on
+light bands (every dark entry the tables hold was solved for a dark surface)
+plus cards, hover / pressed and border variants. The figmaModesTrim guard moved
+from 4,450 to 4,800 for it; Figma's hard limit is 5,000.
+
+**Bars in Figma.** A bar is published to Figma as a Theme mode plus a Surface
+mode, so a bar set to "Primary · Surface" shows the Primary band in Figma's dark
+mode, while the CSS keeps App-Bar / Nav-Bar / Status on the ladder as decided.
+Closing that gap needs a bar-specific mode the Theme collection does not have
+room for (10-mode cap).
+
+The S = 5 case (a brand whose light Surface is tone 5) takes its cards one tone
+BELOW the Surface (tone 4 over 5): tone 6 is in the dark ramp's light half, and
+the five mixes of 6 over 5 run from L* ~41 to ~58, where no one text color
+clears 4.5:1 on all of them. It is the shape the ladder already accepts on its
+tone-5 Brightest.
+
+Tests: `src/__tests__/darkBands.test.ts` (exact tones and cards for Surf,
+Popsicle and Cocktails, CSS == preview == Figma per theme, every band role in
+Figma == the CSS, WCAG on every band section and card, light mode identical in
+the CSS and in Figma's light literals).
 
 ### How it gets there
 

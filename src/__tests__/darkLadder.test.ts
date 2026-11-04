@@ -12,6 +12,12 @@
  * set per theme, the same on every surface level — no per-surface mixes, no
  * opacity. Light mode does not change.
  *
+ * Bands (owner, 2026-11-04): the Primary, Secondary and Tertiary THEMES leave
+ * the ladder. Their dark Surface is S = min(L, 8) (L: the tone their Surface
+ * paints in light mode), their levels S-2 .. S+2, their cards tone S+1 mixed
+ * over S (one tone below when S+1 would cross the dark ramp's split). Every
+ * other theme, the page and its cards keep the ladder.
+ *
  * Invariant 7 (parity is not correctness): the SHAPE is asserted directly —
  * the exact tone per level, the exact solid mix per card, the same five on
  * every surface, every card role passing on every card color, and the accepted
@@ -26,8 +32,9 @@ import { Cascade, type CascadeElement } from '../utils/cssCascade';
 import { orderSheets } from '../utils/renderedAccessibilityReport';
 import {
   DARK_LADDER_LEVELS, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE, DARK_CARD_ALPHA, darkCardHex, darkCardHexesForRamp,
-  cardRoleFailures, labL, blackChosen,
+  cardRoleFailures, labL, blackChosen, bandSurfaceTone, bandTones, bandCardTone, bandCardHexesForRamp, BAND_THEMES,
 } from '../utils/darkLadder';
+import { BANDS } from '../utils/cssgen/darkBandPass';
 import { blendColors } from '../utils/colorScale';
 import { DARK_LADDER } from '../utils/cssgen/darkLadderPass';
 import { parseBackground } from '../utils/backgroundSelection';
@@ -64,6 +71,25 @@ function paletteOf(theme: string, sel: Selection): string {
   return theme === 'Default' ? parseBackground(sel.background).theme : theme;
 }
 
+/** A band theme's tones, worked out here from the LIGHT-mode Surface it paints
+ *  (not read back from what the pass recorded): S = min(L, 8). */
+function bandOf(json: any, theme: string) {
+  const L = json.Modes['Light-Mode'];
+  let v: unknown = L.Themes[theme].Surfaces.Background.value;
+  let lt = 0;
+  for (let hop = 0; hop < 12 && typeof v === 'string'; hop++) {
+    const m = v.match(/^\{(.+)\}$/);
+    if (!m) break;
+    const t = m[1].match(/^Colors\.[\w-]+\.Color-(\d+)$/);
+    if (t) { lt = Number(t[1]); break; }
+    let node: any = L;
+    for (const k of m[1].split('.')) node = node?.[k];
+    v = node?.value;
+  }
+  const S = bandSurfaceTone(lt);
+  return { L: lt, S, tones: bandTones(S), cardTone: bandCardTone(S) };
+}
+
 /* Tallies reported once at the end. */
 const tally = {
   cards: 0, levelOnBright: 0, darkerOnBright: 0, darkerOnBrightest: 0,
@@ -96,13 +122,17 @@ describe('dark ladder — what the CSS paints', () => {
         for (const theme of THEMES) {
           const pal = paletteOf(theme, sel);
           const tone = (n: number) => hex(dark.Colors[pal][`Color-${n}`].value)!;
+          /* A band theme's tones come from its light Surface; everyone else
+             paints the ladder. */
+          const band = (BAND_THEMES as readonly string[]).includes(theme) ? bandOf(json, theme) : null;
+          const toneAt = (level: typeof DARK_LADDER_LEVELS[number]) => (band ? band.tones[level] : DARK_LADDER_TONE[level]);
           /* What a level paints: its tone, or black on Neutral's tone 1 when
              the designer chose black — exactly then, never otherwise. */
           const black = blackChosen(sel) && pal === 'Neutral';
           const paints = (level: typeof DARK_LADDER_LEVELS[number]) =>
-            (DARK_LADDER_TONE[level] === 1 && black ? '#000000' : tone(DARK_LADDER_TONE[level]));
-          const face = tone(DARK_CARD_TONE);
-          const page = tone(DARK_LADDER_TONE.Surface);
+            (toneAt(level) === 1 && black ? '#000000' : tone(toneAt(level)));
+          const face = tone(band ? band.cardTone : DARK_CARD_TONE);
+          const page = tone(band ? band.S : DARK_LADDER_TONE.Surface);
           /* The theme's ONE set: tone 4 over the page (tone 3), exactly. */
           const want: Record<string, string> = {};
           for (const card of DARK_CARD_LEVELS) {
@@ -115,7 +145,7 @@ describe('dark ladder — what the CSS paints', () => {
           for (const level of DARK_LADDER_LEVELS) {
             const bg = hexA(cascade.computed(surfaceEl(theme, level))['--Background']);
             const w = paints(level);
-            if (bg !== w) problems.push(`${theme}/${level}: ${bg}, expected ${pal} ${w === '#000000' ? 'black' : `tone ${DARK_LADDER_TONE[level]}`} ${w}`);
+            if (bg !== w) problems.push(`${theme}/${level}: ${bg}, expected ${pal} ${w === '#000000' ? 'black' : `tone ${toneAt(level)}`} ${w}`);
             surfaces[level] = w;
           }
 
@@ -139,7 +169,13 @@ describe('dark ladder — what the CSS paints', () => {
                  the surface — the owner accepted that; asserted so it cannot
                  change unnoticed. */
               const dL = labL(got) - labL(surface);
-              if (level === 'Surface-Bright') {
+              if (band) {
+                /* A band's cards sit between tones S and its card tone; on a
+                   level darker than both they read as raised. (On the rest
+                   they sit level with or below it — the ladder's accepted
+                   shape, one band over.) */
+                if (toneAt(level) < Math.min(band.S, band.cardTone) && !(dL > 0)) problems.push(`${theme}/${level}/${card}: ${got} not lighter than the surface ${surface}`);
+              } else if (level === 'Surface-Bright') {
                 if (got === surface) tally.levelOnBright++;
                 else if (dL < 0) tally.darkerOnBright++;
                 else problems.push(`${theme}/${level}/${card}: ${got} lighter than the tone-4 surface ${surface}`);
@@ -170,7 +206,10 @@ describe('dark ladder — what the CSS paints', () => {
                 if (HIGHER[outer].includes(inner)) {
                   tally.nestedHigher++;
                   if (bg !== want[inner]) problems.push(`${theme}/${level}/${outer}>${inner}: ${bg}, expected ${want[inner]}`);
-                  if (inner !== outer && !(labL(bg) > labL(painted[outer]))) problems.push(`${theme}/${level}/${outer}>${inner}: ${bg} not lighter than its parent ${painted[outer]}`);
+                  /* A higher level moves toward the card face: lighter, unless
+                     the band's cards were taken one tone BELOW its Surface. */
+                  const upward = !band || band.cardTone > band.S;
+                  if (inner !== outer && upward && !(labL(bg) > labL(painted[outer]))) problems.push(`${theme}/${level}/${outer}>${inner}: ${bg} not lighter than its parent ${painted[outer]}`);
                   if (nf.length) { tally.nestedHigherFailures++; problems.push(`${theme}/${level}/${outer}>${inner} on ${bg}: ${nf.slice(0, 2).join(', ')}`); }
                 } else if (DARK_CARD_LEVELS.indexOf(inner) < DARK_CARD_LEVELS.indexOf(outer)) {
                   tally.nestedLower++;
@@ -276,17 +315,18 @@ describe('dark ladder — Figma holds exactly the CSS cards and backgrounds (per
       const wrong: string[] = [];
       for (const theme of THEMES) {
         const pal = paletteOf(theme, sel);
+        const band = (BAND_THEMES as readonly string[]).includes(theme) ? bandOf(json, theme) : null;
         for (const level of DARK_LADDER_LEVELS) {
           const got = resolve(figma.Themes[theme]?.[level]?.Background?.value);
-          const t = DARK_LADDER_TONE[level];
+          const t = band ? band.tones[level] : DARK_LADDER_TONE[level];
           const want = t === 1 && pal === 'Neutral' && blackChosen(sel) ? '#000000' : hex(D.Colors[pal][`Color-${t}`].value);
           if (got !== want) wrong.push(`${theme}/${level}: ${got} vs ${want}`);
         }
         /* The theme's one set — tone 4 over the page, solid — and exactly
            what the CSS paints for that theme's cards (on its page surface;
            every surface paints the same five). */
-        const face = hex(D.Colors[pal][`Color-${DARK_CARD_TONE}`].value)!;
-        const page = hex(D.Colors[pal][`Color-${DARK_LADDER_TONE.Surface}`].value)!;
+        const face = hex(D.Colors[pal][`Color-${band ? band.cardTone : DARK_CARD_TONE}`].value)!;
+        const page = hex(D.Colors[pal][`Color-${band ? band.S : DARK_LADDER_TONE.Surface}`].value)!;
         for (const card of DARK_CARD_LEVELS) {
           const raw = figma.Themes[theme]?.Containers?.[card]?.value;
           const got = resolve(raw);
@@ -297,7 +337,7 @@ describe('dark ladder — Figma holds exactly the CSS cards and backgrounds (per
         }
         if (figma.Themes[theme]?.Containers?.['Container-Highest']?.value !== undefined
           && resolve(figma.Themes[theme].Containers['Container-Highest'].value) !== face) {
-          wrong.push(`${theme} Highest is not tone 4`);
+          wrong.push(`${theme} Highest is not its card tone`);
         }
       }
       /* Every row's cards: the palette's one set, solid, in the payload; in the

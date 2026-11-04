@@ -25,6 +25,7 @@
  * 10 backgrounds x 6 buttons x 3 cards x 2 texts = 1,800 systems, ~12 min)
  * runs with RENDERED_FULL=1.
  */
+import chroma from 'chroma-js';
 import { describe, it, expect } from 'vitest';
 import {
   BRANDS, BACKGROUNDS, BUTTONS, CARDS, TEXTS, makeScheme,
@@ -110,9 +111,11 @@ describe('visited links', () => {
 /* ─── Black or white is decided per mode ──────────────────────────────────
  *
  * Parity is not correctness (invariant 7): this asserts the intended shape
- * directly. A dark-mode card is dark whatever tone it is keyed to, so its
- * black/white button and Text-BW must be the WHITE face on every theme's card;
- * and the Default theme's dark page must carry the white face too. */
+ * directly. A dark-mode card on the ladder is dark whatever tone it is keyed
+ * to, so its black/white button and Text-BW must be the WHITE face; a band
+ * theme's card (Primary / Secondary / Tertiary, utils/darkLadder.ts, Bands) is
+ * as light as its band, so it carries the face that contrasts it — black on a
+ * light card. The Default theme's dark page carries the white face. */
 describe('black/white face follows what the section paints', () => {
   const sel: Selection = { background: 'Neutral/Surface-Brightest', button: 'black-white', cardColoring: 'tonal', textColoring: 'tonal' };
   const { files } = quietly(() => buildSystem(BRANDS.Popsicle, sel));
@@ -120,12 +123,15 @@ describe('black/white face follows what the section paints', () => {
   const root: CascadeElement = { attrs: {}, root: true };
   const white = (v: string | undefined) => /^#ffffff/i.test(String(v));
 
+  const lightCard = (v: string | undefined) => chroma.valid(v) && chroma(v as string).luminance() > 0.18;
   for (const theme of REPORT_THEMES) {
-    it(`dark mode · ${theme} cards carry the white face`, () => {
+    it(`dark mode · ${theme} cards carry the face that contrasts them`, () => {
       const card: CascadeElement = { attrs: { 'data-surface': 'Container' }, parent: { attrs: { 'data-theme': theme }, parent: root } };
       const v = cascade.computed(card);
-      expect(white(v['--Buttons-BlackWhite-Button']), `${theme} button ${v['--Buttons-BlackWhite-Button']}`).toBe(true);
-      expect(white(v['--Text-BW']), `${theme} Text-BW ${v['--Text-BW']}`).toBe(true);
+      const wantWhite = !lightCard(v['--Background']);
+      if (!['Primary', 'Secondary', 'Tertiary'].includes(theme)) expect(wantWhite, `${theme} card ${v['--Background']} is dark`).toBe(true);
+      expect(white(v['--Buttons-BlackWhite-Button']), `${theme} button ${v['--Buttons-BlackWhite-Button']} on ${v['--Background']}`).toBe(wantWhite);
+      expect(white(v['--Text-BW']), `${theme} Text-BW ${v['--Text-BW']} on ${v['--Background']}`).toBe(wantWhite);
     });
   }
 

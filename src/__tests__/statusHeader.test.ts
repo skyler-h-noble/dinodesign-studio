@@ -33,6 +33,14 @@ import type { ColorScheme } from '../types';
 
 /** Every palette theme: its heading comes from its own palette (Primary's always did). */
 const STATUS = ['Primary', 'Secondary', 'Tertiary', 'Neutral', 'Info', 'Success', 'Warning', 'Error'] as const;
+/* Primary, Secondary and Tertiary are dark-mode bands (cssgen/darkBandPass.ts):
+   where their Header table's entry is answered for the ladder, the reference
+   names the theme's own palette tone directly, or a Band entry whose light
+   value IS the Header table's entry. Still the theme's own palette. */
+const BAND = new Set(['Primary', 'Secondary', 'Tertiary']);
+const headerRef = (theme: string, branch: string) => (BAND.has(theme)
+  ? new RegExp(`^\\{(Header\\.${branch}\\.${theme}\\.Color-\\d+|Colors\\.${theme}\\.Color-\\d+|Band\\.Header-${branch}-${theme}-Color-\\d+-T\\d+)\\}$`)
+  : new RegExp(`^\\{Header\\.${branch}\\.${theme}\\.Color-\\d+\\}$`));
 const LEVELS = ['Surface', 'Surface-Dim', 'Surface-Dimmest', 'Surface-Bright', 'Surface-Brightest'];
 const T = { family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false };
 const SEL = { background: 'white', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' };
@@ -119,7 +127,7 @@ describe('export: status headings come from their own palette and clear 3:1', ()
         const node = json.Modes[mode].Themes[theme];
         for (const [section, data] of Object.entries<any>(node)) {
           const branch = section.startsWith('Containers') ? 'Containers' : 'Surfaces';
-          expect(data.Header.value, `${mode} ${theme}/${section}`).toMatch(new RegExp(`^\\{Header\\.${branch}\\.${theme}\\.Color-\\d+\\}$`));
+          expect(data.Header.value, `${mode} ${theme}/${section}`).toMatch(headerRef(theme, branch));
         }
         const sheet = css[`${mode}.css`];
         const root = rootDecl([sheet]);
@@ -142,7 +150,7 @@ describe('Figma: the Theme collection binds status headings to their own palette
     for (const theme of STATUS) {
       for (const [section, data] of Object.entries<any>(figma.Themes[theme])) {
         if (!data?.Header) continue;
-        expect(String(data.Header.value), `${theme}/${section}`).toMatch(new RegExp(`^\\{Header\\.(Surfaces|Containers)\\.${theme}\\.Color-\\d+\\}$`));
+        expect(String(data.Header.value), `${theme}/${section}`).toMatch(headerRef(theme, '(Surfaces|Containers)'));
       }
     }
   });

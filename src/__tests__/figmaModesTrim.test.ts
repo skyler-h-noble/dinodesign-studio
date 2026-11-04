@@ -20,13 +20,13 @@ import type { ColorScheme, UserSelections } from '../types';
 
 /** A scheme built the way ColorStage builds one, so the palettes pass through
  *  the picked colors (see the lockedHex fix in ColorStage). */
-function makeScheme(colors: [string, string, string]): ColorScheme {
+function makeScheme(colors: [string, string, string], tones?: { primary: number; secondary: number; tertiary: number }): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
   return {
     name: 'Test',
     colors,
-    extractedTones: {
+    extractedTones: tones ?? {
       primary: chroma(colors[0]).lch()[0],
       secondary: chroma(colors[1]).lch()[0],
       tertiary: chroma(colors[2]).lch()[0],
@@ -182,13 +182,34 @@ describe('Figma Modes trim', () => {
        tones 1-5 ladder with tone-4 cards adds 2-10 Quiet section opacities
        here (a few surface sections no longer share their tone's alpha):
        4,405 / 4,435 / 4,407 for this brand on a primary / white / black page
-       (was 4,402 / 4,432 / 4,397). It is measured on a
-       white and a black page too, which carry the most. */
-    expect(n).toBeLessThan(4450);
+       (was 4,402 / 4,432 / 4,397).
+       4,800 (from 4,450) for the dark-mode bands (cssgen/darkBandPass.ts):
+       the Primary / Secondary / Tertiary themes paint their own lighter tones
+       in dark mode while every other theme keeps the ladder, and the Theme
+       layer is mode-independent, so wherever a band needs another dark answer
+       for the same light reference it needs a Modes variable: Band (cards,
+       surface hover / pressed, border variants, the backgrounds that do not
+       stay on their light index, and roles whose light answer does not clear
+       the band), Band-Button (state and black/white buttons on a light band:
+       their dark entries were all solved for dark surfaces) and a Quiet float
+       per band section whose shared alpha falls short. Roles are reused
+       wherever a table index or the light answer's own palette tone already
+       clears the band. Measured: this brand 4,567 / 4,567 / 4,524 (+162 /
+       +132 / +117); the worst case is a brand whose light Surfaces sit on
+       tone 8+ (Surf's published Primary is tone 9), measured below:
+       4,719 on a white page. ~280 of room to the hard limit remain. It is
+       measured on a white and a black page too, which carry the most. */
+    expect(n).toBeLessThan(4800);
     for (const background of ['white', 'black']) {
       const other = (buildAll(makeScheme(BRANDS[0]), { background, button: 'primary', cardColoring: background === 'black' ? 'black' : 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;
       let m = 0; walk(other.Modes['Light-Mode'], [], () => m++);
-      expect(m, `${background} page`).toBeLessThan(4450);
+      expect(m, `${background} page`).toBeLessThan(4800);
     }
+    /* The band's worst case: Surf, its Primary and Secondary on light tone 9
+       (dark Surface capped at 8, every level light) and Tertiary on 7. */
+    const surf = (buildAll(makeScheme(['#9d8a5c', '#009f87', '#e26801'], { primary: 90, secondary: 90, tertiary: 71 }),
+      { background: 'white', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;
+    let w = 0; walk(surf.Modes['Light-Mode'], [], () => w++);
+    expect(w, 'Surf (light tone 9) on a white page').toBeLessThan(4800);
   }, 60_000);
 });

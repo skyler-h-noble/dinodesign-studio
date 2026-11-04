@@ -41,26 +41,30 @@
  *
  * 6. Card roles that fail on the lightest card (tone 4 itself, Highest) move
  *    up their own palette until they pass.
+ *
+ * 7. The Primary, Secondary and Tertiary themes leave the ladder for their own
+ *    lighter band (utils/darkLadder.ts, Bands; cssgen/darkBandPass.ts).
  */
 import chroma from 'chroma-js';
 import {
   darkLadderMaps, themeWindows, labL, darkCardHexesForRamp, blackChosen, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
-  type DarkLadderLevel,
+  LADDER_WINDOWS_KEY, type DarkLadderLevel,
 } from '../darkLadder';
+import { applyDarkBands, BANDS } from './darkBandPass';
 
 type Json = any;
 
 const GLOBAL_FAMILIES = ['Text', 'Header', 'Quiet', 'Border', 'Icon', 'Icon-Variant', 'Eyebrows', 'Default-Button-Border'];
 const PALETTE_FAMILIES = ['Hover', 'Pressed'];
 
-function getAt(root: Json, path: string): Json {
+export function getAt(root: Json, path: string): Json {
   let node = root;
   for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) return undefined; }
   return node;
 }
 
 /** Every {value} leaf under a node, as [relative path, leaf]. */
-function leaves(node: Json, prefix = ''): Array<[string, Json]> {
+export function leaves(node: Json, prefix = ''): Array<[string, Json]> {
   if (!node || typeof node !== 'object') return [];
   if ('value' in node) return [[prefix, node]];
   const out: Array<[string, Json]> = [];
@@ -75,7 +79,7 @@ function leaves(node: Json, prefix = ''): Array<[string, Json]> {
  * and in both modes. Mutating it in place would move every table that shares
  * it — including light mode's — so each write gets its own path.
  */
-function writeLeaf(root: Json, path: string, value: unknown): void {
+export function writeLeaf(root: Json, path: string, value: unknown): void {
   const parts = path.split('.');
   let node = root;
   for (const k of parts.slice(0, -1)) {
@@ -87,7 +91,7 @@ function writeLeaf(root: Json, path: string, value: unknown): void {
   node[key] = { ...(node[key] && typeof node[key] === 'object' ? node[key] : { type: 'color' }), value };
 }
 
-const refOf = (v: unknown): string | null =>
+export const refOf = (v: unknown): string | null =>
   typeof v === 'string' && /^\{[^{}]+\}$/.test(v) ? v.slice(1, -1) : null;
 
 /**
@@ -108,6 +112,10 @@ export function applyDarkLadder(colorSystem: Json, sel?: DarkLadderSelections) {
   const dark = colorSystem?.Modes?.['Dark-Mode'];
   if (!light?.Themes || !dark?.Themes) return null;
   const stats = { repointed: 0, remapped: 0, pinned: 0, iconOn: 0, rows: 0, cardRoles: 0 };
+  /* The dark tables as generated: keyed by TONE, before anything here re-keys
+     them. The band step (7) reads each answer for the tone a band level
+     actually paints from this. */
+  const toneKeyed = JSON.parse(JSON.stringify({ ...dark, Themes: undefined }));
 
   /* ── 1. Theme references that named a tone now name a row ───────────── */
   const lightValue = (path: string) => {
@@ -481,6 +489,16 @@ export function applyDarkLadder(colorSystem: Json, sel?: DarkLadderSelections) {
     }
   }
 
-  return { ...stats, maps, windows };
+  /* ── 7. Bands: Primary, Secondary and Tertiary keep their color ──────────
+   *
+   * The windows are recorded first, in both modes, so every reader of the
+   * ladder maps (the CSS export, the Figma payload, the Default theme's
+   * expansion, the accessibility report) keeps seeing exactly what it saw
+   * before: the band step repoints those three themes' own references, and
+   * after that their Text references no longer name their window's index. */
+  for (const mode of [light, dark]) mode[LADDER_WINDOWS_KEY] = JSON.parse(JSON.stringify(windows));
+  const bands = BANDS.enabled ? applyDarkBands(light, dark, toneKeyed) : null;
+
+  return { ...stats, maps, windows, bands };
 }
 

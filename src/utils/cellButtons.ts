@@ -24,6 +24,7 @@
 import { buildPreviewCSS } from './buildPreviewCSS';
 import { parseBackground, parseBar } from './backgroundSelection';
 import { defaultBackgroundTone, defaultSurfaceRefs, defaultDimmestRef } from './cssgen/exportToCSS';
+import { recordedBands } from './darkLadder';
 
 type Ramp = { tone: number; color: string }[];
 type Palettes = Record<string, Ramp>;
@@ -31,6 +32,9 @@ type Palettes = Record<string, Ramp>;
 /** Themes whose Default button follows the user's choice. Info / Success /
  *  Warning / Error keep their own state button on their own surfaces. */
 const CELL_THEMES = ['Default', 'Primary', 'Secondary', 'Tertiary', 'Neutral', 'App-Bar', 'Nav-Bar', 'Status'];
+const BAR_THEMES = ['App-Bar', 'Nav-Bar', 'Status'];
+/** Bar entries the Figma payload has no reader for (see the end of applyCellButtons). */
+export const CELL_BUTTON_CSS_GROUP = 'Cell-Button-CSS';
 
 /** Section name in the export → surface level in the picker. */
 const SECTION_LEVEL: Record<string, string> = {
@@ -205,6 +209,29 @@ export function applyCellButtons(colorSystem: any, input: Input): number {
   }
   for (const m of [L, D]) for (const t of Object.keys(m)) if (!Object.keys(m[t]).length) delete m[t];
 
+  /* A bar (CSS only — the Figma payload shows a bar as a Theme mode plus a
+     Surface mode, never through its own entries) on a Primary / Secondary /
+     Tertiary palette used to share that theme's entry in both modes. Those
+     themes now paint their own dark-mode band (utils/darkLadder.ts, Bands)
+     while the bar keeps the ladder, so the bar's entry is its own — and goes
+     to a CSS-only group rather than costing Figma ten variables a section
+     that nothing there reads. */
+  const bandPalettes = new Set(Object.values(recordedBands(colorSystem?.Modes?.['Dark-Mode'])).map((b) => b.palette));
+  const group = new Map<string, string>();   // 'Theme.Section' -> the group its entry lives in
+  for (const [key, path] of target) {
+    const [theme, sectionName] = key.split('.');
+    if (key === path && BAR_THEMES.includes(theme) && bandPalettes.has(themePalette(theme))) {
+      for (const m of [L, D]) {
+        const which = m === L ? 'Light-Mode' : 'Dark-Mode';
+        const css = (colorSystem.Modes[which][CELL_BUTTON_CSS_GROUP] ??= {});
+        (css[theme] ??= {})[sectionName] = m[theme][sectionName];
+        delete m[theme][sectionName];
+        if (!Object.keys(m[theme]).length) delete m[theme];
+      }
+      group.set(key, CELL_BUTTON_CSS_GROUP);
+    }
+  }
+
   // Point every covered section's Default button at its entry. The refs are
   // the same in both modes; the Modes group carries the per-mode values.
   for (const modeName of ['Light-Mode', 'Dark-Mode'] as const) {
@@ -214,7 +241,7 @@ export function applyCellButtons(colorSystem: any, input: Input): number {
       const btn = themes[theme]?.[sectionName]?.Buttons?.Default;
       if (!btn) continue;
       for (const f of CELL_BUTTON_FIELDS) {
-        btn[f] = { value: `{Cell-Button.${path}.${f}}`, type: 'color' };
+        btn[f] = { value: `{${group.get(key) ?? 'Cell-Button'}.${path}.${f}}`, type: 'color' };
       }
     }
   }

@@ -7,7 +7,7 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, type DarkCardLevel } from './darkLadder';
+import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -673,6 +673,10 @@ export function buildPreviewCSS(input: BuildInput): string {
   const PC = toneToColorNumber(colorScheme.extractedTones?.primary || 60);
   const SC = toneToColorNumber(colorScheme.extractedTones?.secondary || 60);
   const TC = toneToColorNumber(colorScheme.extractedTones?.tertiary || 60);
+  /* Dark mode: a Primary / Secondary / Tertiary section paints its own band —
+     Surface on min(L, 8), L being the tone it paints in light mode (PC / SC /
+     TC), and cards of tone S+1 mixed over S (utils/darkLadder.ts, Bands). */
+  const bandS = (name: string): number => bandSurfaceTone(name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC);
   // Button tones. In dark mode every button sits at Color-12 of its palette —
   // the same rule generateButtonsSimplified applies (DARK_BUTTON_N).
   // Surfaces keep the extracted tones, so these are separate from PC/SC/TC.
@@ -1018,7 +1022,7 @@ export function buildPreviewCSS(input: BuildInput): string {
   // Tertiary container always uses its own palette — never white/black.
   // Dark mode: tone 4 for solving; emitted mixed with the Tertiary page (tone 3).
   if (isDark) {
-    tertiaryContainerBg = p(tertiary, DARK_CARD_TONE);
+    tertiaryContainerBg = p(tertiary, bandCardTone(bandS('Tertiary')));
   } else {
     tertiaryContainerBg = p(tertiary, 10);
   }
@@ -1030,7 +1034,7 @@ export function buildPreviewCSS(input: BuildInput): string {
     : effectiveCardColoring === 'white' ? 12
     : effectiveCardColoring === 'black' ? 3
     : tonalContainerN;
-  const tertiaryContainerN = isDark ? DARK_CARD_TONE : 10;
+  const tertiaryContainerN = isDark ? bandCardTone(bandS('Tertiary')) : 10;
   /* What the card levels EMIT. Dark mode: the face above (tone 4) mixed with
      the page (tone 3) — solid, no opacity, one set for every surface level. */
   const darkCardEmit = (face: string, level: DarkCardLevel) => (isDark ? darkCardHex(face, surfaceBg, level) : face);
@@ -1276,9 +1280,9 @@ export function buildPreviewCSS(input: BuildInput): string {
   type SurfaceTheme = 'Primary' | 'Secondary' | 'Tertiary';
   const palFor = (name: SurfaceTheme): typeof vPrimary =>
     name === 'Secondary' ? vSecondary : name === 'Tertiary' ? vTertiary : vPrimary;
-  // Dark mode: a theme's Surface level paints its tone 3 (utils/darkLadder.ts).
+  // Dark mode: a theme's Surface level paints its band tone (utils/darkLadder.ts, Bands).
   const nFor = (name: SurfaceTheme): number =>
-    isDark ? DARK_LADDER_TONE.Surface : name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
+    isDark ? bandS(name) : name === 'Secondary' ? SC : name === 'Tertiary' ? TC : PC;
   // Emit the per-palette button tokens (Buttons-Primary-*, Buttons-Secondary-*,
   // Buttons-Tertiary-*). The lib's Light-Mode.css hardcodes these under every
   // theme/surface combo (including pink #f5dddd for every -Hover token), so
@@ -1366,12 +1370,12 @@ export function buildPreviewCSS(input: BuildInput): string {
     }).join('\n');
   };
 
-  /* Dark mode paints a theme's Surface on its tone 3 (utils/darkLadder.ts),
-     where the lib's static sheet still assumes a light tone — so the preview
-     states the roles for the surface it actually paints. The :root palette
-     vars are the LIGHT ramp, so the tones are found on that ramp. */
-  const darkSurfaceRoleLines = (name: string, bgHex: string, lightRamp: Array<{ hex: string }>): string => {
-    const t = getAccessibleTones(bgHex, DARK_LADDER_TONE.Surface, lightRamp);
+  /* Dark mode paints a theme's Surface on its band tone (utils/darkLadder.ts,
+     Bands), where the lib's static sheet still assumes a light-mode tone — so
+     the preview states the roles for the surface it actually paints. The
+     :root palette vars are the LIGHT ramp, so the tones are found on that ramp. */
+  const darkSurfaceRoleLines = (name: string, bgHex: string, lightRamp: Array<{ hex: string }>, n: number): string => {
+    const t = getAccessibleTones(bgHex, n, lightRamp);
     return [
       `  --Header: var(--${name}-Color-${t.header});`,
       `  --Text: var(--${name}-Color-${t.text});`,
@@ -1492,7 +1496,10 @@ ${defaultButtonLines(scopeBtn)}`;
         /* Dark mode: every theme paints its levels on tones 1-5 of its own
            palette (utils/darkLadder.ts) — the background the export's
            Cell-Button solves each cell against. */
-        const n = isDark ? darkTableTone(level) : barToneFor(theme, level, coreFor(theme));
+        /* (Primary / Secondary / Tertiary paint their own band: utils/darkLadder.ts, Bands.) */
+        const n = isDark
+          ? (theme === 'Neutral' ? darkTableTone(level) : bandTones(bandS(theme))[level as keyof ReturnType<typeof bandTones>])
+          : barToneFor(theme, level, coreFor(theme));
         const ramp = modeRamp(theme);
         // Neutral's darkest level is a literal black in light mode, not a tone
         // (neutralSurfaceWindow / generateSingleTheme) — no tone is true black.
@@ -1885,7 +1892,7 @@ ${(() => {
   // and the tertiary CONTAINER already do. Pinning it to TC in both modes is
   // what left the tertiary card cream on a dark page — the one card that never
   // followed the mode. Dark: its Surface level on the dark ladder, tone 3.
-  const tertiaryThemeN = isDark ? DARK_LADDER_TONE.Surface : TC;
+  const tertiaryThemeN = isDark ? bandS('Tertiary') : TC;
   const tertiaryThemePal = isDark ? tertiaryDark : tertiaryLight;
   const tertiarySurfaceBg = p(tertiaryThemePal, tertiaryThemeN);
   const tertiarySurfaceTones = getAccessibleTones(tertiarySurfaceBg, tertiaryThemeN, tertiaryThemePal);
@@ -1929,7 +1936,7 @@ ${emitTagTextTokens()}
 [data-theme="Secondary"][data-surface="Surface"] {
   --Background: ${isDark ? p(vSecondary, nFor('Secondary')) : `var(--Secondary-Color-${SC})`};
   --Surface: ${isDark ? p(vSecondary, nFor('Secondary')) : `var(--Secondary-Color-${SC})`};
-${isDark ? darkSurfaceRoleLines('Secondary', p(vSecondary, nFor('Secondary')), secondaryLight) : ''}
+${isDark ? darkSurfaceRoleLines('Secondary', p(vSecondary, nFor('Secondary')), secondaryLight, nFor('Secondary')) : ''}
 ${emitDefaultBtnTokens('Secondary')}
 ${emitPerPaletteButtonTokens(p(vSecondary, nFor('Secondary')), nFor('Secondary'))}
 ${emitStateButtonTokens(nFor('Secondary'))}
@@ -1978,7 +1985,7 @@ ${(() => {
 [data-theme="Primary"][data-surface="Surface"] {
 ${isDark ? `  --Background: ${p(vPrimary, nFor('Primary'))};
   --Surface: ${p(vPrimary, nFor('Primary'))};
-${darkSurfaceRoleLines('Primary', p(vPrimary, nFor('Primary')), primaryLight)}` : ''}
+${darkSurfaceRoleLines('Primary', p(vPrimary, nFor('Primary')), primaryLight, nFor('Primary'))}` : ''}
 ${emitDefaultBtnTokens('Primary')}
 ${emitPerPaletteButtonTokens(isDark ? p(vPrimary, nFor('Primary')) : p(primaryLight, PC), nFor('Primary'))}
 ${emitStateButtonTokens(nFor('Primary'))}
@@ -1986,13 +1993,13 @@ ${emitTagTextTokens()}
 }
 ${isDark ? `
 /* Dark mode: cards in a Primary / Secondary / Tertiary section are that
-   theme's own five — its tone 4 mixed with its page tone 3, as in the export
-   (one set per theme, the same on every surface level). Restated on the card,
-   after the Container Surface block that restates the page's cards on every
-   card. */
-${darkCardScope('[data-theme="Primary"]', p(vPrimary, DARK_CARD_TONE), p(vPrimary, DARK_LADDER_TONE.Surface))}
-${darkCardScope('[data-theme="Secondary"]', p(vSecondary, DARK_CARD_TONE), p(vSecondary, DARK_LADDER_TONE.Surface))}
-${darkCardScope('[data-theme="Tertiary"]', p(vTertiary, DARK_CARD_TONE), p(vTertiary, DARK_LADDER_TONE.Surface))}
+   theme's own five — its band's tone S+1 mixed over its Surface S, as in the
+   export (one set per theme, the same on every surface level). Restated on
+   the card, after the Container Surface block that restates the page's cards
+   on every card. */
+${darkCardScope('[data-theme="Primary"]', p(vPrimary, bandCardTone(bandS('Primary'))), p(vPrimary, bandS('Primary')))}
+${darkCardScope('[data-theme="Secondary"]', p(vSecondary, bandCardTone(bandS('Secondary'))), p(vSecondary, bandS('Secondary')))}
+${darkCardScope('[data-theme="Tertiary"]', p(vTertiary, bandCardTone(bandS('Tertiary'))), p(vTertiary, bandS('Tertiary')))}
 ` : ''}
 /* ══ Nav Bar ══ */
 ${(() => {

@@ -2,8 +2,9 @@
  * The dark-mode surface ladder and the cards that sit on it.
  *
  * ── The decision (owner, 2026-11-04) ───────────────────────────────────────
- * In DARK mode every theme — Default included, no special case — paints its
- * five surface levels like this:
+ * In DARK mode every theme — Default included — paints its five surface levels
+ * like this, except the Primary, Secondary and Tertiary themes, which paint
+ * their own lighter band (see Bands, at the end of this file):
  *
  *   Surface-Dimmest   tone 1
  *   Surface-Dim       tone 2
@@ -90,6 +91,9 @@ export const SECTION_LEVEL: Record<string, DarkLadderLevel> = {
   'Surfaces-Brightest': 'Surface-Brightest',
 };
 
+/** Where the windows are recorded in a mode's data (a plain array, not a token). */
+export const LADDER_WINDOWS_KEY = 'Ladder-Windows';
+
 export interface ThemeWindow {
   theme: string;
   palette: string;
@@ -113,6 +117,13 @@ const val = (node: any): string => String(node && typeof node === 'object' ? nod
  * Background somewhere else.
  */
 export function themeWindows(modeData: any): ThemeWindow[] {
+  /* The band pass (cssgen/darkBandPass.ts) repoints the Primary, Secondary
+     and Tertiary themes' references at the colors their lighter dark-mode
+     surfaces need, so their Text references no longer name the table index
+     their level uses. The windows are recorded before that, and every reader
+     of the maps keeps seeing exactly the windows it saw before. */
+  const stored = modeData?.[LADDER_WINDOWS_KEY];
+  if (Array.isArray(stored)) return stored as ThemeWindow[];
   const out: ThemeWindow[] = [];
   for (const [theme, sections] of Object.entries<any>(modeData?.Themes ?? {})) {
     if (!sections || typeof sections !== 'object') continue;
@@ -306,4 +317,95 @@ export function cardRoleFailures(decls: Record<string, string | undefined>, card
 
 export function cardRolesFit(decls: Record<string, string | undefined>): (cardHex: string) => boolean {
   return (card: string) => cardRoleFailures(decls, card).length === 0;
+}
+
+/* ─── Bands: the Primary, Secondary and Tertiary themes keep their color ────
+ *
+ * Owner decision, 2026-11-04 (Figma "Surf — dark mode colors (tones 1–5)",
+ * node 10837:2): in dark mode a themed section keeps some of its color.
+ *
+ * For the Primary, Secondary and Tertiary THEMES only, the dark-mode Surface is
+ *
+ *   S = min(L, 8)
+ *
+ * where L is the tone that theme's Surface paints in LIGHT mode. A light tone
+ * 1-7 "stays true" (same index, painted from the dark ramp); 8-12 is capped at
+ * 8. The other levels are centred on it — Dimmest S-2, Dim S-1, Bright S+1,
+ * Brightest S+2, clamped to 1..12 — and the cards keep the ladder's card
+ * relationship, shifted: tone S+1 mixed over S at 50 / 65 / 75 / 90 / 100%,
+ * one set per theme on every level.
+ *
+ * Everything else keeps the ladder above: the Default theme and the page
+ * (tones 1-5, page 3, cards tone 4 over 3), Neutral, Info, Success, Warning,
+ * Error, App-Bar, Nav-Bar, Status and the black rule.
+ *
+ * Example (Surf's published palettes): Primary light 9 -> dark 8, so its
+ * levels are 6 / 7 / 8 / 9 / 10; Tertiary light 7 -> 7 (5 / 6 / 7 / 8 / 9).
+ * cssgen/darkBandPass.ts puts it into the exported JSON.
+ */
+export const BAND_THEMES = ['Primary', 'Secondary', 'Tertiary'] as const;
+export const BAND_MAX_TONE = 8;
+
+const clampTone = (t: number) => Math.max(1, Math.min(12, t));
+
+/** The dark-mode Surface tone of a band theme whose light Surface is tone `L`. */
+export function bandSurfaceTone(L: number): number {
+  return clampTone(Math.min(L, BAND_MAX_TONE));
+}
+
+/** A band theme's five dark-mode levels, centred on S. */
+export function bandTones(S: number): Record<DarkLadderLevel, number> {
+  return {
+    'Surface-Dimmest': clampTone(S - 2),
+    'Surface-Dim': clampTone(S - 1),
+    'Surface': clampTone(S),
+    'Surface-Bright': clampTone(S + 1),
+    'Surface-Brightest': clampTone(S + 2),
+  };
+}
+
+/** The dark ramp's light half starts here: tones 1-5 are dark, 6-12 light
+ *  (DARK_TONE_SCALE jumps from L* 24 to 58 between them). */
+export const DARK_RAMP_LIGHT_FROM = 6;
+
+/**
+ * The tone a band theme's cards are mixed from: one above the Surface.
+ *
+ * Two clamps, both falling back to one BELOW (S-1):
+ *  - S+1 past the ramp (S = 12) — the owner's rule; cannot happen while S <= 8.
+ *  - S+1 across the dark ramp's split (S = 5): tone 6 sits in the light half,
+ *    so the five mixes run from L* ~41 to ~58, and no one text color clears
+ *    4.5:1 on all of them (white fails from Container up, black on Lowest).
+ *    Cards one tone darker keep every card on the surface's own side — the
+ *    shape the ladder already accepts on its tone-5 Brightest, where the cards
+ *    sit darker than the surface.
+ */
+export function bandCardTone(S: number): number {
+  if (S + 1 > 12) return S - 1;
+  if (S < DARK_RAMP_LIGHT_FROM && S + 1 >= DARK_RAMP_LIGHT_FROM) return S - 1;
+  return S + 1;
+}
+
+/** A band theme's five card colors off its dark ramp (tone 1 first). */
+export function bandCardHexesForRamp(ramp: string[], S: number): Record<DarkCardLevel, string> {
+  return darkCardHexes(ramp[bandCardTone(S) - 1], ramp[S - 1]);
+}
+
+export interface BandInfo {
+  theme: string;
+  palette: string;
+  /** the tone the theme's Surface paints in light mode */
+  L: number;
+  S: number;
+  tones: Record<DarkLadderLevel, number>;
+  cardTone: number;
+}
+
+/** Where the band pass records the bands, in each mode's data (plain JSON, not tokens). */
+export const LADDER_BANDS_KEY = 'Ladder-Bands';
+
+/** The bands recorded in a mode's data, by theme. */
+export function recordedBands(modeData: any): Record<string, BandInfo> {
+  const b = modeData?.[LADDER_BANDS_KEY];
+  return b && typeof b === 'object' && !Array.isArray(b) ? b as Record<string, BandInfo> : {};
 }

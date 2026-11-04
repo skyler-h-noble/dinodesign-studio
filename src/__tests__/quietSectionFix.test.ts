@@ -123,7 +123,7 @@ describe('Quiet on themed surfaces clears 4.5:1 in both modes', () => {
       expect(pairs.length).toBe(2);
       for (const [w, fg, back] of pairs) expect(contrastRatio(fg, back), `${b[0]} ${bg} ${w}`).toBeGreaterThanOrEqual(4.5);
     }
-  });
+  }, 60_000);
 });
 
 describe('the fix is scoped', () => {
@@ -173,8 +173,15 @@ describe('the fix is scoped', () => {
       if (quiet[k].value > tone) overriddenHere.add(`${theme}/${section}`);
     }
     expect([...overriddenHere].sort()).toEqual([...changedSections].sort());
-    // Untouched sections still alias the shared tone value.
-    expect(String(figma.Themes.Primary.Surface['Quiet-Opacity'].value)).toMatch(/^\{Quiet\.Color-\d+-Opacity\}$/);
+    // Untouched sections still alias the shared tone value. (Primary is a
+    // dark-mode band theme now, whose lighter sections can need their own.)
+    for (const [theme, sections] of Object.entries<any>(figma.Themes)) {
+      for (const [section, node] of Object.entries<any>(sections)) {
+        const v = node?.['Quiet-Opacity']?.value;
+        if (typeof v !== 'string' || !v.startsWith('{Quiet.') || own.includes(`${theme}-${section}-Opacity`)) continue;
+        expect(v, `${theme}/${section}`).toMatch(/^\{Quiet\.Color-\d+-Opacity\}$/);
+      }
+    }
   });
 
   it('Figma: existing per-tone floats are untouched; sections that need one alias their own', () => {

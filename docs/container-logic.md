@@ -13,7 +13,7 @@ Two implementations produce these values and they must agree
 | --- | --- |
 | Export / Figma | `src/utils/cssgen/generateSimplifiedBackgrounds.ts` |
 | Phone preview | `src/utils/buildPreviewCSS.ts` |
-| Dark-mode cards (both, shared) | `src/utils/darkLadder.ts` (`DARK_CARD_ALPHA`, `darkCardHex`), written by `cssgen/darkLadderPass.ts` |
+| Dark-mode cards (both, shared) | `src/utils/darkLadder.ts` (`DARK_CARD_ALPHA`, `darkCardHex`, `bandCardHexesForRamp`), written by `cssgen/darkLadderPass.ts` and, for the band themes, `cssgen/darkBandPass.ts` |
 
 Verified by `src/__tests__/containerTone.test.ts` and
 `scripts/audit-containers.ts`.
@@ -200,6 +200,43 @@ level inside a higher one (Lowest inside Container) comes out darker than its
 parent — that is not the pattern. Its roles still pass (9,000 measured), but use
 a higher level.
 
+### Dark mode bands — cards one tone above the band
+
+Owner's decision (2026-11-04, the same day): the Primary, Secondary and
+Tertiary THEMES paint their own band in dark mode — Surface S = min(L, 8), L
+being the tone their Surface paints in light mode, levels S-2 .. S+2
+([background-selection.md](background-selection.md#bands-primary-secondary-and-tertiary-keep-their-color)).
+Their cards keep the relationship above, shifted onto the band:
+
+| level | dark mode, band theme |
+| --- | --- |
+| `Container-Lowest` | 50% tone S+1, 50% tone S |
+| `Container-Low` | 65% tone S+1 |
+| `Container` | 75% tone S+1 |
+| `Container-High` | 90% tone S+1 |
+| `Container-Highest` | tone S+1 itself |
+
+Same `blendColors`, solid, one set per theme on every surface level, the same
+in the CSS, the preview and Figma (`bandCardHexesForRamp` in
+`utils/darkLadder.ts`; written by `cssgen/darkBandPass.ts` as Band entries
+whose light value is the card the theme always had). Surf's Primary (S 8):
+`#c0b295 #c2b497 #c4b699 #c6b89c #c8ba9e`.
+
+Two clamps, both to tone S-1 (one BELOW): S+1 past the ramp (cannot happen
+while S <= 8), and S = 5, where tone 6 sits in the dark ramp's light half — the
+mixes of 6 over 5 run from L* ~41 to ~58 and no one text color clears 4.5:1 on
+all five. Tone 4 over 5 keeps every card on the surface's side, the shape the
+ladder already accepts on its tone-5 Brightest.
+
+Card roles on a band are re-solved for the band's cards: a band card's darkest
+point is the Surface itself (S+1 over S is lighter than S), so a dark
+foreground that clears tone S clears every card; on a dark band (S <= 5, cards
+one below) the lightest card is S itself and a light foreground that clears S
+clears them all. On a card, Quiet is a color of its own (the CSS has no surface
+alpha to composite it with there), so it is graded like text.
+
+The page's cards and every other theme's are unchanged: tone 4 over the page.
+
 ---
 
 ## Which tone a tonal card uses
@@ -317,6 +354,7 @@ The comment above them describes a Color-1/2/3 shift that no longer happens.
 npx vitest run src/__tests__/containerTone.test.ts   # ramp shape, both pipelines
 npx tsx scripts/audit-containers.ts                  # contrast, every level and style
 npx vitest run src/__tests__/darkLadder.test.ts      # dark: tone-4 cards, one set per theme, roles pass
+npx vitest run src/__tests__/darkBands.test.ts       # dark bands: S+1-over-S cards, CSS == preview == Figma
 ```
 
 The ramp test covers every `Background-N`, not just the four a user can pick — a

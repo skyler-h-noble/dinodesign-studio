@@ -49,13 +49,18 @@ export interface Selection {
   textColoring: typeof TEXTS[number];
 }
 
-export function makeScheme(colors: [string, string, string]): ColorScheme {
+/** The tone each color lands on (lightness), unless a test pins it: a studio
+ *  system can carry a tone other than its color's own lightness (Surf's
+ *  published Primary sits on tone 9). */
+export type ExtractedTones = { primary: number; secondary: number; tertiary: number };
+
+export function makeScheme(colors: [string, string, string], extracted?: ExtractedTones): ColorScheme {
   const light = (hex: string) => generateSemanticLightModeScale(hex, undefined, hex);
   const dark = (hex: string) => generateSemanticDarkModeScale(hex);
   return {
     name: 'Test',
     colors,
-    extractedTones: {
+    extractedTones: extracted ?? {
       primary: chroma(colors[0]).lch()[0],
       secondary: chroma(colors[1]).lch()[0],
       tertiary: chroma(colors[2]).lch()[0],
@@ -72,8 +77,8 @@ const FACES = {
 };
 
 /** The tokens JSON and published CSS files for one brand + selection. */
-export function buildSystem(colors: [string, string, string], sel: Selection) {
-  const scheme = makeScheme(colors);
+export function buildSystem(colors: [string, string, string], sel: Selection, extracted?: ExtractedTones) {
+  const scheme = makeScheme(colors, extracted);
   const button = BUTTONS[sel.button] ?? 'primary-fixed';
   const bgTheme = parseBackground(sel.background).theme;
   const json = exportColorSystemToJSON(
@@ -116,8 +121,8 @@ export function quietly<T>(fn: () => T): T {
 export interface Failure { mode: string; background: string; surfaceLevel: string; check: ReportCheck }
 
 /** Every failing check the rendered report finds for one brand + selection. */
-export function renderedFailures(colors: [string, string, string], sel: Selection): Failure[] {
-  const { files } = quietly(() => buildSystem(colors, sel));
+export function renderedFailures(colors: [string, string, string], sel: Selection, extracted?: ExtractedTones): Failure[] {
+  const { files } = quietly(() => buildSystem(colors, sel, extracted));
   const sections: ReportSection[] = buildRenderedAccessibilityReport({
     light: orderSheets(files, 'Light'),
     dark: orderSheets(files, 'Dark'),

@@ -9,6 +9,7 @@
 
 import { parseBar, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
 import { darkLadderMaps, windowForPalette, exactIndexForTone } from './darkLadder';
+import { LADDER_PAGE_ICONS_KEY, BAND_GROUP, BAND_BUTTON_GROUP, BAND_ORIGINALS_KEY } from './cssgen/darkBandPass';
 import { defaultDimmestRef } from './cssgen/exportToCSS';
 import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
 import { computeRadii, migrateLegacyRadii, buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRadii';
@@ -686,6 +687,9 @@ export function generateFigmaJSON(
 
   const modes = ['Light-Mode', 'Dark-Mode'];
 
+  /* Dark values of the band button-border pairs, written once Dark-Mode
+     exists (the Theme collection is built during the Light-Mode pass). */
+  const pendingBandDark: Record<string, string> = {};
   for (const modeName of modes) {
     const modeData = designSystemJSON.Modes?.[modeName];
     if (!modeData) continue;
@@ -761,6 +765,13 @@ export function generateFigmaJSON(
       /* A card's palette-color role (a dark card's link) that has to follow
          the lighter dark-mode cards (darkLadderPass, step 6). */
       'Card-Accent',
+      /* The Primary / Secondary / Tertiary themes' dark-mode bands
+         (cssgen/darkBandPass.ts): a role whose light value is the reference it
+         always had and whose dark value is the band's answer, and the button
+         units on a band, read whole like Cell-Button. Band-Variant is the
+         CSS's only — Figma draws a variant as its icon at an opacity. */
+      BAND_GROUP,
+      BAND_BUTTON_GROUP,
     ];
 
     for (const section of MODES_SECTIONS) {
@@ -800,6 +811,13 @@ export function generateFigmaJSON(
             const hex = toHex(entry?.[k]?.value);
             if (hex) entry[k] = { value: hex, type: 'color' };
           }
+        }
+      }
+      // Band-Button: <unit>.<field> (cssgen/darkBandPass.ts).
+      for (const entry of Object.values<any>(modeSection[BAND_BUTTON_GROUP] ?? {})) {
+        for (const k of ['Highlight', 'Lowlight']) {
+          const hex = toHex(entry?.[k]?.value);
+          if (hex) entry[k] = { value: hex, type: 'color' };
         }
       }
     }
@@ -1302,6 +1320,23 @@ export function generateFigmaJSON(
         return true;
       };
 
+      /* Band button borders (cssgen/darkBandPass.ts): the reference each one
+         replaced, and one Modes variable per distinct light/dark pair. */
+      const bandOriginals: Record<string, string> = designSystemJSON.Modes?.['Light-Mode']?.[BAND_ORIGINALS_KEY] ?? {};
+      const bandBorderByPair = new Map<string, string>();
+      const bandBorderEntry = (lightRef: string, darkRef: string): string => {
+        const pair = `${lightRef}|${darkRef}`;
+        const hit = bandBorderByPair.get(pair);
+        if (hit) return hit;
+        const name = `Button-Border-${lightRef.slice(1, -1).replace(/^Default-Button-Border\./, '').replace(/[^\w-]+/g, '-')}-${bandBorderByPair.size + 1}`;
+        const lightSection = figma.Modes?.['Light-Mode'];
+        if (lightSection) (lightSection[BAND_GROUP] ??= {})[name] = { value: lightRef, type: 'color' };
+        pendingBandDark[name] = darkRef;
+        const ref = `{${BAND_GROUP}.${name}}`;
+        bandBorderByPair.set(pair, ref);
+        return ref;
+      };
+
       for (const themeName of THEME_MODES) {
         const theme = themes[themeName];
         if (!theme) continue;
@@ -1380,7 +1415,7 @@ export function generateFigmaJSON(
                   const tokenVal = (val as any).value;
                   // Check if it's already a Backgrounds ref
                   const bgRef = tokenVal.replace(/[{}]/g, '');
-                  if (bgRef.startsWith('Backgrounds.') || bgRef.startsWith('Containers.')) {
+                  if (bgRef.startsWith('Backgrounds.') || bgRef.startsWith('Containers.') || bgRef.startsWith(`${BAND_GROUP}.`)) {
                     target[key] = { value: tokenVal, type: 'color' };
                   } else {
                     // Resolve to hex as fallback
@@ -1451,7 +1486,8 @@ export function generateFigmaJSON(
                     'Buttons', 'Default-Button', 'Default-Button-Border', 'Backgrounds',
                     'Button-Hover', 'Button-Pressed', 'Button-Highlight', 'Button-Lowlight',
                     'Dropshadow-Color',
-                    'Default-Background', 'Tonal-Button', 'Cell-Button'];
+                    'Default-Background', 'Tonal-Button', 'Cell-Button',
+                    BAND_GROUP, BAND_BUTTON_GROUP];
 
                   // If the token already references a Modes group, keep it as-is
                   // (don't resolve further — the plugin will alias to the Modes variable)
@@ -1501,7 +1537,7 @@ export function generateFigmaJSON(
                       // and Pressed, and its light values are identical to the
                       // tone-keyed ones, so light output is unchanged.
                       const shadeMatch = String(btnToken.value).match(
-                        /\{((?:Buttons|Default-Button|Cell-Button)\.[\w-]+\.[\w-]+|Tonal-Button\.[\w-]+\.[\w-]+\.[\w-]+)\.Button\}/
+                        /\{((?:Buttons|Default-Button|Cell-Button)\.[\w-]+\.[\w-]+|Tonal-Button\.[\w-]+\.[\w-]+\.[\w-]+|Band-Button\.[\w-]+)\.Button\}/
                       );
                       /* A tonal state button: everything — fill, label, states,
                          bevel and the border, which IS the fill — comes from
@@ -1511,7 +1547,7 @@ export function generateFigmaJSON(
                       /* A Cell-Button entry carries the whole button, border
                          included — Fixed's border is NOT the fill — so every
                          field already points into it. Leave it as written. */
-                      const cell = !!shadeMatch && shadeMatch[1].startsWith('Cell-Button.');
+                      const cell = !!shadeMatch && (shadeMatch[1].startsWith('Cell-Button.') || shadeMatch[1].startsWith(`${BAND_BUTTON_GROUP}.`));
                       if (shadeMatch) {
                         target[key]['Hover'] = { value: `{${shadeMatch[1]}.Hover}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{${shadeMatch[1]}.Pressed}`, type: 'color' };
@@ -1524,8 +1560,13 @@ export function generateFigmaJSON(
                         // tone table gave a bevel computed from the light fill
                         // sitting on the dark button — the same divergence the
                         // Hover/Pressed fix above corrects.
-                        target[key]['Highlight'] = { value: `{${shadeMatch[1]}.Highlight}`, type: 'color' };
-                        target[key]['Lowlight'] = { value: `{${shadeMatch[1]}.Lowlight}`, type: 'color' };
+                        /* A band button unit carries no bevel of its own: the
+                           section names its state entry's (cssgen/darkBandPass.ts). */
+                        const bandBevel = shadeMatch[1].startsWith(`${BAND_BUTTON_GROUP}.`);
+                        for (const bevel of ['Highlight', 'Lowlight']) {
+                          if (bandBevel && String(target[key][bevel]?.value ?? '').startsWith('{')) continue;
+                          target[key][bevel] = { value: `{${shadeMatch[1]}.${bevel}}`, type: 'color' };
+                        }
                       } else {
                         target[key]['Hover'] = { value: `{Button-Hover.${palette}.${colorN}}`, type: 'color' };
                         target[key]['Pressed'] = { value: `{Button-Pressed.${palette}.${colorN}}`, type: 'color' };
@@ -1541,7 +1582,11 @@ export function generateFigmaJSON(
                       // background's Color-N.
                       const existingBorder = target[key]['Border']?.value;
                       if (cell) {
-                        target[key]['Border'] = { value: `{${shadeMatch![1]}.Border}`, type: 'color' };
+                        /* A band state button's unit carries no Border: its
+                           border IS its fill, and the section says so. */
+                        const unitBorder = shadeMatch![1].startsWith(`${BAND_BUTTON_GROUP}.`) && existingBorder === `{${shadeMatch![1]}.Button}`
+                          ? existingBorder : `{${shadeMatch![1]}.Border}`;
+                        target[key]['Border'] = { value: unitBorder, type: 'color' };
                       } else if (tonal) {
                         target[key]['Border'] = { value: `{${shadeMatch![1]}.Button}`, type: 'color' };
                       } else if (typeof existingBorder === 'string') {
@@ -1549,10 +1594,22 @@ export function generateFigmaJSON(
                         // Surface-Dimmest, Surface-Bright, Containers,
                         // Container-Low(est), Container-High(est). Preserves
                         // the scope and surface Color-N; rewrites the palette.
-                        const borderMatch = existingBorder.match(
+                        /* A dark-mode band (cssgen/darkBandPass.ts) repointed
+                           this border at the color its band needs. Figma's
+                           border is Default-Button-Border at the index the
+                           ORIGINAL reference named, so take that for light
+                           mode and the band's own border for dark: one
+                           variable holding the pair. */
+                        const bandOriginal: string | undefined = bandOriginals[`${themeName}.${currentInternalKey}.Buttons.${key}.Border`];
+                        const borderMatch = (bandOriginal ?? existingBorder).match(
                           /\{Border\.([\w-]+)\.[\w-]+\.(Color-[\w-]+)\}/
                         );
-                        if (borderMatch) {
+                        if (borderMatch && bandOriginal) {
+                          const scope = /^Container/.test(borderMatch[1]) ? 'Containers' : 'Surfaces';
+                          const borderPalette = (themeName === 'Default' && key === 'Default') ? 'Default' : palette;
+                          const lightRef = `{Default-Button-Border.${scope}.${borderPalette}.${borderMatch[2]}}`;
+                          target[key]['Border'] = { value: bandBorderEntry(lightRef, existingBorder), type: 'color' };
+                        } else if (borderMatch) {
                           const surfaceColorN = borderMatch[2];
                           // Default-Button-Border, not Border.<scope>. Same
                           // index, but the Modes layer supplies the light value
@@ -2318,9 +2375,12 @@ export function generateFigmaJSON(
            own theme On-* for this level — the dark-ladder pass pointed those
            at the text for the icon actually drawn there. Same as exportToCSS. */
         if (darkWindow && section) {
+          /* A band theme's On-* as they were on the ladder (exportToCSS
+             reads the same record). */
+          const ladderIcons = modeData[LADDER_PAGE_ICONS_KEY]?.[darkPalette]?.[section];
           const icons = modeData.Themes?.[darkPalette]?.[section]?.Icons;
           for (const pal of [...ACCENT_PALETTES, 'Default', 'Match']) {
-            const raw = icons?.[`On-${pal}`]?.value;
+            const raw = ladderIcons ? ladderIcons[`On-${pal}`] : icons?.[`On-${pal}`]?.value;
             const hex = typeof raw === 'string' ? (raw.startsWith('#') ? raw : resolveToHex(raw, modeLookup, modeColors)) : null;
             if (hex?.startsWith('#')) defBg[`${prefix}On-${pal}`] = { value: hex, type: 'color' };
           }
@@ -2997,6 +3057,10 @@ const FIGMA_LG_BUTTON_PADDING = 16;
 
   const unresolvedBefore = countUnresolved();
 
+  if (Object.keys(pendingBandDark).length && figma.Modes?.['Dark-Mode']) {
+    const g = (figma.Modes['Dark-Mode'][BAND_GROUP] ??= {});
+    for (const [name, value] of Object.entries(pendingBandDark)) g[name] = { value, type: 'color' };
+  }
   for (const modeName of Object.keys(figma.Modes ?? {})) {
     const modeSection: any = figma.Modes[modeName];
     const bevelPct = designSystemJSON._componentStyle?.bevelOpacity ?? 50;

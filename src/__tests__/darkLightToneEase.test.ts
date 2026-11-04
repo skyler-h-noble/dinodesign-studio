@@ -256,16 +256,16 @@ describe('preview, export and Figma agree on the eased tones', () => {
     }
   });
 
-  it('a dark-mode Primary section (Surface) paints its dark-ladder tone in the export', () => {
+  it('a dark-mode Primary section (Surface) paints its band tone, from the eased ramp', () => {
     // The case that prompted the ease was <Section theme="Primary"
-    // surface="Surface"> painting Color-6. Since the dark ladder
-    // (utils/darkLadder.ts) every theme's levels paint tones 1-5 in dark
-    // mode — Surface tone 3, Bright tone 4 — which the ease leaves alone.
+    // surface="Surface"> painting Color-6. Primary is a band theme
+    // (utils/darkLadder.ts, Bands): its dark Surface is min(L, 8) of the dark
+    // ramp — the eased ramp — and Bright one tone up.
+    const band = (json as any).Modes['Dark-Mode']['Ladder-Bands'].Primary;
     const bg = cssToken(css['Dark-Mode.css'], /\[data-theme="Primary"\]\[data-surface="Surface"\]/, 'Background');
-    expect(norm(resolveVar(css['Dark-Mode.css'], bg))).toBe(norm(eased[2].hex));
+    expect(norm(resolveVar(css['Dark-Mode.css'], bg))).toBe(norm(eased[band.S - 1].hex));
     const bright = cssToken(css['Dark-Mode.css'], /\[data-theme="Primary"\]\[data-surface="Surface-Bright"\]/, 'Background');
-    expect(norm(resolveVar(css['Dark-Mode.css'], bright))).toBe(norm(eased[3].hex));
-    expect(eased[2].hex).toBe(plain[2].hex);
+    expect(norm(resolveVar(css['Dark-Mode.css'], bright))).toBe(norm(eased[band.tones['Surface-Bright'] - 1].hex));
   });
 
   it('the preview reads the eased ramp where it draws from the dark palette', () => {
