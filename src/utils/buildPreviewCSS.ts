@@ -373,7 +373,7 @@ function deriveHex(hex: string, lightOffset: number, satMul: number): string {
  * We find the max lightness shift where contrast(mix(bg, shifted, opacity), textColor) >= 4.5.
  * Since opacity is user-controlled (0-100%), we compute for worst case (100% opacity).
  */
-function highlightFor(hex: string): string {
+function highlightHex(hex: string): string {
   // Try progressively smaller shifts until contrast is safe
   const textColor = isLight(hex) ? '#1a1a1a' : '#ffffff';
   for (let shift = 25; shift >= 2; shift -= 2) {
@@ -383,7 +383,7 @@ function highlightFor(hex: string): string {
   return hex; // No shift if nothing passes
 }
 
-function lowlightFor(hex: string): string {
+function lowlightHex(hex: string): string {
   const textColor = isLight(hex) ? '#1a1a1a' : '#ffffff';
   for (let shift = 25; shift >= 2; shift -= 2) {
     const candidate = deriveHex(hex, -shift, 1.3);
@@ -391,6 +391,14 @@ function lowlightFor(hex: string): string {
   }
   return hex;
 }
+
+/* --Buttons-*-Highlight / -Lowlight are COMMA RGB TRIPLETS, as in the
+   published CSS (cssGeneration.test: "Highlight/Lowlight should be RGB
+   triplets"). The lib paints the bevel with rgb(var(--Buttons-X-Highlight)),
+   and a hex inside rgb() is invalid — the whole box-shadow drops and the
+   preview's buttons render flat while the exported ones are bevelled. */
+function highlightFor(hex: string): string { return hexToRgb(highlightHex(hex)); }
+function lowlightFor(hex: string): string { return hexToRgb(lowlightHex(hex)); }
 
 /** Mix two hex colors at 50% */
 function mixHex(hex1: string, hex2: string): string {

@@ -23,7 +23,7 @@ import { buttonBorderWidthPx, buttonSelectedBorderWidthPx } from './componentRad
 import type { ComponentStyle } from '../types';
 import { buttonModeMetricVars } from './buttonSizing';
 import { lineMetricsVars, navMetricsVars, selectionMetricsVars, tooltipMetricsVars, fieldMetricsVars, otherMetricsVars, FAB_SIZE } from './componentSize';
-import { fabBevelVars } from './bevelGeometry';
+import { fabBevelVars, bevelVars } from './bevelGeometry';
 export type { ComponentStyle };
 
 /** The flat per-style customization object, as stored in a system's snapshot. */
@@ -115,6 +115,14 @@ export function componentStyleVars(
     '--Button-Bevel-Opacity': `${bevelOpacity / 100}`,
     '--Button-Bevel-Px': `${bevelPx}px`,
     ...fabBevelVars(FAB_SIZE, bevel),
+    /* The per-size bevel GEOMETRY the lib's Button paints with
+       (var(--Sm-Button-Highlight-Offset-x) …). The lib's core.css ships them
+       at 0px, so without these the preview's buttons were flat whatever the
+       Bevel slider said, while the export — which emits them per platform
+       (platformBevelCSS) — was bevelled. Desktop heights, as the studio is. */
+    ...bevelVars('', buttonHeight, bevel),
+    ...bevelVars('Sm-', smallButtonHeight, bevel),
+    ...bevelVars('Lg-', largeButtonHeight, bevel),
     /* Button-Height / Sm- / Lg- now come from buttonModeMetricVars above, so
        they are not restated here — one source, matching Figma's names.
        These two remain as ALIASES: ToggleButtonGroup, Autocomplete and Input

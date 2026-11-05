@@ -127,6 +127,16 @@ export function bevelCSS(prefix: string, height: number, percent: number, indent
     .join('\n');
 }
 
+/** The same eight custom properties as a record — for an inline style or a
+ *  serialised sheet (componentStyleVars). Same names and values as bevelCSS. */
+export function bevelVars(prefix: string, height: number, percent: number): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [suffix, value] of Object.entries(bevelGeometry(height, percent))) {
+    out[`--${prefix}Button-${suffix}`] = `${value}px`;
+  }
+  return out;
+}
+
 /** The same eight values as bare numbers, keyed for the Figma JSON. */
 export function bevelJSON(prefix: string, height: number, percent: number): Record<string, number> {
   const out: Record<string, number> = {};
