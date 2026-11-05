@@ -87,8 +87,13 @@
      `overflow-x: auto` makes this a scroll container, and a scroll container
      clips on BOTH axes — the browser promotes the other axis away from
      `visible`. So the cards' own `overflow: visible` cannot save their
-     shadows; the space has to exist inside this box. */
-  padding-bottom: 10px;
+     shadows; the space has to exist inside this box — on every side: a
+     hovered card lifts 1px and grows its shadow, so with room only at the
+     bottom its top edge and side shadows were cut off. The negative margin
+     keeps the cards where they were. */
+  padding: 6px 10px 12px;
+  margin: -6px -10px -2px;
+  width: calc(100% + 20px);
 }
 
 .assign-bg-buttons {
