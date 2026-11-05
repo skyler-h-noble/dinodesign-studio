@@ -354,7 +354,6 @@ export default function ColorAssignmentStage({
                   size="small"
                   fullWidth
                   className="dino-color-select"
-                  style={{ ['--select-trigger-color' as any]: getNavColor(userSelections[nav.key]) }}
                   value={userSelections[nav.key]}
                   onChange={(val: string) => {
                     const v = val as NavOption;

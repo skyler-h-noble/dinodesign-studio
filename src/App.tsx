@@ -915,16 +915,6 @@ function MainApp() {
           border-color: var(--swatch-color) !important;
           opacity: 0.9;
         }
-        /* Canonical lib 0.1.8 Select with mode=color paints the trigger
-           swatch using the option's value (e.g. primary-light) instead of
-           its color field, producing an empty/invalid background. Consumer
-           sets --select-trigger-color and this rule paints the first child
-           of the combobox flex:1 box (i.e. the broken swatch).
-           MISSING-LIB-COMPONENT: Select wrapper — port color-trigger fix. */
-        .dino-color-select[style*="--select-trigger-color"] [role="combobox"] > div:first-child > div > div:first-child {
-          background-color: var(--select-trigger-color) !important;
-          background-image: none !important;
-        }
       `}} />
       {/* Per-variant bevel shadow. Each variant exposes its palette's
           Highlight/Lowlight RGB triples via --Current-Bevel-*; one rule
