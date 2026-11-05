@@ -5,6 +5,19 @@ import type { ColorScheme, UserSelections, ComponentStyle, TypographyStyle } fro
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
 import { useMemo } from 'react';
 
+/** The phone's stylesheet, fenced to the phone.
+ *
+ *  buildPreviewCSS emits page-level selectors — [data-theme="Brand"],
+ *  [data-theme], [data-surface], :root. Injected bare, they matched the whole
+ *  studio, and because this <style> mounts after the studio's own brand sheet
+ *  it won every tie: the Assign Colors stage's cards took the phone's shadows
+ *  (the defaults, 0.345 alpha) instead of the user's, and a Dark preview would
+ *  have re-themed the page around it. @scope keeps every rule inside the
+ *  wrapper; :root becomes :scope so the root-level tokens land on it. */
+export function scopePhoneCSS(css: string): string {
+  return `@scope (.phone-preview-scope) {\n${css.replace(/:root\b/g, ':scope')}\n}`;
+}
+
 interface PhonePreviewProps {
   colorScheme: ColorScheme | null;
   userSelections: UserSelections;
@@ -32,17 +45,19 @@ export default function PhonePreview({
   const css = useMemo(() => {
     if (!colorScheme) return '';
     try {
-      return buildPreviewCSS({
+      return scopePhoneCSS(buildPreviewCSS({
         colorScheme, userSelections, componentStyle, mode, typographyStyles,
         styleCustomizations: styleCustomizations as never,
-      });
+      }));
     } catch { return ''; }
   }, [colorScheme, userSelections, componentStyle, mode, typographyStyles, styleCustomizations]);
 
   if (!colorScheme) return null;
 
   return (
-    <>
+    /* display: contents — the scope root adds no box, so the phone lays out
+       exactly as before; custom properties still inherit through it. */
+    <div className="phone-preview-scope" style={{ display: 'contents' }}>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
       <div className="phone-frame" data-theme="Brand-Nav-Bar" style={{
         width: 390, borderRadius: 48, border: '8px solid #2e2e2e',
@@ -282,6 +297,6 @@ export default function PhonePreview({
           ))}
         </nav>
       </div>
-    </>
+    </div>
   );
 }

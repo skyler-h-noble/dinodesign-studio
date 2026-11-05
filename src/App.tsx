@@ -538,6 +538,8 @@ function MainApp() {
             onSelectionsChanged={setUserSelections}
             moodBoardUrl={moodBoardUrl}
             designSystemName={designSystemName}
+            componentStyle={componentStyle}
+            styleCustomizations={savedStyleCustomizations?.[componentStyle]}
             onColorsReordered={(newColors) => {
               if (!selectedColorScheme) return;
               setSelectedColorScheme({

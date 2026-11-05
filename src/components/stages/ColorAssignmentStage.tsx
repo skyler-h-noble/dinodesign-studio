@@ -17,7 +17,7 @@ import {
 import PhonePreview from '../PhonePreview';
 import '../../styles/assign-colors.css';
 
-import type { StageProps, UserSelections, ColorScheme, TypographyStyle } from '../../types';
+import type { StageProps, UserSelections, ColorScheme, TypographyStyle, ComponentStyle } from '../../types';
 
 interface Props extends StageProps {
   colorScheme: ColorScheme | null;
@@ -30,6 +30,12 @@ interface Props extends StageProps {
   userSelections: UserSelections;
   moodBoardUrl?: string | null;
   designSystemName?: string;
+  /** The picked component style and its sliders, Shadow included. The phone
+   *  preview was hard-wired to 'modern' with no sliders, so it rendered the
+   *  DEFAULT shadows — and its stylesheet was global, so those defaults
+   *  replaced the user's on every card of this stage. */
+  componentStyle?: ComponentStyle;
+  styleCustomizations?: Record<string, unknown>;
 }
 
 /** A bar's stored value: a legacy string, or 'Theme/Surface-Level'. */
@@ -98,6 +104,8 @@ export default function ColorAssignmentStage({
   moodBoardUrl,
   designSystemName,
   typographyStyles,
+  componentStyle = 'modern',
+  styleCustomizations,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'preview' | 'customize'>('customize');
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
@@ -266,7 +274,8 @@ export default function ColorAssignmentStage({
               <PhonePreview
                 colorScheme={colorScheme}
                 userSelections={userSelections}
-                componentStyle="modern"
+                componentStyle={componentStyle}
+                styleCustomizations={styleCustomizations}
                 mode={previewMode}
                 moodBoardUrl={moodBoardUrl}
                 designSystemName={designSystemName}
