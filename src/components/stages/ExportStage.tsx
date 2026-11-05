@@ -379,7 +379,7 @@ export default function ExportStage({
           <BodySmall color="quiet">
             Make sure the Supabase storage bucket &quot;design-systems&quot; exists and allows public uploads.
           </BodySmall>
-          <Button variant="primary-outline" onClick={onBack}>Back</Button>
+          <Button variant="default-outline" onClick={onBack}>Back</Button>
         </VStack>
       </div>
     );
@@ -402,7 +402,7 @@ export default function ExportStage({
           ))}
           <div style={{ flex: 1 }} />
           <code className="export-id-code" data-surface="Container" style={{ maxWidth: 280 }}>{uniqueId}</code>
-          <Button variant="primary-outline" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
+          <Button variant="default-outline" size="small" onClick={() => handleCopy(uniqueId, setCopiedId)}>
             {copiedId ? 'Copied' : 'Copy'}
           </Button>
         </HStack>
@@ -418,7 +418,7 @@ export default function ExportStage({
               <BodySmall color="quiet">
                 View your complete design system with all 49 components rendered with your brand tokens. Share the playground link with your team.
               </BodySmall>
-              <Button variant="primary" style={{ width: '100%' }} disabled={!hasId} onClick={() => window.open(playgroundUrl, '_blank')}>
+              <Button variant="default" style={{ width: '100%' }} disabled={!hasId} onClick={() => window.open(playgroundUrl, '_blank')}>
                 Open Playground
               </Button>
             </VStack>
@@ -441,7 +441,7 @@ export default function ExportStage({
                 to every component, style, and variable.
               </BodySmall>
               <Button
-                variant="primary"
+                variant="default"
                 style={{ width: '100%' }}
                 onClick={() => setShowFigmaImportModal(true)}
                 disabled={!dinoId}
@@ -495,7 +495,7 @@ export default function ExportStage({
                 Download a detailed contrast report showing Text, Header, Quiet, Border, Button, and Button Text contrast ratios for every background, surface, and container.
               </BodySmall>
               <Button
-                variant="primary"
+                variant="default"
                 style={{ width: '100%' }}
                 disabled={!hasId}
                 onClick={() => window.open(`/accessibility-report?id=${dinoId}`, '_blank', 'noopener')}
@@ -512,7 +512,7 @@ export default function ExportStage({
             <VStack spacing={2}>
               <BodySmall style={{ fontWeight: 600 }}>Download All Files</BodySmall>
               <Button
-                variant="primary"
+                variant="default"
                 style={{ width: '100%' }}
                 onClick={async () => {
                   const zip = new JSZip();
@@ -555,7 +555,7 @@ export default function ExportStage({
                 Writes the 3 dynamic CSS files (<code>base.css</code>, <code>Light-Mode.css</code>, <code>Dark-Mode.css</code>) to your OmniDesign folder. First time you'll pick the folder; after that the studio remembers it and writes directly. Static lib files are left alone. Chrome/Edge only.
               </BodySmall>
               <Button
-                variant="primary-outline"
+                variant="default-outline"
                 style={{ width: '100%' }}
                 onClick={async () => {
                   type DirHandle = FileSystemDirectoryHandle & {

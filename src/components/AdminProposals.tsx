@@ -264,13 +264,13 @@ function ProposalCard({
           <Button variant="success" size="small" disabled={busy || proposal.status === 'accepted'} onClick={() => setStatus('accepted')}>
             Accept
           </Button>
-          <Button variant="primary" size="small" disabled={busy || proposal.status === 'inLib'} onClick={() => setStatus('inLib')}>
+          <Button variant="default" size="small" disabled={busy || proposal.status === 'inLib'} onClick={() => setStatus('inLib')}>
             Mark as in library
           </Button>
           <Button variant="error-outline" size="small" disabled={busy || proposal.status === 'rejected'} onClick={() => setStatus('rejected')}>
             Reject
           </Button>
-          <Button variant="primary-outline" size="small" disabled={busy || proposal.status === 'pending'} onClick={() => setStatus('pending')}>
+          <Button variant="default-outline" size="small" disabled={busy || proposal.status === 'pending'} onClick={() => setStatus('pending')}>
             Reopen
           </Button>
         </HStack>
@@ -329,7 +329,7 @@ function FigmaTemplateUploader() {
 
         <HStack spacing={2} style={{ alignItems: 'center' }}>
           <Button
-            variant="primary-outline"
+            variant="default-outline"
             size="small"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
@@ -348,7 +348,7 @@ function FigmaTemplateUploader() {
 
         <HStack spacing={2}>
           <Button
-            variant="primary"
+            variant="default"
             size="small"
             disabled={!pending || busy}
             onClick={upload}

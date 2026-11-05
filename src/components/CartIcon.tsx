@@ -111,7 +111,7 @@ function CartModal({ totalCents, onClose }: { totalCents: number; onClose: () =>
           <Button variant="outline" color="default" size="small" onClick={onClose}>Close</Button>
           {items.length > 0 && (
             <Button
-              variant="primary"
+              variant="default"
               size="small"
               onClick={handleCheckout}
               disabled={working}

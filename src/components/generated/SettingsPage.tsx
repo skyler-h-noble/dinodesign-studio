@@ -58,7 +58,7 @@ export default function SettingsPage() {
                   <TextInput label="Full name" defaultValue="Lise Noble" fullWidth />
                   <TextInput type="email" label="Email" defaultValue="lise@dino.design" fullWidth />
                   <Divider />
-                  <Button variant="primary" style={{ alignSelf: 'flex-start' }}>Save changes</Button>
+                  <Button variant="default" style={{ alignSelf: 'flex-start' }}>Save changes</Button>
                 </VStack>
               </Card>
             </TabPanel>

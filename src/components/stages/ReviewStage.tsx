@@ -306,7 +306,7 @@ export default function ReviewStage({
                   Get your hosted playground, Figma integration, and code package.
                 </BodySmall>
                 <Button
-                  variant="primary"
+                  variant="default"
                   onClick={onNext}
                   style={{ width: '100%', padding: '14px 24px', fontSize: '1rem', fontWeight: 700 }}
                 >

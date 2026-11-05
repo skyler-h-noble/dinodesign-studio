@@ -1983,7 +1983,7 @@ export default function TypographyTestPage({
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                 style={{ display: 'none' }}
               />
-              <Button variant="primary" onClick={() => fileRef.current?.click()}>
+              <Button variant="default" onClick={() => fileRef.current?.click()}>
                 Pick a moodboard
               </Button>
             </>
@@ -2884,7 +2884,7 @@ function FontUploadButton({ onUpload }: { onUpload: (file: File) => void }) {
         }}
         style={{ display: 'none' }}
       />
-      <Button variant="primary-outline" size="small" onClick={() => ref.current?.click()}>
+      <Button variant="default-outline" size="small" onClick={() => ref.current?.click()}>
         Upload a font
       </Button>
     </HStack>

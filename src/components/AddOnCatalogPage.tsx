@@ -74,7 +74,7 @@ export default function AddOnCatalogPage() {
                   <BodySmall color="quiet">{addon.description}</BodySmall>
                   {addon.available && (
                     <Button
-                      variant="primary"
+                      variant="default"
                       size="small"
                       style={{ alignSelf: 'flex-start' }}
                       onClick={() => {
@@ -94,7 +94,7 @@ export default function AddOnCatalogPage() {
             <Button variant="outline" color="default" size="medium" onClick={() => { window.location.href = '/'; }}>
               Back to home
             </Button>
-            <Button variant="primary" size="medium" onClick={() => { window.location.href = '/create'; }}>
+            <Button variant="default" size="medium" onClick={() => { window.location.href = '/create'; }}>
               Build your design system
             </Button>
           </HStack>
@@ -189,7 +189,7 @@ function AddOnPurchaseModal({
         ) : systems.length === 0 ? (
           <VStack spacing={2}>
             <Body>You don't have any design systems yet.</Body>
-            <Button variant="primary" size="small" onClick={() => { window.location.href = '/create'; }}>
+            <Button variant="default" size="small" onClick={() => { window.location.href = '/create'; }}>
               Create one
             </Button>
           </VStack>
@@ -205,7 +205,7 @@ function AddOnPurchaseModal({
                     <BodySmall style={{ color: 'var(--Buttons-Success-Button, #2a8)', fontWeight: 600 }}>Unlocked ✓</BodySmall>
                   ) : (
                     <Button
-                      variant="primary"
+                      variant="default"
                       size="small"
                       onClick={() => handlePurchase(sys.id)}
                       disabled={isWorking}

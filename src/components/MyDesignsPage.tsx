@@ -557,7 +557,7 @@ function DesignSystemCard({
         {/* Linked Figma file — first one only at this size */}
         {ds.linkedFigmaFiles.length > 0 && (
           <Button
-            variant="primary-outline"
+            variant="default-outline"
             size="small"
             startIcon={<FigmaGlyph />}
             style={{ width: '100%' }}
@@ -574,7 +574,7 @@ function DesignSystemCard({
         )}
 
         <Button
-          variant="primary"
+          variant="default"
           size="small"
           startIcon={<OpenInNewIcon style={{ fontSize: 14 }} />}
           style={{ width: '100%' }}

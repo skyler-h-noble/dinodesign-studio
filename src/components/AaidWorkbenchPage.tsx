@@ -555,7 +555,7 @@ export default function AaidWorkbenchPage() {
                 fullWidth
               />
               <Button
-                variant="primary"
+                variant="default"
                 onClick={handleConvert}
                 disabled={!canConvert || busy}
               >
@@ -689,7 +689,7 @@ export default function AaidWorkbenchPage() {
                     </TabList>
                   </Tabs>
                   {jsx && rightView === 'code' && (
-                    <Button size="small" variant="primary-outline" onClick={copyJsx}>Copy</Button>
+                    <Button size="small" variant="default-outline" onClick={copyJsx}>Copy</Button>
                   )}
                 </HStack>
 
@@ -756,7 +756,7 @@ export default function AaidWorkbenchPage() {
                 placeholder="Wrong component? Missing token? Misnamed prop? Inline color slipped through? Be specific — this teaches the CLAUDE.md what to avoid."
               />
               <HStack gap="var(--Sizing-1)" alignItems="center">
-                <Button variant="primary" onClick={handleSaveCorrection} disabled={!correction.trim() && !verdict}>
+                <Button variant="default" onClick={handleSaveCorrection} disabled={!correction.trim() && !verdict}>
                   Save feedback
                 </Button>
                 {verdictSaved && <Caption color="success">Saved.</Caption>}
@@ -1053,7 +1053,7 @@ function CodeToDesignPanel() {
             </Alert>
             <HStack gap="var(--Sizing-1)" alignItems="center">
               <Button
-                variant="primary"
+                variant="default"
                 disabled={unknown.length > 0}
                 onClick={async () => {
                   await navigator.clipboard.writeText(payload);

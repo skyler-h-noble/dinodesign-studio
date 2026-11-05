@@ -755,7 +755,7 @@ export default function ColorStage({
       <VStack spacing={4} alignItems="center" style={{ padding: '80px 24px' }}>
         <H2 style={{ textAlign: 'center' }}>Color Extraction</H2>
         <Body style={{ color: 'var(--Buttons-Error-Button)' }}>{error || 'No data'}</Body>
-        <Button variant="primary-outline" onClick={onBack}>Back</Button>
+        <Button variant="default-outline" onClick={onBack}>Back</Button>
       </VStack>
     );
   }
@@ -966,7 +966,7 @@ export default function ColorStage({
                     {colorName} Max Chroma: {sliderValue}
                   </BodySmall>
                   <SliderInput
-                    variant="primary"
+                    variant="default"
                     min={sliderMin}
                     max={sliderMax}
                     value={sliderValue}
@@ -1035,7 +1035,7 @@ export default function ColorStage({
                           Darkest Hue: {Math.round(hueEditDarkHue)}°
                         </BodySmall>
                         <SliderInput
-                          variant="primary"
+                          variant="default"
                           min={0}
                           max={360}
                           step={1}
@@ -1071,7 +1071,7 @@ export default function ColorStage({
                           Lightest Hue: {Math.round(hueEditLightHue)}°
                         </BodySmall>
                         <SliderInput
-                          variant="primary"
+                          variant="default"
                           min={0}
                           max={360}
                           step={1}
@@ -1109,17 +1109,11 @@ export default function ColorStage({
                   Reset Hues
                 </Button>
               )}
-              <Button variant="primary-outline" size="small" onClick={() => setHueEditTopIdx(null)}>Cancel</Button>
+              <Button variant="default-outline" size="small" onClick={() => setHueEditTopIdx(null)}>Cancel</Button>
               <Button
-                variant="primary"
+                variant="default"
                 size="small"
                 onClick={applyEdit}
-                sx={{
-                  backgroundColor: 'var(--Text)',
-                  color: 'var(--Background)',
-                  borderColor: 'var(--Text)',
-                  '&:hover': { backgroundColor: 'var(--Text)', opacity: 0.85, borderColor: 'var(--Text)' },
-                }}
               >
                 Apply
               </Button>
@@ -1382,7 +1376,7 @@ export default function ColorStage({
                             backgroundColor: validation.suggested, border: '1px solid var(--Border)', flexShrink: 0,
                           }} />
                           <BodySmall color="quiet">Suggested: {validation.suggested}</BodySmall>
-                          <Button size="small" variant="primary-outline" onClick={() => setHexEditValue(validation.suggested!)}>
+                          <Button size="small" variant="default-outline" onClick={() => setHexEditValue(validation.suggested!)}>
                             Use
                           </Button>
                         </HStack>
@@ -1402,17 +1396,11 @@ export default function ColorStage({
 
             {/* Actions */}
             <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-              <Button variant="primary-outline" size="small" onClick={() => setHexEditIndex(null)}>Cancel</Button>
+              <Button variant="default-outline" size="small" onClick={() => setHexEditIndex(null)}>Cancel</Button>
               <Button
-                variant="primary"
+                variant="default"
                 size="small"
                 onClick={applyHexEdit}
-                sx={{
-                  backgroundColor: 'var(--Text)',
-                  color: 'var(--Background)',
-                  borderColor: 'var(--Text)',
-                  '&:hover': { backgroundColor: 'var(--Text)', opacity: 0.85, borderColor: 'var(--Text)' },
-                }}
               >
                 {hexEditSource === 'top' ? 'Apply' : 'Close'}
               </Button>

@@ -177,7 +177,7 @@ export default function AccountPage() {
                 <BodySmall color="quiet">{user.email}</BodySmall>
               </VStack>
               <Button
-                variant="primary-outline"
+                variant="default-outline"
                 size="small"
                 onClick={() => window.location.href = '/my-designs'}
               >
@@ -256,7 +256,7 @@ export default function AccountPage() {
                     Account actions
                   </BodySmall>
                   <HStack spacing={2}>
-                    <Button variant="primary-outline" size="small" onClick={() => signOut()}>
+                    <Button variant="default-outline" size="small" onClick={() => signOut()}>
                       Sign Out
                     </Button>
                   </HStack>
@@ -298,7 +298,7 @@ function DesignSystemPanel({
       <HStack spacing={2} style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <H3 style={{ margin: 0 }}>{ds.name}</H3>
         <Button
-          variant="primary-outline"
+          variant="default-outline"
           size="small"
           onClick={() => window.location.href = `/my-designs/${ds.id}`}
         >
@@ -419,7 +419,7 @@ function AddOnRow({
             </Button>
           ) : (
             <Button
-              variant="primary"
+              variant="default"
               size="small"
               onClick={onAddToCart}
             >

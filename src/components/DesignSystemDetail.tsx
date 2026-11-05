@@ -300,7 +300,7 @@ export default function DesignSystemDetail() {
         <AppHeader />
         <VStack spacing={4} style={{ padding: 40, alignItems: 'center' }}>
           <H2>Design system not found</H2>
-          <Button variant="primary-outline" onClick={() => window.location.href = '/account#my-designs'}>
+          <Button variant="default-outline" onClick={() => window.location.href = '/account#my-designs'}>
             Back to My Designs
           </Button>
         </VStack>
@@ -569,7 +569,7 @@ function FigmaUpdateModal({ open, onClose, hasLinkedFile }: { open: boolean; onC
           </BodySmall>
         )}
         <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary" onClick={onClose}>Got it</Button>
+          <Button variant="default" onClick={onClose}>Got it</Button>
         </HStack>
       </VStack>
     </Modal>
@@ -655,7 +655,7 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
           </VStack>
           <HStack spacing={1} style={{ flexShrink: 0, alignItems: 'center' }}>
             <Button
-              variant="primary-outline"
+              variant="default-outline"
               size="small"
               onClick={() => window.location.href = `/create?id=${id}`}
             >
@@ -740,7 +740,7 @@ function DetailHeader({ record, id, headerStyle, colors, onMarkPushed, onRequest
             size="small"
             endDecorator={
               <Button
-                variant="primary-outline"
+                variant="default-outline"
                 size="small"
                 disabled={marking}
                 onClick={async () => {
@@ -854,7 +854,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
           <BodySmall color="quiet">
             View your complete design system with all components rendered with your brand tokens.
           </BodySmall>
-          <Button variant="primary" style={{ width: '100%' }} onClick={() => window.open(playgroundUrl, '_blank')}>
+          <Button variant="default" style={{ width: '100%' }} onClick={() => window.open(playgroundUrl, '_blank')}>
             Open Playground
           </Button>
         </VStack>
@@ -880,7 +880,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
                 Your design system is live in Figma. Jump straight to the file.
               </BodySmall>
               <Button
-                variant="primary"
+                variant="default"
                 style={{ width: '100%' }}
                 onClick={() => window.open(figmaFileUrl(record.linkedFigmaFiles[0]), '_blank', 'noopener')}
               >
@@ -893,7 +893,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
                 Get a full Figma design system with your brand tokens applied to every component, style, and variable.
               </BodySmall>
               <Button
-                variant="primary"
+                variant="default"
                 style={{ width: '100%' }}
                 onClick={onOpenFigmaImport}
               >
@@ -946,7 +946,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             Detailed contrast report for every background, surface, and container.
           </BodySmall>
           <Button
-            variant="primary"
+            variant="default"
             style={{ width: '100%' }}
             onClick={() => window.open(`/accessibility-report?id=${id}`, '_blank', 'noopener')}
           >
@@ -973,7 +973,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             Code tab, and paste it here.
           </BodySmall>
           <Button
-            variant="primary-outline"
+            variant="default-outline"
             style={{ width: '100%' }}
             onClick={() => window.open(
               `${OVERLAY_TOOL_URL}?ds=${encodeURIComponent(id || '')}`, '_blank', 'noopener',
@@ -993,7 +993,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             placeholder={'{\n  "image": "hero.png",\n  "settings": { … }\n}'}
           />
           <Button
-            variant="primary"
+            variant="default"
             style={{ width: '100%' }}
             disabled={!overlayJson.trim() || overlayState === 'saving'}
             onClick={saveOverlayDefault}
@@ -1016,7 +1016,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
         <VStack spacing={2}>
           <BodySmall style={{ fontWeight: 600 }}>Download All Files</BodySmall>
           <Button
-            variant="primary-outline"
+            variant="default-outline"
             style={{ width: '100%' }}
             onClick={async () => {
               const zip = new JSZip();
@@ -1045,7 +1045,7 @@ function UseMyDesignTab({ id, record, onOpenFigmaImport }: { id: string; record:
             Download All (.zip)
           </Button>
           <Button
-            variant="primary-outline"
+            variant="default-outline"
             style={{ width: '100%' }}
             onClick={async () => {
               type DirHandle = FileSystemDirectoryHandle & {
@@ -1274,7 +1274,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
                     </BodySmall>
                   </VStack>
                   <Button
-                    variant="primary-outline"
+                    variant="default-outline"
                     size="small"
                     onClick={() => window.open(figmaFileUrl(f), '_blank', 'noopener')}
                   >
@@ -1314,7 +1314,7 @@ function SettingsTab({ id, record, payments, onRecordChange }: {
                 />
               </div>
               <Button
-                variant="primary"
+                variant="default"
                 size="small"
                 disabled={linking || !figmaUrl.trim()}
                 onClick={handleLink}
@@ -1457,7 +1457,7 @@ function VersionsTab({
                 </VStack>
                 {!isCurrent && (
                   <Button
-                    variant="primary-outline"
+                    variant="default-outline"
                     size="small"
                     disabled={isRestoring || restoringVersionId !== null}
                     onClick={() => onRequestRestore(v)}
@@ -1494,10 +1494,10 @@ function RestoreVersionModal({
           restore it back any time.
         </Body>
         <HStack spacing={2} style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary-outline" size="small" onClick={onClose} disabled={restoring}>
+          <Button variant="default-outline" size="small" onClick={onClose} disabled={restoring}>
             Cancel
           </Button>
-          <Button variant="primary" size="small" onClick={onConfirm} disabled={restoring}>
+          <Button variant="default" size="small" onClick={onConfirm} disabled={restoring}>
             {restoring ? 'Restoring…' : `Restore v${target.version}`}
           </Button>
         </HStack>

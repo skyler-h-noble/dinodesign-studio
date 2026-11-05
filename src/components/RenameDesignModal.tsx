@@ -91,10 +91,10 @@ export default function RenameDesignModal({ open, currentName, userId, excludeId
           </Alert>
         )}
         <HStack spacing={2} justifyContent="flex-end">
-          <Button variant="primary-outline" size="medium" onClick={onClose}>
+          <Button variant="default-outline" size="medium" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" size="medium" onClick={handleConfirm} disabled={!canConfirm}>
+          <Button variant="default" size="medium" onClick={handleConfirm} disabled={!canConfirm}>
             {checking ? 'Checking…' : 'Continue'}
           </Button>
         </HStack>

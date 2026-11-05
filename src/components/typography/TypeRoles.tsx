@@ -762,7 +762,7 @@ export function RolePanels(p: RolePanelsProps) {
                             <Button
                               key={b}
                               size="small"
-                              variant={s.body.branch === b ? 'primary' : 'default-outline'}
+                              variant={s.body.branch === b ? 'default' : 'default-outline'}
                               onClick={() => p.onBodyBranch(b)}
                             >
                               {label}

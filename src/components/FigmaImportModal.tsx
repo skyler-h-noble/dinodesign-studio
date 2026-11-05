@@ -34,7 +34,7 @@ export function FigmaImportModal({
             </BodySmall>
             <div>
               <Button
-                variant="primary"
+                variant="default"
                 size="small"
                 onClick={async () => {
                   try {
@@ -95,7 +95,7 @@ export function FigmaImportModal({
               wordBreak: 'break-all',
             }}>{id}</code>
             <Button
-              variant={copiedId ? 'success' : 'primary-outline'}
+              variant={copiedId ? 'success' : 'default-outline'}
               size="small"
               onClick={copyId}
               disabled={!id}
