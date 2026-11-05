@@ -206,19 +206,22 @@ describe('Figma Modes trim', () => {
        Dropshadow-Color alias reads, and one per non-band Containers group,
        whose single literal was the light value in both modes. Measured: this
        brand 4,598 / 4,598 / 4,555, Surf 4,788 — 12 under this guard, ~210
-       under Figma's 5,000. */
-    expect(n).toBeLessThan(4800);
+       under Figma's 5,000.
+       5,000 (from 4,800), owner's call 2026-11-05: the guard is now Figma's
+       own per-collection limit, so it fails exactly where an import would.
+       Surf's worst case was 4,788 when it moved. */
+    expect(n).toBeLessThanOrEqual(5000);
     for (const background of ['white', 'black']) {
       const other = (buildAll(makeScheme(BRANDS[0]), { background, button: 'primary', cardColoring: background === 'black' ? 'black' : 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;
       let m = 0; walk(other.Modes['Light-Mode'], [], () => m++);
-      expect(m, `${background} page`).toBeLessThan(4800);
+      expect(m, `${background} page`).toBeLessThanOrEqual(5000);
     }
     /* The band's worst case: Surf, its Primary and Secondary on light tone 9
        (dark Surface capped at 8, every level light) and Tertiary on 7. */
     const surf = (buildAll(makeScheme(['#9d8a5c', '#009f87', '#e26801'], { primary: 90, secondary: 90, tertiary: 71 }),
       { background: 'white', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;
     let w = 0; walk(surf.Modes['Light-Mode'], [], () => w++);
-    expect(w, 'Surf (light tone 9) on a white page').toBeLessThan(4800);
+    expect(w, 'Surf (light tone 9) on a white page').toBeLessThanOrEqual(5000);
     /* Card / Text Coloring (2026-11-05, utils/darkLadder.ts): a neutral
        page's tonal cards and text read existing Primary rows and tables, so
        they add nothing (Surf white tonal stays 4,788). Black cards in dark
@@ -229,6 +232,6 @@ describe('Figma Modes trim', () => {
     const surfBlack = (buildAll(makeScheme(['#9d8a5c', '#009f87', '#e26801'], { primary: 90, secondary: 90, tertiary: 71 }),
       { background: 'white', button: 'primary', cardColoring: 'black', textColoring: 'tonal' } as never, 'light') as any).figma;
     let wb = 0; walk(surfBlack.Modes['Light-Mode'], [], () => wb++);
-    expect(wb, 'Surf (light tone 9) on a white page, black cards').toBeLessThan(4800);
+    expect(wb, 'Surf (light tone 9) on a white page, black cards').toBeLessThanOrEqual(5000);
   }, 60_000);
 });

@@ -218,7 +218,8 @@ page reads the On-* its palette's theme had on the ladder (`Ladder-Page-Icons`).
 and ~280 for one on tone 8+ (Surf), most of it state and black/white buttons on
 light bands (every dark entry the tables hold was solved for a dark surface)
 plus cards, hover / pressed and border variants. The figmaModesTrim guard moved
-from 4,450 to 4,800 for it; Figma's hard limit is 5,000.
+from 4,450 to 4,800 for it, and on 2026-11-05 to 5,000 — Figma's own
+per-collection limit.
 
 **Bars in Figma.** A bar is published to Figma as a Theme mode plus a Surface
 mode, so a bar set to "Primary · Surface" shows the Primary band in Figma's dark
