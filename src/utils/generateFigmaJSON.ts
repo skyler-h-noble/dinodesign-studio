@@ -8,7 +8,7 @@
  */
 
 import { parseBar, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { darkLadderMaps, windowForPalette, exactIndexForTone, recordedColoring, cardPaletteFor, textPaletteFor } from './darkLadder';
+import { darkLadderMaps, windowForPalette, exactIndexForTone, recordedColoring, cardPaletteFor, pageRolePalette, DARK_CARD_LEVELS } from './darkLadder';
 import { LADDER_PAGE_ICONS_KEY, BAND_GROUP, BAND_BUTTON_GROUP, BAND_ORIGINALS_KEY } from './cssgen/darkBandPass';
 import { defaultDimmestRef } from './cssgen/exportToCSS';
 import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
@@ -99,7 +99,7 @@ const THEMES: string[] = [...THEME_MODES];
  * palette they chose next to the default that resolves it.
  */
 import { solveChartPalette } from './chartPalette';
-import { solveQuietOpacities, sectionQuietOverrides, QUIET_SECTION_FIX_MODES } from './quietOpacity';
+import { cardQuietOpacity, solveQuietOpacities, sectionQuietOverrides, QUIET_SECTION_FIX_MODES } from './quietOpacity';
 
 export function themeOrder(defaultTheme?: string): string[] {
   const rest = THEMES.filter((t) => t !== 'Default');
@@ -2041,8 +2041,8 @@ export function generateFigmaJSON(
       const contPalette = isDark ? darkPalette : defTheme;
       const coloring = recordedColoring(modeData);
       const cardPalette = cardPaletteFor(contPalette, coloring.cardColoring);
-      const textPalette = textPaletteFor(bgPalette, coloring.textColoring);
-      const textPal = (section: string) => (section === 'Text' || section === 'Header' || section === 'Quiet' ? textPalette : null);
+      const rolePal = (role: string) => pageRolePalette(bgPalette, coloring.textColoring, role);
+      const textPal = (section: string) => (section === 'Text' || section === 'Header' || section === 'Quiet' ? rolePal(section) : null);
       const contN = isDark ? darkContainerN : (defaultSettings['Card-Coloring']?.ContN?.value || 12);
 
       const modeColors = modeData.Colors;
@@ -2231,7 +2231,7 @@ export function generateFigmaJSON(
         if (!sectionData) return null;
         const token = role.byBackground
           ? sectionData.Surfaces?.[`Background-${tone}`]
-          : sectionData.Surfaces?.[role.pal ?? ((role.role === 'Text' || role.role === 'Header' || role.role === 'Quiet' || role.role === 'Icons-Default') ? textPalette : bgPalette)]?.[`Color-${tone}`];
+          : sectionData.Surfaces?.[role.pal ?? ((role.role === 'Text' || role.role === 'Header' || role.role === 'Quiet' || role.role === 'Icons-Default') ? rolePal(role.role) : bgPalette)]?.[`Color-${tone}`];
         let hex = token?.value;
         if (!hex) return null;
         if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
@@ -2299,7 +2299,9 @@ export function generateFigmaJSON(
            accent one, which is why they sit outside the loop above. */
         for (const role of ['Default', 'Match']) {
           const iconHex = defBg[`${prefix}Icons-${role}`]?.value;
-          const tone = findTone(iconHex || '');
+          /* White text (Black & White on a dark surface) is no palette's tone: the
+             mark on it is the text a white surface carries — as exportToCSS. */
+          const tone = String(iconHex ?? '').toLowerCase().startsWith('#ffffff') ? { palette: 'Neutral', n: 12 } : findTone(iconHex || '');
           if (!tone) continue;
           let onHex = modeData.Text?.Surfaces?.[tone.palette]?.[`Color-${tone.n}`]?.value;
           if (onHex?.includes('{')) onHex = resolveToHex(onHex, modeLookup, modeColors) || onHex;
@@ -2446,7 +2448,7 @@ export function generateFigmaJSON(
         // Same fallback as the surface loop above — Container-Border-Variant
         // was the last {Default-Background.*} reference with nothing behind it.
         const sectionData = modeData[section] ?? figma.Modes[modeName]?.[section];
-        const cp = textPal(section) ? textPaletteFor(contPalette, coloring.textColoring) : contPalette;
+        const cp = textPal(section) ? pageRolePalette(contPalette, coloring.textColoring, section) : contPalette;
         if (!sectionData?.Containers?.[cp]?.[contColorN]) continue;
         const token = sectionData.Containers[cp][contColorN];
         let hex = token?.value;
@@ -2489,9 +2491,22 @@ export function generateFigmaJSON(
         }
       }
 
-      const contAlpha = quietAlphaAt(contN);
+      /* The card's Quiet is its Text at the smallest opacity that clears
+         4.5:1 on all five card levels — the same cardQuietOpacity the CSS
+         export and the preview use, so the solid they paint is what this
+         alias + opacity renders on the card face (owner, 2026-11-05). It
+         read the page tone's shared alpha, which was solved for a surface,
+         not for these cards. Container-Quiet keeps its key (invariant 8) and
+         now holds that same solid. */
+      const levelHexes = DARK_CARD_LEVELS.map((l) => defBg[l]?.value).filter((v): v is string => typeof v === 'string' && v.startsWith('#'));
+      const cardText = defBg['Container-Text']?.value;
+      const cardQuiet = typeof cardText === 'string' && cardText.startsWith('#') && levelHexes.length === 5 && typeof defBg.Container?.value === 'string'
+        ? cardQuietOpacity(cardText, levelHexes, defBg.Container.value)
+        : null;
+      const contAlpha = cardQuiet ? cardQuiet.percent : quietAlphaAt(contN);
       if (contAlpha !== null)
         defBg['Container-Quiet-Opacity'] = { value: contAlpha, type: 'number' };
+      if (cardQuiet) defBg['Container-Quiet'] = { value: cardQuiet.solid, type: 'color' };
 
       figma.Modes[modeName]['Default-Background'] = defBg;
     }

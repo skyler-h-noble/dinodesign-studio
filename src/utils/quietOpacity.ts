@@ -102,6 +102,51 @@ export function alphaForContrast(fg: string, bg: string, target = 4.5): number |
   return a;
 }
 
+/** A card's Quiet: its Text at one opacity, solved for all five card levels. */
+export interface CardQuiet {
+  /** 0..1, quantised to the 3 decimals Figma's percent float carries */
+  alpha: number;
+  /** 0..100 — what Figma's Container-Quiet-Opacity float holds */
+  percent: number;
+  /** the composited solid over the card face — what the CSS and the preview paint */
+  solid: string;
+}
+
+/**
+ * Card Quiet, one model for the CSS, the preview and Figma (owner, 2026-11-05).
+ *
+ * Figma draws a card's Quiet as the card's Text with its opacity bound to a
+ * float; the CSS has no opacity channel on a custom property, so it ships the
+ * solid that opacity produces over the card face (Container). One Containers
+ * section carries the roles for all five levels, so the opacity is the
+ * SMALLEST (a narrow pass is a pass) at which both hold on every level:
+ *
+ *   - Figma's composite over that level clears `target`, and
+ *   - the CSS solid (composited over the face) clears `target` on that level.
+ *
+ * A Text with an alpha of its own (dark Black & White text is white at 70%)
+ * multiplies in, as it does when Figma binds an opacity to that variable.
+ * Returns the Text itself (alpha 1) when no opacity below 1 clears — an alpha
+ * can only lower contrast.
+ */
+export function cardQuietOpacity(text: string, levels: string[], face: string, target = 4.5): CardQuiet | null {
+  const t = text.replace('#', '');
+  if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(t) || !levels.length || !face) return null;
+  const fg = `#${t.slice(0, 6)}`;
+  const textAlpha = t.length === 8 ? parseInt(t.slice(6, 8), 16) / 255 : 1;
+  const bgs = levels.map((l) => l.slice(0, 7));
+  const base = face.slice(0, 7);
+  for (let k = 1; k <= 255; k++) {
+    const alpha = Math.round((k / 255) * 1000) / 1000;
+    const eff = alpha * textAlpha;
+    const solid = compositeOver(fg, base, eff);
+    if (bgs.every((bg) => contrastRatio(compositeOver(fg, bg, eff), bg) >= target && contrastRatio(solid, bg) >= target)) {
+      return { alpha, percent: Math.round(alpha * 1000) / 10, solid };
+    }
+  }
+  return { alpha: 1, percent: 100, solid: compositeOver(fg, base, textAlpha) };
+}
+
 export interface QuietOpacity {
   /** 0..1, quantised */
   alpha: number;

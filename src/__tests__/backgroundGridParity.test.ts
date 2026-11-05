@@ -12,6 +12,11 @@
  * 2. The default icon is the surface's Text, everywhere.
  * 3. Black cards in light mode are flat: the row Figma reads, in all three.
  *
+ * Since 2026-11-05 part 1 holds every combination three ways with nothing
+ * skipped: Black & White page text reads the BW tables in the CSS, Figma and
+ * the preview, and white cards are flat like black ones
+ * (pageCardTextParity.test.ts covers both modes and the cards' text roles).
+ *
  * Invariant 7: the intended values are asserted on their own (the expected
  * page hex from the palette, Default-Settings, flat cards, icon == text), and
  * then the CSS, the preview and the Figma payload are held to each other
@@ -109,29 +114,26 @@ describe('1. every grid pick: the light page the CSS paints is the one the previ
           if (hex(p['--Background']) !== want) wrong.push(`${tag}: preview page ${hex(p['--Background'])}, want ${want}`);
           if (hex(fig?.Surface?.value) !== want) wrong.push(`${tag}: Figma page ${hex(fig?.Surface?.value)}, want ${want}`);
 
-          // The page's paired roles. Black & White text is held CSS == Figma
-          // only: the preview paints it as literal #1a1a1a / white while the
-          // CSS and Figma read the page palette's own table — a difference
-          // every legacy page has too (primary-light: #1a1a1a vs #593462),
-          // outside this change.
+          // The page's paired roles, CSS == preview == Figma under both Text
+          // Colorings (Black & White reads the BW tables in all three since
+          // 2026-11-05; the preview used to paint literal #1a1a1a / white).
           for (const r of PAGE_ROLES) {
             const cv = hex(c[r]), pvv = hex(p[r]), fv = hex(fig?.[FIGMA_KEY[r]]?.value);
-            if (combo.textColoring === 'tonal' && cv !== pvv) wrong.push(`${tag} ${r}: CSS ${cv}, preview ${pvv}`);
+            if (cv !== pvv) wrong.push(`${tag} ${r}: CSS ${cv}, preview ${pvv}`);
             if (cv !== fv) wrong.push(`${tag} ${r}: CSS ${cv}, Figma ${fv}`);
           }
           // The page's own button (what an unthemed Button paints).
           const cb = hex(c['--Buttons-Default-Button']), pb = hex(p['--Buttons-Default-Button']);
           if (cb !== pb) wrong.push(`${tag} Default button: CSS ${cb}, preview ${pb}`);
 
-          // The page's five cards. White cards are held CSS == preview only:
-          // Figma holds one flat Neutral Color-12 for them while the CSS and
-          // the preview let the page through (98 / 97 / 94 / 92%) — the same
-          // on every tinted legacy page, outside this change.
+          // The page's five cards, every Card Coloring: white cards are flat
+          // in light mode since 2026-11-05 (the Card-Coloring row Figma reads),
+          // so all three hold the same five.
           for (const l of DARK_CARD_LEVELS) {
             const cc = hex(css.Light.computed(card('Default', l))['--Background']);
             const pc = hex(preview.Light.computed({ attrs: { 'data-surface': l }, parent: page('Brand') })['--Background']);
             const fc = hex(fig?.[l]?.value);
-            if (combo.cardColoring !== 'white' && cc !== fc) wrong.push(`${tag} ${l}: CSS ${cc}, Figma ${fc}`);
+            if (cc !== fc) wrong.push(`${tag} ${l}: CSS ${cc}, Figma ${fc}`);
             if (cc !== pc) wrong.push(`${tag} ${l}: CSS ${cc}, preview ${pc}`);
           }
           // Figma's Theme collection leads with the picked theme (after Default).
@@ -154,11 +156,11 @@ describe('1. every grid pick: the light page the CSS paints is the one the previ
         const bText = hex(bw.css.Light.computed(page('Default'))['--Text'])!;
         const tCard = hex(tonal.css.Light.computed(card('Default', 'Container'))['--Background'])!;
         const wCard = hex(bw.css.Light.computed(card('Default', 'Container'))['--Background'])!;
-        // Tonal text is a Primary tone; black-white text a Neutral one. (On a
-        // mid-grey page the Primary text tone is near-black, so chroma alone
-        // cannot tell them apart.)
+        // Tonal text is a Primary tone; black-white text black or white (the BW
+        // table: Neutral Color-1 or white). On a mid-grey page the Primary text
+        // tone is near-black, so chroma alone cannot tell them apart.
         expect(tones('Primary'), `${brand} ${bg} tonal text ${tText}`).toContain(tText);
-        expect(tones('Neutral'), `${brand} ${bg} black-white text ${bText}`).toContain(bText);
+        expect([tones('Neutral')[0], '#ffffff'], `${brand} ${bg} black-white text ${bText}`).toContain(bText);
         expect(chroma.deltaE(tCard, wCard), `${brand} ${bg} card`).toBeGreaterThan(3);
       }
     }

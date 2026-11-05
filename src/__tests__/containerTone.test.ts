@@ -256,9 +256,9 @@ describe('tonal container tone follows the background', () => {
 
   // White and black cards had no preview test, so the preview could run its
   // ladder the opposite way to the export and nothing would say so. In light
-  // mode white cards start pure white and take on the page; black cards are
-  // flat (owner, 2026-11-05), ending at pure Neutral Color-1.
-  it('preview: white cards intensify toward Highest and black cards are flat, like the export', () => {
+  // mode both are flat (owner, 2026-11-05): white cards are Neutral Color-12
+  // over the Card-Coloring row 12, black cards end at pure Neutral Color-1.
+  it('preview: white and black cards are flat, like the export', () => {
     const levels = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest'];
     for (const cardColoring of ['white', 'black']) {
       const css = buildPreviewCSS({
@@ -271,13 +271,13 @@ describe('tonal container tone follows the background', () => {
       if (cardColoring === 'white') {
         expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Lowest'))))
           .toBe(norm(NEUTRAL_LIGHT[11]));
-        // On a pale page the white steps are tiny and neighbours can round to
-        // the same hex, so: never lighter going up, and the top is tinted.
+        /* Flat since 2026-11-05 (owner): the page no longer shows through.
+           On this tinted page each level is within a unit of Color-12; never
+           lighter going up. */
         for (let i = 1; i < L.length; i++) {
           expect(`white/step${i}:${L[i] <= L[i - 1]}`).toBe(`white/step${i}:true`);
         }
-        expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest'))))
-          .not.toBe(norm(NEUTRAL_LIGHT[11]));
+        expect(L[0] - L[L.length - 1], 'white cards are flat').toBeLessThan(1);
       } else {
         expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest'))))
           .toBe(norm(NEUTRAL_LIGHT[0]));

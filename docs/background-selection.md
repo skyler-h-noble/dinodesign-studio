@@ -268,6 +268,19 @@ the page palette's Surface index, through the same window.
 Tests: `src/__tests__/darkLadder.test.ts` (what the CSS paints per brand x
 theme, the preview and Figma agree, light mode byte-identical).
 
+**The preview's page and card text** (fixed 2026-11-05). The preview's Brand
+block states the brand palettes as their LIGHT ramps, so a dark-mode
+`var(--Primary-Color-N)` drew a light tone, and it picked that tone with its
+own contrast search on the light ramp: Popsicle's dark page Text was #f7d9fb
+(light Color-9) where the CSS and Figma paint #e8beef. It now reads what the
+export reads — the curated table's answer for the tone the level paints (the
+page tone 3, a card its face, matched by lightness), resolved on the dark ramp
+as a hex, with darkLadderPass step 6's lift for a card cell that misses the
+lightest card — for Text and Header on the page and its cards, in both modes.
+Test: `src/__tests__/pageCardTextParity.test.ts`. The page's Quiet is the one
+role still solved by the preview's own search (it does not have the export's
+shared per-tone opacity table).
+
 ## A neutral page: Card Coloring and Text Coloring
 
 Owner's decision (2026-11-05): "Tonal uses the Primary tint." When the page

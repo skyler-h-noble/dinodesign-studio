@@ -49,7 +49,7 @@ black-white text — the choice changed nothing. So for the **page's own**
 | page palette | Card Coloring | the page's cards read | Text Coloring | the page's Text / Header / Quiet read |
 | --- | --- | --- | --- | --- |
 | Neutral | tonal | `Backgrounds.Primary.Background-<page N>` | tonal | the Primary tables at the page's index |
-| Neutral | white / black | Neutral, as before | black-white | Neutral, as before |
+| Neutral | white / black | Neutral, as before | black-white | Text: the BW tables (any page palette, below); Header: Neutral |
 | anything else | any | the page palette, as before | any | the page palette, as before |
 
 The Primary row at the page's own index is the same tone / opacity ladder tonal
@@ -77,6 +77,24 @@ Implemented in `exportToCSS` (Default-Background), `generateFigmaJSON`
 mode's data (`Card-Text-Coloring`), because the CSS is generated from the JSON
 alone; a system stored before that record existed reads neither and is
 unchanged.
+
+### Black & White text: the BW tables, on every page
+
+Text Coloring = Black & White means black or white text ("Black & white
+only", the option's label in the end-user docs; `defaultThemeLogic`: "All text
+uses BW color"). Every themed section has always read the curated BW tables
+under it (`getContainerVars`: `SurfaceDefaultTextTheme: 'BW'`) — black or white
+per tone and mode, with the greyscale `Quiet.<scope>.BW` beside it (3704f55).
+Only the page (the Default theme, through Default-Background) went through
+`textPaletteFor` and kept the page palette's tinted table, and the preview
+painted its own literal `#1a1a1a` / white. Since 2026-11-05 the page and its
+cards read the BW tables for Text, Quiet and the default icon in all three
+(`pageRolePalette` in `utils/darkLadder.ts`); Header and Border keep the
+palette, as every themed section's do.
+
+Popsicle on `primary-light`, page Text: light #593462 (CSS, Figma) / #1a1a1a
+(preview) → #040404 in all three; dark #e8beef (CSS, Figma) / #ffffffb3
+(preview) → #ffffffb3. Tonal text is unchanged.
 
 The generator is then told the user's style so each row carries the right ramp.
 It used to be hardcoded to `'tonal'`, which made the `professional` and `black`
@@ -119,28 +137,27 @@ a dark one. Rising elevation moves *away* from the page.
 | `Container-High` | 90% |
 | `Container-Highest` | **the tone itself** |
 
-**In light mode, color intensifies toward `Container-Highest` in tonal and
-white cards.** Tonal reaches the pure tone, white takes on the most page. Black
-cards are flat (below). White and black used to run the other way, so Highest was
-their *least* colored level; they were reversed on 2026-10-10 using the same
-five values, so `Container` itself did not move.
+**In light mode, color intensifies toward `Container-Highest` in tonal cards**
+(tonal reaches the pure tone). White and black cards are flat (below). White
+and black used to run the other way, then intensified too; both are flat since
+2026-11-05.
 
 ### White cards (light mode)
 
-Face is **Neutral Color-12**. The opacities sit high because white cards must
-still read as white — even the top level only lets a little of the page
-through. The floor is pure white.
+**Flat** (owner, 2026-11-05: cards are solid colors, no page showing
+through). All five levels are the row Figma holds: Neutral Color-12 at
+100 / 98 / 97 / 94 / 92% over the Card-Coloring `ContN` row's OWN tone (row
+12 of the page palette), not over the page. On a neutral page every level is
+Neutral Color-12 itself (#fcfcfc); on a tinted page each is within a unit of
+it (#fbfcfc / #fcfcfb on a few).
 
-| Level | Opacity |
-| --- | --- |
-| `Container-Lowest` | **Neutral Color-12** |
-| `Container-Low` | 98% |
-| `Container` | 97% |
-| `Container-High` | 94% |
-| `Container-Highest` | 92% |
+Before, the CSS and the preview blended Color-12 over the PAGE (Popsicle on
+`primary-base`: #fcfcfc #fbf9fb #faf8fa #f8f4f9 #f6f1f8) while Figma's
+Default-Background held five #fcfcfc. The card's shadow color follows the flat
+face. Dark mode is unchanged: white cards keep the fixed tone-4 set.
 
-On a very pale page (Color-11 and up) the steps are tiny and neighbours can
-round to the same hex — see [Known-flat cases](#known-flat-cases).
+Source: `exportToCSS.ts` (`flatRowN`), `buildPreviewCSS.ts` (white branch).
+Test: `backgroundGridParity.test.ts` part 1 and `pageCardTextParity.test.ts`.
 
 ### Black cards (light mode)
 
@@ -156,20 +173,31 @@ Default-Background held #050405 / #050405 / #040405 / #040404 / #040404, so the 
 cards disagreed. The card's Border-Variant and shadow color follow the flat
 face. Dark mode is unchanged (near-black, see below).
 
-Source: `exportToCSS.ts` (`flatBlackRowN`), `buildPreviewCSS.ts` (`blackRowN`).
+Source: `exportToCSS.ts` (`flatRowN`), `buildPreviewCSS.ts` (`blackRowN`).
 Test: `backgroundGridParity.test.ts` part 3, and the Figma == CSS check in
 `cardTextColoring.test.ts`, which no longer skips light black cards.
 
-### A card's Quiet clears all five levels
+### A card's Quiet: its Text at one opacity, the same in all three
 
-One Containers section carries the roles for every card level, and the Quiet
-table is keyed to the face (`Container`). Where the lower levels drift toward
-the page — dark tonal cards on a mid-dark page, light tonal cards on a mid-grey
-one — the face's Quiet fell to 4.25-4.49:1 on `Container-Lowest` / `-Low`.
-When that happens the card's Quiet becomes its Text composited at the smallest
-opacity that clears all five (the form Figma draws Quiet in). A Quiet that
-already clears all five is untouched. Source: `exportToCSS.ts`, beside
-`Default-Background.Container-Quiet`.
+One model (owner, 2026-11-05): the card's Quiet is the card's Text at the
+**smallest opacity that clears 4.5:1 on all five card levels** — the form
+Figma draws (Text with its opacity bound to `Container-Quiet-Opacity`). The CSS
+and the preview paint the solid that opacity gives over the card face
+(`Container`). The opacity has to hold both ways on every level: Figma's
+composite over that level, and the CSS solid on that level. A narrow pass is a
+pass; nothing is padded. A Text with an alpha of its own (dark Black & White
+text, white at 70%) multiplies in, as it does in Figma.
+
+Before there were three answers: the CSS used the Quiet table's tone (with a
+composite only where the table failed a level), Figma drew the card Text at
+the page tone's shared alpha, and the preview ran its own tone search. Popsicle
+on a white page, tonal cards: light #784284 (CSS) / #826289 (Figma) / #784284
+(preview) → #83638a; dark #c99cd1 / #ad8ab3 / #e8baef → #a987af.
+
+Source: `cardQuietOpacity` in `utils/quietOpacity.ts`, read by `exportToCSS.ts`
+(`Default-Background.Container-Quiet`), `generateFigmaJSON.ts`
+(`Container-Quiet-Opacity`, and `Container-Quiet` holds the solid) and
+`buildPreviewCSS.ts`. Test: `pageCardTextParity.test.ts`.
 
 ### Dark mode — tone 4 mixed with the page, one set per theme
 

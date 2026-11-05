@@ -11,10 +11,10 @@
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N, normalizeBackground, gridBackgroundTone } from '../backgroundSelection';
-import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone, recordedColoring, cardPaletteFor, textPaletteFor } from '../darkLadder';
+import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone, recordedColoring, cardPaletteFor, pageRolePalette } from '../darkLadder';
 import { LADDER_PAGE_ICONS_KEY } from './darkBandPass';
 import { chartColorVisionCSS } from '../chartColorVision';
-import { compositeOver, contrastRatio, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
+import { cardQuietOpacity, compositeOver, contrastRatio, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS, FAB_SIZE } from '../componentSize';
 import { fabBevelVars } from '../bevelGeometry';
@@ -1380,8 +1380,11 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
        page palette, or white / black-white, reads the page palette as before. */
     const coloring = recordedColoring(modeData);
     const cardPal = cardPaletteFor(defPal, coloring.cardColoring);
-    const textPal = textPaletteFor(defPal, coloring.textColoring);
-    const palFor = (prop: string) => (prop === 'Text' || prop === 'Header' || prop === 'Quiet' ? textPal : defPal);
+    /* Black & White text reads the BW tables for Text / Quiet / the default
+       icon (pageRolePalette) — the table every themed section already reads
+       under that choice. */
+    const palFor = (prop: string) => pageRolePalette(defPal, coloring.textColoring, prop);
+    const textPal = palFor('Text');
     /* Dark mode: defN and the scope tones below are the page palette's window
        INDICES — right for its rows and its Hover/Pressed, which are keyed by
        the background's palette. Every other role reads the entry that answers
@@ -1409,11 +1412,17 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
        neutral page and within a unit of it on a tinted one. It read the page's
        OWN row, so the published cards were a 90 / 92 / 94 / 96% ramp of black
        over the page while Figma held one flat #040404. Dark mode keeps its
-       own near-black set (darkLadderPass). */
-    const flatBlackRowN = !isDarkMode && coloring.cardColoring === 'black'
+       own near-black set (darkLadderPass).
+       White cards likewise (owner, 2026-11-05: cards are solid colors, no
+       page showing through): the ContN row is 12, where Neutral Color-12
+       sits over Color-12, so every level is #fcfcfc on a neutral page and
+       within a unit of it on a tinted one — Figma's row. They read the
+       page's own row, a 98 / 97 / 94 / 92% white over the page. Dark mode
+       white cards keep the fixed tone-4 set, as before. */
+    const flatRowN = !isDarkMode && (coloring.cardColoring === 'black' || coloring.cardColoring === 'white')
       ? Number(fullJsonData?.Metadata?.['Default-Settings']?.['Card-Coloring']?.ContN?.value) || null
       : null;
-    const contBgKey = `Backgrounds.${cardPal}.Background-${flatBlackRowN ?? contN}`;
+    const contBgKey = `Backgrounds.${cardPal}.Background-${flatRowN ?? contN}`;
     Object.assign(tokenLookup, defaultSurfaceRefs(defPal, defN, defaultDimmestRef(fullJsonData, modeData, modeName)));
     // Surface-Brightest. overrideSurface in generateCompleteThemes routes the
     // Default theme's brightest surface through Default-Background alongside
@@ -1464,7 +1473,22 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       }
       return typeof ref === 'string' && /^#[0-9a-f]{6}/i.test(ref) ? ref.slice(0, 7) : null;
     };
-    const faceHex = resolveRefHex(`{${contBgKey}.Containers.${isDarkMode ? 'Container-Highest' : 'Container'}}`);
+    /** The same, keeping an alpha byte (dark Black & White text is #ffffffb3). */
+    const resolveRefColor = (start: string): string | null => {
+      const six = resolveRefHex(start);
+      if (!six) return null;
+      let ref: unknown = start;
+      for (let hop = 0; hop < 10 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
+        const path = (ref as string).slice(1, -1);
+        if (tokenLookup[path]) { ref = tokenLookup[path]; continue; }
+        let node: any = modeData;
+        for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) break; }
+        if (node === undefined) { node = fullJsonData; for (const k of path.split('.')) { node = node?.[k]; if (node === undefined) break; } }
+        ref = typeof node === 'string' ? node : node?.value;
+      }
+      return typeof ref === 'string' && /^#[0-9a-f]{8}$/i.test(ref) ? ref.toLowerCase() : six;
+    };
+    const faceHex =resolveRefHex(`{${contBgKey}.Containers.${isDarkMode ? 'Container-Highest' : 'Container'}}`);
     const lightnessOf = (hex: string) => { const [r, g, b] = [1, 3, 5].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y; };
     let faceN = contN;
     if (faceHex) {
@@ -1485,35 +1509,25 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${palFor(prop)}.${colorN}}`;
       tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${palFor(prop)}.${faceColorN}}`;
     }
-    /* The card's Quiet has to read on all FIVE card levels, not only the
-       face it is keyed to: one Containers section carries the roles for every
-       level. The table entry at the face tone clears the face, but where the
-       cards blend toward the page (a dark mid-tone page under dark tonal
-       cards, a mid-grey page under light ones) Container-Lowest and -Low drift
-       toward the page and the face's Quiet fell to 4.25-4.49:1 there — on
-       several grid pages and on primary-base for Popsicle, Chocolate and Grape.
-       The Quiet table has no other entry for that card (it holds one value
-       for dark faces and one for light), so the card takes Quiet's own other
-       form, the one Figma draws: the card's Text at an opacity — composited
-       over the level it reads worst on, at the smallest opacity that clears
-       all five (a narrow pass is a pass). A Quiet that already clears all
-       five is left exactly as it was. */
-    {
-      const quietPal = palFor('Quiet');
+    /* The card's Quiet: ONE model in the CSS, the preview and Figma (owner,
+       2026-11-05) — the card's Text at an opacity, the form Figma draws. One
+       Containers section carries the roles for every level, so the opacity
+       is the smallest at which Quiet clears 4.5:1 on all five card levels
+       (cardQuietOpacity; a narrow pass is a pass). The CSS ships the solid
+       that opacity paints over the card face; Figma's
+       Default-Background.Container-Quiet-Opacity holds the same number. It
+       used to be the Quiet table's tone (a third color, #784284 where Figma
+       drew #826289 on a Popsicle white page), with a composite only where the
+       table failed a level. */
+    const cardQuiet = (() => {
       const levels = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest']
         .map((l) => resolveRefHex(`{${contBgKey}.Containers.${l}}`))
         .filter((h): h is string => Boolean(h));
-      const quiet = resolveRefHex(`{Quiet.Containers.${quietPal}.Color-${faceN}}`);
-      const text = resolveRefHex(`{Text.Containers.${palFor('Text')}.Color-${faceN}}`);
-      const clearsAll = (hex: string) => levels.every((bg) => contrastRatio(hex, bg) >= 4.5);
-      if (levels.length && quiet && text && !clearsAll(quiet)) {
-        const worst = levels.reduce((w, bg) => (contrastRatio(text, bg) < contrastRatio(text, w) ? bg : w));
-        for (let step = 128; step <= 255; step++) {
-          const solid = compositeOver(text, worst, step / 255);
-          if (clearsAll(solid)) { tokenLookup['Default-Background.Container-Quiet'] = solid; break; }
-        }
-      }
-    }
+      const face = resolveRefHex(`{${contBgKey}.Containers.Container}`);
+      const text = resolveRefColor(`{Text.Containers.${palFor('Text')}.Color-${faceN}}`);
+      return levels.length === 5 && face && text ? cardQuietOpacity(text, levels, face) : null;
+    })();
+    if (cardQuiet) tokenLookup['Default-Background.Container-Quiet'] = cardQuiet.solid;
     tokenLookup['Default-Background.Container-Quiet-Opacity'] =
       `{Quiet.${faceColorN}-Opacity}`;
     tokenLookup['Default-Background.Container-Text-Match'] =
@@ -1580,6 +1594,9 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
      */
     const iconToneFor = (raw: any): { palette: string; n: number } | null => {
       if (typeof raw !== 'string' || !raw) return null;
+      /* White text (Black & White text on a dark surface) is no palette's
+         tone; the mark on it is the text a white surface carries. */
+      if (raw === '{Colors.White}') return { palette: 'Neutral', n: 12 };
       const ref = raw.match(/^\{Colors\.([\w-]+)\.Color-(\d+)\}$/);
       if (ref) return { palette: ref[1], n: Number(ref[2]) };
       if (!raw.startsWith('#')) return null;

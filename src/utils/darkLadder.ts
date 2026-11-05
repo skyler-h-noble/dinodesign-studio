@@ -493,6 +493,21 @@ export function cardPaletteFor(pagePalette: string, cardColoring?: unknown): str
 export function textPaletteFor(pagePalette: string, textColoring?: unknown): string {
   return pagePalette === 'Neutral' && textColoring === 'tonal' ? 'Primary' : pagePalette;
 }
+/** The table the page's (and its cards') role reads, Text Coloring included.
+ *
+ *  Black & White text (owner, 2026-11-05: the option is "Black & white only")
+ *  reads the curated BW tables — Text.<scope>.BW is black or white, solved per
+ *  tone and mode, and Quiet.<scope>.BW is its greyscale quiet. That is what
+ *  every themed section has always painted under Black & White
+ *  (getContainerVars: SurfaceDefaultTextTheme 'BW'); only the page went
+ *  through textPaletteFor and kept the palette's tinted text. Headers keep the
+ *  palette under either choice, as every themed section's do. */
+export function pageRolePalette(pagePalette: string, textColoring: unknown, role: string): string {
+  if (textColoring === 'black-white' && (role === 'Text' || role === 'Quiet' || role === 'Icons-Default')) return 'BW';
+  return role === 'Text' || role === 'Header' || role === 'Quiet' || role === 'Icons-Default'
+    ? textPaletteFor(pagePalette, textColoring)
+    : pagePalette;
+}
 
 /** Where the two selections are recorded, in each mode's data (plain JSON, not
  *  tokens), so the CSS export and the Figma payload — which expand the Default

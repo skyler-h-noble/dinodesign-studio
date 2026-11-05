@@ -7,7 +7,13 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N, normalizeBackground, gridBackgroundTone } from './backgroundSelection';
-import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, blackCardHexesForPage, cardPaletteFor, textPaletteFor, type DarkCardLevel } from './darkLadder';
+import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, blackCardHexesForPage, cardPaletteFor, textPaletteFor, pageRolePalette, labL, type DarkCardLevel } from './darkLadder';
+import { cardQuietOpacity } from './quietOpacity';
+import { lightModeTextFixed } from './cssgen/lightModeTonalTextFixedStructure';
+import { darkModeTextFixed } from './cssgen/darkModeTextFixedStructure';
+import { lightModeHeaderFixed } from './cssgen/lightModeTonalHeaderFixedStructure';
+import { darkModeHeaderFixed } from './cssgen/darkModeHeaderFixedStructure';
+import { darkModeBorderFixed } from './cssgen/darkModeBorderFixedStructure';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, effectLevelScopeCSS, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -19,6 +25,17 @@ import { getFixedTextToken, textTableToken, getFixedHeaderToken, getFixedIconTok
 import { resolveButtonChoice, buttonForSurface, type ButtonPalette, type ButtonTone, type CellTone } from './buttonChoice';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
 import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
+/* The curated role tables as they are written, copied once at load. The
+   export assigns these module objects into its JSON and later passes write
+   into them in place (measured: the dark Text and Header tables differ after
+   one export), so once an export has run in the session the shared objects
+   no longer hold the tables as written. The preview reads its own copy and
+   applies the export's rules (tone, face, dark-card lift) itself. */
+const ROLE_TABLES = {
+  lightText: structuredClone(lightModeTextFixed), darkText: structuredClone(darkModeTextFixed),
+  lightHeader: structuredClone(lightModeHeaderFixed), darkHeader: structuredClone(darkModeHeaderFixed),
+  darkBorder: structuredClone(darkModeBorderFixed),
+};
 
 /** Convert a `{Colors.Palette.Color-N}` token reference (returned by
  *  getFixedTextToken / getFixedHeaderToken) into a CSS `var(--Palette-Color-N)`
@@ -73,7 +90,7 @@ function toneOfRef(ref: string): number | null {
 function buildIconPaletteLines(
   backgroundN: number, isContainer: boolean, isDark: boolean, defaultPalette: string,
   hexOf: (palette: string, n: number) => string | null,
-  textValue: string, textTone: number,
+  textValue: string, textTone: number, onDefault?: string,
 ): string {
   const palettes = ['Primary', 'Secondary', 'Tertiary', 'Neutral',
                     'Info', 'Success', 'Warning', 'Error'] as const;
@@ -138,7 +155,7 @@ function buildIconPaletteLines(
      different tone, so Icons-Default read 2.37:1 where --Text read 4.5:1). */
   lines.push(`  --Icons-Default: ${textValue};`);
   lines.push(`  --Icons-Default-Variant: ${textValue};`);
-  lines.push(`  --Icons-On-Default: ${tokenRefToVar(onTokenFor(defaultPalette, textTone))};`);
+  lines.push(`  --Icons-On-Default: ${onDefault ?? tokenRefToVar(onTokenFor(defaultPalette, textTone))};`);
 
   return lines.join('\n');
 }
@@ -1047,10 +1064,13 @@ export function buildPreviewCSS(input: BuildInput): string {
     const face = p(cardRamp, DARK_CARD_TONE);
     containerLowest = containerLow = containerBg = containerHigh = containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'white') {
-    // White cards ramp too, at much higher opacities — they must still read as
-    // white. The floor is pure white and each raised level takes on more of
-    // the page, so color intensifies toward Highest as in the other styles.
-    const at = (a: number) => blendColors(neutral(12), p(surfacePalette, surfaceN), a);
+    // White cards are FLAT in light mode (owner, 2026-11-05), like black ones:
+    // Neutral Color-12 over the card row's own tone — the export's and
+    // Figma's row, Card-Coloring ContN = 12 of the page palette — so every
+    // level is Color-12 on a neutral page and within a unit of it on a
+    // tinted one. This blended over the PAGE (98 / 97 / 94 / 92%), letting
+    // the page show through cards Figma holds as solid white.
+    const at = (a: number) => blendColors(neutral(12), p(surfacePalette, 12), a);
     containerLowest = neutral(12);
     containerLow = at(0.98);
     containerBg = at(0.97);
@@ -1152,6 +1172,120 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerQuiet = quietFor(containerBg);
     containerBorder = neutral(containerBorderTones.border);
   }
+
+  /* ── The page's and its cards' Text / Header / Quiet, read the way the
+     export reads them (owner, 2026-11-05; exportToCSS Default-Background) ──
+
+     The curated tables at the tone the page and the card face paint, resolved
+     against THIS mode's ramps:
+       - Text Coloring picks the table (pageRolePalette): Black & White reads
+         the BW tables for Text, the palette (rule B included) for Header.
+         The preview painted literal #1a1a1a / white instead.
+       - Dark mode reads each table's answer for the tone the level paints —
+         the page tone 3, the card its face — from the DARK ramp. The Brand
+         block's palette vars are the LIGHT ramp, so a var(--Primary-Color-N)
+         here drew a light tone (#f7d9fb where the export has #e8beef).
+       - A card's role is read at its face's tone (nearest by lightness in
+         the page palette), as exportToCSS's faceN; in dark mode a cell that
+         misses its threshold on the lightest card moves up its palette, as
+         darkLadderPass step 6 does.
+       - A card's Quiet is its Text at the smallest opacity that clears all
+         five card levels (cardQuietOpacity) — the solid the CSS paints and
+         the alias + opacity Figma draws. */
+  const rampOf = (pal: string): Array<{ hex: string }> | undefined =>
+    pal === 'Primary' ? primary : pal === 'Secondary' ? secondary : pal === 'Tertiary' ? tertiary : SEMANTIC_RAMPS[pal];
+  const tableHex = (ref: unknown): string | null => {
+    if (typeof ref !== 'string') return null;
+    if (ref.startsWith('#')) return ref.toLowerCase();
+    if (ref === '{Colors.White}') return WHITE_TEXT;
+    const vib = ref.match(/^\{Colors\.([\w-]+)\.Color-Vibrant\}$/);
+    if (vib) return hexOfPalette(vib[1], 8);
+    const m = ref.match(/^\{Colors\.([\w-]+)\.Color-(\d+)\}$/);
+    return m ? (rampOf(m[1])?.[Number(m[2]) - 1]?.hex ?? null) : null;
+  };
+  const roleTable = (family: 'Text' | 'Header' | 'Border'): any =>
+    family === 'Text' ? (isDark ? ROLE_TABLES.darkText : ROLE_TABLES.lightText)
+      : family === 'Header' ? (isDark ? ROLE_TABLES.darkHeader : ROLE_TABLES.lightHeader)
+      : ROLE_TABLES.darkBorder;
+  const cellRef = (family: 'Text' | 'Header' | 'Border', scope: 'Surfaces' | 'Containers', pal: string, n: number): unknown => {
+    const table = roleTable(family);
+    let ref: unknown = table?.[scope]?.[pal]?.[`Color-${n}`]?.value;
+    for (let hop = 0; hop < 4 && typeof ref === 'string' && ref.startsWith(`{${family}.`); hop++) {
+      const [, sc, pl, cn] = ref.slice(1, -1).split('.');
+      ref = table?.[sc]?.[pl]?.[cn]?.value;
+    }
+    return ref;
+  };
+  /* darkLadderPass step 6: a dark card cell that misses its threshold on the
+     lightest card (a neutral at the highest L* any palette's tone 4 has)
+     moves the fewest steps up its own palette that clear it. */
+  const darkCardGround = (() => {
+    if (!isDark) return null;
+    const ls = [primary, secondary, tertiary, ...['Neutral', 'Info', 'Success', 'Warning', 'Error'].map((k) => SEMANTIC_RAMPS[k])]
+      .map((r) => r?.[DARK_CARD_TONE - 1]?.hex).filter((h): h is string => Boolean(h)).map((h) => labL(h.slice(0, 7)));
+    return ls.length ? chroma.lab(Math.max(...ls), 0, 0).hex() : null;
+  })();
+  const onGround = (hex: string, ground: string): number => {
+    const c = chroma(hex);
+    const fg = c.alpha() < 1 ? chroma.mix(ground, c.alpha(1), c.alpha(), 'rgb') : c;
+    return chroma.contrast(fg.hex('rgb'), ground);
+  };
+  const cardCellHex = (family: 'Text' | 'Header', pal: string, n: number, threshold: number): string | null => {
+    const ref = cellRef(family, 'Containers', pal, n);
+    const hex = tableHex(ref);
+    if (!hex || !darkCardGround || onGround(hex, darkCardGround) >= threshold) return hex;
+    const m = String(ref).match(/^\{Colors\.([\w-]+)\.Color-(\d+)\}$/);
+    if (!m) return hex;
+    for (let k = Number(m[2]) + 1; k <= 12; k++) {
+      const step = rampOf(m[1])?.[k - 1]?.hex;
+      if (step && onGround(step, darkCardGround) >= threshold) return step;
+    }
+    return hex;
+  };
+  const pagePal = surfacePaletteName;
+  const roleTone = isDark ? DARK_LADDER_TONE.Surface : surfaceN;
+  const cieL = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y;
+  };
+  const cardFaceHex = (isDark ? cardHighestOut : cardOut).slice(0, 7);
+  const cardFaceN = (() => {
+    const ramp = rampOf(pagePal) ?? [];
+    let best = Infinity, n = containerN;
+    for (let i = 1; i <= 12; i++) {
+      const h = ramp[i - 1]?.hex;
+      if (!h) continue;
+      const d = Math.abs(cieL(h.slice(0, 7)) - cieL(cardFaceHex));
+      if (d < best) { best = d; n = i; }
+    }
+    return n;
+  })();
+  const rolePal = (role: string) => pageRolePalette(pagePal, effectiveTextColoring, role);
+  const pageTextOut = tableHex(cellRef('Text', 'Surfaces', rolePal('Text'), roleTone)) ?? surfaceText;
+  const pageHeaderOut = tableHex(cellRef('Header', 'Surfaces', rolePal('Header'), roleTone)) ?? surfaceHeader;
+  const pageBorderOut = isDark
+    ? (tableHex(cellRef('Border', 'Surfaces', pagePal, roleTone)) ?? surfaceBorder)
+    : `var(--${surfacePaletteName}-Color-${surfaceTones.border})`;
+  const cardTextOut = cardCellHex('Text', rolePal('Text'), cardFaceN, 4.5) ?? containerText;
+  const cardHeaderOut = cardCellHex('Header', rolePal('Header'), cardFaceN, 3) ?? containerHeader;
+  /* The mark that sits ON the default icon (which is the Text above): the
+     Text table at the icon's own tone where that clears 4.5:1, else the end
+     of the Neutral ramp that contrasts more — the shape onTokenFor uses. */
+  const onDefaultFor = (iconHex: string): string => {
+    const icon = iconHex.slice(0, 7).toLowerCase();
+    for (const pal of ['Primary', 'Secondary', 'Tertiary', 'Neutral']) {
+      const i = (rampOf(pal) ?? []).findIndex((t) => t?.hex?.toLowerCase() === icon);
+      if (i < 0) continue;
+      const cand = tableHex(cellRef('Text', 'Surfaces', pal, i + 1));
+      if (cand && chroma.contrast(cand.slice(0, 7), icon) >= 4.5) return cand;
+      break;
+    }
+    const [dark, light] = [neutral(1), neutral(12)];
+    return chroma.contrast(dark, icon) >= chroma.contrast(light, icon) ? dark : light;
+  };
+  const cardQuietOut = cardQuietOpacity(cardTextOut,
+    [cardLowestOut, cardLowOut, cardOut, cardHighOut, cardHighestOut], cardOut)?.solid ?? containerQuiet;
 
   // ── Buttons ──
   // Primary: uses actual Primary extracted color
@@ -1717,11 +1851,11 @@ ${isDark
   --Container-High: ${cardHighOut};
   --Container-Highest: ${cardHighestOut};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg, shadowOpts))};
-  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.text})` : surfaceText};
-  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
+  --Text: ${pageTextOut};
+  --Header: ${pageHeaderOut};
   --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
   --Eyebrow: ${eyebrowFor(surfacePaletteName, surfaceBg, surfaceN)};
-  --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
+  --Border: ${pageBorderOut};
   --Border-Variant: ${variantHex8(surfaceBorder, BORDER_VARIANT_ALPHA, surfaceBg)};
   --Hover: ${activeAndHoverFor(surfacePalette, surfaceN).hover};
   --Pressed: ${activeAndHoverFor(surfacePalette, surfaceN).active};
@@ -1733,7 +1867,7 @@ ${isDark
   --Link: ${tokenRefToVar(textTableToken(surfaceN, false, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
 ${buildTextPaletteLines(surfaceN, false, isDark)}
-${buildIconPaletteLines(surfaceN, false, isDark, textPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
+${buildIconPaletteLines(surfaceN, false, isDark, textPaletteName, hexOfPalette, pageTextOut, surfaceTones.text, onDefaultFor(pageTextOut))}
 ${buildHeaderPaletteLines(surfaceN, false)}
 ${emitStateButtonTokens(surfaceN)}
   --Focus-Visible: #3b82f6;
@@ -1775,9 +1909,9 @@ ${emitTagTextTokens()}
   --Container-High: ${cardHighOut};
   --Container-Highest: ${cardHighestOut};
   --Container-Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
-  --Container-Text: ${containerText};
-  --Container-Header: ${containerHeader};
-  --Container-Quiet: ${containerQuiet};
+  --Container-Text: ${cardTextOut};
+  --Container-Header: ${cardHeaderOut};
+  --Container-Quiet: ${cardQuietOut};
   --Container-Border: ${containerBorder};
 ${defaultButtonLines(defaultButtonFor(containerPaletteName, containerN, containerBg, true), 'Container-')}
 }
@@ -1838,9 +1972,9 @@ ${(() => {
   --Container-High: ${cardHighOut};
   --Container-Highest: ${cardHighestOut};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
-  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.text})` : containerText};
-  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.header})` : containerHeader};
-  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
+  --Text: ${cardTextOut};
+  --Header: ${cardHeaderOut};
+  --Quiet: ${cardQuietOut};
   --Eyebrow: ${eyebrowFor(containerPaletteName, containerBg, containerN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
   --Border-Variant: ${variantHex8(containerBorder, BORDER_VARIANT_ALPHA, containerBg)};
@@ -1857,7 +1991,7 @@ ${(() => {
   --Link: ${tokenRefToVar(textTableToken(containerN, true, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
 ${buildTextPaletteLines(containerN, true, isDark)}
-${buildIconPaletteLines(containerN, true, isDark, containerTextPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.text})` : containerText, containerTones.text)}
+${buildIconPaletteLines(containerN, true, isDark, containerTextPaletteName, hexOfPalette, cardTextOut, containerTones.text, onDefaultFor(cardTextOut))}
 ${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${contDefBg};
   --Buttons-Primary-Text: ${contDefText};

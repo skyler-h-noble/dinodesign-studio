@@ -78,11 +78,11 @@ describe('B. a neutral page: tonal cards and tonal text use the Primary tint', (
     // [page Text, page Header, card Text, card Header]
     Popsicle: {
       tonal: { light: ['#593462', '#784284', '#593462', '#784284'], dark: ['#e8beef', '#e8beef', '#e8beef', '#d9ade0'] },
-      'black-white': { light: ['#424242', '#575757', '#424242', '#575757'], dark: ['#cccccc', '#cccccc', '#cccccc', '#bbbbbb'] },
+      'black-white': { light: ['#040404', '#575757', '#040404', '#575757'], dark: ['#ffffffb3', '#cccccc', '#ffffffb3', '#bbbbbb'] },
     },
     Cocktails: {
       tonal: { light: ['#3f4525', '#525b2d', '#3f4525', '#525b2d'], dark: ['#cacfac', '#cacfac', '#cacfac', '#b9bf9a'] },
-      'black-white': { light: ['#424242', '#575757', '#424242', '#575757'], dark: ['#cccccc', '#cccccc', '#cccccc', '#bbbbbb'] },
+      'black-white': { light: ['#040404', '#575757', '#040404', '#575757'], dark: ['#ffffffb3', '#cccccc', '#ffffffb3', '#bbbbbb'] },
     },
   };
 
@@ -120,13 +120,24 @@ describe('B. a neutral page: tonal cards and tonal text use the Primary tint', (
     }, 120_000);
   }
 
-  it('only the page changes: a Primary page is unaffected by rule B in both modes', () => {
+  it('a Primary page: tonal text is the palette, Black & White text is black or white, headers keep the palette', () => {
+    /* Rule B does not touch a Primary page: tonal text there is the page
+       palette's own table. Black & White text reads the BW table (since
+       2026-11-05 — it used to read the palette's table too, so the choice
+       did nothing on a Primary page), and the header keeps the palette under
+       both, as every themed section's does. */
     for (const brand of Object.keys(FIXTURES)) {
       for (const bg of ['primary-light', 'primary-base']) {
-        const a = cssPage(brand, sel(bg, 'tonal', 'tonal'), 'Light');
-        const b = cssPage(brand, sel(bg, 'tonal', 'black-white'), 'Light');
-        // On a Primary page the page palette IS Primary: tonal and BW read the same tables as before.
-        expect(a.text).toBe(b.text);
+        for (const mode of ['Light', 'Dark'] as const) {
+          const a = cssPage(brand, sel(bg, 'tonal', 'tonal'), mode);
+          const b = cssPage(brand, sel(bg, 'tonal', 'black-white'), mode);
+          const chromaOf = (h: string) => chroma(h.slice(0, 7)).lch()[1];
+          const prim = (built(brand, sel(bg, 'tonal', 'tonal')).json as any).Modes[`${mode}-Mode`].Colors.Primary;
+          const primaryTones = Array.from({ length: 12 }, (_, i) => hex(prim[`Color-${i + 1}`].value));
+          expect(primaryTones, `${brand} ${bg} ${mode} tonal ${a.text}`).toContain(a.text);
+          expect(chromaOf(b.text), `${brand} ${bg} ${mode} black-white ${b.text}`).toBeLessThan(2);
+          expect(b.header, `${brand} ${bg} ${mode} header`).toBe(a.header);
+        }
       }
     }
   }, 120_000);
