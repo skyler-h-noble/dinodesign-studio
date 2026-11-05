@@ -96,6 +96,41 @@ function ensureFonts(urls: string[]): void {
 }
 
 /**
+ * Keep the studio's skin out of any region that wears the USER's brand.
+ *
+ * The create flow and the design-system detail page paint the user's system
+ * with buildPreviewCSS, which scopes everything to `[data-theme="Brand"]`.
+ * That region sits INSIDE OmniDesignProvider's `<div data-theme="Default">`,
+ * and the skin is a published system whose surface rules read
+ *
+ *   [data-theme="Default"] [data-surface="Surface-Dim"]:not([data-theme])
+ *
+ * A descendant selector does not care which theme is NEAREST, so every
+ * `data-surface` without its own `data-theme` under Brand matched it. At
+ * specificity 0,3,0 it beat the brand's own
+ * `[data-theme="Brand"] [data-surface="Surface-Dim"]` (0,2,0), and the
+ * element's whole paired token set — the Default button among it — came from
+ * the studio's system instead of the user's. Its values are partly
+ * `var(--Primary-Color-3)` / `var(--Secondary-Color-7)`, resolved against the
+ * USER's palettes (so a purple slider on Component Style), and partly literal
+ * hex (the sage hover `#acc1ac` on the color stage's choice buttons).
+ *
+ * `@scope … to ([data-theme="Brand"])` stops every skin rule at the brand's
+ * edge, whatever its specificity, so the brand sheet is the only design
+ * system speaking inside it. Inherited values from above still flow in, which
+ * is the same as before for anything the brand does not redeclare.
+ *
+ * `:root` becomes `:scope`: inside @scope, `:root` no longer matches <html>
+ * (measured in Chrome — the skin's root tokens, the fonts among them, dropped
+ * out), while `:scope` is the scoping root itself, at the same specificity.
+ */
+export const BRAND_BOUNDARY = '[data-theme="Brand"]';
+
+export function scopeStudioSkin(css: string): string {
+  return `@scope (:root) to (${BRAND_BOUNDARY}) {\n${css.replace(/:root\b/g, ':scope')}\n}`;
+}
+
+/**
  * Fetch a published design system and dress the studio in it.
  *
  * Resolves once applied. Deliberately not awaited before first paint: the lib
@@ -131,7 +166,7 @@ export async function applyStudioDesignSystem(id: string): Promise<boolean> {
   if (existing) existing.remove();
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = css;
+  style.textContent = scopeStudioSkin(css);
   document.head.appendChild(style);
   return true;
 }
