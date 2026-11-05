@@ -399,6 +399,8 @@ export interface BandInfo {
   S: number;
   tones: Record<DarkLadderLevel, number>;
   cardTone: number;
+  /** With black cards: the Neutral tone the near-black cards' face is. */
+  blackCardTone?: number;
 }
 
 /** Where the band pass records the bands, in each mode's data (plain JSON, not tokens). */
@@ -408,4 +410,102 @@ export const LADDER_BANDS_KEY = 'Ladder-Bands';
 export function recordedBands(modeData: any): Record<string, BandInfo> {
   const b = modeData?.[LADDER_BANDS_KEY];
   return b && typeof b === 'object' && !Array.isArray(b) ? b as Record<string, BandInfo> : {};
+}
+
+/* ─── Card Coloring and Text Coloring (owner, 2026-11-05) ─────────────────
+ *
+ * Two decisions about the page's own cards and text, which looked like they
+ * changed nothing:
+ *
+ * A. Dark mode: "Black cards stay black only." Tonal and white cards keep the
+ *    one fixed dark set above (tone 4 over the page; a band's S+1 over S).
+ *    Black cards become NEAR-BLACK: the light-mode black-card ladder (Neutral
+ *    Color-1 at 90 / 92 / 94 / 96%, Highest = Neutral Color-1 itself —
+ *    docs/container-logic.md) mixed over the theme's dark page instead —
+ *    tone 3 for a ladder theme, tone S for a band. One set per theme, the same
+ *    on every surface level, like every other dark card.
+ *
+ *    Separation: the face is the DARKEST Neutral tone whose L* differs from
+ *    the page by at least BLACK_CARD_MIN_DL. A dark page is tone 3 (L* ~11
+ *    for Neutral), so Neutral Color-1 (L* ~3) always clears it; the rule only
+ *    matters for a page that is itself near-black, where the face steps up
+ *    the Neutral ramp until it reads as a separate card.
+ *
+ *    Every role a dark-mode card carries is lighter than the card and was
+ *    solved on tone 4 (the lightest dark card); a near-black card is darker,
+ *    so each of them clears it by more. A band's card roles are re-solved
+ *    against these cards by the band pass (they are dark on a light band's
+ *    tonal cards and must be light here).
+ *
+ * B. Neutral page: "Tonal uses the Primary tint." When the page palette is
+ *    Neutral, tonal cards on the page use the PRIMARY palette's row (the same
+ *    tone / opacity ladder tonal cards have on a Primary page — the row at the
+ *    page's own index, so nothing new is generated and Figma already holds
+ *    it), and tonal text uses the Primary text tables (the curated per-surface
+ *    tables a Primary page reads). In dark mode tonal cards take Primary's one
+ *    dark set (tone 4 over tone 3 of Primary) — the light choice carried
+ *    through, so the choice stays visible. White stays white, black-white
+ *    stays black / white, and only the Default theme (the page) changes: a
+ *    themed section already uses its own palette.
+ */
+export const BLACK_CARD_ALPHA: Record<DarkCardLevel, number> = {
+  'Container-Lowest': 0.9,
+  'Container-Low': 0.92,
+  'Container': 0.94,
+  'Container-High': 0.96,
+  'Container-Highest': 1,
+};
+/** The least L* step that reads as a separate card against the page. */
+export const BLACK_CARD_MIN_DL = 5;
+
+/** The Neutral tone a black card's face is (1-based): the darkest whose L*
+ *  differs from `page` by at least BLACK_CARD_MIN_DL. */
+export function blackCardFaceTone(neutralRamp: string[], page: string): number {
+  const pl = labL(page);
+  for (let t = 1; t <= neutralRamp.length; t++) {
+    if (Math.abs(labL(neutralRamp[t - 1]) - pl) >= BLACK_CARD_MIN_DL) return t;
+  }
+  return 1;
+}
+
+/** A black card level's SOLID color: the face mixed over the theme's page. */
+export function blackCardHex(face: string, page: string, level: DarkCardLevel): string {
+  const f = chroma(face).hex('rgb').toLowerCase();
+  if (BLACK_CARD_ALPHA[level] >= 1) return f;
+  return blendColors(f, chroma(page).hex('rgb'), BLACK_CARD_ALPHA[level]).toLowerCase();
+}
+
+/** A theme's five near-black cards over `page`, and the Neutral tone they use. */
+export function blackCardHexesForPage(neutralRamp: string[], page: string): { tone: number; cards: Record<DarkCardLevel, string> } {
+  const tone = blackCardFaceTone(neutralRamp, page);
+  const face = neutralRamp[tone - 1];
+  return {
+    tone,
+    cards: Object.fromEntries(DARK_CARD_LEVELS.map((l) => [l, blackCardHex(face, page, l)])) as Record<DarkCardLevel, string>,
+  };
+}
+
+/** The palette the PAGE's tonal cards are drawn from (rule B). */
+export function cardPaletteFor(pagePalette: string, cardColoring?: unknown): string {
+  return pagePalette === 'Neutral' && cardColoring === 'tonal' ? 'Primary' : pagePalette;
+}
+/** The palette the PAGE's Text / Header / Quiet are drawn from (rule B). */
+export function textPaletteFor(pagePalette: string, textColoring?: unknown): string {
+  return pagePalette === 'Neutral' && textColoring === 'tonal' ? 'Primary' : pagePalette;
+}
+
+/** Where the two selections are recorded, in each mode's data (plain JSON, not
+ *  tokens), so the CSS export and the Figma payload — which expand the Default
+ *  theme from the JSON alone — read the same choice. A system stored before
+ *  the record existed reads '' for both, which changes nothing: rule B needs
+ *  an explicit 'tonal', and the dark black cards read the ladder's own
+ *  selection (blackChosen's input), which is not stored either. */
+export const COLORING_KEY = 'Card-Text-Coloring';
+export interface ColoringChoice { cardColoring: string; textColoring: string }
+export function recordedColoring(modeData: any): ColoringChoice {
+  const c = modeData?.[COLORING_KEY];
+  return {
+    cardColoring: typeof c?.cardColoring === 'string' ? c.cardColoring : '',
+    textColoring: typeof c?.textColoring === 'string' ? c.textColoring : '',
+  };
 }

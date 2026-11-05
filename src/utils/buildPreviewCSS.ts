@@ -7,7 +7,7 @@ import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generat
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
 import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, type DarkCardLevel } from './darkLadder';
+import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, blackCardHexesForPage, cardPaletteFor, textPaletteFor, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, effectLevelScopeCSS, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
 // Contrast lookup tables for per-palette Text and Header tokens — the
@@ -941,6 +941,18 @@ export function buildPreviewCSS(input: BuildInput): string {
   const tonalIsLight = surfaceN >= 6;
   const tonalContainerN = tonalIsLight ? 10 : 2;
 
+  /* Card Coloring / Text Coloring on a NEUTRAL page (owner, 2026-11-05;
+     utils/darkLadder.ts): tonal cards take the Primary palette — the row a
+     Primary page's tonal cards use, at this page's tone; in dark mode
+     Primary's tone 4 over its tone 3 — and tonal text the Primary tones. Read
+     from the user's pick, not effectiveCardColoring: white cards in dark mode
+     keep the page palette's set. Black cards in dark mode are near-black
+     (Neutral Color-1 over the page at 90 / 92 / 94 / 96 / 100%). */
+  const cardRampName = cardPaletteFor(surfacePaletteName, sel.cardColoring);
+  const cardRamp = cardRampName !== surfacePaletteName ? primary : surfacePalette;
+  const textPaletteName = textPaletteFor(surfacePaletteName, effectiveTextColoring);
+  const darkBlackCards = isDark && sel.cardColoring === 'black';
+
   // White/Black card coloring ONLY applies to Default theme containers
   // Tertiary (and other themed containers) always keep their palette color
   if (effectiveCardColoring === 'white') {
@@ -953,7 +965,7 @@ export function buildPreviewCSS(input: BuildInput): string {
       const ramp = darkThemeRamp(darkTheme);
       containerBg = ramp ? p(ramp, 3) : neutral(3);
     } else {
-      containerBg = p(surfacePalette, tonalContainerN);
+      containerBg = p(cardRamp, tonalContainerN);
     }
   }
 
@@ -985,12 +997,14 @@ export function buildPreviewCSS(input: BuildInput): string {
     // (Background-10 light / Background-2 dark) every opacity blends a color
     // with itself and the card vanishes. Step one tone away from the page.
     const faceTone = surfaceN === tonalContainerN ? (tonalIsLight ? 11 : 3) : tonalContainerN;
-    const face = p(surfacePalette, faceTone);
+    const face = p(cardRamp, faceTone);
     // Blend against the color --Surface actually RESOLVES to, not surfaceBg.
     // For a black background those differ (surfaceBg is #1a1a1a, the token is
     // Neutral-Color-1), which put the ramp on a different base than the page
-    // and made the first step move the wrong way.
-    const at = (a: number) => blendColors(face, p(surfacePalette, surfaceN), a);
+    // and made the first step move the wrong way. On a neutral page with
+    // tonal cards the row is Primary's, blended over Primary at this tone —
+    // the export's Backgrounds.Primary.Background-N.
+    const at = (a: number) => blendColors(face, p(cardRamp, surfaceN), a);
     containerLowest = at(0.65);
     containerLow = at(0.75);
     containerBg = at(0.85);
@@ -1015,7 +1029,7 @@ export function buildPreviewCSS(input: BuildInput): string {
        export's cards, one set for every surface level. The roles below are
        solved on tone 4 itself, the lightest thing a card can paint and so the
        hardest ground for every role; the mixes are what darkCardEmit emits. */
-    const face = p(surfacePalette, DARK_CARD_TONE);
+    const face = p(cardRamp, DARK_CARD_TONE);
     containerLowest = containerLow = containerBg = containerHigh = containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'white') {
     // White cards ramp too, at much higher opacities — they must still read as
@@ -1047,13 +1061,16 @@ export function buildPreviewCSS(input: BuildInput): string {
   const tertiaryContainerN = isDark ? bandCardTone(bandS('Tertiary')) : 10;
   /* What the card levels EMIT. Dark mode: the face above (tone 4) mixed with
      the page (tone 3) — solid, no opacity, one set for every surface level. */
-  const darkCardEmit = (face: string, level: DarkCardLevel) => (isDark ? darkCardHex(face, surfaceBg, level) : face);
+  const darkCardPage = isDark ? p(cardRamp, DARK_LADDER_TONE.Surface) : surfaceBg;
+  const darkBlackSet = darkBlackCards ? blackCardHexesForPage(NEUTRAL, surfaceBg).cards : null;
+  const darkCardEmit = (face: string, level: DarkCardLevel) =>
+    (!isDark ? face : darkBlackSet ? darkBlackSet[level] : darkCardHex(face, darkCardPage, level));
   /* Dark mode: a theme's five card colors, stated on the cards inside it and
      on a card that names the theme itself. The Container Surface block
      restates the PAGE's cards on every card (a studio-shell rule would
      otherwise win), so a theme restates its own at a higher specificity. */
   const darkCardScope = (sel: string, face: string, page: string): string => {
-    const cards = darkCardHexes(face, page);
+    const cards = darkBlackCards ? blackCardHexesForPage(NEUTRAL, page).cards : darkCardHexes(face, page);
     return `${sel} [data-surface^="Container"],\n${sel}[data-surface^="Container"] {\n`
       + DARK_CARD_LEVELS.map((l) => `  --${l}: ${cards[l]};`).join('\n') + '\n}';
   };
@@ -1084,7 +1101,10 @@ export function buildPreviewCSS(input: BuildInput): string {
   const containerPaletteName = effectiveCardColoring === 'white' ? 'Neutral'
     : effectiveCardColoring === 'black' ? 'Neutral'
     : isDark ? 'Primary'
-    : surfacePaletteName;
+    : cardRampName;
+  /* The card's Text / Header / Quiet: Primary's under tonal text on a
+     neutral page (whatever the card), else the card palette as before. */
+  const containerTextPaletteName = textPaletteName !== surfacePaletteName ? textPaletteName : containerPaletteName;
 
   if (effectiveTextColoring === 'tonal') {
     surfaceText = p(textPalette, surfaceTones.text);
@@ -1682,9 +1702,9 @@ ${isDark
   --Container-High: ${cardHighOut};
   --Container-Highest: ${cardHighestOut};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(surfaceBg, shadowOpts))};
-  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText};
-  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
-  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
+  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.text})` : surfaceText};
+  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.header})` : surfaceHeader};
+  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.quiet})` : surfaceQuiet};
   --Eyebrow: ${eyebrowFor(surfacePaletteName, surfaceBg, surfaceN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.border})` : surfaceBorder};
   --Border-Variant: ${variantHex8(surfaceBorder, BORDER_VARIANT_ALPHA, surfaceBg)};
@@ -1803,9 +1823,9 @@ ${(() => {
   --Container-High: ${cardHighOut};
   --Container-Highest: ${cardHighestOut};
   --Dropshadow-Color: ${hexToRgb(dropshadowFor(containerBg, shadowOpts))};
-  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText};
-  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.header})` : containerHeader};
-  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
+  --Text: ${effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.text})` : containerText};
+  --Header: ${effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.header})` : containerHeader};
+  --Quiet: ${effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.quiet})` : containerQuiet};
   --Eyebrow: ${eyebrowFor(containerPaletteName, containerBg, containerN)};
   --Border: ${effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.border})` : containerBorder};
   --Border-Variant: ${variantHex8(containerBorder, BORDER_VARIANT_ALPHA, containerBg)};

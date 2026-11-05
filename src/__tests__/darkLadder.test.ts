@@ -33,6 +33,7 @@ import { orderSheets } from '../utils/renderedAccessibilityReport';
 import {
   DARK_LADDER_LEVELS, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE, DARK_CARD_ALPHA, darkCardHex, darkCardHexesForRamp,
   cardRoleFailures, labL, blackChosen, bandSurfaceTone, bandTones, bandCardTone, bandCardHexesForRamp, BAND_THEMES,
+  blackCardHexesForPage, cardPaletteFor, BLACK_CARD_MIN_DL,
 } from '../utils/darkLadder';
 import { BANDS } from '../utils/cssgen/darkBandPass';
 import { blendColors } from '../utils/colorScale';
@@ -70,6 +71,13 @@ const HIGHER: Record<string, string[]> = {
 function paletteOf(theme: string, sel: Selection): string {
   return theme === 'Default' ? parseBackground(sel.background).theme : theme;
 }
+/** The palette a theme's TONAL cards come from: its own, except the page's on
+ *  a neutral page, which takes Primary's (owner, 2026-11-05). */
+function cardPaletteOf(theme: string, sel: Selection): string {
+  return theme === 'Default' ? cardPaletteFor(paletteOf(theme, sel), sel.cardColoring) : theme;
+}
+/** The dark ramp of a palette, tone 1 first. */
+const rampOf = (dark: any, pal: string) => Array.from({ length: 12 }, (_, i) => chroma(dark.Colors[pal][`Color-${i + 1}`].value).hex('rgb').toLowerCase());
 
 /** A band theme's tones, worked out here from the LIGHT-mode Surface it paints
  *  (not read back from what the pass recorded): S = min(L, 8). */
@@ -92,7 +100,7 @@ function bandOf(json: any, theme: string) {
 
 /* Tallies reported once at the end. */
 const tally = {
-  cards: 0, levelOnBright: 0, darkerOnBright: 0, darkerOnBrightest: 0,
+  cards: 0, levelOnBright: 0, darkerOnBright: 0, darkerOnBrightest: 0, blackOnDimmest: 0,
   nestedHigher: 0, nestedHigherFailures: 0,
   nestedLower: 0, nestedLowerDarker: 0, nestedLowerFailures: 0,
 };
@@ -100,6 +108,7 @@ afterAll(() => {
   process.stdout.write(`[darkLadder] ${tally.cards} solid card colors checked (card x surface x theme x system); ` +
     `on Surface-Bright ${tally.levelOnBright} level with it and ${tally.darkerOnBright} darker, ` +
     `on Surface-Brightest ${tally.darkerOnBrightest} darker (the accepted consequence); ` +
+    `black cards on Surface-Dimmest (level with it, accepted): ${tally.blackOnDimmest}; ` +
     `nested, a HIGHER level inside: ${tally.nestedHigher} measured, ${tally.nestedHigherFailures} with a failing role; ` +
     `nested, a LOWER level inside (not the pattern): ${tally.nestedLower} measured, ${tally.nestedLowerDarker} darker than the parent, ` +
     `${tally.nestedLowerFailures} with a failing role\n`);
@@ -131,13 +140,29 @@ describe('dark ladder — what the CSS paints', () => {
           const black = blackChosen(sel) && pal === 'Neutral';
           const paints = (level: typeof DARK_LADDER_LEVELS[number]) =>
             (toneAt(level) === 1 && black ? '#000000' : tone(toneAt(level)));
-          const face = tone(band ? band.cardTone : DARK_CARD_TONE);
+          const cpal = cardPaletteOf(theme, sel);
+          const ctone = (n: number) => hex(dark.Colors[cpal][`Color-${n}`].value)!;
+          const face = ctone(band ? band.cardTone : DARK_CARD_TONE);
           const page = tone(band ? band.S : DARK_LADDER_TONE.Surface);
-          /* The theme's ONE set: tone 4 over the page (tone 3), exactly. */
+          const cardPage = band ? page : ctone(DARK_LADDER_TONE.Surface);
+          /* The theme's ONE set: tone 4 over the page (tone 3), exactly — or,
+             with black cards, near-black: Neutral Color-1 over the theme's
+             page at 90 / 92 / 94 / 96 / 100% (owner, 2026-11-05). */
+          const blackCards = sel.cardColoring === 'black';
+          const blackSet = blackCards ? blackCardHexesForPage(rampOf(dark, 'Neutral'), page) : null;
           const want: Record<string, string> = {};
           for (const card of DARK_CARD_LEVELS) {
-            want[card] = DARK_CARD_ALPHA[card] >= 1 ? face : blendColors(face, page, DARK_CARD_ALPHA[card]).toLowerCase();
-            expect(darkCardHex(face, page, card), `${theme} ${card} helper`).toBe(want[card]);
+            if (blackSet) { want[card] = blackSet.cards[card]; continue; }
+            want[card] = DARK_CARD_ALPHA[card] >= 1 ? face : blendColors(face, cardPage, DARK_CARD_ALPHA[card]).toLowerCase();
+            expect(darkCardHex(face, cardPage, card), `${theme} ${card} helper`).toBe(want[card]);
+          }
+          if (blackSet) {
+            /* Near-black and separated: every card at least BLACK_CARD_MIN_DL
+               darker than the theme's page, Highest L* under 10. */
+            for (const card of DARK_CARD_LEVELS) {
+              if (!(labL(page) - labL(want[card]) >= BLACK_CARD_MIN_DL)) problems.push(`${theme}/${card}: black card ${want[card]} not separated from the page ${page}`);
+            }
+            if (!(labL(want['Container-Highest']) < 10)) problems.push(`${theme}: black card Highest ${want['Container-Highest']} is not near-black`);
           }
 
           // The five surfaces: tones 1-5, exactly (black where chosen).
@@ -169,14 +194,26 @@ describe('dark ladder — what the CSS paints', () => {
                  the surface — the owner accepted that; asserted so it cannot
                  change unnoticed. */
               const dL = labL(got) - labL(surface);
-              if (band) {
+              if (blackSet) {
+                /* Near-black cards sit below every surface from Dim up. On
+                   Surface-Dimmest (tone 1, or black where chosen) they sit
+                   level with it — the black-card counterpart of the tonal
+                   cards on Bright, accepted the same way: cards belong on the
+                   page. Measured, not failed. */
+                if (level === 'Surface-Dimmest') tally.blackOnDimmest++;
+                else if (!(dL < 0)) problems.push(`${theme}/${level}/${card}: black card ${got} not darker than ${surface}`);
+              } else if (band) {
                 /* A band's cards sit between tones S and its card tone; on a
                    level darker than both they read as raised. (On the rest
                    they sit level with or below it — the ladder's accepted
                    shape, one band over.) */
                 if (toneAt(level) < Math.min(band.S, band.cardTone) && !(dL > 0)) problems.push(`${theme}/${level}/${card}: ${got} not lighter than the surface ${surface}`);
               } else if (level === 'Surface-Bright') {
-                if (got === surface) tally.levelOnBright++;
+                /* Level with: the same color, or — a neutral page's tonal
+                   cards are Primary's tone 4 on Neutral's tone 4 — the same
+                   lightness to within 1 L* (palettes share one lightness per
+                   tone). */
+                if (got === surface || Math.abs(dL) < 1) tally.levelOnBright++;
                 else if (dL < 0) tally.darkerOnBright++;
                 else problems.push(`${theme}/${level}/${card}: ${got} lighter than the tone-4 surface ${surface}`);
               } else if (level === 'Surface-Brightest') {
@@ -208,7 +245,7 @@ describe('dark ladder — what the CSS paints', () => {
                   if (bg !== want[inner]) problems.push(`${theme}/${level}/${outer}>${inner}: ${bg}, expected ${want[inner]}`);
                   /* A higher level moves toward the card face: lighter, unless
                      the band's cards were taken one tone BELOW its Surface. */
-                  const upward = !band || band.cardTone > band.S;
+                  const upward = !blackSet && (!band || band.cardTone > band.S);
                   if (inner !== outer && upward && !(labL(bg) > labL(painted[outer]))) problems.push(`${theme}/${level}/${outer}>${inner}: ${bg} not lighter than its parent ${painted[outer]}`);
                   if (nf.length) { tally.nestedHigherFailures++; problems.push(`${theme}/${level}/${outer}>${inner} on ${bg}: ${nf.slice(0, 2).join(', ')}`); }
                 } else if (DARK_CARD_LEVELS.indexOf(inner) < DARK_CARD_LEVELS.indexOf(outer)) {
@@ -227,10 +264,13 @@ describe('dark ladder — what the CSS paints', () => {
         const page = hex(cascade.computed({ attrs: { 'data-theme': 'Default' }, parent: root })['--Background']);
         expect(page, 'the dark page').toBe(pageHex);
         // And cards straight on the page, with no theme anywhere above them.
-        const pageFace = hex(dark.Colors[pagePal][`Color-${DARK_CARD_TONE}`].value)!;
+        const pageCardPal = cardPaletteOf('Default', sel);
+        const pageFace = hex(dark.Colors[pageCardPal][`Color-${DARK_CARD_TONE}`].value)!;
+        const pageCardGround = hex(dark.Colors[pageCardPal][`Color-${DARK_LADDER_TONE.Surface}`].value)!;
+        const pageBlack = sel.cardColoring === 'black' ? blackCardHexesForPage(rampOf(dark, 'Neutral'), pageHex) : null;
         for (const card of DARK_CARD_LEVELS) {
           const got = hexA(cascade.computed({ attrs: { 'data-surface': card }, parent: root })['--Background']);
-          expect(got, `${card} on the bare page`).toBe(darkCardHex(pageFace, pageHex, card));
+          expect(got, `${card} on the bare page`).toBe(pageBlack ? pageBlack.cards[card] : darkCardHex(pageFace, pageCardGround, card));
         }
 
         expect(problems.slice(0, 12)).toEqual([]);
@@ -325,12 +365,16 @@ describe('dark ladder — Figma holds exactly the CSS cards and backgrounds (per
         /* The theme's one set — tone 4 over the page, solid — and exactly
            what the CSS paints for that theme's cards (on its page surface;
            every surface paints the same five). */
-        const face = hex(D.Colors[pal][`Color-${band ? band.cardTone : DARK_CARD_TONE}`].value)!;
+        const cpal = cardPaletteOf(theme, sel);
+        const face0 = hex(D.Colors[cpal][`Color-${band ? band.cardTone : DARK_CARD_TONE}`].value)!;
         const page = hex(D.Colors[pal][`Color-${band ? band.S : DARK_LADDER_TONE.Surface}`].value)!;
+        const cardGround = band ? page : hex(D.Colors[cpal][`Color-${DARK_LADDER_TONE.Surface}`].value)!;
+        const black = sel.cardColoring === 'black' ? blackCardHexesForPage(rampOf(D, 'Neutral'), page) : null;
+        const face = black ? black.cards['Container-Highest'] : face0;
         for (const card of DARK_CARD_LEVELS) {
           const raw = figma.Themes[theme]?.Containers?.[card]?.value;
           const got = resolve(raw);
-          const want = darkCardHex(face, page, card);
+          const want = black ? black.cards[card] : darkCardHex(face, cardGround, card);
           if (got !== want) wrong.push(`${theme}/${card}: Figma ${got} vs ${want}`);
           const css = hexA(cascade.computed(cardOn(card, surfaceEl(theme, 'Surface')))['--Background']);
           if (got !== css) wrong.push(`${theme}/${card}: Figma ${got} vs CSS ${css}`);
@@ -345,7 +389,9 @@ describe('dark ladder — Figma holds exactly the CSS cards and backgrounds (per
       for (const [pal, rows] of Object.entries<any>(M.Backgrounds ?? {})) {
         const ramp = Array.from({ length: 12 }, (_, i) => hex(D.Colors?.[pal]?.[`Color-${i + 1}`]?.value) ?? '');
         if (ramp.some((h) => !h)) continue;
-        const set = darkCardHexesForRamp(ramp);
+        const black = sel.cardColoring === 'black' ? blackCardHexesForPage(rampOf(D, 'Neutral'), ramp[DARK_LADDER_TONE.Surface - 1]) : null;
+        const set = black ? black.cards : darkCardHexesForRamp(ramp);
+        const highestAlias = black ? `{Colors.Neutral.Color-${black.tone}}` : `{Colors.${pal}.Color-${DARK_CARD_TONE}}`;
         for (const [row, r] of Object.entries<any>(rows)) {
           for (const card of DARK_CARD_LEVELS) {
             const c = r?.Containers?.[card]?.value;
@@ -353,7 +399,7 @@ describe('dark ladder — Figma holds exactly the CSS cards and backgrounds (per
             if (resolve(c) !== set[card]) wrong.push(`${pal}/${row}/${card}: ${c}, expected ${set[card]}`);
           }
           const j = D.Backgrounds?.[pal]?.[row]?.Containers?.['Container-Highest']?.value;
-          if (j !== undefined && j !== `{Colors.${pal}.Color-${DARK_CARD_TONE}}`) wrong.push(`JSON ${pal}/${row} Highest: ${j}, expected the tone-4 alias`);
+          if (j !== undefined && j !== highestAlias) wrong.push(`JSON ${pal}/${row} Highest: ${j}, expected ${highestAlias}`);
         }
       }
       expect(wrong.slice(0, 12)).toEqual([]);

@@ -11,7 +11,7 @@
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
-import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone } from '../darkLadder';
+import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone, recordedColoring, cardPaletteFor, textPaletteFor } from '../darkLadder';
 import { LADDER_PAGE_ICONS_KEY } from './darkBandPass';
 import { chartColorVisionCSS } from '../chartColorVision';
 import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
@@ -1361,6 +1361,15 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
   {
     const { defPal, defN } = defaultBackgroundTone(fullJsonData, modeData, modeName);
     const isDarkMode = modeName === 'Dark-Mode';
+    /* Card Coloring / Text Coloring on a NEUTRAL page (owner, 2026-11-05):
+       tonal cards take the Primary palette's row at the page's own index, and
+       tonal text the Primary text tables — otherwise both read Neutral and
+       look exactly like White / Black-&-White (utils/darkLadder.ts). Any other
+       page palette, or white / black-white, reads the page palette as before. */
+    const coloring = recordedColoring(modeData);
+    const cardPal = cardPaletteFor(defPal, coloring.cardColoring);
+    const textPal = textPaletteFor(defPal, coloring.textColoring);
+    const palFor = (prop: string) => (prop === 'Text' || prop === 'Header' || prop === 'Quiet' ? textPal : defPal);
     /* Dark mode: defN and the scope tones below are the page palette's window
        INDICES — right for its rows and its Hover/Pressed, which are keyed by
        the background's palette. Every other role reads the entry that answers
@@ -1381,7 +1390,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
 
     // Background surfaces/containers — reference Backgrounds.{Palette}.Background-{N}
     const bgKey = `Backgrounds.${defPal}.Background-${defN}`;
-    const contBgKey = `Backgrounds.${defPal}.Background-${contN}`;
+    const contBgKey = `Backgrounds.${cardPal}.Background-${contN}`;
     Object.assign(tokenLookup, defaultSurfaceRefs(defPal, defN, defaultDimmestRef(fullJsonData, modeData, modeName)));
     // Surface-Brightest. overrideSurface in generateCompleteThemes routes the
     // Default theme's brightest surface through Default-Background alongside
@@ -1449,8 +1458,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // Text, Header, Quiet, Border, etc. — reference {Section.Surfaces.Palette.Color-N}
     const props = ['Text', 'Header', 'Quiet', 'Border', 'Border-Variant'];
     for (const prop of props) {
-      tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${defPal}.${colorN}}`;
-      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${defPal}.${faceColorN}}`;
+      tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${palFor(prop)}.${colorN}}`;
+      tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${palFor(prop)}.${faceColorN}}`;
     }
     tokenLookup['Default-Background.Container-Quiet-Opacity'] =
       `{Quiet.${faceColorN}-Opacity}`;
@@ -1489,8 +1498,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     // Container states come from the Containers group, which is computed from
     // the container color. The flat family is indexed by background tone and
     // would send a dark container to a light hover.
-    tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${defPal}.${contColorN}}`;
-    tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${defPal}.${contColorN}}`;
+    tokenLookup['Default-Background.Container-Hover'] = `{Hover.Containers.${cardPal}.${contColorN}}`;
+    tokenLookup['Default-Background.Container-Pressed'] = `{Pressed.Containers.${cardPal}.${contColorN}}`;
 
     // Per-surface foregrounds for the Default theme.
     //
@@ -1555,7 +1564,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       const vColorN = `Color-${roleIndex(tone)}`;
       // Base roles resolve from their own family at the surface's own palette.
       for (const prop of props) {
-        tokenLookup[`Default-Background.${prefix}${prop}`] = `{${prop}.Surfaces.${defPal}.${vColorN}}`;
+        tokenLookup[`Default-Background.${prefix}${prop}`] = `{${prop}.Surfaces.${palFor(prop)}.${vColorN}}`;
       }
       // Text-BW is black or white for this surface's tone. It resolves through
       // the BlackWhite map rather than a palette family, so it cannot ride the

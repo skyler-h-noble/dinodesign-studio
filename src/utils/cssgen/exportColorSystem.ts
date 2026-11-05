@@ -1,6 +1,7 @@
 // Button logic update - OB=8 when PC>=9 - 12-tone scale
 import { applyCellButtons } from '../cellButtons';
 import { applyDarkLadder, DARK_LADDER } from './darkLadderPass';
+import { COLORING_KEY } from '../darkLadder';
 import { blendColors } from '../colorScale';
 import type { NavSelection } from './generateCompleteThemes';
 import { nearestAvailableWeight } from '../googleFontWeights';
@@ -7978,6 +7979,13 @@ export function exportColorSystemToJSON(
      After every pass that writes Theme references (it reads them), and before
      Cell-Button, which solves each section's button against the background
      the section actually paints. */
+  /* Card Coloring / Text Coloring, recorded where the CSS export and the
+     Figma payload read the page's choices from (utils/darkLadder.ts,
+     COLORING_KEY): they expand the Default theme from the JSON alone. */
+  for (const mode of ['Light-Mode', 'Dark-Mode'] as const) {
+    const md = (colorSystem as any)?.Modes?.[mode];
+    if (md) md[COLORING_KEY] = { cardColoring: userSelections?.cardColoring ?? 'tonal', textColoring: userSelections?.textColoring ?? 'tonal' };
+  }
   const ladder = DARK_LADDER.enabled ? applyDarkLadder(colorSystem, userSelections as never) : null;
   if (ladder) {
     console.log(`🌙 [JSON Export] Dark ladder: ${ladder.remapped} entries re-keyed, ${ladder.pinned} tone readers pinned, ` +

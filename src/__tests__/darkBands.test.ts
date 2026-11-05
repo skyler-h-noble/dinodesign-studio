@@ -135,9 +135,11 @@ describe('dark bands — the exact tones and cards', () => {
           `surface ${ramp(S)}; cards ${DARK_CARD_LEVELS.map((c) => cards[c]).join(' ')}`);
       }
       // The page and its cards stay on the ladder (tone 3, tone 4 over 3).
+      // A neutral page's TONAL cards are Primary's (owner, 2026-11-05: "Tonal
+      // uses the Primary tint"), so its Highest is Primary's tone 4.
       const neutral = (n: number) => hex(D.Colors.Neutral[`Color-${n}`].value)!;
       expect(at(cascade, 'Default')).toBe(neutral(3));
-      expect(at(cascade, 'Default', undefined, 'Container-Highest')).toBe(neutral(4));
+      expect(at(cascade, 'Default', undefined, 'Container-Highest')).toBe(hex(D.Colors.Primary['Color-4'].value));
       expect(wrong).toEqual([]);
     }, 120_000);
   }

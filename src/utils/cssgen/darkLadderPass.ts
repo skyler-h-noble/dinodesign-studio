@@ -37,7 +37,9 @@
  *    only where the designer chose black), and every row's five cards become
  *    SOLID colors: tone 4 of its palette mixed with the palette's page
  *    (tone 3) at 50 / 65 / 75 / 90 / 100% — ONE set per palette, the same on
- *    every surface. Figma and the CSS both read these.
+ *    every surface. With black cards, the near-black set instead: Neutral
+ *    Color-1 over the page at 90 / 92 / 94 / 96 / 100%. Figma and the CSS both
+ *    read these.
  *
  * 6. Card roles that fail on the lightest card (tone 4 itself, Highest) move
  *    up their own palette until they pass.
@@ -47,7 +49,7 @@
  */
 import chroma from 'chroma-js';
 import {
-  darkLadderMaps, themeWindows, labL, darkCardHexesForRamp, blackChosen, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
+  darkLadderMaps, themeWindows, labL, darkCardHexesForRamp, blackCardHexesForPage, blackChosen, DARK_LADDER_TONE, DARK_CARD_LEVELS, DARK_CARD_TONE,
   LADDER_WINDOWS_KEY, type DarkLadderLevel,
 } from '../darkLadder';
 import { applyDarkBands, BANDS } from './darkBandPass';
@@ -378,15 +380,25 @@ export function applyDarkLadder(colorSystem: Json, sel?: DarkLadderSelections) {
    * (generateSimplifiedBackgrounds' dark rows still compute the pre-ladder
    * mix, Color-3 over Color-2; this replaces it with the same shape one tone
    * up, from the final dark Colors.) */
+  /* Black cards (owner, 2026-11-05: "Black cards stay black only"): the
+     light-mode black-card ladder — Neutral Color-1 at 90 / 92 / 94 / 96%,
+     Highest Neutral Color-1 itself — mixed over each palette's dark page
+     (tone 3) instead, one set per palette (utils/darkLadder.ts, Card
+     Coloring). Tonal and white cards keep the tone-4 set. */
+  const blackCards = sel?.cardColoring === 'black';
+  const neutralRamp = Array.from({ length: 12 }, (_, i) => String(dark.Colors?.Neutral?.[`Color-${i + 1}`]?.value ?? '').slice(0, 7));
+  const neutralOk = neutralRamp.every((h) => /^#[0-9a-f]{6}$/i.test(h));
   for (const pal of Object.keys(dark.Backgrounds ?? {})) {
     const ramp = Array.from({ length: 12 }, (_, i) => String(dark.Colors?.[pal]?.[`Color-${i + 1}`]?.value ?? '').slice(0, 7));
     if (!/^#[0-9a-f]{6}$/i.test(ramp[DARK_CARD_TONE - 1]) || !/^#[0-9a-f]{6}$/i.test(ramp[DARK_LADDER_TONE.Surface - 1])) continue;
-    const cards = darkCardHexesForRamp(ramp);
+    const black = blackCards && neutralOk ? blackCardHexesForPage(neutralRamp, ramp[DARK_LADDER_TONE.Surface - 1]) : null;
+    const cards = black ? black.cards : darkCardHexesForRamp(ramp);
+    const highest = black ? `{Colors.Neutral.Color-${black.tone}}` : `{Colors.${pal}.Color-${DARK_CARD_TONE}}`;
     for (const [rowName, row] of Object.entries<Json>(dark.Backgrounds[pal] ?? {})) {
       if (!row?.Containers) continue;
       for (const level of DARK_CARD_LEVELS) {
         writeLeaf(dark, `Backgrounds.${pal}.${rowName}.Containers.${level}`,
-          level === 'Container-Highest' ? `{Colors.${pal}.Color-${DARK_CARD_TONE}}` : cards[level]);
+          level === 'Container-Highest' ? highest : cards[level]);
       }
     }
   }
@@ -497,7 +509,7 @@ export function applyDarkLadder(colorSystem: Json, sel?: DarkLadderSelections) {
    * before: the band step repoints those three themes' own references, and
    * after that their Text references no longer name their window's index. */
   for (const mode of [light, dark]) mode[LADDER_WINDOWS_KEY] = JSON.parse(JSON.stringify(windows));
-  const bands = BANDS.enabled ? applyDarkBands(light, dark, toneKeyed) : null;
+  const bands = BANDS.enabled ? applyDarkBands(light, dark, toneKeyed, { blackCards }) : null;
 
   return { ...stats, maps, windows, bands };
 }

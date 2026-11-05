@@ -149,6 +149,9 @@ when-chosen rule is the narrower one the owner asked to keep.)
 Cards are **solid colors mixed from tone 4 and the page (tone 3)** — one step
 above the page, 50 / 65 / 75 / 90 / 100% tone 4, `blendColors`, no opacity —
 see [Container logic](container-logic.md#dark-mode--tone-4-mixed-with-the-page-one-set-per-theme).
+That holds for tonal and white cards. **Black cards stay black** (owner,
+2026-11-05): Neutral Color-1 over the theme's page at 90 / 92 / 94 / 96 / 100%
+([Container logic](container-logic.md#dark-mode--black-cards-stay-black)).
 **One set per theme, the same on every surface level**, so Figma, the CSS and
 the preview hold exactly the same five values. On the page and the Dim levels
 a card reads as raised. On Surface-Bright (tone 4) and Surface-Brightest
@@ -263,6 +266,25 @@ the page palette's Surface index, through the same window.
 
 Tests: `src/__tests__/darkLadder.test.ts` (what the CSS paints per brand x
 theme, the preview and Figma agree, light mode byte-identical).
+
+## A neutral page: Card Coloring and Text Coloring
+
+Owner's decision (2026-11-05): "Tonal uses the Primary tint." When the page
+palette is Neutral (`white`, `black`, any `Neutral/…` pick), the page's tonal
+cards come from the **Primary** row at the page's index and its tonal Text /
+Header / Quiet from the **Primary** tables, in both modes — otherwise tonal
+looked exactly like white cards and black-white text. White and black-white
+keep Neutral; themed sections keep their own palette; a non-neutral page is
+byte-identical in light mode. Full rule and measurements:
+[Container logic](container-logic.md#a-neutral-page-tonal-cards-and-text-use-the-primary-tint).
+
+**A known gap it runs into.** The CSS export's `defaultBackgroundTone` maps
+only the four legacy strings; any other grid pick (`Neutral/Surface-Dim`,
+`Primary/Surface-Bright`, …) falls to `Background-Theme` metadata that nothing
+writes, so in LIGHT mode the CSS page for those picks is Primary Color-11
+while the preview and Figma paint the real level. Not changed here (it would
+move light mode for non-neutral pages); until it is fixed, rule B reaches the
+light CSS only for `white` and `black`, and every grid pick in dark mode.
 
 ## Related
 

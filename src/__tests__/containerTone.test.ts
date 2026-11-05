@@ -46,6 +46,9 @@ function makeScheme(colors: [string, string, string]): ColorScheme {
 }
 
 const SCHEME = makeScheme(['#7b3f9d', '#2563eb', '#b8329b']);
+/** The scheme's Primary light ramp: a NEUTRAL page's tonal cards are drawn
+ *  from it (owner, 2026-11-05: "Tonal uses the Primary tint"). */
+const PRIMARY_LIGHT = ((SCHEME as any).tonePalettes.primary as Array<{ hex?: string; color?: string }>).map((t) => t.hex ?? t.color ?? '');
 
 const TYPOGRAPHY = [
   { type: 'header' as const, family: 'Inter', weight: '600', letterSpacing: '0em', allCaps: false },
@@ -204,22 +207,22 @@ describe('tonal container tone follows the background', () => {
   });
 
   // ── The preview ──
-  it('preview: a WHITE background gets the light tonal card (Neutral Color-10)', () => {
+  it('preview: a WHITE background gets the light tonal card (Primary Color-10 — a neutral page\'s tonal cards are Primary)', () => {
     const css = buildPreviewCSS({
       colorScheme: SCHEME, userSelections: tonal('white'),
       componentStyle: 'modern', mode: 'light', typographyStyles: TYPOGRAPHY,
     } as never);
     expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest'))))
-      .toBe(norm(NEUTRAL_LIGHT[9]));
+      .toBe(norm(PRIMARY_LIGHT[9]));
   });
 
-  it('preview: a BLACK background in LIGHT mode gets a DARK card (Neutral Color-2)', () => {
+  it('preview: a BLACK background in LIGHT mode gets a DARK card (Primary Color-2)', () => {
     const css = buildPreviewCSS({
       colorScheme: SCHEME, userSelections: tonal('black'),
       componentStyle: 'modern', mode: 'light', typographyStyles: TYPOGRAPHY,
     } as never);
     const container = norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest')));
-    expect(container).toBe(norm(NEUTRAL_LIGHT[1]));
+    expect(container).toBe(norm(PRIMARY_LIGHT[1]));
     // The regression this test exists for: a near-white card on a black page.
     expect(chroma(container!).luminance()).toBeLessThan(0.2);
   });
@@ -240,10 +243,14 @@ describe('tonal container tone follows the background', () => {
         Math.abs(chroma(hex).lch()[0] - chroma(surface).lch()[0]);
       const steps = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest']
         .map((t) => dist(level(t)));
+      /* Never backwards. On a white page the Primary tint is pale enough
+         that two neighbours can round to one hex (docs/container-logic.md,
+         Known-flat cases), so a step may hold still — but the ends move. */
       for (let i = 1; i < steps.length; i++) {
-        expect(`${background}/step${i}:${steps[i] > steps[i - 1]}`)
+        expect(`${background}/step${i}:${steps[i] >= steps[i - 1]}`)
           .toBe(`${background}/step${i}:true`);
       }
+      expect(steps[steps.length - 1] > steps[0], `${background}: Highest further from the page than Lowest`).toBe(true);
     }
   });
 

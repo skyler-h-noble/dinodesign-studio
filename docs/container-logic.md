@@ -36,7 +36,47 @@ theme's containers alias into:
 
 So white and black cards are **always Neutral** — Color-12 and Color-1 — no
 matter which palette the surrounding theme uses. Only tonal cards follow the
-theme.
+theme — with one exception, the page on a neutral background (below).
+
+### A neutral page: tonal cards and text use the Primary tint
+
+Owner's decision (2026-11-05): "Tonal uses the Primary tint." On a Neutral
+page, tonal cards drawn from the Neutral palette looked identical to white
+cards, and tonal text drawn from the Neutral tables looked identical to
+black-white text — the choice changed nothing. So for the **page's own**
+(Default theme) cards and text only:
+
+| page palette | Card Coloring | the page's cards read | Text Coloring | the page's Text / Header / Quiet read |
+| --- | --- | --- | --- | --- |
+| Neutral | tonal | `Backgrounds.Primary.Background-<page N>` | tonal | the Primary tables at the page's index |
+| Neutral | white / black | Neutral, as before | black-white | Neutral, as before |
+| anything else | any | the page palette, as before | any | the page palette, as before |
+
+The Primary row at the page's own index is the same tone / opacity ladder tonal
+cards have on a Primary page: Color-10 blended over the row's surface at 65 /
+75 / 85 / 90 / 100% (Color-11 on the Background-10 collision, Color-2 on a dark
+page). Nothing new is generated — every row already exists, in Figma too — so
+the Figma Modes count does not move. The card roles keep their face-tone keys
+(palettes share one lightness per tone), so contrast is the tables' own.
+
+In dark mode the page's tonal cards take **Primary's** dark set (Primary tone 4
+over Primary tone 3, the row every Primary row holds) rather than Neutral's —
+the light choice carried through, and the only way the choice stays visible.
+White cards keep the page palette's set; tonal text takes the Primary tables at
+the page's dark index.
+
+Themed sections are unchanged: they already use their own palette. Icons,
+borders, the eyebrow and the Match roles keep the page palette. Measured on a
+white page (CIEDE2000, `Container`, tonal vs white): Popsicle light 11.3 /
+dark 15.9, Cocktails 7.4 / 10.6; page Text tonal vs black-white: Popsicle
+21.2 / 20.5, Cocktails 14.9 / 14.0.
+
+Implemented in `exportToCSS` (Default-Background), `generateFigmaJSON`
+(Default-Background) and `buildPreviewCSS`, reading `cardPaletteFor` /
+`textPaletteFor` in `utils/darkLadder.ts`. The selections are recorded in each
+mode's data (`Card-Text-Coloring`), because the CSS is generated from the JSON
+alone; a system stored before that record existed reads neither and is
+unchanged.
 
 The generator is then told the user's style so each row carries the right ramp.
 It used to be hardcoded to `'tonal'`, which made the `professional` and `black`
@@ -160,12 +200,12 @@ Brightest. That is what lets every implementation hold exactly the same values:
 `darkLadder.test.ts` asserts the exact `blendColors` values, the same five on
 every surface level, and Figma == CSS == preview per theme.
 
-Every card style (tonal, white, black) is tonal in dark mode: a theme's cards
-use that theme's palette, and the Default theme's use the page palette. This is
-what the generator did before the ladder work too. Black cards and a Black page
-change only the surfaces (Neutral's tone 1 paints pure black — see
-[background-selection.md](background-selection.md#dark-mode-the-ladder)); the
-cards stay Neutral tone 4 over Neutral tone 3 for a Neutral page. The
+Tonal and white cards are tonal in dark mode: a theme's cards use that theme's
+palette, and the Default theme's use the page palette (Primary's, for tonal
+cards on a neutral page — [above](#a-neutral-page-tonal-cards-and-text-use-the-primary-tint)).
+**Black cards stay black** — see [Dark mode — black cards](#dark-mode--black-cards-stay-black).
+A Black page changes only the surfaces (Neutral's tone 1 paints pure black — see
+[background-selection.md](background-selection.md#dark-mode-the-ladder)). The
 light-mode [collision rule](#the-collision-rule) does not apply: the dark card
 face is tone 4 and the page is tone 3, so they never coincide.
 
@@ -199,6 +239,65 @@ lighter than its parent and exactly the color that level has anywhere
 level inside a higher one (Lowest inside Container) comes out darker than its
 parent — that is not the pattern. Its roles still pass (9,000 measured), but use
 a higher level.
+
+### Dark mode — black cards stay black
+
+Owner's decision (2026-11-05): "Black cards stay black only." With Card
+Coloring = black, dark-mode cards are near-black: the
+[light-mode black-card ladder](#black-cards-light-mode) mixed over the theme's
+dark page instead.
+
+| level | dark mode, black cards |
+| --- | --- |
+| `Container-Lowest` | 90% Neutral Color-1, 10% page |
+| `Container-Low` | 92% |
+| `Container` | 94% |
+| `Container-High` | 96% |
+| `Container-Highest` | Neutral Color-1 itself |
+
+"The page" is the theme's dark Surface: tone 3 for a ladder theme (the Default
+theme, Neutral, the states, the bars) and tone S for a band (Primary,
+Secondary and Tertiary keep their color; a black card inside them is still
+near-black). Solid, `blendColors`, one set per theme on every surface level —
+the same shape as every other dark card — written into every Backgrounds row
+by `darkLadderPass` step 5 and, for the bands, as Band entries by
+`darkBandPass` (`BLACK_CARD_ALPHA`, `blackCardHexesForPage` in
+`utils/darkLadder.ts`). Highest stays an alias, `{Colors.Neutral.Color-1}`.
+
+Popsicle and Cocktails (Neutral dark Color-1 `#0b0b0b`): the page's cards are
+`#0d0d0d #0d0d0d #0c0c0c #0c0c0c #0b0b0b` on a `#1f1f1f` page (L* 3.6-3.0 on
+11.8). Popsicle's Primary band (`#a97cb1`):
+`#1b161c #181418 #141215 #111012 #0b0b0b`.
+
+**Separation.** The face is the darkest Neutral tone whose L* differs from the
+page by at least 5 (`BLACK_CARD_MIN_DL`). The dark page is never darker than
+tone 3 (L* ~12) — a Black page paints black only on Surface-Dimmest — so Neutral
+Color-1 (L* ~3) always clears it and the rule picks Color-1 for every theme we
+measured. It exists for a page that is itself near-black, where the face steps
+up the Neutral ramp until the card reads as separate.
+
+**The levels are nearly flat.** 90-96% of a near-black over a near-black page
+moves a few RGB units, so neighbours round to the same hex (as light-mode black
+cards on a dark page do). Elevation comes from the drop shadow.
+
+**Known consequence (accepted, the counterpart of tonal cards on Bright):** on
+Surface-Dimmest — tone 1, or black where chosen — near-black cards sit level
+with the surface. Cards belong on the page. `darkLadder.test.ts` counts it
+(225 across the test systems) rather than failing it.
+
+**Roles.** Every dark card role is lighter than the card and was solved on
+tone 4, the lightest dark card; a near-black card is darker still, so each one
+clears it by more. The ladder's card tables are unchanged. On a band the card
+roles were solved for the band's LIGHT cards (dark foregrounds), so the band
+pass re-solves them against the near-black set — which in practice keeps the
+ladder's own references (they already pass) and needs fewer Band entries than
+tonal cards: Figma's Modes count drops by 1 to 113 with black cards (Surf on a
+white page 4,815 → 4,702). A near-black card's hover and pressed stay the
+ladder's card states rather than the band's light card tone.
+
+`darkLadder.test.ts` (every role on every card of every theme, nested cards)
+and `cardTextColoring.test.ts` (exact hexes, separation, CSS == preview ==
+Figma per theme, the rendered WCAG report) cover it.
 
 ### Dark mode bands — cards one tone above the band
 
@@ -355,6 +454,7 @@ npx vitest run src/__tests__/containerTone.test.ts   # ramp shape, both pipeline
 npx tsx scripts/audit-containers.ts                  # contrast, every level and style
 npx vitest run src/__tests__/darkLadder.test.ts      # dark: tone-4 cards, one set per theme, roles pass
 npx vitest run src/__tests__/darkBands.test.ts       # dark bands: S+1-over-S cards, CSS == preview == Figma
+npx vitest run src/__tests__/cardTextColoring.test.ts  # black cards in dark, neutral-page tonal = Primary
 ```
 
 The ramp test covers every `Background-N`, not just the four a user can pick — a

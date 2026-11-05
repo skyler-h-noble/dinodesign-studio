@@ -45,7 +45,7 @@
  */
 import chroma from 'chroma-js';
 import {
-  BAND_THEMES, bandSurfaceTone, bandTones, bandCardTone, bandCardHexesForRamp, DARK_CARD_LEVELS, SECTION_LEVEL,
+  BAND_THEMES, bandSurfaceTone, bandTones, bandCardTone, bandCardHexesForRamp, blackCardHexesForPage, DARK_CARD_LEVELS, SECTION_LEVEL,
   LADDER_BANDS_KEY, type BandInfo, type DarkLadderLevel,
 } from '../darkLadder';
 import { variantHex8, BORDER_VARIANT_ALPHA, ICON_VARIANT_ALPHA } from '../variantAlpha';
@@ -154,7 +154,14 @@ export interface BandStats {
   fallbacks: string[];
 }
 
-export function applyDarkBands(light: Json, dark: Json, toneKeyed: Json): BandStats {
+export interface BandOptions {
+  /** Card Coloring = black: a band's cards are near-black (utils/darkLadder.ts,
+   *  Card Coloring) — Neutral Color-1 over the band's Surface at 90 / 92 / 94 /
+   *  96 / 100% — and its card roles are solved against those. */
+  blackCards?: boolean;
+}
+
+export function applyDarkBands(light: Json, dark: Json, toneKeyed: Json, opts: BandOptions = {}): BandStats {
   const stats: BandStats = {
     bands: [], kept: 0, sameTable: 0, toColors: 0, entries: 0, cssEntries: 0,
     buttonsKept: 0, buttonsReused: 0, buttonUnits: 0, fallbacks: [],
@@ -256,8 +263,11 @@ export function applyDarkBands(light: Json, dark: Json, toneKeyed: Json): BandSt
     const cardTone = bandCardTone(S);
     const ramp = Array.from({ length: 12 }, (_, i) => String(dark.Colors?.[palette]?.[`Color-${i + 1}`]?.value ?? '').slice(0, 7).toLowerCase());
     if (ramp.some((h) => !/^#[0-9a-f]{6}$/.test(h))) continue;
-    const cards = bandCardHexesForRamp(ramp, S);
-    stats.bands.push({ theme, palette, L, S, tones, cardTone });
+    const neutralRamp = Array.from({ length: 12 }, (_, i) => String(dark.Colors?.Neutral?.[`Color-${i + 1}`]?.value ?? '').slice(0, 7).toLowerCase());
+    const black = opts.blackCards && neutralRamp.every((h) => /^#[0-9a-f]{6}$/.test(h)) ? blackCardHexesForPage(neutralRamp, ramp[S - 1]) : null;
+    const cards = black ? black.cards : bandCardHexesForRamp(ramp, S);
+    const cardFace = black ? `{Colors.Neutral.Color-${black.tone}}` : `{Colors.${palette}.Color-${cardTone}}`;
+    stats.bands.push({ theme, palette, L, S, tones, cardTone, ...(black ? { blackCardTone: black.tone } : {}) });
 
     pageIcons[palette] = {};
     for (const section of Object.keys(SECTION_LEVEL)) {
@@ -295,7 +305,7 @@ export function applyDarkBands(light: Json, dark: Json, toneKeyed: Json): BandSt
         for (const level of DARK_CARD_LEVELS) {
           const ref = node[level]?.value;
           if (typeof ref !== 'string') continue;
-          const want = level === 'Container-Highest' ? `{Colors.${palette}.Color-${cardTone}}` : cards[level];
+          const want = level === 'Container-Highest' ? cardFace : cards[level];
           writeBoth(`${base}.${level}`, entry(BAND_GROUP, `Card-${theme}-${level}`, lightValueFor(ref), want));
         }
       }
@@ -316,7 +326,9 @@ export function applyDarkBands(light: Json, dark: Json, toneKeyed: Json): BandSt
         if (btnField && !['Border', 'Outline-Text', 'Outline-Quiet'].includes(btnField[2])) continue;   // fills: below
         if (btnField && (UNIT_FILL.test(ref) || tonalBorder(rel))) continue;                           // a unit's own border
         const th = thresholdOf(rel);
-        const answer = toneAnswer(ref, T, cardTone);
+        /* A near-black card's hover and pressed stay the ladder's card
+           states (solved for a dark card), not the band's light card tone. */
+        const answer = card && black && /^\{(Hover|Pressed)\./.test(ref) ? null : toneAnswer(ref, T, cardTone);
         if (!answer && !th) continue;
         const group = cssOnly(rel) ? BAND_CSS_GROUP : BAND_GROUP;
         const want = answer ? settled(toneKeyed, answer) : null;

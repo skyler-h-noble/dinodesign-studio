@@ -8,7 +8,7 @@
  */
 
 import { parseBar, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
-import { darkLadderMaps, windowForPalette, exactIndexForTone } from './darkLadder';
+import { darkLadderMaps, windowForPalette, exactIndexForTone, recordedColoring, cardPaletteFor, textPaletteFor } from './darkLadder';
 import { LADDER_PAGE_ICONS_KEY, BAND_GROUP, BAND_BUTTON_GROUP, BAND_ORIGINALS_KEY } from './cssgen/darkBandPass';
 import { defaultDimmestRef } from './cssgen/exportToCSS';
 import { devicesTypeGridVariables, deviceSizesGridAliases, pageLayoutVariables } from './layoutGrid';
@@ -2033,7 +2033,16 @@ export function generateFigmaJSON(
         const tone = ladderMaps?.byPalette[bgPalette]?.[winIdx];
         return ladderMaps && tone ? exactIndexForTone(ladderMaps.global, tone, winIdx) : winIdx;
       };
+      /* Card Coloring / Text Coloring on a neutral page (utils/darkLadder.ts):
+         tonal cards read the Primary row, tonal text the Primary tables — the
+         same rule exportToCSS applies to Default-Background. contPalette is
+         the page palette the card ROLES have always been read at; the card
+         colors come from cardPalette. */
       const contPalette = isDark ? darkPalette : defTheme;
+      const coloring = recordedColoring(modeData);
+      const cardPalette = cardPaletteFor(contPalette, coloring.cardColoring);
+      const textPalette = textPaletteFor(bgPalette, coloring.textColoring);
+      const textPal = (section: string) => (section === 'Text' || section === 'Header' || section === 'Quiet' ? textPalette : null);
       const contN = isDark ? darkContainerN : (defaultSettings['Card-Coloring']?.ContN?.value || 12);
 
       const modeColors = modeData.Colors;
@@ -2102,7 +2111,7 @@ export function generateFigmaJSON(
 
       // Container variants — use the appropriate container N
       const contBgKey = `Background-${contN}`;
-      const contBgData = modeData.Backgrounds?.[contPalette]?.[contBgKey];
+      const contBgData = modeData.Backgrounds?.[cardPalette]?.[contBgKey];
       if (contBgData?.Containers) {
         for (const [ck, cv] of Object.entries(contBgData.Containers)) {
           let hex = (cv as any)?.value;
@@ -2132,8 +2141,9 @@ export function generateFigmaJSON(
         // is absent from the source colorSystem, so the source alone yields
         // nothing for it and the role is skipped.
         const sectionData = modeData[section] ?? figma.Modes[modeName]?.[section];
-        if (!sectionData?.Surfaces?.[bgPalette]?.[surfaceColorN]) continue;
-        const token = sectionData.Surfaces[bgPalette][surfaceColorN];
+        const sp = textPal(section) ?? bgPalette;
+        if (!sectionData?.Surfaces?.[sp]?.[surfaceColorN]) continue;
+        const token = sectionData.Surfaces[sp][surfaceColorN];
         let hex = token?.value;
         if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
         if (hex) defBg[section] = { value: hex, type: 'color' };
@@ -2218,7 +2228,7 @@ export function generateFigmaJSON(
         if (!sectionData) return null;
         const token = role.byBackground
           ? sectionData.Surfaces?.[`Background-${tone}`]
-          : sectionData.Surfaces?.[role.pal ?? bgPalette]?.[`Color-${tone}`];
+          : sectionData.Surfaces?.[role.pal ?? ((role.role === 'Text' || role.role === 'Header' || role.role === 'Quiet') ? textPalette : bgPalette)]?.[`Color-${tone}`];
         let hex = token?.value;
         if (!hex) return null;
         if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
@@ -2433,8 +2443,9 @@ export function generateFigmaJSON(
         // Same fallback as the surface loop above — Container-Border-Variant
         // was the last {Default-Background.*} reference with nothing behind it.
         const sectionData = modeData[section] ?? figma.Modes[modeName]?.[section];
-        if (!sectionData?.Containers?.[contPalette]?.[contColorN]) continue;
-        const token = sectionData.Containers[contPalette][contColorN];
+        const cp = textPal(section) ? textPaletteFor(contPalette, coloring.textColoring) : contPalette;
+        if (!sectionData?.Containers?.[cp]?.[contColorN]) continue;
+        const token = sectionData.Containers[cp][contColorN];
         let hex = token?.value;
         if (hex?.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;
         if (hex) defBg[`Container-${section}`] = { value: hex, type: 'color' };

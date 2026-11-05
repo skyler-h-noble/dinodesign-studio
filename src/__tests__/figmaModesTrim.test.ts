@@ -219,5 +219,16 @@ describe('Figma Modes trim', () => {
       { background: 'white', button: 'primary', cardColoring: 'tonal', textColoring: 'tonal' } as never, 'light') as any).figma;
     let w = 0; walk(surf.Modes['Light-Mode'], [], () => w++);
     expect(w, 'Surf (light tone 9) on a white page').toBeLessThan(4800);
+    /* Card / Text Coloring (2026-11-05, utils/darkLadder.ts): a neutral
+       page's tonal cards and text read existing Primary rows and tables, so
+       they add nothing (Surf white tonal stays 4,788). Black cards in dark
+       mode are near-black, and a band's card roles mostly keep the ladder's
+       references on them, so they need FEWER Band entries: Surf white black
+       4,815 -> 4,702 (it was over this guard, unmeasured). Measured here so
+       it cannot creep back. */
+    const surfBlack = (buildAll(makeScheme(['#9d8a5c', '#009f87', '#e26801'], { primary: 90, secondary: 90, tertiary: 71 }),
+      { background: 'white', button: 'primary', cardColoring: 'black', textColoring: 'tonal' } as never, 'light') as any).figma;
+    let wb = 0; walk(surfBlack.Modes['Light-Mode'], [], () => wb++);
+    expect(wb, 'Surf (light tone 9) on a white page, black cards').toBeLessThan(4800);
   }, 60_000);
 });
