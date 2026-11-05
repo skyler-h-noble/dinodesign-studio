@@ -380,17 +380,14 @@ export default function ComponentStyleStage({
                       <Label color="quiet" style={{ fontSize: '0.7rem' }}>Style</Label>
                       <HStack spacing={2} style={{ flexWrap: 'wrap' }}>
                         <Button variant="default" size="medium"
-                          sx={{ minHeight: `${custom.buttonHeight}px` }}
                           onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           Solid
                         </Button>
                         <Button variant="default-outline" size="medium"
-                          sx={{ minHeight: `${custom.buttonHeight}px` }}
                           onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           Outline
                         </Button>
                         <Button variant="ghost" size="medium"
-                          sx={{ minHeight: `${custom.buttonHeight}px` }}
                           onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           Ghost
                         </Button>
@@ -402,17 +399,14 @@ export default function ComponentStyleStage({
                       <Label color="quiet" style={{ fontSize: '0.7rem' }}>Size</Label>
                       <HStack spacing={2} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
                         <Button variant="default" size="small"
-                          sx={{ minHeight: `${custom.smallButtonHeight}px` }}
                           onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           Small
                         </Button>
                         <Button variant="default" size="medium"
-                          sx={{ minHeight: `${custom.buttonHeight}px` }}
                           onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           Medium
                         </Button>
                         <Button variant="default" size="large"
-                          sx={{ minHeight: `${custom.largeButtonHeight}px` }}
                           onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           Large
                         </Button>
