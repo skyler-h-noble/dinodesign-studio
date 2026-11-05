@@ -3,7 +3,7 @@
  * Determines default theme settings based on Primary Color tone, surface style, and scheme type
  */
 import { toneToColorNumber } from '../colorScale';
-import { barPaletteAndTone } from '../backgroundSelection';
+import { barPaletteAndTone, gridBackgroundTone } from '../backgroundSelection';
 
 /**
  * Map 12-tone Color-N to Background-N. Backgrounds are now 1:1 with Color-N
@@ -320,7 +320,9 @@ function mapSelectionToThemeAndN(selection: string, primaryColorTone: number): {
     'primary-medium': { theme: 'Primary', n: 6 },
     'primary-dark': { theme: 'Primary', n: 3 }
   };
-  return mapping[selection] || { theme: 'Primary', n: primaryColorN };
+  /* A grid pick ('Neutral/Surface-Dim') decodes through the picker's own
+     table; it fell to Primary at the core tone. */
+  return mapping[selection] || gridBackgroundTone(selection, primaryColorN) || { theme: 'Primary', n: primaryColorN };
 }
 
 /**

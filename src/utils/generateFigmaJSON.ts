@@ -2179,7 +2179,10 @@ export function generateFigmaJSON(
         { role: 'Focus-Visible', section: 'Focus-Visible', pal: null, byBackground: true },
         // Icons-Default tracks --Text in every other theme (verified across all
         // 20); Default must not be the exception. Its -Variant is the alpha
-        // form, matching generateSingleTheme's non-BW branch.
+        // form, matching generateSingleTheme's non-BW branch. The Theme layer
+        // now aliases the default icon to Text itself; this value is kept equal
+        // to it (Text's palette, rule B included) so On-Default, derived from
+        // it below, is the mark for the icon actually drawn.
         { role: 'Icons-Default', section: 'Text', pal: null },
         /* Same source as Icons-Default, at FULL strength. It used to read the
            'Icon-Variant' section for a baked alpha; that section no longer
@@ -2228,7 +2231,7 @@ export function generateFigmaJSON(
         if (!sectionData) return null;
         const token = role.byBackground
           ? sectionData.Surfaces?.[`Background-${tone}`]
-          : sectionData.Surfaces?.[role.pal ?? ((role.role === 'Text' || role.role === 'Header' || role.role === 'Quiet') ? textPalette : bgPalette)]?.[`Color-${tone}`];
+          : sectionData.Surfaces?.[role.pal ?? ((role.role === 'Text' || role.role === 'Header' || role.role === 'Quiet' || role.role === 'Icons-Default') ? textPalette : bgPalette)]?.[`Color-${tone}`];
         let hex = token?.value;
         if (!hex) return null;
         if (hex.includes('{')) hex = resolveToHex(hex, modeLookup, modeColors) || hex;

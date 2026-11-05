@@ -239,6 +239,46 @@ export function legacyName(sel: BackgroundSelection): string | null {
   return null;
 }
 
+/** A stored value in the `Theme/Surface` form, or null for anything else. */
+function parseGridForm(value: unknown): BackgroundSelection | null {
+  if (typeof value !== 'string' || !value.includes('/')) return null;
+  const [theme, surface] = value.split('/');
+  if (!(ALL_THEMES as readonly string[]).includes(theme)) return null;
+  if (!(SURFACE_LEVELS as readonly string[]).includes(surface)) return null;
+  return { theme: theme as BackgroundTheme, surface: surface as SurfaceLevel };
+}
+
+/**
+ * The legacy name for a stored background, where one exists.
+ *
+ * The studio stores the four combinations that have a legacy name AS that name,
+ * but a value written in the grid form ('Neutral/Surface-Brightest') means the
+ * same page, and every generator that switches on 'white' / 'black' /
+ * 'primary-base' / 'primary-light' has to see it as such. Anything else comes
+ * back unchanged.
+ */
+export function normalizeBackground<T>(value: T): T | string {
+  const sel = parseGridForm(value);
+  return (sel && legacyName(sel)) || value;
+}
+
+/**
+ * The palette and light-mode tone a GRID pick paints: the sixteen
+ * combinations with no legacy name, decoded through toneFor — the table the
+ * picker, the preview and the Figma payload read.
+ *
+ * Returns null for a legacy name (in either form) and for anything that does
+ * not parse, so callers keep their own exact mapping for those. The generators
+ * that switch on the legacy strings each had a `default:` here that painted
+ * Primary (Color-11, or the core) for every grid pick, while the preview
+ * painted the real level.
+ */
+export function gridBackgroundTone(value: unknown, coreToneN?: number): { theme: BackgroundTheme; n: number } | null {
+  const sel = parseGridForm(value);
+  if (!sel || legacyName(sel)) return null;
+  return { theme: sel.theme, n: toneFor(sel.theme, sel.surface, coreToneN) };
+}
+
 /** Human label for the picker. */
 export function backgroundLabel(sel: BackgroundSelection): string {
   const legacy = legacyName(sel);

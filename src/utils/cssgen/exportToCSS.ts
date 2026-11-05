@@ -10,11 +10,11 @@
 
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
-import { darkPageTheme, DARK_PAGE_N } from '../backgroundSelection';
+import { darkPageTheme, DARK_PAGE_N, normalizeBackground, gridBackgroundTone } from '../backgroundSelection';
 import { themeWindows, windowForPalette, darkLadderMaps, exactIndexForTone, recordedColoring, cardPaletteFor, textPaletteFor } from '../darkLadder';
 import { LADDER_PAGE_ICONS_KEY } from './darkBandPass';
 import { chartColorVisionCSS } from '../chartColorVision';
-import { compositeOver, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
+import { compositeOver, contrastRatio, solveQuietOpacities, sectionQuietOverrides, QUIET_PALETTES, QUIET_SECTION_FIX_MODES } from '../quietOpacity';
 import { buttonModeMetricCSS, buttonHeightAliasCSS } from '../buttonSizing';
 import { navMetricsCSS, FAB_SIZE } from '../componentSize';
 import { fabBevelVars } from '../bevelGeometry';
@@ -1171,7 +1171,19 @@ export function defaultBackgroundTone(fullJsonData: any, modeData: any, modeName
     case 'black': defPal = 'Neutral'; defN = 1; break;
     case 'primary-base': case 'primary': defPal = 'Primary'; defN = primaryN; break;
     case 'primary-light': defPal = 'Primary'; defN = 11; break;
-    default: defPal = metadata?.['Background-Theme']?.value || 'Primary'; defN = 11; break;
+    default: {
+      /* A grid pick ('Neutral/Surface-Dim', 'Primary/Surface-Bright', ...):
+         the theme and light tone the preview and the Figma payload paint
+         (backgroundSelection.toneFor). It fell to Background-Theme metadata
+         that nothing writes, so the published page was Primary Color-11 for
+         sixteen of the twenty picks. A grid value with a legacy name decodes
+         as that name, so it lands on the cases above. */
+      const legacy = normalizeBackground(bgSelection);
+      const grid = gridBackgroundTone(bgSelection, primaryN);
+      if (legacy !== bgSelection) return defaultBackgroundTone({ Metadata: { ...metadata, Background: { value: legacy } } }, modeData, modeName);
+      if (grid) { defPal = grid.theme; defN = grid.n; break; }
+      defPal = metadata?.['Background-Theme']?.value || 'Primary'; defN = 11; break;
+    }
   }
   // Dark mode does NOT reuse the light-mode palette/tone. The selection above
   // describes the LIGHT background; in dark mode the Default theme sits on the
@@ -1390,7 +1402,18 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
 
     // Background surfaces/containers — reference Backgrounds.{Palette}.Background-{N}
     const bgKey = `Backgrounds.${defPal}.Background-${defN}`;
-    const contBgKey = `Backgrounds.${cardPal}.Background-${contN}`;
+    /* Black cards in LIGHT mode are flat (owner, 2026-11-05): the card row is
+       the one Figma's Default-Background reads — the Card-Coloring ContN row
+       of the page palette (row 1; row 3 on a black page), where the black face
+       sits over (nearly) its own tone, so every level is Neutral Color-1 on a
+       neutral page and within a unit of it on a tinted one. It read the page's
+       OWN row, so the published cards were a 90 / 92 / 94 / 96% ramp of black
+       over the page while Figma held one flat #040404. Dark mode keeps its
+       own near-black set (darkLadderPass). */
+    const flatBlackRowN = !isDarkMode && coloring.cardColoring === 'black'
+      ? Number(fullJsonData?.Metadata?.['Default-Settings']?.['Card-Coloring']?.ContN?.value) || null
+      : null;
+    const contBgKey = `Backgrounds.${cardPal}.Background-${flatBlackRowN ?? contN}`;
     Object.assign(tokenLookup, defaultSurfaceRefs(defPal, defN, defaultDimmestRef(fullJsonData, modeData, modeName)));
     // Surface-Brightest. overrideSurface in generateCompleteThemes routes the
     // Default theme's brightest surface through Default-Background alongside
@@ -1429,8 +1452,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     /* Dark mode reads Highest — tone 4 itself, the lightest card and the one
        every card role is solved for (darkLadderPass step 6). The Container row
        holds the page mix, a touch darker. */
-    const faceHex = (() => {
-      let ref: unknown = `{${contBgKey}.Containers.${isDarkMode ? 'Container-Highest' : 'Container'}}`;
+    const resolveRefHex = (start: string): string | null => {
+      let ref: unknown = start;
       for (let hop = 0; hop < 10 && typeof ref === 'string' && ref.startsWith('{'); hop++) {
         const path = (ref as string).slice(1, -1);
         if (tokenLookup[path]) { ref = tokenLookup[path]; continue; }
@@ -1440,7 +1463,8 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
         ref = typeof node === 'string' ? node : node?.value;
       }
       return typeof ref === 'string' && /^#[0-9a-f]{6}/i.test(ref) ? ref.slice(0, 7) : null;
-    })();
+    };
+    const faceHex = resolveRefHex(`{${contBgKey}.Containers.${isDarkMode ? 'Container-Highest' : 'Container'}}`);
     const lightnessOf = (hex: string) => { const [r, g, b] = [1, 3, 5].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y; };
     let faceN = contN;
     if (faceHex) {
@@ -1460,6 +1484,35 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
     for (const prop of props) {
       tokenLookup[`Default-Background.${prop}`] = `{${prop}.Surfaces.${palFor(prop)}.${colorN}}`;
       tokenLookup[`Default-Background.Container-${prop}`] = `{${prop}.Containers.${palFor(prop)}.${faceColorN}}`;
+    }
+    /* The card's Quiet has to read on all FIVE card levels, not only the
+       face it is keyed to: one Containers section carries the roles for every
+       level. The table entry at the face tone clears the face, but where the
+       cards blend toward the page (a dark mid-tone page under dark tonal
+       cards, a mid-grey page under light ones) Container-Lowest and -Low drift
+       toward the page and the face's Quiet fell to 4.25-4.49:1 there — on
+       several grid pages and on primary-base for Popsicle, Chocolate and Grape.
+       The Quiet table has no other entry for that card (it holds one value
+       for dark faces and one for light), so the card takes Quiet's own other
+       form, the one Figma draws: the card's Text at an opacity — composited
+       over the level it reads worst on, at the smallest opacity that clears
+       all five (a narrow pass is a pass). A Quiet that already clears all
+       five is left exactly as it was. */
+    {
+      const quietPal = palFor('Quiet');
+      const levels = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest']
+        .map((l) => resolveRefHex(`{${contBgKey}.Containers.${l}}`))
+        .filter((h): h is string => Boolean(h));
+      const quiet = resolveRefHex(`{Quiet.Containers.${quietPal}.Color-${faceN}}`);
+      const text = resolveRefHex(`{Text.Containers.${palFor('Text')}.Color-${faceN}}`);
+      const clearsAll = (hex: string) => levels.every((bg) => contrastRatio(hex, bg) >= 4.5);
+      if (levels.length && quiet && text && !clearsAll(quiet)) {
+        const worst = levels.reduce((w, bg) => (contrastRatio(text, bg) < contrastRatio(text, w) ? bg : w));
+        for (let step = 128; step <= 255; step++) {
+          const solid = compositeOver(text, worst, step / 255);
+          if (clearsAll(solid)) { tokenLookup['Default-Background.Container-Quiet'] = solid; break; }
+        }
+      }
     }
     tokenLookup['Default-Background.Container-Quiet-Opacity'] =
       `{Quiet.${faceColorN}-Opacity}`;
@@ -1628,7 +1681,7 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       }
       // On-Default follows the theme's own palette rather than an accent one,
       // so it is derived from the same source as Icons-Default below.
-      const defOnTone = iconToneFor(modeData?.Text?.Surfaces?.[defPal]?.[vColorN]?.value);
+      const defOnTone = iconToneFor(modeData?.Text?.Surfaces?.[textPal]?.[vColorN]?.value);
       if (defOnTone) {
         tokenLookup[`Default-Background.${prefix}On-Default`] =
           `{Text.Surfaces.${defOnTone.palette}.Color-${defOnTone.n}}`;
@@ -1665,7 +1718,9 @@ function generateThemesVariables(modeData: any, fullJsonData?: any, modeName?: s
       tokenLookup[`Default-Background.${prefix}Text-Match`] = `{Text.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Header-Match`] = `{Header.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Icons-Match`] = `{Icon.Surfaces.${defPal}.${vColorN}}`;
-      tokenLookup[`Default-Background.${prefix}Icons-Default`] = `{Text.Surfaces.${defPal}.${vColorN}}`;
+      /* The theme aliases its default icon to Text itself (generateCompleteThemes);
+         this key is kept, in step with it, for anything that still names it. */
+      tokenLookup[`Default-Background.${prefix}Icons-Default`] = `{Text.Surfaces.${textPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Icons-Default-Variant`] = `{Icon-Variant.Surfaces.${defPal}.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Hotlink`] = `{Text.Surfaces.Info.${vColorN}}`;
       tokenLookup[`Default-Background.${prefix}Hotlink-Visited`] = `{Text.Surfaces.Hotlink-Visited.${vColorN}}`;

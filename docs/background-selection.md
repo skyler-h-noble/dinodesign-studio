@@ -278,13 +278,36 @@ keep Neutral; themed sections keep their own palette; a non-neutral page is
 byte-identical in light mode. Full rule and measurements:
 [Container logic](container-logic.md#a-neutral-page-tonal-cards-and-text-use-the-primary-tint).
 
-**A known gap it runs into.** The CSS export's `defaultBackgroundTone` maps
-only the four legacy strings; any other grid pick (`Neutral/Surface-Dim`,
-`Primary/Surface-Bright`, …) falls to `Background-Theme` metadata that nothing
-writes, so in LIGHT mode the CSS page for those picks is Primary Color-11
-while the preview and Figma paint the real level. Not changed here (it would
-move light mode for non-neutral pages); until it is fixed, rule B reaches the
-light CSS only for `white` and `black`, and every grid pick in dark mode.
+**The light-mode grid gap is closed** (owner, 2026-11-05). The CSS export's
+`defaultBackgroundTone` used to map only the four legacy strings; every other
+grid pick fell to `Background-Theme` metadata that nothing writes, so in LIGHT
+mode the published page was Primary Color-11. The studio passes no
+`backgroundTheme` / `backgroundN` to the export, so the JSON (and the Figma
+payload built from it) put the page on Primary at the core tone, and the preview
+painted the right level but solved its text and borders for a white page. Now
+every pick decodes through `toneFor` everywhere:
+
+- `exportColorSystemToJSON` normalizes a grid value with a legacy name
+  (`Neutral/Surface-Brightest`) to that name, and fills `backgroundTheme` /
+  `backgroundN` for the other sixteen, so Default-Settings — what Figma reads —
+  and the Default theme are built on the picked page (`gridBackgroundTone`).
+- `defaultBackgroundTone` (CSS) and `buildPreviewCSS` paint the same theme and
+  level, and the preview solves its roles for that page rather than for white.
+- Rule B reaches the light CSS for every Neutral pick, not only `white` /
+  `black`.
+
+Measured on Popsicle (tonal cards, tonal text), light page:
+
+| pick | CSS before | preview before | Figma before | all three after |
+| --- | --- | --- | --- | --- |
+| `Neutral/Surface-Bright` | #fff5ff | #e2e2e2 (text #231725) | #b771c6 | #e2e2e2, text #231725 |
+| `Secondary/Surface-Dim` | #fff5ff | #00495c (text #00617d) | #b771c6 | #00495c, text #c3e8f7 |
+
+The four legacy strings publish byte-identical CSS for this change. Dark mode
+keeps its page (the palette's tone 3), but a grid pick's dark CSS and Figma now
+derive their other Default-theme levels from the right Default-Settings, which
+brings them to the legacy Primary / Neutral picks' values. Tests:
+`src/__tests__/backgroundGridParity.test.ts`.
 
 ## Related
 

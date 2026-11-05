@@ -215,12 +215,10 @@ describe('neutral page, light mode: the page roles agree between the CSS and Fig
           const bgv = (k: string) => hex(M['Default-Background']?.[k]?.value);
           const p = cssPage(brand, s, mode);
           expect([bgv('Text'), bgv('Header')], `${mode} page Text / Header`).toEqual([p.text, p.header]);
-          // The Default theme's cards: Figma's Default-Background holds the CSS's five (tonal and white; light black
-          // cards keep a pre-existing difference, reported separately).
-          if (!(mode === 'Light' && card === 'black')) {
-            const fc = DARK_CARD_LEVELS.map((l) => bgv(l));
-            expect(fc, `${mode} cards`).toEqual(cssCards(brand, s, mode));
-          }
+          // The Default theme's cards: Figma's Default-Background holds the CSS's five, every card coloring —
+          // light black cards included, flat since 2026-11-05 (backgroundGridParity.test.ts, part 3).
+          const fc = DARK_CARD_LEVELS.map((l) => bgv(l));
+          expect(fc, `${mode} cards`).toEqual(cssCards(brand, s, mode));
         }
       }, 120_000);
     }

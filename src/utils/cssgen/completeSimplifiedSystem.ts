@@ -8,6 +8,7 @@ import type { NavSelection } from './generateCompleteThemes';
 import { generateAllThemesWithSurfacesAndContainers } from './generateCompleteThemes';
 import { generateLightModeTags, generateDarkModeTags } from './generateTagsSimplified';
 import type { AltStop2 } from '../altDisplay';
+import { gridBackgroundTone } from '../backgroundSelection';
 
 /**
  * Helper to detect surface style based on extracted colors
@@ -250,6 +251,17 @@ export function getSimplifiedDefaultSettings(
           config.defaultTheme = 'Neutral';
           config.defaultN = 1;
           break;
+        default: {
+          /* A grid pick ('Neutral/Surface-Dim'): the theme and tone the
+             picker and the preview paint (backgroundSelection.toneFor). It
+             fell through to the surface-style default above, so the Default
+             theme was built on a page nobody chose. */
+          const grid = gridBackgroundTone(userSelections.background, PC);
+          if (grid) {
+            config.defaultTheme = grid.theme;
+            config.defaultN = grid.n;
+          }
+        }
       }
     }
     

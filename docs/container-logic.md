@@ -119,9 +119,9 @@ a dark one. Rising elevation moves *away* from the page.
 | `Container-High` | 90% |
 | `Container-Highest` | **the tone itself** |
 
-**In light mode, color intensifies toward `Container-Highest` in every card
-style.** Tonal reaches the pure tone, white takes on the most page, black
-reaches pure black. White and black used to run the other way, so Highest was
+**In light mode, color intensifies toward `Container-Highest` in tonal and
+white cards.** Tonal reaches the pure tone, white takes on the most page. Black
+cards are flat (below). White and black used to run the other way, so Highest was
 their *least* colored level; they were reversed on 2026-10-10 using the same
 five values, so `Container` itself did not move.
 
@@ -144,16 +144,32 @@ round to the same hex — see [Known-flat cases](#known-flat-cases).
 
 ### Black cards (light mode)
 
-Face is **Neutral Color-1**. The lower levels let the page bleed through and
-the top level is the pure colour.
+**Flat** (owner, 2026-11-05). All five levels are the one value Figma holds:
+Neutral Color-1 at 90 / 92 / 94 / 96 / 100% over the card row's OWN tone —
+the Card-Coloring `ContN` row (row 1; row 3 on a black page) — not over the
+page. On a neutral page every level is Neutral Color-1 itself (#040404 for the
+fixture brands); on a tinted page each is within a unit or two of it.
 
-| Level | Opacity |
-| --- | --- |
-| `Container-Lowest` | 90% |
-| `Container-Low` | 92% |
-| `Container` | 94% |
-| `Container-High` | 96% |
-| `Container-Highest` | **Neutral Color-1** |
+Before, the CSS and the preview blended Color-1 over the PAGE (a visible ramp:
+Popsicle on `primary-light`, Lowest #1d1c1d -> Container #131213 -> Highest #040404) while Figma's
+Default-Background held #050405 / #050405 / #040405 / #040404 / #040404, so the published cards and the Figma
+cards disagreed. The card's Border-Variant and shadow color follow the flat
+face. Dark mode is unchanged (near-black, see below).
+
+Source: `exportToCSS.ts` (`flatBlackRowN`), `buildPreviewCSS.ts` (`blackRowN`).
+Test: `backgroundGridParity.test.ts` part 3, and the Figma == CSS check in
+`cardTextColoring.test.ts`, which no longer skips light black cards.
+
+### A card's Quiet clears all five levels
+
+One Containers section carries the roles for every card level, and the Quiet
+table is keyed to the face (`Container`). Where the lower levels drift toward
+the page — dark tonal cards on a mid-dark page, light tonal cards on a mid-grey
+one — the face's Quiet fell to 4.25-4.49:1 on `Container-Lowest` / `-Low`.
+When that happens the card's Quiet becomes its Text composited at the smallest
+opacity that clears all five (the form Figma draws Quiet in). A Quiet that
+already clears all five is untouched. Source: `exportToCSS.ts`, beside
+`Default-Background.Container-Quiet`.
 
 ### Dark mode — tone 4 mixed with the page, one set per theme
 

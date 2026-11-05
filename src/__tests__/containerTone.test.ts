@@ -256,9 +256,9 @@ describe('tonal container tone follows the background', () => {
 
   // White and black cards had no preview test, so the preview could run its
   // ladder the opposite way to the export and nothing would say so. In light
-  // mode every card style intensifies toward Highest: white cards start pure
-  // white and take on the page, black cards end at pure Neutral Color-1.
-  it('preview: white and black cards intensify toward Highest, like the export', () => {
+  // mode white cards start pure white and take on the page; black cards are
+  // flat (owner, 2026-11-05), ending at pure Neutral Color-1.
+  it('preview: white cards intensify toward Highest and black cards are flat, like the export', () => {
     const levels = ['Container-Lowest', 'Container-Low', 'Container', 'Container-High', 'Container-Highest'];
     for (const cardColoring of ['white', 'black']) {
       const css = buildPreviewCSS({
@@ -281,9 +281,14 @@ describe('tonal container tone follows the background', () => {
       } else {
         expect(norm(resolveVar(previewToken(css, /\[data-theme="Brand"\]/, 'Container-Highest'))))
           .toBe(norm(NEUTRAL_LIGHT[0]));
+        /* Flat since 2026-11-05 (owner): black cards in light mode are the
+           Card-Coloring row Figma reads — Neutral Color-1 over its own row
+           tone — not a ramp over the page. On this tinted page each level is
+           within a unit of Color-1; never lighter going up. */
         for (let i = 1; i < L.length; i++) {
-          expect(`black/step${i}:${L[i] < L[i - 1]}`).toBe(`black/step${i}:true`);
+          expect(`black/step${i}:${L[i] <= L[i - 1]}`).toBe(`black/step${i}:true`);
         }
+        expect(L[0] - L[L.length - 1], 'black cards are flat').toBeLessThan(1);
       }
     }
   });

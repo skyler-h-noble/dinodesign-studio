@@ -26,7 +26,7 @@ import { calculateDefaultThemeSettings, getSelectionName, applyUserSelections } 
 import { generateAllButtonsForMode } from './generateButtons';
 import { generateCompleteButtonSystem } from './generateButtonsSimplified';
 import { generateCompleteSimplifiedSystem } from './completeSimplifiedSystem';
-import { parseBar, parseBackground, toneFor, barToneFor } from '../backgroundSelection';
+import { parseBar, parseBackground, toneFor, barToneFor, normalizeBackground, gridBackgroundTone } from '../backgroundSelection';
 
 import { STATE_THEME_TONE } from '../themes';
 
@@ -3451,7 +3451,27 @@ export function exportColorSystemToJSON(
 ): ColorSystemExport {
   console.log('🏗️ [JSON Export] Starting color system export...');
   console.log('📊 [JSON Export] Configuration:', { selectedBackground, buttonStyle, extractedTones, componentStyle });
-  
+
+  /* The page background in the grid form (docs/background-selection.md).
+     A grid value with a legacy name ('Neutral/Surface-Brightest') is that
+     legacy name, so every switch below sees 'white'. The other sixteen carry
+     their theme and light tone as backgroundTheme / backgroundN — the fields
+     the studio's picker writes and generateDesignSystem does not pass on —
+     so Default-Settings (what the Figma payload reads) and the Default theme
+     are built on the page the preview paints rather than Primary. Legacy
+     strings are untouched. */
+  if (userSelections?.background) {
+    const background = normalizeBackground(userSelections.background) as NonNullable<typeof userSelections>['background'];
+    const grid = gridBackgroundTone(background, extractedTones?.primary ? toneToColorNumber(extractedTones.primary) : 9);
+    userSelections = {
+      ...userSelections,
+      background,
+      ...(grid && userSelections.backgroundTheme === undefined
+        ? { backgroundTheme: grid.theme as 'Primary' | 'Neutral', backgroundN: grid.n }
+        : {}),
+    };
+  }
+
   // Validate that we have the required palettes
   const requiredPalettes = ['neutral', 'primary', 'secondary', 'tertiary'] as const;
   const missingPalettes = requiredPalettes.filter(key => 

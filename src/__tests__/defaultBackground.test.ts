@@ -37,7 +37,11 @@ const EXPECTED_ROLES = [
      one of the three that could not speak in a palette's hue — while the Quiet
      section in Modes covered the same ten scopes as Text the whole time. */
   ...ACCENTS.map(p => `Quiet-${p}`),
-  ...['Default', ...ACCENTS].flatMap(p => [`Icons-${p}`, `Icons-${p}-Variant`]),
+  /* Icons-Default is not listed: the default icon IS the surface's Text
+     (owner, 2026-11-05), so it aliases {Default-Background.<prefix>Text} —
+     still routed, asserted on its own below. Its -Variant keeps its key. */
+  'Icons-Default-Variant',
+  ...ACCENTS.flatMap(p => [`Icons-${p}`, `Icons-${p}-Variant`]),
   // On-<pal>: foreground for content sitting ON the icon color, at 4.5:1.
   // exportColorSystem computes these for the other 17 themes, but it runs after
   // the themes are built and cannot resolve Default's {Default-Background.*}
@@ -110,7 +114,14 @@ describe('Default theme routes every surface role through Default-Background', (
     expect(surfaces.Icons, 'Icons should still be a nested object').toBeTypeOf('object');
     expect(surfaces.Icons.Primary?.value).toBe('{Default-Background.Icons-Primary}');
     expect(surfaces.Icons['Primary-Variant']?.value).toBe('{Default-Background.Icons-Primary-Variant}');
-    expect(surfaces.Icons.Default?.value).toBe('{Default-Background.Icons-Default}');
+    // The default icon aliases the surface's Text itself (owner, 2026-11-05).
+    expect(surfaces.Icons.Default?.value).toBe('{Default-Background.Text}');
+    for (const scope of SURFACE_SCOPES) {
+      const prefix = scope === 'Surfaces' ? '' : `${scope.replace('Surfaces-', 'Surface-')}-`;
+      expect(themes.Default[scope].Icons.Default?.value, scope).toBe(`{Default-Background.${prefix}Text}`);
+    }
+    // A card's default icon is the card's Text.
+    expect(themes.Default.Containers.Icons.Default?.value).toBe('{Default-Background.Container-Text}');
     // A flat key here means the override wrote to the wrong shape.
     expect(surfaces['Icons-Primary']).toBeUndefined();
   });

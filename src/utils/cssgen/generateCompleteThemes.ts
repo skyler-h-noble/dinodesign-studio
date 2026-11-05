@@ -1280,6 +1280,15 @@ export function generateAllThemesWithSurfacesAndContainers(
         if (section['Icons'][key] === undefined) continue;
         section['Icons'][key] = { value: `{Default-Background.${fgPrefix}Icons-${key}}`, type: 'color' };
       }
+      /* The default icon IS the surface's text color (owner, 2026-11-05): an
+         alias to the same Text variable, so it moves with Text Coloring —
+         tonal text on a neutral page turns Primary-tinted, and so do the
+         icons — in the CSS, the preview and Figma alike, with no variable of
+         its own to drift. Colored icons (Icons-Primary, ...) keep their
+         tables. */
+      if (section['Icons']['Default'] !== undefined) {
+        section['Icons']['Default'] = { value: `{Default-Background.${fgPrefix}Text}`, type: 'color' };
+      }
       // On-<pal> is CREATED here, not rewritten.
       //
       // exportColorSystem computes On-* for the other 17 themes by resolving
@@ -1414,6 +1423,19 @@ export function generateAllThemesWithSurfacesAndContainers(
     themes.Default.Containers['Border'] = { value: '{Default-Background.Container-Border}', type: 'color' };
     themes.Default.Containers['Border-Variant'] = { value: '{Default-Background.Container-Border-Variant}', type: 'color' };
     themes.Default.Containers['Focus-Visible'] = { value: '{Default-Background.Container-Focus-Visible}', type: 'color' };
+    /* A card's default icon is the card's text color, as on the surfaces
+       above. It was a fixed {Text.Containers.<page palette>.Color-<ContN>} —
+       right for one mode and one Text Coloring, so in dark mode (and under
+       tonal text on a neutral page) a card's icons were grey under tinted
+       text. The mark ON that icon (On-Default) is the card color itself:
+       Container-Text clears 4.5:1 on every card level by construction, so
+       the card color clears it on the text color. Both alias existing
+       variables; nothing is added to Figma. */
+    const cardIcons = themes.Default.Containers['Icons'];
+    if (cardIcons) {
+      cardIcons['Default'] = { value: '{Default-Background.Container-Text}', type: 'color' };
+      cardIcons['On-Default'] = { value: '{Default-Background.Container}', type: 'color' };
+    }
   }
 
   console.log('🔍 [generateAllThemes] Default theme generated with:');

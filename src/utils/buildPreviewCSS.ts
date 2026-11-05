@@ -6,7 +6,7 @@ import { toneToColorNumber, generateSemanticLightModeScale, generateSemanticDark
 import { SEMANTIC_SEEDS, semanticLightScale, semanticDarkScale } from './generateFullPalettes';
 import { computeRadii, migrateLegacyRadii } from './componentRadii';
 import { navMetricsCSS } from './componentSize';
-import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N } from './backgroundSelection';
+import { parseBackground, parseBar, toneFor, barToneFor, SURFACE_LEVELS, darkPageTheme, DARK_PAGE_N, normalizeBackground, gridBackgroundTone } from './backgroundSelection';
 import { DARK_LADDER_TONE, DARK_CARD_TONE, DARK_CARD_LEVELS, darkCardHex, darkCardHexes, darkTableTone, blackChosen, bandSurfaceTone, bandCardTone, bandTones, blackCardHexesForPage, cardPaletteFor, textPaletteFor, type DarkCardLevel } from './darkLadder';
 import { menuLevelCSS } from './menuLevels';
 import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, effectLevelScopeCSS, neutralEffectLevelRecipe, shadowOptionsFromStyle, libRadiusOverrideCSS, type ShadowOptions } from './dropshadow';
@@ -534,6 +534,12 @@ function withOutlineQuiet(css: string): string {
          per-palette Outline-Quiet to override it. */
       if (p === 'Default' && setsQuiet && !body.includes(`--Buttons-${p}-Outline-Quiet:`)) missing.push(`  --Buttons-${p}-Outline-Quiet: var(--Quiet);`);
     }
+    /* The default icon is the scope's text color (owner, 2026-11-05), as the
+       export writes it in every surface scope. A scope that sets --Text and
+       not --Icons-Default (a themed band, a fixed Neutral end) inherited the
+       PAGE's icon color under its own text. Resolved on this element, beside
+       the --Text it reads. */
+    if (setsText && !/^\s*--Icons-Default:/m.test(body)) missing.push('  --Icons-Default: var(--Text);');
     return missing.length ? `{${body.replace(/\s*$/, '')}\n${missing.join('\n')}\n}` : whole;
   });
 }
@@ -719,11 +725,19 @@ export function buildPreviewCSS(input: BuildInput): string {
     const ramp = darkThemeRamp(darkTheme);
     surfaceBg = ramp ? p(ramp, DARK_PAGE_N) : neutral(DARK_PAGE_N);
   } else {
-    switch (sel.background) {
+    /* A grid value with a legacy name is that legacy name. The other
+       sixteen picks paint their own level (toneFor, as surfaceN below), and
+       every role is solved against it: this fell to white, so a
+       Neutral/Surface-Dim page drew its text, borders and buttons for a white
+       page on a dark grey one. */
+    const grid = gridBackgroundTone(sel.background, PC);
+    switch (normalizeBackground(sel.background)) {
       case 'black': surfaceBg = '#1a1a1a'; break;
       case 'primary-base': surfaceBg = p(primary, PC); break;
       case 'primary-light': surfaceBg = p(primary, 11); break;
-      default: surfaceBg = '#ffffff';
+      default: surfaceBg = !grid ? '#ffffff'
+        : grid.theme === 'Neutral' ? neutral(grid.n)
+        : p(grid.theme === 'Secondary' ? secondary : grid.theme === 'Tertiary' ? tertiary : primary, grid.n);
     }
   }
 
@@ -1011,13 +1025,14 @@ export function buildPreviewCSS(input: BuildInput): string {
     containerHigh = at(0.90);
     containerHighest = face;
   } else if (!isDark && effectiveCardColoring === 'black') {
-    // Black cards intensify toward Highest, like every light-mode style: the
-    // lower levels let the page bleed through and the top level is pure.
-    //
-    // The face is Neutral Color-1, matching the export. The preview used to use
-    // Color-3 while the export emitted a flat Color-2 — a silent divergence in
-    // the flat value, invisible because both looked like a plausible dark card.
-    const at = (a: number) => blendColors(neutral(1), p(surfacePalette, surfaceN), a);
+    // Black cards are FLAT in light mode (owner, 2026-11-05): the face, Neutral
+    // Color-1, over the card row's own tone — the export's and Figma's row,
+    // Card-Coloring ContN of the page palette: 1, or 3 on a black page
+    // (defaultThemeLogic). On a neutral page every level is Color-1; on a
+    // tinted one each is within a unit of it. This blended over the PAGE,
+    // a 90 / 92 / 94 / 96% ramp that Figma never held.
+    const blackRowN = surfacePaletteName === 'Neutral' && surfaceN <= 2 ? 3 : 1;
+    const at = (a: number) => blendColors(neutral(1), p(surfacePalette, blackRowN), a);
     containerLowest = at(0.90);
     containerLow = at(0.92);
     containerBg = at(0.94);
@@ -1718,7 +1733,7 @@ ${isDark
   --Link: ${tokenRefToVar(textTableToken(surfaceN, false, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${surfaceTones.text});
 ${buildTextPaletteLines(surfaceN, false, isDark)}
-${buildIconPaletteLines(surfaceN, false, isDark, surfacePaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${surfacePaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
+${buildIconPaletteLines(surfaceN, false, isDark, textPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${textPaletteName}-Color-${surfaceTones.text})` : surfaceText, surfaceTones.text)}
 ${buildHeaderPaletteLines(surfaceN, false)}
 ${emitStateButtonTokens(surfaceN)}
   --Focus-Visible: #3b82f6;
@@ -1842,7 +1857,7 @@ ${(() => {
   --Link: ${tokenRefToVar(textTableToken(containerN, true, 'Info', isDark))};
   --Link-Visited: var(--Hotlink-Visited-Color-${containerTones.text});
 ${buildTextPaletteLines(containerN, true, isDark)}
-${buildIconPaletteLines(containerN, true, isDark, containerPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${containerPaletteName}-Color-${containerTones.text})` : containerText, containerTones.text)}
+${buildIconPaletteLines(containerN, true, isDark, containerTextPaletteName, hexOfPalette, effectiveTextColoring === 'tonal' ? `var(--${containerTextPaletteName}-Color-${containerTones.text})` : containerText, containerTones.text)}
 ${buildHeaderPaletteLines(containerN, true)}
   --Buttons-Primary-Button: ${contDefBg};
   --Buttons-Primary-Text: ${contDefText};
