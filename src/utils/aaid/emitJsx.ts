@@ -522,7 +522,15 @@ export function emitFile(tree: JsxNode, meta: EmitMeta): string {
     if (one.length <= WIDTH) lines.push(one);
     else lines.push('import {', ...libNames.map((x) => `${IND}${x},`), `} from '${LIB_MODULE}';`);
   }
-  for (const mod of [...defaults.keys()].sort(byCodePoint)) lines.push(`import ${defaults.get(mod)} from '${mod}';`);
+  /* A module written as "path#Export" is a NAMED import — @omni-design/icons
+     0.2.0 serves its non-filled styles as one module per style
+     (`import { AddRounded as AddRoundedIcon } from '@omni-design/icons/rounded'`). */
+  for (const mod of [...defaults.keys()].sort(byCodePoint)) {
+    const hash = mod.indexOf('#');
+    lines.push(hash < 0
+      ? `import ${defaults.get(mod)} from '${mod}';`
+      : `import { ${mod.slice(hash + 1)} as ${defaults.get(mod)} } from '${mod.slice(0, hash)}';`);
+  }
 
   lines.push('');
   lines.push(`export default function ${componentName(meta.rootName)}() {`);

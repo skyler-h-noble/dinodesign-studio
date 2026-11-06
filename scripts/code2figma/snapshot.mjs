@@ -86,6 +86,10 @@ registerHooks({
        gets its own recorder's stand-ins. */
     const q = queryOf(context.parentURL);
     if (specifier === '@omni-design/components') return { url: STAND_IN_URL + q, shortCircuit: true };
+    /* @omni-design/icons 0.2.0: the non-filled styles are one module each,
+       imported by name ({ HomeOutlined } from '@omni-design/icons/outlined'). */
+    const styleMod = /^@omni-design\/icons\/(outlined|rounded|sharp|twotone)$/.exec(specifier);
+    if (styleMod) return { url: `c2f-iconstyle:${styleMod[1]}${q}`, shortCircuit: true };
     const icon = /^@omni-design\/icons\/([A-Za-z0-9]+?)(?:Icon)?(?:\.js)?$/.exec(specifier);
     if (icon) return { url: `c2f-icon:${icon[1]}${q}`, shortCircuit: true };
     if (ASSET.test(specifier)) return { url: `c2f-asset:${path.basename(specifier.replace(/\?.*$/, ''))}`, shortCircuit: true };
@@ -106,6 +110,13 @@ registerHooks({
       const r = globalThis.__omniC2F;
       const names = Object.keys(r.exports).filter((k) => /^[A-Za-z_$][\w$]*$/.test(k) && k !== 'default');
       const src = `const r = globalThis.__omniC2F.exports;\n${names.map((n) => `export const ${n} = r[${JSON.stringify(n)}];`).join('\n')}\nexport default r.default;\n`;
+      return { format: 'module', source: src, shortCircuit: true };
+    }
+    if (url.startsWith('c2f-iconstyle:')) {
+      // Every icon name the real style module exports, each a recorded stand-in.
+      const style = url.slice(14).replace(/\?.*$/, '');
+      const names = Object.keys(appRequire(`@omni-design/icons/${style}`)).filter((k) => /^[A-Z][A-Za-z0-9]*$/.test(k));
+      const src = names.map((n) => `export const ${n} = globalThis.__omniC2F.icon(${JSON.stringify(n)});`).join('\n');
       return { format: 'module', source: src, shortCircuit: true };
     }
     if (url.startsWith('c2f-icon:')) {

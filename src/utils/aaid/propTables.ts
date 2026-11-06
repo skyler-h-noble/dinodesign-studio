@@ -591,7 +591,12 @@ export function mapIcon(n: IRNode, ctx: MapCtx): JsxNode {
   const figmaStyle = variantOf(n, 'Style');
   const name = glyph ? iconComponentName(glyph, figmaStyle) : null;
   if (!name) return ctx.fallback(n, glyph ? `icon glyph "${glyph}" has no @omni-design/icons name` : 'icon glyph not identifiable');
-  const glyphEl = el(`${name}Icon`, [], [], `@omni-design/icons/${name}`);
+  /* Filled icons keep their own path; @omni-design/icons 0.2.0 serves the
+     Rounded / Sharp styles from one module each (a named import). */
+  const style = /(Rounded|Sharp|Outlined|TwoTone)$/.exec(name)?.[1];
+  const glyphEl = el(`${name}Icon`, [], [], style
+    ? `@omni-design/icons/${style.toLowerCase()}#${name}`
+    : `@omni-design/icons/${name}`);
   return el('Icon', [], [glyphEl]);
 }
 

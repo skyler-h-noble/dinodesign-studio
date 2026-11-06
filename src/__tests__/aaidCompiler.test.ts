@@ -408,7 +408,7 @@ describe('Button (rule 4f)', () => {
     expect(c).not.toMatch(/width: 300|height: 40/);
   });
   it('start icon in the Round family → the Rounded component', () => {
-    expect(compileFigmaFrame(KITCHEN_SINK).code).toContain("import AddRoundedIcon from '@omni-design/icons/AddRounded';");
+    expect(compileFigmaFrame(KITCHEN_SINK).code).toContain("import { AddRounded as AddRoundedIcon } from '@omni-design/icons/rounded';");
   });
 });
 

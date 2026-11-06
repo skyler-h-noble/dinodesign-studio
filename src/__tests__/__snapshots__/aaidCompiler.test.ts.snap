@@ -25,8 +25,8 @@ import {
   Tag,
   ThemedZone,
 } from '@omni-design/components';
-import AddRoundedIcon from '@omni-design/icons/AddRounded';
 import SearchIcon from '@omni-design/icons/Search';
+import { AddRounded as AddRoundedIcon } from '@omni-design/icons/rounded';
 
 export default function KitchenSink() {
   return (

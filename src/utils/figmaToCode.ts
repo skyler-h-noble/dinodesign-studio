@@ -703,7 +703,7 @@ CONVERSION RULES:
         Style=Round    (Material Icons Round)  add -> AddRoundedIcon
         Style=Sharp    (Material Icons Sharp)  add -> AddSharpIcon
 
-        import AddRoundedIcon from '@omni-design/icons/AddRounded';
+        import { AddRounded as AddRoundedIcon } from '@omni-design/icons/rounded';
 
     Note Figma says "Round" and the icon names say "Rounded" — map it, do not
     copy it.
