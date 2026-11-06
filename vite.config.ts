@@ -26,6 +26,13 @@ export default defineConfig({
        commits in the main checkout. */
     exclude: [...configDefaults.exclude, '.claude/**'],
   },
+  /* brotli-wasm finds its .wasm with `new URL('brotli_wasm_bg.wasm',
+     import.meta.url)`. Pre-bundling moves the module into .vite/deps, where
+     that URL points at nothing, so the dev server must serve it as it is. The
+     production build resolves the URL and emits the .wasm as an asset. */
+  optimizeDeps: {
+    exclude: ['brotli-wasm'],
+  },
   resolve: {
     preserveSymlinks: true,
     dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled', '@mui/material'],

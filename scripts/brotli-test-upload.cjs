@@ -30,71 +30,29 @@ const BUCKET = 'dino-design.firebasestorage.app';
 const BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/`;
 const urlFor = (p, token) => BASE + encodeURIComponent(p) + '?alt=media' + (token ? '&token=' + token : '');
 
-/* ── whitespace-only minifier (port of the safemin pass that passed the
-      1,047-token snapshot with zero differences) ── */
-function stripComments(t) {
-  let out = ''; let q = null;
-  for (let i = 0; i < t.length; i++) {
-    const c = t[i];
-    if (q) { out += c; if (c === '\\') { out += t[++i] ?? ''; continue; } if (c === q) q = null; continue; }
-    if (c === '"' || c === "'") { q = c; out += c; continue; }
-    if (c === '/' && t[i + 1] === '*') { const j = t.indexOf('*/', i + 2); i = (j < 0 ? t.length : j + 2) - 1; continue; }
-    out += c;
-  }
-  return out;
-}
-function splitDecls(b) {
-  const parts = []; let cur = ''; let depth = 0; let q = null;
-  for (const c of b) {
-    if (q) { cur += c; if (c === q) q = null; continue; }
-    if (c === '"' || c === "'") q = c;
-    else if (c === '(') depth++;
-    else if (c === ')') depth--;
-    if (c === ';' && depth === 0) { parts.push(cur); cur = ''; } else cur += c;
-  }
-  if (cur.trim()) parts.push(cur);
-  return parts;
-}
-const normSel = (s) => s.trim().replace(/\s+/g, ' ').replace(/\s*,\s*/g, ',');
-function emit(t) {
-  const out = []; let i = 0;
-  while (i < t.length) {
-    const m = /^\s*(@import[^;]*;)/.exec(t.slice(i));
-    if (m) { out.push(m[1].trim()); i += m[0].length; continue; }
-    const j = t.indexOf('{', i);
-    if (j < 0) break;
-    const head = t.slice(i, j);
-    let d = 1; let k = j + 1;
-    while (d && k < t.length) { if (t[k] === '{') d++; else if (t[k] === '}') d--; k++; }
-    const body = t.slice(j + 1, k - 1);
-    const h = head.trim();
-    if (h.startsWith('@')) out.push(h.replace(/\s+/g, ' ') + '{' + emit(body) + '}');
-    else {
-      const decls = splitDecls(body).filter((p) => p.includes(':')).map((p) => {
-        const c = p.indexOf(':'); return p.slice(0, c).trim() + ':' + p.slice(c + 1).trim();
-      });
-      out.push(normSel(h) + '{' + decls.join(';') + '}');
-    }
-    i = k;
-  }
-  return out.join('');
-}
-const minify = (css) => emit(stripComments(css));
+/* The whitespace-only minifier is the generator's own (src/utils/cssMinifySafe.ts),
+   imported directly — Node strips the types — so this test and the published
+   br/ copies can never minify differently. */
+const loadMinifier = () => import(path.resolve(__dirname, '..', 'src', 'utils', 'cssMinifySafe.ts'));
 
 async function main() {
   const [id, flag] = process.argv.slice(2);
   if (!id) { console.error('Usage: node scripts/brotli-test-upload.cjs <designSystemId> [--dry-run]'); process.exit(1); }
   const dry = flag === '--dry-run';
+  const { minifyCss } = await loadMinifier();
   const theme = await (await fetch(urlFor(`design-systems/${id}/theme.json`))).json();
   const keys = ['foundation', 'core', 'typography', 'lightMode', 'darkMode', 'base', 'styles'].filter((k) => theme[k]);
   const files = [];
   console.log(`${theme.name} (${id})`);
   console.log('file'.padEnd(26), 'raw'.padStart(9), 'gzip now'.padStart(9), 'min+br'.padStart(9));
   for (const k of keys) {
-    const res = await fetch(theme[k]);
+    // A system published with brotli copies names them in the sheet slots and
+    // the readable originals under `plain`; measure from the original.
+    const src = theme.plain?.[k] ?? theme[k];
+    const res = await fetch(src);
     const css = await res.text();
-    const name = decodeURIComponent(new URL(theme[k]).pathname.split('/o/')[1]).split('/').pop();
-    const min = minify(css);
+    const name = decodeURIComponent(new URL(src).pathname.split('/o/')[1]).split('/').pop();
+    const min = minifyCss(css);
     const br = zlib.brotliCompressSync(Buffer.from(min), { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } });
     const gz = zlib.gzipSync(Buffer.from(css), { level: 9 });
     console.log(name.padEnd(26), String(css.length).padStart(9), String(gz.length).padStart(9), String(br.length).padStart(9));

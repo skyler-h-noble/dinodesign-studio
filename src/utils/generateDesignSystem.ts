@@ -985,6 +985,29 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
   // Provider to request up front (fontImports.ts).
   const { consolidateFontImports } = await import('./fontImports');
   consolidateFontImports(uploadFiles);
+
+  // 9. Brotli copies of the sheets under br/, and theme.json pointed at them
+  //    (brotliCopies.ts). The originals above upload unchanged. The copies go
+  //    up FIRST, so theme.json never names a file that is not there yet.
+  //    Best-effort: if the encoder cannot load or a copy fails to upload,
+  //    theme.json goes up as it was, naming the originals.
+  const themeFile = uploadFiles.find((f) => f.name === 'theme.json');
+  const themeBefore = themeFile?.content;
+  try {
+    const { addBrotliCopies, loadBrotliEncoder } = await import('./brotliCopies');
+    const copies = await addBrotliCopies(
+      uploadFiles, await loadBrotliEncoder(), (name) => getPublicFileUrl(uuid, name));
+    for (const copy of copies) {
+      await uploadDesignSystemFile(uuid, copy.name, copy.bytes, copy.contentType, copy.contentEncoding);
+    }
+    const kb = (n: number) => (n / 1024).toFixed(1);
+    console.log(`Brotli copies uploaded: ${copies.map((c) =>
+      `${c.name} ${kb(c.sizes.raw)} KB → ${kb(c.sizes.brotli)} KB`).join(', ')}`);
+  } catch (err) {
+    console.warn('Brotli copies skipped — theme.json keeps the original sheets:', err);
+    if (themeFile && themeBefore !== undefined) themeFile.content = themeBefore;
+  }
+
   for (const file of uploadFiles) {
     try {
       await uploadDesignSystemFile(uuid, file.name, file.content, file.type);

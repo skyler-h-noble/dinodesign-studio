@@ -6,6 +6,8 @@ import { storage, STORAGE_BUCKET } from './client';
 
 /**
  * Storage layout: design-systems/{uuid}/{filename}
+ *   plus design-systems/{uuid}/br/{sheet}.css — minified brotli copies of the
+ *   sheets, which theme.json points at (see utils/brotliCopies.ts)
  * (Top-level "folder" lets us add other top-level paths later — e.g., user-uploads/)
  */
 const ROOT = 'design-systems';
@@ -59,6 +61,10 @@ export async function uploadDesignSystemFile(
   filename: string,
   content: string | Blob | Uint8Array,
   contentType?: string,
+  /** The encoding `content` ALREADY carries (e.g. 'br' for the brotli copies
+   *  in br/). The bytes go up as they are, with this Content-Encoding, and
+   *  are not gzipped again. */
+  preEncoded?: 'br' | 'gzip',
 ): Promise<void> {
   const fileRef = ref(storage, `${ROOT}/${uuid}/${filename}`);
   let data: Blob | Uint8Array;
@@ -86,8 +92,8 @@ export async function uploadDesignSystemFile(
    * would grow. CompressionStream is guarded because it is unavailable in older
    * Safari and in jsdom under test — falling back to the raw bytes is correct
    * there, just larger. */
-  let contentEncoding: string | undefined;
-  const isText = typeof content === 'string'
+  let contentEncoding: string | undefined = preEncoded;
+  const isText = !preEncoded && typeof content === 'string'
     && /\b(css|json|javascript|html|xml|markdown|plain)\b/.test(contentType || 'text/plain');
   if (isText && typeof CompressionStream !== 'undefined' && data instanceof Blob && data.size > 1024) {
     try {
@@ -116,7 +122,7 @@ export async function uploadDesignSystemFile(
   console.log(
     `📤 [Storage] uploaded ${ROOT}/${uuid}/${filename}`
     + ` (${(data instanceof Blob ? data.size : data.byteLength)} bytes`
-    + `${contentEncoding ? ', gzip' : ''}, cache-control: ${metadata.cacheControl})`,
+    + `${contentEncoding ? `, ${contentEncoding}` : ''}, cache-control: ${metadata.cacheControl})`,
   );
 }
 
