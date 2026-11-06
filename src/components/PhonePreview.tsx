@@ -1,5 +1,5 @@
 import {
-  Button, H3, Body, BodySmall, VStack, Card, Chip,
+  Button, H3, Body, BodySmall, VStack, Card, Tag,
 } from '@omni-design/components';
 import type { ColorScheme, UserSelections, ComponentStyle, TypographyStyle } from '../types';
 import { buildPreviewCSS } from '../utils/buildPreviewCSS';
@@ -233,25 +233,10 @@ export default function PhonePreview({
               <VStack spacing={2}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <H3 style={{ fontSize: 16 }}>Have fun!</H3>
-                  <Chip
-                    label="NEW"
-                    size="small"
-                    variant="tertiary"
-                    sx={{
-                      borderRadius: '2px',
-                      alignSelf: 'flex-start',
-                      // Override the lib's variant colors so the chip reads
-                      // the brand's --Tag-Default-* tokens (mapped to the
-                      // complementary palette per Tag.Default rules — for
-                      // a tertiary card that's the primary palette). Lib's
-                      // Chip doesn't ship a `default` variant, so we keep
-                      // tertiary as the structural variant and just swap
-                      // the colors via sx.
-                      backgroundColor: 'var(--Tag-Default-BG, var(--Tag-Tertiary-BG))',
-                      color: 'var(--Tag-Default-Text, var(--Tag-Tertiary-Text))',
-                      borderColor: 'var(--Tag-Default-BG, var(--Tag-Tertiary-BG))',
-                    }}
-                  />
+                  {/* The lib's Tag reads --Tag-Default-BG / -Text itself. This was a
+                      Chip with its colors overridden through sx, which drew
+                      the chip's own surface ring around a pill — not a tag. */}
+                  <Tag style={{ alignSelf: 'flex-start' }}>NEW</Tag>
                 </div>
                 {moodBoardUrl && (
                   <div style={{ width: '100%', height: 56, borderRadius: 8, overflow: 'hidden' }}>
