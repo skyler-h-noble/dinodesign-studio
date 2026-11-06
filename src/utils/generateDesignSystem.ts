@@ -799,28 +799,11 @@ ${overlayOffsetCSS('Android-Mobile').join('\n')}
   --Button-Line-Height: 20px;
 }
 
-/* Decorative Font Application */
-/* In decorative mode, eyebrows swap onto the Display face. Re-pointing the
-   face token is all it takes — every style wearing that face follows, because
-   each one's --<style>-Font-Family is relative to it. */
-
-[data-surface="Surface"] [data-decorative],
-[data-surface="Surface-Dim"] [data-decorative],
-[data-surface="Surface-Dimmest"] [data-decorative],
-[data-surface="Surface-Bright"] [data-decorative] {
-  --Font-Family-Header: var(--Set-Font-Family-Header);
-  --Font-Family-Header-Weight: var(--Set-Font-Family-Header-Weight);
-  --Font-Family-Eyebrow: var(--Font-Family-Display);
-}
-
-/* Explicit decorative variants — always available regardless of mode */
-[data-typography="decorative-header"] {
-  font-family: var(--Font-Family-Header);
-  font-weight: var(--Set-Font-Family-Header-Weight);
-}
-[data-typography="decorative-overline"] {
-  font-family: var(--Font-Family-Display);
-}
+/* No decorative mode. Typography is Omni or System (data-typography), and
+   the Eyebrow never changes face: Inter on Desktop, the device's own face
+   elsewhere. The [data-decorative] block that re-pointed it at the Display
+   face, and the decorative-header / decorative-overline variants, were left
+   over from the pre-Omni/System model; nothing sets either attribute. */
 
 `;
 

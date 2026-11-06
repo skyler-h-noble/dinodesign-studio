@@ -238,9 +238,8 @@ function roleOverrideRules(): string {
    now, on the Eyebrow face. The lib hard-codes both families, so they are
    corrected here rather than through a token.
 
-   Both read the face token, which is what keeps decorative mode working:
-   core.css re-points --Font-Family-Eyebrow at the Display face inside
-   [data-decorative], on a higher-specificity selector.
+   Both read the face token. The Eyebrow face never switches (there is no
+   decorative mode); it is Inter on Desktop and the device's face elsewhere.
 --------------------------------------------------------------------------- */
 ${displaySelectors('.typography')} {
   font-family: var(--Font-Family-Display);
