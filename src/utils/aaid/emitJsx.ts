@@ -187,7 +187,13 @@ class Compiler implements MapCtx {
         case 'list':
         case 'listItem':
           if (isListRow(n)) return el('List', this.layoutStyleProps(n), [mapListItem(n, this)]);
-          if (kind === 'list') return el('List', [...listProps(n, this), ...this.layoutStyleProps(n)], this.children(n, true));
+          if (kind === 'list') {
+            /* The live List set holds its rows in a "List Slot"; older files
+               put the rows directly under the instance. */
+            const kids = n.children ?? [];
+            const rows = kids.length === 1 && /^list slot$/i.test(kids[0].name) ? kids[0].children ?? [] : kids;
+            return el('List', [...listProps(n, this), ...this.layoutStyleProps(n)], this.children(n, true, rows));
+          }
           return this.fallback(n, 'list item without start / text / end slots');
       }
     }

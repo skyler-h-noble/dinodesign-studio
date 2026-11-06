@@ -151,6 +151,29 @@ export const TEXT_STYLE_TO_EXPORT: Record<string, string> = {
   eyebrow: 'Eyebrow', 'eyebrow-medium': 'Eyebrow', 'eyebrow-small': 'EyebrowSmall', 'eyebrow-large': 'EyebrowLarge',
   overline: 'Eyebrow', 'overline-medium': 'Eyebrow', 'overline-small': 'EyebrowSmall', 'overline-large': 'EyebrowLarge',
   'number-small': 'NumberSmall', 'number-medium': 'NumberMedium', 'number-large': 'NumberLarge',
+  /* The live file names the lib's one caption size Caption-Medium (it also has
+     Caption-Small / -Large, which no lib export draws — left unmapped). */
+  'caption-medium': 'Caption', 'caption-medium-bold': 'CaptionBold',
+};
+
+/**
+ * The other direction: a typography export → the live Figma text style that
+ * draws it, spelled exactly. TEXT_STYLE_TO_EXPORT is many-to-one (body,
+ * body-medium → Body), so the inverse has to name which style is the real one.
+ * code2figma.test.ts checks each value is a live style AND reads back through
+ * TEXT_STYLE_TO_EXPORT to the same export, so the two tables cannot drift.
+ */
+export const EXPORT_TO_TEXT_STYLE: Record<string, string> = {
+  DisplayLarge: 'Display-Large', DisplayMedium: 'Display-Medium', DisplaySmall: 'Display-Small',
+  AltDisplayLarge: 'Alt-Display-Large', AltDisplayMedium: 'Alt-Display-Medium', AltDisplaySmall: 'Alt-Display-Small',
+  H1: 'H1', H2: 'H2', H3: 'H3', H4: 'H4', H5: 'H5', H6: 'H6',
+  SubtitleLarge: 'Subtitle-Large', Subtitle: 'Subtitle-Medium', SubtitleSmall: 'Subtitle-Small',
+  BodyLarge: 'Body-Large', Body: 'Body-Medium', BodySmall: 'Body-Small',
+  BodyLargeSemibold: 'Body-Large-Semibold', BodySemibold: 'Body-Medium-Semibold', BodySmallSemibold: 'Body-Small-Semibold',
+  Caption: 'Caption-Medium', CaptionBold: 'Caption-Medium-Bold', Legal: 'Legal', LegalSemibold: 'Legal-Semibold',
+  LabelLarge: 'Label-Large', Label: 'Label-Medium', LabelSmall: 'Label-Small',
+  EyebrowLarge: 'Eyebrow-Large', Eyebrow: 'Eyebrow-Medium', EyebrowSmall: 'Eyebrow-Small',
+  NumberLarge: 'Number-Large', NumberMedium: 'Number-Medium', NumberSmall: 'Number Small',
 };
 
 /** Display and heading exports: never given a color prop (rule 4e). */
@@ -199,76 +222,114 @@ export const LIB_DEFAULTS: Record<string, Record<string, string | number | boole
 // and that is correct" (a runtime state, a default). A value missing from the
 // row is reported as unmapped — rule 0c says a variant the designer set is a
 // fact, so silently dropping one is the failure.
+//
+// The tables run BOTH ways. Figma → code reads them as written. Code → Figma
+// (src/utils/code2figma/) reads them backwards: for each row it draws the
+// value whose [prop, literal] the code sets, else the row's `draw` value. So:
+//
+//   - value keys are spelled EXACTLY as the live Figma set spells them
+//     ("Non-clickable", "iconOnly", "Focus-Visible") — Figma variant values
+//     are case-sensitive, and this is where the spelling lives;
+//   - `draw` is the value a component with none of the row's props gets. A row
+//     without `draw` is read-only: an axis older files have and the live
+//     library no longer does (Button Size, Card Elevation, ListItem Type). It
+//     still compiles old files and is never drawn.
+//
+// src/utils/code2figma/figmaLibrary.live.json is the live capture these
+// spellings are checked against (code2figma.test.ts).
 
 export type VariantRow = {
   figma: string;
   values: Record<string, [string, string | number | true] | null>;
+  /** The value drawn when the code sets none of this row's props. */
+  draw?: string;
 };
 
-const STATES_RUNTIME = { default: null, hover: null, pressed: null, 'focus-visible': null, focus: null } as const;
+const STATES_RUNTIME = { Default: null, Hover: null, Pressed: null, 'Focus-Visible': null, Focus: null } as const;
 
 export const VARIANT_TABLES: Record<string, VariantRow[]> = {
   /* rule 4f — Size / Elevation / Type / State / Status. Style (the shape) and
-     the Buttons mode compose into `variant` in mapButton, not here. */
+     the Buttons mode compose into `variant` in mapButton, not here. Size and
+     Elevation are older files' axes: the live set takes size from the
+     Component-Size mode and has no elevation axis. */
   Button: [
     { figma: 'Size', values: { small: ['size', 'small'], medium: null, large: ['size', 'large'] } },
     { figma: 'Elevation', values: { elevated: ['elevated', true], default: null, flat: null, none: null } },
-    { figma: 'Type', values: { text: null, icononly: ['iconOnly', true], letternumber: ['letterNumber', true], avatar: ['avatar', true] } },
-    { figma: 'State', values: { ...STATES_RUNTIME, disabled: ['disabled', true] } },
-    { figma: 'Status', values: { selected: ['selected', true], unselected: null } },
+    { figma: 'Type', draw: 'text', values: { text: null, iconOnly: ['iconOnly', true], letterNumber: ['letterNumber', true], Avatar: ['avatar', true] } },
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Status', draw: 'unselected', values: { selected: ['selected', true], unselected: null } },
+    { figma: 'Badge', draw: 'false', values: { true: ['badge', true], false: null } },
   ],
   /* rule 4f-2 — no shape axis; color is the Buttons mode. Checked becomes
      defaultChecked: the output is static, and `checked` without onChange is a
-     read-only control React warns about. */
+     read-only control React warns about. State=error is an older file's way of
+     saying what the live set's Validation boolean says. */
   Checkbox: [
     { figma: 'Size', values: { small: ['size', 'small'], medium: null, large: ['size', 'large'] } },
-    { figma: 'Checked', values: { checked: ['defaultChecked', true], unchecked: null, indeterminate: ['indeterminate', true] } },
-    { figma: 'State', values: { ...STATES_RUNTIME, disabled: ['disabled', true], error: ['error', true] } },
+    { figma: 'Checked', draw: 'unchecked', values: { checked: ['defaultChecked', true], unchecked: null, indeterminate: ['indeterminate', true] } },
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true], error: ['error', true] } },
+    { figma: 'Validation', draw: 'false', values: { true: ['error', true], false: null } },
   ],
   /* rule 4f-3 — the lib's color is a palette; "Colored" draws the line in it.
-     Figma's Size axis has one option; thickness follows Component-Size. */
+     Figma's Size axis has one option; thickness follows Component-Size. The
+     palette values are older files'; the live set has Default | Colored. */
   Divider: [
-    { figma: 'Orientation', values: { horizontal: null, vertical: ['orientation', 'vertical'] } },
+    { figma: 'Orientation', draw: 'horizontal', values: { horizontal: null, vertical: ['orientation', 'vertical'] } },
     {
       figma: 'Color',
+      draw: 'Default',
       values: {
-        default: null, 'border-variant': null, colored: ['colored', true],
+        Default: null, 'border-variant': null, Colored: ['colored', true],
         primary: ['color', 'primary'], secondary: ['color', 'secondary'], tertiary: ['color', 'tertiary'],
         neutral: ['color', 'neutral'], info: ['color', 'info'], success: ['color', 'success'],
         warning: ['color', 'warning'], error: ['color', 'error'],
       },
     },
-    { figma: 'Size', values: { small: null } },
+    { figma: 'Size', draw: 'small', values: { small: null } },
+    /* The live set's Pill boolean draws a nested Divider-Pill with text —
+       indicatorText in the lib. Not mapped yet, so Pill=true is reported. */
+    { figma: 'Pill', draw: 'false', values: { false: null } },
   ],
   /* Avatar's Style axis (parity: Photo · Default · Initials). Older files
-     called it Type / Content with Icon for the glyph. */
+     called it Type / Content with Icon for the glyph. Container=Shape draws an
+     Avatar Shape — which shape is a nested instance, not mapped yet. */
   Avatar: [
-    { figma: 'Style', values: { photo: ['defaultPhoto', true], default: null, icon: null, initials: null } },
+    { figma: 'Style', draw: 'Default', values: { Photo: ['defaultPhoto', true], Default: null, icon: null, Initials: null } },
     { figma: 'Type', values: { photo: ['defaultPhoto', true], default: null, icon: null, initials: null } },
     { figma: 'Content', values: { photo: ['defaultPhoto', true], default: null, icon: null, initials: null } },
+    { figma: 'Container', draw: 'Circle', values: { Circle: null } },
   ],
   Chip: [
-    { figma: 'State', values: { ...STATES_RUNTIME, disabled: ['disabled', true] } },
-    { figma: 'Status', values: { selected: ['selected', true], unselected: null } },
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Status', draw: 'unselected', values: { selected: ['selected', true], unselected: null } },
   ],
+  /* The live Card (2026-11) is Orientation × State × Elevated, with State=Drag
+     and a Selected BOOLEAN. Older files had Elevation=elevated and a Status
+     axis; both still compile. */
   Card: [
-    { figma: 'State', values: { 'non-clickable': null, ...STATES_RUNTIME, disabled: ['disabled', true] } },
+    { figma: 'State', draw: 'Non-clickable', values: { 'Non-clickable': null, ...STATES_RUNTIME, Disabled: ['disabled', true], Drag: ['draggable', true] } },
     { figma: 'Status', values: { selected: ['selected', true], unselected: null } },
-    { figma: 'Orientation', values: { vertical: null, horizontal: ['orientation', 'horizontal'] } },
+    { figma: 'Selected', draw: 'false', values: { true: ['selected', true], false: null } },
+    { figma: 'Orientation', draw: 'vertical', values: { vertical: null, horizontal: ['orientation', 'horizontal'] } },
+    { figma: 'Elevated', draw: 'false', values: { true: ['elevated', true], false: null } },
     { figma: 'Elevation', values: { elevated: ['elevated', true], default: null, flat: null } },
+    { figma: 'No Bleed Content', draw: 'false', values: { false: null } },
   ],
   List: [
-    { figma: 'Type', values: { clickable: ['clickable', true], 'non-clickable': null } },
-    { figma: 'Orientation', values: { vertical: null, horizontal: ['orientation', 'horizontal'] } },
+    { figma: 'Type', draw: 'Non-clickable', values: { Clickable: ['clickable', true], 'Non-clickable': null } },
+    { figma: 'Orientation', draw: 'vertical', values: { vertical: null, horizontal: ['orientation', 'horizontal'] } },
     { figma: 'Size', values: { small: ['size', 'small'], medium: null, large: ['size', 'large'] } },
   ],
+  /* The live List Item says clickable through State (Non-clickable vs the
+     interaction states) — mapListItem reads that; older files used Type. */
   ListItem: [
     { figma: 'Type', values: { clickable: ['clickable', true], 'non-clickable': null } },
     { figma: 'Size', values: { small: ['size', 'small'], medium: null, large: ['size', 'large'] } },
     { figma: 'Status', values: { selected: ['selected', true], unselected: null } },
-    { figma: 'State', values: { ...STATES_RUNTIME, disabled: ['disabled', true] } },
-    { figma: 'Bottom Border', values: { true: ['bottomBorder', true], false: null } },
-    { figma: 'Right Border', values: { true: ['rightBorder', true], false: null } },
+    { figma: 'Selected', draw: 'false', values: { true: ['selected', true], false: null } },
+    { figma: 'State', draw: 'Non-clickable', values: { 'Non-clickable': null, ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Bottom Border', draw: 'false', values: { true: ['bottomBorder', true], false: null } },
+    { figma: 'Right Border', draw: 'false', values: { true: ['rightBorder', true], false: null } },
   ],
   Box: [
     { figma: 'Radius', values: { none: null, small: ['radius', 'small'], medium: ['radius', 'medium'], large: ['radius', 'large'] } },
@@ -284,14 +345,21 @@ export const CONSUMED_KEYS: Record<string, string[]> = {
   Chip: ['start-avatar', 'start-icon', 'end-icon', 'end-avatar', 'deletable', 'color'],
   Ratio: ['ratio', 'property 1', 'image placeholder', 'fill'],
   Typography: ['type', 'style', 'property 1', 'variant'],
-  Icon: ['style'],
-  Tag: ['color'],
-  ListItem: ['1st row', '2nd row', '3rd row', 'show eyebrow', 'show title', 'show secondary', 'start slot', 'end slot', 'beginning slot'],
+  Icon: ['style', 'icon name'],
+  Tag: ['color', 'theme', 'fit'],
+  ListItem: ['1st row', '2nd row', '3rd row', 'show eyebrow', 'show title', 'show secondary', 'start slot', 'end slot', 'beginning slot', 'image'],
 };
 
 export interface MappedVariants {
   props: Array<[string, PropValue]>;
   unmapped: string[];
+}
+
+/** A row's value entry, matched case-insensitively. */
+export function rowValue(row: VariantRow, value: string): { key: string; hit: [string, string | number | true] | null } | undefined {
+  const v = value.trim().toLowerCase();
+  for (const key of Object.keys(row.values)) if (key.toLowerCase() === v) return { key, hit: row.values[key] };
+  return undefined;
 }
 
 /** Apply one component's variant table to an instance's props. */
@@ -304,23 +372,52 @@ export function applyVariantTable(exportName: string, props: Record<string, stri
   for (const key of Object.keys(props ?? {}).sort()) {
     const k = key.trim().toLowerCase();
     const raw = props![key];
-    const v = raw.trim().toLowerCase();
     const row = rows.find((r) => r.figma.toLowerCase() === k);
     if (!row) {
       if (!consumed.has(k)) unmapped.push(`${key}=${raw}`);
       continue;
     }
-    if (!(v in row.values)) {
+    const entry = rowValue(row, raw);
+    if (!entry) {
       unmapped.push(`${key}=${raw}`);
       continue;
     }
-    const hit = row.values[v];
+    const hit = entry.hit;
     if (hit && !seen.has(hit[0])) {
       seen.add(hit[0]);
       out.push([hit[0], lit(hit[1])]);
     }
   }
   return { props: out, unmapped };
+}
+
+/**
+ * The inverse of applyVariantTable: code props → Figma variant values, for the
+ * rows that are drawn (`draw` set). `hasValue` says whether the target set has
+ * that axis and value — a value the live set lacks is never drawn, and a row
+ * whose axis the set lacks is skipped. Returns the props the rows consumed, so
+ * the caller can tell what was not expressed.
+ */
+export function invertVariantTable(
+  exportName: string,
+  code: Record<string, unknown>,
+  hasValue: (axis: string, value: string) => boolean = () => true,
+): { variant: Record<string, string>; used: string[] } {
+  const variant: Record<string, string> = {};
+  const used: string[] = [];
+  for (const row of VARIANT_TABLES[exportName] ?? []) {
+    if (row.draw === undefined || !hasValue(row.figma, row.draw)) continue;
+    let chosen = row.draw;
+    for (const [key, hit] of Object.entries(row.values)) {
+      if (!hit) continue;
+      const [prop, want] = hit;
+      const got = code[prop];
+      const match = want === true ? got === true : got === want;
+      if (match && hasValue(row.figma, key)) { chosen = key; used.push(prop); break; }
+    }
+    variant[row.figma] = chosen;
+  }
+  return { variant, used };
 }
 
 /** Read a variant value by case-insensitive key. */
@@ -461,6 +558,24 @@ export function iconComponentName(glyph: string, figmaStyle?: string): string | 
   const suffix = ICON_STYLE_SUFFIX[(figmaStyle ?? 'default').trim().toLowerCase()];
   if (suffix === undefined) return null;
   return base + suffix;
+}
+
+/**
+ * The inverse of iconComponentName, for code → Figma: "ChevronRightRounded" →
+ * { glyph: "chevron_right", style: "Round" }. Material ligatures use
+ * underscores. iconComponentName(glyph, style) gives the name back (tested).
+ * undefined for a family Figma's Icon set does not draw (TwoTone).
+ */
+export function iconGlyphFromComponent(name: string): { glyph: string; style: 'Default' | 'Round' | 'Sharp' } | undefined {
+  let base = name.replace(/Icon$/, '');
+  let style: 'Default' | 'Round' | 'Sharp' = 'Default';
+  if (/TwoTone$/.test(base)) return undefined;
+  if (/Rounded$/.test(base)) { style = 'Round'; base = base.slice(0, -'Rounded'.length); }
+  else if (/Sharp$/.test(base)) { style = 'Sharp'; base = base.slice(0, -'Sharp'.length); }
+  const words = base.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return undefined;
+  if (words[words.length - 1] === 'outlined') words[words.length - 1] = 'outline';
+  return { glyph: words.join('_'), style };
 }
 
 /** The glyph an Icon instance draws: its ligature text, else its child's name. */
@@ -710,7 +825,8 @@ export function mapRatio(n: IRNode, ctx: MapCtx, slot: Slot): JsxNode {
      ListItem has no definite height, so fit="height" collapses (rule 4d). */
   if (slot !== 'decorator') props.push(['fit', str(vertical ? 'height' : 'width')]);
   const imageFill = n.fills?.includes('image');
-  const content = (n.children ?? []).find((c) => /content slot/i.test(c.name));
+  /* "Content Slot" in older files; the live sets name it "Ratio Slot". */
+  const content = (n.children ?? []).find((c) => /content slot|ratio slot/i.test(c.name));
   const placeholder = isTrue(variantOf(n, 'Image Placeholder')) || (imageFill && !content);
   if (placeholder) props.push(['placeholder', yes]);
   const children: JsxNode[] = [];
@@ -784,9 +900,13 @@ export function mapChip(n: IRNode, ctx: MapCtx): JsxNode {
 export function mapTag(n: IRNode, ctx: MapCtx): JsxNode {
   const t = firstText(n);
   if (!t) return ctx.fallback(n, 'tag without a label');
-  const color = buttonColorFromMode(variantOf(n, 'Color')) ?? buttonColorFromMode(ctx.mode(n, 'Buttons'));
+  /* The live Tag set calls its palette axis Theme (Default · Primary … Error);
+     older files called it Color. */
+  const theme = buttonColorFromMode(variantOf(n, 'Theme'));
+  const color = buttonColorFromMode(variantOf(n, 'Color')) ?? (theme === 'default' ? undefined : theme) ?? buttonColorFromMode(ctx.mode(n, 'Buttons'));
   const props: Array<[string, PropValue]> = [];
   if (color && color !== 'black-white') props.push(['color', str(color)]);
+  if (/^fill$/i.test(variantOf(n, 'Fit') ?? '')) props.push(['width', str('fill')]);
   return el('Tag', withStyle(props, ctx.layoutStyle(n, { box: false })), [text(t.text!.content.trim())]);
 }
 
@@ -797,7 +917,9 @@ export function mapCard(n: IRNode, ctx: MapCtx): JsxNode {
   for (const u of mapped.unmapped) ctx.note(n, `variant ${u} not mapped`);
   const props: Array<[string, PropValue]> = [...mapped.props];
   const clickableState = variantOf(n, 'State');
-  if (clickableState && !/^non-clickable$/i.test(clickableState)) props.push(['clickable', yes]);
+  /* Drag is the live set's dragged state — `draggable`, from the table — not
+     a click target. */
+  if (clickableState && !/^(non-clickable|drag)$/i.test(clickableState)) props.push(['clickable', yes]);
   const ts = themeAndSurface(n.modes?.Theme, n.modes?.Surface);
   for (const p of ts.problems) ctx.note(n, p);
   if (ts.theme) props.push(['data-theme', str(ts.theme)]);
@@ -810,6 +932,10 @@ export function mapCard(n: IRNode, ctx: MapCtx): JsxNode {
   /* Collapse a lone content/slot frame — its children are the card's. */
   let kids = n.children ?? [];
   if (kids.length === 1 && /slot|content/i.test(kids[0].name)) kids = kids[0].children ?? [];
+  /* The live Card nests its slots: Card Container > Card Content >
+     [No Bleed Card Content, Padded Card Content]. The card's children are what
+     those slots hold, in that order. */
+  else if (kids.length === 1 && /^card container$/i.test(kids[0].name)) kids = cardSlotChildren(kids[0]);
   const children: JsxNode[] = [];
   for (const c of kids) {
     const k = ctx.compile(c, 'flow');
@@ -818,17 +944,41 @@ export function mapCard(n: IRNode, ctx: MapCtx): JsxNode {
   return el('Card', withStyle(stripDefaults('Card', props), ctx.layoutStyle(n, { box: true })), children);
 }
 
+/** The children of a live Card's slots, found under Card Container. */
+function cardSlotChildren(container: IRNode): IRNode[] {
+  const slots = findAll(container, (x) => /^(no bleed card content|padded card content)$/i.test(x.name));
+  if (!slots.length) return container.children ?? [];
+  return slots.flatMap((s) => s.children ?? []);
+}
+
 // ── List rows (rule 4d) ─────────────────────────────────────────────────────
 
-const START_SLOT = /^(beginning|start|left)[\s-]*slot$/i;
-const END_SLOT = /^(end|right)[\s-]*slot$/i;
+/* Older files: Beginning Slot / Text / End Slot as direct children. The live
+   List Item (2026-11): a Content frame holding Start Decorator / Text /
+   End Decorator (slots), plus Divider instances for its borders. */
+const START_SLOT = /^((beginning|start|left)[\s-]*slot|start decorator)$/i;
+const END_SLOT = /^((end|right)[\s-]*slot|end decorator)$/i;
 const TEXT_FRAME = /^text$/i;
+const isRowPart = (c: IRNode) => START_SLOT.test(c.name) || END_SLOT.test(c.name) || TEXT_FRAME.test(c.name);
+
+/** A row's slot and text frames — direct children, or the live set's Content frame's. */
+function rowParts(n: IRNode): { parts: IRNode[]; border: IRNode[] } {
+  const kids = n.children ?? [];
+  if (kids.some(isRowPart)) return { parts: kids, border: [] };
+  const content = kids.find((c) => /^content$/i.test(c.name) && (c.children ?? []).some(isRowPart));
+  if (!content) return { parts: kids, border: [] };
+  /* The border Dividers are the Bottom/Right Border booleans drawn — the
+     table reads those, so the layers themselves are not content. */
+  const border = kids.filter((c) => c !== content && /^divider$/i.test(c.name));
+  const rest = kids.filter((c) => c !== content && !border.includes(c));
+  return { parts: [...(content.children ?? []), ...rest], border };
+}
 
 /** True for an instance that IS a row: it has a start/text/end slot child. */
 export function isListRow(n: IRNode): boolean {
   const kind = kindOf(n);
   if (kind !== 'listItem' && kind !== 'list') return false;
-  return (n.children ?? []).some((c) => START_SLOT.test(c.name) || END_SLOT.test(c.name) || TEXT_FRAME.test(c.name));
+  return rowParts(n).parts.some(isRowPart);
 }
 
 /** Which ListItem prop a text layer feeds, from its type style. */
@@ -845,10 +995,11 @@ export function mapListItem(n: IRNode, ctx: MapCtx): JsxNode {
   const mapped = applyVariantTable('ListItem', n.props);
   for (const u of mapped.unmapped) ctx.note(n, `variant ${u} not mapped`);
   const props: Array<[string, PropValue]> = [];
-  const start = (n.children ?? []).find((c) => START_SLOT.test(c.name));
-  const end = (n.children ?? []).find((c) => END_SLOT.test(c.name));
-  const textFrame = (n.children ?? []).find((c) => TEXT_FRAME.test(c.name));
-  const other = (n.children ?? []).filter((c) => c !== start && c !== end && c !== textFrame);
+  const { parts } = rowParts(n);
+  const start = parts.find((c) => START_SLOT.test(c.name));
+  const end = parts.find((c) => END_SLOT.test(c.name));
+  const textFrame = parts.find((c) => TEXT_FRAME.test(c.name));
+  const other = parts.filter((c) => c !== start && c !== end && c !== textFrame);
   for (const o of other) ctx.note(o, `row layer "${o.name}" is not a slot or the text frame — not emitted`);
 
   /* Per-row algorithm (rule 4d): only THIS row's rendered text decides its
@@ -895,6 +1046,12 @@ export function mapListItem(n: IRNode, ctx: MapCtx): JsxNode {
   if (roles.secondary) props.push(['secondary', str(roles.secondary)]);
   if (!variantOf(n, 'Size')) props.push(['size', str(componentSize(n, ctx))]);
   props.push(...mapped.props);
+  /* The live set has no Type axis: an interaction State (anything but
+     Non-clickable) is what says the row is clickable. */
+  const rowState = variantOf(n, 'State');
+  if (variantOf(n, 'Type') === undefined && rowState && !/^non-clickable$/i.test(rowState) && !props.some(([k]) => k === 'clickable')) {
+    props.push(['clickable', yes]);
+  }
   /* rule 4d ROW SIZE — a FIXED row carries its height to the pixel. */
   const rowStyle: Array<[string, string | number]> = [];
   if (n.sizing?.v === 'FIXED' && n.box) rowStyle.push(['height', n.box.h]);

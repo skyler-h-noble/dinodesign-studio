@@ -1,0 +1,35 @@
+{
+ "about": "The same five omni-r5 states, page component only (no header or footer), wrapped in the app's providers — the scope that the 2026-11-06 prototype measured, so the two coverage numbers compare.",
+ "app": "~/omni-bench/omni-r5",
+ "router": "memory",
+ "viewport": { "name": "Desktop", "width": 1280, "height": 800 },
+ "mode": "light",
+ "wrap": [
+  { "module": "src/context/ToastContext.jsx", "export": "ToastProvider" },
+  { "module": "src/context/OrdersContext.jsx", "export": "OrdersProvider" },
+  { "module": "src/context/CartContext.jsx", "export": "CartProvider" }
+ ],
+ "states": [
+  { "name": "home", "route": "/", "routePattern": "/", "entry": { "module": "src/pages/Home.jsx" } },
+  { "name": "product", "route": "/p/linen-throw", "routePattern": "/p/:slug", "entry": { "module": "src/pages/Product.jsx" } },
+  {
+   "name": "cart-filled", "route": "/cart", "routePattern": "/cart", "entry": { "module": "src/pages/Cart.jsx" },
+   "localStorage": {
+    "goods-co-cart": [
+     { "id": "p1::-::-", "productId": "p1", "slug": "linen-throw", "name": "Linen Throw", "image": "https://picsum.photos/seed/omni-1/800/800", "price": 72, "qty": 1 },
+     { "id": "p2::-::-", "productId": "p2", "slug": "stoneware-vase", "name": "Stoneware Vase", "image": "https://picsum.photos/seed/omni-2/800/800", "price": 24, "qty": 2 },
+     { "id": "p3::-::-", "productId": "p3", "slug": "oak-side-table", "name": "Oak Side Table", "image": "https://picsum.photos/seed/omni-3/800/800", "price": 24, "qty": 1 }
+    ]
+   }
+  },
+  { "name": "cart-empty", "route": "/cart", "routePattern": "/cart", "entry": { "module": "src/pages/Cart.jsx" } },
+  {
+   "name": "checkout", "route": "/checkout", "routePattern": "/checkout", "entry": { "module": "src/pages/Checkout.jsx" },
+   "localStorage": {
+    "goods-co-cart": [
+     { "id": "p1::-::-", "productId": "p1", "slug": "linen-throw", "name": "Linen Throw", "image": "https://picsum.photos/seed/omni-1/800/800", "price": 72, "qty": 1 }
+    ]
+   }
+  }
+ ]
+}

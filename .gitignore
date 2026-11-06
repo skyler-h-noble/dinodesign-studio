@@ -28,3 +28,6 @@ dist-ssr
 
 # Bundled CLIP model for analyzeMoodboard (fetch via functions/scripts/fetch-clip-model.sh)
 functions/models/
+
+# code -> Figma runner output (scripts/code2figma/snapshot.mjs)
+code2figma-out/

@@ -131,6 +131,21 @@ export function buttonVariant(colorMode: string, shape: ButtonShape): string {
   return shape === 'outline' ? `${color}-outline` : color;
 }
 
+/**
+ * The inverse of buttonVariant, for code → Figma: a lib `variant` string → the
+ * Buttons mode and the Style shape. `buttonVariant(...split)` gives the input
+ * back for every variant the compiler emits (tested). Returns undefined for a
+ * string that is not one of those shapes.
+ */
+export function splitButtonVariant(variant: string): { colorMode: string; shape: ButtonShape } | undefined {
+  const v = variant.trim();
+  if (v === 'ghost') return { colorMode: 'default', shape: 'ghost' };
+  const m = /^(.+)-outline$/.exec(v);
+  if (m) return { colorMode: m[1], shape: 'outline' };
+  if (/^[a-z]+(-[a-z]+)?$/.test(v) && !/-(light|ghost|text)$/.test(v)) return { colorMode: v, shape: 'solid' };
+  return undefined;
+}
+
 /** True when the mapping drops information the design carried. */
 export function buttonVariantLosesColor(shape: ButtonShape, colorMode: string): boolean {
   return shape === 'ghost' && colorMode !== 'default';
