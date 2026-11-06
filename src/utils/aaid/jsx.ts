@@ -10,7 +10,11 @@ export type PropValue =
   | { kind: 'number'; value: number }
   | { kind: 'true' }
   | { kind: 'node'; value: JsxNode }
-  | { kind: 'style'; value: Array<[string, string | number]> };
+  | { kind: 'style'; value: Array<[string, string | number]> }
+  /** A data literal (arrays / plain objects of strings, numbers, booleans) — `items`, `navLinks`. Keys print in the order given. */
+  | { kind: 'json'; value: JsonValue };
+
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
 export interface JsxElement {
   kind: 'element';
@@ -54,6 +58,7 @@ export const yes: PropValue = { kind: 'true' };
 export const node = (value: JsxNode): PropValue => ({ kind: 'node', value });
 export const style = (value: Array<[string, string | number]>): PropValue => ({ kind: 'style', value });
 export const text = (value: string): JsxText => ({ kind: 'text', value });
+export const json = (value: JsonValue): PropValue => ({ kind: 'json', value });
 
 /** A literal from a table, as a PropValue. */
 export function lit(v: string | number | true): PropValue {

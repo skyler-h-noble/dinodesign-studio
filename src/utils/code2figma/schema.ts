@@ -90,6 +90,18 @@ export interface FrameNode extends Base {
   fill?: { variable: string };
   /** The span this frame takes in a GRID parent. */
   gridColumnSpan?: number;
+  /**
+   * The template set this frame stands for, built from that set's own parts
+   * (Breadcrumbs from .Breadcrumb-Segments + separators, Thumbnail Selector
+   * from Thumbnail instances) because the set has a fixed number of children.
+   * The plugin stamps it as `component` in the aaid note, so Figma → code
+   * reads the frame as that component.
+   */
+  composite?: string;
+  /** What the code said that has no Figma home (a block link's href). */
+  pluginData?: Record<string, string>;
+  /** Signature of the code a composite frame came from (round-trip test). */
+  code?: Signature;
   children: Node[];
 }
 
@@ -103,6 +115,12 @@ export interface InstanceNode extends Base {
   properties?: Record<string, boolean | string>;
   /** Text layers without a TEXT property, by role: the plugin finds the layer (see docs) and sets characters. */
   text?: Record<string, string>;
+  /** A text role whose layer takes another local text style than the template's ("label" → "Subtitle-Medium" on a Link). */
+  textStyles?: Record<string, string>;
+  /** Layers inside the instance to hide, by layer name (Footer's "SocialLinks" when the code has none). */
+  hidden?: string[];
+  /** A literal color that is user DATA, not a token (a Swatch's color): fill the named layer with it. */
+  colorFill?: { layer: string; color: string };
   /** Instances nested inside this one that need their own variant / text (icons in a button). */
   nested?: Array<{ role: string; node: InstanceNode }>;
   /** Children to append into a SLOT of the instance, by slot name. */

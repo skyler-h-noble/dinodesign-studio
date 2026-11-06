@@ -213,6 +213,18 @@ export const LIB_DEFAULTS: Record<string, Record<string, string | number | boole
   List: { size: 'medium', orientation: 'vertical', variant: 'default' },
   ListItem: { size: 'medium', variant: 'default' },
   Ratio: { ratio: '1:1', fit: 'width' },
+  /* Phase 4 */
+  Rating: { size: 'medium', color: 'default', precision: 1 },
+  Link: { textStyle: 'body' },
+  TextInput: { size: 'medium', labelPosition: 'standard', labelType: 'default' },
+  NumberField: { size: 'medium', labelPosition: 'top', variant: 'outlined', type: 'default' },
+  Select: { size: 'medium', labelPosition: 'top' },
+  Tabs: { orientation: 'horizontal', defaultValue: 0, overflow: 'none' },
+  Stepper: { orientation: 'horizontal', variant: 'count', activeStep: 0 },
+  Breadcrumbs: { separator: 'slanted' },
+  Swatch: { size: 'medium', fit: 'fixed' },
+  IconBadge: { color: 'primary', size: 'medium', variant: 'solid' },
+  ThumbnailSelector: { size: 'medium', orientation: 'horizontal', defaultValue: 0 },
 };
 
 // ── Variant tables (rule 0c: map EVERY variant) ─────────────────────────────
@@ -334,6 +346,135 @@ export const VARIANT_TABLES: Record<string, VariantRow[]> = {
   Box: [
     { figma: 'Radius', values: { none: null, small: ['radius', 'small'], medium: ['radius', 'medium'], large: ['radius', 'large'] } },
   ],
+
+  /* ── Phase 4 (2026-11-06): sets read from the live file, both directions ──
+     Props spelled with a leading `$` are DERIVED facts the mapper computes
+     (a star's fill from `value`, a step's status from `activeStep`); they
+     never reach code as a prop. Rows whose value is decided per instance by
+     the mapper (Rating Value, Tab Selector) keep `null` entries so the
+     spelling lives here. */
+
+  /* Rating: Value=Empty is `value` null / 0; the stars are Star instances in
+     the Star Slot (their Status says the value). */
+  Rating: [
+    { figma: 'Value', draw: 'Rated', values: { Rated: null, Empty: ['$empty', true] } },
+  ],
+  Star: [
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Status', draw: 'unselected', values: { unselected: null, selected: ['$fill', 'full'], isHalfFilled: ['$fill', 'half'] } },
+  ],
+  RatingField: [
+    { figma: 'Label', draw: 'label-top', values: { 'label-top': null, 'label-bottom': ['labelPosition', 'bottom'], none: null } },
+  ],
+  /* Link: one Hotlink text layer (Body-Medium unless textStyle says
+     otherwise). Hover / Pressed / Focus-Visible are runtime. */
+  Link: [
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Status', draw: 'Default', values: { Default: null, Visited: ['visited', true] } },
+  ],
+  /* TextInput / TextField → the Input Field set. Label=none is "no visible
+     label" (the label becomes the layer name / aria-label). */
+  TextInput: [
+    { figma: 'Label', draw: 'label-top', values: { 'label-top': null, 'label-left': ['labelPosition', 'left'], floating: ['labelPosition', 'floating'], none: null } },
+  ],
+  Input: [
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Type', draw: 'Default', values: { Default: null, 'Floating Label': ['labelPosition', 'floating'] } },
+    { figma: 'Validation', draw: 'false', values: { true: ['$validation', true], false: null } },
+  ],
+  InputContent: [
+    { figma: 'Content', draw: 'None', values: { None: null, Placeholder: ['$content', 'placeholder'], Value: ['$content', 'value'], Count: null, Swatch: null } },
+  ],
+  /* The label inside Input Field / NumberField / SelectField / RatingField.
+     labelType is TextInput's name for the marker; NumberField calls it `type`
+     (the mapper passes it as labelType). */
+  'Form-Label': [
+    { figma: 'Type', draw: 'default', values: { default: null, required: ['labelType', 'required'], optional: ['labelType', 'optional'] } },
+    { figma: 'Style', draw: 'Default', values: { Default: null, Quiet: null, Disabled: ['disabled', true] } },
+    { figma: 'More Info', draw: 'false', values: { false: null, true: ['$moreInfo', true] } },
+  ],
+  NumberField: [
+    { figma: 'Label', draw: 'label-top', values: { 'label-top': null, 'label-left': ['labelPosition', 'left'], floating: ['labelPosition', 'floating'], none: ['labelPosition', 'none'] } },
+  ],
+  Number: [
+    { figma: 'Type', draw: 'Outline', values: { Outline: null, Spinner: ['$type', 'spinner'], 'Floating-outline': ['$type', 'floating-outline'], 'Floating-Spinner': ['$type', 'floating-spinner'] } },
+  ],
+  /* Select → the SelectField set; its trigger is a nested Select instance. */
+  Select: [
+    { figma: 'Label', draw: 'label-top', values: { 'label-top': null, 'label-left': ['labelPosition', 'left'], none: ['labelPosition', 'none'], Floating: ['labelPosition', 'floating'] } },
+  ],
+  SelectTrigger: [
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Type', draw: 'Default', values: { Default: null, Floating: ['labelPosition', 'floating'] } },
+  ],
+  /* Tabs: the first and last Tab are fixed children of the set, the rest go
+     in the Tab Slot. The selected tab is the Tab's Selected boolean. */
+  Tabs: [
+    { figma: 'Orientation', draw: 'Horizontal', values: { Horizontal: null, 'Vertical-Left': ['orientation', 'vertical-left'], 'Vertical-Right': ['orientation', 'vertical-right'] } },
+    { figma: 'overflow', draw: 'None', values: { None: null, Scroll: ['overflow', 'scroll'], More: ['overflow', 'more'] } },
+    { figma: 'Baseline', draw: 'true', values: { true: null, false: ['$noBaseline', true] } },
+  ],
+  Tab: [
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Selector', draw: 'Bottom', values: { Bottom: null, Left: ['$orientation', 'vertical-left'], Right: ['$orientation', 'vertical-right'] } },
+    { figma: 'Selected', draw: 'false', values: { true: ['$selected', true], false: null } },
+  ],
+  /* Stepper: Count Step (count) or No-Count Step (noCount); the first and last
+     step are fixed children, the rest alternate with Step-Lines in the slot. */
+  Stepper: [
+    { figma: 'Orientation', draw: 'horizontal', values: { horizontal: null, vertical: ['orientation', 'vertical'] } },
+    { figma: 'Style', draw: 'count', values: { count: null, noCount: ['variant', 'noCount'] } },
+  ],
+  'Count Step': [
+    { figma: 'Status', draw: 'incomplete', values: { incomplete: null, current: ['$status', 'current'], complete: ['$status', 'complete'] } },
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+  ],
+  'No-Count Step': [
+    { figma: 'Status', draw: 'incomplete', values: { incomplete: null, current: ['$status', 'current'], complete: ['$status', 'complete'] } },
+    { figma: 'Orientation', draw: 'horizontal', values: { horizontal: null, vertical: ['$orientation', 'vertical'] } },
+  ],
+  'Step-Line': [
+    { figma: 'Status', draw: 'incomplete', values: { incomplete: null, complete: ['$status', 'complete'], 'incomplete-dashed': ['$status', 'incomplete-dashed'] } },
+    { figma: 'Orientation', draw: 'horizontal', values: { horizontal: null, vertical: ['$orientation', 'vertical'] } },
+  ],
+  Breadcrumbs: [
+    { figma: 'Layout', draw: 'Default', values: { Default: null, Condensed: ['condense', true] } },
+  ],
+  '.Breadcrumb-Segments': [
+    { figma: 'Type', draw: 'default', values: { default: null, current: ['$current', true] } },
+  ],
+  '.Breadcrumbs-separator': [
+    { figma: 'Shape', draw: 'slanted', values: { slanted: null, bar: ['separator', 'bar'], ellipsis: ['separator', 'ellipsis'], 'custom-icon': ['$customSeparator', true] } },
+  ],
+  /* Swatch: lib fit "fixed" (its own width) is Figma's Fit; "fill" is Fill.
+     Non-clickable = no onClick. */
+  Swatch: [
+    { figma: 'State', draw: 'Non-clickable', values: { 'Non-clickable': null, ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Fit', draw: 'Fit', values: { Fit: null, Fill: ['fit', 'fill'] } },
+    { figma: 'Mark', draw: 'Check', values: { Check: null, Radio: ['radio', true] } },
+    { figma: 'Selected', draw: 'false', values: { true: ['selected', true], false: null } },
+    { figma: 'Label', draw: 'true', values: { true: null, false: ['$noLabel', true] } },
+  ],
+  IconBadge: [
+    { figma: 'Background', draw: 'Tile', values: { Tile: null, Shape: ['$shape', true] } },
+  ],
+  /* ThumbnailSelector (lib 0.38): one Thumbnail per item, in a
+     Thumbnail Selector row / column. */
+  Thumbnail: [
+    { figma: 'Size', draw: 'Medium', values: { Small: ['size', 'small'], Medium: null, Large: ['size', 'large'] } },
+    { figma: 'State', draw: 'Default', values: { ...STATES_RUNTIME, Disabled: ['disabled', true] } },
+    { figma: 'Status', draw: 'Unselected', values: { Unselected: null, Selected: ['$selected', true] } },
+  ],
+  'Thumbnail Selector': [
+    { figma: 'Orientation', draw: 'Horizontal', values: { Horizontal: null, Vertical: ['orientation', 'vertical'] } },
+  ],
+  AppBar: [
+    { figma: 'Layout', draw: 'Left brand', values: { 'Left brand': null, 'Center Brand': ['layout', 'center-brand'], 'Title App Bar': ['layout', 'title'] } },
+    { figma: 'Menu', draw: 'true', values: { true: null, false: ['$noMenu', true] } },
+  ],
+  Footer: [
+    { figma: 'Copyright', draw: 'true', values: { true: null, false: ['$noCopyright', true] } },
+  ],
 };
 
 /**
@@ -437,7 +578,10 @@ export function isTrue(v: string | undefined): boolean {
 
 export type ComponentKind =
   | 'button' | 'checkbox' | 'divider' | 'ratio' | 'listItem' | 'list' | 'avatar'
-  | 'typography' | 'chip' | 'tag' | 'card' | 'icon' | 'box';
+  | 'typography' | 'chip' | 'tag' | 'card' | 'icon' | 'box'
+  /* Phase 4 — mapped in moreMappers.ts */
+  | 'rating' | 'link' | 'inputField' | 'numberField' | 'selectField' | 'tabs' | 'stepper' | 'breadcrumbs'
+  | 'swatch' | 'iconBadge' | 'thumbnailSelector' | 'appBar' | 'footer';
 
 export const COMPONENT_NAME_PATTERNS: Array<[RegExp, ComponentKind]> = [
   [/^button(-small|-large)?(-elevated)?$/, 'button'],
@@ -453,6 +597,19 @@ export const COMPONENT_NAME_PATTERNS: Array<[RegExp, ComponentKind]> = [
   [/^card$/, 'card'],
   [/^icon$/, 'icon'],
   [/^box$/, 'box'],
+  [/^rating(field)?$/, 'rating'],
+  [/^link$/, 'link'],
+  [/^input field$/, 'inputField'],
+  [/^numberfield$/, 'numberField'],
+  [/^selectfield$/, 'selectField'],
+  [/^tabs$/, 'tabs'],
+  [/^stepper$/, 'stepper'],
+  [/^breadcrumbs$/, 'breadcrumbs'],
+  [/^swatch$/, 'swatch'],
+  [/^iconbadge$/, 'iconBadge'],
+  [/^thumbnail selector$/, 'thumbnailSelector'],
+  [/^appbar$/, 'appBar'],
+  [/^footer$/, 'footer'],
 ];
 
 /** The kind for a component-set name (or a layer name when there is none). */
@@ -671,7 +828,7 @@ export function buttonColor(n: IRNode, ctx: MapCtx): (typeof BUTTON_COLORS)[numb
     ?? 'default';
 }
 
-function componentSize(n: IRNode, ctx: MapCtx): (typeof SIZES)[number] {
+export function componentSize(n: IRNode, ctx: MapCtx): (typeof SIZES)[number] {
   const v = variantOf(n, 'Size')?.toLowerCase();
   if (has(SIZES, v)) return v;
   const m = ctx.mode(n, 'Component-Size', COMPONENT_SIZE_DEFAULT).toLowerCase();

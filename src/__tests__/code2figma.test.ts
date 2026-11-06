@@ -14,8 +14,10 @@
  *   - phase 2: the mapper's layout, normalization and placeholder rules;
  *   - the acceptance test: code → IR → simulated Figma nodes → the existing
  *     Figma → code compiler → code, with the same components and props for
- *     every clean node — on a hand-written page and on two real omni-r5 states
- *     recorded by the runner (fixtures, so no bench app is needed here).
+ *     every clean node — on hand-written pages and on six real omni-r5 / omni-r7
+ *     page states recorded by the runner (fixtures, so no bench app is needed);
+ *   - phase 4: the tables for Rating, Link, the fields, Tabs, Stepper,
+ *     Breadcrumbs, Swatch, IconBadge, ThumbnailSelector, AppBar and Footer.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
@@ -31,7 +33,7 @@ import {
   invertVariantTable, normalizeStyleName,
 } from '../utils/aaid/propTables';
 import { buttonVariant, splitButtonVariant } from '../utils/figmaModeMapping';
-import { LIBRARY, findSet, hasVariantValue } from '../utils/code2figma/library';
+import { LIBRARY, findComponent, findSet, hasVariantValue } from '../utils/code2figma/library';
 import { createRecorder, mediaMatches, parseStyle, type RecordedNode } from '../utils/code2figma/record';
 import { mapRecorded, walkC2F } from '../utils/code2figma/mapper';
 import { irSignatures, irToFigmaNode, jsxSignatures } from '../utils/code2figma/roundTrip';
@@ -39,6 +41,8 @@ import type { C2FDocument, InstanceNode, Node, TextNode } from '../utils/code2fi
 
 type N = Record<string, any>;
 const ROOT = process.cwd();
+/** Page-only recordings (scripts/code2figma/specs/*.pages.omni-snapshots.json). */
+const FIXTURES = ['omni-r5-cart-filled', 'omni-r5-checkout', 'omni-r5-home', 'omni-r5-product', 'omni-r7-home', 'omni-r7-product'];
 const fixture = (f: string) => JSON.parse(fs.readFileSync(path.join(ROOT, 'src/__tests__/__fixtures__/code2figma', f), 'utf8'));
 
 const txt = (characters: string, extra: N = {}): N => ({ id: `t-${characters}`, name: characters, type: 'TEXT', characters, ...extra });
@@ -49,6 +53,12 @@ const inst = (component: string, variant: N = {}, extra: N = {}): N => ({ id: ex
 /** Table name → the live set it reads. */
 const TABLE_SET: Record<string, string> = {
   Button: 'Button', Checkbox: 'Checkbox', Divider: 'Divider', Avatar: 'Avatar', Chip: 'Chip', Card: 'Card', List: 'List', ListItem: 'List Item', Box: 'Box',
+  /* Phase 4 */
+  Rating: 'Rating', Star: 'Star', RatingField: 'RatingField', Link: 'Link', TextInput: 'Input Field', Input: 'Input', InputContent: 'InputContent',
+  'Form-Label': 'Form-Label', NumberField: 'NumberField', Number: 'Number', Select: 'SelectField', SelectTrigger: 'Select', Tabs: 'Tabs', Tab: 'Tab',
+  Stepper: 'Stepper', 'Count Step': 'Count Step', 'No-Count Step': 'No-Count Step', 'Step-Line': 'Step-Line', Breadcrumbs: 'Breadcrumbs',
+  '.Breadcrumb-Segments': '.Breadcrumb-Segments', '.Breadcrumbs-separator': '.Breadcrumbs-separator', Swatch: 'Swatch', IconBadge: 'IconBadge',
+  Thumbnail: 'Thumbnail', 'Thumbnail Selector': 'Thumbnail Selector', AppBar: 'AppBar', Footer: 'Footer',
 };
 
 /** Live axes no table reads yet — reported as unmapped notes, listed in docs/code-to-figma.md. */
@@ -63,9 +73,14 @@ describe('phase 0 — the tables against the live Figma capture', () => {
     expect(card.axes.Elevated.values.sort()).toEqual(['false', 'true']);
   });
 
+  it('every table has a row-set entry here (a new table must be checked against the live file)', () => {
+    expect(Object.keys(VARIANT_TABLES).sort()).toEqual(Object.keys(TABLE_SET).sort());
+  });
+
   for (const [table, setName] of Object.entries(TABLE_SET)) {
     it(`${table}: every drawn row's axis and default exist in the live "${setName}" set, and every live axis is read`, () => {
-      const set = findSet(setName)!;
+      /* Footer is a lone component (no variants), so only its properties count. */
+      const set: { axes: Record<string, { values: string[] }>; properties: Record<string, unknown> } = findSet(setName) ?? { axes: {}, properties: findComponent(setName)!.properties };
       expect(set).toBeTruthy();
       const rows = VARIANT_TABLES[table];
       for (const r of rows.filter((x) => x.draw !== undefined)) {
@@ -217,6 +232,9 @@ function fakeLib(): Record<string, unknown> {
     Body, Body1: Body, BodySmall: C('BodySmall'), Subtitle: C('Subtitle'), H2: C('H2'), DisplayLarge: C('DisplayLarge'), AutoHeading: C('AutoHeading'),
     Modal: C('Modal'), Tabs: C('Tabs'), TabList: C('TabList'), Tab: C('Tab'), TabPanel: C('TabPanel'), HeadingLevel: C('HeadingLevel'),
     StateMessage: C('StateMessage'), TextInput: C('TextInput'), OmniDesignProvider: C('OmniDesignProvider'),
+    Rating: C('Rating'), Link: C('Link'), TextField: C('TextField'), NumberField: C('NumberField'), Select: C('Select'), Stepper: C('Stepper'), Step: C('Step'),
+    Breadcrumbs: C('Breadcrumbs'), BreadcrumbItem: C('BreadcrumbItem'), Swatch: C('Swatch'), IconBadge: C('IconBadge'), ThumbnailSelector: C('ThumbnailSelector'),
+    AppBar: C('AppBar'), Footer: C('Footer'), Slider: C('Slider'),
     RATIO_NAMES: ['1:1'], useOmniDesign: () => { throw new Error('real hook needs the real provider'); }, shapePath: () => '',
   };
 }
@@ -351,15 +369,15 @@ describe('phase 2 — the mapper', () => {
   });
 
   it('a component with no Figma counterpart is a placeholder named for it; a set without a table says which set', () => {
-    const doc = map(record((L) => h(L.VStack, null, h(L.StateMessage, { title: 'Empty' }), h(L.TextInput, { label: 'Email' }))).nodes);
+    const doc = map(record((L) => h(L.VStack, null, h(L.StateMessage, { title: 'Empty' }), h(L.Slider, { label: 'Volume' }))).nodes);
     const [a, b] = (doc.root.children[0] as any).children;
     expect(a).toMatchObject({ kind: 'placeholder', name: 'StateMessage', status: 'unmapped' });
-    expect(b).toMatchObject({ kind: 'placeholder', status: 'needsTable', figmaSet: 'Input Field' });
-    expect(doc.placeholders.map((p) => p.source)).toEqual(['StateMessage', 'TextInput']);
+    expect(b).toMatchObject({ kind: 'placeholder', status: 'needsTable', figmaSet: 'Slider' });
+    expect(doc.placeholders.map((p) => p.source)).toEqual(['StateMessage', 'Slider']);
   });
 
   it('every variant value and mode the IR names exists in the live capture', () => {
-    for (const f of ['omni-r5-cart-filled.recorded.json', 'omni-r5-checkout.recorded.json', 'omni-r5-home.recorded.json']) {
+    for (const f of FIXTURES.map((x) => `${x}.recorded.json`)) {
       const doc = map(fixture(f));
       for (const n of all(doc)) {
         if (n.kind === 'instance') {
@@ -375,6 +393,126 @@ describe('phase 2 — the mapper', () => {
   it('is deterministic: the same recording maps to the same bytes', () => {
     const rec = fixture('omni-r5-cart-filled.recorded.json');
     expect(JSON.stringify(map(rec))).toBe(JSON.stringify(map(structuredClone(rec))));
+  });
+});
+
+// ── Phase 4: the tables that replaced the needs-table placeholders ─────────
+
+describe('phase 4 — code → Figma for the new tables', () => {
+  const one = (el: (L: any, icon: (n: string) => any) => React.ReactElement) => {
+    const doc = map(record(el).nodes);
+    return { doc, node: doc.root.children[0] as any };
+  };
+
+  it('Rating: five Stars in the Star Slot, filled the way the lib fills them; readOnly and the exact value in plugin data', () => {
+    const { node } = one((L) => h(L.Rating, { value: 3.7, precision: 0.5, readOnly: true, size: 'small' }));
+    expect(node).toMatchObject({ kind: 'instance', status: 'clean', component: { set: 'Rating' }, variant: { Value: 'Rated' }, modes: { 'Component-Size': 'small' } });
+    expect(node.slots['Star Slot'].map((s: InstanceNode) => s.variant.Status)).toEqual(['selected', 'selected', 'selected', 'isHalfFilled', 'unselected']);
+    expect(node.pluginData).toEqual({ readOnly: 'true', value: '3.7', precision: '0.5' });
+    expect(node.code).toEqual({ c: 'Rating', p: { value: 3.5, precision: 0.5, size: 'small' } });
+    const empty = one((L) => h(L.Rating, { value: null, label: 'Yours' })).node;
+    expect(empty).toMatchObject({ component: { set: 'RatingField' }, variant: { Label: 'label-top' }, text: { label: 'Yours' } });
+    expect(empty.nested[0].node.variant).toEqual({ Value: 'Empty' });
+  });
+
+  it('Link: inline text → the Link set; a block link → a frame around its content, href kept', () => {
+    const inline = one((L) => h(L.Link, { href: '/docs', textStyle: 'body-small', visited: true }, 'Docs')).node;
+    expect(inline).toMatchObject({ kind: 'instance', status: 'clean', variant: { State: 'Default', Status: 'Visited' }, text: { label: 'Docs' }, textStyles: { label: 'Body-Small' }, pluginData: { href: '/docs' } });
+    const block = one((L) => h(L.Link, { href: '/p/1', style: { textDecoration: 'none' } }, h(L.Subtitle, null, 'Linen Throw'))).node;
+    expect(block).toMatchObject({ kind: 'frame', name: 'Link', status: 'clean', pluginData: { href: '/p/1' }, layout: { mode: 'HORIZONTAL', counter: 'CENTER' } });
+    expect(block.children[0]).toMatchObject({ kind: 'text', textStyle: 'Subtitle-Medium' });
+    /* Without textDecoration: none the lib underlines the text inside — not drawn, so lossy. */
+    expect(one((L) => h(L.Link, { href: '/p/1', style: { display: 'block' } }, h(L.VStack, null, h(L.Body, null, 'x')))).node.status).toBe('lossy');
+  });
+
+  it('TextInput → Input Field with Form-Label, Input and InputContent parts; TextField normalized to the same', () => {
+    const { node } = one((L) => h(L.TextInput, { label: 'Email', labelType: 'required', placeholder: 'you@example.com', fullWidth: true, type: 'email' }));
+    expect(node).toMatchObject({ component: { set: 'Input Field' }, variant: { Label: 'label-top' }, text: { label: 'Email' }, sizing: { h: 'FILL' }, pluginData: { inputType: 'email' }, status: 'clean' });
+    expect(node.nested.map((x: any) => [x.role, x.node.component.set, x.node.variant])).toEqual([
+      ['label', 'Form-Label', { Style: 'Default', Type: 'required' }],
+      ['input', 'Input', { State: 'Default', Type: 'Default' }],
+      ['content', 'InputContent', { Content: 'Placeholder' }],
+    ]);
+    expect(node.nested[2].node.text).toEqual({ value: 'you@example.com' });
+    const { doc, node: tf } = one((L) => h(L.TextField, { label: 'Promo code', value: '' }));
+    expect(tf).toMatchObject({ component: { set: 'Input Field' }, sizing: { h: 'FILL' }, code: { c: 'TextInput' } });
+    expect(doc.normalizations.map((x) => x.message)[0]).toMatch(/^TextField drawn as Input Field/);
+  });
+
+  it('NumberField, Select: Label=none keeps the name as the layer and aria-label; the value / chosen option is the shown text', () => {
+    const nf = one((L) => h(L.NumberField, { label: 'Quantity for Linen Throw', labelPosition: 'none', value: 2, min: 1, max: 10 })).node;
+    expect(nf).toMatchObject({ name: 'Quantity for Linen Throw', variant: { Label: 'none' }, properties: { 'Helper Text': false }, pluginData: { ariaLabel: 'Quantity for Linen Throw', min: '1', max: '10' } });
+    expect(nf.nested[0].node).toMatchObject({ component: { set: 'Number' }, variant: { Type: 'Outline' }, text: { value: '2' } });
+    const sel = one((L) => h(L.Select, { label: 'Country', value: 'CA', options: [{ value: 'US', label: 'United States' }, { value: 'CA', label: 'Canada' }] })).node;
+    expect(sel.nested.map((x: any) => x.role)).toEqual(['label', 'select', 'content']);
+    expect(sel.nested[2].node).toMatchObject({ variant: { Content: 'Value' }, text: { value: 'Canada' } });
+  });
+
+  it('Tabs: first Tab, middle Tabs in the Tab Slot, last Tab; the active panel follows the bar', () => {
+    const { node } = one((L) => h(L.Tabs, { defaultValue: 'b' },
+      h(L.TabList, null, h(L.Tab, { value: 'a' }, 'A'), h(L.Tab, { value: 'b' }, 'B'), h(L.Tab, { value: 'c' }, 'C')),
+      h(L.TabPanel, { value: 'b' }, h(L.Body, null, 'Panel B'))));
+    expect(node).toMatchObject({ kind: 'frame', name: 'Tabs' });
+    const bar = node.children[0];
+    expect(bar).toMatchObject({ component: { set: 'Tabs' }, variant: { Orientation: 'Horizontal', overflow: 'None' }, properties: { Baseline: true } });
+    expect(bar.nested.map((x: any) => [x.role, x.node.text.label, x.node.properties.Selected])).toEqual([['first', 'A', false], ['last', 'C', false]]);
+    expect(bar.slots['Tab Slot'].map((t: any) => [t.text.label, t.properties.Selected])).toEqual([['B', true]]);
+    expect(node.children[1]).toMatchObject({ kind: 'text', characters: 'Panel B' });
+  });
+
+  it('Stepper: statuses from activeStep, Step-Lines between the steps', () => {
+    const { node } = one((L) => h(L.Stepper, { activeStep: 1 }, h(L.Step, { label: 'Cart' }), h(L.Step, { label: 'Ship' }), h(L.Step, { label: 'Pay' })));
+    expect(node.nested.map((x: any) => [x.role, x.node.variant.Status, x.node.text])).toEqual([
+      ['first', 'complete', { label: 'Cart', number: '1' }], ['last', 'incomplete', { label: 'Pay', number: '3' }],
+    ]);
+    expect(node.slots['Step Slot'].map((x: any) => `${x.component.set}:${x.variant.Status}`)).toEqual(['Step-Line:complete', 'Count Step:current', 'Step-Line:incomplete']);
+  });
+
+  it('Breadcrumbs and ThumbnailSelector: frames built from their sets\' parts, stamped as the component', () => {
+    const bc = one((L) => h(L.Breadcrumbs, null, h(L.BreadcrumbItem, { href: '/' }, 'Home'), h(L.Link, { href: '/c' }, 'Shop'), h(L.BodySmall, null, 'Throw'))).node;
+    expect(bc).toMatchObject({ kind: 'frame', composite: 'Breadcrumbs', layout: { mode: 'HORIZONTAL', itemSpacing: { px: 8, variable: 'Sizing-1' } } });
+    expect(bc.children.map((x: any) => `${x.component.set}:${Object.values(x.variant)[0]}`)).toEqual([
+      '.Breadcrumb-Segments:default', '.Breadcrumbs-separator:slanted', '.Breadcrumb-Segments:default', '.Breadcrumbs-separator:slanted', '.Breadcrumb-Segments:current',
+    ]);
+    const ts = one((L) => h(L.ThumbnailSelector, { 'aria-label': 'Product images', size: 'small', value: 1, items: [{ src: 'a.jpg', alt: 'Front' }, { src: 'b.jpg', alt: 'Back' }] })).node;
+    expect(ts).toMatchObject({ kind: 'frame', name: 'Product images', composite: 'Thumbnail Selector', layout: { mode: 'HORIZONTAL', wrap: true } });
+    expect(ts.children.map((x: any) => [x.name, x.variant.Size, x.variant.Status, x.image.src])).toEqual([['Front', 'Small', 'Unselected', 'a.jpg'], ['Back', 'Small', 'Selected', 'b.jpg']]);
+  });
+
+  it('Swatch, IconBadge: the swatch color is user data on its layer; the badge color is the Icons mode', () => {
+    const sw = one((L) => h(L.Swatch, { color: '#6f7a3a', label: 'Olive', selected: true, onClick: () => {} })).node;
+    expect(sw).toMatchObject({ variant: { State: 'Default', Fit: 'Fit', Mark: 'Check' }, properties: { Selected: true, Label: true }, colorFill: { layer: 'Color Swatch', color: '#6f7a3a' }, status: 'clean' });
+    const ib = one((L, icon) => h(L.IconBadge, { color: 'success' }, h(icon('Home')))).node;
+    expect(ib).toMatchObject({ variant: { Background: 'Tile' }, modes: { Icons: 'Success' }, status: 'clean' });
+    expect(one((L, icon) => h(L.IconBadge, { color: 'primary', variant: 'light' }, h(icon('Home')))).node.status).toBe('lossy');
+  });
+
+  it('AppBar and Footer: drawn from the set, lossy where it has no layer (brand, end slot)', () => {
+    const { node } = one((L) => h(L.AppBar, { brand: 'Acme', navLinks: [{ label: 'Shop', href: '/s' }, { label: 'About', href: '/a' }] }));
+    expect(node).toMatchObject({ component: { set: 'AppBar' }, variant: { Layout: 'Left brand' }, properties: { Menu: false }, status: 'lossy' });
+    expect(node.nested[0].node.nested.map((x: any) => x.node.text.label)).toEqual(['Shop', 'About']);
+    const ft = one((L) => h(L.Footer, { columns: [{ title: 'Shop', links: [{ label: 'All', href: '/all' }] }], copyrightName: 'Acme' })).node;
+    expect(ft).toMatchObject({ component: { set: 'Footer' }, properties: { Copyright: true }, hidden: ['Base'], text: { copyrightName: 'Acme' }, status: 'clean' });
+    expect(ft.slots.Slot[0].children[0]).toMatchObject({ kind: 'text', characters: 'Shop', textStyle: 'H4' });
+  });
+
+  it('a page of every new table round-trips: each clean node comes back with the same component and props', () => {
+    const doc = map(record((L, icon) => h(L.VStack, { spacing: 2 },
+      h(L.Rating, { value: 4.5, precision: 0.5, readOnly: true }),
+      h(L.Link, { href: '/docs' }, 'Read the docs'),
+      h(L.TextInput, { label: 'Email', placeholder: 'you@example.com', fullWidth: true }),
+      h(L.NumberField, { label: 'Quantity', value: 2, min: 1 }),
+      h(L.Select, { label: 'Country', options: ['Canada', 'France'], value: '' }),
+      h(L.Tabs, { defaultValue: 1 }, h(L.TabList, null, h(L.Tab, null, 'One'), h(L.Tab, null, 'Two'), h(L.Tab, null, 'Three'))),
+      h(L.Stepper, { activeStep: 2 }, h(L.Step, { label: 'A' }), h(L.Step, { label: 'B' }), h(L.Step, { label: 'C' }), h(L.Step, { label: 'D' })),
+      h(L.Breadcrumbs, null, h(L.BreadcrumbItem, { href: '/' }, 'Home'), h(L.BreadcrumbItem, null, 'Here')),
+      h(L.Swatch, { color: 'teal', label: 'Teal', selected: true }),
+      h(L.IconBadge, { color: 'secondary' }, h(icon('Park'))),
+      h(L.ThumbnailSelector, { 'aria-label': 'Views', items: [{ src: 'a', alt: 'A' }, { src: 'b', alt: 'B' }, { src: 'c', alt: 'C' }], defaultValue: 2 }))).nodes);
+    expect(doc.coverage.needsTable + doc.coverage.unmapped).toBe(0);
+    const { compiled, clean, compared } = assertRoundTrip(doc);
+    expect(clean).toBe(compared);
+    expect(compiled.report.fallbacks).toEqual([]);
   });
 });
 
@@ -424,9 +562,9 @@ describe('acceptance — code → IR → Figma nodes → Figma → code', () => 
     expect(compiled.code).toMatch(/<Card clickable elevated surface="Container">/);
   });
 
-  for (const state of ['cart-filled', 'checkout', 'home']) {
-    it(`omni-r5 ${state}, recorded by the runner: every clean node comes back with the same component and props`, () => {
-      const doc = map(fixture(`omni-r5-${state}.recorded.json`));
+  for (const name of FIXTURES) {
+    it(`${name}, recorded by the runner: every clean node comes back with the same component and props`, () => {
+      const doc = map(fixture(`${name}.recorded.json`));
       const { clean, compared } = assertRoundTrip(doc);
       expect(clean).toBeGreaterThan(10);
       expect(compared).toBeGreaterThanOrEqual(clean);

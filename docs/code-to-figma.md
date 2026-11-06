@@ -6,8 +6,9 @@ The studio already turns a Figma frame into code without a model (`src/utils/aai
 own copy of the Omni Figma template — the same components, variant values,
 variable modes and Sizing tokens the code used.
 
-Status, 2026-11-06: phases 0–2 are built. Phase 3 (the plugin command that builds
-the frames) is not; this document is written so it can be built from it.
+Status, 2026-11-06: phases 0–2 and phase 4 (the prop tables for the sets the
+first pass left as placeholders) are built. Phase 3 (the plugin command that
+builds the frames) is not; this document is written so it can be built from it.
 
 ```
 app code ──(1) runner──▶ recorded tree ──(2) mapper──▶ IR (JSON) ──(3) plugin──▶ Figma frames
@@ -20,13 +21,14 @@ app code ──(1) runner──▶ recorded tree ──(2) mapper──▶ IR (J
 | Piece | File |
 | --- | --- |
 | Runner (Node only, not in the browser bundle) | `scripts/code2figma/snapshot.mjs` |
-| Snapshot specs for the benchmark store | `scripts/code2figma/specs/omni-r5.omni-snapshots.json` (whole app), `omni-r5.pages.omni-snapshots.json` (page only) |
+| Snapshot specs for the benchmark store | `scripts/code2figma/specs/omni-r5.omni-snapshots.json` (whole app), `omni-r5.pages.omni-snapshots.json` (page only); the same pair for `omni-r7` (lib 0.38.1) |
 | Recording stand-ins | `src/utils/code2figma/record.ts` |
 | Mapper (recorded tree → IR) | `src/utils/code2figma/mapper.ts` |
 | IR types — the source of truth for this doc | `src/utils/code2figma/schema.ts` |
 | Live Figma vocabulary (captured 2026-11-06) | `src/utils/code2figma/figmaLibrary.live.json`, read through `library.ts` |
 | Round trip (IR → plugin node JSON, signatures) | `src/utils/code2figma/roundTrip.ts` |
-| Tests | `src/__tests__/code2figma.test.ts` |
+| Figma → code for the phase-4 sets | `src/utils/aaid/moreMappers.ts` (tables in `propTables.ts`) |
+| Tests | `src/__tests__/code2figma.test.ts`, `src/__tests__/aaidCompiler.test.ts` |
 
 The prop tables are not forked: the mapper reads `src/utils/aaid/propTables.ts`
 backwards. See [The tables run both ways](#the-tables-run-both-ways).
@@ -174,6 +176,8 @@ the template; the mapper reports them). Buttons modes are lower case
 | `layout.wrap` | `layoutWrap = 'WRAP'` |
 | `layout.columns`, `gridFallback` | GRID: 12 columns. Where Figma's grid auto-layout is not available, draw `gridFallback` (HORIZONTAL + wrap) with each child FIXED at `span / 12` of the content width minus gaps |
 | `gridColumnSpan` | On a child of a GRID frame: columns it spans at this viewport |
+| `composite` | The template set this frame stands for, built from that set's own parts because the set has a fixed number of children (`Breadcrumbs` from `.Breadcrumb-Segments` + `.Breadcrumbs-separator`; `Thumbnail Selector` from `Thumbnail`). Stamp it as `component` in the aaid note |
+| `pluginData` | What the code said that has no Figma home (a block link's `href`) |
 | `fill` | `{ variable: "Background" }`: bind the frame's fill. Absent = no fill |
 | `children` | Child nodes, in order |
 
@@ -204,6 +208,9 @@ How code becomes frames:
 | `slots` | `{ slotName: Node[] }`: children to append into a SLOT of the instance |
 | `image` | `{ src, alt?, scaleMode }`: image fill for an Avatar photo or a Ratio |
 | `pluginData` | What the code said that has no Figma home (`ariaLabel`, `href`) |
+| `textStyles` | A text role whose layer takes another local text style than the template's (`{ label: "Body-Small" }` on a Link) |
+| `hidden` | Layers inside the instance to hide, by layer name (Footer `Base`, `SocialLinks`; AppBar `Tab Holder`, `Right Content`) |
+| `colorFill` | `{ layer, color }`: a literal color that is user DATA, not a token — a Swatch's color on its `Color Swatch` layer |
 | `code` | Signature of the code it came from (`{c, p, t}`): informational, used by the round-trip test |
 
 What each mapped component draws (the Figma → code tables, inverted):
@@ -220,6 +227,19 @@ What each mapped component draws (the Figma → code tables, inverted):
 | `Ratio` | `Ratio - Fill Horizontal` (or `- Fill Vertical` for `fit="height"`) | `Ratio`; an `<img>` child → `image`; other children → slot `Ratio Slot` |
 | `List` | `List` | `clickable` → `Type`; `orientation`; rows → slot `List Slot` |
 | `ListItem` | `List Item` | `clickable` / `onClick` → `State=Default` (else `Non-clickable`), `disabled`, `selected`, `bottomBorder` / `rightBorder`; decorators → slots `Start Decorator` / `End Decorator`; `image` → `Image` |
+| `Rating` | `Rating` (in a `RatingField` when it has a `label`) | `Value` Rated / Empty; five `Star` instances in the `Star Slot`, `Status` selected / isHalfFilled / unselected the way the lib fills them (full when n ≤ value, half when precision is 0.5 and n − ½ ≤ value — 4.2 draws four); `disabled` → each Star `State=Disabled`; size → `Component-Size`; color → `Icons` mode. `readOnly`, the exact value and the precision go to `pluginData` |
+| `Link` | `Link` | inline text only: `disabled` → `State`, `visited` → `Status=Visited`; the text is the `label` role, a `textStyle` other than body is `textStyles.label`; `href` → `pluginData`. A link around anything else is a **block link**: a frame around its content (inline-flex row, or a column with `display: block`), `href` in `pluginData` — clean when the app turns the underline off, lossy when the lib's underline propagates into the text |
+| `TextInput`, `TextField` | `Input Field` | `labelPosition` → `Label` (no label → `none`); nested parts `label` (`Form-Label`: `labelType` → `Type`, disabled → `Style`), `input` (`Input`: `State`, `Type=Floating Label`, `Validation`, `Start Icon`, `End Decorator`), `content` (`InputContent`: `Content` Value / Placeholder / None with its text); `fullWidth` → FILL; size → `Component-Size`. TextField is normalized (it compiles back as TextInput); helperText and validation messages are lossy (no helper line in the set) |
+| `NumberField` | `NumberField` | `labelPosition` → `Label`; `Helper Text`; nested `label`, `number` (`Number` `Type` Outline / Spinner / Floating-…, the value as text). `labelPosition="none"` keeps the label as the layer name and `pluginData.ariaLabel` |
+| `Select` | `SelectField` | `Label`; nested `label`, `select` (`Select` `State`, `Type`), `content` (`InputContent`: the chosen option's label as Value, else the placeholder) |
+| `Tabs` (+ `TabList`, `Tab`) | `Tabs` | `Orientation`, `overflow`, `Baseline`; the first Tab is nested `first`, the last `last`, the rest go in the `Tab Slot`. Each `Tab`: `State`, `Selector` from the orientation, `Selected`, `Text`, decorators. The active panel is drawn after the bar in a column |
+| `Stepper` (+ `Step`) | `Stepper` | `Orientation`, `Style` count / noCount; steps are `Count Step` (or `No-Count Step`) — `first`, `last` and, in the `Step Slot`, `Step-Line`, step, `Step-Line` …; status from `activeStep`; labels and numbers as text roles |
+| `Breadcrumbs` (+ `BreadcrumbItem`, `Link`, text) | frame, `composite: "Breadcrumbs"` | `.Breadcrumb-Segments` (`Type=current` for the last) and `.Breadcrumbs-separator` (`Shape` from `separator`), `Sizing-1` apart; crumb `href`s in `pluginData` |
+| `Swatch` | `Swatch` | `State` (Non-clickable without onClick), `Fit`, `Mark`, `Selected`, `Label`; the color as `colorFill` |
+| `IconBadge` | `IconBadge` | `Background` Tile / Shape; color → `Icons` mode (the tile is bound to `Icons/Icon`); the icon nested. `variant` light / dark has no Figma form — lossy |
+| `ThumbnailSelector` | frame, `composite: "Thumbnail Selector"` | one `Thumbnail` per item (`Size`, `State`, `Status`), its image as `image`, the alt as the layer name; a row that wraps (`Sizing-1`) or a column |
+| `AppBar` | `AppBar` | `Layout`, `Menu` (off at or above `collapseAt`); navLinks as the nested `tabs` part. **Lossy**: the brand (the template's Brand is artwork), the App-Bar theme (no mode), and `centerSlot` / `endSlot` (no slot — their items are drawn beside the bar so nothing is lost) |
+| `Footer` | `Footer` (lone) | `Copyright`; link columns built into its `Slot` (H4 title + Link parts); `Base` / `SocialLinks` / `StayInTouc` hidden when the code has none; the subscribe title and the copyright name as text roles. **Lossy** with a `brand` (no brand row) or `socialLinks` (three fixed Brand-Icons) |
 | an icon (`@omni-design/icons/<Name>`) | `Icon` | `Style`: Default / Round (`…Rounded`) / Sharp (`…Sharp`); property `Icon name` = the ligature (`ChevronRightRounded` → `chevron_right`); inside `<Icon color size>`: modes `Icons` and `Icons & Avatars` |
 
 ### `text`
@@ -249,7 +269,13 @@ A labeled frame for what nothing in the template draws yet:
 `{ component, figmaSet?, reason, layout, children }`. `needsTable` placeholders
 name the template set that exists (`figmaSet`: `Input Field`, `Rating`, `Link` …)
 but has no prop table yet; `unmapped` ones have no Figma counterpart
-(`StateMessage`, `SearchField`, a raw `<button>`). Their children are mapped
+(`StateMessage`, `SearchField`, a raw `<button>`).
+
+A **part** — a Star, a Step-Line, a breadcrumb segment, a Form-Label, a tab
+inside an AppBar — is an instance the IR draws as PART of the component the code
+wrote. It is not counted on its own; the component is. (`source` is
+`part:<set>`.) A Tab or a Step the app wrote itself is counted, because the
+app's code has that node. Their children are mapped
 normally and drawn inside, so content is not lost.
 
 ### Example
@@ -300,7 +326,37 @@ Body, so the two numbers compare.
 
 ---
 
-## Results on omni-r5 (2026-11-06)
+## Results after phase 4 (2026-11-06)
+
+Strict counts normalized nodes as lossy. "Drawn" fell slightly where a
+placeholder's loose text became a component's own text role (a Tab label, a
+breadcrumb), and where crumbs became parts of one Breadcrumbs.
+
+**omni-r5, page only** — the prototype's scope (before → after):
+
+| State | Drawn | Clean | Lossy | Needs table | Unmapped | Strict before | Strict after |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Home | 186 | 184 | 2 | 0 | 0 | 89% | 98% |
+| Product | 111 | 105 | 2 | 0 | 4 | 72% | 94% |
+| Cart, 3 lines | 66 | 66 | 0 | 0 | 0 | 86% | 92% |
+| Cart, empty | 5 | 4 | 0 | 0 | 1 | 80% | 80% |
+| Checkout | 40 | 40 | 0 | 0 | 0 | 73% | 95% |
+| **All five** | **408** | **399** | **4** | **0** | **5** | **82%** | **95%** |
+
+**omni-r5, whole app**: 448 drawn, 424 clean, 14 lossy, 0 need a table, 10
+unmapped — strict 80% → **92%**. The lossy ten more than the page run are the
+AppBar and Footer on every state.
+
+**omni-r7 (lib 0.38.1), page only**: 397 drawn, 375 clean, 21 lossy, 0 need a
+table, 1 unmapped — strict 83% → **93%**. **Whole app**: 447 drawn, 410 clean,
+31 lossy, 6 unmapped — strict 81% → **90%**.
+
+What is left: unmapped `SearchField` (in the app bar), raw `<button>` (r5's
+hand-built thumbnails), `StateMessage`; lossy `line-through` prices (4 per app),
+r7's eight block links whose text the lib underlines, r7's IconBadge
+`variant="light"` (4), a VStack `divider`, and AppBar / Footer (brand, slots).
+
+## Results on omni-r5 before phase 4 (2026-11-06)
 
 **Page only** (`omni-r5.pages.omni-snapshots.json` — the prototype's scope):
 
@@ -447,6 +503,26 @@ library — library instances would bind to the library's variables.
    | Avatar | `initials` | the TEXT inside |
    | List Item | `eyebrow`, `title`, `secondary` | the three TEXT layers of `Content > Text`, in that order; hide the ones the IR does not give |
    | Checkbox | `label` | not in the set: draw a `Checkbox Field` (`Label=label-right`) holding the Checkbox, and put the label there |
+   | Link | `label` | the `Hotlink` TEXT; `textStyles.label` → set that local text style on it |
+   | Input Field, NumberField, SelectField, RatingField | `label` | the TEXT inside the `Form-Label` instance |
+   | NumberField | `helper` | the TEXT inside `Form-Helper` |
+   | InputContent, Number | `value` (`prefix`, `suffix`) | the `Component Name` TEXT (`prefix` / `suffix` layers) |
+   | Tab | `label` | `Typography Holder > Component Name` |
+   | Count Step / No-Count Step | `label`, `number` | the visible `Label` TEXT; the `Component Name` TEXT in the circle |
+   | .Breadcrumb-Segments | `label` | the TEXT in its `Hotlink` (Link) instance |
+   | Swatch | `label` | the `Label` TEXT |
+   | Footer | `subscribeTitle`, `subscribeBody`, `subscribeButton`, `copyrightName` | `Stay In Touch`, `Monthly updates…`, the Button's label; replace "Brand Name" in the Copyright TEXT |
+
+   **Nested roles of the phase-4 sets.** `first` / `last`: the first and last
+   fixed child of that set (`Tab` in Tabs, the step in `Step Holder`); `rating`:
+   the Rating in a RatingField; `label`: the `Form-Label`; `input`, `select`,
+   `number`: that instance inside the field; `content`: the `InputContent`
+   inside the `input` (or `select > Input`); `tabs`: the Tabs in the AppBar's
+   `Tab Holder`.
+
+   **`hidden`**: set `visible = false` on each named layer inside the
+   instance. **`colorFill`**: a solid paint of that color on the named layer
+   (literal by design — it is the user's data).
 
 5. `slots`: find the SLOT node by name inside the instance (`Padded Card
    Content`, `List Slot`, `Ratio Slot`, `Start Decorator` …) and append the
@@ -501,6 +577,65 @@ loop with the plugin simulated by `irToFigmaNode`.
 Show the IR's `coverage`, every `normalization` and every placeholder, plus
 anything the build itself could not do (a missing set, a drifted variant, a
 missing slot, a mode the file lacks, an image that did not load).
+
+---
+
+## Phase 4 — the prop tables (2026-11-06)
+
+Every table is a `VARIANT_TABLES` entry in `propTables.ts`, read forwards by
+Figma → code (`moreMappers.ts`) and backwards by code → Figma (`mapper.ts`).
+Props spelled with a leading `$` are DERIVED facts (a star's fill from `value`,
+a step's status from `activeStep`, a tab's Selector from the orientation) — the
+mapper turns them into the real prop, they are never emitted.
+
+| Table | Live set | Rows |
+| --- | --- | --- |
+| `Rating` · `Star` · `RatingField` | Rating · Star · RatingField | Value · State, Status · Label |
+| `Link` | Link | State, Status |
+| `TextInput` · `Input` · `InputContent` · `Form-Label` | Input Field · Input · InputContent · Form-Label | Label · State, Type, Validation · Content · Type, Style, More Info |
+| `NumberField` · `Number` | NumberField · Number | Label · Type |
+| `Select` · `SelectTrigger` | SelectField · Select | Label · State, Type |
+| `Tabs` · `Tab` | Tabs · Tab | Orientation, overflow, Baseline · State, Selector, Selected |
+| `Stepper` · `Count Step` · `No-Count Step` · `Step-Line` | same names | Orientation, Style · Status, State · Status, Orientation · Status, Orientation |
+| `Breadcrumbs` · `.Breadcrumb-Segments` · `.Breadcrumbs-separator` | same names | Layout · Type · Shape |
+| `Swatch` | Swatch | State, Fit, Mark, Selected, Label |
+| `IconBadge` | IconBadge | Background |
+| `Thumbnail` · `Thumbnail Selector` | same names (lib 0.38, added to the capture) | Size, State, Status · Orientation |
+| `AppBar` · `Footer` | AppBar · Footer (lone) | Layout, Menu · Copyright |
+
+Every row is tested both ways: `aaidCompiler.test.ts` compiles each value one at
+a time (and type-checks the phase-4 output against the lib's real types);
+`code2figma.test.ts` checks every drawn row against the live capture, maps each
+component from code, and round-trips a page of all of them plus three more
+recorded pages (r5 product, r7 home, r7 product).
+
+**Decisions worth knowing**
+
+- A block link (Link around a card or a heading) is a frame with the href in
+  plugin data, like Button / Card hrefs. It is clean when the app sets
+  `textDecoration: none`; otherwise the lib's underline propagates into every
+  text inside it and is not drawn, so it is lossy (r7's product cards).
+- A field in a stretching column fills it with or without `fullWidth` (the lib's
+  fields and Button are block-level / inline-flex with `width: auto`), so the
+  round trip compares what is drawn. This also applies to Button, whose clean
+  nodes in r5 / r7 product were affected.
+- What Figma does not carry comes back neutral and noted, never guessed: a
+  link's href (`href="#"`), a select's options (`options={[]}`), a swatch's
+  color, a thumbnail's image URL, a rating's `readOnly`.
+
+**Figma → code changes**: none to existing output. The golden snapshots are
+byte-identical. New: these sets compile where they used to be `unknown
+component` FALLBACKs, and the printer gained a data-literal prop kind (`items`,
+`navLinks`, `columns`).
+
+**Still placeholders** (no Figma counterpart): `SearchField`, `StateMessage`,
+raw `<button>`. Still needing a table: `TextArea`, `SwatchField`, `Autocomplete`,
+`LinkGroup`, `Table`, `Alert`, `Snackbar`, `Pagination`, `MobileAppBar`, dialogs,
+`ToggleButtonGroup`, `ButtonGroup`, sliders, progress, loaders, `Accordion`,
+form parts, `Switch`, `Radio`, `Tooltip`, `Popover`, `Fab`, `Badge`, `CodeBlock`,
+dates, `AvatarGroup`, `BottomNavigation`, menus, `SpeedDial`, `Sheet`,
+`TreeView`, `ImagePlaceholder`, `Copyright` (the `NEEDS_TABLE` list in
+`mapper.ts`).
 
 ---
 

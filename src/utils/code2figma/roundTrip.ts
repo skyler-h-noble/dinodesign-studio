@@ -42,7 +42,25 @@ const SIG_PROPS: Record<string, Record<string, string | number | boolean>> = {
   List: { clickable: false, orientation: 'vertical' },
   ListItem: { clickable: false, selected: false, disabled: false, secondary: '', eyebrow: '' },
   Icon: { glyph: '' },
+  /* Phase 4 */
+  Rating: { value: 0, precision: 1, size: 'medium', color: 'default', disabled: false, label: '', labelPosition: 'top' },
+  Link: { disabled: false, visited: false, textStyle: 'body' },
+  TextInput: { label: '', labelPosition: 'standard', labelType: 'default', placeholder: '', defaultValue: '', disabled: false, size: 'medium', fullWidth: false, validation: '' },
+  NumberField: { label: '', labelPosition: 'top', value: '', variant: 'outlined', size: 'medium', disabled: false, helperText: '', fullWidth: false, type: 'default' },
+  Select: { label: '', labelPosition: 'top', disabled: false, size: 'medium', fullWidth: false },
+  Tabs: { orientation: 'horizontal', value: 0 },
+  Stepper: { activeStep: 0, orientation: 'horizontal', variant: 'count' },
+  Breadcrumbs: {},
+  Swatch: { selected: false, disabled: false, fit: 'fixed', radio: false, size: 'medium', label: '' },
+  IconBadge: { color: 'primary', size: 'medium', glyph: '' },
+  ThumbnailSelector: { size: 'medium', orientation: 'horizontal', value: 0 },
+  AppBar: { layout: '' },
+  Footer: {},
 };
+
+/** Components whose signature already says everything inside them: the walk does not descend. */
+const LEAF_COMPONENTS = new Set(['Button', 'Chip', 'ListItem', 'Rating', 'Link', 'TextInput', 'NumberField', 'Select', 'Tabs', 'Stepper', 'Breadcrumbs', 'Swatch', 'IconBadge', 'ThumbnailSelector', 'AppBar', 'Footer']);
+const LEAF_SETS = new Set(['Button', 'Chip', 'List Item', 'Rating', 'RatingField', 'Link', 'Input Field', 'NumberField', 'SelectField', 'Tabs', 'Stepper', 'Swatch', 'IconBadge', 'AppBar', 'Footer']);
 const TYPOGRAPHY = new Set(Object.keys(EXPORT_TO_TEXT_STYLE));
 
 function plain(v: unknown): string | number | boolean | undefined {
@@ -79,6 +97,28 @@ export function codeSignature(component: string, props: Record<string, RecordedV
      image URL); the photo style is what survives. */
   if (component === 'Avatar' && typeof props.src === 'string') q.defaultPhoto = true;
   if (component === 'Button' && typeof props.contentType === 'string') q[props.contentType] = true;
+  /* Rating: the stars the lib DRAWS (full when n <= value, half when
+     precision is 0.5 and n - 0.5 <= value) — 4.2 draws four stars and comes
+     back as 4; precision survives only when a half star is drawn. The exact
+     value rides in plugin data. */
+  if (component === 'Rating') {
+    const raw = typeof props.value === 'number' ? props.value : typeof props.defaultValue === 'number' ? props.defaultValue : 0;
+    const v = Math.max(0, Math.min(5, raw));
+    const shown = props.precision === 0.5 ? Math.floor(v * 2) / 2 : Math.floor(v);
+    q.value = shown;
+    q.precision = shown % 1 ? 0.5 : 1;
+  }
+  /* TextInput: the field shows the value, or else the placeholder. */
+  if (component === 'TextInput') {
+    const value = props.value ?? props.defaultValue;
+    q.defaultValue = value === undefined || value === null ? '' : String(value);
+    if (q.defaultValue) delete q.placeholder;
+  }
+  /* A Link's textStyle that draws Body-Medium is the default. */
+  if (component === 'Link' && typeof props.textStyle === 'string') {
+    const exp = TEXT_STYLE_TO_EXPORT[normalizeStyleName(props.textStyle)];
+    q.textStyle = exp === 'Body' || !exp ? 'body' : normalizeStyleName(EXPORT_TO_TEXT_STYLE[exp] ?? props.textStyle);
+  }
   return signature(component, q, text);
 }
 
@@ -87,12 +127,42 @@ function propValue(v: PropValue): unknown {
     case 'string': return v.value;
     case 'number': return v.value;
     case 'true': return true;
+    case 'json': return v.value;
     default: return undefined;
   }
 }
 
 function jsxText(nodes: JsxNode[]): string {
   return nodes.map((n) => (n.kind === 'text' ? n.value : n.kind === 'element' && !n.tag.endsWith('Icon') ? jsxText(n.children) : '')).join('');
+}
+
+/** The phase-4 components whose emitted JSX spells a fact differently from the code's props. */
+function jsxSpecial(n: JsxElement, props: Record<string, unknown>): Signature | undefined {
+  const kids = n.children.filter((c): c is JsxElement => c.kind === 'element');
+  switch (n.tag) {
+    case 'Rating': return signature('Rating', { ...props, value: props.defaultValue ?? props.value ?? 0 });
+    case 'NumberField': return signature('NumberField', { ...props, value: props.defaultValue ?? props.value });
+    case 'Select': return signature('Select', props, String(props.defaultValue ?? props.placeholder ?? 'Select\u2026'));
+    case 'Tabs': {
+      const tabs = kids.flatMap((l) => l.children).filter((c): c is JsxElement => c.kind === 'element' && c.tag === 'Tab');
+      return signature('Tabs', { orientation: props.orientation, value: props.defaultValue ?? 0 }, tabs.map((t) => jsxText(t.children).trim()).join(' | '));
+    }
+    case 'Stepper': return signature('Stepper', props, kids.map((s) => String(Object.fromEntries(s.props.map(([k, v]) => [k, propValue(v)])).label ?? '')).join(' | '));
+    case 'Breadcrumbs': return signature('Breadcrumbs', {}, kids.map((c) => jsxText(c.children).trim()).join(' / '));
+    case 'IconBadge': {
+      const glyph = kids[0]?.tag.replace(/Icon$/, '');
+      return signature('IconBadge', { ...props, glyph });
+    }
+    case 'ThumbnailSelector': {
+      const items = Array.isArray(props.items) ? (props.items as Array<Record<string, unknown>>) : [];
+      return signature('ThumbnailSelector', { ...props, value: props.defaultValue ?? 0 }, items.map((i) => String(i.alt ?? '')).join(' | '));
+    }
+    case 'AppBar': {
+      const links = Array.isArray(props.navLinks) ? (props.navLinks as Array<Record<string, unknown>>) : [];
+      return signature('AppBar', props, links.map((l) => String(l.label ?? '')).join(' | '));
+    }
+    default: return undefined;
+  }
 }
 
 /** Signatures of the compiled JSX, pre-order, for the components the IR compares. */
@@ -106,11 +176,16 @@ export function jsxSignatures(root: JsxNode): Signature[] {
       out.push(signature('Icon', { glyph }));
       return;
     }
+    const special = jsxSpecial(n, props);
+    if (special) {
+      out.push(special);
+      return;
+    }
     if (n.tag in SIG_PROPS || TYPOGRAPHY.has(n.tag)) {
       const text = n.tag === 'Card' || n.tag === 'List' || n.tag === 'Ratio' ? undefined : jsxText(n.children);
       out.push(signature(n.tag, props, text));
     }
-    if (n.tag === 'ListItem' || n.tag === 'Button' || n.tag === 'Chip') return;
+    if (LEAF_COMPONENTS.has(n.tag)) return;
     for (const c of n.children) walk(c);
   };
   walk(root);
@@ -124,9 +199,14 @@ export function irSignatures(root: Node): Array<{ sig: Signature; status: string
     if (n.kind === 'instance' || n.kind === 'text') {
       if (n.code) out.push({ sig: n.code, status: n.status, id: n.id });
       if (n.kind === 'instance') {
-        if (n.component.set === 'List Item' || n.component.set === 'Button' || n.component.set === 'Chip') return;
+        if (LEAF_SETS.has(n.component.set)) return;
         for (const kids of Object.values(n.slots ?? {})) kids.forEach(walk);
       }
+      return;
+    }
+    /* A composite frame (Breadcrumbs, Thumbnail Selector) is one component. */
+    if (n.kind === 'frame' && n.composite) {
+      if (n.code) out.push({ sig: n.code, status: n.status, id: n.id });
       return;
     }
     if (n.kind === 'frame' || n.kind === 'placeholder') n.children.forEach(walk);
@@ -213,8 +293,86 @@ function instanceChildren(n: InstanceNode, conv: (x: Node) => any): any[] {
     case 'Tag':
     case 'Checkbox': return n.text?.label ? [text(`${n.id}:label`, 'Label', n.text.label)] : [];
     case 'Avatar': return n.text?.initials ? [text(`${n.id}:initials`, 'Initials', n.text.initials)] : [];
+    /* Phase 4 — the live layer structure each set has (read 2026-11-06). */
+    case 'Rating':
+      return [slot(`${n.id}:stars`, 'Star Slot', kids('Star Slot'))];
+    case 'RatingField':
+      return [formLabel(n, conv), ...(nested('rating') ? [conv(nested('rating')!)] : [])].filter(Boolean);
+    case 'Link':
+      return [text(`${n.id}:label`, 'Hotlink', n.text?.label ?? '', n.textStyles?.label ?? 'Body-Medium')];
+    case 'Input Field':
+    case 'NumberField':
+    case 'SelectField': {
+      const out: any[] = [formLabel(n, conv)].filter(Boolean);
+      for (const role of ['input', 'number', 'select']) {
+        const x = nested(role);
+        if (x) out.push(conv(x));
+      }
+      if (set === 'NumberField' && n.text?.helper) out.push({ id: `${n.id}:helper`, name: 'Form-Helper', type: 'INSTANCE', component: 'Form-Helper', variant: { Validation: 'none' }, children: [text(`${n.id}:helperText`, 'Input Help Text', n.text.helper, 'Legal')] });
+      return out;
+    }
+    case 'Input': {
+      const content = parentNested(n, 'content');
+      return [{ id: `${n.id}:frame`, name: 'Input/Default/Search', type: 'FRAME', children: [{ id: `${n.id}:inner`, name: 'Inner Frame', type: 'FRAME', children: [
+        ...(nested('start') ? [conv(nested('start')!)] : []),
+        ...(content ? [conv(content)] : []),
+        ...(n.slots?.['End Decorator Content'] ? [slot(`${n.id}:end`, 'End Decorator Content', kids('End Decorator Content'))] : []),
+      ] }] }];
+    }
+    case 'Select': {
+      const content = parentNested(n, 'content');
+      return content ? [{ id: `${n.id}:input`, name: 'Input', type: 'INSTANCE', component: 'Input', variant: { State: 'Default', Type: 'Default' }, children: [conv(content)] }] : [];
+    }
+    case 'InputContent':
+    case 'Number':
+      return n.text?.value ? [text(`${n.id}:value`, 'Component Name', n.text.value)] : [];
+    case 'Tabs':
+      return [
+        ...(nested('first') ? [conv(nested('first')!)] : []),
+        slot(`${n.id}:tabs`, 'Tab Slot', kids('Tab Slot')),
+        ...(nested('last') ? [conv(nested('last')!)] : []),
+      ];
+    case 'Tab':
+      return [...(nested('start') ? [conv(nested('start')!)] : []), ...(n.text?.label ? [text(`${n.id}:label`, 'Component Name', n.text.label)] : [])];
+    case 'Stepper':
+      return [{ id: `${n.id}:holder`, name: 'Step Holder', type: 'FRAME', children: [
+        ...(nested('first') ? [conv(nested('first')!)] : []),
+        slot(`${n.id}:steps`, 'Step Slot', kids('Step Slot')),
+        ...(nested('last') ? [conv(nested('last')!)] : []),
+      ] }];
+    case 'Count Step':
+    case 'No-Count Step':
+      return [
+        ...(n.text?.number ? [text(`${n.id}:number`, 'Component Name', n.text.number)] : []),
+        ...(n.text?.label ? [text(`${n.id}:label`, 'Label', n.text.label, 'Dynamic-Label')] : []),
+      ];
+    case '.Breadcrumb-Segments':
+      return [{ id: `${n.id}:link`, name: 'Hotlink', type: 'INSTANCE', component: 'Link', variant: { State: 'Default', Status: 'Default' }, children: [text(`${n.id}:label`, 'Hotlink', n.text?.label ?? '', 'Dynamic Body')] }];
+    case 'Swatch':
+      return [{ id: `${n.id}:color`, name: 'Color Swatch', type: 'FRAME', children: [] }, ...(n.text?.label ? [text(`${n.id}:label`, 'Label', n.text.label, 'Legal')] : [])];
+    case 'IconBadge':
+      return nested('icon') ? [conv(nested('icon')!)] : [];
+    case 'AppBar':
+      return nested('tabs') ? [{ id: `${n.id}:holder`, name: 'Tab Holder', type: 'FRAME', children: [conv(nested('tabs')!)] }] : [];
+    case 'Footer':
+      return [{ id: `${n.id}:frame`, name: 'Footer Frame', type: 'FRAME', children: [slot(`${n.id}:slot`, 'Slot', kids('Slot'))] }];
     default: return [];
   }
+}
+
+/** The Form-Label inside a field: its Type / Style from the nested part, the label text. */
+function formLabel(n: InstanceNode, conv: (x: Node) => any): any {
+  const part = n.nested?.find((x) => x.role === 'label')?.node;
+  if (!part || !n.text?.label) return undefined;
+  const fl = conv(part);
+  fl.children = [{ id: `${n.id}:labelFrame`, name: 'label', type: 'FRAME', children: [text(`${n.id}:labelText`, 'Label', n.text.label, 'Dynamic-Label')] }];
+  return fl;
+}
+
+/** Field parts are siblings in the IR's `nested` list; the plugin finds them inside one another. */
+const PARENT_OF = new WeakMap<InstanceNode, InstanceNode>();
+function parentNested(n: InstanceNode, role: string): InstanceNode | undefined {
+  return PARENT_OF.get(n)?.nested?.find((x) => x.role === role)?.node;
 }
 
 /** The plugin's enriched-tree JSON for an IR subtree (see the file comment). */
@@ -228,6 +386,7 @@ export function irToFigmaNode(n: Node): any {
       if (n.kind === 'frame' && n.fill) bound.fills = n.fill.variable;
       return {
         id: n.id, name: n.name, type: 'FRAME',
+        ...(n.kind === 'frame' && n.composite ? { component: n.composite } : {}),
         layout: frameNote(n.layout),
         ...modes, ...sizingKeys(n),
         ...(Object.keys(bound).length ? { boundVars: bound } : {}),
@@ -240,6 +399,7 @@ export function irToFigmaNode(n: Node): any {
     case 'image':
       return { id: n.id, name: n.name, type: 'RECTANGLE', fills: [{ type: 'IMAGE' }], ...sizingKeys(n) };
     case 'instance': {
+      for (const x of n.nested ?? []) PARENT_OF.set(x.node, n);
       const variant: Record<string, string> = { ...n.variant };
       for (const [k, v] of Object.entries(n.properties ?? {})) if (typeof v === 'boolean') variant[k] = String(v);
       return {

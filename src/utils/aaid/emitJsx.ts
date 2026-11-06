@@ -30,12 +30,16 @@
 // confident wrong answer with no marker, which is the worst outcome.
 
 import { IRIndex, subtreeSize, walkIR, type IRDocument, type IRNode } from './ir';
-import { el, LIB_MODULE, str, n as num, style as styleProp, type JsxElement, type JsxFallback, type JsxNode, type PropValue } from './jsx';
+import { el, LIB_MODULE, str, n as num, style as styleProp, type JsonValue, type JsxElement, type JsxFallback, type JsxNode, type PropValue } from './jsx';
 import {
   componentKindFromName, DETACHED_NAMES, elevationFromMode, isListRow, listProps, mapAvatar, mapButton, mapCard,
   mapCheckbox, mapChip, mapDivider, mapIcon, mapListItem, mapRatio, mapTag, mapTypography, paddingShorthand,
   spacing, themeAndSurface, applyVariantTable, type MapCtx, type Slot,
 } from './propTables';
+import {
+  mapAppBar, mapBreadcrumbs, mapFooter, mapIconBadge, mapInputField, mapLink, mapNumberField, mapRating, mapSelectField,
+  mapStepper, mapSwatch, mapTabs, mapThumbnailSelector,
+} from './moreMappers';
 
 // ── Report shapes ───────────────────────────────────────────────────────────
 
@@ -184,6 +188,19 @@ class Compiler implements MapCtx {
         case 'card': return mapCard(n, this);
         case 'icon': return mapIcon(n, this);
         case 'box': return this.container(n, true);
+        case 'rating': return mapRating(n, this);
+        case 'link': return mapLink(n, this);
+        case 'inputField': return mapInputField(n, this);
+        case 'numberField': return mapNumberField(n, this);
+        case 'selectField': return mapSelectField(n, this);
+        case 'tabs': return mapTabs(n, this);
+        case 'stepper': return mapStepper(n, this);
+        case 'breadcrumbs': return mapBreadcrumbs(n, this);
+        case 'swatch': return mapSwatch(n, this);
+        case 'iconBadge': return mapIconBadge(n, this);
+        case 'thumbnailSelector': return mapThumbnailSelector(n, this);
+        case 'appBar': return mapAppBar(n, this);
+        case 'footer': return mapFooter(n, this);
         case 'list':
         case 'listItem':
           if (isListRow(n)) return el('List', this.layoutStyleProps(n), [mapListItem(n, this)]);
@@ -409,6 +426,17 @@ function styleText(entries: Array<[string, string | number]>): string {
   return `{{ ${sorted.map(([k, v]) => `${k}: ${typeof v === 'number' ? String(v) : jsString(v)}`).join(', ')} }}`;
 }
 
+/** A data literal as JS source; object keys in the order given (the mapper fixes it). */
+function jsonText(v: JsonValue): string {
+  if (v === null) return 'null';
+  if (typeof v === 'string') return jsString(v);
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return `[${v.map(jsonText).join(', ')}]`;
+  const entries = Object.entries(v);
+  if (!entries.length) return '{}';
+  return `{ ${entries.map(([k, x]) => `${/^[A-Za-z_$][\w$]*$/.test(k) ? k : jsString(k)}: ${jsonText(x)}`).join(', ')} }`;
+}
+
 /** An attribute as lines (most are one line; a nested element may be several). */
 function attrLines(name: string, v: PropValue, indent: string): string[] {
   switch (v.kind) {
@@ -421,6 +449,11 @@ function attrLines(name: string, v: PropValue, indent: string): string[] {
       if (indent.length + one.length <= WIDTH) return [one];
       const sorted = [...v.value].sort((a, b) => byCodePoint(a[0], b[0]));
       return [`${name}={{`, ...sorted.map(([k, x]) => `${IND}${k}: ${typeof x === 'number' ? String(x) : jsString(x)},`), '}}'];
+    }
+    case 'json': {
+      const one = `${name}={${jsonText(v.value)}}`;
+      if (indent.length + one.length <= WIDTH || !Array.isArray(v.value)) return [one];
+      return [`${name}={[`, ...v.value.map((x) => `${IND}${jsonText(x)},`), ']}'];
     }
     case 'node': {
       if (v.value.kind === 'fallback') return [`${name}={null /* ${fallbackText(v.value)} */}`];

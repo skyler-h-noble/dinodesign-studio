@@ -1,0 +1,94 @@
+{
+ "about": "Snapshot spec for the omni-r7 benchmark store (Goods & Co, built on @omni-design/components 0.38.1). Each state is one Figma frame: the whole app (header, page, footer) at a route, with seeded storage, at a viewport. Format: docs/code-to-figma.md, 'The snapshot spec'.",
+ "app": "~/omni-bench/omni-r7",
+ "entry": {
+  "module": "src/App.jsx",
+  "export": "default"
+ },
+ "router": "memory",
+ "viewport": {
+  "name": "Desktop",
+  "width": 1280,
+  "height": 800
+ },
+ "mode": "light",
+ "states": [
+  {
+   "name": "home",
+   "route": "/",
+   "description": "Home, empty cart"
+  },
+  {
+   "name": "product",
+   "route": "/p/linen-throw",
+   "description": "Product page, default color and size selected"
+  },
+  {
+   "name": "cart-filled",
+   "route": "/cart",
+   "description": "Cart with 3 lines, no promo applied",
+   "localStorage": {
+    "goods-and-co:cart": [
+     {
+      "key": "p1::::",
+      "productId": "p1",
+      "slug": "linen-throw",
+      "name": "Linen Throw",
+      "image": "https://picsum.photos/seed/omni-1/800/800",
+      "price": 72,
+      "color": null,
+      "size": null,
+      "quantity": 1
+     },
+     {
+      "key": "p2::::",
+      "productId": "p2",
+      "slug": "stoneware-vase",
+      "name": "Stoneware Vase",
+      "image": "https://picsum.photos/seed/omni-2/800/800",
+      "price": 24,
+      "color": null,
+      "size": null,
+      "quantity": 2
+     },
+     {
+      "key": "p3::::",
+      "productId": "p3",
+      "slug": "oak-side-table",
+      "name": "Oak Side Table",
+      "image": "https://picsum.photos/seed/omni-3/800/800",
+      "price": 24,
+      "color": null,
+      "size": null,
+      "quantity": 1
+     }
+    ]
+   }
+  },
+  {
+   "name": "cart-empty",
+   "route": "/cart",
+   "description": "Empty cart"
+  },
+  {
+   "name": "checkout",
+   "route": "/checkout",
+   "description": "Checkout step 1, one item in the cart",
+   "localStorage": {
+    "goods-and-co:cart": [
+     {
+      "key": "p1::::",
+      "productId": "p1",
+      "slug": "linen-throw",
+      "name": "Linen Throw",
+      "image": "https://picsum.photos/seed/omni-1/800/800",
+      "price": 72,
+      "color": null,
+      "size": null,
+      "quantity": 1
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -32,7 +32,7 @@ import {
   BUTTON_COLORS, EXPORT_TO_TEXT_STYLE, LIB_DEFAULTS, RATIO_NAMES, SIZES, SIZING_TOKENS, SURFACES, TEXT_STYLE_TO_EXPORT, THEMES,
   iconGlyphFromComponent, invertVariantTable, normalizeStyleName, ratioName,
 } from '../aaid/propTables';
-import { LIBRARY, findComponent, findSet, hasTextStyle, hasVariantValue, propertyNames } from './library';
+import { LIBRARY, collectionModes, findComponent, findSet, hasTextStyle, hasVariantValue, propertyNames } from './library';
 import type { RecordedNode, RecordedValue } from './record';
 import { codeSignature, signature } from './roundTrip';
 import {
@@ -42,20 +42,23 @@ import {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+type Lib = Extract<RecordedNode, { kind: 'lib' }>;
+
 // ── Tables owned by this direction (no Figma → code counterpart yet) ────────
 
 /** Lib exports with a set in the template but no prop table yet → placeholder naming the set. */
 export const NEEDS_TABLE: Record<string, string> = {
-  TextInput: 'Input Field', TextArea: 'TextArea', NumberField: 'NumberField', Select: 'SelectField', Autocomplete: 'Input Field',
-  Rating: 'Rating', Link: 'Link', LinkGroup: 'HotlinkGroup', Tabs: 'Tabs', Tab: 'Tab', Stepper: 'Stepper', Step: 'Count Step',
-  Breadcrumbs: 'Breadcrumbs', BreadcrumbItem: '.Breadcrumb-Segments', Swatch: 'Swatch', SwatchField: 'SwatchField', Table: 'Data Table',
-  Alert: 'Alert', Snackbar: 'Snackbar', Pagination: 'Pagination Strip', AppBar: 'AppBar', DesktopAppBar: 'AppBar', MobileAppBar: 'AppBar',
+  TextArea: 'TextArea', SwatchField: 'SwatchField', Autocomplete: 'Input Field',
+  /* Parts drawn by their parent's table (Tabs, Stepper, Breadcrumbs); alone, a placeholder. */
+  Tab: 'Tab', Step: 'Count Step', BreadcrumbItem: '.Breadcrumb-Segments',
+  LinkGroup: 'HotlinkGroup', Table: 'Data Table',
+  Alert: 'Alert', Snackbar: 'Snackbar', Pagination: 'Pagination Strip', MobileAppBar: 'AppBar',
   Drawer: 'Drawer', Dialog: 'Dialog', AlertDialog: 'Dialog', FormDialog: 'Dialog', Modal: 'Modal', ToggleButtonGroup: 'ToggleButtonGroup', ButtonGroup: 'ButtonGroup',
   RangeSlider: 'Slider', Slider: 'Slider', SliderInput: 'SliderField', LinearProgress: 'Progress Bar', CircularProgress: 'ProgressRing',
   PageLoader: 'Fixed-Loader', Loader: 'Loader Styles', Accordion: 'Accordion Segment', AccordionGroup: 'Accordion Group',
   InputMessage: 'Form-Helper', FormHelper: 'Form-Helper', FormLabel: 'Form-Label', FieldGroup: 'Grouped Form Component',
   SwitchInput: 'Switch', Switch: 'Switch', Radio: 'Radio', RadioGroup: 'RadioField ', Tooltip: 'Tooltip', Popover: 'Popover',
-  IconBadge: 'IconBadge', Footer: 'Footer', Fab: 'FAB', Badge: 'Badge Counter', CodeBlock: 'CodeBlock', DatePicker: 'Day Cell',
+  Fab: 'FAB', Badge: 'Badge Counter', CodeBlock: 'CodeBlock', DatePicker: 'Day Cell',
   DayCell: 'Day Cell', AvatarGroup: 'Avatar Group', BottomNavigation: 'Nav-Bar', Menu: 'Menu Item', MenuItem: 'Menu Item',
   SpeedDial: 'SpeedDial', Sheet: 'Sheet', TreeView: 'TreeView', ImagePlaceholder: 'Image Placeholder', Copyright: 'Copyright',
 };
@@ -368,6 +371,19 @@ class Mapper {
       case 'Ratio': return this.ratio(n, parent, id, normalized);
       case 'List': return this.list(n, parent, id, normalized);
       case 'ListItem': return this.listItem(n, parent, id, normalized);
+      case 'Rating': case 'RatingInput': return this.rating(n, parent, id, normalized);
+      case 'Link': return this.link(n, parent, id, normalized);
+      case 'TextInput': case 'TextField': return this.inputField(n, name, parent, id, normalized);
+      case 'NumberField': return this.numberField(n, parent, id, normalized);
+      case 'Select': return this.select(n, parent, id, normalized);
+      case 'Tabs': return this.tabs(n, parent, id, normalized);
+      case 'Stepper': return this.stepper(n, parent, id, normalized);
+      case 'Breadcrumbs': return this.breadcrumbs(n, parent, id, normalized);
+      case 'Swatch': return this.swatch(n, parent, id, normalized);
+      case 'IconBadge': return this.iconBadge(n, parent, id, normalized);
+      case 'ThumbnailSelector': return this.thumbnailSelector(n, parent, id, normalized);
+      case 'AppBar': case 'DesktopAppBar': return this.appBar(n, parent, id, normalized);
+      case 'Footer': return this.footer(n, parent, id, normalized);
       case 'Icon': {
         const glyph = this.withSlots(n).find((c) => c.kind === 'icon');
         if (glyph && glyph.kind === 'icon') return this.icon(glyph.name, glyph.props, parent, id, n.props, normalized);
@@ -826,6 +842,10 @@ class Mapper {
       const s = this.sizing(this.styleOf(n), parent, false, notes);
       if (s) node.sizing = s;
     }
+    /* The lib's Button is inline-flex, so a stretching column fills it with or
+       without fullWidth; Figma → code reads that FILL back as fullWidth (rule
+       4f-3b). Compare what is drawn. */
+    if (node.sizing?.h === 'FILL' && node.code && !node.code.p.fullWidth && !code.iconOnly) node.code = { ...node.code, p: { ...node.code.p, fullWidth: true } };
     if (p.elevated === true) { notes.push('elevated: the live Button set has no elevation axis'); lossy = true; }
     const pd: Record<string, string> = {};
     if (label) pd.ariaLabel = label;
@@ -1050,6 +1070,664 @@ class Mapper {
     return this.done(node, notes, { lossy, normalized });
   }
 
+  // Phase 4 — the sets read from the live file on 2026-11-06 ----------------
+
+  /**
+   * An instance that is a PART of the component being mapped (a star, a step
+   * line, a breadcrumb segment): drawn, never counted on its own — the
+   * component it belongs to is the one node coverage counts.
+   */
+  private part(setName: string, id: string, name: string, table: string, code: Record<string, unknown>, extra: Partial<InstanceNode> = {}): InstanceNode {
+    const { variant, booleans } = this.variantFor(table, setName, code);
+    const node = this.instance(setName, id, name, `part:${setName}`, sortKeys(variant));
+    if (Object.keys(booleans).length) node.properties = { ...booleans };
+    Object.assign(node, extra);
+    return node;
+  }
+
+  /** A text layer that is part of a component's own drawing (not counted). */
+  private partText(id: string, characters: string, textStyle: string, name = characters.slice(0, 40)): TextNode {
+    return { id, name, kind: 'text', status: 'clean', source: 'part:text', characters, textStyle };
+  }
+
+  /** A frame that is part of a component's own drawing (not counted). */
+  private partFrame(id: string, name: string, layout: Layout, children: Node[]): FrameNode {
+    return { id, name, kind: 'frame', status: 'clean', source: 'part:frame', layout, children };
+  }
+
+  private sizeMode(p: Record<string, RecordedValue>, modes: Record<string, string>): void {
+    const size = str(p.size);
+    if (size && size !== 'medium' && has(SIZES, size)) modes['Component-Size'] = size;
+  }
+
+  private setModes(node: Node, modes: Record<string, string>): void {
+    if (Object.keys(modes).length) node.modes = { ...(node.modes ?? {}), ...modes };
+  }
+
+  /** Rating → Rating (Value + five Stars in the Star Slot); with a label, inside a RatingField. */
+  private rating(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const precision = p.precision === 0.5 ? 0.5 : 1;
+    const raw = typeof p.value === 'number' ? p.value : typeof p.defaultValue === 'number' ? p.defaultValue : null;
+    const v = raw === null ? 0 : Math.max(0, Math.min(5, raw));
+    /* What the lib draws: a star is full when its number is <= value, half
+       when precision is 0.5 and its half is <= value (Rating.js renderStar). */
+    const shown = precision === 0.5 ? Math.floor(v * 2) / 2 : Math.floor(v);
+    const disabled = p.disabled === true;
+    const stars = [0, 1, 2, 3, 4].map((i) => this.part('Star', `${id}.star.${i}`, 'Star', 'Star', {
+      disabled, $fill: i + 1 <= v ? 'full' : precision === 0.5 && i + 0.5 <= v ? 'half' : undefined,
+    }));
+    const label = p.label === undefined ? undefined : str(p.label);
+    if (p.label !== undefined && !label) { notes.push('label is not plain text — not drawn'); lossy = true; }
+    const inner = this.instance('Rating', label ? `${id}.rating` : id, 'Rating', n.name, sortKeys(this.variantFor('Rating', 'Rating', { $empty: !v }).variant));
+    inner.slots = { 'Star Slot': stars };
+    let node = inner;
+    if (label) {
+      node = this.instance('RatingField', id, label, n.name, sortKeys(this.variantFor('RatingField', 'RatingField', { labelPosition: p.labelPosition }).variant));
+      node.text = { label };
+      node.nested = [{ role: 'rating', node: inner }];
+    }
+    const modes = this.themeModes(p.theme, p.surface, notes) ?? {};
+    this.sizeMode(p, modes);
+    const color = str(p.color);
+    if (color && color !== 'default') {
+      if (collectionModes('Icons')?.includes(cap(color))) modes.Icons = cap(color);
+      else { notes.push(`color "${color}" has no Icons mode`); lossy = true; }
+    }
+    this.setModes(node, modes);
+    const pd: Record<string, string> = {};
+    if (p.readOnly === true) { pd.readOnly = 'true'; notes.push('readOnly is behavior (no hover, not focusable) — kept in plugin data'); }
+    if (raw !== null && raw !== shown) { pd.value = String(raw); notes.push(`value ${raw} draws as ${shown} stars (the lib fills by precision ${precision}); the exact value is kept in plugin data`); }
+    if (precision === 0.5) pd.precision = '0.5';
+    if (Object.keys(pd).length) node.pluginData = pd;
+    node.code = codeSignature('Rating', p, undefined);
+    const s = this.sizing(this.styleOf(n), parent, false, notes);
+    if (s) node.sizing = s;
+    if (this.restStyle(this.styleOf(n), [], notes)) lossy = true;
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /**
+   * Link. Inline text → the Link set (one Hotlink layer). Anything else is a
+   * BLOCK link — a wrapper around a card or a heading — which the Link set
+   * cannot hold: drawn as a frame around its content, href in plugin data.
+   */
+  private link(n: Lib, parent: Parent, id: string, normalized: string[]): Node {
+    const p = n.props;
+    const style = this.styleOf(n);
+    const notes: string[] = [];
+    let lossy = false;
+    const kids = this.withSlots(n).filter((c) => !(c.kind === 'text' && !c.text.trim()));
+    const href = str(p.href) ?? str(p.to);
+    const inline = kids.length > 0 && kids.every((c) => c.kind === 'text' || (c.kind === 'html' && INLINE_TAGS.has(c.tag) && c.children.every((x) => x.kind === 'text')));
+    if (inline) {
+      const label = textOf(kids).trim();
+      const { variant } = this.variantFor('Link', 'Link', { disabled: p.disabled === true, visited: p.visited === true });
+      const node = this.instance('Link', id, label, n.name, sortKeys(variant));
+      node.text = { label };
+      const ts = str(p.textStyle);
+      if (ts) {
+        const exp = TEXT_STYLE_TO_EXPORT[normalizeStyleName(ts)];
+        const ramp = exp ? EXPORT_TO_TEXT_STYLE[exp] : undefined;
+        if (!ramp) { notes.push(`textStyle "${ts}" is not in the Figma type ramp`); lossy = true; }
+        else if (ramp !== 'Body-Medium') node.textStyles = { label: ramp };
+      }
+      const color = str(p.color);
+      if (color && color !== 'primary') { notes.push(`color "${color}": the Link set draws the Hotlink color only`); lossy = true; }
+      const other = inlineParts(kids);
+      if (other.length) { notes.push(`inline ${[...new Set(other)].join(', ')} flattened into the link text`); lossy = true; }
+      if (href) node.pluginData = { href };
+      node.code = codeSignature('Link', p, label);
+      const s = this.sizing(style, parent, false, notes);
+      if (s) node.sizing = s;
+      if (this.restStyle(style, [], notes)) lossy = true;
+      return this.done(node, notes, { lossy, normalized });
+    }
+    /* Block link: the lib's <a> is inline-flex (a row, centered) unless the
+       app makes it a block. */
+    const display = style.display;
+    const column = display === 'block' || style.flexDirection === 'column';
+    const layout: Layout = column ? { mode: 'VERTICAL' } : { mode: 'HORIZONTAL', counter: 'CENTER' };
+    const self: Parent = column ? { direction: 'column', stretch: false, block: true } : { direction: 'row', stretch: false, block: false };
+    const node: FrameNode = { id, name: 'Link', kind: 'frame', status: 'clean', source: n.name, layout, children: [] };
+    notes.push('block link: the Link set draws one line of text — drawn as its content, href in plugin data');
+    if (href) node.pluginData = { href };
+    const deco = String(style.textDecoration ?? style.textDecorationLine ?? '');
+    if (!/^none\b/.test(deco)) { notes.push('the lib underlines every text inside a link (text-decoration propagates) — the underline is not drawn'); lossy = true; }
+    if (this.restStyle(style, ['display', 'textDecoration', 'flexDirection'], notes)) lossy = true;
+    const s = this.sizing(style, parent, column, notes);
+    if (s) node.sizing = s;
+    node.children = this.children(kids, self, id);
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  private formLabel(id: string, code: Record<string, unknown>): InstanceNode {
+    return this.part('Form-Label', id, 'Form-Label', 'Form-Label', code);
+  }
+
+  /** TextInput / TextField → Input Field (Form-Label + Input > InputContent). */
+  private inputField(n: Lib, name: string, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const style = this.styleOf(n);
+    const notes: string[] = [];
+    const norm = [...normalized];
+    let lossy = false;
+    const isField = name === 'TextField';
+    if (isField) norm.push('TextField drawn as Input Field — it compiles back as TextInput (the same field; TextField is its MUI-markup sibling)');
+    const label = p.label === undefined ? undefined : str(p.label);
+    if (p.label !== undefined && !label) { notes.push('label is not plain text — not drawn'); lossy = true; }
+    const lp = isField ? 'standard' : str(p.labelPosition) ?? 'standard';
+    const { variant } = this.variantFor('TextInput', 'Input Field', { labelPosition: lp });
+    if (!label) variant.Label = 'none';
+    const node = this.instance('Input Field', id, label ?? str(p['aria-label']) ?? 'Input Field', n.name, sortKeys(variant));
+    const disabled = p.disabled === true;
+    const validation = str(p.validation) ?? (p.error === true ? 'error' : undefined);
+    const nested: NonNullable<InstanceNode['nested']> = [];
+    if (label) {
+      node.text = { label };
+      nested.push({ role: 'label', node: this.formLabel(`${id}.label`, { labelType: p.labelType, disabled }) });
+    }
+    const input = this.part('Input', `${id}.input`, 'Input', 'Input', { disabled, labelPosition: lp, $validation: !!validation });
+    const start = this.decorator(n.slots?.startAdornment, 'start', notes);
+    input.properties = { ...(input.properties ?? {}), 'Start Icon': start?.kind === 'icon', 'End Decorator': !!n.slots?.endAdornment };
+    if (start?.nested) input.nested = [start.nested];
+    if (start && start.kind !== 'icon') { notes.push('startAdornment that is not an icon — not drawn'); lossy = true; }
+    if (n.slots?.endAdornment) input.slots = { 'End Decorator Content': this.children(n.slots.endAdornment, { direction: 'row', stretch: false, block: false }, `${id}.end`) };
+    nested.push({ role: 'input', node: input });
+    const value = str(p.value) ?? str(p.defaultValue);
+    const placeholder = str(p.placeholder);
+    const shown = value ? value : placeholder;
+    const content = this.part('InputContent', `${id}.content`, 'InputContent', 'InputContent', { $content: value ? 'value' : placeholder ? 'placeholder' : undefined });
+    content.properties = { ...(content.properties ?? {}), Prefix: p.prefix !== undefined, Suffix: p.suffix !== undefined };
+    const ctext: Record<string, string> = {};
+    if (shown) ctext.value = shown;
+    if (str(p.prefix)) ctext.prefix = str(p.prefix)!;
+    if (str(p.suffix)) ctext.suffix = str(p.suffix)!;
+    if (Object.keys(ctext).length) content.text = ctext;
+    nested.push({ role: 'content', node: content });
+    node.nested = nested;
+    if (p.helperText !== undefined && p.helperText !== '') { notes.push('helperText: the Input Field set has no helper line'); lossy = true; }
+    const message = str(p.validationMessage) ?? str(p.errorMessage);
+    if (message) { notes.push('validation message: drawn as the Validation edge only (Validation Frame not wired)'); lossy = true; }
+    if (validation && validation !== 'error') { notes.push(`validation "${validation}": the Input's Validation boolean draws the error edge`); lossy = true; }
+    if (p.multiline === true) { notes.push('multiline: the TextArea set is not mapped — drawn as one line'); lossy = true; }
+    const pd: Record<string, string> = {};
+    if (str(p.type) && p.type !== 'text') pd.inputType = String(p.type);
+    if (!label && str(p['aria-label'])) pd.ariaLabel = String(p['aria-label']);
+    if (Object.keys(pd).length) node.pluginData = pd;
+    const modes: Record<string, string> = {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    const fullWidth = isField ? p.fullWidth !== false : p.fullWidth === true;
+    const s = this.sizing(style, parent, false, notes) ?? {};
+    if (fullWidth) s.h = 'FILL';
+    if (Object.keys(s).length) node.sizing = s;
+    if (this.restStyle(style, [], notes)) lossy = true;
+    /* The lib's fields are block-level (width: auto), so a stretching column
+       fills them with or without fullWidth — what is compared is what is drawn. */
+    node.code = codeSignature('TextInput', { ...p, labelPosition: lp, fullWidth: node.sizing?.h === 'FILL', ...(validation ? { validation } : {}) }, undefined);
+    return this.done(node, notes, { lossy, normalized: norm });
+  }
+
+  /** NumberField → NumberField (Form-Label + Number + Form-Helper). */
+  private numberField(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const style = this.styleOf(n);
+    const notes: string[] = [];
+    let lossy = false;
+    const label = p.label === undefined ? undefined : str(p.label);
+    if (p.label !== undefined && !label) { notes.push('label is not plain text — not drawn'); lossy = true; }
+    const lp = str(p.labelPosition) ?? 'top';
+    const { variant, booleans } = this.variantFor('NumberField', 'NumberField', { labelPosition: lp });
+    if (!label) variant.Label = 'none';
+    const node = this.instance('NumberField', id, label ?? 'NumberField', n.name, sortKeys(variant));
+    const helper = str(p.helperText);
+    node.properties = { ...booleans, 'Helper Text': !!helper };
+    const text: Record<string, string> = {};
+    const nested: NonNullable<InstanceNode['nested']> = [];
+    if (label && lp !== 'none') {
+      text.label = label;
+      nested.push({ role: 'label', node: this.formLabel(`${id}.label`, { labelType: p.type, disabled: p.disabled === true }) });
+    }
+    if (helper) text.helper = helper;
+    if (Object.keys(text).length) node.text = text;
+    const value = typeof p.value === 'number' ? p.value : typeof p.defaultValue === 'number' ? p.defaultValue : 0;
+    const type = `${lp === 'floating' ? 'floating-' : ''}${p.variant === 'spinner' ? 'spinner' : 'outline'}`;
+    nested.push({ role: 'number', node: this.part('Number', `${id}.number`, 'Number', 'Number', { $type: type === 'outline' ? undefined : type }, { text: { value: String(value) } }) });
+    node.nested = nested;
+    if (p.disabled === true) { notes.push('disabled: the Number set has no State axis'); lossy = true; }
+    if (p.validation !== undefined) { notes.push('validation: not drawn on NumberField'); lossy = true; }
+    const pd: Record<string, string> = {};
+    if (label && lp === 'none') pd.ariaLabel = label;
+    for (const k of ['min', 'max', 'step']) if (typeof p[k] === 'number') pd[k] = String(p[k]);
+    if (Object.keys(pd).length) node.pluginData = pd;
+    const modes: Record<string, string> = {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    const s = this.sizing(style, parent, false, notes) ?? {};
+    if (p.fullWidth === true) s.h = 'FILL';
+    if (Object.keys(s).length) node.sizing = s;
+    if (this.restStyle(style, [], notes)) lossy = true;
+    node.code = codeSignature('NumberField', { ...p, value, fullWidth: node.sizing?.h === 'FILL' }, undefined);
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /** Select → SelectField (Form-Label + Select > Input > InputContent). */
+  private select(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const style = this.styleOf(n);
+    const notes: string[] = [];
+    let lossy = false;
+    const label = p.label === undefined ? undefined : str(p.label);
+    if (p.label !== undefined && !label) { notes.push('label is not plain text — not drawn'); lossy = true; }
+    const lp = str(p.labelPosition) ?? 'top';
+    const { variant } = this.variantFor('Select', 'SelectField', { labelPosition: lp });
+    if (!label) variant.Label = 'none';
+    const node = this.instance('SelectField', id, label ?? 'Select', n.name, sortKeys(variant));
+    const nested: NonNullable<InstanceNode['nested']> = [];
+    if (label && lp !== 'none') {
+      node.text = { label };
+      nested.push({ role: 'label', node: this.formLabel(`${id}.label`, { disabled: p.disabled === true }) });
+    }
+    nested.push({ role: 'select', node: this.part('Select', `${id}.select`, 'Select', 'SelectTrigger', { disabled: p.disabled === true, labelPosition: lp }) });
+    const options = Array.isArray(p.options) ? p.options : [];
+    const flat = options.flatMap((o) => (isObj(o) && Array.isArray(o.options) ? o.options : [o]));
+    const current = p.value ?? p.defaultValue;
+    const hit = flat.find((o) => (isObj(o) ? o.value === current : o === current));
+    const chosen = current !== undefined && current !== '' && hit !== undefined ? (isObj(hit) ? str(hit.label) ?? str(hit.value) : str(hit)) : undefined;
+    const shown = chosen ?? str(p.placeholder) ?? 'Select…';
+    nested.push({ role: 'content', node: this.part('InputContent', `${id}.content`, 'InputContent', 'InputContent', { $content: chosen ? 'value' : 'placeholder' }, { text: { value: shown } }) });
+    node.nested = nested;
+    if (p.mode === 'color' || n.slots?.startDecoration) { notes.push('color mode / start decoration not drawn'); lossy = true; }
+    const pd: Record<string, string> = { options: String(flat.length) };
+    if (label && lp === 'none') pd.ariaLabel = label;
+    node.pluginData = pd;
+    const modes: Record<string, string> = {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    const s = this.sizing(style, parent, false, notes) ?? {};
+    if (p.fullWidth === true) s.h = 'FILL';
+    if (Object.keys(s).length) node.sizing = s;
+    if (this.restStyle(style, [], notes)) lossy = true;
+    node.code = codeSignature('Select', { ...p, labelPosition: lp, fullWidth: node.sizing?.h === 'FILL' }, shown);
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /** One Tab, counted on its own (a Tab is a lib export the app wrote). */
+  private tab(t: Lib, orientation: string, id: string, label?: string): InstanceNode {
+    const tp = t.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const { variant, booleans } = this.variantFor('Tab', 'Tab', { disabled: tp.disabled === true, $orientation: orientation, $selected: tp.$selected === true });
+    const text = label ?? textOf(t.children).trim();
+    const node = this.instance('Tab', id, text || str(tp['aria-label']) || 'Tab', t.name, sortKeys(variant));
+    const start = this.decorator(t.slots?.startDecorator, 'start', notes);
+    const end = this.decorator(t.slots?.endDecorator, 'end', notes);
+    node.properties = {
+      ...booleans, Text: tp.iconOnly !== true && !!text,
+      'Start Icon': start?.kind === 'icon', 'Start Avatar': start?.kind === 'avatar', 'End Icon': end?.kind === 'icon', 'End Avatar': end?.kind === 'avatar',
+    };
+    if (text && tp.iconOnly !== true) node.text = { label: text };
+    const nested = [start?.nested, end?.nested].filter(Boolean) as NonNullable<InstanceNode['nested']>;
+    if (nested.length) node.nested = nested;
+    if (start?.kind === 'other' || end?.kind === 'other') lossy = true;
+    if (str(tp.href)) node.pluginData = { href: String(tp.href) };
+    return this.done(node, notes, { lossy });
+  }
+
+  /** The first / slot / last arrangement Tabs and Stepper share. */
+  private firstSlotLast<T extends Node>(items: T[], slotItems: Node[], slotName: string, node: InstanceNode, notes: string[]): boolean {
+    if (!items.length) return true;
+    node.nested = [{ role: 'first', node: items[0] as unknown as InstanceNode }];
+    if (items.length > 1) node.nested.push({ role: 'last', node: items[items.length - 1] as unknown as InstanceNode });
+    node.slots = { [slotName]: slotItems };
+    if (items.length < 2) { notes.push(`one item: the template's last ${items[0].kind === 'instance' ? (items[0] as unknown as InstanceNode).component.set : ''} layer stays visible`); return true; }
+    return false;
+  }
+
+  /** Tabs → the Tabs set (first Tab, Tab Slot, last Tab); the active panel follows it. */
+  private tabs(n: Lib, parent: Parent, id: string, normalized: string[]): Node {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const kids = this.withSlots(n);
+    const lists = kids.filter((c): c is Lib => c.kind === 'lib' && this.canon(c) === 'TabList');
+    const tabNodes = lists.flatMap((l) => l.children.filter((c): c is Lib => c.kind === 'lib' && this.canon(c) === 'Tab'));
+    const panels = kids.filter((c) => !lists.includes(c as Lib));
+    const o = str(p.orientation) ?? 'horizontal';
+    const orientation = o === 'vertical' ? 'vertical-right' : o;
+    const overflow = str(p.overflow) ?? (p.scrollable === true ? 'scroll' : undefined);
+    const { variant, booleans } = this.variantFor('Tabs', 'Tabs', { orientation, overflow, $noBaseline: p.baseline === false });
+    const wrapped = panels.some((c) => !(c.kind === 'text' && !c.text.trim()));
+    const iid = wrapped ? `${id}.0` : id;
+    const node = this.instance('Tabs', iid, 'Tabs', n.name, sortKeys(variant));
+    node.properties = { ...booleans };
+    const tabs = tabNodes.map((t, i) => this.tab(t, orientation, i === 0 ? `${iid}.first` : i === tabNodes.length - 1 ? `${iid}.last` : `${iid}.slot.${i - 1}`));
+    if (this.firstSlotLast(tabs, tabs.slice(1, -1), 'Tab Slot', node, notes)) lossy = true;
+    const selected = Math.max(0, tabNodes.findIndex((t) => t.props.$selected === true));
+    const tv = str(p.variant);
+    if (tv && tv !== 'standard') { notes.push(`variant "${tv}": the Tabs set draws the standard indicator only`); lossy = true; }
+    if (str(p.color) && p.color !== 'default') { notes.push(`color "${String(p.color)}": no verified Figma mode for the indicator color`); lossy = true; }
+    if (p.navigation === true) node.pluginData = { navigation: 'true' };
+    const modes: Record<string, string> = {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    if (!orientation.startsWith('vertical')) node.sizing = { h: 'FILL' };
+    node.code = signature('Tabs', { orientation, value: selected }, tabNodes.map((t) => textOf(t.children).trim()).join(' | '));
+    const done = this.done(node, notes, { lossy, normalized });
+    if (!wrapped) return done;
+    /* The panel is a sibling of the tab bar in Figma: a column holding both,
+       counted as neither (the Tabs instance and the panel's own nodes are). */
+    const rest = this.children(panels, { direction: 'column', stretch: true, block: true }, '').map((c, i) => this.reId(c, `${id}.${i + 1}`));
+    const frame: FrameNode = { id, name: 'Tabs', kind: 'frame', status: 'clean', source: 'part:frame', layout: { mode: 'VERTICAL' }, children: [done, ...rest] };
+    const s = this.sizing(this.styleOf(n), parent, true, []);
+    if (s) frame.sizing = s;
+    return frame;
+  }
+
+  /** Stepper → the Stepper set: first step, Step Slot (lines and middle steps), last step. */
+  private stepper(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const kids = this.withSlots(n).filter((c) => !(c.kind === 'text' && !c.text.trim()));
+    const steps = kids.filter((c): c is Lib => c.kind === 'lib' && this.canon(c) === 'Step');
+    if (steps.length !== kids.length) { notes.push('children that are not Steps — not drawn'); lossy = true; }
+    const active = typeof p.activeStep === 'number' ? p.activeStep : 0;
+    const orientation = p.orientation === 'vertical' ? 'vertical' : 'horizontal';
+    const noCount = p.variant === 'noCount';
+    const labelPos = str(p.labelPosition) ?? (orientation === 'vertical' ? 'right' : 'bottom');
+    const { variant } = this.variantFor('Stepper', 'Stepper', { orientation, variant: p.variant });
+    const node = this.instance('Stepper', id, 'Stepper', n.name, sortKeys(variant));
+    const last = steps.length - 1;
+    const stepId = (i: number) => (i === 0 ? `${id}.first` : i === last ? `${id}.last` : `${id}.slot.${2 * i - 1}`);
+    const status = (i: number) => (i < active ? 'complete' : i === active ? 'current' : undefined);
+    const built = steps.map((s, i) => {
+      const sn: string[] = [];
+      let sl = false;
+      const label = str(s.props.label) ?? (textOf(s.children).trim() || undefined);
+      const setName = noCount ? 'No-Count Step' : 'Count Step';
+      const code = noCount ? { $status: status(i), $orientation: orientation } : { $status: status(i), disabled: s.props.disabled === true };
+      const { variant: sv } = this.variantFor(setName, setName, code);
+      const st = this.instance(setName, stepId(i), label ?? `Step ${i + 1}`, s.name, sortKeys(sv));
+      const icon = this.decorator(s.slots?.icon, 'icon', sn);
+      if (noCount) {
+        st.properties = { Label: !!label };
+        if (s.props.disabled === true) { sn.push('disabled: the No-Count Step set has no State axis'); sl = true; }
+      } else {
+        st.properties = { 'Bottom Label': !!label && labelPos === 'bottom', 'Right Label': !!label && labelPos === 'right', Icon: icon?.kind === 'icon', Number: icon?.kind !== 'icon' };
+        if (icon?.nested) st.nested = [icon.nested];
+      }
+      if (icon && icon.kind !== 'icon') sl = true;
+      st.text = { ...(label ? { label } : {}), ...(!noCount && icon?.kind !== 'icon' ? { number: String(i + 1) } : {}) };
+      return this.done(st, sn, { lossy: sl });
+    });
+    const line = (i: number) => this.part('Step-Line', `${id}.slot.${2 * i}`, 'Step-Line', 'Step-Line', {
+      $status: i < active ? 'complete' : p.dashedIncomplete === true ? 'incomplete-dashed' : undefined, $orientation: orientation,
+    });
+    const slot: Node[] = [];
+    for (let i = 0; i < last; i += 1) {
+      slot.push(line(i));
+      if (i + 1 < last) slot.push(built[i + 1]);
+    }
+    if (this.firstSlotLast(built, slot, 'Step Slot', node, notes)) lossy = true;
+    const modes = this.themeModes(p.theme, p.surface, notes) ?? {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    if (str(p.color) && p.color !== 'default') { notes.push(`color "${String(p.color)}": no verified Figma mode for the step color`); lossy = true; }
+    if (p.clickable === true) node.pluginData = { clickable: 'true' };
+    if (orientation === 'horizontal') node.sizing = { h: 'FILL' };
+    node.code = signature('Stepper', { activeStep: active, orientation, variant: noCount ? 'noCount' : 'count' }, steps.map((s) => str(s.props.label) ?? textOf(s.children).trim()).join(' | '));
+    void parent;
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /**
+   * Breadcrumbs → a frame of the set's own parts (.Breadcrumb-Segments and
+   * .Breadcrumbs-separator), Sizing-1 apart — the set itself holds a fixed six
+   * segments. The frame carries `composite`, so Figma → code reads it back.
+   */
+  private breadcrumbs(n: Lib, parent: Parent, id: string, normalized: string[]): FrameNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const crumbs = this.withSlots(n).filter((c) => !(c.kind === 'text' && !c.text.trim()));
+    const sep = str(p.separator) ?? 'slanted';
+    const sepCode = ['slanted', 'bar', 'ellipsis'].includes(sep) ? { separator: sep } : { $customSeparator: true };
+    if (!('separator' in sepCode)) { notes.push('custom separator drawn as the custom-icon shape'); lossy = true; }
+    const children: Node[] = [];
+    const labels: string[] = [];
+    crumbs.forEach((c, i) => {
+      if (i > 0) children.push(this.part('.Breadcrumbs-separator', `${id}.${children.length}`, 'Separator', '.Breadcrumbs-separator', sepCode));
+      const label = c.kind === 'text' ? c.text.trim() : textOf(c.kind === 'lib' ? this.withSlots(c) : c.kind === 'html' ? c.children : []).trim();
+      if (!label || c.kind === 'icon') { notes.push(`crumb ${i + 1} is not text — not drawn`); lossy = true; return; }
+      labels.push(label);
+      const href = c.kind === 'lib' ? str(c.props.href) ?? str(c.props.to) : undefined;
+      children.push(this.part('.Breadcrumb-Segments', `${id}.${children.length}`, label, '.Breadcrumb-Segments', { $current: i === crumbs.length - 1 }, {
+        text: { label }, ...(href ? { pluginData: { href } } : {}),
+      }));
+    });
+    if (p.condense === true && crumbs.length > (typeof p.maxItems === 'number' ? p.maxItems : 4)) { notes.push('condensed trail drawn in full'); lossy = true; }
+    const node: FrameNode = {
+      id, name: 'Breadcrumbs', kind: 'frame', status: 'clean', source: n.name, composite: 'Breadcrumbs',
+      layout: { mode: 'HORIZONTAL', itemSpacing: space(8), counter: 'CENTER' }, children,
+    };
+    const modes: Record<string, string> = {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    node.code = signature('Breadcrumbs', {}, labels.join(' / '));
+    const s = this.sizing(this.styleOf(n), parent, false, notes);
+    if (s) node.sizing = s;
+    if (this.restStyle(this.styleOf(n), [], notes)) lossy = true;
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /** Swatch → Swatch; its color is user data, painted on the Color Swatch layer. */
+  private swatch(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const label = p.label === undefined ? undefined : str(p.label);
+    if (p.label !== undefined && !label) { notes.push('label is not plain text — not drawn'); lossy = true; }
+    const { variant, booleans } = this.variantFor('Swatch', 'Swatch', { disabled: p.disabled === true, fit: p.fit, radio: p.radio === true, selected: p.selected === true, $noLabel: !label });
+    if (isObj(p.onClick) && variant.State === 'Non-clickable') variant.State = 'Default';
+    const node = this.instance('Swatch', id, label ?? 'Swatch', n.name, sortKeys(variant));
+    node.properties = { ...booleans };
+    if (label) node.text = { label };
+    const color = str(p.color);
+    if (color) node.colorFill = { layer: 'Color Swatch', color };
+    const modes: Record<string, string> = {};
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    const s = this.sizing(this.styleOf(n), parent, false, notes) ?? {};
+    if (p.fit === 'fill') s.h = 'FILL';
+    if (Object.keys(s).length) node.sizing = s;
+    if (this.restStyle(this.styleOf(n), [], notes)) lossy = true;
+    node.code = codeSignature('Swatch', p, undefined);
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /** IconBadge → IconBadge (tile filled from the Icons collection) with its icon. */
+  private iconBadge(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const { variant } = this.variantFor('IconBadge', 'IconBadge', { $shape: p.shape !== undefined });
+    const node = this.instance('IconBadge', id, 'IconBadge', n.name, sortKeys(variant));
+    const ic = this.decorator(this.withSlots(n), 'icon', notes);
+    if (ic?.nested) node.nested = [ic.nested];
+    if (ic && ic.kind !== 'icon') lossy = true;
+    if (p.shape !== undefined) { notes.push(`shape "${String(p.shape)}": Background=Shape drawn; which shape is not a variant`); lossy = true; }
+    const color = str(p.color) ?? String(LIB_DEFAULTS.IconBadge.color);
+    const modes: Record<string, string> = {};
+    if (collectionModes('Icons')?.includes(cap(color))) modes.Icons = cap(color);
+    else { notes.push(`color "${color}" has no Icons mode`); lossy = true; }
+    this.sizeMode(p, modes);
+    this.setModes(node, modes);
+    const v = str(p.variant);
+    if (v && v !== 'solid') { notes.push(`variant "${v}": the IconBadge set has one tile (the Icons color) — drawn solid`); lossy = true; }
+    const glyph = ic?.nested?.node.properties?.['Icon name'];
+    node.code = signature('IconBadge', { color, size: p.size, glyph: ic?.nested ? ic.nested.node.code?.p.glyph : undefined });
+    void glyph;
+    void parent;
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /** ThumbnailSelector (lib 0.38) → a Thumbnail Selector frame of Thumbnail instances, one per item. */
+  private thumbnailSelector(n: Lib, parent: Parent, id: string, normalized: string[]): FrameNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const items = (Array.isArray(p.items) ? p.items : []).filter(isObj);
+    const sel = typeof p.value === 'number' ? p.value : typeof p.defaultValue === 'number' ? p.defaultValue : 0;
+    const vertical = p.orientation === 'vertical';
+    const size = str(p.size) ?? 'medium';
+    const alts: string[] = [];
+    const children = items.map((it, i) => {
+      const alt = str(it.alt) ?? '';
+      alts.push(alt);
+      if (it.label !== undefined) { notes.push(`item ${i + 1} label not drawn`); lossy = true; }
+      return this.part('Thumbnail', `${id}.${i}`, alt || `Thumbnail ${i + 1}`, 'Thumbnail', { size, disabled: it.disabled === true || p.disabled === true, $selected: i === sel }, {
+        image: { src: str(it.src) ?? '', scaleMode: 'FILL', ...(alt ? { alt } : {}) },
+      });
+    });
+    const label = str(p['aria-label']);
+    const node: FrameNode = {
+      id, name: label ?? 'Thumbnail Selector', kind: 'frame', status: 'clean', source: n.name, composite: 'Thumbnail Selector',
+      layout: vertical ? { mode: 'VERTICAL', itemSpacing: space(8) } : { mode: 'HORIZONTAL', itemSpacing: space(8), wrap: true }, children,
+    };
+    if (!label && !p['aria-labelledby']) notes.push('no aria-label — the group is unnamed');
+    node.code = signature('ThumbnailSelector', { size, orientation: vertical ? 'vertical' : 'horizontal', value: sel }, alts.join(' | '));
+    const s = this.sizing(this.styleOf(n), parent, false, notes);
+    if (s) node.sizing = s;
+    if (this.restStyle(this.styleOf(n), [], notes)) lossy = true;
+    return this.done(node, notes, { lossy, normalized });
+  }
+
+  /** Tab parts for a Tabs instance inside another component (AppBar's nav). */
+  private tabsPart(id: string, labels: string[], selected: number): InstanceNode {
+    const tabs = labels.map((label, i) => this.part('Tab', i === 0 ? `${id}.first` : i === labels.length - 1 ? `${id}.last` : `${id}.slot.${i - 1}`, label, 'Tab', { $selected: i === selected }, {
+      properties: { Selected: i === selected, Text: true, 'Start Icon': false, 'Start Avatar': false, 'End Icon': false, 'End Avatar': false }, text: { label },
+    }));
+    const node = this.part('Tabs', id, 'Tabs', 'Tabs', {});
+    this.firstSlotLast(tabs, tabs.slice(1, -1), 'Tab Slot', node, []);
+    return node;
+  }
+
+  /** AppBar → AppBar (Layout, Menu; navLinks as its Tabs). Brand and the end slot have no layer to go in. */
+  private appBar(n: Lib, parent: Parent, id: string, normalized: string[]): Node {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const links = (Array.isArray(p.navLinks) ? p.navLinks : []).map((l) => (isObj(l) ? { label: str(l.label) ?? '', href: str(l.href), current: l.current === true } : { label: str(l) ?? '', href: undefined, current: false }));
+    const collapseAt = typeof p.collapseAt === 'number' ? p.collapseAt : 900;
+    const menuType = str(p.menuType) ?? 'auto';
+    const menu = p.showMenu !== false && menuType !== 'none' && (menuType === 'hamburger' || this.width < collapseAt);
+    const { variant, booleans } = this.variantFor('AppBar', 'AppBar', { layout: p.layout, $noMenu: !menu });
+    const slotKids = (['centerSlot', 'endSlot'] as const).map((k) => ({ k, kids: (n.slots?.[k] ?? []).filter((c) => !(c.kind === 'text' && !c.text.trim())) }));
+    const wrapped = slotKids.some((x) => x.kids.length);
+    const iid = wrapped ? `${id}.0` : id;
+    const node = this.instance('AppBar', iid, 'AppBar', n.name, sortKeys(variant));
+    node.properties = { ...booleans };
+    if (p.mode === 'mobile') { notes.push('mode="mobile": the AppBar set draws the desktop bar'); lossy = true; }
+    if (links.length && this.width >= collapseAt) node.nested = [{ role: 'tabs', node: this.tabsPart(`${iid}.tabs`, links.map((l) => l.label), links.findIndex((l) => l.current)) }];
+    const hidden: string[] = [];
+    if (!links.length || this.width < collapseAt) hidden.push('Tab Holder');
+    const pd: Record<string, string> = {};
+    if (p.brand !== undefined) {
+      if (str(p.brand)) pd.brand = String(p.brand);
+      notes.push('brand: the template\'s Brand is artwork with no text layer — not drawn'); lossy = true;
+    }
+    for (const { k, kids } of slotKids) {
+      if (kids.length) { notes.push(`${k}: the AppBar set has no slot — its ${kids.length} item(s) are drawn beside the bar`); lossy = true; }
+    }
+    if (n.slots?.endSlot) hidden.push('Right Content');
+    if (hidden.length) node.hidden = hidden;
+    const hrefs = links.map((l) => l.href).filter(Boolean);
+    if (hrefs.length) pd.navLinks = JSON.stringify(links.map((l) => ({ label: l.label, href: l.href })));
+    if (Object.keys(pd).length) node.pluginData = pd;
+    notes.push('App-Bar theme: the template\'s .Theme collection has no App-Bar mode — the set\'s own fill is used');
+    node.sizing = { h: 'FILL' };
+    node.code = signature('AppBar', { layout: p.layout }, links.map((l) => l.label).join(' | '));
+    void parent;
+    const done = this.done(node, notes, { lossy, normalized });
+    if (!wrapped) return done;
+    /* The slot content keeps its place in the count and on the canvas: a row
+       of [bar, center items, end items]. */
+    const row: Parent = { direction: 'row', stretch: false, block: false };
+    const rest = this.children(slotKids.flatMap((x) => x.kids), row, '').map((c, i) => this.reId(c, `${id}.${i + 1}`));
+    return { id, name: 'AppBar', kind: 'frame', status: 'clean', source: 'part:frame', layout: { mode: 'HORIZONTAL', counter: 'CENTER' }, sizing: { h: 'FILL' }, children: [done, ...rest] };
+  }
+
+  /** Footer → Footer: link columns built into its Slot; Base rows hidden when the code has none. */
+  private footer(n: Lib, parent: Parent, id: string, normalized: string[]): InstanceNode {
+    const p = n.props;
+    const notes: string[] = [];
+    let lossy = false;
+    const node = this.instance('Footer', id, 'Footer', n.name, {});
+    const { booleans } = this.variantFor('Footer', 'Footer', { $noCopyright: p.copyright === false });
+    node.properties = { ...booleans };
+    const sid = `${id}.slot`;
+    const v8 = { px: 8, variable: 'Sizing-1' };
+    let slot: Node[];
+    if (n.children.some((c) => !(c.kind === 'text' && !c.text.trim()))) {
+      slot = this.children(n.children, { direction: 'row', stretch: false, block: false }, sid);
+    } else {
+      slot = [];
+      const address = isObj(p.address) ? p.address : undefined;
+      if (address) {
+        const lines = [str(address.company), ...(Array.isArray(address.lines) ? address.lines.map(str) : []), str(address.phone), str(address.email)].filter(Boolean) as string[];
+        slot.push(this.partFrame(`${sid}.${slot.length}`, 'BrandInfo', { mode: 'VERTICAL' }, lines.map((l, i) => this.partText(`${sid}.0.${i}`, l, 'Body-Small'))));
+      }
+      const columns = (Array.isArray(p.columns) ? p.columns : []).filter(isObj).slice(0, 3);
+      for (const col of columns) {
+        const cid = `${sid}.${slot.length}`;
+        const links = (Array.isArray(col.links) ? col.links : []).filter(isObj);
+        const linkParts = links.map((l, i) => this.part('Link', `${cid}.1.${i}`, str(l.label) ?? 'Link', 'Link', {}, {
+          text: { label: str(l.label) ?? '' }, ...(str(l.href) ? { pluginData: { href: String(l.href) } } : {}),
+        }));
+        const kids: Node[] = [];
+        if (str(col.title)) kids.push(this.partText(`${cid}.0`, String(col.title), 'H4'));
+        kids.push(this.partFrame(`${cid}.1`, 'Links', { mode: 'VERTICAL', itemSpacing: v8 }, linkParts));
+        slot.push(this.partFrame(cid, 'Links', { mode: 'VERTICAL', itemSpacing: v8 }, kids));
+      }
+    }
+    node.slots = { Slot: slot };
+    const social = Array.isArray(p.socialLinks) ? p.socialLinks.length : 0;
+    const sub = isObj(p.subscribe) ? p.subscribe : undefined;
+    const hidden: string[] = [];
+    if (!social && !sub) hidden.push('Base');
+    else {
+      if (!social) hidden.push('SocialLinks');
+      if (!sub) hidden.push('StayInTouc');
+    }
+    if (social) { notes.push(`socialLinks: the template's Base row has three fixed Brand-Icons — ${social} link(s) not mapped`); lossy = true; }
+    const text: Record<string, string> = {};
+    if (sub) {
+      text.subscribeTitle = str(sub.title) ?? 'Stay in the loop';
+      if (str(sub.description)) text.subscribeBody = String(sub.description);
+      else hidden.push('Monthly updates on new components and tips.');
+      text.subscribeButton = str(sub.buttonLabel) ?? 'Subscribe';
+    }
+    if (str(p.copyrightName)) text.copyrightName = String(p.copyrightName);
+    if (Object.keys(text).length) node.text = text;
+    if (hidden.length) node.hidden = hidden;
+    const pd: Record<string, string> = {};
+    if (p.brand !== undefined) {
+      if (str(p.brand)) pd.brand = String(p.brand);
+      notes.push('brand: the template Footer has no brand row above its columns — not drawn'); lossy = true;
+    }
+    if (typeof p.copyrightYear === 'number') pd.copyrightYear = String(p.copyrightYear);
+    if (Object.keys(pd).length) node.pluginData = pd;
+    if (str(p.color) && p.color !== 'default') { notes.push(`color "${String(p.color)}": the Footer is drawn on its default band`); lossy = true; }
+    node.sizing = { h: 'FILL' };
+    node.code = signature('Footer', {});
+    void parent;
+    return this.done(node, notes, { lossy, normalized });
+  }
+
   // Placeholders -----------------------------------------------------------
 
   private placeholderShell(id: string, source: string, component: string, reason: string, figmaSet?: string): PlaceholderNode {
@@ -1075,6 +1753,9 @@ const KNOWN = new Set([
   ...Object.keys(STACKS), 'Box', 'Section', 'Container', 'Grid', 'CardContent', 'CardActions', 'ThemedZone', 'Paper', 'Surfaced',
   ...Object.keys(EXPORT_TO_TEXT_STYLE), 'AutoHeading', 'Typography', 'Heading',
   'Button', 'Checkbox', 'Divider', 'Avatar', 'Chip', 'Tag', 'Card', 'Ratio', 'List', 'ListItem', 'Icon',
+  /* Phase 4 */
+  'Rating', 'RatingInput', 'Link', 'TextInput', 'TextField', 'NumberField', 'Select', 'Tabs', 'Stepper', 'Breadcrumbs', 'Swatch',
+  'IconBadge', 'ThumbnailSelector', 'AppBar', 'DesktopAppBar', 'Footer',
 ]);
 
 function sortKeys<T extends Record<string, string>>(o: T): T {

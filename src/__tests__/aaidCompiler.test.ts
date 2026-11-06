@@ -319,6 +319,43 @@ export const elevations: readonly NonNullable<BoxProps['elevation']>[] = [0, 1, 
 
 // ── One row at a time ───────────────────────────────────────────────────────
 
+// Phase 4 builders: the live sets' layer structure, as read on 2026-11-06.
+const slotN = (name: string, children: N[]): N => ({ id: `slot-${name}`, name, type: 'SLOT', children });
+const formLabel = (v: N = {}, label = 'Email'): N => inst('Form-Label', { Type: 'default', Style: 'Default', 'More Info': 'false', ...v }, {
+  id: 'fl', children: [{ id: 'fl-f', name: 'label', type: 'FRAME', children: [txt(label, { id: 'fl-t', styleName: 'Dynamic-Label' })] }],
+});
+const content = (v: N = { Content: 'Placeholder' }, t = 'you@example.com'): N => inst('InputContent', v, { id: 'ic', children: [txt(t, { id: 'ic-t', name: 'Component Name' })] });
+const input = (v: N = {}, c: N = content()): N => inst('Input', { State: 'Default', Type: 'Default', Validation: 'false', 'Start Icon': 'false', 'End Decorator': 'false', ...v }, { id: 'in', children: [c] });
+const star = (status: string, v: N = {}, i = 0): N => inst('Star', { State: 'Default', Status: status, ...v }, { id: `star-${i}` });
+const stars = (first?: N): N => slotN('Star Slot', [first ?? star('selected'), star('selected', {}, 1), star('selected', {}, 2), star('unselected', {}, 3), star('unselected', {}, 4)]);
+const numberField = (v: N = {}, num: N = {}): N => inst('NumberField', v, {
+  id: 'nf', name: 'Quantity', children: [formLabel({}, 'Quantity'), inst('Number', { Type: 'Outline', ...num }, { id: 'num', children: [txt('2', { id: 'num-t', name: 'Component Name' })] })],
+});
+const selectField = (v: N = {}, trigger: N = {}): N => inst('SelectField', v, {
+  id: 'sf', children: [formLabel({}, 'Country'), inst('Select', { State: 'Default', Type: 'Default', ...trigger }, { id: 'sel', children: [input({}, content({ Content: 'Placeholder' }, 'Select\u2026'))] })],
+});
+const tab = (label: string, v: N = {}, i = 0): N => inst('Tab', {
+  State: 'Default', Selector: 'Bottom', Selected: 'false', Text: 'true', 'Start Icon': 'false', 'Start Avatar': 'false', 'End Icon': 'false', 'End Avatar': 'false', ...v,
+}, { id: `tab-${i}`, children: [txt(label, { id: `tab-t-${i}`, name: 'Component Name' })] });
+const tabsOf = (v: N = {}, first?: N): N => inst('Tabs', v, { id: 'tabs', children: [first ?? tab('One'), slotN('Tab Slot', [tab('Two', {}, 1)]), tab('Three', {}, 2)] });
+const step = (status: string, v: N = {}, i = 0, set = 'Count Step'): N => inst(set, { Status: status, ...(set === 'Count Step' ? { State: 'Default' } : { Orientation: 'horizontal' }), ...v }, {
+  id: `step-${i}`, children: [txt(String(i + 1), { id: `sn-${i}`, name: 'Component Name' }), txt(`Step ${i + 1}`, { id: `sl-${i}`, name: 'Label' })],
+});
+const line = (status: string, v: N = {}, i = 0): N => inst('Step-Line', { Status: status, Orientation: 'horizontal', ...v }, { id: `line-${i}` });
+const stepperOf = (v: N = {}, parts: { first?: N; line?: N; set?: string } = {}): N => {
+  const set = parts.set ?? 'Count Step';
+  return inst('Stepper', v, { id: 'stp', children: [{ id: 'sh', name: 'Step Holder', type: 'FRAME', children: [
+    parts.first ?? step('current', {}, 0, set), slotN('Step Slot', [parts.line ?? line('incomplete'), step('incomplete', {}, 1, set), line('incomplete', {}, 1)]), step('incomplete', {}, 2, set),
+  ] }] });
+};
+const seg = (label: string, v: N = {}, i = 0): N => inst('.Breadcrumb-Segments', { Type: 'default', ...v }, {
+  id: `seg-${i}`, children: [inst('Link', { State: 'Default', Status: 'Default' }, { id: `segl-${i}`, children: [txt(label, { id: `segt-${i}`, styleName: 'Dynamic Body' })] })],
+});
+const crumbs = (v: N = {}, first: N = {}, separator: N = {}): N => inst('Breadcrumbs', v, { id: 'bc', children: [
+  seg('Home', first, 0), inst('.Breadcrumbs-separator', { Shape: 'slanted', ...separator }, { id: 'sep-0', children: [txt('/', { id: 'sep-t' })] }), seg('Shop', { Type: 'current' }, 1),
+] });
+const thumb = (v: N = {}): N => inst('Thumbnail', { Size: 'Medium', State: 'Default', Status: 'Unselected', ...v }, { id: 'th-0', name: 'Front view' });
+
 /** A compilable instance for each table, so a single variant can be varied. */
 const TABLE_SUBJECT: Record<string, (variant: N) => N> = {
   Button: (v) => inst('Button', v, { id: 'b', name: 'Profile', children: [icon('person'), txt('Label')] }),
@@ -330,10 +367,39 @@ const TABLE_SUBJECT: Record<string, (variant: N) => N> = {
   List: (v) => inst('List', v, { id: 'l' }),
   ListItem: (v) => row('li', [['Subtitle-Large', 'Title']], undefined, undefined, v),
   Box: (v) => inst('Box', v, { id: 'bx', layout: { mode: 'VERTICAL', gap: 8 }, children: [txt('x', { styleName: 'Body' })] }),
+  /* Phase 4 — each part's table is varied inside its parent. */
+  Rating: (v) => inst('Rating', v, { id: 'rt', children: [stars()] }),
+  Star: (v) => inst('Rating', { Value: 'Rated' }, { id: 'rt', children: [stars(star('selected', v))] }),
+  RatingField: (v) => inst('RatingField', v, { id: 'rf', children: [formLabel({}, 'Your rating'), inst('Rating', { Value: 'Rated' }, { id: 'rt', children: [stars()] })] }),
+  Link: (v) => inst('Link', v, { id: 'lk', children: [txt('Docs', { styleName: 'Body-Medium' })] }),
+  TextInput: (v) => inst('Input Field', v, { id: 'if', children: [formLabel(), input()] }),
+  Input: (v) => inst('Input Field', { Label: 'label-top' }, { id: 'if', children: [formLabel(), input(v)] }),
+  InputContent: (v) => inst('Input Field', { Label: 'label-top' }, { id: 'if', children: [formLabel(), input({}, content(v, 'x'))] }),
+  'Form-Label': (v) => inst('Input Field', { Label: 'label-top' }, { id: 'if', children: [formLabel(v), input()] }),
+  NumberField: (v) => numberField(v),
+  Number: (v) => numberField({ Label: 'label-top' }, v),
+  Select: (v) => selectField(v),
+  SelectTrigger: (v) => selectField({ Label: 'label-top' }, v),
+  Tabs: (v) => tabsOf(v),
+  Tab: (v) => tabsOf({}, tab('One', v, 0)),
+  Stepper: (v) => stepperOf(v),
+  'Count Step': (v) => stepperOf({}, { first: step('current', v, 0) }),
+  'No-Count Step': (v) => stepperOf({ Style: 'noCount' }, { set: 'No-Count Step', first: step('current', v, 0, 'No-Count Step') }),
+  'Step-Line': (v) => stepperOf({}, { line: line('incomplete', v) }),
+  Breadcrumbs: (v) => crumbs(v),
+  '.Breadcrumb-Segments': (v) => crumbs({}, v),
+  '.Breadcrumbs-separator': (v) => crumbs({}, {}, v),
+  Swatch: (v) => inst('Swatch', v, { id: 'sw', children: [{ id: 'cs', name: 'Color Swatch', type: 'FRAME', children: [] }, txt('Olive', { id: 'swl', name: 'Label', styleName: 'Legal' })] }),
+  IconBadge: (v) => inst('IconBadge', v, { id: 'ib', children: [icon('home')] }),
+  Thumbnail: (v) => inst('Thumbnail Selector', { Orientation: 'Horizontal' }, { id: 'ts', name: 'Product images', children: [thumb(v)] }),
+  'Thumbnail Selector': (v) => inst('Thumbnail Selector', v, { id: 'ts', name: 'Product images', children: [thumb()] }),
+  AppBar: (v) => inst('AppBar', v, { id: 'ab', children: [tabsOf()] }),
+  Footer: (v) => inst('Footer', v, { id: 'ft' }),
 };
 
 function emitted(prop: string, value: string | number | true): RegExp {
-  if (value === true) return new RegExp(`[\\s<]${prop}(\\s|/|>)`);
+  /* A data literal (ThumbnailSelector items) spells it `prop: value`. */
+  if (value === true) return new RegExp(`[\\s<]${prop}(\\s|/|>)|[{,] ${prop}: true\\b`);
   if (typeof value === 'number') return new RegExp(`${prop}=\\{${value}\\}`);
   return new RegExp(`${prop}="${value}"`);
 }
@@ -346,7 +412,9 @@ describe('variant tables — every row', () => {
           const { code, report } = compileFigmaFrame(TABLE_SUBJECT[exportName]({ [r.figma]: figmaValue }));
           expect(report.notes.filter((x) => x.message.includes(`${r.figma}=`))).toEqual([]);
           expect(report.fallbacks).toEqual([]);
-          if (hit) {
+          /* `$` props are derived facts the mapper turns into another prop (a
+             star's fill → value); the mapper tests below pin those. */
+          if (hit && !hit[0].startsWith('$')) {
             const isDefault = LIB_DEFAULTS[exportName]?.[hit[0]] === hit[1];
             if (!isDefault) expect(code).toMatch(emitted(hit[0], hit[1]));
           }
@@ -576,4 +644,96 @@ describe('sha256', () => {
       expect(sha256Hex(s)).toBe(createHash('sha256').update(s, 'utf8').digest('hex'));
     }
   });
+});
+
+// ── Phase 4: the sets code → Figma now draws, read back ─────────────────────
+
+describe('phase 4 mappers (Figma → code)', () => {
+  /* Whitespace flattened: a long element wraps one attribute per line. */
+  const code = (n: N) => compileFigmaFrame(n).code.replace(/\s+/g, ' ');
+
+  it('Rating: the stars say the value; a half star says precision', () => {
+    expect(code(inst('Rating', { Value: 'Rated' }, { children: [stars()] }))).toContain('<Rating defaultValue={3} />');
+    const half = slotN('Star Slot', [star('selected'), star('selected', {}, 1), star('isHalfFilled', {}, 2), star('unselected', {}, 3), star('unselected', {}, 4)]);
+    expect(code(inst('Rating', { Value: 'Rated' }, { children: [half] }))).toContain('<Rating defaultValue={2.5} precision={0.5} />');
+    expect(code(inst('Rating', { Value: 'Empty' }, { children: [stars()] }))).toContain('<Rating />');
+    expect(code(inst('RatingField', { Label: 'label-bottom' }, { children: [formLabel({}, 'Yours'), inst('Rating', { Value: 'Rated' }, { children: [stars()] })] })))
+      .toContain('<Rating defaultValue={3} label="Yours" labelPosition="bottom" />');
+  });
+
+  it('Link: the Hotlink text, a non-body style as textStyle, and a note for the missing href', () => {
+    const r = compileFigmaFrame(inst('Link', { State: 'Default', Status: 'Visited' }, { children: [txt('Docs', { styleName: 'Body-Small' })] }));
+    expect(r.code).toContain('<Link href="#" textStyle="body-small" visited>Docs</Link>');
+    expect(r.report.notes.map((x) => x.message)).toContain('link target is not in the design — set href');
+  });
+
+  it('Input Field → TextInput: label, marker, placeholder or value, disabled', () => {
+    expect(code(inst('Input Field', { Label: 'label-left' }, { sizingH: 'FILL', children: [formLabel({ Type: 'required' }), input({ State: 'Disabled' })] })))
+      .toContain('<TextInput disabled fullWidth label="Email" labelPosition="left" labelType="required" placeholder="you@example.com" />');
+    expect(code(inst('Input Field', { Label: 'label-top' }, { children: [formLabel(), input({}, content({ Content: 'Value' }, 'a@b.co'))] })))
+      .toContain('<TextInput defaultValue="a@b.co" label="Email" />');
+  });
+
+  it('NumberField: Label=none takes the layer name as the label; the shown number is the value', () => {
+    const r = code(inst('NumberField', { Label: 'none' }, { name: 'Quantity for Linen Throw', children: [inst('Number', { Type: 'Spinner' }, { children: [txt('3', { name: 'Component Name' })] })] }));
+    expect(r).toContain('<NumberField defaultValue={3} label="Quantity for Linen Throw" labelPosition="none" variant="spinner" />');
+  });
+
+  it('SelectField → Select, with the options it cannot know noted', () => {
+    const r = compileFigmaFrame(selectField());
+    expect(r.code).toContain('<Select label="Country" options={[]} />');
+    expect(r.report.notes.map((x) => x.message)).toContain('select options are not in the design — fill options');
+  });
+
+  it('Tabs: first Tab, Tab Slot, last Tab — the Selected one is the defaultValue', () => {
+    const c = code(inst('Tabs', {}, { children: [tab('One'), slotN('Tab Slot', [tab('Two', { Selected: 'true' }, 1)]), tab('Three', {}, 2)] }));
+    expect(c).toMatch(/<Tabs defaultValue=\{1\}>\s*<TabList>\s*<Tab>One<\/Tab>\s*<Tab>Two<\/Tab>\s*<Tab>Three<\/Tab>\s*<\/TabList>\s*<\/Tabs>/);
+  });
+
+  it('Stepper: the current step is activeStep, labels come from the Label layers', () => {
+    const s = inst('Stepper', {}, { children: [{ id: 'sh', name: 'Step Holder', type: 'FRAME', children: [
+      step('complete', {}, 0), slotN('Step Slot', [line('complete'), step('current', {}, 1), line('incomplete', {}, 1)]), step('incomplete', {}, 2),
+    ] }] });
+    expect(code(s)).toMatch(/<Stepper activeStep=\{1\}>\s*<Step label="Step 1" \/>\s*<Step label="Step 2" \/>\s*<Step label="Step 3" \/>\s*<\/Stepper>/);
+  });
+
+  it('Breadcrumbs: the set, or a frame of its segments stamped Breadcrumbs, both read back', () => {
+    expect(code(crumbs({}, {}, { Shape: 'bar' }))).toMatch(/<Breadcrumbs separator="bar">\s*<BreadcrumbItem href="#">Home<\/BreadcrumbItem>\s*<BreadcrumbItem>Shop<\/BreadcrumbItem>/);
+    const composite = { ...frame('Breadcrumbs', 'HORIZONTAL', crumbs().children), component: 'Breadcrumbs' };
+    expect(code(composite)).toMatch(/<Breadcrumbs>\s*<BreadcrumbItem href="#">Home<\/BreadcrumbItem>/);
+  });
+
+  it('Swatch: selection, fit and label; the literal color is noted, not invented', () => {
+    const r = compileFigmaFrame(TABLE_SUBJECT.Swatch({ State: 'Default', Fit: 'Fill', Mark: 'Check', Selected: 'true', Label: 'true' }));
+    expect(r.code).toContain('<Swatch fit="fill" label="Olive" selected />');
+    expect(r.report.notes.map((x) => x.message)).toContain('swatch color is a literal fill, not carried in the design IR — set color');
+  });
+
+  it('IconBadge: the Icons mode is the color; the glyph is the child', () => {
+    expect(code(inst('IconBadge', { Background: 'Tile' }, { modes: { Icons: 'Success' }, children: [icon('home')] })))
+      .toMatch(/<IconBadge color="success">\s*<HomeIcon \/>\s*<\/IconBadge>/);
+  });
+
+  it('Thumbnail Selector: one item per Thumbnail, alt from the layer name, the Selected one is defaultValue', () => {
+    const r = compileFigmaFrame(inst('Thumbnail Selector', { Orientation: 'Horizontal' }, { name: 'Product images', children: [
+      thumb({ Size: 'Small' }), inst('Thumbnail', { Size: 'Small', State: 'Disabled', Status: 'Selected' }, { id: 'th-1', name: 'Back view' }),
+    ] }));
+    expect(r.code).toContain('defaultValue={1}');
+    expect(r.code).toContain("items={[{ src: '', alt: 'Front view' }, { src: '', alt: 'Back view', disabled: true }]}");
+    expect(r.code).toContain('size="small"');
+    expect(r.code).toContain('aria-label="Product images"');
+  });
+
+  it('the phase 4 output type-checks against the real lib types', () => {
+    const sink = frame('Phase 4', 'VERTICAL', [
+      TABLE_SUBJECT.Rating({ Value: 'Rated' }), TABLE_SUBJECT.RatingField({ Label: 'label-bottom' }), TABLE_SUBJECT.Link({ Status: 'Visited' }),
+      TABLE_SUBJECT.TextInput({ Label: 'label-left' }), TABLE_SUBJECT.NumberField({ Label: 'none' }), TABLE_SUBJECT.Select({ Label: 'label-top' }),
+      TABLE_SUBJECT.Tabs({ Orientation: 'Vertical-Left' }), TABLE_SUBJECT.Stepper({ Style: 'noCount' }), TABLE_SUBJECT.Breadcrumbs({ Layout: 'Condensed' }),
+      TABLE_SUBJECT.Swatch({ Mark: 'Radio' }), TABLE_SUBJECT.IconBadge({}), TABLE_SUBJECT['Thumbnail Selector']({ Orientation: 'Vertical' }),
+      TABLE_SUBJECT.AppBar({ Layout: 'Center Brand' }), TABLE_SUBJECT.Footer({ Copyright: 'false' }),
+    ], { id: 'p4' });
+    const out = compileFigmaFrame(sink);
+    expect(out.report.fallbacks).toEqual([]);
+    expect(typecheck({ 'aaid-phase4.tsx': out.code })).toEqual([]);
+  }, 60000);
 });

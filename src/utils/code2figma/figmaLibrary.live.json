@@ -1,5 +1,5 @@
 {
- "_comment": "LIVE capture of every component set (variant axes + component properties with their #id suffixes), lone components on set-less pages, local text styles and variable collections, read from the Figma library file Qv2dqF7mYoAGY77EkdrwTv through the Plugin API (read-only; nothing was written). Skipped: add-on pages (Charts, BentoGrid, SocialShareImages), scratch pages, and the Status Bar device-chrome sub-sets (.Cellular Signal, .Wifi, .Battery, .Time, .Android/*, Status Bar/iPadOS), which are artwork. Axis value spelling is exact - the code->Figma IR must use it verbatim. Set keys are the library publish keys; node ids are per COPY of the template and are only for spotting drift. Refresh by re-running the capture script in docs/code-to-figma.md.",
+ "_comment": "LIVE capture of every component set (variant axes + component properties with their #id suffixes), lone components on set-less pages, local text styles and variable collections, read from the Figma library file Qv2dqF7mYoAGY77EkdrwTv through the Plugin API (read-only; nothing was written). Skipped: add-on pages (Charts, BentoGrid, SocialShareImages), scratch pages, and the Status Bar device-chrome sub-sets (.Cellular Signal, .Wifi, .Battery, .Time, .Android/*, Status Bar/iPadOS), which are artwork. Axis value spelling is exact - the code->Figma IR must use it verbatim. Set keys are the library publish keys; node ids are per COPY of the template and are only for spotting drift. Refresh by re-running the capture script in docs/code-to-figma.md. Partial refresh 2026-11-06 (phase 4): the ThumbnailSelector page (Thumbnail, Thumbnail Selector - new with lib 0.38) was read and added; the sets phase 4 maps (Rating, Link, Input, NumberField, Select, Tabs, Stepper, Breadcrumbs, Swatch, IconBadge, AppBar, Footer) were re-read and matched this capture unchanged.",
  "capturedAt": "2026-11-06",
  "fileKey": "Qv2dqF7mYoAGY77EkdrwTv",
  "sets": [
@@ -3048,6 +3048,60 @@
       "Fill"
      ],
      "default": "Hug"
+    }
+   },
+   "properties": {}
+  },
+  {
+   "page": "ThumbnailSelector",
+   "name": "Thumbnail",
+   "id": "10890:304",
+   "key": "515132ce307b94c01b4224d58bd95fb6febbd6de",
+   "variants": 30,
+   "defaultVariant": "Size=Small, State=Default, Status=Unselected",
+   "axes": {
+    "Size": {
+     "values": [
+      "Small",
+      "Medium",
+      "Large"
+     ],
+     "default": "Small"
+    },
+    "State": {
+     "values": [
+      "Default",
+      "Hover",
+      "Pressed",
+      "Focus-Visible",
+      "Disabled"
+     ],
+     "default": "Default"
+    },
+    "Status": {
+     "values": [
+      "Unselected",
+      "Selected"
+     ],
+     "default": "Unselected"
+    }
+   },
+   "properties": {}
+  },
+  {
+   "page": "ThumbnailSelector",
+   "name": "Thumbnail Selector",
+   "id": "10890:387",
+   "key": "4dbb3ed906c1e4fca12a3fd451f33b5a0ad389d8",
+   "variants": 2,
+   "defaultVariant": "Orientation=Horizontal",
+   "axes": {
+    "Orientation": {
+     "values": [
+      "Horizontal",
+      "Vertical"
+     ],
+     "default": "Horizontal"
     }
    },
    "properties": {}
