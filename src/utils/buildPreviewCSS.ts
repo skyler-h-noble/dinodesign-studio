@@ -24,7 +24,8 @@ import { dropshadowBaseHex, SHADOW_LEVELS, effectLevelRecipe, effectLevelScopeCS
 import { getFixedTextToken, textTableToken, getFixedHeaderToken, getFixedIconToken, iconToneAt, accessibleIconTone } from './cssgen/exportColorSystem';
 import { resolveButtonChoice, buttonForSurface, type ButtonPalette, type ButtonTone, type CellTone } from './buttonChoice';
 import { typographyDeclarations, generateTypographyRules } from './cssgen/generateTypographyTokensCSS';
-import { resolveRoles , SYSTEM_UI_STACK } from './typeScale';
+import { resolveRoles } from './typeScale';
+import { EYEBROW_DESKTOP } from './typographyPlatform';
 /* The curated role tables as they are written, copied once at load. The
    export assigns these module objects into its JSON and later passes write
    into them in place (measured: the dark Text and Header tables differ after
@@ -2328,13 +2329,15 @@ ${(() => {
    * fallback only applies when the variable is UNDEFINED, and it is defined. */
   --Set-Font-Family-Display: ${decorativeFamily};
   --Font-Family-Display: ${decorativeFamily};
-  /* Eyebrow is a FIXED face — the OS UI stack — not a picked one, and not a
-   * relative of the decorative face. The preview emitted neither token, and the
+  /* Eyebrow is a FIXED face — Inter on Desktop, the same family the export's
+   * Desktop block states (typographyPlatform EYEBROW_DESKTOP); it was the OS UI
+   * stack here, so the studio and the published site showed different eyebrows
+   * — not a picked one, and not a relative of the decorative face. The preview emitted neither token, and the
    * lib's core.css falls back to var(--Decorative-Font-Family), so the eyebrow
    * rendered in the display font. Same shape as the Display bug above: the
    * fallback chain does not fail loudly, it lands somewhere plausible. */
-  --Set-Font-Family-Eyebrow: ${SYSTEM_UI_STACK};
-  --Font-Family-Eyebrow: ${SYSTEM_UI_STACK};
+  --Set-Font-Family-Eyebrow: ${EYEBROW_DESKTOP};
+  --Font-Family-Eyebrow: ${EYEBROW_DESKTOP};
   /* Eyebrow is ALWAYS uppercase. The export states this; the preview did not,
    * and only came out right because the consumer happened to inline
    * "uppercase" as a var() fallback. That works until something defines the

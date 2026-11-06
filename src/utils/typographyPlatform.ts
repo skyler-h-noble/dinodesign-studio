@@ -1230,7 +1230,9 @@ const NATIVE_FACE: Record<string, string> = {
  * face, and sits in the same genre as SF Pro and Roboto so the three read as
  * one decision rather than three.
  */
-const EYEBROW_DESKTOP = 'Inter, sans-serif';
+/** The eyebrow's Desktop face. Exported so the preview states the same family
+ *  the export does — they disagreed (OS UI stack vs Inter) for a while. */
+export const EYEBROW_DESKTOP = 'Inter, sans-serif';
 
 /** The one family the eyebrow needs FETCHED. The native faces are already on
  *  the device; Inter is not, so it has to be imported like any other webfont.

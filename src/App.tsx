@@ -26,6 +26,7 @@ import { autoAssignColors } from './utils/autoAssignColors';
 import { suggestComponentStyle } from './utils/autoSuggestStyle';
 import { buildPreviewCSS } from './utils/buildPreviewCSS';
 import { loadGoogleFonts } from './utils/googleFontsManager';
+import { EYEBROW_WEB_FAMILY } from './utils/typographyPlatform';
 import { componentStyleVars } from './utils/componentStyleVars';
 
 import AppHeader from './components/AppHeader';
@@ -739,9 +740,13 @@ function MainApp() {
    * The eyebrow deliberately has no family (it is the OS UI stack), so the
    * empty string is filtered out rather than requested. */
   useEffect(() => {
-    const families = [...new Set(
-      typographyStyles.map(t => t.family).filter((f): f is string => !!f && f.trim().length > 0),
-    )];
+    /* Plus the eyebrow's Desktop face: it is not a picked role, so scanning
+       the picks never finds it, and the preview now states Inter as the export
+       does. */
+    const families = [...new Set([
+      ...typographyStyles.map(t => t.family).filter((f): f is string => !!f && f.trim().length > 0),
+      EYEBROW_WEB_FAMILY,
+    ])];
     if (families.length) loadGoogleFonts(families).catch(() => {});
   }, [typographyStyles]);
 
