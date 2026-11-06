@@ -8,6 +8,7 @@
  * 3. Nested modes: { Backgrounds: {...}, Modes: { "Light-Mode-Tonal": {...}, ... }, Theme: {...} }
  */
 
+import { darkPhotoDimCSS } from '../darkImageDim';
 import chroma from 'chroma-js';
 import { solveChartPalette } from '../chartPalette';
 import { darkPageTheme, DARK_PAGE_N, normalizeBackground, gridBackgroundTone } from '../backgroundSelection';
@@ -3734,14 +3735,7 @@ export function generateCSSFiles(jsonData: any): { [filename: string]: string } 
         // The token --Image-Overlay-Color-1 still ships #0000004D for consumers
         // who'd rather use a literal overlay layer themselves.
         if (mode === 'Dark-Mode') {
-          validatedCSS += `
-
-/* Dark-mode image treatment — 30% black overlay applied via filter so it
-   works on plain <img> tags without requiring a wrapper element. */
-img {
-  filter: brightness(0.7);
-}
-`;
+          validatedCSS += `\n\n${darkPhotoDimCSS()}`;
         }
         validatedCSS += chartGroundCSS(jsonData, mode);
         validatedCSS += modeSwitchCSS(mode);

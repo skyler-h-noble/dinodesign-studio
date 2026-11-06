@@ -1,4 +1,5 @@
 import { overlayWidthCSS } from './deviceChrome';
+import { darkPhotoDimCSS } from './darkImageDim';
 import chroma from 'chroma-js';
 import { variantHex8, BORDER_VARIANT_ALPHA } from './variantAlpha';
 import type { ColorScheme, UserSelections, ComponentStyle } from '../types';
@@ -2536,7 +2537,7 @@ ${navMetricsCSS('  ').join('\n')}
 }
 
 ${isDark ? `/* ══ Dark mode image treatment ══
- * Every <img> gets a 30% black overlay (via brightness, which is
+ * Photos (not logos) get a 30% black overlay (via brightness, which is
  * mathematically equivalent on opaque pixels and works on replaced
  * elements without a wrapper).
  *
@@ -2544,12 +2545,7 @@ ${isDark ? `/* ══ Dark mode image treatment ══
  * sets them to the design system's dark-mode palette tones (e.g.
  * var(--Neutral-Color-9)), which the export pipeline contrast-verifies
  * against each surface. */
-[data-theme="Brand"] img,
-[data-theme^="Brand-"] img,
-[data-theme="Brand"] [data-theme] img {
-  filter: brightness(0.7);
-}
-` : ''}
+${darkPhotoDimCSS('[data-theme="Brand"], [data-theme^="Brand-"]')}` : ''}
 
 /* The NEUTRAL theme's two ends.
  *
