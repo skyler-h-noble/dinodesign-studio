@@ -28,7 +28,7 @@ const crypto = require('crypto');
 
 const BUCKET = 'dino-design.firebasestorage.app';
 const BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/`;
-const urlFor = (p) => BASE + encodeURIComponent(p) + '?alt=media';
+const urlFor = (p, token) => BASE + encodeURIComponent(p) + '?alt=media' + (token ? '&token=' + token : '');
 
 /* ── whitespace-only minifier (port of the safemin pass that passed the
       1,047-token snapshot with zero differences) ── */
@@ -108,28 +108,33 @@ async function main() {
   admin.initializeApp({ projectId: 'dino-design', storageBucket: BUCKET });
   const bucket = admin.storage().bucket();
   const testTheme = { ...theme, name: theme.name + ' (brotli test)' };
+  /* brotli-test/ is not publicly readable under storage.rules (only
+     design-systems/ is), so every link carries its file's download token —
+     a token URL is served without a rules change. */
   for (const f of files) {
     const dest = `brotli-test/${id}/${f.name}`;
+    const token = crypto.randomUUID();
     await bucket.file(dest).save(f.br, {
       resumable: false,
       metadata: {
         contentType: 'text/css; charset=utf-8',
         contentEncoding: 'br',
         cacheControl: 'no-cache, max-age=0, must-revalidate',
-        metadata: { firebaseStorageDownloadTokens: crypto.randomUUID() },
+        metadata: { firebaseStorageDownloadTokens: token },
       },
     });
-    testTheme[f.key] = urlFor(dest);
+    testTheme[f.key] = urlFor(dest, token);
     console.log('✔', dest);
   }
   const tdest = `brotli-test/${id}/theme.json`;
+  const ttoken = crypto.randomUUID();
   await bucket.file(tdest).save(JSON.stringify(testTheme, null, 2), {
     resumable: false,
     metadata: { contentType: 'application/json', cacheControl: 'no-cache, max-age=0, must-revalidate',
-      metadata: { firebaseStorageDownloadTokens: crypto.randomUUID() } },
+      metadata: { firebaseStorageDownloadTokens: ttoken } },
   });
   console.log('✔', tdest);
-  console.log('\nTest themeURL:\n' + urlFor(tdest));
+  console.log('\nTest themeURL:\n' + urlFor(tdest, ttoken));
   process.exit(0);
 }
 
